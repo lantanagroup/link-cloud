@@ -213,15 +213,13 @@ public class PatientCensusService : IPatientCensusService
                 }
 
                 var fhirList = resultList as List;
-                if (fhirList != null && fhirList.Entry != null)
+                results.Add(new PatientListItem
                 {
-                    results.Add(new PatientListItem
-                    {
-                        ListType = ConvertToListType(query.CensusPatientStatus.Value),
-                        TimeFrame = ConvertToTimeFrame(query.CensusTimeFrame.Value),
-                        PatientIds = fhirList.Entry.Select(x => x.Item?.ReferenceElement.Value.SplitReference().Trim()).ToList(),
-                    });
-                }
+                    ListType = ConvertToListType(query.CensusPatientStatus.Value),
+                    TimeFrame = ConvertToTimeFrame(query.CensusTimeFrame.Value),
+                    PatientIds = fhirList.Entry.Select(x => x.Item?.ReferenceElement.Value.SplitReference().Trim()).ToList() ?? [],
+                });
+                
             }
             catch (TimeoutException timeoutEx)
             {

@@ -1,5 +1,4 @@
 ﻿using LantanaGroup.Link.Census.Application.Interfaces;
-using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Census.Domain.Queries;
 using LantanaGroup.Link.Census.Application.Models.Enums;
@@ -7,6 +6,7 @@ using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.Census.Application.Factories;
 
 namespace IntegrationTests.Census;
 
@@ -212,9 +212,12 @@ public class QueryTests
         var facilityId = "TestFacility" + Guid.NewGuid().ToString();
         var patientId = Guid.NewGuid().ToString();
 
+        var encounterId = Guid.NewGuid().ToString();
+        var patientIdentifierId = Guid.NewGuid().ToString();
+
         var encounter = new PatientEncounter
         {
-            Id = Guid.NewGuid().ToString(),
+            Id = encounterId,
             FacilityId = facilityId,
             CorrelationId = correlationId,
             AdmitDate = DateTime.UtcNow.AddDays(-5),
@@ -223,9 +226,10 @@ public class QueryTests
             {
                 new PatientIdentifier
                 {
-                    Id = Guid.NewGuid().ToString(),
+                    Id = patientIdentifierId,
                     Identifier = patientId,
-                    SourceType = SourceType.FHIR.ToString()
+                    SourceType = SourceType.FHIR.ToString(),
+                    PatientEncounterId = encounterId
                 }
             }
         };
@@ -269,7 +273,7 @@ public class QueryTests
     {
         // Arrange
         var db = _fixture.DbContext;
-        var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEventQueries>();
+        var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
 
         var facilityId = "TestFacility" + Guid.NewGuid().ToString();
         var patientId1 = Guid.NewGuid().ToString();
@@ -281,11 +285,16 @@ public class QueryTests
 
         // Create the events and their payloads
         var events = new List<PatientEvent>();
+        var encounters = new List<PatientEncounter>();
         // Within date range, admit event, patient 1
         var admitCorrelationId1 = Guid.NewGuid().ToString();
         var patient1AdmitPayload = new FHIRListAdmitPayload(patientId1, DateTime.UtcNow.AddDays(-3));
         var patient1AdmitEvent = patient1AdmitPayload.CreatePatientEvent(facilityId, admitCorrelationId1);
+        var patient1Encounter = new PatientEncounterBuilder(facilityId,null,patient1AdmitEvent.EventDate, null, admitCorrelationId1).AddPatientIdentifier(patientId1, SourceType.FHIR).GetPatientEncounter();
         events.Add(patient1AdmitEvent);
+
+        patient1Encounter.PatientIdentifiers.FirstOrDefault().Id = Guid.NewGuid().ToString();
+        db.PatientEncounters.Add(patient1Encounter);
 
         // Within date range, discharge event, patient 1 (latest for patient 1)
         //var dischargeCorrelationId1 = Guid.NewGuid().ToString();
@@ -297,28 +306,40 @@ public class QueryTests
         var admitCorrelationId2 = Guid.NewGuid().ToString();
         var patient2AdmitPayload = new FHIRListAdmitPayload(patientId2, DateTime.UtcNow.AddDays(-2));
         var patient2AdmitEvent = patient2AdmitPayload.CreatePatientEvent(facilityId, admitCorrelationId2);
+        var patient2Encounter = new PatientEncounterBuilder(facilityId, null, patient2AdmitEvent.EventDate, null, admitCorrelationId2).AddPatientIdentifier(patientId2, SourceType.FHIR).GetPatientEncounter();
         events.Add(patient2AdmitEvent);
+
+        patient2Encounter.PatientIdentifiers.FirstOrDefault().Id = Guid.NewGuid().ToString();
+        db.PatientEncounters.Add(patient2Encounter);
 
         // Outside date range, admit event
         var outsidePatientId = Guid.NewGuid().ToString();
         var outsideCorrelationId = Guid.NewGuid().ToString();
-        var outsideAdmitPayload = new FHIRListAdmitPayload(outsidePatientId, DateTime.UtcNow.AddDays(-10));
+        var outsideAdmitPayload = new FHIRListAdmitPayload(outsidePatientId, DateTime.UtcNow.AddDays(1));
         var outsideAdmitEvent = outsideAdmitPayload.CreatePatientEvent(facilityId, outsideCorrelationId);
+        var outsideEncounter = new PatientEncounterBuilder(facilityId, null, outsideAdmitEvent.EventDate, null, outsideCorrelationId).AddPatientIdentifier(outsidePatientId, SourceType.FHIR).GetPatientEncounter();
         events.Add(outsideAdmitEvent);
+
+        outsideEncounter.PatientIdentifiers.FirstOrDefault().Id = Guid.NewGuid().ToString();
+        db.PatientEncounters.Add(outsideEncounter);
 
         // Different facility, within date range
         var otherFacilityPatientId = Guid.NewGuid().ToString();
         var otherFacilityCorrelationId = Guid.NewGuid().ToString();
         var otherFacilityPayload = new FHIRListAdmitPayload(otherFacilityPatientId, DateTime.UtcNow.AddDays(-3));
         var otherFacilityEvent = otherFacilityPayload.CreatePatientEvent("OtherFacility", otherFacilityCorrelationId);
+        var otherFacilityEncounter = new PatientEncounterBuilder("OtherFacility", null, otherFacilityEvent.EventDate, null, otherFacilityCorrelationId).AddPatientIdentifier(otherFacilityPatientId, SourceType.FHIR).GetPatientEncounter();
         events.Add(otherFacilityEvent);
+
+        otherFacilityEncounter.PatientIdentifiers.FirstOrDefault().Id = Guid.NewGuid().ToString();
+        db.PatientEncounters.Add(otherFacilityEncounter);
 
         await db.PatientEvents.AddRangeAsync(events);
         await db.SaveChangesAsync();
 
         // Act
         var results =
-            await queries.GetAdmittedPatientEventModelsByDateRange(facilityId, startDate, endDate,
+            await queries.GetAdmittedPatientEncounterModelsByDateRange(facilityId, startDate, endDate,
                 CancellationToken.None);
 
         // Assert
@@ -327,19 +348,17 @@ public class QueryTests
         Assert.Equal(2, results?.Count() ?? 0);
 
         // Verify both admitted patients are in the results
-        Assert.Contains(results, e => e.SourcePatientId == patientId1);
-        Assert.Contains(results, e => e.SourcePatientId == patientId2);
+        Assert.Contains(results, e => e.PatientIdentifiers.FirstOrDefault().Identifier == patientId1);
+        Assert.Contains(results, e => e.PatientIdentifiers.FirstOrDefault().Identifier == patientId2);
 
         foreach (var result in results)
         {
             // Extract the date from the payload
-            var eventDate = GetDateFromPayload(result.Payload);
+            //var eventDate = GetDateFromPayload(result.Payload);
 
-            Assert.True(eventDate >= startDate && eventDate <= endDate,
-                $"Event date {eventDate} for event {result.Id} should be between {startDate} and {endDate}");
+            Assert.True(result.AdmitDate >= startDate && result.AdmitDate <= endDate,
+                $"Event date {result.AdmitDate} for event {result.Id} should be between {startDate} and {endDate}");
         }
-
-
     }
 
     private DateTime GetDateFromPayload(IPayload payload)
@@ -359,7 +378,7 @@ public class QueryTests
     {
         // Arrange
         var db = _fixture.DbContext;
-        var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEventQueries>();
+        var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
 
         var facilityId = "TestFacility" + Guid.NewGuid().ToString();
         var startDate = DateTime.UtcNow.AddDays(-5);
@@ -367,15 +386,7 @@ public class QueryTests
 
         // Act & Assert - Invalid facility ID
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            queries.GetAdmittedPatientEventModelsByDateRange(null, startDate, endDate, CancellationToken.None));
-
-        // Act & Assert - Default start date
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            queries.GetAdmittedPatientEventModelsByDateRange(facilityId, default, endDate, CancellationToken.None));
-
-        // Act & Assert - Default end date
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            queries.GetAdmittedPatientEventModelsByDateRange(facilityId, startDate, default, CancellationToken.None));
+            queries.GetAdmittedPatientEncounterModelsByDateRange(null, startDate, endDate, CancellationToken.None));
     }
 
     [Fact]

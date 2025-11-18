@@ -76,6 +76,16 @@ public class FhirListConfigurationModel
                     errors.AddModelError(nameof(EHRPatientLists), $"Duplicate TimeFrame and Status combination found: {uniqueKey}");
                 }
             }
+
+            //check for duplicate fhirIds
+            var fhirIdSet = new HashSet<string>();
+            foreach (var list in EHRPatientLists)
+            {
+                if (!fhirIdSet.Add(list.FhirId))
+                {
+                    errors.AddModelError(nameof(EHRPatientLists), $"Duplicate FhirId found: {list.FhirId}");
+                }
+            }
         }
 
         return errors;
