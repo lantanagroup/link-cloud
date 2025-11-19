@@ -3,6 +3,7 @@
 on:
   push:
     branches:
+      - dev
       - tech_debt/ec-docs
 
 permissions:
