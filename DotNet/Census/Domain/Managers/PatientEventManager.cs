@@ -52,27 +52,18 @@ public class PatientEventManager : IPatientEventManager
 
     public async Task DeletePatientEventById(string id, CancellationToken cancellationToken)
     {
-        try 
+        if (string.IsNullOrWhiteSpace(id))
         {
-            await _patientEventRepository.StartTransactionAsync(cancellationToken);
-
-            if (string.IsNullOrWhiteSpace(id))
-            {
-                throw new ArgumentException("Patient event ID cannot be null or empty.", nameof(id));
-            }
-
-            var toBeDeletedEvent = await _patientEventRepository.GetAsync(id, cancellationToken);
-
-            if (toBeDeletedEvent == null)
-            {
-                throw new Exception($"Patient event with ID {id} not found.");
-            }
-
-            await _patientEventRepository.DeleteAsync(id, cancellationToken);
+            throw new ArgumentException("Patient event ID cannot be null or empty.", nameof(id));
         }
-        finally
+
+        var toBeDeletedEvent = await _patientEventRepository.GetAsync(id, cancellationToken);
+
+        if (toBeDeletedEvent == null)
         {
-
+            throw new Exception($"Patient event with ID {id} not found.");
         }
+
+        await _patientEventRepository.DeleteAsync(id, cancellationToken);
     }
 }

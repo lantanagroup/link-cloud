@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Census.Application.Models;
+﻿using LantanaGroup.Link.Census.Application.Interfaces;
+using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Domain.Context;
@@ -323,35 +324,27 @@ public class PatientEncounterQueries : IPatientEncounterQueries
                     }
                 }
                 // For discharge or update events - update existing encounter
-                else if (encounter != null)
+                else if (encounter != null && IsUpdateablePayload(payload))
                 {
-                    try
+                    encounter = payload.UpdatePatientEncounter(encounter);
+                    encounter.ModifyDate = evt.ModifyDate;
+                    
+                    // Re-check identifiers after update
+                    foreach (var identifier in encounter.PatientIdentifiers)
                     {
-                        // Only try to update if we already have an encounter
-                        encounter = payload.UpdatePatientEncounter(encounter);
-                        encounter.ModifyDate = evt.ModifyDate;
-
-                        // Re-check identifiers after update
-                        foreach (var identifier in encounter.PatientIdentifiers)
+                        if (string.IsNullOrEmpty(identifier.Id))
                         {
-                            if (string.IsNullOrEmpty(identifier.Id))
-                            {
-                                identifier.Id = Guid.NewGuid().ToString();
-                            }
-                        }
-
-                        foreach (var visitIdentifier in encounter.PatientVisitIdentifiers)
-                        {
-                            if (string.IsNullOrEmpty(visitIdentifier.Id))
-                            {
-                                visitIdentifier.Id = Guid.NewGuid().ToString();
-                            }
+                            identifier.Id = Guid.NewGuid().ToString();
                         }
                     }
-                    catch (NotImplementedException)
+                    
+                    foreach (var visitIdentifier in encounter.PatientVisitIdentifiers)
                     {
-                        // Skip update if not implemented
-                    }
+                        if (string.IsNullOrEmpty(visitIdentifier.Id))
+                        {
+                            visitIdentifier.Id = Guid.NewGuid().ToString();
+                        }
+                    }   
                 }
             }
 
@@ -541,6 +534,15 @@ public class PatientEncounterQueries : IPatientEncounterQueries
                 ? query.OrderBy(e => e.ModifyDate)
                 : query.OrderByDescending(e => e.ModifyDate),
             _ => query.OrderBy(e => e.CreateDate)
+        };
+    }
+
+    private bool IsUpdateablePayload(IPayload payload)
+    {
+        return payload switch
+        {
+            FHIRListDischargePayload => true,
+            _ => false
         };
     }
     #endregion
