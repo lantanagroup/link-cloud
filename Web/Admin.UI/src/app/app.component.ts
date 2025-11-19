@@ -77,7 +77,7 @@ export class AppComponent implements OnInit, OnChanges {
   }
 
   showDashboard(){
-    return this.userProfile?.email || !this.loginRequired;
+    return (!!this.userProfile?.email) || !this.loginRequired;
   }
 
   logout() {
