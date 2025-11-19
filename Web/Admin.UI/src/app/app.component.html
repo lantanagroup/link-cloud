@@ -2,7 +2,7 @@
   <img src="assets/link-shield.png" alt="Icon" class="toolbar-icon" />
   <span class="toolbar-divider">Link Administration</span>
   <span class="example-spacer"></span>
-  @if (userProfile?.email) {
+  @if (showDashboard()) {
     <span class="toolbar-divider">
       <tenant-search-bar style="margin-right: 1.5em;"></tenant-search-bar>
     </span>
@@ -23,7 +23,7 @@
     </span>
   }
 </mat-toolbar>
-@if (userProfile?.email) {
+@if (showDashboard()) {
   <div>
     <link-nav-bar></link-nav-bar>
   </div>
