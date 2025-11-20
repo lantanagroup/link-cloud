@@ -1,6 +1,6 @@
 import {BreakpointObserver, Breakpoints} from '@angular/cdk/layout';
-import {Component, OnChanges, OnInit} from '@angular/core';
-import {filter, map, Observable, shareReplay} from 'rxjs';
+import {Component, OnChanges, OnDestroy, OnInit} from '@angular/core';
+import {Subscription} from 'rxjs';
 import {UserProfile} from './models/user-pofile.model';
 import {AppConfigService} from './services/app-config.service';
 import {AuthenticationService} from './services/security/authentication.service';
@@ -14,23 +14,13 @@ import {ActivatedRoute, NavigationEnd, Router} from "@angular/router";
   styleUrls: ['./app.component.scss'],
   standalone: false
 })
-export class AppComponent implements OnInit, OnChanges {
+export class AppComponent implements OnInit, OnChanges, OnDestroy {
 
   userProfile: UserProfile | undefined;
   loginRequired = true;
-
-  isHandset$: Observable<boolean> = this.breakpointObserver.observe(Breakpoints.Handset)
-    .pipe(
-      map(result => result.matches),
-      shareReplay()
-    );
-
+  private profileSubscription?: Subscription;
 
   constructor(private router: Router, private route: ActivatedRoute, private breakpointObserver: BreakpointObserver, private authService: AuthenticationService, private profileService: UserProfileService, public appConfigService: AppConfigService) {
-
-    this.profileService.userProfileUpdated.subscribe(profile => {
-      this.userProfile = profile;
-    });
 
   }
 
@@ -41,7 +31,7 @@ export class AppComponent implements OnInit, OnChanges {
   async ngOnInit(): Promise<void> {
     this.loginRequired = this.appConfigService.config?.authRequired || false;
 
-    this.profileService.userProfileUpdated.subscribe(profile => {
+    this.profileSubscription = this.profileService.userProfileUpdated.subscribe(profile => {
       this.userProfile = profile;
     });
 
@@ -60,4 +50,9 @@ export class AppComponent implements OnInit, OnChanges {
       this.router.navigate(['/logout']);
     }
   }
+
+  ngOnDestroy(): void {
+    this.profileSubscription?.unsubscribe();
+  }
+
 }
