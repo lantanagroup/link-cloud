@@ -1,6 +1,5 @@
 ﻿using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Enums;
-using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Shared.Application.Enums; // Important for SQL functions
 using LantanaGroup.Link.Shared.Application.Models.Responses;
@@ -38,6 +37,10 @@ public interface IPatientEventQueries
         int pageSize = 10,
         int pageNumber = 1,
         CancellationToken cancellationToken = default);
+
+    Task<PatientEventModel> GetPatientEventById(
+        string id,
+        CancellationToken cancellationToken);
 
     Task DeletePatientEventByCorrelationId(
         string correlationId,
@@ -94,9 +97,9 @@ public class PatientEventQueries : IPatientEventQueries
 
     private async Task DeletePatientEventByCorrelationIdBatch(string correlationId, CancellationToken cancellationToken)
     {
-        await _context.PatientEvents
-            .Where(x => x.CorrelationId == correlationId)
-            .ExecuteDeleteAsync(cancellationToken);
+        var entities = _context.PatientEvents.Where(x => x.CorrelationId == correlationId);
+        _context.PatientEvents.RemoveRange(entities);
+        await _context.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<PatientEvent> GetLatestEventByFacilityAndPatientId(string facilityId, string patientId,
@@ -186,6 +189,14 @@ public class PatientEventQueries : IPatientEventQueries
         CancellationToken cancellationToken = default)
     {
         await transaction.RollbackAsync(cancellationToken);
+    }
+
+    public async Task<PatientEventModel> GetPatientEventById(string id, CancellationToken cancellationToken)
+    {
+        return _context.PatientEvents
+            .Where(x => x.Id == id)
+            .Select(PatientEventModel.FromDomain)
+            .FirstOrDefault();
     }
 
     #region Private Methods
