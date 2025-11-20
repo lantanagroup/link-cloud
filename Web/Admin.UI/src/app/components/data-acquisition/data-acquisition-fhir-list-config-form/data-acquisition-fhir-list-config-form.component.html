@@ -47,10 +47,13 @@
                 placeholder="FhirId"
               />
               <!-- Error messages -->
-              @if ("patientForm.get('fhirId')?.hasError('required') && (patientForm.get('fhirId')?.touched || patientForm.get('fhirId')?.value == '')"){
+              @if (patientForm.get('fhirId')?.hasError('required') && (patientForm.get('fhirId')?.touched || patientForm.get('fhirId')?.value == '')){
                 <mat-error>
                   FhirId is required
                 </mat-error>
+              }
+              @if (patientForm.get('fhirId')?.hasError('duplicate')) {
+                <mat-error>Duplicate FhirId</mat-error>
               }
             </mat-form-field>
           </div>
