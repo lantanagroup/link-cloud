@@ -47,7 +47,6 @@ export class AppComponent implements OnInit, OnChanges, OnDestroy {
   logout() {
     if (this.loginRequired) {
       this.authService.logout();
-      this.router.navigate(['/logout']);
     }
   }
 
