@@ -4,8 +4,8 @@ import { NgModule } from '@angular/core';
 
 const routes: Routes = [
   { path: 'logout', loadComponent: () => import('./components/logout/logout.component').then(mod => mod.LogOutComponent) },
+  { path: 'login', loadComponent: () => import('./components/login/login.component').then(mod => mod.LoginComponent) },
   { path: 'dashboard', loadComponent: () => import('./components/dashboard/admin-dashboard/admin-dashboard.component').then(mod => mod.AdminDashboardComponent) },
-  { path: 'logout', loadComponent: () => import('./components/dashboard/admin-dashboard/admin-dashboard.component').then(mod => mod.AdminDashboardComponent) },
   { path: 'tenant', loadComponent: () => import('./components/tenant/tenant-dashboard/tenant-dashboard.component').then(mod => mod.TenantDashboardComponent) },
   { path: 'tenant/facility/:id/edit', loadComponent: () => import('./components/tenant/facility-edit/facility-edit.component').then(mod => mod.FacilityEditComponent) },
   { path: 'tenant/facility/:facilityId', loadComponent: () => import('./components/tenant/facility-view/facility-view.component').then(mod => mod.FacilityViewComponent) },
@@ -32,7 +32,8 @@ const routes: Routes = [
   { path: 'query-plans', loadComponent: () => import('./components/query-plans/query-plans-dashboard/query-plans-dashboard.component').then(mod => mod.QueryPlansDashboardComponent) },
   { path: 'app-configuration', loadComponent: () => import('./components/app-configuration/app-configuration-dashboard/app-configuration-dashboard.component').then(mod => mod.AppConfigurationDashboardComponent) },
   { path: 'kafka', loadComponent: () => import('./components/kafka/kafka-dashboard/kafka-dashboard.component').then(mod => mod.KafkaDashboardComponent) },
-  { path: '**', redirectTo: '' },
+  { path: '', redirectTo: 'login', pathMatch: 'full' },
+  { path: '**', redirectTo: 'login' }
 ];
 
 @NgModule({
