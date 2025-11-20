@@ -403,6 +403,8 @@ services:
     build:
       context: .
       dockerfile: DotNet/Account/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
     networks:
       - link-nw
     depends_on:
@@ -443,6 +445,8 @@ services:
     build:
       context: .
       dockerfile: DotNet/Audit/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
     networks:
       - link-nw
     depends_on:
@@ -572,6 +576,8 @@ services:
     build:
       context: .
       dockerfile: DotNet/Census/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
     networks:
       - link-nw
     depends_on:
@@ -622,6 +628,8 @@ services:
     build:
       context: .
       dockerfile: DotNet/DataAcquisition/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
     networks:
       - link-nw
     depends_on:
@@ -672,6 +680,8 @@ services:
      build:
        context: .
        dockerfile: DotNet/DataAcquisition.AcquisitionWorker/Dockerfile
+       args:
+         BUILD_CONFIGURATION: Debug
      networks:
        - link-nw
      depends_on:
@@ -786,6 +796,8 @@ services:
     build:
       context: .
       dockerfile: DotNet/Normalization/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
     networks:
       - link-nw
     depends_on:
@@ -832,6 +844,8 @@ services:
     build:
       context: .
       dockerfile: DotNet/QueryDispatch/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
     networks:
       - link-nw
     depends_on:
@@ -883,6 +897,8 @@ services:
     build:
       context: .
       dockerfile: DotNet/Report/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
     networks:
       - link-nw
     depends_on:
@@ -944,6 +960,8 @@ services:
     build:
       context: .
       dockerfile: DotNet/Submission/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
     networks:
       - link-nw
     volumes: 
@@ -992,6 +1010,8 @@ services:
     build:
       context: .
       dockerfile: DotNet/Tenant/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
     networks:
       - link-nw
     depends_on:
@@ -1081,6 +1101,8 @@ services:
     build:
       context: .
       dockerfile: DotNet/Terminology/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
     networks:
       - link-nw
     depends_on:

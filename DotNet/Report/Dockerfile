@@ -2,16 +2,17 @@
 
 FROM lantanagroup/aspnet8-run AS base
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
 COPY ["DotNet/Report/Report.csproj", "DotNet/Report/"]
 RUN dotnet restore "DotNet/Report/Report.csproj"
 COPY . .
 WORKDIR "/src/DotNet/Report"
-RUN dotnet build "Report.csproj" -c Debug -o /app/build
+RUN dotnet build "Report.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 FROM build AS publish
-RUN dotnet publish "Report.csproj" -c Debug -o /app/publish --no-self-contained
+RUN dotnet publish "Report.csproj" -c $BUILD_CONFIGURATION -o /app/publish --no-self-contained
 
 FROM base AS final
 WORKDIR /app
