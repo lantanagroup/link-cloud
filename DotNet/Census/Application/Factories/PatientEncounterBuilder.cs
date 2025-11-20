@@ -13,7 +13,7 @@ public class PatientEncounterBuilder
         _patientEncounter.MedicalRecordNumber = MRN;
         _patientEncounter.AdmitDate = admitDate;
 
-        if (dischargeDate != null)
+        if (dischargeDate != default)
         {
             _patientEncounter.DischargeDate = dischargeDate;
         }
