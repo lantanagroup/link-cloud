@@ -255,6 +255,7 @@ public class QueryConfigController : Controller
                 FacilityId = fhirQueryConfiguration.FacilityId,
                 FhirServerBaseUrl = fhirQueryConfiguration.FhirServerBaseUrl,
                 Authentication = fhirQueryConfiguration.Authentication,
+                MaxConcurrentRequests = fhirQueryConfiguration.MaxConcurrentRequests,
                 MinAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MinAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
                 MaxAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MaxAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
             }, cancellationToken);
