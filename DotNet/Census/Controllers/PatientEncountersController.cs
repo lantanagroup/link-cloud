@@ -155,7 +155,7 @@ public class PatientEncountersController : Controller
     [HttpPost("rebuild")]
     public async Task<IActionResult> RebuildMaterializedView(
         string facilityId,
-        string? correlationId = null,
+        string? correlationId = default,
         CancellationToken cancellationToken = default)
     {
         facilityId = HtmlInputSanitizer.SanitizeAndRemove(facilityId ?? string.Empty);
@@ -166,7 +166,7 @@ public class PatientEncountersController : Controller
 
         try
         {
-            await _patientEncounterQueries.RebuildPatientEncounterTable(cancellationToken);
+            await _patientEncounterQueries.RebuildPatientEncounterTable(facilityId, correlationId,cancellationToken: cancellationToken);
         }
         catch (Exception ex)
         {
