@@ -225,7 +225,7 @@ namespace UnitTests.Census
         public async Task RebuildMaterializedView_ReturnsAccepted_WhenSuccess()
         {
             // Arrange
-            _queriesMock.Setup(q => q.RebuildPatientEncounterTable(It.IsAny<CancellationToken>()))
+            _queriesMock.Setup(q => q.RebuildPatientEncounterTable(null, null, true, It.IsAny<CancellationToken>()))
                         .Returns(Task.CompletedTask);
 
             // Act
@@ -239,7 +239,7 @@ namespace UnitTests.Census
         public async Task RebuildMaterializedView_ReturnsProblem_WhenExceptionThrown()
         {
             // Arrange
-            _queriesMock.Setup(q => q.RebuildPatientEncounterTable(It.IsAny<CancellationToken>()))
+            _queriesMock.Setup(q => q.RebuildPatientEncounterTable(It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
                         .ThrowsAsync(new Exception("Rebuild error"));
 
             // Act
