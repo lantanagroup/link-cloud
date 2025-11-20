@@ -8,6 +8,7 @@ RUN chown -R 1654:1654 /data/submission
 USER 1654
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
 COPY ["DotNet/Submission/Submission.csproj", "DotNet/Submission/"]
@@ -15,10 +16,10 @@ COPY ["DotNet/Link.Authorization/Link.Authorization.csproj", "DotNet/Link.Author
 RUN dotnet restore "DotNet/Submission/Submission.csproj"
 COPY . .
 WORKDIR "/src/DotNet/Submission"
-RUN dotnet build "Submission.csproj" -c Release -o /app/build
+RUN dotnet build "Submission.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 FROM build AS publish
-RUN dotnet publish "Submission.csproj" -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "Submission.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app

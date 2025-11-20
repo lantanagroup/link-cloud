@@ -2,16 +2,17 @@
 
 FROM lantanagroup/aspnet8-run AS base
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
 COPY ["DotNet/QueryDispatch/QueryDispatch.csproj", "DotNet/QueryDispatch/"]
 RUN dotnet restore "DotNet/QueryDispatch/QueryDispatch.csproj"
 COPY . .
 WORKDIR "/src/DotNet/QueryDispatch"
-RUN dotnet build "QueryDispatch.csproj" -c Release -o /app/build
+RUN dotnet build "QueryDispatch.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 FROM build AS publish
-RUN dotnet publish "QueryDispatch.csproj" -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "QueryDispatch.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app

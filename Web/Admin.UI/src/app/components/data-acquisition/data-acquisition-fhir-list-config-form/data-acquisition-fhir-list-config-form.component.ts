@@ -4,7 +4,15 @@ import {
 } from '../../../interfaces/data-acquisition/data-acquisition-fhir-list-config-model.interface';
 import {Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges} from '@angular/core';
 
-import {FormArray, FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
+import {
+  AbstractControl,
+  FormArray,
+  FormBuilder,
+  FormControl,
+  FormGroup,
+  ReactiveFormsModule, ValidationErrors, ValidatorFn,
+  Validators
+} from '@angular/forms';
 import {MatButtonModule} from '@angular/material/button';
 import {MatChipsModule} from '@angular/material/chips';
 import {MatFormFieldModule} from '@angular/material/form-field';
@@ -75,11 +83,56 @@ export class DataAcquisitionFhirListConfigFormComponent implements OnInit, OnCha
     this.configForm = this.fb.group({
       facilityId: this.fb.control('', Validators.required),
       fhirServerBaseUrl: this.fb.control('', Validators.required),
-      patientListControl: this.fb.array([this.createPatientFormGroup()])
+      patientListControl: this.fb.array(
+        [this.createPatientFormGroup()],
+        { validators: this.fhirIdDuplicateValidator }
+      )
     });
   }
 
-// Method must be a class-level method, not inside constructor
+  private fhirIdDuplicateValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
+    if (!(control instanceof FormArray)) {
+      return null;
+    }
+
+    const values = control.controls.map(ctrl =>
+      ctrl.get('fhirId')?.value?.trim()
+    );
+
+    const seen = new Map<string, number[]>();
+
+    values.forEach((val, index) => {
+      if (!val) return;
+      if (!seen.has(val)) seen.set(val, []);
+      seen.get(val)!.push(index);
+    });
+
+    // Find only actual duplicates (size > 1)
+    const duplicates = [...seen.entries()]
+      .filter(([_, indexes]) => indexes.length > 1)
+      .flatMap(([_, indexes]) => indexes);
+
+    // Assign errors to duplicate fields
+    control.controls.forEach((ctrl, index) => {
+      const fhirId = ctrl.get('fhirId');
+      if (!fhirId) return;
+
+      if (duplicates.includes(index)) {
+        fhirId.setErrors({ ...fhirId.errors, duplicate: true });
+      } else {
+        if (fhirId.errors && fhirId.errors['duplicate']) {
+          delete fhirId.errors['duplicate'];
+          if (Object.keys(fhirId.errors).length === 0) {
+            fhirId.setErrors(null);
+          }
+        }
+      }
+    });
+
+    return duplicates.length ? { duplicateFhirId: true } : null;
+  };
+
+ // Method must be a class-level method, not inside constructor
   createPatientFormGroup(ehrPatient?: IEhrPatientListModel): FormGroup {
     return this.fb.group({
       status: this.fb.control(ehrPatient?.status ?? '', Validators.required),
@@ -101,10 +154,9 @@ export class DataAcquisitionFhirListConfigFormComponent implements OnInit, OnCha
       this.fhirServerBaseUrlControl.setValue(this.item.fhirBaseServerUrl);
       this.fhirServerBaseUrlControl.updateValueAndValidity();
 
-      // this.loadPatientLists(this.item.ehrPatientLists);
       this.populateAllCombinations(this.item.ehrPatientLists);
+      this.patientListControl.setValidators(this.fhirIdDuplicateValidator);
       this.patientListControl.updateValueAndValidity();
-
     } else {
       this.populateAllCombinations();
       this.formMode = FormMode.Create;
