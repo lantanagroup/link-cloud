@@ -18,6 +18,7 @@ export class AppComponent implements OnInit, OnChanges, OnDestroy {
 
   userProfile: UserProfile | undefined;
   loginRequired = true;
+  oauth2  = false;
   private profileSubscription?: Subscription;
 
   constructor(private router: Router, private route: ActivatedRoute, private breakpointObserver: BreakpointObserver, private authService: AuthenticationService, private profileService: UserProfileService, public appConfigService: AppConfigService) {
@@ -30,6 +31,7 @@ export class AppComponent implements OnInit, OnChanges, OnDestroy {
 
   async ngOnInit(): Promise<void> {
     this.loginRequired = this.appConfigService.config?.authRequired || false;
+    this.oauth2 = this.appConfigService.config?.oauth2?.enabled || false;
 
     this.profileSubscription = this.profileService.userProfileUpdated.subscribe(profile => {
       this.userProfile = profile;
@@ -45,10 +47,10 @@ export class AppComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   logout() {
-    if (this.loginRequired) {
-      this.authService.logout();
-      this.router.navigate(['/logout']);
-    }
+    if (!this.loginRequired) return;
+
+    this.authService.logout();
+    if (this.oauth2) this.router.navigate(['/logout']);
   }
 
   ngOnDestroy(): void {
