@@ -74,7 +74,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             // if referer is not empty then set RedirectUri changes to referer + "/dashboard"
             if (!String.IsNullOrEmpty(referer))
             {
-                RedirectLink = referer + "/dashboard?logged=true";
+                RedirectLink = referer + "/dashboard";
             }
 
             return Results.Challenge(
