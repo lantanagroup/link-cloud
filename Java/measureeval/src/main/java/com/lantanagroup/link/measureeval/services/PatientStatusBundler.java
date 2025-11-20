@@ -37,7 +37,7 @@ public class PatientStatusBundler {
         return bundle;
     }
 
-    private List<AbstractResourceEntity> retrieveResources (PatientReportingEvaluationStatus patientStatus) {
+    private List<AbstractResourceEntity> retrieveResources(PatientReportingEvaluationStatus patientStatus) {
         if (logger.isDebugEnabled()) {
             logger.debug("Retrieving resources");
         }
@@ -46,14 +46,19 @@ public class PatientStatusBundler {
                 .filter(resource -> resource.getNormalizationStatus() == NormalizationStatus.NORMALIZED)
                 .filter(resource -> !resource.getIsPatientResource())
                 .toList();
+        var patientResourcesRefs = patientStatus.getResources().stream()
+                .filter(resource -> resource.getNormalizationStatus() == NormalizationStatus.NORMALIZED)
+                .filter(PatientReportingEvaluationStatus.Resource::getIsPatientResource)
+                .toList();
 
         logger.debug("Collecting patient resources for patient {} and {} shared resources from the database", patientStatus.getPatientId(), sharedResourcesRefs.size());
 
         try (Timer timer = Timer.start()) {
-            var patientResources = resourceRepository.findResources(false, patientStatus.getFacilityId(), patientStatus.getCorrelationId());
-            var sharedResources = resourceRepository.findResources(true, patientStatus.getFacilityId(), patientStatus.getCorrelationId());
+            var patientResources = resourceRepository.findResources(patientStatus.getFacilityId(), false, patientResourcesRefs);
+            var sharedResources = resourceRepository.findResources(patientStatus.getFacilityId(), true, sharedResourcesRefs);
 
-            logger.debug("Retrieved {} patient resources and {} shared resources from the database in {} seconds", patientResources.size(), sharedResources.size(), timer.getSeconds());
+            logger.debug("Retrieved {} patient resources and {} shared resources from the database in {} seconds",
+                    patientResources.size(), sharedResources.size(), timer.getSeconds());
 
             List<AbstractResourceEntity> resources = new ArrayList<>();
             resources.addAll(patientResources);
