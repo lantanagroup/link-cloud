@@ -1,12 +1,12 @@
 import { HttpClient } from "@angular/common/http";
 import { Injectable } from "@angular/core";
-import { UserClaims, UserProfile } from "../../models/user-pofile.model";
+import {UserProfile } from "../../models/user-pofile.model";
 import { AppConfigService } from "../app-config.service";
-import { ErrorHandlingService } from "../error-handling.service";
 import { UserProfileService } from "../user-profile.service";
 import { join as pathJoin } from '@fireflysemantics/join';
 import {OAuthService} from "angular-oauth2-oidc";
 import {firstValueFrom} from "rxjs/internal/firstValueFrom";
+
 
 @Injectable({
   providedIn: 'root'
@@ -15,7 +15,7 @@ import {firstValueFrom} from "rxjs/internal/firstValueFrom";
 export class AuthenticationService {
   userProfile!: UserProfile;
 
-  constructor(private http: HttpClient, private profileService: UserProfileService, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService, private oauthService: OAuthService) { }
+  constructor(private http: HttpClient, private profileService: UserProfileService, public appConfigService: AppConfigService, private oauthService: OAuthService) { }
 
   async loadProfile() {
     const response: UserProfile = await firstValueFrom(this.http.get<UserProfile>(`${this.appConfigService.config?.baseApiUrl}/user`, { withCredentials: true }));
@@ -43,8 +43,9 @@ export class AuthenticationService {
   }
 
   logout() {
-    if (this.appConfigService.config?.oauth2) {
-      this.oauthService.logOut();
+    this.profileService.clearProfile();
+    if (this.appConfigService.config?.oauth2?.enabled) {
+      // this.oauthService.logOut();
     } else {
       window.location.href = pathJoin(this.appConfigService.config?.baseApiUrl || '/api', 'logout');
     }
