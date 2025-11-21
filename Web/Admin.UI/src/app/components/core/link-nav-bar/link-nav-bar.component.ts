@@ -28,7 +28,7 @@ export class LinkNavBarComponent {
   constructor(private router: Router, private appConfig: AppConfigService) { }
 
   subnavItems: SubnavItem[] = [
-    { label: 'Home', path: '/' },
+    { label: 'Home', path: '/dashboard' },
     { label: 'Tenants', path: '/tenant' },
     { label: 'Reports', path: '/reports' },
     {
