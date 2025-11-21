@@ -19,32 +19,19 @@ export class AuthenticationService {
   }
 
   async loadProfile(): Promise<UserProfile | null> {
-    try {
-      const response: UserProfile = await firstValueFrom(
-        this.http.get<UserProfile>(
-          `${this.appConfigService.config?.baseApiUrl}/user`,
-          { withCredentials: true }
-        )
-      );
+    const response: UserProfile = await firstValueFrom(this.http.get<UserProfile>(`${this.appConfigService.config?.baseApiUrl}/user`, {withCredentials: true}));
 
-      this.userProfile = new UserProfile(
-        response.email,
-        response.firstName,
-        response.lastName,
-        response.roles,
-        response.permissions
-      );
+    this.userProfile = new UserProfile(
+      response.email,
+      response.firstName,
+      response.lastName,
+      response.roles,
+      response.permissions
+    );
+    this.profileService.setProfile(this.userProfile);
 
-      // Save in profile service
-      this.profileService.setProfile(this.userProfile);
-
-      return this.userProfile;
-    } catch (err) {
-      console.error('Failed to load profile', err);
-      return null;
-    }
+    return this.userProfile;
   }
-
 
   async login() {
     if (this.appConfigService.config?.oauth2?.enabled) {
