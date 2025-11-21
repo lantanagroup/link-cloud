@@ -19,19 +19,32 @@ export class AuthenticationService {
   }
 
   async loadProfile(): Promise<UserProfile | null> {
-    const response: UserProfile = await firstValueFrom(this.http.get<UserProfile>(`${this.appConfigService.config?.baseApiUrl}/user`, {withCredentials: true}));
+    try {
+      const response: UserProfile = await firstValueFrom(
+        this.http.get<UserProfile>(
+          `${this.appConfigService.config?.baseApiUrl}/user`,
+          { withCredentials: true }
+        )
+      );
 
-    this.userProfile = new UserProfile(
-      response.email,
-      response.firstName,
-      response.lastName,
-      response.roles,
-      response.permissions
-    );
-    this.profileService.setProfile(this.userProfile);
+      this.userProfile = new UserProfile(
+        response.email,
+        response.firstName,
+        response.lastName,
+        response.roles,
+        response.permissions
+      );
 
-    return this.userProfile;
+      // Save in profile service
+      this.profileService.setProfile(this.userProfile);
+
+      return this.userProfile;
+    } catch (err) {
+      console.error('Failed to load profile', err);
+      return null;
+    }
   }
+
 
   async login() {
     if (this.appConfigService.config?.oauth2?.enabled) {
@@ -52,17 +65,6 @@ export class AuthenticationService {
     } else {
       window.location.href = pathJoin(this.appConfigService.config?.baseApiUrl || '/api', 'logout');
     }
-  }
-
-  // ✅ New method
-  isLoggedIn(): boolean {
-    // 1. Check if OAuth token exists and is valid
-    if (this.appConfigService.config?.oauth2?.enabled) {
-      return this.oauthService.hasValidAccessToken();
-    }
-
-    // 2. Otherwise, check if userProfile is loaded
-    return !!this.userProfile?.email;
   }
 
 }
