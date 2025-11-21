@@ -24,10 +24,10 @@ export class ErrorInterceptor implements HttpInterceptor {
         this.router.navigate(['/unauthorized']);
       }
       else if([401].includes(err.status)){
-        // route to unauthorized
+        // route to login
         this.router.navigate(['/login']);
       }
-      
+
       return throwError(() => err);
     }))
   }
