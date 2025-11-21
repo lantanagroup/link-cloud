@@ -18,18 +18,16 @@ export class ErrorInterceptor implements HttpInterceptor {
       if (isLoginCallback) {
         return throwError(() => err);
       }
-      
+
       if ([403].includes(err.status)) {
         // route to unauthorized
         this.router.navigate(['/unauthorized']);
       }
       else if([401].includes(err.status)){
-        // route to unauthorized
+        // route to login
         this.router.navigate(['/login']);
       }
-
-      //const error = err.error?.message || err.statusText;
-      //console.error(err);
+      
       return throwError(() => err);
     }))
   }
