@@ -37,7 +37,7 @@ specifications:
 
 The Tenant service is the entry point for configuring a tenant into Link Cloud. The service is responsible for maintaining and generating events for the scheduled measure reporting periods that the tenant is configured for. These events contain the initial information needed for Link Cloud to query resources and perform measure evaluations based on a specific reporting period.
 
-The Tenant service uses Quartz with ADO JOb Stores to manage jobs across multiple instances of the service, primarily for producing ReportScheduled Kafka events.
+The Tenant service uses Quartz with ADO Job Stores to manage jobs across multiple instances of the service, primarily for producing ReportScheduled Kafka events.
 
 ## Nodes
 
