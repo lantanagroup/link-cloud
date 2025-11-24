@@ -146,7 +146,7 @@ namespace DataAcquisition.Domain.Migrations
                 table: "DataAcquisitionLog",
                 columns: new[] { "ExecutionDate", "Id" },
                 descending: new bool[0])
-                .Annotation("SqlServer:Include", new[] { "Priority", "FacilityId", "IsCensus", "PatientId", "ReportableEvent", "ReportTrackingId", "CorrelationId", "TraceId", "FhirVersion", "QueryType", "QueryPhase", "Status", "RetryAttempts", "CompletionDate", "CompletionTimeMilliseconds", "ResourceId" });
+                .Annotation("SqlServer:Include", new[] { "Priority", "FacilityId", "IsCensus", "PatientId", "ReportableEvent", "ReportTrackingId", "CorrelationId", "TraceId", "FhirVersion", "QueryType", "QueryPhase", "Status", "RetryAttempts", "CompletionDate", "CompletionTimeMilliseconds" });
         }
 
         /// <inheritdoc />
