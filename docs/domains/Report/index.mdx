@@ -52,7 +52,7 @@ TODO
 stateDiagram-v2
 state "Report Scheduled" as ReportScheduled
 state "Data Acquisition Requested" as DataAcquisitionRequested
-state "Patient IDs Acquired" as PatientIDsAcquired
+state "Patient Lists Acquired" as PatientListsAcquired
 state "Resource Evaluated" as ResourceEvaluated
 state "Validation Complete" as ValidationComplete
 state "Report Submitted" as ReportSubmitted
@@ -60,13 +60,13 @@ state "Report Generation Failed" as ReportGenerationFailed
 state "Submission Failed" as SubmissionFailed
 
 ReportScheduled --> DataAcquisitionRequested : GenerateReportValue
-DataAcquisitionRequested --> PatientIDsAcquired : PatientIdsAcquiredValue
-PatientIDsAcquired --> ResourceEvaluated : ResourceEvaluatedValue (for each patient)
+DataAcquisitionRequested --> PatientListsAcquired : PatientListsAcquiredValue
+PatientListsAcquired --> ResourceEvaluated : ResourceEvaluatedValue (for each patient)
 ResourceEvaluated --> ValidationComplete : ReadyForValidationValue
 ValidationComplete --> ReportSubmitted : ReportSubmittedValue
 
 DataAcquisitionRequested --> ReportGenerationFailed : Error
-PatientIDsAcquired --> RelsportGenerationFailed : Error
+PatientListsAcquired --> ReportGenerationFailed : Error
 ResourceEvaluated --> ReportGenerationFailed : Error
 ValidationComplete --> ReportGenerationFailed : Error
 ReportSubmitted --> SubmissionFailed : Error

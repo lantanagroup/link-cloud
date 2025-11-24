@@ -283,7 +283,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
 
-    //PatientIdsAcquired Listener
+    //PatientListsAcquired Listener
     builder.Services.AddTransient<ITransientExceptionHandler<string, PatientListMessage>, TransientExceptionHandler<string, PatientListMessage>>();
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientListMessage>, DeadLetterExceptionHandler<string, PatientListMessage>>();
 

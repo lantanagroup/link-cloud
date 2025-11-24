@@ -69,7 +69,7 @@ namespace LantanaGroup.Link.Report.Listeners
             {
                 consumer.Subscribe(nameof(KafkaTopic.PatientListsAcquired));
 
-                _logger.LogInformation("Started PatientIdsAcquired consumer for topic '{Topic}' at {StartTime}", nameof(KafkaTopic.PatientListsAcquired), DateTime.UtcNow);
+                _logger.LogInformation("Started PatientListsAcquired consumer for topic '{Topic}' at {StartTime}", nameof(KafkaTopic.PatientListsAcquired), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -155,7 +155,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (Exception ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - PatientIdsAcquired Exception thrown: " + ex.Message), facilityId);
+                                _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - PatientListsAcquired Exception thrown: " + ex.Message), facilityId);
                             }
                             finally
                             {
@@ -183,7 +183,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error encountered in PatientIdsAcquiredListener");
+                        _logger.LogError(ex, "Error encountered in PatientListsAcquiredListener");
                         consumer.Commit();
                     }
                 }
