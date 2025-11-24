@@ -55,20 +55,6 @@ The Census service consumes `PatientIDsAcquired` events from Kafka. When a new e
 
 ## Event Payload Structures
 
-### PatientListsAcquired Event
-
-```json
-{ 
-  "facilityId": "string", 
-  "patientIds": ["string"], 
-  "acquisitionTimestamp": "string" 
-}
-```
-
-- **facilityId**: The unique identifier for the facility.
-- **patientIds**: Array of FHIR patient IDs.
-- **acquisitionTimestamp**: ISO 8601 timestamp of acquisition.
-
 ### PatientCensusScheduled Event
 
 ```json
@@ -118,9 +104,14 @@ Both FHIR list payloads are critical components of the patient census tracking s
 
 ```json
 { 
-  "facilityId": "string", 
-  "patientIds": ["string"], 
-  "acquisitionTimestamp": "string" 
+  "reportTrackingId": "string", 
+  "patientLists": [
+    {
+      "listType": "string" // Acceptable values: "Admit", "Discharge",
+      "timeFrame": "string" // Acceptable values: "LessThan24Hours", "Between24To48Hours", "MoreThan48Hours",
+      "patientIds": ["string"]
+    }
+  ]
 }
 ```
 
