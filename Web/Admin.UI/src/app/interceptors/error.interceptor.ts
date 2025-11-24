@@ -12,20 +12,22 @@ export class ErrorInterceptor implements HttpInterceptor {
   intercept(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
     return next.handle(request).pipe(catchError(err => {
 
-      const isLoginCallback = this.router.url == "/dashboard";
+      const isLoginCallback = this.router.url == "/login";
 
       // Skip interceptor logic for  login callback
       if (isLoginCallback) {
         return throwError(() => err);
       }
 
-      if ([401, 403].includes(err.status)) {
+      if ([403].includes(err.status)) {
         // route to unauthorized
-        this.router.navigate(['unauthorized']);
+        this.router.navigate(['/unauthorized']);
       }
-
-      //const error = err.error?.message || err.statusText;
-      //console.error(err);
+      else if([401].includes(err.status)){
+        // route to login
+        this.router.navigate(['/login']);
+      }
+      
       return throwError(() => err);
     }))
   }

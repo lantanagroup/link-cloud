@@ -74,7 +74,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             // if referer is not empty then set RedirectUri changes to referer + "/dashboard"
             if (!String.IsNullOrEmpty(referer))
             {
-                RedirectLink = referer + "/dashboard?logged=true";
+                RedirectLink = referer + "/dashboard";
             }
 
             return Results.Challenge(
@@ -108,7 +108,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 context.SignOutAsync(LinkAdminConstants.AuthenticationSchemes.Cookie);
                 return Results.SignOut(properties: new AuthenticationProperties
                 {
-                    RedirectUri = referer + "/logout"
+                    RedirectUri = "/logout"
                 },
                  authenticationSchemes: [LinkAdminConstants.AuthenticationSchemes.Cookie]);
             }

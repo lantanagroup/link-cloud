@@ -72,7 +72,7 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
                     if (rootElement.TryGetProperty("patientId", out patientIdProp))
                         patientId = patientIdProp.GetString();
                     
-                    if (rootElement.TryGetProperty("admitDate", out var dischargeDateProp) && 
+                    if (rootElement.TryGetProperty("dischargeDate", out var dischargeDateProp) && 
                         dischargeDateProp.ValueKind == JsonValueKind.String)
                     {
                         DateTime.TryParse(dischargeDateProp.GetString(), out dischargeDate);

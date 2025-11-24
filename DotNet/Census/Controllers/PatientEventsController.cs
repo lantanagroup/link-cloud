@@ -17,16 +17,19 @@ public class PatientEventsController : Controller
     private readonly ILogger<PatientEventsController> _logger;
     private readonly IPatientEventManager _patientEventManager;
     private readonly IPatientEventQueries _patientEventQueries;
+    private readonly IPatientEncounterQueries _patientEncounterQueries;
 
     public PatientEventsController(
         ILogger<PatientEventsController> logger,
         IPatientEventManager patientEventManager,
-        IPatientEventQueries patientEventQueries
+        IPatientEventQueries patientEventQueries,
+        IPatientEncounterQueries patientEncounterQueries
     )
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _patientEventManager = patientEventManager ?? throw new ArgumentNullException(nameof(patientEventManager));
         _patientEventQueries = patientEventQueries ?? throw new ArgumentNullException(nameof(patientEventQueries));
+        _patientEncounterQueries = patientEncounterQueries ?? throw new ArgumentNullException(nameof(patientEncounterQueries));
     }
 
     /// <summary>
@@ -88,7 +91,7 @@ public class PatientEventsController : Controller
     }
 
     /// <summary>
-    /// Soft deletes a patient event and rebuilds the materialized view for the related correlation id.
+    /// Deletes a patient event and rebuilds the materialized view for the related correlation id.
     /// </summary>
     /// <remarks>
     /// DELETE: api/patient-events/{id}
@@ -104,13 +107,31 @@ public class PatientEventsController : Controller
             return BadRequest("Patient event ID is required.");
         }
 
+        using var transaction = await _patientEventQueries.StartTransaction();
         try
         {
+            var patientEventFaciltyId = (await _patientEventQueries.GetPatientEventById(id, cancellationToken))?.FacilityId;
+
+            if(string.IsNullOrWhiteSpace(patientEventFaciltyId))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return NotFound($"Patient event with ID {id} not found.");
+            }
+
             await _patientEventManager.DeletePatientEventById(id, cancellationToken);
+            await _patientEncounterQueries.RebuildPatientEncounterTable(
+                facilityId: patientEventFaciltyId,
+                correlationId: null,
+                useTransaction: false,
+                cancellationToken: cancellationToken
+            );
+
+            await transaction.CommitAsync(cancellationToken);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting patient event with ID {Id}", id?.Replace("\r", "").Replace("\n", ""));
+            await transaction.RollbackAsync(cancellationToken);
             return Problem(
                 detail: "An error occurred while processing your request.",
                 statusCode: StatusCodes.Status500InternalServerError
@@ -121,7 +142,7 @@ public class PatientEventsController : Controller
     }
 
     /// <summary>
-    /// Soft deletes the patient event store for the given correlation id and removes the corresponding materialized view.
+    /// Deletes the patient event store for the given correlation id and removes the corresponding materialized view.
     /// </summary>
     /// <remarks>
     /// DELETE: api/patient-events/visit/{correlationId}
@@ -136,15 +157,24 @@ public class PatientEventsController : Controller
         {
             return BadRequest("Correlation ID is required.");
         }
-        
+
+        using var transaction = await _patientEventQueries.StartTransaction();
         try
         {
             await _patientEventQueries.DeletePatientEventByCorrelationId(correlationId, cancellationToken);
+            await _patientEncounterQueries.RebuildPatientEncounterTable(
+                facilityId: null,
+                correlationId: correlationId,
+                useTransaction: false,
+                cancellationToken: cancellationToken
+            );
+            await transaction.CommitAsync(cancellationToken);
 
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting patient events for correlation ID {CorrelationId}", correlationId?.Replace("\r", "").Replace("\n", ""));
+            await transaction.RollbackAsync(cancellationToken);
             return Problem(
                 detail: "An error occurred while processing your request.",
                 statusCode: StatusCodes.Status500InternalServerError
