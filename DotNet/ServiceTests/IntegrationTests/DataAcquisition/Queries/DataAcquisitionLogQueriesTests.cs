@@ -37,7 +37,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var pendingLog = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            ResourceId = "test",
+            
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = "TestFacility",
@@ -60,7 +60,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var failedLog = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            ResourceId = "test",
+            
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = "TestFacility",
@@ -84,7 +84,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var ineligibleLog = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            ResourceId = "test",
+            
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = "TestFacility",
@@ -150,7 +150,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log1 = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            ResourceId = "test",
+            
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = facilityId,
@@ -169,7 +169,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log2 = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            ResourceId = "test",
+            
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = facilityId,
@@ -189,7 +189,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var incompleteLog = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            ResourceId = "test",
+            
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = facilityId,
@@ -237,7 +237,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            ResourceId = "test",
+            
             
             TraceId = Guid.NewGuid().ToString(),
 
@@ -288,7 +288,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            ResourceId = "test",
+            
             
             TraceId = Guid.NewGuid().ToString(),
 
@@ -365,7 +365,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var incompleteLog = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            ResourceId = "test",
+            
             
             TraceId = Guid.NewGuid().ToString(),
 
@@ -401,7 +401,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var referenceLog = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            ResourceId = "test",
+            
             
             TraceId = Guid.NewGuid().ToString(),
 
@@ -461,7 +461,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log1 = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            ResourceId = "test",
+            
             
             TraceId = Guid.NewGuid().ToString(),
 
@@ -484,7 +484,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log2 = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            ResourceId = "test",
+            
             
             TraceId = Guid.NewGuid().ToString(),
 
@@ -536,7 +536,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            ResourceId = "test",
+            
             
             TraceId = Guid.NewGuid().ToString(),
 
@@ -621,7 +621,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            ResourceId = "test",
+            
             
             TraceId = Guid.NewGuid().ToString(),
 
@@ -711,7 +711,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log1 = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            ResourceId = "test",
+            
             
             TraceId = Guid.NewGuid().ToString(),
 
@@ -785,7 +785,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            ResourceId = "test",
+            
             
             TraceId = Guid.NewGuid().ToString(),
 
@@ -831,7 +831,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log1 = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            ResourceId = "test",
+            
             
             TraceId = Guid.NewGuid().ToString(),
 
@@ -854,7 +854,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log2 = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            ResourceId = "test",
+            
             
             TraceId = Guid.NewGuid().ToString(),
 
@@ -877,7 +877,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log3 = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            ResourceId = "test",
+            
             
             TraceId = Guid.NewGuid().ToString(),
 
@@ -929,7 +929,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             var log = new DataAcquisitionLog
             {
                 FhirVersion = "test",
-                ResourceId = "test",
+                
                 
                 TraceId = Guid.NewGuid().ToString(),
 
