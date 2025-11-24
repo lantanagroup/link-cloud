@@ -4,6 +4,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DataAcquisition.Domain.Migrations
 {
     [DbContext(typeof(DataAcquisitionDbContext))]
-    partial class DataAcquisitionDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251124172044_IX_DataAcquisitionLogs_Paging_Default")]
+    partial class IX_DataAcquisitionLogs_Paging_Default
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -630,6 +633,9 @@ namespace DataAcquisition.Domain.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("ResourceAcquiredIds")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ResourceId")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int?>("RetryAttempts")
