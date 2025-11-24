@@ -137,7 +137,7 @@ Both FHIR list payloads are critical components of the patient census tracking s
 
 The Census service exposes REST endpoints to manage tenant-specific census configuration.
 
-#### GET /census/config/{facilityId}
+#### GET /census/config/\{facilityId\}
 
 Retrieves the census configuration for a specific facility.
 
@@ -185,7 +185,7 @@ Creates a new census configuration.
 }
 ```
 
-#### PUT /census/config/{facilityId}
+#### PUT /census/config/\{facilityId\}
 
 Updates an existing census configuration.
 
@@ -205,7 +205,7 @@ Updates an existing census configuration.
 - `200 OK`: Configuration updated successfully.
 - `404 Not Found`: If no configuration exists for the specified facilityId.
 
-#### DELETE /census/config/{facilityId}
+#### DELETE /census/config/\{facilityId\}
 
 Deletes a census configuration.
 
@@ -220,7 +220,7 @@ Deletes a census configuration.
 
 Endpoints for retrieving patient census data and patient lists.
 
-#### GET /api/census/{facilityId}/history/admitted
+#### GET /api/census/\{facilityId\}/history/admitted
 
 Gets the admitted patients for a facility within a date range. Returns a FHIR List resource containing patient references.
 
@@ -240,7 +240,7 @@ Returns a FHIR List resource with the following structure:
 - `status`: Current
 - `mode`: Snapshot
 - `extension`: Contains applicable period with start and end dates
-- `entry[]`: Array of patient references in format "Patient/{patientId}"
+- `entry[]`: Array of patient references in format "Patient/\{patientId\}"
 
 ### Patient Encounters Controller
 
@@ -368,7 +368,7 @@ Returns all events stored in the patient events data store for the given facilit
 }
 ```
 
-#### DELETE /api/census/patient-events/{id}
+#### DELETE /api/census/patient-events/\{id\}
 
 Soft deletes a patient event and rebuilds the materialized view for the related correlation id.
 
@@ -380,7 +380,7 @@ Soft deletes a patient event and rebuilds the materialized view for the related 
 - `400 Bad Request`: If patient event ID is not provided.
 - `500 Internal Server Error`: If an error occurs during processing.
 
-#### DELETE /api/census/patient-events/visit/{correlationId}
+#### DELETE /api/census/patient-events/visit/\{correlationId\}
 
 Soft deletes the patient event store for the given correlation id and removes the corresponding materialized view.
 
@@ -425,7 +425,7 @@ The Census service uses Entity Framework Core with SQL Server for data persisten
 
 ### Scheduled Jobs
 
-The Census service uses Quartz.NET for scheduling the census acquisition jobs based on tenant configurations. Each job:
+The Census service uses Quartz.NET with ADO Job Stores for scheduling the census acquisition jobs based on tenant configurations. Each job:
 
 1. Reads the facility-specific configuration
 2. Triggers the census acquisition process
@@ -556,7 +556,7 @@ Link is evaluating the feasibility of using **ADT feeds**—specifically for adm
 
 Both the FHIR List and Bulk FHIR methods utilize a configurable scheduling system, allowing each tenant to define query intervals. The scheduling system is based on CRON patterns, ensuring Link can automatically query the EHR at specified times to maintain an updated census.
 
-Census uses Quartz with ADO JOb Stores to manage jobs across multiple instances of the service, primarily for scheduling Patinet List retrieval and Retry events.
+Census uses Quartz with ADO Job Stores to manage jobs across multiple instances of the service, primarily for scheduling Patient List retrieval and Retry events.
 
 ### Data Persistence and Tracking
 
