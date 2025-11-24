@@ -49,9 +49,7 @@ public class PatientDataService : IPatientDataService
     private readonly IDatabase _database;
 
     private readonly ILogger<PatientDataService> _logger;
-    private readonly IFhirQueryConfigurationManager _fhirQueryManager;
     private readonly IFhirQueryConfigurationQueries _fhirQueryQueries;
-    private readonly IQueryPlanManager _queryPlanManager;
     private readonly IQueryPlanQueries _queryPlanQueries;
     private readonly IQueryListProcessor _queryListProcessor;
     private readonly ProducerConfig _producerConfig;
@@ -65,9 +63,7 @@ public class PatientDataService : IPatientDataService
     public PatientDataService(
         IDatabase database,
         ILogger<PatientDataService> logger,
-        IFhirQueryConfigurationManager fhirQueryManager,
         IFhirQueryConfigurationQueries fhirQueryQueries,
-        IQueryPlanManager queryPlanManager,
         IQueryPlanQueries queryPlanQueries,
         IQueryListProcessor queryListProcessor,
         IReadFhirCommand readFhirCommand,
@@ -80,9 +76,7 @@ public class PatientDataService : IPatientDataService
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _fhirQueryManager = fhirQueryManager;
         _fhirQueryQueries = fhirQueryQueries;
-        _queryPlanManager = queryPlanManager;
         _queryPlanQueries = queryPlanQueries;
 
         _producerConfig = new ProducerConfig();
@@ -456,7 +450,6 @@ public class PatientDataService : IPatientDataService
                 }
 
                 List<string> resourceIds = new List<string>();
-
 
                 //4. call api
                 foreach (var fhirQuery in log.FhirQuery.ToList())
