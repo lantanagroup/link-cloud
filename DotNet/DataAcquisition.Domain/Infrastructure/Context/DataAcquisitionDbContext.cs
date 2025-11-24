@@ -149,6 +149,29 @@ public class DataAcquisitionDbContext : DbContext
 
             entity.Property(d => d.QueryType)
                 .HasConversion(new EnumToStringConverter<FhirQueryType>());
+
+            entity.HasIndex(e => new { e.ExecutionDate, e.Id })
+                .IsDescending()
+                .IsDescending()
+                .HasDatabaseName("IX_DataAcquisitionLogs_Paging_Default")
+                .IncludeProperties(
+                    nameof(DataAcquisitionLog.Priority),
+                    nameof(DataAcquisitionLog.FacilityId),
+                    nameof(DataAcquisitionLog.IsCensus),
+                    nameof(DataAcquisitionLog.PatientId),
+                    nameof(DataAcquisitionLog.ReportableEvent),
+                    nameof(DataAcquisitionLog.ReportTrackingId),
+                    nameof(DataAcquisitionLog.CorrelationId),
+                    nameof(DataAcquisitionLog.TraceId),
+                    nameof(DataAcquisitionLog.FhirVersion),
+                    nameof(DataAcquisitionLog.QueryType),
+                    nameof(DataAcquisitionLog.QueryPhase),
+                    nameof(DataAcquisitionLog.Status),
+                    nameof(DataAcquisitionLog.RetryAttempts),
+                    nameof(DataAcquisitionLog.CompletionDate),
+                    nameof(DataAcquisitionLog.CompletionTimeMilliseconds),
+                    nameof(DataAcquisitionLog.ResourceId)
+                );
         });
 
         //-------------------ResourceReferenceType-------------------
