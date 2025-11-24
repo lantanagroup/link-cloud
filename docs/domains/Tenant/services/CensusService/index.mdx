@@ -107,8 +107,8 @@ Both FHIR list payloads are critical components of the patient census tracking s
   "reportTrackingId": "string", 
   "patientLists": [
     {
-      "listType": <"Admit", "Discharge">,
-      "timeFrame": <"LessThan24Hours", "Between24To48Hours", "MoreThan48Hours">,
+      "listType": "string" - Acceptable values: "Admit", "Discharge",
+      "timeFrame": "string" - Acceptable values: "LessThan24Hours", "Between24To48Hours", "MoreThan48Hours",
       "patientIds": ["string"]
     }
   ]
