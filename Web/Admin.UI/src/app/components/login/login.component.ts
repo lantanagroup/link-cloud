@@ -54,7 +54,4 @@ export class LoginComponent implements OnInit {
     }
   }
 
-  retryLogin() {
-    this.login();
-  }
 }
