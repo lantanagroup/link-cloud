@@ -8,7 +8,7 @@ on:
       - main
       - 'release/**'
       - 'hotfix/**'
-    types: [opened, edited, synchronize]
+    types: [opened]
 
 jobs:
   check-title:
