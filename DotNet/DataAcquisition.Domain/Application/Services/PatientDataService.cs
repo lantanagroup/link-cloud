@@ -328,9 +328,6 @@ public class PatientDataService : IPatientDataService
                     return;
                 }
 
-                
-
-
                 using var activity = new Activity("PatientDataService.ExecuteLogRequest");
 
                 //set trace parent id based on log trace id
@@ -454,9 +451,12 @@ public class PatientDataService : IPatientDataService
 
                 List<string> resourceIds = new List<string>();
 
+
+
                 //4. call api
                 foreach (var fhirQuery in log.FhirQuery.ToList())
                 {
+                    bool skipFetch = false;
                     //check if log is search and not census, if true,
                     //check if fhirQuery query param has ids under _id, update status to Completed and continue if no ids are populated.
                     if(fhirQuery.QueryType == FhirQueryType.Search && !log.IsCensus)
@@ -467,50 +467,44 @@ public class PatientDataService : IPatientDataService
                             var ids = new List<string>();
                             foreach(var idParam in idParams)
                             {
-                                var splitIds = idParam.Substring(4).Split(',');
+                                var splitIds = idParam.Substring(4).Trim().Split(',');
                                 ids.AddRange(splitIds);
                             }
-                            if(!ids.Any())
+
+                            //cleanse ids for empty strings in ids
+                            ids = ids.Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
+
+                            if (!ids.Any())
                             {
-                                //update log to completed and continue
-                                log.Status = RequestStatus.Completed;
-                                log.CompletionDate = System.DateTime.UtcNow;
-                                log.CompletionTimeMilliseconds = 0;
-                                log.Notes?.Add($"[{DateTime.UtcNow}] No IDs found in _id query parameter for Search FHIR query. Marking log as Completed.");
-                                await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
-                                {
-                                    Id = log.Id,
-                                    RetryAttempts = log.RetryAttempts,
-                                    CompletionDate = log.CompletionDate,
-                                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
-                                    ExecutionDate = log.ExecutionDate,
-                                    Notes = log.Notes,
-                                    Status = log.Status,
-                                }, cancellationToken);
-                                return;
+                                log.Notes ??= [];
+                                log.Notes.Add($"[{DateTime.UtcNow}] No IDs found in _id query parameter for Search FHIR query. Marking log as Completed.");
+                                skipFetch = true;
                             }
                         }
                     }
 
-                    foreach (var resourceType in fhirQuery.ResourceTypes)
+                    if (!skipFetch)
                     {
+                        foreach (var resourceType in fhirQuery.ResourceTypes)
+                        {
 
-                        if (fhirQuery.QueryType == FhirQueryType.Read)
-                        {
-                            resourceIds = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType, fhirQueryConfiguration, resourceIds, cancellationToken);
-                        }
-                        else if (fhirQuery.QueryType == FhirQueryType.Search)
-                        {
-                            resourceIds = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, resourceIds, resourceType, cancellationToken);
-                        }
-                        else if (fhirQuery.QueryType == FhirQueryType.BulkDataRequest)
-                        {
-                            throw new NotSupportedException("Bulk Data is currently not supported.");
-                        }
-                        else if (fhirQuery.QueryType == FhirQueryType.BulkDataPoll)
-                        {
-                            throw new NotSupportedException("Bulk Data is currently not supported.");
-                        }
+                            if (fhirQuery.QueryType == FhirQueryType.Read)
+                            {
+                                resourceIds = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType, fhirQueryConfiguration, resourceIds, cancellationToken);
+                            }
+                            else if (fhirQuery.QueryType == FhirQueryType.Search)
+                            {
+                                resourceIds = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, resourceIds, resourceType, cancellationToken);
+                            }
+                            else if (fhirQuery.QueryType == FhirQueryType.BulkDataRequest)
+                            {
+                                throw new NotSupportedException("Bulk Data is currently not supported.");
+                            }
+                            else if (fhirQuery.QueryType == FhirQueryType.BulkDataPoll)
+                            {
+                                throw new NotSupportedException("Bulk Data is currently not supported.");
+                            }
+                        } 
                     }
                 }
 
