@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DataAcquisition.Domain.Migrations
 {
     [DbContext(typeof(DataAcquisitionDbContext))]
-    [Migration("20251124162058_RemoveResourceIdColumn")]
+    [Migration("20251124172045_RemoveResourceIdColumn")]
     partial class RemoveResourceIdColumn
     {
         /// <inheritdoc />
