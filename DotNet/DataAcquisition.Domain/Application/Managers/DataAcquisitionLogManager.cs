@@ -42,7 +42,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             QueryPhase = model.QueryPhase,
             FhirVersion = model.FhirVersion,
             QueryType = model.QueryType,
-            ResourceId = model.ResourceId,
+            ResourceAcquiredIds = model.ResourceAcquiredIds,
             FhirQueries = model.FhirQuery.Select(q => new FhirQuery
             {
                 FacilityId = model.FacilityId,
@@ -133,6 +133,11 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         if(updateLog.RetryAttempts != null)
         {
             existingLog.RetryAttempts = updateLog.RetryAttempts;
+        }
+
+        if (updateLog.ResourceAcquiredIds?.Any() ?? false)
+        {
+            existingLog.ResourceAcquiredIds = updateLog.ResourceAcquiredIds;
         }
 
         if (updateLog.TraceId != null)
