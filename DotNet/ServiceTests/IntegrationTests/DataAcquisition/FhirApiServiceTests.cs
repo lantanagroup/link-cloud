@@ -1,20 +1,23 @@
 ﻿using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Rest;
 using Hl7.Fhir.Support;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
-using Microsoft.Extensions.Logging;
 using Moq;
 using System.Net;
+using System.Collections.Frozen;
+using System.Collections.Generic;
+using System.Linq;
+using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition;
@@ -156,5 +159,97 @@ public class FhirApiServiceTests
         Assert.NotNull(log.Notes);
         Assert.NotEmpty(log.Notes);
         Assert.StartsWith("OperationOutcome", log.Notes[0]);
+    }
+
+    [Fact]
+    public async Task ExecuteSearch_SharedResource_KafkaMessage_NoPatientId()
+    {
+        // Arrange: Mock all dependencies for FhirApiService
+        var referenceResourceManager = new Mock<IReferenceResourcesManager>();
+        var referenceResourceQueries = new Mock<IReferenceResourcesQueries>();
+        var referenceResourceService = new Mock<IReferenceResourceService>();
+        var searchFhirCommand = new Mock<ISearchFhirCommand>();
+        var readFhirCommand = new Mock<IReadFhirCommand>();
+        var kafkaProducer = new Mock<Confluent.Kafka.IProducer<string, ResourceAcquired>>();
+
+        // Prepare a shared resource (e.g., Location) with no patient context
+        var location = new Hl7.Fhir.Model.Location
+        {
+            Id = "loc-1"
+        };
+        var bundle = new Hl7.Fhir.Model.Bundle
+        {
+            Entry = new List<Hl7.Fhir.Model.Bundle.EntryComponent>
+            {
+                new Hl7.Fhir.Model.Bundle.EntryComponent { Resource = location }
+            }
+        };
+
+        // Setup searchFhirCommand to return the bundle as an async stream
+        searchFhirCommand
+            .Setup(x => x.ExecuteAsync(
+                It.IsAny<SearchFhirCommandRequest>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(GetBundleAsync(bundle));
+
+        // Capture the produced Kafka message
+        ResourceAcquired? producedMessage = null;
+        kafkaProducer
+            .Setup(x => x.ProduceAsync(
+                It.IsAny<string>(),
+                It.IsAny<Confluent.Kafka.Message<string, ResourceAcquired>>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, Confluent.Kafka.Message<string, ResourceAcquired>, CancellationToken>((topic, msg, ct) =>
+            {
+                producedMessage = msg.Value;
+            })
+            .ReturnsAsync(new Confluent.Kafka.DeliveryResult<string, ResourceAcquired>());
+
+        var service = new FhirApiService(
+            referenceResourceManager.Object,
+            referenceResourceQueries.Object,
+            referenceResourceService.Object,
+            searchFhirCommand.Object,
+            readFhirCommand.Object,
+            kafkaProducer.Object
+        );
+
+        var log = new DataAcquisitionLogModel
+        {
+            FacilityId = "fac-1",
+            CorrelationId = "corr-1",
+            QueryPhase = QueryPhase.Initial,
+            ScheduledReport = new LantanaGroup.Link.Shared.Application.Models.ScheduledReport(),
+            ReportableEvent = ReportableEvent.Adhoc
+        };
+
+        var fhirQuery = new FhirQueryModel
+        {
+            IsReference = true, // Shared resource
+            ResourceReferenceTypes = new List<ResourceReferenceTypeModel>(),
+            IdQueryParameterValues = new List<string> { "loc-1" }
+        };
+
+        var fhirQueryConfig = new FhirQueryConfigurationModel
+        {
+            FhirServerBaseUrl = "http://example.com/fhir"
+        };
+
+        var resourceIds = new List<string>();
+
+        // Act
+        await service.ExecuteSearch(log, fhirQuery, fhirQueryConfig, resourceIds, Hl7.Fhir.Model.ResourceType.Location);
+
+        // Assert: Kafka message was produced and PatientId is null
+        Assert.NotNull(producedMessage);
+        Assert.Equal(location, producedMessage.Resource);
+        Assert.Null(producedMessage.PatientId);
+
+    }
+
+    private static async IAsyncEnumerable<Hl7.Fhir.Model.Bundle> GetBundleAsync(Hl7.Fhir.Model.Bundle bundle)
+    {
+        yield return bundle;
+        await Task.CompletedTask;
     }
 }
