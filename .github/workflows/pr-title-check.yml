@@ -1,5 +1,5 @@
 # From: https://levelup.gitconnected.com/enforcing-jira-ticket-formatting-in-github-pr-titles-and-commit-messages-78d9755568df
-name: "PR Title Check"
+name: "check-title"
 on:
   workflow_dispatch:
   pull_request_target:
@@ -12,7 +12,7 @@ on:
 
 jobs:
   check-title:
-    name: PR Title Check
+    name: check-title
     runs-on: ubuntu-latest
     steps:
     - name: Check PR title
