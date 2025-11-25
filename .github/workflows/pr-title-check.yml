@@ -1,16 +1,14 @@
 # From: https://levelup.gitconnected.com/enforcing-jira-ticket-formatting-in-github-pr-titles-and-commit-messages-78d9755568df
 name: "PR Title Check"
 on:
-  pull_request:
+  workflow_dispatch:
+  pull_request_target:
     branches: 
       - dev
       - main
       - 'release/**'
       - 'hotfix/**'
     types: [opened, edited, synchronize]
-  merge_group:
-    branches:
-      - dev
 
 jobs:
   check-title:
