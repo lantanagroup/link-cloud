@@ -232,7 +232,7 @@ public class ResourceAcquiredListener : BackgroundService
                             Notes = $"Data Acquisition processing failure \nException Message: {ex}",
                         };
 
-                        _deadLetterExceptionHandler.HandleException(message, new DeadLetterException("Data Acquisition Exception thrown: " + ex.Message), message.Message.Key);
+                        _transientExceptionHandler.HandleException(message, new TransientException("Data Acquisition Exception thrown: " + ex.Message), message.Message.Key);
                     }
                     finally
                     {

@@ -226,8 +226,8 @@ Gets the admitted patients for a facility within a date range. Returns a FHIR Li
 
 **Parameters:**
 - `facilityId` (path, required): The unique identifier of the facility.
-- `startDate` (query, optional): Start date for the date range filter. If not provided, defaults to retrieving all active patients.
-- `endDate` (query, optional): End date for the date range filter.
+- `startDate` (query, required): Start date for the date range filter.
+- `endDate` (query, required): End date for the date range filter.
 
 **Response:**
 - `200 OK`: Returns a FHIR List resource with admitted patients.
