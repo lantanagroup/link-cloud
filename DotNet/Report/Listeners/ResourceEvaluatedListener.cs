@@ -193,6 +193,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
         public async Task ProcessMessageAsync(ConsumeResult<ResourceEvaluatedKey, ResourceEvaluatedValue> result, CancellationToken cancellationToken)
         {
+            var stopwatch = Stopwatch.StartNew();
+
             var key = result.Message.Key;
             var value = result.Message.Value;
             var facilityId = key.FacilityId;
@@ -330,6 +332,9 @@ namespace LantanaGroup.Link.Report.Listeners
             {
                 await _reportManifestProducer.Produce(schedule);
             }
+
+            stopwatch.Stop();
+            _logger.LogDebug("ResourceEvaluated consumed in {ElapsedSeconds} seconds for FacilityId: {FacilityId}, PatientId: {PatientId}", stopwatch.Elapsed.TotalSeconds, facilityId, value.PatientId);
         }
 
         private static string GetFacilityIdFromHeader(Headers headers)

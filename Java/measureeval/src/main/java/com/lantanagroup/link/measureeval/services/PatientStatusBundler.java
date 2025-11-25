@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.time.Duration;
+import java.time.Instant;
 
 @Service
 public class PatientStatusBundler {
@@ -44,13 +46,20 @@ public class PatientStatusBundler {
                 .filter(resource -> resource.getNormalizationStatus() == NormalizationStatus.NORMALIZED)
                 .filter(resource -> !resource.getIsPatientResource())
                 .toList();
+        var patientResourcesRefs = patientStatus.getResources().stream()
+                .filter(resource -> resource.getNormalizationStatus() == NormalizationStatus.NORMALIZED)
+                .filter(PatientReportingEvaluationStatus.Resource::getIsPatientResource)
+                .toList();
 
         logger.debug("Collecting patient resources for patient {} and {} shared resources from the database", patientStatus.getPatientId(), sharedResourcesRefs.size());
 
-        var patientResources = resourceRepository.findResources(false, patientStatus.getFacilityId(), patientStatus.getCorrelationId());
-        var sharedResources = resourceRepository.findResources(true, patientStatus.getFacilityId(), patientStatus.getCorrelationId());
+        Instant start = Instant.now();
+        var patientResources = resourceRepository.findResources(patientStatus.getFacilityId(), false, patientResourcesRefs);
+        var sharedResources = resourceRepository.findResources(patientStatus.getFacilityId(), true, sharedResourcesRefs);
+        Duration elapsed = Duration.between(start, Instant.now());
 
-        logger.debug("Retrieved {} patient resources and {} shared resources from the database", patientResources.size(), sharedResources.size());
+        logger.debug("Retrieved {} patient resources and {} shared resources from the database in {} seconds",
+                patientResources.size(), sharedResources.size(), elapsed.toMillis() / 1000.0);
 
         List<AbstractResourceEntity> resources = new ArrayList<>();
         resources.addAll(patientResources);
