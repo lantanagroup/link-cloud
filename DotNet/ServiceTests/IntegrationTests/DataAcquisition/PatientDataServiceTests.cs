@@ -91,9 +91,7 @@ public class PatientDataServiceTests
         _service = new PatientDataService(
             _mockDatabase.Object,
             _mockLogger.Object,
-            _mockFhirQueryManager.Object,
             _mockFhirQueryQueries.Object,
-            _mockQueryPlanManager.Object,
             _mockQueryPlanQueries.Object,
             _mockQueryListProcessor.Object,
             _mockReadFhirCommand.Object,
