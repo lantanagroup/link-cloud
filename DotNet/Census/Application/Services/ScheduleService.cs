@@ -56,7 +56,8 @@ public class ScheduleService : BackgroundService
             {
                 try
                 {
-                    await censusSchedulingRepo.UpdateJobsForFacility(facility, Scheduler);
+                    if(facility.Enabled ?? true)
+                        await censusSchedulingRepo.UpdateJobsForFacility(facility, Scheduler);
                 }
                 catch (Exception ex)
                 {
@@ -74,7 +75,7 @@ public class ScheduleService : BackgroundService
                 if (parts.Length < 2) continue; // Invalid name, skip
                 string facilityId = parts[0];
 
-                if (!facilities.Any(f => f.FacilityID == facilityId))
+                if (!facilities.Any(f => f.FacilityID == facilityId || !(f.Enabled?? true)))
                 {
                     try
                     {
