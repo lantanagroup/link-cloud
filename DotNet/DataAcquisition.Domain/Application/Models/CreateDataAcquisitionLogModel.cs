@@ -1,5 +1,4 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 
@@ -22,6 +21,6 @@ namespace DataAcquisition.Domain.Application.Models
         public string? TraceId { get; set; }
         public List<string> Notes { get; set; } = new List<string>();
         public required ScheduledReport ScheduledReport { get; set; }
-        public string ResourceId { get; internal set; }
+        public List<string> ResourceAcquiredIds { get; set; } = new();
     }
 }
