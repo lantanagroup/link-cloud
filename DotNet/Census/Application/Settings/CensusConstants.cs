@@ -21,12 +21,6 @@ public static class CensusConstants
         public const string CorrelationId = "X-Correlation-Id";
     }
 
-    public static class MessageNames
-    {
-        public const string PatientIDsAcquired = "PatientIDsAcquired";
-        public const string PatientIDsAcquiredError = "PatientIDsAcquired-Error";
-    }
-
     public static class CensusLoggingIds
     {
         public const int GenerateItems = 1000;

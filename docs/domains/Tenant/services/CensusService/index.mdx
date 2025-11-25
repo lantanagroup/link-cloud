@@ -45,12 +45,12 @@ The system routinely gathers census data by leveraging multiple methods compatib
 
 ## Event Sourcing Workflow
 
-The Census service consumes `PatientIDsAcquired` events from Kafka. When a new event is received, the `PatientListsAcquiredListener` processes the payload, updating census records for the specified facility. This enables downstream reporting and data acquisition.
+The Census service consumes `PatientListsAcquired` events from Kafka. When a new event is received, the `PatientListsAcquiredListener` processes the payload, updating census records for the specified facility. This enables downstream reporting and data acquisition.
 
 **Workflow Steps:**
 1. **Scheduling:** A scheduled job (per tenant configuration) triggers a request for updated patient lists.
 2. **Data Acquisition:** The system sends a `DataAcquisitionRequested` event, prompting the acquisition of FHIR patient lists.
-3. **Event Production:** Upon successful acquisition, a `PatientIDsAcquired` event is produced, containing the list of patient FHIR IDs.
+3. **Event Production:** Upon successful acquisition, a `PatientListsAcquired` event is produced, containing the list of patient FHIR IDs.
 4. **Census Update:** The Census service consumes the event and updates its records accordingly.
 
 ## Event Payload Structures
@@ -536,6 +536,10 @@ The **FHIR List Resource** method is one of the primary approaches for acquiring
 - **Functionality**: Queries the EHR for patient lists identified by a `listId`.
 - **Tenant Configurability**: The `listId` is configurable per tenant within Link, allowing each institution to define the patient population that constitutes their census.
 - **Applicability**: This method supports census management for any EHR that utilizes FHIR Lists representing relevant patient groups.
+- **Rules**: The following rules are enforced by Census when processing FHIR List resources:
+  - Admission lists are processed before discharge lists.
+  - If a patient appears on a discharge lists with no corresponding admit event, an admission event is created and then the patient is discharged.
+  - If a patient is admitted and then disappears off of all incoming lists, the patient is discharged.
 
 #### 2. FHIR Standard - Bulk FHIR Implementation Guide
 

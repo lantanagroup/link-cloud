@@ -115,7 +115,14 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             if (logger.isInfoEnabled()) {
                 logger.info("Consuming record: RECORD=[{}] FACILITY=[{}] CORRELATION=[{}] ACQUISITION COMPLETE=[{}]", KafkaUtils.format(record), facilityId, correlationId, value.isAcquisitionComplete());
             }
-            PatientReportingEvaluationStatus patientStatus = Objects.requireNonNullElseGet(retrievePatientStatus(facilityId, correlationId), () -> createPatientStatus(facilityId, correlationId, value));
+
+            PatientReportingEvaluationStatus patientStatus = retrievePatientStatus(facilityId, correlationId);
+
+            if (patientStatus == null) {
+                logger.debug("Patient status for facilityId: {}, correlationId: {} not found. Creating a temporary PatientStatus...", facilityId, correlationId);
+                patientStatus = createPatientStatus(facilityId, correlationId, value);
+            }
+
             Bundle bundle = patientStatusBundler.createBundle(patientStatus);
             evaluateMeasures(value, patientStatus, bundle);
             return;

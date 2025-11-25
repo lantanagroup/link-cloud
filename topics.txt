@@ -19,9 +19,6 @@ PatientCensusScheduled-Retry:3:1
 PatientEvent:3:1
 PatientEvent-Error:3:1
 PatientEvent-Retry:3:1
-PatientIDsAcquired:3:1
-PatientIDsAcquired-Error:3:1
-PatientIDsAcquired-Retry:3:1
 PatientListsAcquired:3:1
 PatientListsAcquired-Error:3:1
 PatientListsAcquired-Retry:3:1
