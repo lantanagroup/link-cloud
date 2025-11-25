@@ -119,7 +119,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             PatientReportingEvaluationStatus patientStatus = retrievePatientStatus(facilityId, correlationId);
 
             if (patientStatus == null) {
-                logger.warn("Patient status for facilityId: {}, correlationId: {} not found. Creating a temporary PatientStatus...", facilityId, correlationId);
+                logger.debug("Patient status for facilityId: {}, correlationId: {} not found. Creating a temporary PatientStatus...", facilityId, correlationId);
                 patientStatus = createPatientStatus(facilityId, correlationId, value);
             }
 
