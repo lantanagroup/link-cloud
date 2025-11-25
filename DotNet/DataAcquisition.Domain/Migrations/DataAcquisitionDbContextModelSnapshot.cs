@@ -632,9 +632,6 @@ namespace DataAcquisition.Domain.Migrations
                     b.Property<string>("ResourceAcquiredIds")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("ResourceId")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<int?>("RetryAttempts")
                         .HasColumnType("int");
 

@@ -15,5 +15,6 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryL
         public DateTime? CompletionDate { get; set; }
         public long? CompletionTimeMilliseconds { get; set; }
         public string? TraceId { get; set; }
+        public List<string>? ResourceAcquiredIds { get; set; }
     }
 }

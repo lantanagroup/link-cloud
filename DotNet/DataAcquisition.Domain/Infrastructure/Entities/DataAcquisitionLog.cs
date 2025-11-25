@@ -45,8 +45,6 @@ public class DataAcquisitionLog
 
     public ReportableEvent? ReportableEvent { get; set; }
 
-    public string? ResourceId { get; set; }
-
     public bool TailSent { get; set; } = false;
 
     public string? ReportTrackingId { get; set; }

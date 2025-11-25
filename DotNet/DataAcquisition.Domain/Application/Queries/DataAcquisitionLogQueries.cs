@@ -267,11 +267,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             query = query.Where(log => log.ReportTrackingId == model.ReportTrackingId);
         }
 
-        if (!string.IsNullOrEmpty(model.ResourceId))
-        {
-            query = query.Where(log => log.ResourceId != null && log.ResourceId == model.ResourceId);
-        }
-
         if (model.QueryPhase.HasValue)
         {
             query = query.Where(log => log.QueryPhase == model.QueryPhase.Value);
