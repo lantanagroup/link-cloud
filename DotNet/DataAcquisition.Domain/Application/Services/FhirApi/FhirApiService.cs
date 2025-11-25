@@ -102,7 +102,7 @@ public class FhirApiService : IFhirApiService
             {
                 Resource = resource,
                 ScheduledReports = new List<Shared.Application.Models.ScheduledReport> { log.ScheduledReport },
-                PatientId = log.PatientId,
+                PatientId = !fhirQuery.IsReference ?? false ? log.PatientId : null,
                 QueryType = log.QueryPhase.ToString(),
                 ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
             }, log.FacilityId, log.CorrelationId, cancellationToken);
@@ -192,7 +192,7 @@ public class FhirApiService : IFhirApiService
                     {
                         Resource = resource,
                         ScheduledReports = new List<Shared.Application.Models.ScheduledReport> { log.ScheduledReport },
-                        PatientId = log.PatientId,
+                        PatientId = !fhirQuery.IsReference ?? false ? log.PatientId : null,
                         QueryType = log.QueryPhase.ToString(),
                         ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
                     }, log.FacilityId, log.CorrelationId, cancellationToken);
