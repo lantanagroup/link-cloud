@@ -95,7 +95,8 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                             Logger.LogError(ex,
                                 "Unhandled exception in listener for {ServiceName} on topic {Topic}",
                                 ServiceInformation.Value.ServiceName, this.TopicName);
-                            DeadLetterConsumerHandler.HandleException(consumeResult, new DeadLetterException("Data Acquisition Exception thrown: " + ex.Message), ExtractFacilityId(consumeResult));
+
+                            TransientExceptionHandler.HandleException(consumeResult, new TransientException($"{ServiceInformation.Value.ServiceName} Exception thrown: " + ex.Message), ExtractFacilityId(consumeResult));
                         }
                         finally
                         {

@@ -93,6 +93,7 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
                 await dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {
                     Id = log.Id,
+                    ResourceAcquiredIds = log.ResourceAcquiredIds,
                     RetryAttempts = log.RetryAttempts,
                     CompletionDate = log.CompletionDate,
                     CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,

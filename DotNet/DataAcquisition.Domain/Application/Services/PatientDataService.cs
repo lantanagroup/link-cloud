@@ -4,6 +4,9 @@ using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -18,13 +21,10 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using StringComparison = System.StringComparison;
 using Task = System.Threading.Tasks.Task;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 
@@ -371,6 +371,7 @@ public class PatientDataService : IPatientDataService
                         await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                         {
                             Id = log.Id,
+                            ResourceAcquiredIds = log.ResourceAcquiredIds,
                             RetryAttempts = log.RetryAttempts,
                             CompletionDate = log.CompletionDate,
                             CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
@@ -388,6 +389,7 @@ public class PatientDataService : IPatientDataService
                         await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                         {
                             Id = log.Id,
+                            ResourceAcquiredIds = log.ResourceAcquiredIds,
                             RetryAttempts = log.RetryAttempts,
                             CompletionDate = log.CompletionDate,
                             CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
@@ -428,6 +430,7 @@ public class PatientDataService : IPatientDataService
                 await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {
                     Id = log.Id,
+                    ResourceAcquiredIds = log.ResourceAcquiredIds,
                     RetryAttempts = log.RetryAttempts,
                     CompletionDate = log.CompletionDate,
                     CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
@@ -487,6 +490,7 @@ public class PatientDataService : IPatientDataService
                 {
                     Id = log.Id,
                     RetryAttempts = log.RetryAttempts,
+                    ResourceAcquiredIds = log.ResourceAcquiredIds,
                     CompletionDate = log.CompletionDate,
                     CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
                     ExecutionDate = log.ExecutionDate,
@@ -505,6 +509,7 @@ public class PatientDataService : IPatientDataService
                 await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {
                     Id = log.Id,
+                    ResourceAcquiredIds = log.ResourceAcquiredIds,
                     RetryAttempts = log.RetryAttempts,
                     CompletionDate = log.CompletionDate,
                     CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,

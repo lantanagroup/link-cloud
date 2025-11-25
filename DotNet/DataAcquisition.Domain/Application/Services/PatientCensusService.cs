@@ -262,6 +262,7 @@ public class PatientCensusService : IPatientCensusService
         var updatedLog = await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
         {
             Id = log.Id,
+            ResourceAcquiredIds = log.ResourceAcquiredIds,
             RetryAttempts = log.RetryAttempts,
             CompletionDate = log.CompletionDate,
             CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
