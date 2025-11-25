@@ -54,9 +54,10 @@ The Measure Eval service is a Java based application that is primarily responsib
 
 ## Custom Configurations
 
-| Property Name                | Description                                       | Type/Value                               | Secret? |
-|------------------------------|---------------------------------------------------|------------------------------------------|---------|
-| link.reportability-predicate | Predicate to determine if a patient is reportable | "...IsInInitialPopulation"<br/>(default) | No      |
+| Property Name                      | Description                                                                                                                                                                     | Type/Value                               | Required | Secret? |
+|------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------|----------|---------|
+| link.reportability-predicate       | Predicate to determine if a patient is reportable                                                                                                                               | "...IsInInitialPopulation"<br/>(default) | No       | No      |
+| link.max-collect-resources-threads | The maximum number of threads to use to collect resources from the mongo database when bundling a patient's resources. Defaults to maximum threads available on the server/pod. | Integer                                  | No       | No      |
 
 ### Reportability Predicates
 
