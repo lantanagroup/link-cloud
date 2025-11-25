@@ -80,9 +80,9 @@ public class AbstractResourceRepository {
         int threadCount = Runtime.getRuntime().availableProcessors();
 
         if (useConfiguredThreadCount) {
+            threadCount = linkConfig.getMaxCollectResourcesThreads();
             logger.debug("Using configured thread count of {}", linkConfig.getMaxCollectResourcesThreads());
         } else {
-            threadCount = Runtime.getRuntime().availableProcessors();
             logger.debug("Using maximum thread count of {} for available processors", threadCount);
         }
 
