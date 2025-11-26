@@ -321,6 +321,24 @@ public class PatientDataService : IPatientDataService
                     throw new ArgumentException($"Facility ID {request.facilityId} does not match log's facility ID {log.FacilityId}.");
                 }
 
+                //check if log has any FhirQuery objects
+                if (log.FhirQuery == null || !log.FhirQuery.Any())
+                {
+                    throw new ArgumentException($"Log with ID {log.Id} does not have any FHIR queries defined.");
+                }
+
+                //check if resource types are defined in all FhirQuery objects
+                if (log.FhirQuery.Any(x => x.ResourceTypes == null || !x.ResourceTypes.Any()))
+                {
+                    throw new ArgumentException($"Log with ID {log.Id} has a FHIR query with no resource types defined.");
+                }
+
+                //check if query type is search and there are no query parameters in FhirQuery
+                if (log.FhirQuery != null && log.FhirQuery.Any() && log.FhirQuery.Any(x => x.QueryType == FhirQueryType.Search && !x.QueryParameters.Any()))
+                {
+                    throw new ArgumentException($"Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
+                }
+
                 //check if isCensus, if true, create scope for PatientCensusService and execute RetrieveListData
                 if (log.IsCensus)
                 {
@@ -407,24 +425,6 @@ public class PatientDataService : IPatientDataService
                     throw new ArgumentException($"Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
                 }
 
-                //check if log has any FhirQuery objects
-                if (log.FhirQuery == null || !log.FhirQuery.Any())
-                {
-                    throw new ArgumentException($"Log with ID {log.Id} does not have any FHIR queries defined.");
-                }
-
-                //check if resource types are defined in all FhirQuery objects
-                if (log.FhirQuery.Any(x => x.ResourceTypes == null || !x.ResourceTypes.Any()))
-                {
-                    throw new ArgumentException($"Log with ID {log.Id} has a FHIR query with no resource types defined.");
-                }
-
-                //check if query type is search and there are no query parameters in FhirQuery
-                if (log.FhirQuery != null && log.FhirQuery.Any() && log.FhirQuery.Any(x => x.QueryType == FhirQueryType.Search && !x.QueryParameters.Any()))
-                {
-                    throw new ArgumentException($"Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
-                }
-
                 //2. set to "Processing"
                 log.Status = RequestStatus.Processing;
                 await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
@@ -452,7 +452,8 @@ public class PatientDataService : IPatientDataService
                         $"No configuration for {log.FacilityId} exists.");
                 }
 
-                List<string> resourceIds = new List<string>();
+                //hashset to hold unique resource ids
+                var resourceIds = new HashSet<string>();
 
                 bool skipFetch = false;
                 
@@ -465,7 +466,6 @@ public class PatientDataService : IPatientDataService
                     }
 
                     //check if log is search and not census, if true,
-                    //check if fhirQuery query param has ids under _id, update status to Completed and continue if no ids are populated.
                     if (fhirQuery.QueryType == FhirQueryType.Search && !log.IsCensus)
                     {
                         var idParams = fhirQuery.QueryParameters.Where(x => x.StartsWith("_id=", StringComparison.InvariantCultureIgnoreCase)).ToList();
@@ -494,14 +494,15 @@ public class PatientDataService : IPatientDataService
                     {
                         foreach (var resourceType in fhirQuery.ResourceTypes)
                         {
-
                             if (fhirQuery.QueryType == FhirQueryType.Read)
                             {
-                                resourceIds = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType, fhirQueryConfiguration, resourceIds, cancellationToken);
+                                var ids = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType, fhirQueryConfiguration, cancellationToken);
+                                if (ids != null) foreach (var id in ids) resourceIds.Add(id);
                             }
                             else if (fhirQuery.QueryType == FhirQueryType.Search)
                             {
-                                resourceIds = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, resourceIds, resourceType, cancellationToken);
+                                var ids = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, resourceType, cancellationToken);
+                                if (ids != null) foreach (var id in ids) resourceIds.Add(id);
                             }
                             else if (fhirQuery.QueryType == FhirQueryType.BulkDataRequest)
                             {
@@ -521,7 +522,8 @@ public class PatientDataService : IPatientDataService
                 log.CompletionTimeMilliseconds = stopwatch.ElapsedMilliseconds;
                 log.CompletionDate = System.DateTime.UtcNow;
                 log.Status = skipFetch ? RequestStatus.Skipped : RequestStatus.Completed;
-                log.ResourceAcquiredIds = resourceIds;
+                log.ResourceAcquiredIds = resourceIds.ToList();
+
                 await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {
                     Id = log.Id,
