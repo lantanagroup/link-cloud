@@ -464,11 +464,13 @@ public class PatientDataService : IPatientDataService
                         {
                             var ids = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType, fhirQueryConfiguration, cancellationToken);
                             resourceIds.AddRange(ids);
+                            resourceIds.AddRange(ids ?? Array.Empty<string>());
                         }
                         else if (fhirQuery.QueryType == FhirQueryType.Search)
                         {
                             var ids = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, resourceType, cancellationToken);
                             resourceIds.AddRange(ids);
+                            resourceIds.AddRange(ids ?? Array.Empty<string>());
                         }
                         else if (fhirQuery.QueryType == FhirQueryType.BulkDataRequest)
                         {
