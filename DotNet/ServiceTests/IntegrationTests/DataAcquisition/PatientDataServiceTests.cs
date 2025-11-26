@@ -314,15 +314,18 @@ public class PatientDataServiceTests
             FacilityId = "facilityId",
             Status = RequestStatus.Ready,
             FhirQueries = new List<FhirQuery>
+        {
+            new FhirQuery
             {
-                new FhirQuery
+                QueryType = FhirQueryType.Read,
+                FhirQueryResourceTypes = new List<FhirQueryResourceType>
                 {
-                    QueryType = FhirQueryType.Read,
-                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } },
-                    QueryParameters = new List<string>(),
-                    ResourceReferenceTypes = new List<ResourceReferenceType>()
-                }
-            },
+                    new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient }
+                },
+                QueryParameters = new List<string>(),
+                ResourceReferenceTypes = new List<ResourceReferenceType>()
+            }
+        },
             ScheduledReport = new ScheduledReport(),
             PatientId = "patient-1",
             CorrelationId = "corr-1"
@@ -348,9 +351,15 @@ public class PatientDataServiceTests
             .Setup(m => m.GetByFacilityIdAsync("facilityId", cancellationToken))
             .ReturnsAsync(fhirQueryConfig);
 
-        _mockReadFhirCommand
-            .Setup(cmd => cmd.ExecuteAsync(It.IsAny<ReadFhirCommandRequest>(), cancellationToken))
-            .ReturnsAsync(new Patient { Id = "patient-1" });
+        // ADD THIS SETUP - Mock the ExecuteRead method to return a list of IDs
+        _mockFhirApiService
+            .Setup(x => x.ExecuteRead(
+                It.IsAny<DataAcquisitionLogModel>(),
+                It.IsAny<FhirQueryModel>(),
+                It.IsAny<Hl7.Fhir.Model.ResourceType>(),
+                It.IsAny<FhirQueryConfigurationModel>(),
+                cancellationToken))
+            .ReturnsAsync(new[] { "Patient/patient-1" });
 
         // Act
         await _service.ExecuteLogRequest(request, cancellationToken);
