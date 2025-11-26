@@ -3,6 +3,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
+using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.Swagger;
 using Swashbuckle.AspNetCore.SwaggerUI;
 
@@ -21,6 +22,7 @@ public static class ConfigureSwaggerExtension
         
         app.UseSwagger(opts =>
         {
+            opts.OpenApiVersion = OpenApiSpecVersion.OpenApi2_0;
             specAction?.Invoke(opts);
         });
         
