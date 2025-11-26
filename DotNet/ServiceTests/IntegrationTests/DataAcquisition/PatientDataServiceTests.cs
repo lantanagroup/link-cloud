@@ -314,15 +314,18 @@ public class PatientDataServiceTests
             FacilityId = "facilityId",
             Status = RequestStatus.Ready,
             FhirQueries = new List<FhirQuery>
+        {
+            new FhirQuery
             {
-                new FhirQuery
+                QueryType = FhirQueryType.Read,
+                FhirQueryResourceTypes = new List<FhirQueryResourceType>
                 {
-                    QueryType = FhirQueryType.Read,
-                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } },
-                    QueryParameters = new List<string>(),
-                    ResourceReferenceTypes = new List<ResourceReferenceType>()
-                }
-            },
+                    new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient }
+                },
+                QueryParameters = new List<string>(),
+                ResourceReferenceTypes = new List<ResourceReferenceType>()
+            }
+        },
             ScheduledReport = new ScheduledReport(),
             PatientId = "patient-1",
             CorrelationId = "corr-1"
@@ -348,9 +351,15 @@ public class PatientDataServiceTests
             .Setup(m => m.GetByFacilityIdAsync("facilityId", cancellationToken))
             .ReturnsAsync(fhirQueryConfig);
 
-        _mockReadFhirCommand
-            .Setup(cmd => cmd.ExecuteAsync(It.IsAny<ReadFhirCommandRequest>(), cancellationToken))
-            .ReturnsAsync(new Patient { Id = "patient-1" });
+        // ADD THIS SETUP - Mock the ExecuteRead method to return a list of IDs
+        _mockFhirApiService
+            .Setup(x => x.ExecuteRead(
+                It.IsAny<DataAcquisitionLogModel>(),
+                It.IsAny<FhirQueryModel>(),
+                It.IsAny<Hl7.Fhir.Model.ResourceType>(),
+                It.IsAny<FhirQueryConfigurationModel>(),
+                cancellationToken))
+            .ReturnsAsync(new[] { "Patient/patient-1" });
 
         // Act
         await _service.ExecuteLogRequest(request, cancellationToken);
@@ -368,5 +377,116 @@ public class PatientDataServiceTests
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(() => _service.ExecuteLogRequest(request, cancellationToken));
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_ShouldAccumulateResourceIds_FromMultipleFhirQueries()
+    {
+        // Arrange
+        var request = new AcquisitionRequest(1, "facility-1");
+        var cancellationToken = CancellationToken.None;
+
+        var log = new DataAcquisitionLog
+        {
+            Id = 1,
+            FacilityId = "facility-1",
+            PatientId = "Patient/123",
+            Status = RequestStatus.Ready,
+            CorrelationId = "corr-1",
+            FhirQueries = new List<FhirQuery>
+        {
+            new FhirQuery
+            {
+                QueryType = FhirQueryType.Read,
+                FhirQueryResourceTypes = new List<FhirQueryResourceType>
+                {
+                    new() { ResourceType = ResourceType.Patient }
+                }
+            },
+            new FhirQuery
+            {
+                QueryType = FhirQueryType.Search,
+                FhirQueryResourceTypes = new List<FhirQueryResourceType>
+                {
+                    new() { ResourceType = ResourceType.Observation }
+                },
+                QueryParameters = new List<string> { "patient=Patient/123" }
+            },
+            new FhirQuery
+            {
+                QueryType = FhirQueryType.Read,
+                FhirQueryResourceTypes = new List<FhirQueryResourceType>
+                {
+                    new() { ResourceType = ResourceType.Encounter }
+                }
+            }
+        },
+            ScheduledReport = new ScheduledReport()
+        };
+
+        var model = DataAcquisitionLogModel.FromDomain(log);
+
+        _mockLogQueries
+            .Setup(q => q.GetAsync(1, cancellationToken))
+            .ReturnsAsync(model);
+
+        _mockFhirQueryQueries
+            .Setup(q => q.GetByFacilityIdAsync("facility-1", cancellationToken))
+            .ReturnsAsync(new FhirQueryConfigurationModel { FacilityId = "facility-1" });
+
+        // Mock three different queries returning different IDs
+        _mockFhirApiService
+            .Setup(x => x.ExecuteRead(
+                It.IsAny<DataAcquisitionLogModel>(),
+                It.Is<FhirQueryModel>(q => q.ResourceTypes.Contains(ResourceType.Patient)),
+                ResourceType.Patient,
+                It.IsAny<FhirQueryConfigurationModel>(),
+                cancellationToken))
+            .ReturnsAsync(new[] { "Patient/123" });
+
+        _mockFhirApiService
+            .Setup(x => x.ExecuteSearch(
+                It.IsAny<DataAcquisitionLogModel>(),
+                It.Is<FhirQueryModel>(q => q.ResourceTypes.Contains(ResourceType.Observation)),
+                It.IsAny<FhirQueryConfigurationModel>(),
+                ResourceType.Observation,
+                cancellationToken))
+            .ReturnsAsync(new[] { "Observation/obs1", "Observation/obs2" });
+
+        _mockFhirApiService
+            .Setup(x => x.ExecuteRead(
+                It.IsAny<DataAcquisitionLogModel>(),
+                It.Is<FhirQueryModel>(q => q.ResourceTypes.Contains(ResourceType.Encounter)),
+                ResourceType.Encounter,
+                It.IsAny<FhirQueryConfigurationModel>(),
+                cancellationToken))
+            .ReturnsAsync(new[] { "Encounter/enc1" });
+
+        _mockLogManager
+            .Setup(m => m.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), cancellationToken))
+            .ReturnsAsync(model)
+            .Callback<UpdateDataAcquisitionLogModel, CancellationToken>((updateModel, _) =>
+            {
+                // Capture the final log state
+                model.ResourceAcquiredIds = updateModel.ResourceAcquiredIds;
+                model.Status = updateModel.Status;
+            });
+
+        // Act
+        await _service.ExecuteLogRequest(request, cancellationToken);
+
+        // Assert - All IDs from all queries must be present
+        _mockLogManager.Verify(m => m.UpdateAsync(
+            It.Is<UpdateDataAcquisitionLogModel>(u =>
+                u.ResourceAcquiredIds != null &&
+                u.ResourceAcquiredIds.Count == 4 &&
+                u.ResourceAcquiredIds.Contains("Patient/123") &&
+                u.ResourceAcquiredIds.Contains("Observation/obs1") &&
+                u.ResourceAcquiredIds.Contains("Observation/obs2") &&
+                u.ResourceAcquiredIds.Contains("Encounter/enc1") &&
+                u.Status == RequestStatus.Completed
+            ),
+            cancellationToken),
+            Times.Once);
     }
 }
