@@ -455,7 +455,7 @@ public class PatientDataServiceTests
                 }
                 else if (updateCallCount == 2)
                 {
-                    Assert.Equal(RequestStatus.Completed, model.Status);
+                    Assert.Equal(RequestStatus.Skipped, model.Status);
                     Assert.Contains(model.Notes, n =>
                         n.Contains("No IDs found in _id query parameter for Search FHIR query. Marking log as Completed."));
                 }

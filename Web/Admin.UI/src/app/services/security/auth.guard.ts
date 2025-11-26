@@ -33,7 +33,7 @@ export class AuthGuard implements CanActivate {
       if (profile?.email) return true;
     } catch (error: any) {
       if (error.status !== 401) {
-        console.error('Failed to load profile:', error);
+        return false;
       }
     }
     sessionStorage.setItem('returnUrl', state.url);
