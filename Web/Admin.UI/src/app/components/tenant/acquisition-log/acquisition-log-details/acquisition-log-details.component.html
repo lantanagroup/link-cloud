@@ -37,7 +37,7 @@
     <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
       <div style="flex: 1;">
         <div class="data-label inline-label">
-          Resource(s):
+          Resource Type(s):
           <span class="data-value" style="display: inline;">{{getCombinedResourceTypes()}}</span>
         </div>
       </div>
@@ -80,7 +80,7 @@
       <div style="flex: 1;">
         <div class="data-label inline-label">
           TimeZone:
-          <span class="data-value" style="display: inline;">{{ acquisitionLog?.timeZone }}</span>
+          <span class="data-value" style="display: inline;">{{acquisitionLog?.timeZone}}</span>
         </div>
       </div>
       <div style="flex: 1;">
@@ -123,9 +123,16 @@
           <ng-container>
             <ul style="margin-bottom: 0;">
               @for (fhirQuery of acquisitionLog?.fhirQuery; track fhirQuery) {
-                <li>
-                  <span class="data-value  selectable-value" style="display: inline;">{{fhirQuery?.query}}</span>
-                </li>
+                @if (fhirQuery?.queryType == "Read" && fhirQuery?.resourceTypes.includes("Patient")) {
+                  <li>
+                    <span class="data-value  selectable-value"
+                          style="display: inline;">{{ fhirQuery?.query }}{{acquisitionLog.patientId}}</span>
+                  </li>
+                } @else {
+                  <li>
+                    <span class="data-value  selectable-value" style="display: inline;">{{fhirQuery?.query}}</span>
+                  </li>
+                }
               }
             </ul>
           </ng-container>
