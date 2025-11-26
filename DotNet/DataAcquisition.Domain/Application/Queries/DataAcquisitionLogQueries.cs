@@ -174,7 +174,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
     public async Task<IEnumerable<TailingMessageModel>> GetTailingMessages(CancellationToken cancellationToken = default)
     {
-        var completedOrFailedStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached };
+        var completedOrFailedStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped };
 
         try
         {
