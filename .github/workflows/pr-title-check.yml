@@ -7,7 +7,7 @@ on:
       - main
       - 'release/**'
       - 'hotfix/**'
-    types: [opened]
+    # types: [opened]
   workflow_dispatch:
 
 jobs:
