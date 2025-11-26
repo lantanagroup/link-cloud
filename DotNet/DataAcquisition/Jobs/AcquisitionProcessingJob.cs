@@ -96,6 +96,7 @@ public class AcquisitionProcessingJob : IJob
                         await dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                         {
                             Id = log.Id,
+                            ResourceAcquiredIds = log.ResourceAcquiredIds,
                             RetryAttempts = log.RetryAttempts,
                             CompletionDate = log.CompletionDate,
                             CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, 
@@ -146,6 +147,7 @@ public class AcquisitionProcessingJob : IJob
                             await dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                             {
                                 Id = log.Id,
+                                ResourceAcquiredIds = log.ResourceAcquiredIds,
                                 RetryAttempts = log.RetryAttempts,
                                 CompletionDate = log.CompletionDate,
                                 CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
@@ -168,6 +170,7 @@ public class AcquisitionProcessingJob : IJob
                     await dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                     {
                         Id = log.Id,
+                        ResourceAcquiredIds = log.ResourceAcquiredIds,
                         RetryAttempts = log.RetryAttempts,
                         CompletionDate = log.CompletionDate,
                         CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
@@ -211,6 +214,7 @@ public class AcquisitionProcessingJob : IJob
                         await dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                         {
                             Id = log.Id,
+                            ResourceAcquiredIds = log.ResourceAcquiredIds,
                             RetryAttempts = log.RetryAttempts,
                             CompletionDate = log.CompletionDate,
                             CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
