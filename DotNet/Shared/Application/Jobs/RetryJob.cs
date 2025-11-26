@@ -3,11 +3,11 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Quartz;
 using System.Text;
-using Newtonsoft.Json;
 
 namespace LantanaGroup.Link.Shared.Jobs;
 
@@ -55,6 +55,14 @@ public class RetryJob : IJob
             {
                 headers.Add(header.Key, Encoding.UTF8.GetBytes(header.Value));
             }
+
+            //Remove the Retry Count Header and replace it with a new value.
+            if (headers.Any(h => h.Key == KafkaConstants.HeaderConstants.RetryCount))
+            {
+                headers.Remove(KafkaConstants.HeaderConstants.RetryCount);
+            }
+
+            headers.Add(KafkaConstants.HeaderConstants.RetryCount, Encoding.UTF8.GetBytes(retryModel.RetryCount.ToString()));
 
             using (var producer = _retryKafkaProducerFactory.CreateProducer(config, useOpenTelemetry: false))
             {
