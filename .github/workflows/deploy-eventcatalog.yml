@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       EVENTCATALOG_STARTER_LICENSE_KEY: ${{ secrets.EVENTCATALOG_STARTER_LICENSE_KEY }}
-      BASE_URL: 'https://lantanagroup.github.io/link-cloud/'
+      BASE_URL: '/link-cloud/'
 
     steps:
       - name: Checkout repository
