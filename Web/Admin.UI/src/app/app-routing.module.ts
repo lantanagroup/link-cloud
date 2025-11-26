@@ -35,7 +35,7 @@ const routes: Routes = [
   { path: 'app-configuration', loadComponent: () => import('./components/app-configuration/app-configuration-dashboard/app-configuration-dashboard.component').then(mod => mod.AppConfigurationDashboardComponent), canActivate: [AuthGuard]  },
   { path: 'kafka', loadComponent: () => import('./components/kafka/kafka-dashboard/kafka-dashboard.component').then(mod => mod.KafkaDashboardComponent) , canActivate: [AuthGuard] },
   { path: '', redirectTo: 'login', pathMatch: 'full' },
-  { path: '**', redirectTo: '' }
+  { path: '**', redirectTo: 'login' }
 ];
 
 @NgModule({
