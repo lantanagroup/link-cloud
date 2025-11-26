@@ -454,15 +454,19 @@ public class PatientDataService : IPatientDataService
 
                 List<string> resourceIds = new List<string>();
 
-
-
+                bool skipFetch = false;
+                
                 //4. call api
                 foreach (var fhirQuery in log.FhirQuery.ToList())
                 {
-                    bool skipFetch = false;
+                    if(skipFetch)
+                    {
+                        break;
+                    }
+
                     //check if log is search and not census, if true,
                     //check if fhirQuery query param has ids under _id, update status to Completed and continue if no ids are populated.
-                    if(fhirQuery.QueryType == FhirQueryType.Search && !log.IsCensus)
+                    if (fhirQuery.QueryType == FhirQueryType.Search && !log.IsCensus)
                     {
                         var idParams = fhirQuery.QueryParameters.Where(x => x.StartsWith("_id=", StringComparison.InvariantCultureIgnoreCase)).ToList();
                         if(idParams.Any())
@@ -516,7 +520,7 @@ public class PatientDataService : IPatientDataService
 
                 log.CompletionTimeMilliseconds = stopwatch.ElapsedMilliseconds;
                 log.CompletionDate = System.DateTime.UtcNow;
-                log.Status = RequestStatus.Completed;
+                log.Status = skipFetch ? RequestStatus.Skipped : RequestStatus.Completed;
                 log.ResourceAcquiredIds = resourceIds;
                 await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {
