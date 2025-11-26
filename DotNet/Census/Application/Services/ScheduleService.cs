@@ -67,7 +67,7 @@ public class ScheduleService : BackgroundService
                     try
                     {
                         await censusSchedulingRepo.DeleteJobsForFacility(facilityId, Scheduler);
-                        _logger.LogInformation("Cleaned up orphan job for removed facility: {FacilityId}.", facilityId);
+                        _logger.LogDebug("Cleaned up orphan job for removed facility: {FacilityId}.", facilityId);
                     }
                     catch (Exception ex)
                     {
@@ -94,7 +94,7 @@ public class ScheduleService : BackgroundService
                     if (parts.Length < 2) continue; // Invalid name, skip
                     string facilityId = parts[0];
                     await censusSchedulingRepo.DeleteJobsForFacility(facilityId, Scheduler);
-                    _logger.LogInformation("Removed disabled job for facility: {FacilityId}.", facilityId);
+                    _logger.LogDebug("Removed disabled job for facility: {FacilityId}.", facilityId);
                 }
                 catch (Exception ex)
                 {
@@ -106,11 +106,11 @@ public class ScheduleService : BackgroundService
             {
                 try
                 {
-                    _logger.LogInformation("Scheduling Census job for facility: {FacilityId}. enabled: {enabled}", facility.FacilityID, facility.Enabled);
+                    _logger.LogDebug("Scheduling Census job for facility: {FacilityId}. enabled: {enabled}", facility.FacilityID, facility.Enabled);
 
                     if (facility.Enabled ?? true)
                     {
-                        _logger.LogInformation("Adding/Updating Census job for facility: {FacilityId}.", facility.FacilityID);
+                        _logger.LogDebug("Adding/Updating Census job for facility: {FacilityId}.", facility.FacilityID);
                         await censusSchedulingRepo.UpdateJobsForFacility(facility, Scheduler);
                     }
                 }
