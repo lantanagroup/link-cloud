@@ -135,15 +135,13 @@ public class PatientListsAcquiredListener : BackgroundService
                                 {
                                     throw new TransientException("DB Error processing message: " + ex.Message, ex);
                                 }
-                                //add produce exeption catch
                                 catch (ProduceException<string, List<PatientListItem>> ex)
                                 {
                                     throw new TransientException("Error producing message: " + ex.Message, ex);
                                 }
                                 catch (Exception ex)
                                 {
-
-                                    throw new DeadLetterException("Error processing message: " + ex.Message, ex);
+                                    throw new TransientException("Error processing message: " + ex.Message, ex);
                                 }
                             }
                         }
@@ -160,7 +158,7 @@ public class PatientListsAcquiredListener : BackgroundService
                         catch (Exception ex)
                         {
                             _logger.LogError(ex, $"Failed to process Patient Event.");
-                            _nonTransientExceptionHandler.HandleException(rawmessage, ex, rawmessage.Message.Key);
+                            _transientExceptionHandler.HandleException(rawmessage, ex, rawmessage.Message.Key);
                         }
                         finally
                         {
