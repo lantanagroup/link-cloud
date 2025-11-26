@@ -45,12 +45,12 @@ The Measure Eval service is a Java based application that is primarily responsib
 
 ## Common Configurations
 
-* [Azure App Config](/docs/custom/config/java#azure-app-config)
-* [Telemetry](/docs/custom/config/java#telemetry)
-* [Swagger](/docs/custom/config/java#swagger)
-* [Mongo DB](/docs/custom/config/java#mongo-db)
-* [Kafka](/docs/custom/config/java#kafka)
-* [Service Authentication](/docs/custom/config/java#service-authentication)
+* <Link href="/docs/custom/config/java#azure-app-config">Azure App Config</Link>
+* <Link href="/docs/custom/config/java#telemetry">Telemetry</Link>
+* <Link href="/docs/custom/config/java#swagger">Swagger</Link>
+* <Link href="/docs/custom/config/java#mongo-db">Mongo DB</Link>
+* <Link href="/docs/custom/config/java#kafka">Kafka</Link>
+* <Link href="/docs/custom/config/java#service-authentication">Service Authentication</Link>
 
 ## Custom Configurations
 
@@ -84,7 +84,7 @@ Package `com.lantanagroup.link.measureeval.reportability`:
 1. **Pre-preparation**:
  - Data is collected and normalized to align with FHIR standards.
  - Measure packages are prepared, containing all artifacts necessary for evaluation.
-2. **Execution**: Measures are executed systematically against the acquired data for each patient, including multiple evaluations during **progressive querying** as described in [Progressive Querying](/docs/services/DataAcquisitionService).
+2. **Execution**: Measures are executed systematically against the acquired data for each patient, including multiple evaluations during **progressive querying** as described in <Link href="/docs/services/DataAcquisitionService">Progressive Querying</Link>.
 3. **Results**: Each measure produces results indicating compliance or performance, which can be consumed by reporting or downstream systems. These results are in the form of a MeasureReport resource specific to the individual patient that the measure was executed against.
 
 ### Role in Progressive Querying

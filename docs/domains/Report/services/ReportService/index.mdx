@@ -128,25 +128,25 @@ The following environment variables and settings are used for the Report Service
 > For a full list of environment variables and their usage, see the [docker-compose.yml](../../../../../link-cloud/docker-compose.yml) file and the `appsettings.json` file.
 ## Common Configurations
 
-* [Swagger](/docs/custom/config/dotnet#swagger)
-* [Azure App Configuration](/docs/custom/config/dotnet#azure-app-config-environment-variables)
-* [Kafka Configuration](/docs/custom/config/dotnet#kafka)
-* [Kafka Consumer Retry Configuration](/docs/custom/config/dotnet#kafka-consumer-settings)
-* [Service Registry Configuration](/docs/custom/config/dotnet#service-registry)
-* [CORS Configuration](/docs/custom/config/dotnet#cors)
-* [Token Service Configuration](/docs/custom/config/dotnet#token-service-settings)
-* [Service Authentication](/docs/custom/config/dotnet#service-authentication)
-* [Mongo Database](/docs/custom/config/dotnet#mongo-database)
+* <Link href="/docs/custom/config/dotnet#swagger">Swagger</Link>
+* <Link href="/docs/custom/config/dotnet#azure-app-config-environment-variables">Azure App Configuration</Link>
+* <Link href="/docs/custom/config/dotnet#kafka">Kafka Configuration</Link>
+* <Link href="/docs/custom/config/dotnet#kafka-consumer-settings">Kafka Consumer Retry Configuration</Link>
+* <Link href="/docs/custom/config/dotnet#service-registry">Service Registry Configuration</Link>
+* <Link href="/docs/custom/config/dotnet#cors">CORS Configuration</Link>
+* <Link href="/docs/custom/config/dotnet#token-service-settings">Token Service Configuration</Link>
+* <Link href="/docs/custom/config/dotnet#service-authentication">Service Authentication</Link>
+* <Link href="/docs/custom/config/dotnet#mongo-database">Mongo Database</Link>
 
 ## Features and Functionality
 
 Retry Scheduling in the Report Service:
 
-Within the Report service, retries are scheduled using Quartz.NET’s in-memory scheduler, even though the service itself leverages a persistent MongoDB-backed scheduler for critical, long-lived jobs like report period completions. The retry jobs are managed by a dedicated RetryScheduleService that uses the "InMemoryScheduler" (registered via keyed dependency injection) to schedule and execute retry operations. This approach ensures that retry jobs are lightweight, fast, and do not persist across service restarts—making them ideal for transient, short-lived retry logic where durability is not required.
+Within the Report service, retries are scheduled using Quartz.NETï¿½s in-memory scheduler, even though the service itself leverages a persistent MongoDB-backed scheduler for critical, long-lived jobs like report period completions. The retry jobs are managed by a dedicated RetryScheduleService that uses the "InMemoryScheduler" (registered via keyed dependency injection) to schedule and execute retry operations. This approach ensures that retry jobs are lightweight, fast, and do not persist across service restartsï¿½making them ideal for transient, short-lived retry logic where durability is not required.
 
 Impact of InMemory vs. MongoDB Persistence:
 
-Using the in-memory scheduler for retries means that retry jobs are lost if the service restarts or crashes, but this is often acceptable for retry logic that can be safely re-queued or recalculated. In contrast, MongoDB persistence (used for report scheduling) ensures that jobs survive restarts, support clustering, and provide fault tolerance—critical for business workflows that must not be lost. This dual approach allows the Report service to balance reliability and performance: persistent scheduling for essential workflows, and fast, resource-efficient in-memory scheduling for retries and transient operations.
+Using the in-memory scheduler for retries means that retry jobs are lost if the service restarts or crashes, but this is often acceptable for retry logic that can be safely re-queued or recalculated. In contrast, MongoDB persistence (used for report scheduling) ensures that jobs survive restarts, support clustering, and provide fault toleranceï¿½critical for business workflows that must not be lost. This dual approach allows the Report service to balance reliability and performance: persistent scheduling for essential workflows, and fast, resource-efficient in-memory scheduling for retries and transient operations.
 
 Different types of report generation methods:
 
