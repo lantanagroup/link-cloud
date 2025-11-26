@@ -452,7 +452,8 @@ public class PatientDataService : IPatientDataService
                         $"No configuration for {log.FacilityId} exists.");
                 }
 
-                List<string> resourceIds = new List<string>();
+                //hashset to hold unique resource ids
+                var resourceIds = new HashSet<string>();
 
                 //4. call api
                 foreach (var fhirQuery in log.FhirQuery.ToList())
@@ -463,14 +464,12 @@ public class PatientDataService : IPatientDataService
                         if (fhirQuery.QueryType == FhirQueryType.Read)
                         {
                             var ids = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType, fhirQueryConfiguration, cancellationToken);
-                            resourceIds.AddRange(ids);
-                            resourceIds.AddRange(ids ?? Array.Empty<string>());
+                            foreach (var id in ids) resourceIds.Add(id);
                         }
                         else if (fhirQuery.QueryType == FhirQueryType.Search)
                         {
                             var ids = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, resourceType, cancellationToken);
-                            resourceIds.AddRange(ids);
-                            resourceIds.AddRange(ids ?? Array.Empty<string>());
+                            foreach (var id in ids) resourceIds.Add(id);
                         }
                         else if (fhirQuery.QueryType == FhirQueryType.BulkDataRequest)
                         {
@@ -489,7 +488,7 @@ public class PatientDataService : IPatientDataService
                 log.CompletionTimeMilliseconds = stopwatch.ElapsedMilliseconds;
                 log.CompletionDate = System.DateTime.UtcNow;
                 log.Status = RequestStatus.Completed;
-                log.ResourceAcquiredIds = resourceIds;
+                log.ResourceAcquiredIds = resourceIds.ToList();
                 await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {
                     Id = log.Id,
