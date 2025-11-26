@@ -15,6 +15,7 @@ public class ServiceInformation
     public string ProductVersion { get; init; } = string.Empty;
     public string Commit { get; init; } = string.Empty;
     public string Build { get; init; } = string.Empty;
+    public string SwaggerUrl { get; set; } = string.Empty;
 
     public static ServiceInformation GetServiceInformation(Assembly assembly, IConfiguration configuration)
     {
@@ -25,6 +26,11 @@ public class ServiceInformation
         
         if (string.IsNullOrEmpty(serviceInformation.Version))
             serviceInformation.Version = assemblyVersion;
+        
+        var enableSwagger = configuration.GetValue<bool>("EnableSwagger");
+
+        if (enableSwagger)
+            serviceInformation.SwaggerUrl = "/swagger/index.html";
 
         return serviceInformation;
     }
@@ -32,10 +38,13 @@ public class ServiceInformation
     /**
      * Gets service information for a given service at its base URL.
      */
-    public static async Task<ServiceInformation?> GetServiceInformation(HttpClient client, string? serviceInfoEndpoint, ILogger logger)
+    public static async Task<ServiceInformation?> GetServiceInformation(HttpClient client, string? internalBaseUrl, string? externalBaseUrl, string? serviceInfoPath, ILogger logger)
     {
-        if (string.IsNullOrEmpty(serviceInfoEndpoint))
+        if (string.IsNullOrEmpty(internalBaseUrl) || string.IsNullOrEmpty(serviceInfoPath))
             return null;
+
+        string serviceInfoEndpoint =
+            internalBaseUrl + (serviceInfoPath.StartsWith("/") ? serviceInfoPath : "/" + serviceInfoPath);
         
         try
         {
@@ -46,9 +55,28 @@ public class ServiceInformation
                 return null;
             }
             var content = await response.Content.ReadAsStringAsync();
-            JsonSerializerOptions options = new JsonSerializerOptions();
-            options.PropertyNameCaseInsensitive = true;
-            return JsonSerializer.Deserialize<ServiceInformation>(content, options);
+            JsonSerializerOptions options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+            ServiceInformation? serviceInfo = JsonSerializer.Deserialize<ServiceInformation>(content, options);
+
+            if (serviceInfo != null && !string.IsNullOrEmpty(serviceInfo.SwaggerUrl) &&
+                serviceInfo.SwaggerUrl.StartsWith("/"))
+            {
+                string baseUrl = externalBaseUrl ?? internalBaseUrl;
+                
+                logger.LogDebug("Service information Swagger URL is relative, using base URL {BaseUrl}", baseUrl);
+                
+                if (baseUrl.EndsWith("/"))
+                    baseUrl = baseUrl.Substring(0, baseUrl.Length - 1);
+                
+                serviceInfo.SwaggerUrl = baseUrl + serviceInfo.SwaggerUrl;
+                
+                logger.LogDebug("Service information Swagger URL is now {SwaggerUrl}", serviceInfo.SwaggerUrl);
+            }
+
+            return serviceInfo;
         }
         catch (Exception ex)
         {

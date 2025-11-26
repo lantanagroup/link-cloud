@@ -5,6 +5,7 @@ import { ILinkServiceHealthSummary } from './link-service-health-summary.interfa
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
+import {IServiceInfoModel, ServiceInfoService} from "../service-info.service";
 
 @Component({
   selector: 'app-link-health-check',
@@ -12,40 +13,58 @@ import { MatIconModule } from '@angular/material/icon';
     CommonModule,
     MatToolbarModule,
     MatTableModule,
-    MatIconModule   
+    MatIconModule
   ],
   templateUrl: './link-health-check.component.html',
   styleUrl: './link-health-check.component.scss'
 })
 export class LinkHealthCheckComponent implements OnInit {
-  dataSource!: MatTableDataSource<ILinkServiceHealthSummary>;
+  healthDataSource!: MatTableDataSource<ILinkServiceHealthSummary>;
+  serviceInfosDataSource!: MatTableDataSource<IServiceInfoModel>;
   healthSummary: ILinkServiceHealthSummary[] = [];
-  displayedColumns: string[] = ['ServiceName', 'ServiceHealthStatus', 'KafkaConnection', 'DatabaseConnection', 'CacheConnection'];
+  serviceInfos: IServiceInfoModel[] = [];
+  healthDisplayColumns: string[] = ['ServiceName', 'ServiceHealthStatus', 'KafkaConnection', 'DatabaseConnection', 'CacheConnection'];
+  serviceInfosDisplayColumns: string[] = ['serviceName', 'version', 'productVersion', 'commit', 'build'];
 
   initializeSummaries = true;
+  initializeServiceInfos = true;
 
-  constructor(private monitorService: MonitorService) { }
+  constructor(private monitorService: MonitorService, private serviceInfoService: ServiceInfoService) { }
 
   ngOnInit(): void {
-    this.dataSource = new MatTableDataSource<ILinkServiceHealthSummary>();
-    this.getLinkHealthSummary();    
+    this.healthDataSource = new MatTableDataSource<ILinkServiceHealthSummary>();
+    this.getHealthSummary();
+    this.getServiceInfos();
   }
 
-  getLinkHealthSummary(): void {
+  getHealthSummary(): void {
     this.monitorService.getLinkHealthCheck().subscribe({
       next: (response: ILinkServiceHealthSummary[]) => {
         this.healthSummary = response;
-        this.dataSource.data = this.healthSummary;
-        this.initializeSummaries = false;
+        this.healthDataSource.data = this.healthSummary;
       },
       error: (error) => {
         console.error('Error fetching link health summary:', error);
-      } 
+      },
+      complete: () => {
+        this.initializeSummaries = false;
+      }
     })
   }
 
-  onRefresh(): void {
-    this.getLinkHealthSummary();
+  getServiceInfos(): void {
+    this.serviceInfoService.getServiceInfos().subscribe({
+      next: (response: IServiceInfoModel[]) => {
+        this.serviceInfos = response;
+        this.serviceInfosDataSource.data = this.serviceInfos;
+      },
+      error: (error) => {
+        console.error('Error fetching service infos:', error);
+      },
+      complete: () => {
+        this.initializeServiceInfos = false;
+      }
+    })
   }
 
 }
