@@ -155,7 +155,7 @@ public class FhirApiServiceTests
             .ThrowsAsync(exception);
 
         await Assert.ThrowsAsync<FhirOperationException>(async () =>
-            await service.ExecuteRead(log, fhirQuery, ResourceType.Patient, new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://example.com/fhir" }, null!));
+            await service.ExecuteRead(log, fhirQuery, ResourceType.Patient, new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://example.com/fhir" }));
         Assert.NotNull(log.Notes);
         Assert.NotEmpty(log.Notes);
         Assert.StartsWith("OperationOutcome", log.Notes[0]);
@@ -235,10 +235,8 @@ public class FhirApiServiceTests
             FhirServerBaseUrl = "http://example.com/fhir"
         };
 
-        var resourceIds = new List<string>();
-
         // Act
-        await service.ExecuteSearch(log, fhirQuery, fhirQueryConfig, resourceIds, Hl7.Fhir.Model.ResourceType.Location);
+        await service.ExecuteSearch(log, fhirQuery, fhirQueryConfig, Hl7.Fhir.Model.ResourceType.Location);
 
         // Assert: Kafka message was produced and PatientId is null
         Assert.NotNull(producedMessage);

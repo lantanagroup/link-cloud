@@ -462,11 +462,13 @@ public class PatientDataService : IPatientDataService
 
                         if (fhirQuery.QueryType == FhirQueryType.Read)
                         {
-                            resourceIds = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType, fhirQueryConfiguration, resourceIds, cancellationToken);
+                            var ids = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType, fhirQueryConfiguration, cancellationToken);
+                            resourceIds.AddRange(ids);
                         }
                         else if (fhirQuery.QueryType == FhirQueryType.Search)
                         {
-                            resourceIds = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, resourceIds, resourceType, cancellationToken);
+                            var ids = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, resourceType, cancellationToken);
+                            resourceIds.AddRange(ids);
                         }
                         else if (fhirQuery.QueryType == FhirQueryType.BulkDataRequest)
                         {
