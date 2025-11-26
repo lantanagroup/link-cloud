@@ -747,6 +747,9 @@ services:
       telemetry.exporter_endpoint: http://otel-collector:4317
       loki.enabled: true
       loki.url: http://loki:3100
+      spring.data.redis.host: redis_cache
+      spring.data.redis.port: 6379
+      spring.data.redis.password: ${REDIS_PASS}
     ports:
       - "8067:8067"
     build:
