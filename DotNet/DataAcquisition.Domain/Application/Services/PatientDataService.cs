@@ -4,6 +4,9 @@ using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -18,13 +21,10 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using StringComparison = System.StringComparison;
 using Task = System.Threading.Tasks.Task;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 
@@ -321,6 +321,24 @@ public class PatientDataService : IPatientDataService
                     throw new ArgumentException($"Facility ID {request.facilityId} does not match log's facility ID {log.FacilityId}.");
                 }
 
+                //check if log has any FhirQuery objects
+                if (log.FhirQuery == null || !log.FhirQuery.Any())
+                {
+                    throw new ArgumentException($"Log with ID {log.Id} does not have any FHIR queries defined.");
+                }
+
+                //check if resource types are defined in all FhirQuery objects
+                if (log.FhirQuery.Any(x => x.ResourceTypes == null || !x.ResourceTypes.Any()))
+                {
+                    throw new ArgumentException($"Log with ID {log.Id} has a FHIR query with no resource types defined.");
+                }
+
+                //check if query type is search and there are no query parameters in FhirQuery
+                if (log.FhirQuery != null && log.FhirQuery.Any() && log.FhirQuery.Any(x => x.QueryType == FhirQueryType.Search && !x.QueryParameters.Any()))
+                {
+                    throw new ArgumentException($"Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
+                }
+
                 //check if isCensus, if true, create scope for PatientCensusService and execute RetrieveListData
                 if (log.IsCensus)
                 {
@@ -371,6 +389,7 @@ public class PatientDataService : IPatientDataService
                         await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                         {
                             Id = log.Id,
+                            ResourceAcquiredIds = log.ResourceAcquiredIds,
                             RetryAttempts = log.RetryAttempts,
                             CompletionDate = log.CompletionDate,
                             CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
@@ -388,6 +407,7 @@ public class PatientDataService : IPatientDataService
                         await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                         {
                             Id = log.Id,
+                            ResourceAcquiredIds = log.ResourceAcquiredIds,
                             RetryAttempts = log.RetryAttempts,
                             CompletionDate = log.CompletionDate,
                             CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
@@ -405,29 +425,12 @@ public class PatientDataService : IPatientDataService
                     throw new ArgumentException($"Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
                 }
 
-                //check if log has any FhirQuery objects
-                if (log.FhirQuery == null || !log.FhirQuery.Any())
-                {
-                    throw new ArgumentException($"Log with ID {log.Id} does not have any FHIR queries defined.");
-                }
-
-                //check if resource types are defined in all FhirQuery objects
-                if (log.FhirQuery.Any(x => x.ResourceTypes == null || !x.ResourceTypes.Any()))
-                {
-                    throw new ArgumentException($"Log with ID {log.Id} has a FHIR query with no resource types defined.");
-                }
-
-                //check if query type is search and there are no query parameters in FhirQuery
-                if (log.FhirQuery != null && log.FhirQuery.Any() && log.FhirQuery.Any(x => x.QueryType == FhirQueryType.Search && !x.QueryParameters.Any()))
-                {
-                    throw new ArgumentException($"Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
-                }
-
                 //2. set to "Processing"
                 log.Status = RequestStatus.Processing;
                 await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {
                     Id = log.Id,
+                    ResourceAcquiredIds = log.ResourceAcquiredIds,
                     RetryAttempts = log.RetryAttempts,
                     CompletionDate = log.CompletionDate,
                     CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
@@ -449,7 +452,8 @@ public class PatientDataService : IPatientDataService
                         $"No configuration for {log.FacilityId} exists.");
                 }
 
-                List<string> resourceIds = new List<string>();
+                //hashset to hold unique resource ids
+                var resourceIds = new HashSet<string>();
 
                 //4. call api
                 foreach (var fhirQuery in log.FhirQuery.ToList())
@@ -459,11 +463,13 @@ public class PatientDataService : IPatientDataService
 
                         if (fhirQuery.QueryType == FhirQueryType.Read)
                         {
-                            resourceIds = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType, fhirQueryConfiguration, resourceIds, cancellationToken);
+                            var ids = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType, fhirQueryConfiguration, cancellationToken);
+                            if(ids != null) foreach (var id in ids) resourceIds.Add(id);
                         }
                         else if (fhirQuery.QueryType == FhirQueryType.Search)
                         {
-                            resourceIds = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, resourceIds, resourceType, cancellationToken);
+                            var ids = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, resourceType, cancellationToken);
+                            if (ids != null) foreach (var id in ids) resourceIds.Add(id);
                         }
                         else if (fhirQuery.QueryType == FhirQueryType.BulkDataRequest)
                         {
@@ -482,11 +488,12 @@ public class PatientDataService : IPatientDataService
                 log.CompletionTimeMilliseconds = stopwatch.ElapsedMilliseconds;
                 log.CompletionDate = System.DateTime.UtcNow;
                 log.Status = RequestStatus.Completed;
-                log.ResourceAcquiredIds = resourceIds;
+                log.ResourceAcquiredIds = resourceIds.ToList();
                 await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {
                     Id = log.Id,
                     RetryAttempts = log.RetryAttempts,
+                    ResourceAcquiredIds = log.ResourceAcquiredIds,
                     CompletionDate = log.CompletionDate,
                     CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
                     ExecutionDate = log.ExecutionDate,
@@ -505,6 +512,7 @@ public class PatientDataService : IPatientDataService
                 await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {
                     Id = log.Id,
+                    ResourceAcquiredIds = log.ResourceAcquiredIds,
                     RetryAttempts = log.RetryAttempts,
                     CompletionDate = log.CompletionDate,
                     CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
