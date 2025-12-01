@@ -52,7 +52,6 @@ import {PatientListAcquiredComponent} from "../patient-listacquired-form/patient
     MatAutocompleteTrigger,
     FaIconComponent,
     MatTooltip,
-    PatientAcquiredFormComponent,
     PatientListAcquiredComponent
   ],
   templateUrl: './integration-test.component.html',
@@ -63,7 +62,6 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
   @ViewChild(MatAutocompleteTrigger) autoTrigger!: MatAutocompleteTrigger;
 
   eventForm!: FormGroup;
-  events: string[] = [EventType.REPORT_SCHEDULED, EventType.PATIENT_ACQUIRED];
   showReportScheduledForm: boolean = false;
   showPatientsAcquiredForm: boolean = false;
 
@@ -85,8 +83,7 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
   filteredFacilities: Observable<{ facilityId: string; facilityName: string }[]> = of([]);
 
-  private lastFilterValue = '';
-  private lastFiltered: { key: string; value: string }[] = [];
+  openPanels: Set<string> = new Set<string>();
 
   constructor(
     private testService: TestService,
@@ -116,12 +113,12 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
     // Setup autocomplete filtering
     this.filteredFacilities = this.facilityInputControl.valueChanges.pipe(
-        startWith(''),
-        debounceTime(300),
-        distinctUntilChanged(),
-        switchMap(term => this.tenantService.autocompleteFacilities(term || '')),
-        map(results => Object.entries(results || {}).map(([facilityId, facilityName]) => ({ facilityId, facilityName }))),
-        tap(facilities => (this.facilities = facilities))
+      startWith(''),
+      debounceTime(300),
+      distinctUntilChanged(),
+      switchMap(term => this.tenantService.autocompleteFacilities(term || '')),
+      map(results => Object.entries(results || {}).map(([facilityId, facilityName]) => ({facilityId, facilityName}))),
+      tap(facilities => (this.facilities = facilities))
     );
   }
 
@@ -132,10 +129,10 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
       const match = this.facilities.find(f => f.facilityId === inputVal);
       if (!inputVal) {
-        facilityIdControl.setErrors({ required: true });
+        facilityIdControl.setErrors({required: true});
         facilityIdControl.setValue("");
       } else if (!match) {
-        facilityIdControl.setErrors({ notFound: true });
+        facilityIdControl.setErrors({notFound: true});
         facilityIdControl.setValue(inputVal);
       } else {
         facilityIdControl.setErrors(null);
@@ -169,14 +166,20 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
     return this.eventForm.get('facilityInput') as FormControl;
   }
 
+  // Check if a panel is open
   isPanelOpen(correlationId: string): boolean {
-    return this.panelStates[correlationId] || false;
+    return this.openPanels.has(correlationId);
   }
 
-  togglePanel(correlationId: string, open: boolean) {
-    this.panelStates[correlationId] = open;
-    localStorage.setItem('panelStates', JSON.stringify(this.panelStates));
+  // Toggle a panel open/closed
+  togglePanel(correlationId: string, open: boolean): void {
+    if (open) {
+      this.openPanels.add(correlationId);
+    } else {
+      this.openPanels.delete(correlationId);
+    }
   }
+
 
   onEventGenerated(facilityId: string) {
     this.facilityId = facilityId;
@@ -293,6 +296,16 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
         verticalPosition: 'top'
       });
     }
+  }
+
+  // Returns true if any entry has an error (used to display Trace ID / Error Message columns)
+  hasAnyError(entries: any[]): boolean {
+    return entries.some(e => e[1]?.some((item: { ErrorMessage: any; }) => item.ErrorMessage));
+  }
+
+ // Returns true if the topic indicates an error (for coloring the topic row)
+  hasErrorInTopic(topic: string): boolean {
+    return topic?.toLowerCase().includes('error');
   }
 
   protected readonly faSearch = faSearch;
