@@ -52,18 +52,6 @@ public class ScheduleService : BackgroundService
 
             using var censusSchedulingRepo = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICensusSchedulingRepository>();
 
-            foreach (CensusConfigEntity facility in facilities)
-            {
-                try
-                {
-                    await censusSchedulingRepo.UpdateJobsForFacility(facility, Scheduler);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Something went wrong scheduling a Census job for facility: {FacilityId}.", facility.FacilityID);
-                }
-            }
-
             // Handle removed facilities: clean up orphan jobs
             var groupMatcher = GroupMatcher<JobKey>.GroupContains(KafkaTopic.PatientCensusScheduled.ToString());
             var allJobKeys = await Scheduler.GetJobKeys(groupMatcher);
@@ -79,12 +67,56 @@ public class ScheduleService : BackgroundService
                     try
                     {
                         await censusSchedulingRepo.DeleteJobsForFacility(facilityId, Scheduler);
-                        _logger.LogInformation("Cleaned up orphan job for removed facility: {FacilityId}.", facilityId);
+                        _logger.LogDebug("Cleaned up orphan job for removed facility: {FacilityId}.", facilityId);
                     }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Failed to clean up orphan job for facility: {FacilityId}.", facilityId);
                     }
+                }
+            }
+
+            //repull jobs (due to possible deletions above) and ID disabled facilities to remove their jobs
+            allJobKeys = await Scheduler.GetJobKeys(groupMatcher);
+            var invalidJobKeys = allJobKeys.Where(x =>
+            {
+                var facilityId = x.Name.Split('-')[0] ?? null;
+                if (facilities.Any(y => y.FacilityID == facilityId && (y.Enabled ?? true) == false))
+                    return true;
+                return false;
+            });
+            
+            foreach (var jobKey in invalidJobKeys)
+            {
+                try
+                {
+                    var parts = jobKey.Name.Split('-');
+                    if (parts.Length < 2) continue; // Invalid name, skip
+                    string facilityId = parts[0];
+                    await censusSchedulingRepo.DeleteJobsForFacility(facilityId, Scheduler);
+                    _logger.LogDebug("Removed disabled job for facility: {FacilityId}.", facilityId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to remove disabled job for facility associated with job: {JobKey}.", jobKey.Name);
+                }
+            }
+
+            foreach (CensusConfigEntity facility in facilities)
+            {
+                try
+                {
+                    _logger.LogDebug("Scheduling Census job for facility: {FacilityId}. enabled: {enabled}", facility.FacilityID, facility.Enabled);
+
+                    if (facility.Enabled ?? true)
+                    {
+                        _logger.LogDebug("Adding/Updating Census job for facility: {FacilityId}.", facility.FacilityID);
+                        await censusSchedulingRepo.UpdateJobsForFacility(facility, Scheduler);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Something went wrong scheduling a Census job for facility: {FacilityId}.", facility.FacilityID);
                 }
             }
 
