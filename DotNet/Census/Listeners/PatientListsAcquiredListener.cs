@@ -141,6 +141,9 @@ public class PatientListsAcquiredListener : BackgroundService
                                 }
                                 catch (Exception ex)
                                 {
+                                    if (ex is DeadLetterException || ex is TransientException)
+                                        throw;
+                                   
                                     throw new TransientException("Error processing message: " + ex.Message, ex);
                                 }
                             }
