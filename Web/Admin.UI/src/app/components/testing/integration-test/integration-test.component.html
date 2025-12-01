@@ -68,50 +68,54 @@
               <tr>
                 <th>Topic</th>
                 <th>Correlation ID</th>
-                <th>Error Message</th>
+                <th *ngIf="hasAnyError(displayedEntries)">Trace ID</th>
+                <th *ngIf="hasAnyError(displayedEntries)">Error Message</th>
               </tr>
               </thead>
               <tbody>
-                @for (entry of displayedEntries; track entry) {
-                  @if (entry[1]?.length > 0) {
-                    @for (item of entry[1]; track item; let i = $index) {
-                      <tr>
-                        @if (i === 0) {
-                          <td [attr.rowspan]="entry[1].length"
-                              [style.color]="entry[0]?.includes('Error') ? 'red' : 'black'">
-                            {{ entry[0] }}
-                          </td>
-                        }
-                        <td>{{ item?.CorrelationId }}</td>
-                        <td class="error-message">
-                          @if (entry[0]?.includes('Error') && item.ErrorMessage) {
-                            <mat-expansion-panel class="error-panel"
-                                                 [expanded]="isPanelOpen(item.correlationId)"
-                                                 (opened)="togglePanel(item.correlationId, true)"
-                                                 (closed)="togglePanel(item.correlationId, false)">
-                              <mat-expansion-panel-header>
-                                <mat-panel-title class="error-text">
-                                  {{ item.ErrorMessage | slice:0:100 }}
-                                  @if (item.ErrorMessage?.length > 100) {
-                                    <span>...</span>
-                                  }
-                                </mat-panel-title>
-                              </mat-expansion-panel-header>
-                              <p class="error-text">{{ item.ErrorMessage }}</p>
-                            </mat-expansion-panel>
-                          }
-                        </td>
-                      </tr>
-                    }
-                  } @else {
-                    <tr>
-                      <td [style.color]="entry[0]?.includes('Error') ? 'red' : 'black'">
-                        {{ entry[0] }}
-                      </td>
-                      <td colspan="2"></td>
-                    </tr>
-                  }
-                }
+              <ng-container *ngFor="let entry of displayedEntries">
+                <ng-container *ngIf="entry[1]?.length > 0; else noItems">
+                  <tr *ngFor="let item of entry[1]; let i = index">
+                    <!-- Topic column rowspan -->
+                    <td *ngIf="i === 0" [attr.rowspan]="entry[1].length"
+                        [style.color]="hasErrorInTopic(entry[0]) ? 'red' : 'black'">
+                      {{ entry[0] }}
+                    </td>
+
+                    <!-- Correlation ID always -->
+                    <td>{{ item.CorrelationId }}</td>
+
+                    <!-- Trace ID only if error exists -->
+                    <td *ngIf="item.ErrorMessage">{{ item.TraceId }}</td>
+
+                    <!-- Error Message only if present -->
+                    <td *ngIf="item.ErrorMessage" class="error-message">
+                      <mat-expansion-panel class="error-panel"
+                                           [expanded]="isPanelOpen(item.CorrelationId)"
+                                           (opened)="togglePanel(item.CorrelationId, true)"
+                                           (closed)="togglePanel(item.CorrelationId, false)">
+                        <mat-expansion-panel-header>
+                          <mat-panel-title class="error-text">
+                            {{ item.ErrorMessage | slice:0:100 }}
+                            <span *ngIf="item.ErrorMessage.length > 100">...</span>
+                          </mat-panel-title>
+                        </mat-expansion-panel-header>
+                        <p class="error-text">{{ item.ErrorMessage }}</p>
+                      </mat-expansion-panel>
+                    </td>
+                  </tr>
+                </ng-container>
+
+                <!-- Topic row when no items -->
+                <ng-template #noItems>
+                  <tr>
+                    <td [style.color]="hasErrorInTopic(entry[0]) ? 'red' : 'black'">{{ entry[0] }}</td>
+                    <td colspan="1"></td> <!-- Correlation ID blank -->
+                    <td *ngIf="hasAnyError(displayedEntries)"></td>
+                    <td *ngIf="hasAnyError(displayedEntries)"></td>
+                  </tr>
+                </ng-template>
+              </ng-container>
               </tbody>
             </table>
           </div>

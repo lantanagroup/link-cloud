@@ -34,21 +34,26 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 {
                     while (!cancellationToken.IsCancellationRequested)
                     {
-                        string errorMessage = null;
 
                         var consumeResult = consumer.Consume(cancellationToken);
-                        // get the correlation id from the message and store it in Cache
-                        string correlationId = string.Empty;
 
-                        if (consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
+                        // Extract headers
+                        string correlationId = string.Empty;
+                        string traceId = string.Empty;
+                        string errorMessage = null;
+
+                        if (consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var correlationHeader))
                         {
 
+                            correlationId = System.Text.Encoding.UTF8.GetString(correlationHeader);
+
+                            // read the exceptions
                             if (consumeResult.Message.Headers.TryGetLastBytes("X-Exception-Message", out var exceptionMessage))
                             {
                                 errorMessage = System.Text.Encoding.UTF8.GetString(exceptionMessage);
                             }
 
-                            if (consumeResult.Message.Headers.TryGetLastBytes("X-Retry-Exception-Message", out var retryExceptionMessage))
+                            else if (consumeResult.Message.Headers.TryGetLastBytes("X-Retry-Exception-Message", out var retryExceptionMessage))
                             {
                                 errorMessage = System.Text.Encoding.UTF8.GetString(retryExceptionMessage);
                             }
@@ -58,7 +63,19 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                                 errorMessage = System.Text.Encoding.UTF8.GetString(kafkaErrorBytes);
                             }
 
-                            correlationId = System.Text.Encoding.UTF8.GetString(headerValue);
+                            // Extract traceId from traceparent header
+                            if (consumeResult.Message.Headers.TryGetLastBytes("traceparent", out var traceParentBytes))
+                            {
+                                string traceParent = System.Text.Encoding.UTF8.GetString(traceParentBytes);
+
+                                // Split by '-' and get the second part (traceId)
+                                string[] parts = traceParent.Split('-');
+                                if (parts.Length >= 2)
+                                {
+                                   traceId = parts[1];
+                                }
+                            }
+
                             if (!checkReportTrackingId(consumeResult.Message.Value, reportTrackingId) && !checkReportTrackingId(consumeResult.Message.Key, reportTrackingId))
                             {
                                 continue;
@@ -84,23 +101,29 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                             var existingEntry = retrievedList.FirstOrDefault(x => x.CorrelationId == correlationId);
                             if (existingEntry == null)
                             {
+                                // Only store TraceId and ErrorMessage if there is an error
                                 retrievedList.Add(new CorrelationCacheEntry
                                 {
                                     CorrelationId = correlationId,
-                                    ErrorMessage = errorMessage
+                                    ErrorMessage = !string.IsNullOrEmpty(errorMessage) ? errorMessage : null,
+                                    TraceId = !string.IsNullOrEmpty(errorMessage) ? traceId : null
                                 });
                             }
-                            else if (!string.IsNullOrEmpty(errorMessage))
+                            else
                             {
-                                // Update error message if new one is present
-                                existingEntry.ErrorMessage = errorMessage;
+                                // Update only if there is a new error
+                                if (!string.IsNullOrEmpty(errorMessage))
+                                {
+                                    existingEntry.ErrorMessage = errorMessage;
+                                    existingEntry.TraceId = traceId;
+                                }
                             }
 
                             // Save updated list to Redis
                             _cache.Set(cacheKey, JsonConvert.SerializeObject(retrievedList), TimeSpan.FromMinutes(30));
 
                         }
-                        // _logger.LogInformation("Consumed message '{MessageValue}' from topic {Topic}, partition {Partition}, offset {Offset}, correlation {CorrelationId}", consumeResult.Message.Value, consumeResult.Topic, consumeResult.Partition, consumeResult.Offset, correlationId);
+
                     }
                 }
                 catch (ConsumeException e)
@@ -149,6 +172,7 @@ public class CorrelationCacheEntry
 {
     public string CorrelationId { get; set; }
     public string ErrorMessage { get; set; }
+    public string TraceId { get; set; }
 }
 
 
