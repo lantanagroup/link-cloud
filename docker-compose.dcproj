@@ -22,6 +22,7 @@
     <Content Include=".docker\kafka-client.properties" />
     <Content Include=".docker\prometheus.yml" />
     <Content Include=".docker\tempo.yml" />
+	<Content Include=".docker\promtail-kafka.yaml" />
     <Content Include="Azure_Pipelines\azure-pipelines.account.cd.yaml" />
     <Content Include="Azure_Pipelines\azure-pipelines.admin-ui.cd.yaml" />
     <Content Include="Azure_Pipelines\azure-pipelines.admin.cd.yaml" />
