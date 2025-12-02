@@ -1,4 +1,5 @@
-﻿using Hl7.Fhir.Model;
+﻿using Google.Protobuf.WellKnownTypes;
+using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.ResourceCategories;
@@ -7,6 +8,7 @@ using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
+using System.Diagnostics;
 
 namespace LantanaGroup.Link.Report.Core
 {
@@ -44,6 +46,8 @@ namespace LantanaGroup.Link.Report.Core
 
         public async Task<PatientSubmissionModel> GenerateBundle(string facilityId, string patientId, string reportScheduleId)
         {
+            var startBundleTime = Stopwatch.GetTimestamp();
+
             var schedule = await _reportScheduledManager.SingleOrDefaultAsync(s => s.Id == reportScheduleId) ?? throw new Exception($"No Measure Reports Scheduled for reportScheduleId of {reportScheduleId}");
 
             var entries = await _database.SubmissionEntryRepository.FindAsync(e =>
@@ -52,7 +56,9 @@ namespace LantanaGroup.Link.Report.Core
 
             // TODO: Return null if no entries found?
 
+            Dictionary<string, List<string>> resources_added = new Dictionary<string, List<string>>();
             Bundle bundle = CreateNewBundle();
+            
             foreach (var entry in entries)
             {
                 if (entry.MeasureReport == null) 
@@ -62,7 +68,7 @@ namespace LantanaGroup.Link.Report.Core
 
                 MeasureReport mr = entry.MeasureReport;
 
-                foreach(var r in entry.ContainedResources)
+                foreach (var r in entry.ContainedResources)
                 {
                     if (r.DocumentId == null)
                         continue;
@@ -71,27 +77,23 @@ namespace LantanaGroup.Link.Report.Core
                     
                     var resourceTypeCategory = ResourceCategory.GetResourceCategoryByType(r.ResourceType);
 
-                    Resource resource = null;
-
                     try
                     {
                         if (resourceTypeCategory == ResourceCategoryType.Patient)
                         {
                             facilityResource = await _database.PatientResourceRepository.GetAsync(r.DocumentId);
-                            resource = facilityResource.GetResource();
-                            AddResourceToBundle(bundle, resource);
+                            AddResourceToBundle(bundle, facilityResource.GetResource(), resources_added);
                         }
                         else
                         {
                             facilityResource = await _database.SharedResourceRepository.GetAsync(r.DocumentId);
-                            resource = facilityResource.GetResource();
-                            AddResourceToBundle(bundle, resource);
+                            AddResourceToBundle(bundle, facilityResource.GetResource(), resources_added);
                         }
                     }
                     catch (Exception ex)
                     {
                         var message = "Contained resource could not be parsed into a valid Resource.";
-                        _logger.LogError(ex, "{ResourceTypeName} with ID {ResourceId} contained resource could not be parsed into a valid Resource.", resource.TypeName, resource?.Id);
+                        _logger.LogError(ex, "{ResourceTypeName} with ID {ResourceId} contained resource could not be parsed into a valid Resource.", facilityResource.GetResource().TypeName, facilityResource.GetResource()?.Id);
 
                         throw new Exception(message, ex);
                     }
@@ -111,7 +113,7 @@ namespace LantanaGroup.Link.Report.Core
                 // clean up resource
                 cleanupResource(mr);
 
-                AddResourceToBundle(bundle, mr);
+                AddResourceToBundle(bundle, mr, resources_added);
 
                 _metrics.IncrementReportGeneratedCounter(new List<KeyValuePair<string, object?>>() {
                     new KeyValuePair<string, object?>("facilityId", schedule.FacilityId),
@@ -129,6 +131,10 @@ namespace LantanaGroup.Link.Report.Core
                 EndDate = schedule.ReportEndDate,
                 Bundle = bundle
             };
+
+            var diffBundleTime = Stopwatch.GetElapsedTime(startBundleTime);
+
+            Console.WriteLine($"Total Bundling Time: Patient {patientId} - Duration: {diffBundleTime}");
 
             return patientSubmissionModel;
         }
@@ -200,16 +206,20 @@ namespace LantanaGroup.Link.Report.Core
         /// </summary>
         /// <param name="bundle"></param>
         /// <param name="resource"></param>
+        /// <param name="resourcesAdded"></param>
         /// <returns></returns>
-        protected Bundle.EntryComponent AddResourceToBundle(Bundle bundle, Resource resource)
+        protected void AddResourceToBundle(Bundle bundle, Resource resource, Dictionary<string, List<string>> resourcesAdded)
         {
             var fullUrl = GetFullUrl(resource);
-            var existingEntry = bundle.FindEntry(fullUrl).FirstOrDefault();
-            return existingEntry ?? bundle.AddResourceEntry(resource, fullUrl);
+
+            if (resourcesAdded.ContainsKey(fullUrl) && resourcesAdded[fullUrl].Where(x => x == resource.TypeName).Any()) {
+                return;
+            }
+
+            bundle.AddResourceEntry(resource, fullUrl);
+            resourcesAdded.Add(resource.Id, new List<string>() { resource.TypeName });
         }
 
         #endregion
-
     }
-
 }
