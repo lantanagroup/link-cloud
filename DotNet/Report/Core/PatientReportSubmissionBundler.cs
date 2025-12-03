@@ -1,5 +1,4 @@
-﻿using Google.Protobuf.WellKnownTypes;
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.ResourceCategories;
@@ -8,7 +7,6 @@ using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
-using System.Diagnostics;
 
 namespace LantanaGroup.Link.Report.Core
 {
@@ -107,7 +105,7 @@ namespace LantanaGroup.Link.Report.Core
                     catch (Exception ex)
                     {
                         var message = "Contained resource could not be parsed into a valid Resource.";
-                        _logger.LogError(ex, "{ResourceTypeName} with ID {ResourceId} contained resource could not be parsed into a valid Resource.", facilityResource.GetResource().TypeName, facilityResource.GetResource()?.Id);
+                        _logger.LogError(ex, "{ResourceTypeName} with ID {ResourceId} contained resource could not be parsed into a valid Resource.", r.ResourceType, r.ResourceId);
 
                         throw new Exception(message, ex);
                     }
