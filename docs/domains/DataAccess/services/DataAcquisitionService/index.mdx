@@ -159,3 +159,15 @@ All times are stored in UTC format. The tenant's time zone is configured with a 
 Data sources (where the FHIR server is located and how to authenticate) are configured via "Query Configs". There is currently no association between a query _plan_ and data source. Whenever data acquisition attempts to execute a query plan against a data source, it uses the FHIR server and authentication method specified by the "Query Config", for the specified facility/tenant.
 
 TODO: Add details about how to authenticate against Epic, Cerner, Basic, and/or OAuth data sources.
+
+#### Application Configuration
+
+# Logging
+
+The Logging configuration defines the logging levels for different parts of the application.
+
+| Property                                | Description                         | Required | Default Value                   | Secret? |
+|-----------------------------------------|-------------------------------------|----------|---------------------------------|---------|
+| Logging__LogLevel__Default              | Default log level                   | No       |                                 | No      |
+| Logging__LogLevel__Microsoft.AspNetCore | Log level for asp net core logs     | No       |                                 | No      |
+| Logging__LogLevel__System               | Level for system logs               | No       |                                 | No      |

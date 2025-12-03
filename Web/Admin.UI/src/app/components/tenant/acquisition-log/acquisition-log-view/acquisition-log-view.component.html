@@ -224,16 +224,15 @@
                 <td class="data-col table-cell">{{log.queryType}}</td>
                 <td class="data-col table-cell">{{log.executionDate | date:'shortDate'}}</td>
                 <td class="table-cell">
-                  <span
-                                  [ngClass]="{
+                  <span [ngClass]="{
                                       'status-pending': log.status === 'Pending',
                                       'status-ready': log.status === 'Ready',
                                       'status-processing': log.status === 'Processing',
                                       'status-completed': log.status === 'Completed',
                                       'status-failed': log.status === 'Failed',
-                                      'status-maxRetryReached': log.status === 'MaxRetriesReached'
-                                  }"
-                  >{{log.status}}</span>
+                                      'status-maxRetryReached': log.status === 'MaxRetriesReached',
+                                      'status-skipped': log.status === 'Skipped'
+                                  }">{{log.status}}</span>
                 </td>
                 <td class="table-cell">
                   <app-table-command

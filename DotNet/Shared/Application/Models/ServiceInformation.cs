@@ -1,8 +1,7 @@
-﻿using System.Reflection;
-using Microsoft.Extensions.Configuration;
-using System.Net.Http;
-using System.Text.Json;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System.Reflection;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.Shared.Application.Models;
 
