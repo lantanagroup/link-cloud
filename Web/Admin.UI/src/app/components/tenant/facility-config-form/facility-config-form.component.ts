@@ -171,7 +171,6 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
     this.toggleViewOnly(this.viewOnly);
 
     this.facilityConfigForm.valueChanges.subscribe(() => {
-      this.facilityConfigForm.updateValueAndValidity();
       this.formValueChanged.emit(this.facilityConfigForm.invalid);
     });
   }

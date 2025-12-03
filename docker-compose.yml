@@ -486,7 +486,15 @@ services:
       LinkTokenService__LinkAdminEmail:      
       LinkTokenService__TokenLifeSpan: 10    
       Authentication__EnableAnonymousAccess: true
-      CORS__AllowAllOrigins: true
+      CORS__AllowAllOrigins: false  # Change from true to false
+      CORS__AllowedOrigins__0: http://localhost:8066  # Add the frontend origin
+      CORS__AllowCredentials: true  # Ensure this is set
+      CORS__AllowedMethods__0: GET
+      CORS__AllowedMethods__1: POST
+      CORS__AllowedMethods__2: PUT
+      CORS__AllowedMethods__3: DELETE
+      CORS__AllowedMethods__4: OPTIONS
+      CORS__AllowedHeaders__0: "*"
       ServiceRegistry__TenantService__TenantServiceURL: http://tenant:8074
       ServiceRegistry__AccountServiceUrl: http://account:8060
       ServiceRegistry__AuditServiceUrl: http://audit:8062
