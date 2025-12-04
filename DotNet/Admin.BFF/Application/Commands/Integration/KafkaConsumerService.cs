@@ -177,11 +177,21 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
         private string getPatientId(string input)
         {
-            var jsonObject = JObject.Parse(input);
-            return jsonObject.Descendants()
-                .OfType<JProperty>()
-                .FirstOrDefault(p => p.Name.Equals("PatientId", StringComparison.OrdinalIgnoreCase))
-                ?.Value.ToString();
+            if (string.IsNullOrEmpty(input)) return null;
+
+            try
+            {
+                var jsonObject = JObject.Parse(input);
+                return jsonObject.Descendants()
+                    .OfType<JProperty>()
+                    .FirstOrDefault(p => p.Name.Equals("PatientId", StringComparison.OrdinalIgnoreCase))
+                    ?.Value.ToString();
+            }
+            catch (JsonException ex)
+             { 
+                 _logger.LogWarning(ex, "Failed to parse message body for PatientId"); 
+                 return null;
+             }
         }
     }
 }
@@ -190,7 +200,7 @@ public class CorrelationCacheEntry
 {
     public string CorrelationId { get; set; }
     
-    public string PatientId { get; set; }
+    public string? PatientId { get; set; }
     public string ErrorMessage { get; set; }
     public string TraceId { get; set; }
 }
