@@ -68,6 +68,7 @@
               <tr>
                 <th>Topic</th>
                 <th>Correlation ID</th>
+                <th>Patient ID</th>
                 <th *ngIf="hasAnyError(displayedEntries)">Trace ID</th>
                 <th *ngIf="hasAnyError(displayedEntries)">Error Message</th>
               </tr>
@@ -84,6 +85,9 @@
 
                     <!-- Correlation ID always -->
                     <td>{{ item.CorrelationId }}</td>
+
+                    <!-- Patient ID always -->
+                    <td>{{ item.PatientId }}</td>
 
                     <!-- Trace ID only if error exists -->
                     <td *ngIf="item.ErrorMessage">{{ item.TraceId }}</td>
@@ -110,7 +114,8 @@
                 <ng-template #noItems>
                   <tr>
                     <td [style.color]="hasErrorInTopic(entry[0]) ? 'red' : 'black'">{{ entry[0] }}</td>
-                    <td colspan="1"></td> <!-- Correlation ID blank -->
+                    <td></td> <!-- Correlation ID blank -->
+                    <td></td> <!-- Patient blank -->
                     <td *ngIf="hasAnyError(displayedEntries)"></td>
                     <td *ngIf="hasAnyError(displayedEntries)"></td>
                   </tr>
