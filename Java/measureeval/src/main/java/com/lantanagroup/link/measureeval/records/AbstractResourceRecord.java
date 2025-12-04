@@ -49,6 +49,14 @@ public abstract class AbstractResourceRecord {
         return resource!=null?resource.getIdElement().getIdPart():"";
     }
 
+    @JsonIgnore
+    public String getResourceTypeAndId() {
+        if (resource == null) {
+            return null;
+        }
+        return String.format("%s/%s", resource.fhirType(), resource.getIdElement().getIdPart());
+    }
+
     @Getter
     @Setter
     public static class ScheduledReport {
