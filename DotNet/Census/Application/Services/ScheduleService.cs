@@ -1,6 +1,7 @@
 ﻿using global::Census.Domain.Entities;
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Jobs;
+using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Shared.Application.Models;
 using Quartz;
@@ -55,14 +56,25 @@ public class ScheduleService : BackgroundService
             // Handle removed facilities: clean up orphan jobs
             var groupMatcher = GroupMatcher<JobKey>.GroupContains(KafkaTopic.PatientCensusScheduled.ToString());
             var allJobKeys = await Scheduler.GetJobKeys(groupMatcher);
+
             foreach (var jobKey in allJobKeys)
             {
-                // Extract facilityId from job name (format: "{facilityId}-{KafkaTopic.PatientCensusScheduled}")
-                var parts = jobKey.Name.Split('-');
-                if (parts.Length < 2) continue; // Invalid name, skip
-                string facilityId = parts[0];
+                //get facility id via job detail which contains the JobDataMap
+                var jobDetail = await Scheduler.GetJobDetail(jobKey, cancellationToken);
+                if (jobDetail == null)
+                {
+                    _logger.LogWarning("Job detail not found for job key: {JobKey}.", jobKey.Name);
+                    continue;
+                }
 
-                if (!facilities.Any(f => f.FacilityID == facilityId))
+                var facilityId = ((CensusConfigEntity)jobDetail.JobDataMap.Get(CensusConstants.Scheduler.Facility))?.FacilityID;
+                if (string.IsNullOrEmpty(facilityId))
+                {
+                    _logger.LogWarning("FacilityId not found in job data map for job: {JobKey}.", jobKey.Name);
+                    continue;
+                }
+
+                if (!facilities.Any(f => f.FacilityID.Equals(facilityId, StringComparison.InvariantCultureIgnoreCase)))
                 {
                     try
                     {
@@ -78,21 +90,47 @@ public class ScheduleService : BackgroundService
 
             //repull jobs (due to possible deletions above) and ID disabled facilities to remove their jobs
             allJobKeys = await Scheduler.GetJobKeys(groupMatcher);
-            var invalidJobKeys = allJobKeys.Where(x =>
+            var invalidJobKeys = new List<JobKey>();
+            foreach (var jobKey in allJobKeys)
             {
-                var facilityId = x.Name.Split('-')[0] ?? null;
+                var jobDetail = await Scheduler.GetJobDetail(jobKey, cancellationToken);
+                if (jobDetail == null)
+                {
+                    _logger.LogWarning("Job detail not found for job key: {JobKey}.", jobKey.Name);
+                    continue;
+                }
+
+                var facilityId = ((CensusConfigEntity)jobDetail.JobDataMap.Get(CensusConstants.Scheduler.Facility))?.FacilityID;
+                if (string.IsNullOrEmpty(facilityId))
+                {
+                    _logger.LogWarning("FacilityId not found in job data map for job: {JobKey}.", jobKey.Name);
+                    continue;
+                }
+
                 if (facilities.Any(y => y.FacilityID == facilityId && (y.Enabled ?? true) == false))
-                    return true;
-                return false;
-            });
+                {
+                    invalidJobKeys.Add(jobKey);
+                }
+            }
             
             foreach (var jobKey in invalidJobKeys)
             {
                 try
                 {
-                    var parts = jobKey.Name.Split('-');
-                    if (parts.Length < 2) continue; // Invalid name, skip
-                    string facilityId = parts[0];
+                    var jobDetail = await Scheduler.GetJobDetail(jobKey, cancellationToken);
+                    if (jobDetail == null)
+                    {
+                        _logger.LogWarning("Job detail not found for job key: {JobKey}.", jobKey.Name);
+                        continue;
+                    }
+
+                    var facilityId = ((CensusConfigEntity)jobDetail.JobDataMap.Get(CensusConstants.Scheduler.Facility))?.FacilityID;
+                    if (string.IsNullOrEmpty(facilityId))
+                    {
+                        _logger.LogWarning("FacilityId not found in job data map for job: {JobKey}.", jobKey.Name);
+                        continue;
+                    }
+
                     await censusSchedulingRepo.DeleteJobsForFacility(facilityId, Scheduler);
                     _logger.LogDebug("Removed disabled job for facility: {FacilityId}.", facilityId);
                 }
@@ -139,6 +177,7 @@ public class ScheduleService : BackgroundService
     }
 
 }
+
 
 
 
