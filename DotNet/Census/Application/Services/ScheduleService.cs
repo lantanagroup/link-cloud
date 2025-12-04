@@ -107,7 +107,7 @@ public class ScheduleService : BackgroundService
                     continue;
                 }
 
-                if (facilities.Any(y => y.FacilityID == facilityId && (y.Enabled ?? true) == false))
+                if (facilities.Any(y => y.FacilityID.Equals(facilityId, StringComparison.InvariantCultureIgnoreCase) && (y.Enabled ?? true) == false))
                 {
                     invalidJobKeys.Add(jobKey);
                 }
