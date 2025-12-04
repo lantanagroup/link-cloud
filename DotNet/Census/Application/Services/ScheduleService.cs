@@ -44,117 +44,75 @@ public class ScheduleService : BackgroundService
         try
         {
             Scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
-
             Scheduler.JobFactory = _jobFactory;
 
-            var configRepo = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICensusConfigManager>();
+            var configRepo = _serviceScopeFactory.CreateScope().ServiceProvider
+                .GetRequiredService<ICensusConfigManager>();
+            var facilities = (await configRepo.GetAllFacilities(cancellationToken)).ToList();
+            var enabledFacilityIds = new HashSet<string>(
+                facilities.Where(f => f.Enabled ?? true).Select(f => f.FacilityID),
+                StringComparer.InvariantCultureIgnoreCase
+            );
 
-            List<CensusConfigEntity> facilities = (await configRepo.GetAllFacilities(cancellationToken)).ToList();
+            using var censusSchedulingRepo = _serviceScopeFactory.CreateScope().ServiceProvider
+                .GetRequiredService<ICensusSchedulingRepository>();
 
-            using var censusSchedulingRepo = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICensusSchedulingRepository>();
-
-            // Handle removed facilities: clean up orphan jobs
+            // Get all existing jobs and their facility IDs
             var groupMatcher = GroupMatcher<JobKey>.GroupContains(KafkaTopic.PatientCensusScheduled.ToString());
             var allJobKeys = await Scheduler.GetJobKeys(groupMatcher);
-
-            foreach (var jobKey in allJobKeys)
-            {
-                //get facility id via job detail which contains the JobDataMap
-                var jobDetail = await Scheduler.GetJobDetail(jobKey, cancellationToken);
-                if (jobDetail == null)
-                {
-                    _logger.LogWarning("Job detail not found for job key: {JobKey}.", jobKey.Name);
-                    continue;
-                }
-
-                var facilityId = ((CensusConfigEntity)jobDetail.JobDataMap.Get(CensusConstants.Scheduler.Facility))?.FacilityID;
-                if (string.IsNullOrEmpty(facilityId))
-                {
-                    _logger.LogWarning("FacilityId not found in job data map for job: {JobKey}.", jobKey.Name);
-                    continue;
-                }
-
-                if (!facilities.Any(f => f.FacilityID.Equals(facilityId, StringComparison.InvariantCultureIgnoreCase)))
-                {
-                    try
-                    {
-                        await censusSchedulingRepo.DeleteJobsForFacility(facilityId, Scheduler);
-                        _logger.LogDebug("Cleaned up orphan job for removed facility: {FacilityId}.", facilityId);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Failed to clean up orphan job for facility: {FacilityId}.", facilityId);
-                    }
-                }
-            }
-
-            //repull jobs (due to possible deletions above) and ID disabled facilities to remove their jobs
-            allJobKeys = await Scheduler.GetJobKeys(groupMatcher);
-            var invalidJobKeys = new List<JobKey>();
-            foreach (var jobKey in allJobKeys)
-            {
-                var jobDetail = await Scheduler.GetJobDetail(jobKey, cancellationToken);
-                if (jobDetail == null)
-                {
-                    _logger.LogWarning("Job detail not found for job key: {JobKey}.", jobKey.Name);
-                    continue;
-                }
-
-                var facilityId = ((CensusConfigEntity)jobDetail.JobDataMap.Get(CensusConstants.Scheduler.Facility))?.FacilityID;
-                if (string.IsNullOrEmpty(facilityId))
-                {
-                    _logger.LogWarning("FacilityId not found in job data map for job: {JobKey}.", jobKey.Name);
-                    continue;
-                }
-
-                if (facilities.Any(y => y.FacilityID.Equals(facilityId, StringComparison.InvariantCultureIgnoreCase) && (y.Enabled ?? true) == false))
-                {
-                    invalidJobKeys.Add(jobKey);
-                }
-            }
             
-            foreach (var jobKey in invalidJobKeys)
+            // Process jobs concurrently with controlled parallelism
+            var maxDegreeOfParallelism = 20; // Tune based on your database/scheduler capacity
+            var semaphore = new SemaphoreSlim(maxDegreeOfParallelism);
+
+            var facilityIdTasks = allJobKeys.Select(async jobKey =>
+            {
+                await semaphore.WaitAsync(cancellationToken);
+                try
+                {
+                    var facilityId = await GetFacilityIdFromJob(jobKey, cancellationToken);
+                    if (facilityId != null && !enabledFacilityIds.Contains(facilityId))
+                    {
+                        return facilityId;
+                    }
+                    return null;
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            }).ToList();
+
+            var results = await Task.WhenAll(facilityIdTasks);
+            var facilityIdsToDelete = results
+                .Where(id => id != null)
+                .ToHashSet(StringComparer.InvariantCultureIgnoreCase);
+
+            // Clean up jobs for removed or disabled facilities
+            foreach (var facilityId in facilityIdsToDelete)
             {
                 try
                 {
-                    var jobDetail = await Scheduler.GetJobDetail(jobKey, cancellationToken);
-                    if (jobDetail == null)
-                    {
-                        _logger.LogWarning("Job detail not found for job key: {JobKey}.", jobKey.Name);
-                        continue;
-                    }
-
-                    var facilityId = ((CensusConfigEntity)jobDetail.JobDataMap.Get(CensusConstants.Scheduler.Facility))?.FacilityID;
-                    if (string.IsNullOrEmpty(facilityId))
-                    {
-                        _logger.LogWarning("FacilityId not found in job data map for job: {JobKey}.", jobKey.Name);
-                        continue;
-                    }
-
                     await censusSchedulingRepo.DeleteJobsForFacility(facilityId, Scheduler);
-                    _logger.LogDebug("Removed disabled job for facility: {FacilityId}.", facilityId);
+                    _logger.LogDebug("Cleaned up jobs for facility: {FacilityId}.", facilityId);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to remove disabled job for facility associated with job: {JobKey}.", jobKey.Name);
+                    _logger.LogError(ex, "Failed to clean up jobs for facility: {FacilityId}.", facilityId);
                 }
             }
 
-            foreach (CensusConfigEntity facility in facilities)
+            // Schedule jobs for enabled facilities
+            foreach (var facility in facilities.Where(f => f.Enabled ?? true))
             {
                 try
                 {
-                    _logger.LogDebug("Scheduling Census job for facility: {FacilityId}. enabled: {enabled}", facility.FacilityID, facility.Enabled);
-
-                    if (facility.Enabled ?? true)
-                    {
-                        _logger.LogDebug("Adding/Updating Census job for facility: {FacilityId}.", facility.FacilityID);
-                        await censusSchedulingRepo.UpdateJobsForFacility(facility, Scheduler);
-                    }
+                    _logger.LogDebug("Adding/Updating Census job for facility: {FacilityId}.", facility.FacilityID);
+                    await censusSchedulingRepo.UpdateJobsForFacility(facility, Scheduler);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Something went wrong scheduling a Census job for facility: {FacilityId}.", facility.FacilityID);
+                    _logger.LogError(ex, "Failed to schedule Census job for facility: {FacilityId}.", facility.FacilityID);
                 }
             }
 
@@ -163,8 +121,27 @@ public class ScheduleService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Something went wrong scheduling a Census job: {Message}.", ex.Message);
+            _logger.LogError(ex, "Failed to start scheduler: {Message}.", ex.Message);
         }
+    }
+
+    private async Task<string?> GetFacilityIdFromJob(JobKey jobKey, CancellationToken cancellationToken)
+    {
+        var jobDetail = await Scheduler.GetJobDetail(jobKey, cancellationToken);
+        if (jobDetail == null)
+        {
+            _logger.LogWarning("Job detail not found for job key: {JobKey}.", jobKey.Name);
+            return null;
+        }
+
+        var facilityId = ((CensusConfigEntity)jobDetail.JobDataMap.Get(CensusConstants.Scheduler.Facility))?.FacilityID;
+        if (string.IsNullOrEmpty(facilityId))
+        {
+            _logger.LogWarning("FacilityId not found in job data map for job: {JobKey}.", jobKey.Name);
+            return null;
+        }
+
+        return facilityId;
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
