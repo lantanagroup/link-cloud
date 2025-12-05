@@ -118,23 +118,36 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             var correlationId = Encoding.UTF8.GetString(headerValue);
 
-                            var reportEntry = await _reportEntryManager.GetPatientEntry(result.Value.ReportTrackingId, result.Value.PatientId);
+                            var reportEntry = await _reportEntryManager.GetPatientEntry(result.Value.ReportTrackingId, result.Value.ReportType, result.Value.PatientId);
 
                             //TODO: Add null check 
 
-                            if (result.Value.IsReportable) {
+                            reportEntry.MeasureReportFileName = result.Value.MeasureReportFileName;
+                            reportEntry.MeasureReportUri = result.Value.MeasureReportURI;
+
+                            if (result.Value.IsReportable)
+                            {
+                                reportEntry.Status = PatientSubmissionStatus.ReadyForValidation;
+                            }
+                            else 
+                            {
                                 reportEntry.Status = PatientSubmissionStatus.NotReportable;
                                 reportEntry.ValidationStatus = ValidationStatus.NotReportable;
-
-                                await _reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
                             }
+
+                            await _reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
 
                             var entries = await _reportEntryManager.FindAsync(x => x.PatientId == result.Value.PatientId && x.FacilityId == result.Value.FacilityId && x.ReportScheduleId == result.Value.ReportTrackingId);
 
-                            var readyForValidation = entries.All(e => e.Status == PatientSubmissionStatus.NotReportable || e.Status == PatientSubmissionStatus.ReadyForValidation) && entries.Any(e => e.Status == PatientSubmissionStatus.ReadyForValidation);
+                           var readyForValidation = entries.All(e =>
+                                e.Status == PatientSubmissionStatus.NotReportable ||
+                                e.Status == PatientSubmissionStatus.ReadyForValidation) &&
+                                entries.Any(e => e.Status == PatientSubmissionStatus.ReadyForValidation);
+
 
                             var schedule = await _reportScheduledManager.GetReportSchedule(result.Value.FacilityId, result.Value.ReportTrackingId, cancellationToken);
 
+                            //TODO: Follow up on this logic
                             if (!readyForValidation)
                             {
                                 await _reportManifestProducer.Produce(schedule, correlationId);
@@ -145,7 +158,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             foreach (var ent in entries.Where(s => s.Status == PatientSubmissionStatus.ReadyForValidation))
                             {
-                                ent.AggregateReportUri = ndjson_blob_uri.AbsolutePath;
+                                ent.AggregateReportUri = ndjson_blob_uri.AbsoluteUri;
+                                //TODO: Add AggregateFileName
                                 ent.ModifyDate = DateTime.UtcNow;
                                 await _reportEntryManager.UpdateAsync(ent, cancellationToken);
                             }

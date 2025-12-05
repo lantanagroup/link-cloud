@@ -16,6 +16,7 @@ namespace LantanaGroup.Link.Report.Entities
         public PatientSubmissionStatus Status { get; set; } = PatientSubmissionStatus.PendingEvaluation;
         public ValidationStatus ValidationStatus { get; set; } = ValidationStatus.Pending;
         public string MeasureReportUri { get; set; } = string.Empty;
+        public string MeasureReportFileName { get; set; } = string.Empty;
         public string AggregateReportUri { get; set; } = string.Empty;
     }
 }

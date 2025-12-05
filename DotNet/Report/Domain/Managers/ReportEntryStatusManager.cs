@@ -10,7 +10,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 {
     public interface IReportEntryStatusManager 
     {
-        Task<ReportEntryStatusModel?> GetPatientEntry(string reportId, string patientId, CancellationToken cancellationToken = default);
+        Task<ReportEntryStatusModel?> GetPatientEntry(string reportId, string reportType, string patientId, CancellationToken cancellationToken = default);
 
         Task<ReportEntryStatusModel> UpdateAsync(ReportEntryStatusModel entry,
             CancellationToken cancellationToken);
@@ -45,9 +45,9 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return await _database.ReportEntryStatusRepository.FindAsync(predicate, cancellationToken);
         }
 
-        public async Task<ReportEntryStatusModel?> GetPatientEntry(string reportId, string patientId, CancellationToken cancellationToken = default)
+        public async Task<ReportEntryStatusModel?> GetPatientEntry(string reportId, string reportType, string patientId, CancellationToken cancellationToken = default)
         {
-            return (await _database.ReportEntryStatusRepository.FindAsync(r => r.ReportScheduleId == reportId && r.PatientId == patientId, cancellationToken)).SingleOrDefault();
+            return (await _database.ReportEntryStatusRepository.FindAsync(r => r.ReportScheduleId == reportId && r.PatientId == patientId && r.ReportType == reportType, cancellationToken)).SingleOrDefault();
         }
 
         public async Task<ReportEntryStatusModel?> SingleOrDefaultAsync(Expression<Func<ReportEntryStatusModel, bool>> predicate, CancellationToken cancellationToken = default)

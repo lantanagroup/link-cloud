@@ -180,35 +180,40 @@ namespace LantanaGroup.Link.Report.Core
             {
                 foreach (var entry in entries)
                 {
-                    Uri entry_uri = new Uri(entry.MeasureReportUri);
-
-                    BlockBlobClient blockReadBlobClient = _containerClient.GetBlockBlobClient(entry_uri.AbsolutePath);
-
-                    using (Stream read_stream = await blockReadBlobClient.OpenReadAsync(true))
-                    using (StreamReader reader = new StreamReader(read_stream))
+                    BlockBlobClient blockReadBlobClient = _containerClient.GetBlockBlobClient(entry.MeasureReportFileName);
+                    
+                    try
                     {
-                        while (reader.Peek() >= 0)
+                        using (Stream read_stream = await blockReadBlobClient.OpenReadAsync(true))
+                        using (StreamReader reader = new StreamReader(read_stream))
                         {
-                            string[] resource_and_id = reader.ReadLine().Split("_");
-
-                            if (resourcesAdded.ContainsKey(resource_and_id[1]) && resourcesAdded[resource_and_id[1]].Where(x => x == resource_and_id[0]).Any())
+                            while (reader.Peek() >= 0)
                             {
-                                //Skip FHIR Resource line
-                                reader.Read();
-                                continue;
-                            }
+                                string[] resource_and_id = reader.ReadLine().Split("_");
 
-                            if (resourcesAdded.ContainsKey(resource_and_id[1]))
-                            {
-                                resourcesAdded[resource_and_id[1]].Add(resource_and_id[0]);
-                            }
-                            else
-                            {
-                                resourcesAdded.Add(resource_and_id[1], new List<string>() { resource_and_id[0] });
-                            }
+                                if (resourcesAdded.ContainsKey(resource_and_id[1]) && resourcesAdded[resource_and_id[1]].Where(x => x == resource_and_id[0]).Any())
+                                {
+                                    //Skip FHIR Resource line
+                                    reader.Read();
+                                    continue;
+                                }
 
-                            writer.WriteLine(reader.ReadLine());
+                                if (resourcesAdded.ContainsKey(resource_and_id[1]))
+                                {
+                                    resourcesAdded[resource_and_id[1]].Add(resource_and_id[0]);
+                                }
+                                else
+                                {
+                                    resourcesAdded.Add(resource_and_id[1], new List<string>() { resource_and_id[0] });
+                                }
+
+                                writer.WriteLine(reader.ReadLine());
+                            }
                         }
+                    }
+                    catch (Exception ex) {
+                        //TODO: Do something with this catch
+                        throw ex;
                     }
                 }
             }
