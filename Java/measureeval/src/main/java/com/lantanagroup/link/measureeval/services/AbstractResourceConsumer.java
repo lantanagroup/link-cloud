@@ -29,6 +29,7 @@ import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.KafkaUtils;
+import org.springframework.util.StopWatch;
 
 import java.util.*;
 import java.util.function.Predicate;
@@ -38,6 +39,8 @@ import static io.opentelemetry.api.common.AttributeKey.stringKey;
 
 public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord> {
     private static final Logger logger = LoggerFactory.getLogger(AbstractResourceConsumer.class);
+    private static final Logger performanceLogger = LoggerFactory.getLogger(
+            "com.lantanagroup.link.performance." + AbstractResourceConsumer.class.getSimpleName());
     private final AbstractResourceRepository resourceRepository;
     private final PatientReportingEvaluationStatusRepository patientStatusRepository;
     private final MeasureReportNormalizer measureReportNormalizer;
@@ -77,84 +80,121 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     }
 
     protected void doConsume (String correlationId, ConsumerRecord<String, T> record) {
+        StopWatch totalStopWatch = new StopWatch();
+        StopWatch taskStopWatch = new StopWatch();
+        totalStopWatch.start();
 
-        Span currentSpan = Span.current();
-        MDC.put("traceId", currentSpan.getSpanContext().getTraceId());
-        MDC.put("spanId", currentSpan.getSpanContext().getSpanId());
+        try {
+            Span currentSpan = Span.current();
+            MDC.put("traceId", currentSpan.getSpanContext().getTraceId());
+            MDC.put("spanId", currentSpan.getSpanContext().getSpanId());
 
-        Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.CORRELATION_ID), correlationId).build();
-        measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
+            taskStopWatch.start("incrementRecordCount");
+            Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.CORRELATION_ID), correlationId).build();
+            measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
+            taskStopWatch.stop();
 
-        String facilityId = record.key();
+            taskStopWatch.start("validateRecord");
+            String facilityId = record.key();
+            if (facilityId == null || facilityId.isEmpty()) {
+                throw new ValidationException("Facility ID is null or empty.");
+            }
+            T value = record.value();
+            if (value.getResource() == null && !value.isAcquisitionComplete()) {
+                throw new ValidationException("Record Resource is null and AcquisitionComplete is false.");
+            }
+            if (value.getQueryType() == null) {
+                throw new ValidationException("Query Type is null.");
+            }
+            if (value.getScheduledReports() == null || value.getScheduledReports().isEmpty()) {
+                throw new ValidationException("Scheduled Reports is null or empty.");
+            }
+            if (value.getReportableEvent() == null) {
+                throw new ValidationException("Reportable Event is null or empty.");
+            }
+            taskStopWatch.stop();
 
-        if (facilityId == null || facilityId.isEmpty()) {
-            throw new ValidationException("Facility ID is null or empty.");
-        }
+            logger.debug(
+                    "Consuming {}: FACILITY=[{}] CORRELATION=[{}] RESOURCE=[{}] TAIL=[{}]",
+                    KafkaUtils.format(record),
+                    facilityId,
+                    correlationId,
+                    value.getResourceTypeAndId(),
+                    value.isAcquisitionComplete());
 
-        T value = record.value();
+            if (value.isAcquisitionComplete()) {
+                taskStopWatch.start("retrieveOrCreatePatientStatus");
+                PatientReportingEvaluationStatus patientStatus = retrievePatientStatus(facilityId, correlationId);
+                if (patientStatus == null) {
+                    logger.warn("Patient status for facilityId: {}, correlationId: {} not found. Creating a temporary PatientStatus...", facilityId, correlationId);
+                    patientStatus = createPatientStatus(facilityId, correlationId, value);
+                }
+                taskStopWatch.stop();
 
-        if (value.getResource() == null && !value.isAcquisitionComplete()) {
-            throw new ValidationException("Record Resource is null and AcquisitionComplete is false.");
-        }
-        if (value.getQueryType() == null) {
-            throw new ValidationException("Query Type is null.");
-        }
-        if (value.getScheduledReports() == null || value.getScheduledReports().isEmpty()) {
-            throw new ValidationException("Scheduled Reports is null or empty.");
-        }
-        if (value.getReportableEvent() == null) {
-            throw new ValidationException("Reportable Event is null or empty.");
-        }
+                taskStopWatch.start("createBundle");
+                Bundle bundle = patientStatusBundler.createBundle(patientStatus);
+                taskStopWatch.stop();
 
-        logger.debug(
-                "Consuming {}: FACILITY=[{}] CORRELATION=[{}] RESOURCE=[{}] TAIL=[{}]",
-                KafkaUtils.format(record),
-                facilityId,
-                correlationId,
-                value.getResourceTypeAndId(),
-                value.isAcquisitionComplete());
+                taskStopWatch.start("evaluateMeasures");
+                evaluateMeasures(value, patientStatus, bundle);
+                taskStopWatch.stop();
 
-        if (value.isAcquisitionComplete()) {
-            PatientReportingEvaluationStatus patientStatus = retrievePatientStatus(facilityId, correlationId);
-
-            if (patientStatus == null) {
-                logger.warn("Patient status for facilityId: {}, correlationId: {} not found. Creating a temporary PatientStatus...", facilityId, correlationId);
-                patientStatus = createPatientStatus(facilityId, correlationId, value);
+                return;
             }
 
-            Bundle bundle = patientStatusBundler.createBundle(patientStatus);
-            evaluateMeasures(value, patientStatus, bundle);
-            return;
-        }
+            logger.trace("Beginning resource update");
 
-        logger.trace("Beginning resource update");
-        AbstractResourceEntity resource = Objects.requireNonNullElseGet(retrieveResource(facilityId, value), () -> createResource(facilityId, value));
-        resource.setResource(value.getResource());
-        resourceRepository.save(resource);
+            taskStopWatch.start("retrieveOrCreateResource");
+            AbstractResourceEntity resource = Objects.requireNonNullElseGet(retrieveResource(facilityId, value), () -> createResource(facilityId, value));
+            taskStopWatch.stop();
 
-        logger.trace("Beginning patient status update");
-        PatientReportingEvaluationStatus patientStatus = Objects.requireNonNullElseGet(retrievePatientStatus(facilityId, correlationId), () -> createPatientStatus(facilityId, correlationId, value));
+            resource.setResource(value.getResource());
 
-        if (patientStatus.getPatientId() == null) {
-            logger.trace("Patient Id is set to : {}", value.getPatientId());
-            patientStatus.setPatientId(value.getPatientId());
-        }
+            taskStopWatch.start("saveResource");
+            resourceRepository.save(resource);
+            taskStopWatch.stop();
 
-        // add the resource in the PatientReportingEvaluationStatus only if does not exist already
-        PatientReportingEvaluationStatus.Resource existingResource = patientStatus.getResources() == null ? null : patientStatus.getResources().stream().filter(res -> res.getResourceType() == value.getResourceType() && Objects.equals(res.getResourceId(), value.getResourceId())).findFirst().orElse(null);
+            logger.trace("Beginning patient status update");
 
-        if (existingResource == null) {
-            PatientReportingEvaluationStatus.Resource statusResource = new PatientReportingEvaluationStatus.Resource();
-            statusResource.setResourceType(value.getResourceType());
-            statusResource.setResourceId(value.getResourceId());
-            statusResource.setQueryType(value.getQueryType());
-            statusResource.setIsPatientResource(value.isPatientResource());
-            statusResource.setNormalizationStatus(getNormalizationStatus());
-            patientStatus.getResources().add(statusResource);
-            patientStatusRepository.save(patientStatus);
-        }
-        else {
-            throw new ValidationException("Duplicate resource: " + value.getResourceTypeAndId());
+            taskStopWatch.start("retrieveOrCreatePatientStatus");
+            PatientReportingEvaluationStatus patientStatus = Objects.requireNonNullElseGet(retrievePatientStatus(facilityId, correlationId), () -> createPatientStatus(facilityId, correlationId, value));
+            taskStopWatch.stop();
+
+            if (patientStatus.getPatientId() == null) {
+                logger.trace("Patient Id is set to : {}", value.getPatientId());
+                patientStatus.setPatientId(value.getPatientId());
+            }
+
+            // add the resource in the PatientReportingEvaluationStatus only if does not exist already
+            taskStopWatch.start("getPatientStatusResource");
+            PatientReportingEvaluationStatus.Resource existingResource = patientStatus.getResources() == null ? null : patientStatus.getResources().stream().filter(res -> res.getResourceType() == value.getResourceType() && Objects.equals(res.getResourceId(), value.getResourceId())).findFirst().orElse(null);
+            taskStopWatch.stop();
+
+            if (existingResource == null) {
+                taskStopWatch.start("createAndAddPatientStatusResource");
+                PatientReportingEvaluationStatus.Resource statusResource = new PatientReportingEvaluationStatus.Resource();
+                statusResource.setResourceType(value.getResourceType());
+                statusResource.setResourceId(value.getResourceId());
+                statusResource.setQueryType(value.getQueryType());
+                statusResource.setIsPatientResource(value.isPatientResource());
+                statusResource.setNormalizationStatus(getNormalizationStatus());
+                patientStatus.getResources().add(statusResource);
+                taskStopWatch.stop();
+
+                taskStopWatch.start("savePatientStatus");
+                patientStatusRepository.save(patientStatus);
+                taskStopWatch.stop();
+            }
+            else {
+                throw new ValidationException("Duplicate resource: " + value.getResourceTypeAndId());
+            }
+        } finally {
+            totalStopWatch.stop();
+            for (StopWatch.TaskInfo task : taskStopWatch.getTaskInfo()) {
+                performanceLogger.trace("{}: {} ns", task.getTaskName(), task.getTimeNanos());
+            }
+            performanceLogger.trace("SUM_OF_TASKS: {} ns", taskStopWatch.getTotalTimeNanos());
+            performanceLogger.trace("TOTAL: {} ns", totalStopWatch.getTotalTimeNanos());
         }
     }
 
