@@ -19,7 +19,7 @@
                 </http>
                 <format>
                     <label>
-                        <pattern>app=${loki_app},component=MeasureEval,TraceId="%X{traceId}",SpanId="%X{spanId}"</pattern>
+                        <pattern>app=${loki_app},component=MeasureEval</pattern>
                         <readMarkers>true</readMarkers>
                     </label>
                     <message>
