@@ -493,10 +493,6 @@ namespace LantanaGroup.Link.Report.Controllers
 
             try
             {
-                // Create search predicates
-                //TODO: design way to dynamically build predicates or change search to use custom method
-                Expression<Func<PatientSubmissionEntry, bool>> predicate = r => r.FacilityId == facilityId && r.ReportScheduleId == reportId;
-              
                 var resources =
                     await _submissionEntryQueries.GetResourceSummary(facilityId, reportId, resourceType, pageSize, pageNumber, HttpContext.RequestAborted);
 
