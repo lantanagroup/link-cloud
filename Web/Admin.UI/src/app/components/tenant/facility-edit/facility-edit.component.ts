@@ -544,9 +544,8 @@ export class FacilityEditComponent implements OnInit {
     return enumValue.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
   }
 
-  onDeleteConfig(): void {
-
-    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+  onDeleteCensusConfig(): void {
+    let dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
       width: '400px',
       data: {
         message: `Are you sure you want to delete this operation?`
@@ -578,10 +577,41 @@ export class FacilityEditComponent implements OnInit {
         });
       }
     });
+  }
 
-    const confirmDelete = confirm('Are you sure you want to delete this configuration?');
-    if (!confirmDelete) return;
-
+  onDeleteQueryDispatchConfig(): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        message: `Are you sure you want to delete this operation?`
+      }
+    });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.queryDispatchService.deleteConfiguration(this.queryDispatchConfig.facilityId).subscribe({
+          next: () => {
+            this.queryDispatchService.getConfiguration(this.facilityId).subscribe({
+              next: (data: IQueryDispatchConfiguration | null) => {
+                if (data) {
+                  this.showNoQueryDispatchConfigAlert = false;
+                  this.queryDispatchConfig = data;
+                } else {
+                  this.showNoQueryDispatchConfigAlert = true;
+                  this.queryDispatchConfig = {facilityId: this.facilityId, dispatchSchedules: []};
+                }
+              },
+              error: () => {
+                this.showNoQueryDispatchConfigAlert = true;
+                this.queryDispatchConfig = {facilityId: this.facilityId, dispatchSchedules: []};
+              }
+            });
+          },
+          error: () => {
+            alert('Error deleting configuration');
+          }
+        });
+      }
+    });
   }
 
 }
