@@ -2,12 +2,12 @@
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Domain.Queries;
+using LantanaGroup.Link.Report.Entities.Enums;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Services.ResourceMerger;
@@ -202,10 +202,11 @@ namespace LantanaGroup.Link.Report.Listeners
             var value = result.Message.Value;
             var facilityId = key.FacilityId;
 
-            var scope = _serviceScopeFactory.CreateScope();
+            using var scope = _serviceScopeFactory.CreateScope();
             var resourceManager = scope.ServiceProvider.GetRequiredService<IResourceManager>();
             var measureReportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
             var submissionEntryManager = scope.ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
+            var entryQueries = scope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
 
             if (!result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
             {
@@ -229,48 +230,33 @@ namespace LantanaGroup.Link.Report.Listeners
                     $"{Name}: One or more required Key/Value properties are null, empty, or otherwise invalid.");
             }
 
-            // find existing report scheduled for this facility, report type, and date range
-            var schedule = await measureReportScheduledManager.GetReportSchedule(key.FacilityId, value.ReportTrackingId, cancellationToken) ??
-                                throw new TransientException($"{Name}: report schedule not found for Facility {key.FacilityId} and reportId: {value.ReportTrackingId}");
-
-            // find existing submission entry for this facility, report schedule, and patient
-            var entry = await submissionEntryManager.SingleAsync(e =>
-                e.ReportScheduleId == schedule.Id
-                && e.PatientId == value.PatientId
-                && e.ReportType == value.ReportType, cancellationToken);
-
             // deserialize the resource
             Resource? resource = null;
             try
             {
                 resource = JsonSerializer.Deserialize<Resource>(value.Resource.ToString(),
                     new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector,
-                        new FhirJsonPocoDeserializerSettings { Validator = null }));
+                        new FhirJsonPocoDeserializerSettings { Validator = null })) ?? throw new Exception($"{Name}: Unable to deserialize event resource");
             }
             catch (Exception ex)
             {
                 throw new DeadLetterException($"{Name}: Unable to deserialize event resource", ex);
             }
 
-            if (resource == null)
-            {
-                throw new DeadLetterException($"{Name}: Unable to deserialize event resource");
-            }
+            var schedule = await measureReportScheduledManager.GetReportSchedule(key.FacilityId, value.ReportTrackingId) ?? throw new TransientException("No Report Schedule Found.");
+
+            var patientReportData = await entryQueries.GetPatientResourceData(key.FacilityId, value.ReportTrackingId, value.PatientId, value.ReportType, resource.Id, cancellationToken: cancellationToken);
+            var entry = patientReportData.Item1 ?? throw new TransientException("No Patient Submission Entry Found");
+            var existingReportResource = patientReportData.Item2;
 
             if (value.IsReportable)
             {
                 if (resource.TypeName == "MeasureReport")
                 {
-                    entry.AddMeasureReport((MeasureReport)resource);
+                    entry.MeasureReport = (MeasureReport)resource;
                 }
                 else
                 {
-                    IFacilityResource? returnedResource = null;
-
-                    var existingReportResource =
-                        await resourceManager.GetResourceAsync(key.FacilityId, resource.Id, resource.TypeName, value.PatientId,
-                            cancellationToken);
-
                     if (existingReportResource != null)
                     {
                         // Set up the ResourceMerger with the UseLatestStrategy
@@ -278,21 +264,17 @@ namespace LantanaGroup.Link.Report.Listeners
                         var strategyLogger = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ILogger<UseLatestStrategy>>();
                         merger.SetStrategy(new UseLatestStrategy(strategyLogger));
 
-                        existingReportResource.SetResource(
-                            merger.Merge(existingReportResource.GetResource(), resource));
+                        existingReportResource.Resource = merger.Merge(existingReportResource.Resource, resource);
 
-                        // Update the existing resource using the merged version of the resource
-                        returnedResource =
-                            await resourceManager.UpdateResourceAsync(existingReportResource,
-                                cancellationToken);
+                        await resourceManager.UpdateResourceAsync(existingReportResource, cancellationToken);
                     }
                     else
                     {
-                        returnedResource = await resourceManager.CreateResourceAsync(key.FacilityId, resource, value.PatientId, cancellationToken);
+                        await resourceManager.CreateResourceAsync(key.FacilityId, entry.ReportScheduleId, [value.ReportType], resource, value.PatientId, cancellationToken );
                     }
-
-                    entry.UpdateContainedResource(returnedResource);
                 }
+
+                entry.Status = entry.MeasureReport != null ? PatientSubmissionStatus.ReadyForValidation : PatientSubmissionStatus.PendingEvaluation;
             }
             else
             {
@@ -301,15 +283,20 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 if (resource.TypeName == "MeasureReport")
                 {
-                    entry.AddMeasureReport((MeasureReport)resource);
+                    entry.MeasureReport = (MeasureReport)resource;
                 }
             }
 
-            await submissionEntryManager.UpdateAsync(entry, cancellationToken);
+            entry = await submissionEntryManager.UpdateAsync(new PatientSubmissionEntryUpdateModel
+            {
+                Id = entry.Id,
+                MeasureReport = entry.MeasureReport,
+                PayloadUri = entry.PayloadUri,
+                Status = entry.Status,
+                ValidationStatus = entry.ValidationStatus,
+            }, cancellationToken);
 
-            var entries = await submissionEntryManager.FindAsync(e => e.PatientId == value.PatientId && e.FacilityId == schedule.FacilityId && e.ReportScheduleId == schedule.Id);
-
-            var readyForValidation = entries.All(e => e.Status == PatientSubmissionStatus.NotReportable || e.Status == PatientSubmissionStatus.ReadyForValidation) && entries.Any(e => e.Status == PatientSubmissionStatus.ReadyForValidation);
+            var readyForValidation = await entryQueries.ReportReadyForValidation(facilityId, schedule.Id, cancellationToken);
 
             if (readyForValidation)
             {
@@ -342,12 +329,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 if (payloadUri != null)
                 {
-                    foreach (var ent in entries.Where(s => s.Status == PatientSubmissionStatus.ReadyForValidation))
-                    {
-                        ent.PayloadUri = payloadUri;
-                        ent.ModifyDate = DateTime.UtcNow;
-                        await submissionEntryManager.UpdateAsync(ent, cancellationToken);
-                    }
+                    await submissionEntryManager.UpdateAllEntriesWithPayloadUri(schedule.Id, payloadUri);
                 }
 
                 try

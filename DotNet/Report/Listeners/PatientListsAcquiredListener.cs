@@ -1,18 +1,19 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
+using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain;
+using LantanaGroup.Link.Report.Domain.Enums;
+using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
-using LantanaGroup.Link.Report.Domain.Enums;
-using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -125,7 +126,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                                 if (entry == null)
                                                 {
-                                                    await _submissionEntryManager.AddAsync(new MeasureReportSubmissionEntryModel()
+                                                    await _submissionEntryManager.AddAsync(new PatientSubmissionEntry()
                                                     {
                                                         PatientId = patientId,
                                                         Status = PatientSubmissionStatus.PendingEvaluation,
@@ -138,7 +139,14 @@ namespace LantanaGroup.Link.Report.Listeners
                                                 else
                                                 {
                                                     entry.Status = PatientSubmissionStatus.PendingEvaluation;
-                                                    await _submissionEntryManager.UpdateAsync(entry);
+                                                    await _submissionEntryManager.UpdateAsync(new PatientSubmissionEntryUpdateModel
+                                                    {
+                                                        Id = entry.Id,
+                                                        MeasureReport = entry.MeasureReport,
+                                                        PayloadUri = entry.PayloadUri,
+                                                        Status = entry.Status,
+                                                        ValidationStatus = entry.ValidationStatus,
+                                                    }, cancellationToken);
                                                 } 
                                             }
                                         }

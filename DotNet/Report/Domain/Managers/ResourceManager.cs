@@ -1,83 +1,39 @@
 ﻿using Hl7.Fhir.Model;
-using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.ResourceCategories;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
-using LantanaGroup.Link.Shared.Application.Models;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
 {
     public interface IResourceManager
     {
-        Task<IFacilityResource?> GetResourceAsync(string facilityId, string resourceId, string resourceType,
-            string patientId = "", CancellationToken cancellationToken = default);
-
-        Task<IFacilityResource> UpdateResourceAsync(IFacilityResource resource, CancellationToken cancellationToken);
-
-        Task<IFacilityResource> CreateResourceAsync(string facilityId, Resource resource, string patientId = "",
-            CancellationToken cancellationToken = default);
+        Task<FhirResource> UpdateResourceAsync(FhirResource resource, CancellationToken cancellationToken = default);
+        Task<FhirResource> CreateResourceAsync(string facilityId, string reportScheduleId, List<string> reportTypes, Resource resource, string patientId = "", CancellationToken cancellationToken = default);
     }
 
     public class ResourceManager : IResourceManager
     {
-        private readonly IDatabase _database;
+        private readonly MongoDbContext _context;
 
-        public ResourceManager(IDatabase database)
+        public ResourceManager(MongoDbContext context)
         {
-            _database = database;
+            _context = context ?? throw new ArgumentNullException(nameof(context));
         }
 
-        public async Task<IFacilityResource?> GetResourceAsync(string facilityId, string resourceId, string resourceType, string patientId = "", CancellationToken cancellationToken = default)
+        public async Task<FhirResource> UpdateResourceAsync(FhirResource fhirResource, CancellationToken cancellationToken = default)
         {
-            var resourceTypeCategory = ResourceCategory.GetResourceCategoryByType(resourceType);
+            fhirResource.ModifyDate = DateTime.UtcNow;
 
-            if (resourceTypeCategory == null)
-            {
-                throw new Exception(resourceType + " is not a valid FHIR resouce");
-            }
+            _context.FhirResources.Update(fhirResource);
 
-            if (resourceTypeCategory == ResourceCategoryType.Patient)
-            {
-                var patientResource = (await _database.PatientResourceRepository.FindAsync(
-                    r => r.FacilityId == facilityId && r.PatientId == patientId && r.ResourceId == resourceId &&
-                         r.ResourceType == resourceType, cancellationToken)).SingleOrDefault();
+            await _context.SaveChangesAsync(cancellationToken);
 
-                return patientResource;
-            }
-
-            var sharedResource = (await _database.SharedResourceRepository.FindAsync(
-                r => r.FacilityId == facilityId && r.ResourceId == resourceId &&
-                     r.ResourceType == resourceType, cancellationToken)).SingleOrDefault();
-
-            return sharedResource;
+            return fhirResource;
         }
 
-        public async Task<IFacilityResource> UpdateResourceAsync(IFacilityResource resource, CancellationToken cancellationToken)
-        {
-            if (resource.GetType() == typeof(PatientResourceModel))
-            {
-                var patientResource = (PatientResourceModel)resource;
-                patientResource.ModifyDate = DateTime.UtcNow;
-
-                patientResource = await _database.PatientResourceRepository.UpdateAsync(patientResource, cancellationToken);
-
-                return patientResource;
-            }
-            else if (resource.GetType() == typeof(SharedResourceModel))
-            {
-                var sharedResource = (SharedResourceModel)resource;
-                sharedResource.ModifyDate = DateTime.UtcNow;
-
-                sharedResource = await _database.SharedResourceRepository.UpdateAsync(sharedResource, cancellationToken);
-
-                return sharedResource;
-            }
-
-            throw new DeadLetterException("parameter resource is not of an expected type");
-        }
-
-        public async Task<IFacilityResource> CreateResourceAsync(string facilityId, Resource resource, string patientId = "", CancellationToken cancellationToken = default)
+        public async Task<FhirResource> CreateResourceAsync(string facilityId, string reportScheduleId, List<string> reportTypes, Resource resource, string patientId = "", CancellationToken cancellationToken = default)
         {
             var resourceTypeCategory = ResourceCategory.GetResourceCategoryByType(resource.TypeName);
 
@@ -86,39 +42,55 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 throw new DeadLetterException(resource.TypeName + " is not a valid FHIR resouce");
             }
 
-            if (resourceTypeCategory == ResourceCategoryType.Patient)
+            var fhirResource = new FhirResource()
             {
-                var patientResource = new PatientResourceModel()
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    FacilityId = facilityId,
-                    PatientId = patientId,
-                    Resource = resource,
-                    ResourceId = resource.Id,
-                    ResourceType = resource.TypeName,
-                    CreateDate = DateTime.UtcNow
-                };
+                FacilityId = facilityId,
+                PatientId = resourceTypeCategory == ResourceCategoryType.Patient ? patientId : null,
+                Resource = resource,
+                ResourceId = resource.Id,
+                ResourceType = resource.TypeName,
+                ResourceCategoryType = (ResourceCategoryType)resourceTypeCategory,
+                CreateDate = DateTime.UtcNow
+            };
 
-                patientResource = await _database.PatientResourceRepository.AddAsync(patientResource, cancellationToken);
+            await _context.FhirResources.AddAsync(fhirResource, cancellationToken);
 
-                return patientResource;
-            }
-            else
+            await _context.SaveChangesAsync(cancellationToken);
+
+            await CreateReportResourceMap(reportScheduleId, reportTypes, fhirResource.Id, cancellationToken);
+
+            return fhirResource;
+        }
+
+        public async Task CreateReportResourceMap(string reportScheduleId, List<string> reportTypes, string fhirResourceId, CancellationToken cancellationToken = default)
+        {
+            var resourceMap = _context.ReportScheduleResourceMaps.SingleOrDefault(r => r.ReportScheduleId == reportScheduleId);
+
+            if (resourceMap == null)
             {
-                var sharedResource = new SharedResourceModel()
+                await _context.ReportScheduleResourceMaps.AddAsync(new ReportScheduleResourceMap
                 {
-                    Id = Guid.NewGuid().ToString(),
-                    FacilityId = facilityId,
-                    Resource = resource,
-                    ResourceId = resource.Id,
-                    ResourceType = resource.TypeName,
-                    CreateDate = DateTime.UtcNow
-                };
+                    FhirResourceId = fhirResourceId,
+                    ReportScheduleId = reportScheduleId,
+                    ReportTypes = reportTypes,
+                    CreateDate = DateTime.UtcNow,
+                    ModifyDate = DateTime.UtcNow
+                });
 
-                sharedResource = await _database.SharedResourceRepository.AddAsync(sharedResource, cancellationToken);
-
-                return sharedResource;
+                await _context.SaveChangesAsync(cancellationToken);
+                return;
             }
+
+            foreach (var reportType in reportTypes) 
+            {
+                if(!resourceMap.ReportTypes.Contains(reportType))
+                {
+                    resourceMap.ReportTypes.Add(reportType);
+                }
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+
         }
     }
 }

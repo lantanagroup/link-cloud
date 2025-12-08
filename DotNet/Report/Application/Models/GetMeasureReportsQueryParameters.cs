@@ -1,5 +1,5 @@
 ﻿using LantanaGroup.Link.Report.Domain.Enums;
-using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Entities.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
 
 namespace LantanaGroup.Link.Report.Application.Models;

@@ -14,14 +14,14 @@ using System.Reflection;
 
 namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 
-public class MongoEntityRepository<T> : IBaseEntityRepository<T> where T : BaseEntity
+public class MongoBaseEntityRepository<T> : IBaseEntityRepository<T> where T : BaseEntity
 {
-    private readonly ILogger<MongoEntityRepository<T>> _logger;
+    private readonly ILogger<MongoBaseEntityRepository<T>> _logger;
     protected readonly IMongoCollection<T> _collection;
     protected readonly IMongoDatabase _database;
     protected readonly MongoClient _client;
 
-    public MongoEntityRepository(IOptions<MongoConnection> mongoSettings, ILogger<MongoEntityRepository<T>> logger)
+    public MongoBaseEntityRepository(IOptions<MongoConnection> mongoSettings, ILogger<MongoBaseEntityRepository<T>> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 

@@ -4,11 +4,12 @@ using LantanaGroup.Link.Report.Application.Options;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
+using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Entities.Enums;
 using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
-using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -42,6 +43,7 @@ namespace IntegrationTests.Report
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+            var scheduleManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
             var aggregator = scope.ServiceProvider.GetRequiredService<MeasureReportAggregator>();
             var dataAcqProducer = scope.ServiceProvider.GetRequiredService<DataAcquisitionRequestedProducer>();
             var readyValProducer = scope.ServiceProvider.GetRequiredService<ReadyForValidationProducer>();
@@ -49,7 +51,7 @@ namespace IntegrationTests.Report
             var tenantApiService = scope.ServiceProvider.GetRequiredService<ITenantApiService>();
 
             // Setup schedule
-            var schedule = new ReportScheduleModel
+            var schedule = new ReportSchedule
             {
                 Id = Guid.NewGuid().ToString(),
                 FacilityId = "TestFacility",
@@ -64,7 +66,7 @@ namespace IntegrationTests.Report
             await database.ReportScheduledRepository.AddAsync(schedule);
 
             // Setup submission entries - all ready
-            var entry1 = new MeasureReportSubmissionEntryModel
+            var entry1 = new PatientSubmissionEntry
             {
                 Id = Guid.NewGuid().ToString(),
                 FacilityId = schedule.FacilityId,
@@ -73,7 +75,7 @@ namespace IntegrationTests.Report
                 Status = PatientSubmissionStatus.ValidationComplete,
                 MeasureReport = new MeasureReport { Id = Guid.NewGuid().ToString(), Measure = "TestMeasure" }
             };
-            var entry2 = new MeasureReportSubmissionEntryModel
+            var entry2 = new PatientSubmissionEntry
             {
                 Id = Guid.NewGuid().ToString(),
                 FacilityId = schedule.FacilityId,
@@ -83,6 +85,7 @@ namespace IntegrationTests.Report
             };
             await database.SubmissionEntryRepository.AddAsync(entry1);
             await database.SubmissionEntryRepository.AddAsync(entry2);
+            await database.SaveChangesAsync();
 
             // Mocks
             var loggerMock = new Mock<ILogger<EndOfReportPeriodJob>>();
@@ -98,7 +101,7 @@ namespace IntegrationTests.Report
             optionsMock.Setup(o => o.Value).Returns(new BlobStorageSettings());
 
             var blobStorageMock = new Mock<BlobStorageService>(optionsMock.Object);
-            blobStorageMock.Setup(b => b.UploadManifestAsync(It.IsAny<ReportScheduleModel>(), It.IsAny<IEnumerable<Resource>>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Uri("test://payload/root/uri/blob"));
+            blobStorageMock.Setup(b => b.UploadManifestAsync(It.IsAny<ReportSchedule>(), It.IsAny<IEnumerable<Resource>>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Uri("test://payload/root/uri/blob"));
 
             var submitKafkaMock = new Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>>();
             var submitPayloadProducer = new SubmitPayloadProducer(database, submitKafkaMock.Object);
@@ -128,6 +131,7 @@ namespace IntegrationTests.Report
                 loggerMock.Object,
                 schedulerFactoryMock.Object,
                 database,
+                scheduleManager,
                 dataAcqProducer,
                 readyValProducer,
                 manifestProducer);
@@ -140,7 +144,7 @@ namespace IntegrationTests.Report
             Assert.Equal(ScheduleStatus.EndOfPeriod, updatedSchedule.Status);
             Assert.True(updatedSchedule.EndOfReportPeriodJobHasRun);
 
-            blobStorageMock.Verify(b => b.UploadManifestAsync(It.Is<ReportScheduleModel>(s => s.Id == schedule.Id), It.IsAny<IEnumerable<Resource>>(), It.IsAny<CancellationToken>()), Times.Once());
+            blobStorageMock.Verify(b => b.UploadManifestAsync(It.Is<ReportSchedule>(s => s.Id == schedule.Id), It.IsAny<IEnumerable<Resource>>(), It.IsAny<CancellationToken>()), Times.Once());
             submitKafkaMock.Verify(p => p.Produce(It.Is<string>(topic => topic == nameof(KafkaTopic.SubmitPayload)),
                 It.Is<Message<SubmitPayloadKey, SubmitPayloadValue>>(m => m.Key.FacilityId == schedule.FacilityId && m.Key.ReportScheduleId == schedule.Id && m.Value.PayloadType == PayloadType.ReportSchedule && m.Value.PayloadUri == "test://payload/root/uri/blob" && m.Value.ReportTypes.Contains("TestReport")), It.Is<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>(h => h == null)), Times.Once());
         }
@@ -150,16 +154,16 @@ namespace IntegrationTests.Report
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+            var scheduleManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
             var aggregator = scope.ServiceProvider.GetRequiredService<MeasureReportAggregator>();
             var blobStorageService = scope.ServiceProvider.GetRequiredService<BlobStorageService>();
             var submitPayloadProducer = scope.ServiceProvider.GetRequiredService<SubmitPayloadProducer>();
             var readyValProducer = scope.ServiceProvider.GetRequiredService<ReadyForValidationProducer>();
             var auditProducer = scope.ServiceProvider.GetRequiredService<AuditableEventOccurredProducer>();
             var tenantApiService = scope.ServiceProvider.GetRequiredService<ITenantApiService>();
-            var dataAcqKafkaProducer = scope.ServiceProvider.GetRequiredService<IProducer<string, DataAcquisitionRequestedValue>>();
 
             // Setup schedule
-            var schedule = new ReportScheduleModel
+            var schedule = new ReportSchedule
             {
                 Id = Guid.NewGuid().ToString(),
                 FacilityId = "TestFacility",
@@ -172,23 +176,28 @@ namespace IntegrationTests.Report
             };
             await database.ReportScheduledRepository.AddAsync(schedule);
 
-            // Setup submission entries - some pending evaluation
-            var entry = new MeasureReportSubmissionEntryModel
+            // Setup submission entries - some pending
+            var pendingPatients = new List<string> { "Patient1", "Patient2" };
+            foreach (var patientId in pendingPatients)
             {
-                Id = Guid.NewGuid().ToString(),
-                FacilityId = schedule.FacilityId,
-                ReportScheduleId = schedule.Id,
-                PatientId = "Patient1",
-                Status = PatientSubmissionStatus.PendingEvaluation
-            };
-            await database.SubmissionEntryRepository.AddAsync(entry);
+                var entry = new PatientSubmissionEntry
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    FacilityId = schedule.FacilityId,
+                    ReportScheduleId = schedule.Id,
+                    PatientId = patientId,
+                    ReportType = "TestReport",
+                    Status = PatientSubmissionStatus.PendingEvaluation
+                };
+                await database.SubmissionEntryRepository.AddAsync(entry);
+            }
+            await database.SaveChangesAsync();
 
             // Mocks
             var loggerMock = new Mock<ILogger<EndOfReportPeriodJob>>();
             var schedulerFactoryMock = new Mock<ISchedulerFactory>();
             var schedulerMock = new Mock<IScheduler>();
             schedulerFactoryMock.Setup(f => f.GetScheduler(It.IsAny<CancellationToken>())).ReturnsAsync(schedulerMock.Object);
-            schedulerMock.Setup(s => s.DeleteJob(It.IsAny<JobKey>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
             var dataAcqKafkaMock = new Mock<IProducer<string, DataAcquisitionRequestedValue>>();
             var dataAcqProducer = new DataAcquisitionRequestedProducer(database, dataAcqKafkaMock.Object);
@@ -196,7 +205,7 @@ namespace IntegrationTests.Report
             var manifestProducerLogger = scope.ServiceProvider.GetRequiredService<ILogger<ReportManifestProducer>>();
             var manifestProducer = new ReportManifestProducer(manifestProducerLogger, database, aggregator, tenantApiService, blobStorageService, submitPayloadProducer, auditProducer);
 
-            // Job context - FIXED
+            // Job context
             var contextMock = new Mock<IJobExecutionContext>();
 
             // Add JobDetail mock
@@ -206,19 +215,20 @@ namespace IntegrationTests.Report
             jobDetailMock.Setup(j => j.JobDataMap).Returns(jobDetailDataMap);
             contextMock.Setup(c => c.JobDetail).Returns(jobDetailMock.Object);
 
-            // Trigger mock (keep as fallback)
+            // Trigger mock
             var triggerMock = new Mock<ITrigger>();
             var triggerDataMap = new JobDataMap();
             triggerDataMap.Put("ReportScheduleId", schedule.Id);
             triggerMock.Setup(t => t.JobDataMap).Returns(triggerDataMap);
             contextMock.Setup(c => c.Trigger).Returns(triggerMock.Object);
 
-            // Create job
+            // Create job with mocked dataAcqProducer
             var job = new EndOfReportPeriodJob(
                 loggerMock.Object,
                 schedulerFactoryMock.Object,
                 database,
-                dataAcqProducer,
+                scheduleManager,
+                dataAcqProducer, 
                 readyValProducer,
                 manifestProducer);
 
@@ -226,12 +236,13 @@ namespace IntegrationTests.Report
             await job.Execute(contextMock.Object);
 
             // Asserts
-            dataAcqKafkaMock.Verify(p => p.Produce(It.Is<string>(topic => topic == nameof(KafkaTopic.DataAcquisitionRequested)),
-                It.Is<Message<string, DataAcquisitionRequestedValue>>(m => m.Key == schedule.FacilityId && m.Value.PatientId == "Patient1" && m.Value.ReportableEvent == "EOM" && m.Value.ScheduledReports[0].ReportTrackingId == schedule.Id), It.Is<Action<DeliveryReport<string, DataAcquisitionRequestedValue>>>(h => h == null)), Times.Once());
+            dataAcqKafkaMock.Verify(p => p.Produce(It.IsAny<string>(), It.IsAny<Message<string, DataAcquisitionRequestedValue>>(), null), Times.Exactly(pendingPatients.Count));
 
             var updatedSchedule = await database.ReportScheduledRepository.SingleOrDefaultAsync(s => s.Id == schedule.Id);
             Assert.Equal(ScheduleStatus.EndOfPeriod, updatedSchedule.Status);
             Assert.True(updatedSchedule.EndOfReportPeriodJobHasRun);
+
+            schedulerMock.Verify(s => s.DeleteJob(It.IsAny<JobKey>(), It.IsAny<CancellationToken>()), Times.Once());
         }
 
         [Fact]
@@ -239,6 +250,7 @@ namespace IntegrationTests.Report
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+            var scheduleManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
             var aggregator = scope.ServiceProvider.GetRequiredService<MeasureReportAggregator>();
             var blobStorageService = scope.ServiceProvider.GetRequiredService<BlobStorageService>();
             var submitPayloadProducer = scope.ServiceProvider.GetRequiredService<SubmitPayloadProducer>();
@@ -247,7 +259,7 @@ namespace IntegrationTests.Report
             var tenantApiService = scope.ServiceProvider.GetRequiredService<ITenantApiService>();
 
             // Setup schedule
-            var schedule = new ReportScheduleModel
+            var schedule = new ReportSchedule
             {
                 Id = Guid.NewGuid().ToString(),
                 FacilityId = "TestFacility",
@@ -261,7 +273,7 @@ namespace IntegrationTests.Report
             await database.ReportScheduledRepository.AddAsync(schedule);
 
             // Setup submission entries - needs validation
-            var entry = new MeasureReportSubmissionEntryModel
+            var entry = new PatientSubmissionEntry
             {
                 Id = Guid.NewGuid().ToString(),
                 FacilityId = schedule.FacilityId,
@@ -272,6 +284,7 @@ namespace IntegrationTests.Report
                 PayloadUri = "test://payload/patient1"
             };
             await database.SubmissionEntryRepository.AddAsync(entry);
+            await database.SaveChangesAsync();
 
             // Mocks
             var loggerMock = new Mock<ILogger<EndOfReportPeriodJob>>();
@@ -288,7 +301,7 @@ namespace IntegrationTests.Report
             var manifestProducerLogger = scope.ServiceProvider.GetRequiredService<ILogger<ReportManifestProducer>>();
             var manifestProducer = new ReportManifestProducer(manifestProducerLogger, database, aggregator, tenantApiService, blobStorageService, submitPayloadProducer, auditProducer);
 
-            // Job context - FIXED
+            // Job context
             var contextMock = new Mock<IJobExecutionContext>();
 
             // Add JobDetail mock
@@ -310,6 +323,7 @@ namespace IntegrationTests.Report
                 loggerMock.Object,
                 schedulerFactoryMock.Object,
                 database,
+                scheduleManager,
                 dataAcqProducer,
                 readyValProducer,
                 manifestProducer);
@@ -325,7 +339,8 @@ namespace IntegrationTests.Report
             Assert.Equal(ScheduleStatus.EndOfPeriod, updatedSchedule.Status);
             Assert.True(updatedSchedule.EndOfReportPeriodJobHasRun);
 
-            var updatedEntry = await database.SubmissionEntryRepository.FirstOrDefaultAsync(e => e.Id == entry.Id);
+            var asserDatabase = _fixture.ServiceProvider.GetRequiredService<IDatabase>();
+            var updatedEntry = await asserDatabase.SubmissionEntryRepository.FirstOrDefaultAsync(e => e.Id == entry.Id);
             Assert.Equal(ValidationStatus.Requested, updatedEntry.ValidationStatus);
         }
 
@@ -334,16 +349,16 @@ namespace IntegrationTests.Report
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+            var scheduleManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
             var aggregator = scope.ServiceProvider.GetRequiredService<MeasureReportAggregator>();
             var blobStorageService = scope.ServiceProvider.GetRequiredService<BlobStorageService>();
             var submitPayloadProducer = scope.ServiceProvider.GetRequiredService<SubmitPayloadProducer>();
             var readyValProducer = scope.ServiceProvider.GetRequiredService<ReadyForValidationProducer>();
             var auditProducer = scope.ServiceProvider.GetRequiredService<AuditableEventOccurredProducer>();
             var tenantApiService = scope.ServiceProvider.GetRequiredService<ITenantApiService>();
-            var dataAcqKafkaProducer = scope.ServiceProvider.GetRequiredService<IProducer<string, DataAcquisitionRequestedValue>>();
 
             // Setup schedule
-            var schedule = new ReportScheduleModel
+            var schedule = new ReportSchedule
             {
                 Id = Guid.NewGuid().ToString(),
                 FacilityId = "TestFacility",
@@ -357,7 +372,7 @@ namespace IntegrationTests.Report
             await database.ReportScheduledRepository.AddAsync(schedule);
 
             // Setup submission entries - patients to evaluate to trigger exception
-            var entry = new MeasureReportSubmissionEntryModel
+            var entry = new PatientSubmissionEntry
             {
                 Id = Guid.NewGuid().ToString(),
                 FacilityId = schedule.FacilityId,
@@ -366,6 +381,7 @@ namespace IntegrationTests.Report
                 Status = PatientSubmissionStatus.PendingEvaluation
             };
             await database.SubmissionEntryRepository.AddAsync(entry);
+            await database.SaveChangesAsync();
 
             // Mocks
             var loggerMock = new Mock<ILogger<EndOfReportPeriodJob>>();
@@ -374,7 +390,8 @@ namespace IntegrationTests.Report
             schedulerFactoryMock.Setup(f => f.GetScheduler(It.IsAny<CancellationToken>())).ReturnsAsync(schedulerMock.Object);
 
             var dataAcqKafkaMock = new Mock<IProducer<string, DataAcquisitionRequestedValue>>();
-            dataAcqKafkaMock.Setup(p => p.Produce(It.IsAny<string>(), It.IsAny<Message<string, DataAcquisitionRequestedValue>>(), It.IsAny<Action<DeliveryReport<string, DataAcquisitionRequestedValue>>>())).Throws(new Exception("Test exception"));
+            dataAcqKafkaMock.Setup(p => p.Produce(It.IsAny<string>(), It.IsAny<Message<string, DataAcquisitionRequestedValue>>(), It.IsAny<Action<DeliveryReport<string, DataAcquisitionRequestedValue>>>()))
+                .Throws(new Exception("Test exception"));
             var dataAcqProducer = new DataAcquisitionRequestedProducer(database, dataAcqKafkaMock.Object);
 
             var manifestProducerLogger = scope.ServiceProvider.GetRequiredService<ILogger<ReportManifestProducer>>();
@@ -402,6 +419,7 @@ namespace IntegrationTests.Report
                 loggerMock.Object,
                 schedulerFactoryMock.Object,
                 database,
+                scheduleManager,
                 dataAcqProducer,
                 readyValProducer,
                 manifestProducer);

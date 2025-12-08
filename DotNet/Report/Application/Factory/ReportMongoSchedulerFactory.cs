@@ -1,11 +1,10 @@
-using Microsoft.Extensions.Options;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Jobs.JobStoreFactories;
 using Quartz;
+using Quartz.Impl;
+using Quartz.Simpl;
 using Quartz.Spi;
 using Reddoxx.Quartz.MongoDbJobStore;
-using Quartz.Simpl;
-using Quartz.Impl;
 
 namespace LantanaGroup.Link.Report.Application.Factory;
 
@@ -36,10 +35,9 @@ public class ReportMongoSchedulerFactory : ISchedulerFactory
             _logger.LogInformation("Creating MongoDB scheduler...");
 
             var loggerFactory = _serviceProvider.GetRequiredService<ILoggerFactory>();
-            var mongoOptions = _serviceProvider.GetRequiredService<IOptions<MongoConnection>>();
+            var context = _serviceProvider.GetRequiredService<MongoDbContext>();
 
-
-            var quartzFactory = new ReportQuartzMongoDbJobStoreFactory(mongoOptions);
+            var quartzFactory = new ReportQuartzMongoDbJobStoreFactory(context);
 
             // Create the MongoDbJobStore
             var mongoJobStore = new MongoDbJobStore(

@@ -199,7 +199,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 );
 
                                 // Create ReportSchedule for AdHoc Report
-                                var reportSchedule = new ReportScheduleModel
+                                var reportSchedule = new ReportSchedule
                                 {
                                     Id = value.AdhocReportId,
                                     FacilityId = facilityId,
@@ -232,7 +232,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     {
                                         foreach (var reportType in reportTypes)
                                         {
-                                            await submissionEntryManager.AddAsync(new MeasureReportSubmissionEntryModel()
+                                            await submissionEntryManager.AddAsync(new PatientSubmissionEntry()
                                             {
                                                 PatientId = p,
                                                 Status = PatientSubmissionStatus.PendingEvaluation,
@@ -286,7 +286,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         //For each patient and report type, Create Submission Entries for each Patient and Report Type
                                         foreach (var reportType in reportTypes)
                                         {
-                                            await submissionEntryManager.AddAsync(new MeasureReportSubmissionEntryModel()
+                                            await submissionEntryManager.AddAsync(new PatientSubmissionEntry()
                                             {
                                                 PatientId = patient,
                                                 Status = PatientSubmissionStatus.PendingEvaluation,

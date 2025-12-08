@@ -1,16 +1,14 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Entities.Enums;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
-using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Quartz;
-using System.Threading;
 using static LantanaGroup.Link.Report.KafkaProducers.ReadyForValidationProducer;
 using Task = System.Threading.Tasks.Task;
 
@@ -22,6 +20,7 @@ namespace LantanaGroup.Link.Report.Jobs
         private readonly ILogger<EndOfReportPeriodJob> _logger;
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly IDatabase _database;
+        private readonly IReportScheduledManager _reportScheduledManager;
         private readonly ReadyForValidationProducer _readyForValidationProducer;
         private readonly DataAcquisitionRequestedProducer _dataAcqProducer;
         private readonly ReportManifestProducer _reportManifestProducer;
@@ -30,6 +29,7 @@ namespace LantanaGroup.Link.Report.Jobs
             ILogger<EndOfReportPeriodJob> logger,
             [FromKeyedServices("MongoScheduler")] ISchedulerFactory schedulerFactory,
             IDatabase database,
+            IReportScheduledManager reportScheduledManager,
             DataAcquisitionRequestedProducer dataAcqProducer,
             ReadyForValidationProducer readyForValidationProducer,
             ReportManifestProducer reportManifestProducer)
@@ -37,6 +37,7 @@ namespace LantanaGroup.Link.Report.Jobs
             _logger = logger;
             _schedulerFactory = schedulerFactory;
             _database = database;
+            _reportScheduledManager = reportScheduledManager;
             _dataAcqProducer = dataAcqProducer;
             _readyForValidationProducer = readyForValidationProducer;
             _reportManifestProducer = reportManifestProducer;
@@ -44,7 +45,7 @@ namespace LantanaGroup.Link.Report.Jobs
 
         public async Task Execute(IJobExecutionContext context)
         {
-            ReportScheduleModel? schedule = null;
+            ReportSchedule? schedule = null;
             try
             {
                 // Get the schedule ID from the job data map
@@ -115,7 +116,7 @@ namespace LantanaGroup.Link.Report.Jobs
 
                 schedule.Status = ScheduleStatus.EndOfPeriod;
                 schedule.EndOfReportPeriodJobHasRun = true;
-                await _database.ReportScheduledRepository.UpdateAsync(schedule);
+                await _reportScheduledManager.UpdateAsync(schedule, CancellationToken.None);
 
                 // remove the job from the scheduler
                 await MeasureReportScheduleService.DeleteJob(schedule, await _schedulerFactory.GetScheduler());

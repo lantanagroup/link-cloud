@@ -5,6 +5,8 @@ using LantanaGroup.Link.Report.Application.ResourceCategories;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Report.Domain.Queries;
+using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 
@@ -19,7 +21,7 @@ namespace LantanaGroup.Link.Report.Core
         private readonly ILogger<PatientReportSubmissionBundler> _logger;
         private readonly IReportServiceMetrics _metrics;
         private readonly IDatabase _database;
-        private readonly IReportScheduledManager _reportScheduledManager;
+        private readonly ISubmissionEntryQueries _submissionEntryQueries;
 
         private readonly List<string> REMOVE_EXTENSIONS = new List<string> {
         "http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.population.description",
@@ -33,91 +35,96 @@ namespace LantanaGroup.Link.Report.Core
         "http://open.epic.com/FHIR/StructureDefinition/extension/team-name",
         "https://open.epic.com/FHIR/StructureDefinition/extension/patient-merge-unmerge-instant"};
 
-        public PatientReportSubmissionBundler(ILogger<PatientReportSubmissionBundler> logger, IDatabase database, IReportServiceMetrics metrics, IReportScheduledManager reportScheduledManager)
+        public PatientReportSubmissionBundler(ILogger<PatientReportSubmissionBundler> logger, IDatabase database, IReportServiceMetrics metrics, ISubmissionEntryQueries submissionEntryQueries)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _metrics = metrics ?? throw new ArgumentException(nameof(metrics));
             _database = database ?? throw new ArgumentNullException(nameof(database));
-            _reportScheduledManager = reportScheduledManager ?? throw new ArgumentNullException(nameof(reportScheduledManager));
+            _submissionEntryQueries = submissionEntryQueries;
         }
-
-
         public async Task<PatientSubmissionModel> GenerateBundle(string facilityId, string patientId, string reportScheduleId)
         {
-            var schedule = await _reportScheduledManager.SingleOrDefaultAsync(s => s.Id == reportScheduleId) ?? throw new Exception($"No Measure Reports Scheduled for reportScheduleId of {reportScheduleId}");
+            var patientReportData = await _submissionEntryQueries.GetPatientReportData(facilityId, reportScheduleId, patientId, cancellationToken: CancellationToken.None);
 
-            var entries = await _database.SubmissionEntryRepository.FindAsync(e =>
-                e.FacilityId == facilityId && e.PatientId == patientId &&
-                schedule.Id == e.ReportScheduleId);
+            return await GenerateBundle(patientReportData, facilityId, patientId, reportScheduleId);
+        }
 
-            // TODO: Return null if no entries found?
+        public async Task<PatientSubmissionModel> GenerateBundle(PatientReportData patientReportData, string facilityId, string patientId, string reportScheduleId)
+        {
+            var schedule = patientReportData.Schedule;
 
             Bundle bundle = CreateNewBundle();
-            foreach (var entry in entries)
+            foreach (var reportType in patientReportData.ReportData)
             {
-                if (entry.MeasureReport == null) 
-                {
-                    continue;
-                }
+                var report = reportType.Key;
+                var data = reportType.Value;
 
-                MeasureReport mr = entry.MeasureReport;
-
-                foreach(var r in entry.ContainedResources)
+                foreach (var entry in data.Entries)
                 {
-                    if (r.DocumentId == null)
+                    if (entry.MeasureReport == null)
+                    {
                         continue;
+                    }
 
-                    IFacilityResource facilityResource = null!;
-                    
-                    var resourceTypeCategory = ResourceCategory.GetResourceCategoryByType(r.ResourceType);
+                    MeasureReport mr = entry.MeasureReport;
 
-                    Resource resource = null;
-
-                    try
+                    foreach (var r in data.Resources)
                     {
-                        if (resourceTypeCategory == ResourceCategoryType.Patient)
+                        if (r.Id == null)
+                            continue;
+
+                        FhirResource facilityResource = null!;
+
+                        var resourceTypeCategory = ResourceCategory.GetResourceCategoryByType(r.ResourceType);
+
+                        Resource resource = null;
+
+                        try
                         {
-                            facilityResource = await _database.PatientResourceRepository.GetAsync(r.DocumentId);
-                            resource = facilityResource.GetResource();
-                            AddResourceToBundle(bundle, resource);
+                            if (resourceTypeCategory == ResourceCategoryType.Patient)
+                            {
+                                facilityResource = await _database.ResourceRepository.GetAsync(r.Id);
+                                resource = facilityResource.Resource;
+                                AddResourceToBundle(bundle, resource);
+                            }
+                            else
+                            {
+                                facilityResource = await _database.ResourceRepository.GetAsync(r.Id);
+                                resource = facilityResource.Resource;
+                                AddResourceToBundle(bundle, resource);
+                            }
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            facilityResource = await _database.SharedResourceRepository.GetAsync(r.DocumentId);
-                            resource = facilityResource.GetResource();
-                            AddResourceToBundle(bundle, resource);
+                            var message = "Contained resource could not be parsed into a valid Resource.";
+                            _logger.LogError(ex, "{ResourceTypeName} with ID {ResourceId} contained resource could not be parsed into a valid Resource.", resource.TypeName, resource?.Id);
+
+                            throw new Exception(message, ex);
                         }
                     }
-                    catch (Exception ex)
+
+
+                    // ensure we have an id to reference
+                    if (string.IsNullOrEmpty(mr.Id))
+                        mr.Id = Guid.NewGuid().ToString();
+                    // ensure we have a meta object
+                    // set individual measure report profile
+                    mr.Meta = new Meta
                     {
-                        var message = "Contained resource could not be parsed into a valid Resource.";
-                        _logger.LogError(ex, "{ResourceTypeName} with ID {ResourceId} contained resource could not be parsed into a valid Resource.", resource.TypeName, resource?.Id);
+                        Profile = new List<string> { ReportConstants.BundleSettings.IndividualMeasureReportProfileUrl }
+                    };
 
-                        throw new Exception(message, ex);
-                    }
-                }
-                
+                    // clean up resource
+                    cleanupResource(mr);
 
-                // ensure we have an id to reference
-                if (string.IsNullOrEmpty(mr.Id))
-                    mr.Id = Guid.NewGuid().ToString();
-                // ensure we have a meta object
-                // set individual measure report profile
-                mr.Meta = new Meta
-                {
-                    Profile = new List<string> { ReportConstants.BundleSettings.IndividualMeasureReportProfileUrl }
-                };
+                    AddResourceToBundle(bundle, mr);
 
-                // clean up resource
-                cleanupResource(mr);
-
-                AddResourceToBundle(bundle, mr);
-
-                _metrics.IncrementReportGeneratedCounter(new List<KeyValuePair<string, object?>>() {
+                    _metrics.IncrementReportGeneratedCounter(new List<KeyValuePair<string, object?>>() {
                     new KeyValuePair<string, object?>("facilityId", schedule.FacilityId),
                     new KeyValuePair<string, object?>("measure.schedule.id", reportScheduleId),
                     new KeyValuePair<string, object?>("measure", mr.Measure)
                 });
+                }
             }
 
             PatientSubmissionModel patientSubmissionModel = new PatientSubmissionModel()
