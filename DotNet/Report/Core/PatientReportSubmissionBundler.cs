@@ -56,10 +56,51 @@ namespace LantanaGroup.Link.Report.Core
             //The 'resourcesAdded' Dictionary will keep track of FHIR resource id's that have been added to the bundle to avoid adding duplicates across entries. The value of each dictionary entry will contain the associated FHIR types. It's a string List type in case there are different FHIR resources that share the same id. This is probably unlikely to happen, but is possible. 
             Dictionary<string, List<string>> resourcesAdded = new Dictionary<string, List<string>>();
 
+            Bundle bundle = CreateNewBundle();
             foreach (var reportType in patientReportData.ReportData)
             {
                 var report = reportType.Key;
                 var data = reportType.Value;
+
+                foreach (var r in data.Resources)
+                {
+                    if (r.Id == null)
+                        continue;
+
+                    if (resourcesAdded.ContainsKey(r.ResourceId) && resourcesAdded[r.ResourceId].Contains(r.ResourceType))
+                    {
+                        continue;
+                    }
+
+                    FhirResource facilityResource = null!;
+
+                    var resourceTypeCategory = ResourceCategory.GetResourceCategoryByType(r.ResourceType);
+
+                    Resource resource = null;
+
+                    try
+                    {
+                        facilityResource = await _database.ResourceRepository.GetAsync(r.Id);
+                        resource = facilityResource.Resource;
+                        AddResourceToBundle(bundle, resource);
+                    }
+                    catch (Exception ex)
+                    {
+                        var message = "Contained resource could not be parsed into a valid Resource.";
+                        _logger.LogError(ex, "{ResourceTypeName} with ID {ResourceId} contained resource could not be parsed into a valid Resource.", r.ResourceType, r.ResourceId);
+
+                        throw new Exception(message, ex);
+                    }
+
+                    if (resourcesAdded.ContainsKey(r.ResourceId))
+                    {
+                        resourcesAdded[r.ResourceId].Add(r.ResourceType);
+                    }
+                    else
+                    {
+                        resourcesAdded.Add(r.ResourceId, new List<string>() { r.ResourceType });
+                    }
+                }
 
                 foreach (var entry in data.Entries)
                 {
@@ -67,45 +108,8 @@ namespace LantanaGroup.Link.Report.Core
                     {
                         continue;
                     }
-                    }
 
                     MeasureReport mr = entry.MeasureReport;
-                    foreach (var r in data.Resources)
-                    {
-                        if (r.Id == null)
-                            continue;
-                            continue;
-                    }
-                        FhirResource facilityResource = null!;
-
-                        var resourceTypeCategory = ResourceCategory.GetResourceCategoryByType(r.ResourceType);
-                        var resourceTypeCategory = ResourceCategory.GetResourceCategoryByType(r.ResourceType);
-                        Resource resource = null;
-
-                        try
-                        {
-                            if (resourceTypeCategory == ResourceCategoryType.Patient)
-                            {
-                                facilityResource = await _database.ResourceRepository.GetAsync(r.Id);
-                                resource = facilityResource.Resource;
-                                AddResourceToBundle(bundle, resource);
-                            }
-                            else
-                            {
-                                facilityResource = await _database.ResourceRepository.GetAsync(r.Id);
-                                resource = facilityResource.Resource;
-                                AddResourceToBundle(bundle, resource);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            var message = "Contained resource could not be parsed into a valid Resource.";
-                            _logger.LogError(ex, "{ResourceTypeName} with ID {ResourceId} contained resource could not be parsed into a valid Resource.", resource.TypeName, resource?.Id);
-                            _logger.LogError(ex, "{ResourceTypeName} with ID {ResourceId} contained resource could not be parsed into a valid Resource.", resource.TypeName, resource?.Id);
-                            throw new Exception(message, ex);
-                        }
-                    }
-
 
                     // ensure we have an id to reference
                     if (string.IsNullOrEmpty(mr.Id))
@@ -115,7 +119,6 @@ namespace LantanaGroup.Link.Report.Core
                     mr.Meta = new Meta
                     {
                         Profile = new List<string> { ReportConstants.BundleSettings.IndividualMeasureReportProfileUrl }
-                    };
                     };
 
                     // clean up resource
@@ -151,7 +154,7 @@ namespace LantanaGroup.Link.Report.Core
             if (resource is DomainResource)
             {
                 DomainResource domainResource = (DomainResource)resource;
-                
+
                 // Remove extensions from resources
                 domainResource.Extension.RemoveAll(e => e.Url != null && REMOVE_EXTENSIONS.Contains(e.Url));
 
@@ -212,13 +215,15 @@ namespace LantanaGroup.Link.Report.Core
         /// <param name="bundle"></param>
         /// <param name="resource"></param>
         /// <returns></returns>
-        protected void AddResourceToBundle(Bundle bundle, Resource resource)
+        protected Bundle.EntryComponent AddResourceToBundle(Bundle bundle, Resource resource)
         {
             var fullUrl = GetFullUrl(resource);
-
-            bundle.AddResourceEntry(resource, fullUrl);
+            var existingEntry = bundle.FindEntry(fullUrl).FirstOrDefault();
+            return existingEntry ?? bundle.AddResourceEntry(resource, fullUrl);
         }
 
         #endregion
+
     }
+
 }
