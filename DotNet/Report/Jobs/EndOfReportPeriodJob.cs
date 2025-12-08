@@ -19,8 +19,7 @@ namespace LantanaGroup.Link.Report.Jobs
     {
         private readonly ILogger<EndOfReportPeriodJob> _logger;
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly IDatabase _database;
-        private readonly IReportScheduledManager _reportScheduledManager;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ReadyForValidationProducer _readyForValidationProducer;
         private readonly DataAcquisitionRequestedProducer _dataAcqProducer;
         private readonly ReportManifestProducer _reportManifestProducer;
@@ -28,16 +27,14 @@ namespace LantanaGroup.Link.Report.Jobs
         public EndOfReportPeriodJob(
             ILogger<EndOfReportPeriodJob> logger,
             [FromKeyedServices("MongoScheduler")] ISchedulerFactory schedulerFactory,
-            IDatabase database,
-            IReportScheduledManager reportScheduledManager,
+            IServiceScopeFactory serviceScopeFactory,
             DataAcquisitionRequestedProducer dataAcqProducer,
             ReadyForValidationProducer readyForValidationProducer,
             ReportManifestProducer reportManifestProducer)
         {
             _logger = logger;
             _schedulerFactory = schedulerFactory;
-            _database = database;
-            _reportScheduledManager = reportScheduledManager;
+            _serviceScopeFactory = serviceScopeFactory;
             _dataAcqProducer = dataAcqProducer;
             _readyForValidationProducer = readyForValidationProducer;
             _reportManifestProducer = reportManifestProducer;
@@ -45,6 +42,10 @@ namespace LantanaGroup.Link.Report.Jobs
 
         public async Task Execute(IJobExecutionContext context)
         {
+            var scope = _serviceScopeFactory.CreateScope();
+            var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+            var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
             ReportSchedule? schedule = null;
             try
             {
@@ -65,7 +66,7 @@ namespace LantanaGroup.Link.Report.Jobs
                 }
 
                 // Fetch the schedule from the database
-                schedule = await _database.ReportScheduledRepository.GetAsync(scheduleId);
+                schedule = await database.ReportScheduledRepository.GetAsync(scheduleId);
 
                 if (schedule == null)
                 {
@@ -78,7 +79,7 @@ namespace LantanaGroup.Link.Report.Jobs
 
                 if (!manifestProduced)
                 {
-                    var patientsToEvaluate = await _database.SubmissionEntryRepository.AnyAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.PendingEvaluation, CancellationToken.None);
+                    var patientsToEvaluate = await database.SubmissionEntryRepository.AnyAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.PendingEvaluation, CancellationToken.None);
 
                     if (patientsToEvaluate)
                     {
@@ -92,7 +93,7 @@ namespace LantanaGroup.Link.Report.Jobs
                         }
                     }
 
-                    var needsValidation = (await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.ReadyForValidation && x.ValidationStatus != ValidationStatus.Requested)).ToList();
+                    var needsValidation = (await database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.ReadyForValidation && x.ValidationStatus != ValidationStatus.Requested)).ToList();
 
                     if (needsValidation.Any())
                     {
@@ -116,7 +117,7 @@ namespace LantanaGroup.Link.Report.Jobs
 
                 schedule.Status = ScheduleStatus.EndOfPeriod;
                 schedule.EndOfReportPeriodJobHasRun = true;
-                await _reportScheduledManager.UpdateAsync(schedule, CancellationToken.None);
+                await reportScheduledManager.UpdateAsync(schedule, CancellationToken.None);
 
                 // remove the job from the scheduler
                 await MeasureReportScheduleService.DeleteJob(schedule, await _schedulerFactory.GetScheduler());

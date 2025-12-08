@@ -114,6 +114,7 @@ namespace LantanaGroup.Link.Report.Core
                     // ensure we have an id to reference
                     if (string.IsNullOrEmpty(mr.Id))
                         mr.Id = Guid.NewGuid().ToString();
+
                     // ensure we have a meta object
                     // set individual measure report profile
                     mr.Meta = new Meta

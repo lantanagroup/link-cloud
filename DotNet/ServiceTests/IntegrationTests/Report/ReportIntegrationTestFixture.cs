@@ -144,9 +144,6 @@ namespace IntegrationTests.Report
                         options.UseMongoDB(client, "reportTestDb");
                     });
 
-                    services.AddDbContext<MongoDbContext>(options =>
-                        options.UseMongoDB(MongoConnectionString, "reportTestDb"));
-
                     services.AddTransient<IEntityRepository<ReportSchedule>, EntityRepository<ReportSchedule, MongoDbContext>>();
                     services.AddTransient<IEntityRepository<PatientSubmissionEntry>, EntityRepository<PatientSubmissionEntry, MongoDbContext>>();
                     services.AddTransient<IEntityRepository<ReportModel>, EntityRepository<ReportModel, MongoDbContext>>();
