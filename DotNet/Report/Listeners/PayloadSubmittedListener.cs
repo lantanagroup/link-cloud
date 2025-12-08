@@ -19,8 +19,7 @@ public class PayloadSubmittedListener(
     ITransientExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue> transientExceptionHandler,
     IDeadLetterExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue> deadLetterExceptionHandler,
     ILogger<PayloadSubmittedListener> logger,
-    ISubmissionEntryManager submissionEntryManager,
-    IReportScheduledManager reportScheduledManager)
+    IServiceScopeFactory serviceScopeFactory)
     : BackgroundService
 {
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -54,7 +53,10 @@ public class PayloadSubmittedListener(
                             consumer.Commit();
                             return;
                         }
-                        
+                        var scope = serviceScopeFactory.CreateScope();
+                        var submissionEntryManager = scope.ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
+                        var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
                         var facilityId = result.Message.Key.FacilityId;
                         
                         try

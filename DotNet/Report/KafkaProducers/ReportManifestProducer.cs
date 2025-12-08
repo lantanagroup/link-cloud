@@ -17,16 +17,17 @@ namespace LantanaGroup.Link.Report.KafkaProducers
     public class ReportManifestProducer
     {
         private readonly ILogger<ReportManifestProducer> _logger;
-        private readonly IDatabase _database;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly MeasureReportAggregator _aggregator;
         private readonly ITenantApiService _tenantApiService;
         private readonly BlobStorageService _blobStorageService;
         private readonly SubmitPayloadProducer _payloadSubmittedProducer;
         private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
 
+
         public ReportManifestProducer(
             ILogger<ReportManifestProducer> logger,
-            IDatabase database,
+            IServiceScopeFactory serviceScopeFactory,
             MeasureReportAggregator aggregator,
             ITenantApiService tenantApiService,
             BlobStorageService blobStorageService,
@@ -34,7 +35,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             AuditableEventOccurredProducer auditableEventOccurredProducer)
         {
             _logger = logger;
-            _database = database;
+            _serviceScopeFactory = serviceScopeFactory;
             _aggregator = aggregator;
             _tenantApiService = tenantApiService;
             _blobStorageService = blobStorageService;
@@ -44,7 +45,9 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public async Task<List<Resource>> Generate(ReportSchedule schedule)
         {
-            var allSubmissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
+            var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
+
+            var allSubmissionEntries = await database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
 
             var submissionEntries = allSubmissionEntries.Where(x => x.Status != PatientSubmissionStatus.NotReportable).ToList();
 
@@ -116,7 +119,9 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public async Task<bool> Produce(ReportSchedule schedule, string correlationId = null)
         {
-            var allReady = !await _database.SubmissionEntryRepository.AnyAsync(e => e.FacilityId == schedule.FacilityId
+            var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
+
+            var allReady = !await database.SubmissionEntryRepository.AnyAsync(e => e.FacilityId == schedule.FacilityId
                 && e.ReportScheduleId == schedule.Id
                 && e.Status != PatientSubmissionStatus.NotReportable
                 && e.Status != PatientSubmissionStatus.ValidationComplete

@@ -24,13 +24,11 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ITransientExceptionHandler<string, PatientListMessage> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, PatientListMessage> _deadLetterExceptionHandler;
         private readonly IServiceScopeFactory _serviceScopeFactory;
-        private readonly ISubmissionEntryManager _submissionEntryManager;
         private string Name => this.GetType().Name;
 
         public PatientListsAcquiredListener(
             ILogger<PatientListsAcquiredListener> logger, 
             IKafkaConsumerFactory<string, PatientListMessage> kafkaConsumerFactory,
-            ISubmissionEntryManager submissionEntryManager,
             ITransientExceptionHandler<string, PatientListMessage> transientExceptionHandler,
             IDeadLetterExceptionHandler<string, PatientListMessage> deadLetterExceptionHandler, 
             IServiceScopeFactory serviceScopeFactory)
@@ -38,8 +36,6 @@ namespace LantanaGroup.Link.Report.Listeners
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _serviceScopeFactory = serviceScopeFactory;
-
-            _submissionEntryManager = submissionEntryManager;
 
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
@@ -86,6 +82,8 @@ namespace LantanaGroup.Link.Report.Listeners
                                 return;
                             }
 
+                            var submissionEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
+
                             try
                             {
                                 var scope = _serviceScopeFactory.CreateScope();
@@ -119,14 +117,14 @@ namespace LantanaGroup.Link.Report.Listeners
                                             {
                                                 var patientId = pId.Split('/').Last();
 
-                                                var entry = await _submissionEntryManager.SingleOrDefaultAsync(e =>
+                                                var entry = await submissionEntryManager.SingleOrDefaultAsync(e =>
                                                            e.ReportScheduleId == scheduledReport.Id
                                                            && e.PatientId == patientId
                                                            && e.ReportType == reportType, consumeCancellationToken);
 
                                                 if (entry == null)
                                                 {
-                                                    await _submissionEntryManager.AddAsync(new PatientSubmissionEntry()
+                                                    await submissionEntryManager.AddAsync(new PatientSubmissionEntry()
                                                     {
                                                         PatientId = patientId,
                                                         Status = PatientSubmissionStatus.PendingEvaluation,
@@ -139,7 +137,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                                 else
                                                 {
                                                     entry.Status = PatientSubmissionStatus.PendingEvaluation;
-                                                    await _submissionEntryManager.UpdateAsync(new PatientSubmissionEntryUpdateModel
+                                                    await submissionEntryManager.UpdateAsync(new PatientSubmissionEntryUpdateModel
                                                     {
                                                         Id = entry.Id,
                                                         MeasureReport = entry.MeasureReport,

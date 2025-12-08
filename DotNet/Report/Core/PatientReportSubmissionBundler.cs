@@ -1,10 +1,7 @@
 ﻿using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.ResourceCategories;
 using LantanaGroup.Link.Report.Domain;
-using LantanaGroup.Link.Report.Domain.Enums;
-using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Domain.Queries;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
@@ -20,8 +17,7 @@ namespace LantanaGroup.Link.Report.Core
     {
         private readonly ILogger<PatientReportSubmissionBundler> _logger;
         private readonly IReportServiceMetrics _metrics;
-        private readonly IDatabase _database;
-        private readonly ISubmissionEntryQueries _submissionEntryQueries;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
         private readonly List<string> REMOVE_EXTENSIONS = new List<string> {
         "http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.population.description",
@@ -35,22 +31,23 @@ namespace LantanaGroup.Link.Report.Core
         "http://open.epic.com/FHIR/StructureDefinition/extension/team-name",
         "https://open.epic.com/FHIR/StructureDefinition/extension/patient-merge-unmerge-instant"};
 
-        public PatientReportSubmissionBundler(ILogger<PatientReportSubmissionBundler> logger, IDatabase database, IReportServiceMetrics metrics, ISubmissionEntryQueries submissionEntryQueries)
+        public PatientReportSubmissionBundler(ILogger<PatientReportSubmissionBundler> logger, IServiceScopeFactory serviceScopeFactory, IReportServiceMetrics metrics)
         {
+            _serviceScopeFactory = serviceScopeFactory;
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _metrics = metrics ?? throw new ArgumentException(nameof(metrics));
-            _database = database ?? throw new ArgumentNullException(nameof(database));
-            _submissionEntryQueries = submissionEntryQueries;
         }
         public async Task<PatientSubmissionModel> GenerateBundle(string facilityId, string patientId, string reportScheduleId)
         {
-            var patientReportData = await _submissionEntryQueries.GetPatientReportData(facilityId, reportScheduleId, patientId, cancellationToken: CancellationToken.None);
+            var queries = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
+            var patientReportData = await queries.GetPatientReportData(facilityId, reportScheduleId, patientId, cancellationToken: CancellationToken.None);
 
             return await GenerateBundle(patientReportData, facilityId, patientId, reportScheduleId);
         }
 
         public async Task<PatientSubmissionModel> GenerateBundle(PatientReportData patientReportData, string facilityId, string patientId, string reportScheduleId)
         {
+            var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
             var schedule = patientReportData.Schedule;
 
             //The 'resourcesAdded' Dictionary will keep track of FHIR resource id's that have been added to the bundle to avoid adding duplicates across entries. The value of each dictionary entry will contain the associated FHIR types. It's a string List type in case there are different FHIR resources that share the same id. This is probably unlikely to happen, but is possible. 
@@ -80,7 +77,7 @@ namespace LantanaGroup.Link.Report.Core
 
                     try
                     {
-                        facilityResource = await _database.ResourceRepository.GetAsync(r.Id);
+                        facilityResource = await database.ResourceRepository.GetAsync(r.Id);
                         resource = facilityResource.Resource;
                         AddResourceToBundle(bundle, resource);
                     }

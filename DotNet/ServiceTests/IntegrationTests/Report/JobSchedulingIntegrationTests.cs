@@ -234,10 +234,10 @@ namespace IntegrationTests.Report
 
             ReportIntegrationTestFixture.DataAcquisitionRequestedProducerMock.Setup(p => p.Produce(It.IsAny<string>(), It.IsAny<Message<string, DataAcquisitionRequestedValue>>(), null))
                 .Verifiable();
-            var dataAcqProducer = new DataAcquisitionRequestedProducer(database, ReportIntegrationTestFixture.DataAcquisitionRequestedProducerMock.Object);
+            var dataAcqProducer = new DataAcquisitionRequestedProducer(serviceScopeFactory, ReportIntegrationTestFixture.DataAcquisitionRequestedProducerMock.Object);
 
             var manifestProducerLogger = scope.ServiceProvider.GetRequiredService<ILogger<ReportManifestProducer>>();
-            var manifestProducer = new ReportManifestProducer(manifestProducerLogger, database, aggregator, tenantApiService, blobStorageService, submitPayloadProducer, auditProducer);
+            var manifestProducer = new ReportManifestProducer(manifestProducerLogger, serviceScopeFactory, aggregator, tenantApiService, blobStorageService, submitPayloadProducer, auditProducer);
 
             // Job context
             var contextMock = new Mock<IJobExecutionContext>();

@@ -10,14 +10,14 @@ namespace LantanaGroup.Link.Report.Application.Factory;
 
 public class ReportMongoSchedulerFactory : ISchedulerFactory
 {
-    private readonly IServiceProvider _serviceProvider;
+    private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly ILogger<ReportMongoSchedulerFactory> _logger;
     private IScheduler? _scheduler;
     private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
 
-    public ReportMongoSchedulerFactory(IServiceProvider serviceProvider, ILogger<ReportMongoSchedulerFactory> logger)
+    public ReportMongoSchedulerFactory(IServiceScopeFactory serviceScopeFactory, ILogger<ReportMongoSchedulerFactory> logger)
     {
-        _serviceProvider = serviceProvider;
+        _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
     }
 
@@ -34,8 +34,10 @@ public class ReportMongoSchedulerFactory : ISchedulerFactory
 
             _logger.LogInformation("Creating MongoDB scheduler...");
 
-            var loggerFactory = _serviceProvider.GetRequiredService<ILoggerFactory>();
-            var context = _serviceProvider.GetRequiredService<MongoDbContext>();
+            var scope = _serviceScopeFactory.CreateScope();
+
+            var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
+            var context = scope.ServiceProvider.GetRequiredService<MongoDbContext>();
 
             var quartzFactory = new ReportQuartzMongoDbJobStoreFactory(context);
 
@@ -43,11 +45,11 @@ public class ReportMongoSchedulerFactory : ISchedulerFactory
             var mongoJobStore = new MongoDbJobStore(
                 loggerFactory,
                 quartzFactory,
-                _serviceProvider
+                scope.ServiceProvider
             );
 
             //get prefix from configuration, default to "reportjobs" if not set
-            var configuration = _serviceProvider.GetRequiredService<IConfiguration>();
+            var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
             var mongoCollectionPrefix = configuration.GetValue<string>("QuartzMongoCollectionPrefix") ?? "reportjobs";
 
             // Set properties

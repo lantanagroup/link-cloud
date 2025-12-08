@@ -161,9 +161,9 @@ namespace IntegrationTests.Report
                     services.AddTransient<MeasureReportAggregator>();
 
                     services.AddTransient<SubmitPayloadProducer>(sp =>
-                        new SubmitPayloadProducer(sp.GetRequiredService<IDatabase>(), SubmitPayloadProducerMock.Object));
+                        new SubmitPayloadProducer(sp.GetRequiredService<IServiceScopeFactory>(), SubmitPayloadProducerMock.Object));
                     services.AddTransient<DataAcquisitionRequestedProducer>(sp =>
-                        new DataAcquisitionRequestedProducer(sp.GetRequiredService<IDatabase>(), DataAcquisitionRequestedProducerMock.Object));
+                        new DataAcquisitionRequestedProducer(sp.GetRequiredService<IServiceScopeFactory>(), DataAcquisitionRequestedProducerMock.Object));
                     services.AddTransient<ReadyForValidationProducer>(sp =>
                         new ReadyForValidationProducer(ReadyForValidationProducerMock.Object, sp.GetRequiredService<IServiceScopeFactory>()));
                     services.AddTransient<AuditableEventOccurredProducer>(sp =>
@@ -175,7 +175,7 @@ namespace IntegrationTests.Report
                     services.AddTransient<ReportManifestProducer>(sp =>
                         new ReportManifestProducer(
                             sp.GetRequiredService<ILogger<ReportManifestProducer>>(),
-                            sp.GetRequiredService<IDatabase>(),
+                            sp.GetRequiredService<IServiceScopeFactory>(),
                             sp.GetRequiredService<MeasureReportAggregator>(),
                             TenantApiServiceMock.Object,
                             BlobStorageMock.Object,
@@ -203,7 +203,8 @@ namespace IntegrationTests.Report
                     services.AddKeyedSingleton<ISchedulerFactory>("MongoScheduler", (provider, key) =>
                     {
                         var logger = provider.GetRequiredService<ILogger<ReportMongoSchedulerFactory>>();
-                        return new ReportMongoSchedulerFactory(provider, logger);
+                        var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
+                        return new ReportMongoSchedulerFactory(scopeFactory, logger);
                     });
                 })
                 .Build();

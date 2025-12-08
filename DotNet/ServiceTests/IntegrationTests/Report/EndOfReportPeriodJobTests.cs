@@ -104,10 +104,10 @@ namespace IntegrationTests.Report
             blobStorageMock.Setup(b => b.UploadManifestAsync(It.IsAny<ReportSchedule>(), It.IsAny<IEnumerable<Resource>>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Uri("test://payload/root/uri/blob"));
 
             var submitKafkaMock = new Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>>();
-            var submitPayloadProducer = new SubmitPayloadProducer(database, submitKafkaMock.Object);
+            var submitPayloadProducer = new SubmitPayloadProducer(serviceScopeFactory, submitKafkaMock.Object);
 
             var manifestProducerLogger = scope.ServiceProvider.GetRequiredService<ILogger<ReportManifestProducer>>();
-            var manifestProducer = new ReportManifestProducer(manifestProducerLogger, database, aggregator, tenantApiMock.Object, blobStorageMock.Object, submitPayloadProducer, auditProducer);
+            var manifestProducer = new ReportManifestProducer(manifestProducerLogger, serviceScopeFactory, aggregator, tenantApiMock.Object, blobStorageMock.Object, submitPayloadProducer, auditProducer);
 
             // Job context - FIXED
             var contextMock = new Mock<IJobExecutionContext>();
@@ -199,10 +199,10 @@ namespace IntegrationTests.Report
             schedulerFactoryMock.Setup(f => f.GetScheduler(It.IsAny<CancellationToken>())).ReturnsAsync(schedulerMock.Object);
 
             var dataAcqKafkaMock = new Mock<IProducer<string, DataAcquisitionRequestedValue>>();
-            var dataAcqProducer = new DataAcquisitionRequestedProducer(database, dataAcqKafkaMock.Object);
+            var dataAcqProducer = new DataAcquisitionRequestedProducer(serviceScopeFactory, dataAcqKafkaMock.Object);
 
             var manifestProducerLogger = scope.ServiceProvider.GetRequiredService<ILogger<ReportManifestProducer>>();
-            var manifestProducer = new ReportManifestProducer(manifestProducerLogger, database, aggregator, tenantApiService, blobStorageService, submitPayloadProducer, auditProducer);
+            var manifestProducer = new ReportManifestProducer(manifestProducerLogger, serviceScopeFactory, aggregator, tenantApiService, blobStorageService, submitPayloadProducer, auditProducer);
 
             // Job context
             var contextMock = new Mock<IJobExecutionContext>();
@@ -297,7 +297,7 @@ namespace IntegrationTests.Report
             var readyValProducer = new ReadyForValidationProducer(readyValKafkaMock.Object, scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>());
 
             var manifestProducerLogger = scope.ServiceProvider.GetRequiredService<ILogger<ReportManifestProducer>>();
-            var manifestProducer = new ReportManifestProducer(manifestProducerLogger, database, aggregator, tenantApiService, blobStorageService, submitPayloadProducer, auditProducer);
+            var manifestProducer = new ReportManifestProducer(manifestProducerLogger, serviceScopeFactory, aggregator, tenantApiService, blobStorageService, submitPayloadProducer, auditProducer);
 
             // Job context
             var contextMock = new Mock<IJobExecutionContext>();
@@ -389,10 +389,10 @@ namespace IntegrationTests.Report
             var dataAcqKafkaMock = new Mock<IProducer<string, DataAcquisitionRequestedValue>>();
             dataAcqKafkaMock.Setup(p => p.Produce(It.IsAny<string>(), It.IsAny<Message<string, DataAcquisitionRequestedValue>>(), It.IsAny<Action<DeliveryReport<string, DataAcquisitionRequestedValue>>>()))
                 .Throws(new Exception("Test exception"));
-            var dataAcqProducer = new DataAcquisitionRequestedProducer(database, dataAcqKafkaMock.Object);
+            var dataAcqProducer = new DataAcquisitionRequestedProducer(serviceScopeFactory, dataAcqKafkaMock.Object);
 
             var manifestProducerLogger = scope.ServiceProvider.GetRequiredService<ILogger<ReportManifestProducer>>();
-            var manifestProducer = new ReportManifestProducer(manifestProducerLogger, database, aggregator, tenantApiService, blobStorageService, submitPayloadProducer, auditProducer);
+            var manifestProducer = new ReportManifestProducer(manifestProducerLogger, serviceScopeFactory, aggregator, tenantApiService, blobStorageService, submitPayloadProducer, auditProducer);
 
             // Job context - FIXED
             var contextMock = new Mock<IJobExecutionContext>();
