@@ -62,6 +62,9 @@ import {
   QueryDispatchConfigFormComponent
 } from "../../query-dispatch/query-dispatch-config-form/query-dispatch-config-form.component";
 import {IQueryDispatchConfiguration} from "../../../interfaces/query-dispatch/query-dispatch-config-model.interface";
+import {
+  DeleteConfirmationDialogComponent
+} from "../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
 
 
 @Component({
@@ -90,7 +93,7 @@ import {IQueryDispatchConfiguration} from "../../../interfaces/query-dispatch/qu
     MatMenuItem,
     MatTooltip,
     QueryDispatchConfigFormComponent
-]
+  ]
 })
 export class FacilityEditComponent implements OnInit {
   @ViewChild(MatAccordion) accordion!: MatAccordion;
@@ -280,36 +283,35 @@ export class FacilityEditComponent implements OnInit {
   }
 
 
-
   loadQueryDispatchConfig(): void {
-   // if (!this.queryDispatchConfig) {
-      this.queryDispatchService.getConfiguration(this.facilityId).subscribe((data: IQueryDispatchConfiguration) => {
-        this.queryDispatchConfig = data;
-        this.showNoQueryDispatchConfigAlert = !this.queryDispatchConfig;
-      }, error => {
-        if (error.status == 404) {
-          this.snackBar.open(`No current query dispatch configuration found for facility ${this.facilityId}, please create one.`, '', {
-            duration: 3500,
-            panelClass: 'info-snackbar',
-            horizontalPosition: 'end',
-            verticalPosition: 'top'
-          });
-          this.queryDispatchConfig = {
-            facilityId: this.facilityConfig.facilityId,
-            dispatchSchedules : []
-          } as IQueryDispatchConfiguration;
-          this.showNoQueryDispatchConfigAlert = true;
-          this.showQueryDispatchDialog();
-        } else {
-          this.snackBar.open(`Failed to load query dispatch configuration for the facility, see error for details.`, '', {
-            duration: 3500,
-            panelClass: 'error-snackbar',
-            horizontalPosition: 'end',
-            verticalPosition: 'top'
-          });
-        }
-      });
-  //  }
+    // if (!this.queryDispatchConfig) {
+    this.queryDispatchService.getConfiguration(this.facilityId).subscribe((data: IQueryDispatchConfiguration) => {
+      this.queryDispatchConfig = data;
+      this.showNoQueryDispatchConfigAlert = !this.queryDispatchConfig;
+    }, error => {
+      if (error.status == 404) {
+        this.snackBar.open(`No current query dispatch configuration found for facility ${this.facilityId}, please create one.`, '', {
+          duration: 3500,
+          panelClass: 'info-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
+        this.queryDispatchConfig = {
+          facilityId: this.facilityConfig.facilityId,
+          dispatchSchedules: []
+        } as IQueryDispatchConfiguration;
+        this.showNoQueryDispatchConfigAlert = true;
+        this.showQueryDispatchDialog();
+      } else {
+        this.snackBar.open(`Failed to load query dispatch configuration for the facility, see error for details.`, '', {
+          duration: 3500,
+          panelClass: 'error-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
+      }
+    });
+    //  }
   }
 
   showDataAcqFhirQueryDialog(): void {
@@ -540,6 +542,46 @@ export class FacilityEditComponent implements OnInit {
   toDescription(enumValue: string): string {
     // Insert a space before each uppercase letter that is preceded by a lowercase letter or number
     return enumValue.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+  }
+
+  onDeleteConfig(): void {
+
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        message: `Are you sure you want to delete this operation?`
+      }
+    });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.censusService.deleteConfiguration(this.censusConfig.facilityId).subscribe({
+          next: () => {
+            this.censusService.getConfiguration(this.facilityId).subscribe({
+              next: (data: ICensusConfiguration | null) => {
+                if (data) {
+                  this.showNoCensusConfigAlert = false;
+                  this.censusConfig = data;
+                } else {
+                  this.showNoCensusConfigAlert = true;
+                  this.censusConfig = {facilityId: this.facilityId, scheduledTrigger: "", enabled: false};
+                }
+              },
+              error: () => {
+                this.showNoCensusConfigAlert = true;
+                this.censusConfig = {facilityId: this.facilityId, scheduledTrigger: "", enabled: false};
+              }
+            });
+          },
+          error: () => {
+            alert('Error deleting configuration');
+          }
+        });
+      }
+    });
+
+    const confirmDelete = confirm('Are you sure you want to delete this configuration?');
+    if (!confirmDelete) return;
+
   }
 
 }
