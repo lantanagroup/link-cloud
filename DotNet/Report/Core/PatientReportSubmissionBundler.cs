@@ -53,7 +53,9 @@ namespace LantanaGroup.Link.Report.Core
         {
             var schedule = patientReportData.Schedule;
 
-            Bundle bundle = CreateNewBundle();
+            //The 'resourcesAdded' Dictionary will keep track of FHIR resource id's that have been added to the bundle to avoid adding duplicates across entries. The value of each dictionary entry will contain the associated FHIR types. It's a string List type in case there are different FHIR resources that share the same id. This is probably unlikely to happen, but is possible. 
+            Dictionary<string, List<string>> resourcesAdded = new Dictionary<string, List<string>>();
+
             foreach (var reportType in patientReportData.ReportData)
             {
                 var report = reportType.Key;
@@ -65,18 +67,19 @@ namespace LantanaGroup.Link.Report.Core
                     {
                         continue;
                     }
+                    }
 
                     MeasureReport mr = entry.MeasureReport;
-
                     foreach (var r in data.Resources)
                     {
                         if (r.Id == null)
                             continue;
-
+                            continue;
+                    }
                         FhirResource facilityResource = null!;
 
                         var resourceTypeCategory = ResourceCategory.GetResourceCategoryByType(r.ResourceType);
-
+                        var resourceTypeCategory = ResourceCategory.GetResourceCategoryByType(r.ResourceType);
                         Resource resource = null;
 
                         try
@@ -98,7 +101,7 @@ namespace LantanaGroup.Link.Report.Core
                         {
                             var message = "Contained resource could not be parsed into a valid Resource.";
                             _logger.LogError(ex, "{ResourceTypeName} with ID {ResourceId} contained resource could not be parsed into a valid Resource.", resource.TypeName, resource?.Id);
-
+                            _logger.LogError(ex, "{ResourceTypeName} with ID {ResourceId} contained resource could not be parsed into a valid Resource.", resource.TypeName, resource?.Id);
                             throw new Exception(message, ex);
                         }
                     }
@@ -112,6 +115,7 @@ namespace LantanaGroup.Link.Report.Core
                     mr.Meta = new Meta
                     {
                         Profile = new List<string> { ReportConstants.BundleSettings.IndividualMeasureReportProfileUrl }
+                    };
                     };
 
                     // clean up resource
@@ -208,15 +212,13 @@ namespace LantanaGroup.Link.Report.Core
         /// <param name="bundle"></param>
         /// <param name="resource"></param>
         /// <returns></returns>
-        protected Bundle.EntryComponent AddResourceToBundle(Bundle bundle, Resource resource)
+        protected void AddResourceToBundle(Bundle bundle, Resource resource)
         {
             var fullUrl = GetFullUrl(resource);
-            var existingEntry = bundle.FindEntry(fullUrl).FirstOrDefault();
-            return existingEntry ?? bundle.AddResourceEntry(resource, fullUrl);
+
+            bundle.AddResourceEntry(resource, fullUrl);
         }
 
         #endregion
-
     }
-
 }

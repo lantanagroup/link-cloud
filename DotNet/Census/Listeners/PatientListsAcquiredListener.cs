@@ -118,7 +118,9 @@ public class PatientListsAcquiredListener : BackgroundService
                                     {
                                         if (resp is PatientEventResponse per && per.PatientEvent != null)
                                         {
-                                            per.PatientEvent.ReportTrackingId = rawmessage.Message.Value.ReportTrackingId;
+                                            if (rawmessage.Message.Value.PatientLists.Any(list => list.PatientIds.Contains(per.PatientEvent.PatientId))) { 
+                                                per.PatientEvent.ReportTrackingId = rawmessage.Message.Value.ReportTrackingId;
+                                            }
                                         }
                                         return resp;
                                     }).ToList();
@@ -141,6 +143,9 @@ public class PatientListsAcquiredListener : BackgroundService
                                 }
                                 catch (Exception ex)
                                 {
+                                    if (ex is DeadLetterException || ex is TransientException)
+                                        throw;
+                                   
                                     throw new TransientException("Error processing message: " + ex.Message, ex);
                                 }
                             }
