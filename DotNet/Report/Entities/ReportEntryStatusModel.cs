@@ -18,5 +18,6 @@ namespace LantanaGroup.Link.Report.Entities
         public string MeasureReportUri { get; set; } = string.Empty;
         public string MeasureReportFileName { get; set; } = string.Empty;
         public string AggregateReportUri { get; set; } = string.Empty;
+        public string AggregateReportFileName { get; set; } = string.Empty;
     }
 }
