@@ -43,7 +43,7 @@ namespace IntegrationTests.Report
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
-            var scheduleManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+            var serviceScopeFactory = scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
             var aggregator = scope.ServiceProvider.GetRequiredService<MeasureReportAggregator>();
             var dataAcqProducer = scope.ServiceProvider.GetRequiredService<DataAcquisitionRequestedProducer>();
             var readyValProducer = scope.ServiceProvider.GetRequiredService<ReadyForValidationProducer>();
@@ -130,8 +130,7 @@ namespace IntegrationTests.Report
             var job = new EndOfReportPeriodJob(
                 loggerMock.Object,
                 schedulerFactoryMock.Object,
-                database,
-                scheduleManager,
+                serviceScopeFactory,
                 dataAcqProducer,
                 readyValProducer,
                 manifestProducer);
@@ -154,7 +153,7 @@ namespace IntegrationTests.Report
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
-            var scheduleManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+            var serviceScopeFactory = scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
             var aggregator = scope.ServiceProvider.GetRequiredService<MeasureReportAggregator>();
             var blobStorageService = scope.ServiceProvider.GetRequiredService<BlobStorageService>();
             var submitPayloadProducer = scope.ServiceProvider.GetRequiredService<SubmitPayloadProducer>();
@@ -226,8 +225,7 @@ namespace IntegrationTests.Report
             var job = new EndOfReportPeriodJob(
                 loggerMock.Object,
                 schedulerFactoryMock.Object,
-                database,
-                scheduleManager,
+                serviceScopeFactory,
                 dataAcqProducer, 
                 readyValProducer,
                 manifestProducer);
@@ -250,7 +248,7 @@ namespace IntegrationTests.Report
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
-            var scheduleManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+            var serviceScopeFactory = scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
             var aggregator = scope.ServiceProvider.GetRequiredService<MeasureReportAggregator>();
             var blobStorageService = scope.ServiceProvider.GetRequiredService<BlobStorageService>();
             var submitPayloadProducer = scope.ServiceProvider.GetRequiredService<SubmitPayloadProducer>();
@@ -322,8 +320,7 @@ namespace IntegrationTests.Report
             var job = new EndOfReportPeriodJob(
                 loggerMock.Object,
                 schedulerFactoryMock.Object,
-                database,
-                scheduleManager,
+                serviceScopeFactory,
                 dataAcqProducer,
                 readyValProducer,
                 manifestProducer);
@@ -349,7 +346,7 @@ namespace IntegrationTests.Report
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
-            var scheduleManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+            var serviceScopeFactory = scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
             var aggregator = scope.ServiceProvider.GetRequiredService<MeasureReportAggregator>();
             var blobStorageService = scope.ServiceProvider.GetRequiredService<BlobStorageService>();
             var submitPayloadProducer = scope.ServiceProvider.GetRequiredService<SubmitPayloadProducer>();
@@ -418,8 +415,7 @@ namespace IntegrationTests.Report
             var job = new EndOfReportPeriodJob(
                 loggerMock.Object,
                 schedulerFactoryMock.Object,
-                database,
-                scheduleManager,
+                serviceScopeFactory,
                 dataAcqProducer,
                 readyValProducer,
                 manifestProducer);

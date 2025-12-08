@@ -187,7 +187,7 @@ namespace IntegrationTests.Report
 
             using var scope = _fixture.ServiceProvider.CreateScope();
             var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
-            var scheduleManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+            var serviceScopeFactory = scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
             var aggregator = scope.ServiceProvider.GetRequiredService<MeasureReportAggregator>();
             var blobStorageService = scope.ServiceProvider.GetRequiredService<BlobStorageService>();
             var submitPayloadProducer = scope.ServiceProvider.GetRequiredService<SubmitPayloadProducer>();
@@ -232,7 +232,6 @@ namespace IntegrationTests.Report
             var schedulerMock = new Mock<IScheduler>();
             schedulerFactoryMock.Setup(f => f.GetScheduler(It.IsAny<CancellationToken>())).ReturnsAsync(schedulerMock.Object);
 
-            // CHANGED: Use static mock for IProducer
             ReportIntegrationTestFixture.DataAcquisitionRequestedProducerMock.Setup(p => p.Produce(It.IsAny<string>(), It.IsAny<Message<string, DataAcquisitionRequestedValue>>(), null))
                 .Verifiable();
             var dataAcqProducer = new DataAcquisitionRequestedProducer(database, ReportIntegrationTestFixture.DataAcquisitionRequestedProducerMock.Object);
@@ -261,9 +260,8 @@ namespace IntegrationTests.Report
             var job = new EndOfReportPeriodJob(
                 loggerMock.Object,
                 schedulerFactoryMock.Object,
-                database,
-                scheduleManager,
-                dataAcqProducer,  // CHANGED: Use the one with mock
+                serviceScopeFactory,
+                dataAcqProducer,
                 readyValProducer,
                 manifestProducer);
 
@@ -271,7 +269,7 @@ namespace IntegrationTests.Report
             await job.Execute(contextMock.Object);
 
             // Asserts
-            ReportIntegrationTestFixture.DataAcquisitionRequestedProducerMock.Verify(p => p.Produce(It.IsAny<string>(), It.IsAny<Message<string, DataAcquisitionRequestedValue>>(), null), Times.Exactly(pendingPatients.Count));  // NEW: Verify calls to produce for each pending patient
+            ReportIntegrationTestFixture.DataAcquisitionRequestedProducerMock.Verify(p => p.Produce(It.IsAny<string>(), It.IsAny<Message<string, DataAcquisitionRequestedValue>>(), null), Times.Exactly(pendingPatients.Count));
 
             var updatedSchedule = await database.ReportScheduledRepository.SingleOrDefaultAsync(s => s.Id == schedule.Id);
             Assert.Equal(ScheduleStatus.EndOfPeriod, updatedSchedule.Status);
