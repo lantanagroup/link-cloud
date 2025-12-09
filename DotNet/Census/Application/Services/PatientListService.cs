@@ -88,12 +88,11 @@ public class PatientListService : IPatientListService
                     var skipProcessing = ShouldSkipProcessing(patientId, facilityId, existingEvent, list.ListType);
                     if (skipProcessing.result)
                     {
-                        _logger.LogInformation(
-                            "{SkipMessage} PatientId: {PatientId}, FacilityId: {FacilityId}, EventType: {EventType}, ListType: {ListType}",
+                        _logger.LogDebug(
+                            "{SkipMessage} PatientId: {PatientId}, FacilityId: {FacilityId}, ListType: {ListType}",
                             skipProcessing.message,
                             patientId,
                             facilityId,
-                            "Admit",
                             list.ListType);
 
                         shouldSkip = true; // Mark for skipping but don't continue yet
@@ -197,8 +196,6 @@ public class PatientListService : IPatientListService
             try
             {
                 await _patientEventManager.AddPatientEvent(admitEvent, cancellationToken);
-                _logger.LogInformation("Added admit event for patient {patientId} in facility {facilityId}", patientId,
-                    facilityId);
 
                 PatientEncounter encounter =
                         await _patientEncounterQueries.GetPatientEncounterByCorrelationIdAsync(correlationId,
