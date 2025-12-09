@@ -177,7 +177,7 @@ public class SubmissionEntryQueries : ISubmissionEntryQueries
         var entry = await _context.PatientSubmissionEntries.SingleOrDefaultAsync(e => e.FacilityId == facilityId && e.ReportScheduleId == reportScheduleId && e.PatientId == patientId && e.ReportType == reportType);
         var resource = await _context.FhirResources.SingleOrDefaultAsync(r => r.FacilityId == facilityId 
                                                                         && r.ResourceId == resourceId
-                                                                        && r.PatientId == null || r.PatientId == patientId);
+                                                                        && (r.PatientId == null || r.PatientId == patientId));
 
         return (entry, resource);
     }
@@ -195,18 +195,12 @@ public class SubmissionEntryQueries : ISubmissionEntryQueries
     public async Task<PagedConfigModel<ResourceSummary>> GetResourceSummary(string facilityId, string reportScheduleId, ResourceType? resourceType, int pageSize, int pageNumber,
             CancellationToken cancellationToken = default)
     {
-        // Step 1: Optionally fetch report to validate, but assuming valid inputs for performance
-        // If needed: var report = await _context.ReportSchedules.FirstOrDefaultAsync(r => r.Id == reportScheduleId && r.FacilityId == facilityId);
-        // if (report == null) throw or return empty
-
-        // Step 2: Fetch distinct FhirResourceIds from maps
         var resourceIds = await _context.ReportScheduleResourceMaps
             .Where(m => m.ReportScheduleId == reportScheduleId)
             .Select(m => m.FhirResourceId)
             .Distinct()
             .ToListAsync(cancellationToken);
 
-        // Step 3: Query resources filtered by IDs and optional resourceType
         var dataQuery = _context.FhirResources
             .Where(r => resourceIds.Contains(r.Id));
 
@@ -216,24 +210,20 @@ public class SubmissionEntryQueries : ISubmissionEntryQueries
             dataQuery = dataQuery.Where(r => r.ResourceType == resourceTypeStr);
         }
 
-        // Order by ResourceType (string)
         dataQuery = dataQuery.OrderBy(r => r.ResourceType);
 
-        // Get count (server-side)
         var count = await dataQuery.CountAsync(cancellationToken);
 
-        // Fetch paged data (server-side)
         var resourceData = await dataQuery
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        // Project to ResourceSummary client-side (since Enum.Parse is client-only)
         var summaries = resourceData.Select(resource => new ResourceSummary
         {
             FacilityId = facilityId,
             MeasureReportId = reportScheduleId,
-            PatientId = resource.PatientId ?? string.Empty,  // Assuming this is the intent; adjust if it's entry-related
+            PatientId = resource.PatientId ?? string.Empty,  
             ResourceId = resource.Id,
             FhirId = resource.ResourceId,
             ResourceType = Enum.Parse<ResourceType>(resource.ResourceType),
@@ -250,18 +240,12 @@ public class SubmissionEntryQueries : ISubmissionEntryQueries
 
     public async Task<List<string>> GetMeasureReportResourceTypeList(string facilityId, string reportId, CancellationToken cancellationToken)
     {
-        // Step 1: Optionally validate report
-        // var report = await _context.ReportSchedules.FirstOrDefaultAsync(r => r.Id == reportId && r.FacilityId == facilityId);
-        // if (report == null) throw or return empty
-
-        // Step 2: Fetch distinct FhirResourceIds from maps
         var resourceIds = await _context.ReportScheduleResourceMaps
             .Where(r => r.ReportScheduleId == reportId)
             .Select(r => r.FhirResourceId)
             .Distinct()
             .ToListAsync(cancellationToken);
 
-        // Step 3: Fetch distinct ResourceType from resources
         var data = await _context.FhirResources
             .Where(resource => resourceIds.Contains(resource.Id))
             .Select(resource => resource.ResourceType)

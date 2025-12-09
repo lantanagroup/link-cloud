@@ -3,6 +3,7 @@ using LantanaGroup.Link.Report.Application.ResourceCategories;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using Microsoft.EntityFrameworkCore;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
@@ -64,11 +65,11 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task CreateReportResourceMap(string reportScheduleId, List<string> reportTypes, string fhirResourceId, CancellationToken cancellationToken = default)
         {
-            var resourceMap = _context.ReportScheduleResourceMaps.SingleOrDefault(r => r.ReportScheduleId == reportScheduleId);
+            var resourceMap = await _context.ReportScheduleResourceMaps.SingleOrDefaultAsync(r => r.ReportScheduleId == reportScheduleId && r.FhirResourceId == fhirResourceId);
 
             if (resourceMap == null)
             {
-                await _context.ReportScheduleResourceMaps.AddAsync(new ReportScheduleResourceMap
+                await _context.ReportScheduleResourceMaps.AddAsync(resourceMap = new ReportScheduleResourceMap
                 {
                     FhirResourceId = fhirResourceId,
                     ReportScheduleId = reportScheduleId,

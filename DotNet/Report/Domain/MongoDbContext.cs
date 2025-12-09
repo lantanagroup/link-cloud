@@ -31,7 +31,7 @@ public class MongoDbContext : DbContext
             .ToCollection("reportSchedule");
 
         modelBuilder.Entity<PatientSubmissionEntry>()
-            .ToCollection("measureReportSubmissionEntry");
+            .ToCollection("patientSubmissionEntry");
 
         modelBuilder.Entity<FhirResource>()
             .ToCollection("fhirResource");
