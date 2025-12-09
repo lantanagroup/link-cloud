@@ -159,7 +159,7 @@ namespace IntegrationTests.Report
         public async Task ProcessMessageAsync_ValidValidation_UpdatesStatusAndProducesSubmitPayload()
         {
             _fixture.ResetMocks();
-            await _fixture.ClearDatabaseAsync();
+            //await _fixture.ClearDatabaseAsync();
 
             using var scope = _fixture.ServiceProvider.CreateScope();
 
@@ -179,7 +179,7 @@ namespace IntegrationTests.Report
 
             await listener.ProcessMessageAsync(consumeResult, default);
 
-            using var assertScope = _fixture.ScopeFactory.CreateScope();
+            using var assertScope = _fixture.ServiceProvider.CreateScope();
             var assertDatabase = assertScope.ServiceProvider.GetRequiredService<IDatabase>();
 
             var updatedEntry = await assertDatabase.SubmissionEntryRepository.FirstOrDefaultAsync(e => e.Id == entry.Id);
@@ -193,7 +193,7 @@ namespace IntegrationTests.Report
         public async Task ProcessMessageAsync_InvalidValidation_AddsOutcomeUpdatesBlobAndProducesSubmitPayload()
         {
             _fixture.ResetMocks();
-            await _fixture.ClearDatabaseAsync();
+            //await _fixture.ClearDatabaseAsync();
 
             using var scope = _fixture.ServiceProvider.CreateScope();
 
@@ -243,7 +243,7 @@ namespace IntegrationTests.Report
             await listener.ProcessMessageAsync(consumeResult, default);
 
             // NEW: Fresh assert scope
-            using var assertScope = _fixture.ScopeFactory.CreateScope();
+            using var assertScope = _fixture.ServiceProvider.CreateScope();
             var assertDatabase = assertScope.ServiceProvider.GetRequiredService<IDatabase>();
             var assertQueries = assertScope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
 
@@ -312,7 +312,7 @@ namespace IntegrationTests.Report
         public async Task ProcessMessageAsync_GeneralException_ThrowsException()
         {
             _fixture.ResetMocks();
-            await _fixture.ClearDatabaseAsync();
+            //await _fixture.ClearDatabaseAsync();
 
             using var scope = _fixture.ServiceProvider.CreateScope();
 

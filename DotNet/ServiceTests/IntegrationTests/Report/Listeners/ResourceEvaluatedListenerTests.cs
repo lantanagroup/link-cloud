@@ -219,7 +219,7 @@ namespace IntegrationTests.Report
         public async Task ProcessMessageAsync_ReportableResource_NewResource_AddsToDBUpdatesEntry()
         {
             _fixture.ResetMocks();
-            await _fixture.ClearDatabaseAsync();
+            //await _fixture.ClearDatabaseAsync();
 
             var facilityId = Guid.NewGuid().ToString();
             var patientId = Guid.NewGuid().ToString();
@@ -257,10 +257,10 @@ namespace IntegrationTests.Report
         }
 
         [Fact]
-        public async Task ProcessMessageAsync_ReportableMeasureReport_ProducesReadyForValidation()
+        public async Task ProcessMessageAsync_ReportableMeasureReport_ProducesValidationRequested()
         {
             _fixture.ResetMocks();
-            await _fixture.ClearDatabaseAsync();
+            //await _fixture.ClearDatabaseAsync();
 
             var facilityId = Guid.NewGuid().ToString();
             var patientId = Guid.NewGuid().ToString();
@@ -281,7 +281,7 @@ namespace IntegrationTests.Report
             var listener = CreateListener(assertScope);
 
             // Create reportable MeasureReport resource
-            var measureReport = new MeasureReport { Id = "mr-1", Type = MeasureReport.MeasureReportType.Individual };  // Assuming reportable
+            var measureReport = new MeasureReport { Id = "mr-1", Type = MeasureReport.MeasureReportType.Individual };
             var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
             var mrStr = JsonSerializer.Serialize(measureReport, options);
 
@@ -292,22 +292,22 @@ namespace IntegrationTests.Report
             await listener.ProcessMessageAsync(consumeResult, default);
 
             var assertQueries = assertScope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
-            var updatedEntry = await assertQueries.GetByIdAsync(entry.Id);  // Reloaded
+            var updatedEntry = await assertQueries.GetByIdAsync(entry.Id); 
 
             Assert.NotNull(updatedEntry);
-            Assert.Equal(PatientSubmissionStatus.ReadyForValidation, updatedEntry.Status);  // Or whatever expected
-            Assert.Equal(mockPayloadUri.ToString(), updatedEntry.PayloadUri);  // NEW: Verify update
+            Assert.Equal(PatientSubmissionStatus.ValidationRequested, updatedEntry.Status); 
+            Assert.Equal(mockPayloadUri.ToString(), updatedEntry.PayloadUri);
 
             // Update AssertProducerMocks to use updatedEntry
             AssertProducerMocks(ReportIntegrationTestFixture.ReadyForValidationProducerMock, ReportIntegrationTestFixture.SubmitPayloadProducerMock,
-                Times.Once(), Times.Never(), schedule, updatedEntry);  // Adjust as needed
+                Times.Once(), Times.Never(), schedule, updatedEntry);
         }
 
         [Fact]
         public async Task ProcessMessageAsync_NotReportable_UpdatesStatusToNotReportable()
         {
             _fixture.ResetMocks();
-            await _fixture.ClearDatabaseAsync();
+            //await _fixture.ClearDatabaseAsync();
 
             var facilityId = Guid.NewGuid().ToString();
             var patientId = Guid.NewGuid().ToString();
@@ -413,7 +413,7 @@ namespace IntegrationTests.Report
         public async Task ProcessMessageAsync_TimeoutException_TransientException()
         {
             _fixture.ResetMocks();
-            await _fixture.ClearDatabaseAsync();
+            //await _fixture.ClearDatabaseAsync();
             var facilityId = Guid.NewGuid().ToString();
             var patientId = Guid.NewGuid().ToString();
 

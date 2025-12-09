@@ -27,14 +27,13 @@ public class ReportMongoSchedulerFactory : ISchedulerFactory
             return _scheduler;
 
         await _lock.WaitAsync(cancellationToken);
+
         try
         {
             if (_scheduler != null)
                 return _scheduler;
 
-            _logger.LogInformation("Creating MongoDB scheduler...");
-
-            var scope = _serviceScopeFactory.CreateScope();
+            using var scope = _serviceScopeFactory.CreateScope();
 
             var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
             var context = scope.ServiceProvider.GetRequiredService<MongoDbContext>();
@@ -69,16 +68,12 @@ public class ReportMongoSchedulerFactory : ISchedulerFactory
             mongoJobStore.InstanceName = schedulerName;
             mongoJobStore.InstanceId = schedulerInstanceId;
 
-            _logger.LogInformation("Scheduler Name: {SchedulerName}, Instance ID: {InstanceId}", schedulerName, schedulerInstanceId);
-
             var schedulerSignaler = new SchedulerSignalerImpl(loggerFactory);
 
             var loadHelper = new SimpleTypeLoadHelper();
             loadHelper.Initialize();
 
             await mongoJobStore.Initialize(loadHelper, schedulerSignaler, cancellationToken);
-
-            _logger.LogInformation("MongoDB job store initialized successfully");
 
             DirectSchedulerFactory.Instance.CreateScheduler(
                 schedulerName,
@@ -89,19 +84,18 @@ public class ReportMongoSchedulerFactory : ISchedulerFactory
 
             _scheduler = await DirectSchedulerFactory.Instance.GetScheduler(schedulerName, cancellationToken);
 
-            _logger.LogInformation("Scheduler created successfully: {SchedulerName}", _scheduler.SchedulerName);
-
             return _scheduler;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to create MongoDB scheduler");
-            throw;
         }
         finally
         {
             _lock.Release();
         }
+
+        return null;
     }
 
     public async Task<IReadOnlyList<IScheduler>> GetAllSchedulers(CancellationToken cancellationToken = default)

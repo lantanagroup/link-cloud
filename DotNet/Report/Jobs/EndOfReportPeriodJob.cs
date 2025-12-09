@@ -42,10 +42,6 @@ namespace LantanaGroup.Link.Report.Jobs
 
         public async Task Execute(IJobExecutionContext context)
         {
-            var scope = _serviceScopeFactory.CreateScope();
-            var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
-            var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
-
             ReportSchedule? schedule = null;
             try
             {
@@ -64,6 +60,10 @@ namespace LantanaGroup.Link.Report.Jobs
                     _logger.LogError("EndOfReportPeriodJob executed but no ReportScheduleId found in job data");
                     return;
                 }
+
+                using var scope = _serviceScopeFactory.CreateScope();
+                var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+                var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
 
                 // Fetch the schedule from the database
                 schedule = await database.ReportScheduledRepository.GetAsync(scheduleId);

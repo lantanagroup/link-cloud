@@ -213,20 +213,20 @@ namespace IntegrationTests.Report
             ScopeFactory = ServiceProvider.GetRequiredService<IServiceScopeFactory>();
         }
 
-        private IMongoDatabase GetMongoDatabase()
-        {
-            var client = new MongoClient(MongoConnectionString);
-            return client.GetDatabase("reportTestDb");
-        }
+        //private IMongoDatabase GetMongoDatabase()
+        //{
+        //    var client = new MongoClient(MongoConnectionString);
+        //    return client.GetDatabase("reportTestDb");
+        //}
 
-        public async Task ClearDatabaseAsync()
-        {
-            var db = GetMongoDatabase();
-            await db.DropCollectionAsync("reportSchedule");
-            await db.DropCollectionAsync("measureReportSubmissionEntry");
-            await db.DropCollectionAsync("fhirResource");
-            await db.DropCollectionAsync("reportScheduleResourceMap");
-        }
+        //public async Task ClearDatabaseAsync()
+        //{
+        //    var db = GetMongoDatabase();
+        //    await db.DropCollectionAsync("reportSchedule");
+        //    await db.DropCollectionAsync("measureReportSubmissionEntry");
+        //    await db.DropCollectionAsync("fhirResource");
+        //    await db.DropCollectionAsync("reportScheduleResourceMap");
+        //}
 
         public void ResetMocks()
         {

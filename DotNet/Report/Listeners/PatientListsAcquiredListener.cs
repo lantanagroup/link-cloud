@@ -86,7 +86,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             try
                             {
-                                var scope = _serviceScopeFactory.CreateScope();
+                                using var scope = _serviceScopeFactory.CreateScope();
                                 var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
 
                                 var key = result.Message.Key;
