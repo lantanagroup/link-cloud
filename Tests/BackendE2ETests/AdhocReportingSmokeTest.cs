@@ -125,13 +125,15 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             await submissionReportZip.DownloadAndExtractSingleMeasureZipAsync(true);
             TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateFilesAppear, failures);
             TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateFilesDoNotAppear, failures);
-
             TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateManifestContent, failures);
-
             TestConfig.ValidationHelper.TryRunValidation(() => submissionReportZip.ValidateSpecificPatientFileContents(3, 2000), failures);
 
             TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidatePatientFile_1, failures);
             TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidatePatientFile_2, failures);
+            TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidatePatientFile_3, failures);
+            TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidatePatientFile_4, failures);
+            TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidatePatientFile_5, failures);
+            TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidatePatientFile_6, failures);
 
             TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidateSingleMeasureAdHocAggregateACHMFile, failures);
             apiE2E.GETSingleMeasureAdHocFacilityValidationResultsForReport();

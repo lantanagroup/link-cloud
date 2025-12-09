@@ -243,20 +243,180 @@ public class SubmissionZipReader(ITestOutputHelper output)
             expectedBundleCounts: expectedBundleCounts,
             expectedEvalCounts: expectedEvalCounts);
     }
+    public void ValidatePatientFile_3()
+    {
+        const string fileName = "patient-jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg.ndjson";
 
+        var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ServiceRequest"] = 16,
+            ["Observation"] = 5,
+            ["Condition"] = 2,
+            ["Procedure"] = 2,
+            ["Encounter"] = 1,
+            ["DiagnosticReport"] = 1,
+            ["Coverage"] = 1,
+            ["MedicationRequest"] = 1,
+            ["Medication"] = 1,
+            ["Device"] = 1,
+            ["Patient"] = 1,
+            ["Location"] = 1,
+            ["OperationOutcome"] = 1,
+            ["MeasureReport"] = 1
+        };
 
+        var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["__TOTAL__"] = 33,
+            ["ServiceRequest"] = 16,
+            ["Observation"] = 5,
+            ["Condition"] = 2,
+            ["Procedure"] = 2,
+            ["Encounter"] = 1,
+            ["DiagnosticReport"] = 1,
+            ["Coverage"] = 1,
+            ["MedicationRequest"] = 1,
+            ["Medication"] = 1,
+            ["Device"] = 1,
+            ["Patient"] = 1,
+            ["Location"] = 1
+        };
 
+        ValidateSinglePatientFile(
+            fileName: fileName,
+            expectedBundleCounts: expectedBundleCounts,
+            expectedEvalCounts: expectedEvalCounts);
+    }
+    public void ValidatePatientFile_4()
+    {
+        const string fileName = "patient-MVLkMLWErl3gQGRCuA2mygtVuix7PMBFBh9WVayaCL7xM.ndjson";
 
+        var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ServiceRequest"] = 27,
+            ["Observation"] = 9,
+            ["Procedure"] = 4,
+            ["MedicationRequest"] = 2,
+            ["DiagnosticReport"] = 2,
+            ["Encounter"] = 2,
+            ["Medication"] = 2,
+            ["Device"] = 2,
+            ["Coverage"] = 2,
+            ["Condition"] = 2,
+            ["Location"] = 1,
+            ["Patient"] = 1,
+            ["OperationOutcome"] = 1,
+            ["MeasureReport"] = 1
+        };
 
+        var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["__TOTAL__"] = 56,
+            ["ServiceRequest"] = 27,
+            ["Observation"] = 9,
+            ["Procedure"] = 4,
+            ["MedicationRequest"] = 2,
+            ["DiagnosticReport"] = 2,
+            ["Encounter"] = 2,
+            ["Medication"] = 2,
+            ["Device"] = 2,
+            ["Coverage"] = 2,
+            ["Condition"] = 2,
+            ["Location"] = 1,
+            ["Patient"] = 1
+        };
 
+        ValidateSinglePatientFile(
+            fileName: fileName,
+            expectedBundleCounts: expectedBundleCounts,
+            expectedEvalCounts: expectedEvalCounts);
+    }
+    public void ValidatePatientFile_5()
+    {
+        const string fileName = "patient-VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA.ndjson";
 
+        var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ServiceRequest"] = 31,
+            ["Observation"] = 11,
+            ["Condition"] = 2,
+            ["MedicationRequest"] = 2,
+            ["Medication"] = 2,
+            ["Encounter"] = 1,
+            ["Procedure"] = 1,
+            ["Location"] = 1,
+            ["DiagnosticReport"] = 1,
+            ["Patient"] = 1,
+            ["Coverage"] = 1,
+            ["OperationOutcome"] = 1,
+            ["MeasureReport"] = 1
+        };
 
+        var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["__TOTAL__"] = 54,
+            ["ServiceRequest"] = 31,
+            ["Observation"] = 11,
+            ["Condition"] = 2,
+            ["MedicationRequest"] = 2,
+            ["Medication"] = 2,
+            ["Encounter"] = 1,
+            ["Procedure"] = 1,
+            ["Location"] = 1,
+            ["DiagnosticReport"] = 1,
+            ["Patient"] = 1,
+            ["Coverage"] = 1
+        };
 
+        ValidateSinglePatientFile(
+            fileName: fileName,
+            expectedBundleCounts: expectedBundleCounts,
+            expectedEvalCounts: expectedEvalCounts);
+    }
+    public void ValidatePatientFile_6()
+    {
+        const string fileName = "patient-x25sJU80vVa51mxJ6vSDcjbNC3BcdCQujJbXQwqdppFOO.ndjson";
 
+        var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ServiceRequest"] = 116,
+            ["Observation"] = 23,
+            ["Medication"] = 4,
+            ["MedicationRequest"] = 4,
+            ["Condition"] = 4,
+            ["Procedure"] = 3,
+            ["Coverage"] = 2,
+            ["Location"] = 2,
+            ["Encounter"] = 2,
+            ["DiagnosticReport"] = 2,
+            ["Patient"] = 1,
+            ["Device"] = 1,
+            ["OperationOutcome"] = 1,
+            ["MeasureReport"] = 1
+        };
 
+        var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["__TOTAL__"] = 164,
+            ["ServiceRequest"] = 116,
+            ["Observation"] = 23,
+            ["Medication"] = 4,
+            ["MedicationRequest"] = 4,
+            ["Condition"] = 4,
+            ["Procedure"] = 3,
+            ["Coverage"] = 2,
+            ["Location"] = 2,
+            ["Encounter"] = 2,
+            ["DiagnosticReport"] = 2,
+            ["Patient"] = 1,
+            ["Device"] = 1
+        };
 
-
-
+        ValidateSinglePatientFile(
+            fileName: fileName,
+            expectedBundleCounts: expectedBundleCounts,
+            expectedEvalCounts: expectedEvalCounts);
+    }
 
     private void ValidateSinglePatientFile(
         string fileName,
