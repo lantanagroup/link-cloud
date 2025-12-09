@@ -20,13 +20,23 @@ public static class TestConfig
     public const string MeasureAch = "NHSNAcuteCareHospitalMonthlyInitialPopulation";
     public const string CronValue = "0 0 */4 * * ?";
 
+    public const string singleMeasureAdHocTestPatient_One = "patient-CYUcGIlSrpJxCBMeEml30YSmE0Ea7loNBPVZfhCUkv7A3.ndjson";
+    public const string singleMeasureAdHocTestPatient_Two = "patient-6tZ8Wt8maJdDFLvEsDcKmAaCAcSOxjr0mB8RjEi5Szw7H.ndjson";
+    public const string singleMeasureAdHocTestPatient_Three = "patient-jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg.ndjson";
+    public const string singleMeasureAdHocTestPatient_Four = "patient-MVLkMLWErl3gQGRCuA2mygtVuix7PMBFBh9WVayaCL7xM.ndjson";
+    public const string singleMeasureAdHocTestPatient_Five = "patient-VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA.ndjson";
+    public const string singleMeasureAdHocTestPatient_Six = "patient-x25sJU80vVa51mxJ6vSDcjbNC3BcdCQujJbXQwqdppFOO.ndjson";
+    public const string singleMeasureAdHocTestPatient_Seven = "patient-jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494.ndjson";
+    public const string singleMeasureAdHocTestPatient_Eight = "patient-DJxsHpmWuBezhV9hJNgEHT4szaKW3uP5vUNzXUCkltpXj.ndjson";
+    public const string singleMeasureAdHocTestPatient_Nine = "patient-9i6Xi6uG2WjuGxHTmpbin4ct2ZwevRwTWhIkJkRjVFZ4C.ndjson";
+    public const string singleMeasureAdHocTestPatient_Ten = "patient-5ieWogP3EGV24Kus8QsGh6rpmUaJBP5Hl0nCSJJXmh6TI.ndjson";
 
     public static class FhirQueryConfig
     {
         public const int MaxConcurrentRequests = 5;
         public static readonly TimeSpan MinAcquisitionPullTime = TimeSpan.FromHours(1);
         public static readonly TimeSpan MaxAcquisitionPullTime = TimeSpan.FromHours(24);
-        public static readonly string TimeZone = "America/New_York"; // Default time zone, can be overridden in tests
+        public static readonly string TimeZone = "America/New_York";
     }
 
     public static readonly string[] SingleMeasureExpectedFiles =

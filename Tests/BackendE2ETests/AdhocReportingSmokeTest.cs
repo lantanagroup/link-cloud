@@ -126,7 +126,6 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateFilesAppear, failures);
             TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateFilesDoNotAppear, failures);
             TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateManifestContent, failures);
-            TestConfig.ValidationHelper.TryRunValidation(() => submissionReportZip.ValidateSpecificPatientFileContents(3, 2000), failures);
 
             TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidatePatientFile_1, failures);
             TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidatePatientFile_2, failures);

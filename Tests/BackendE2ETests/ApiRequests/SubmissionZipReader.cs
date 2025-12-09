@@ -77,10 +77,10 @@ public class SubmissionZipReader(ITestOutputHelper output)
 
         var disallowedFiles = new List<string>
         {
-            "patient-jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494.ndjson",
-            "patient-DJxsHpmWuBezhV9hJNgEHT4szaKW3uP5vUNzXUCkltpXj.ndjson",
-            "patient-9i6Xi6uG2WjuGxHTmpbin4ct2ZwevRwTWhIkJkRjVFZ4C.ndjson",
-            "patient-5ieWogP3EGV24Kus8QsGh6rpmUaJBP5Hl0nCSJJXmh6TI.ndjson"
+            TestConfig.singleMeasureAdHocTestPatient_Seven,
+            TestConfig.singleMeasureAdHocTestPatient_Eight,
+            TestConfig.singleMeasureAdHocTestPatient_Nine,
+            TestConfig.singleMeasureAdHocTestPatient_Ten,
         };
 
         var foundDisallowedFiles = disallowedFiles
@@ -100,7 +100,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
     {
         const string manifestName = "manifest.ndjson";
 
-        // 1️⃣ Locate manifest.ndjson
         var manifestEntry = _zipContents
             .FirstOrDefault(kvp => kvp.Key.EndsWith("manifest.ndjson", StringComparison.OrdinalIgnoreCase));
 
@@ -112,7 +111,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
         if (string.IsNullOrWhiteSpace(manifestText))
             throw new Exception("manifest.ndjson is empty.");
 
-        // 2️⃣ Parse NDJSON content into JsonElements
         var jsonOptions = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true
@@ -126,10 +124,8 @@ public class SubmissionZipReader(ITestOutputHelper output)
         if (manifestLines.Count == 0)
             throw new Exception("manifest.ndjson contained only whitespace.");
 
-        // 3️⃣ Build resourceType counts
-        var counts = BuildResourceTypeCounts(manifestLines);
+        var counts = CountResourceTypes(manifestLines);
 
-        // Optional but recommended: ensure we have the 5 resources we expect
         var expectedCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
             ["Organization"] = 1,
@@ -141,12 +137,10 @@ public class SubmissionZipReader(ITestOutputHelper output)
 
         ValidateResourceTypeCounts(counts, expectedCounts);
 
-        // 4️⃣ Validate OperationOutcome issues (one issue per patient)
         ValidateOperationOutcomeIssuesForPatients(
             manifestLines,
             SingleMeasureExpectedPatientIDs);
 
-        // 5️⃣ Validate List snapshot block
         var expectedPatientRefs = SingleMeasureExpectedPatientIDs
             .Select(id => $"Patient/{id}")
             .ToArray();
@@ -157,15 +151,12 @@ public class SubmissionZipReader(ITestOutputHelper output)
             mode: "snapshot",
             expectedPatientRefs: expectedPatientRefs);
 
-        // 6️⃣ If we got this far, everything passed
         var countsString = string.Join(", ", counts.Select(kv => $"{kv.Key}={kv.Value}"));
         output.WriteLine($"[PASS] manifest.ndjson validation passed. ResourceType counts: {countsString}");
     }
-
-
     public void ValidatePatientFile_1()
     {
-        const string fileName = "patient-CYUcGIlSrpJxCBMeEml30YSmE0Ea7loNBPVZfhCUkv7A3.ndjson";
+        const string fileName = TestConfig.singleMeasureAdHocTestPatient_One;
 
         var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
@@ -207,7 +198,7 @@ public class SubmissionZipReader(ITestOutputHelper output)
     }
     public void ValidatePatientFile_2()
     {
-        const string fileName = "patient-6tZ8Wt8maJdDFLvEsDcKmAaCAcSOxjr0mB8RjEi5Szw7H.ndjson";
+        const string fileName = TestConfig.singleMeasureAdHocTestPatient_Two;
 
         var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
@@ -245,7 +236,7 @@ public class SubmissionZipReader(ITestOutputHelper output)
     }
     public void ValidatePatientFile_3()
     {
-        const string fileName = "patient-jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg.ndjson";
+        const string fileName = TestConfig.singleMeasureAdHocTestPatient_Three;
 
         var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
@@ -289,7 +280,7 @@ public class SubmissionZipReader(ITestOutputHelper output)
     }
     public void ValidatePatientFile_4()
     {
-        const string fileName = "patient-MVLkMLWErl3gQGRCuA2mygtVuix7PMBFBh9WVayaCL7xM.ndjson";
+        const string fileName = TestConfig.singleMeasureAdHocTestPatient_Four;
 
         var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
@@ -333,7 +324,7 @@ public class SubmissionZipReader(ITestOutputHelper output)
     }
     public void ValidatePatientFile_5()
     {
-        const string fileName = "patient-VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA.ndjson";
+        const string fileName = TestConfig.singleMeasureAdHocTestPatient_Five;
 
         var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
@@ -375,7 +366,7 @@ public class SubmissionZipReader(ITestOutputHelper output)
     }
     public void ValidatePatientFile_6()
     {
-        const string fileName = "patient-x25sJU80vVa51mxJ6vSDcjbNC3BcdCQujJbXQwqdppFOO.ndjson";
+        const string fileName = TestConfig.singleMeasureAdHocTestPatient_Six;
 
         var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
@@ -417,7 +408,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
             expectedBundleCounts: expectedBundleCounts,
             expectedEvalCounts: expectedEvalCounts);
     }
-
     private void ValidateSinglePatientFile(
         string fileName,
         Dictionary<string, int> expectedBundleCounts,
@@ -429,7 +419,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
             "MeasureReport"
         };
 
-        // 1️⃣ Locate file in ZIP contents
         var entryKey = _zipContents.Keys
             .FirstOrDefault(name => name.EndsWith(fileName, StringComparison.OrdinalIgnoreCase));
 
@@ -440,7 +429,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
         if (string.IsNullOrWhiteSpace(content))
             throw new Exception($"{fileName} is empty.");
 
-        // 2️⃣ Parse NDJSON to JsonElement list
         var jsonOptions = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true
@@ -454,15 +442,12 @@ public class SubmissionZipReader(ITestOutputHelper output)
         if (lines.Count == 0)
             throw new Exception($"{fileName} contained only whitespace.");
 
-        // 3️⃣ Build bundle counts and ID map
         var bundleCounts = CountResourceTypes(lines);
         var bundleIdsByType = BundleIdsByType(lines);
 
-        // 4️⃣ Parse MeasureReport.evaluatedResource
         var (evalCounts, evalIdsByType, crossTypeRefs) =
             ParseEvaluatedResource(lines, bundleIdsByType);
 
-        // 5️⃣ Validate bundle counts vs expectedBundleCounts
         foreach (var kv in expectedBundleCounts)
         {
             var key = kv.Key;
@@ -480,7 +465,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
             }
         }
 
-        // 6️⃣ Validate evaluatedResource counts (including __TOTAL__)
         foreach (var kv in expectedEvalCounts)
         {
             var key = kv.Key;
@@ -503,7 +487,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
             }
         }
 
-        // 7️⃣ No unexpected evaluated types
         var expectedEvalKeys = new HashSet<string>(expectedEvalCounts.Keys, StringComparer.OrdinalIgnoreCase);
         foreach (var extraKey in evalCounts.Keys.Where(k => !expectedEvalKeys.Contains(k)))
         {
@@ -511,7 +494,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
                 $"{fileName} evaluatedResource contains unexpected type '{extraKey}'.");
         }
 
-        // 8️⃣ Exclusions: should exist in bundle, but not in evaluatedResource
         foreach (var exType in excludedTypes)
         {
             var bundleHas = bundleCounts.TryGetValue(exType, out var c) && c > 0;
@@ -528,7 +510,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
                     "(should be omitted).");
         }
 
-        // 9️⃣ Per-type count equality (excluding excludedTypes)
         foreach (var kv in bundleCounts)
         {
             var type = kv.Key;
@@ -546,7 +527,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
             }
         }
 
-        // 🔟 ID set equality (excluding excludedTypes)
         foreach (var kv in bundleIdsByType)
         {
             var type = kv.Key;
@@ -580,7 +560,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
             }
         }
 
-        // 1️⃣1️⃣ Cross-type guard
         if (crossTypeRefs.Count > 0)
         {
             var details = string.Join("; ",
@@ -591,7 +570,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
                 $"{fileName} evaluatedResource contains cross-type references: {details}");
         }
 
-        // 1️⃣2️⃣ Success log
         var bundleSummary = string.Join(", ",
             expectedBundleCounts.OrderBy(k => k.Key)
                                 .Select(kv => $"{kv.Key}={kv.Value}"));
@@ -671,7 +649,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
         var crossType = new List<(string EvaluatedType, string Id, string ActualType)>();
         var total = 0;
 
-        // id → actual bundle type
         var idToType = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var kv in bundleIdsByType)
         {
@@ -729,98 +706,7 @@ public class SubmissionZipReader(ITestOutputHelper output)
         counts["__TOTAL__"] = total;
         return (counts, idsByType, crossType);
     }
-    public void ValidateSpecificPatientFileContents(int timeoutSeconds = 10, int pollIntervalMs = 1000)
-        {
-            string fileName = "patient-x25sJU80vVa51mxJ6vSDcjbNC3BcdCQujJbXQwqdppFOO.ndjson";
-
-            var entry = _zipContents.Keys.FirstOrDefault(name => name.EndsWith(fileName, StringComparison.OrdinalIgnoreCase));
-            if (entry == null)
-                throw new Exception($"{fileName} is missing from the ZIP archive.");
-
-            var content = _zipContents[entry];
-            JObject json = null;
-
-            var expectedResourceCounts = new Dictionary<string, int>
-                {
-                    { "Encounter", 2 },
-                    { "Observation", 23 },
-                    { "Device", 1 },
-                    { "MedicationRequest", 4 },
-                    { "Procedure", 3 },
-                    { "Condition", 4 },
-                    { "Patient", 1 },
-                    { "Coverage", 2 },
-                    { "DiagnosticReport", 2 },
-                    { "MeasureReport", 1 },
-                    { "ServiceRequest", 116 },
-                    { "Location", 2 },
-                    {"Medication", 4 }
-                };
-            Dictionary<string, int> actualCounts = null;
-            DateTime startTime = DateTime.Now;
-            while ((DateTime.Now - startTime).TotalSeconds < timeoutSeconds)
-            {
-                //the content is ndjson, so we need to split it into lines and parse each line as JSON
-                foreach (var line in content.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
-                {
-                    var lineJson = JObject.Parse(line);
-                    var resourceType = (string)lineJson["resourceType"] ?? "null";
-                
-                    if (actualCounts == null)
-                        actualCounts = new Dictionary<string, int>();
-                    if (actualCounts.ContainsKey(resourceType))
-                        actualCounts[resourceType]++;
-                    else
-                        actualCounts[resourceType] = 1;
-
-                    var entryCounts = lineJson["entry"]?
-                        .GroupBy(e => (string)e["resource"]?["resourceType"])
-                        .ToDictionary(g => g.Key ?? "null", g => g.Count()) ?? new Dictionary<string, int>();
-
-                    foreach (var kvp in entryCounts)
-                    {
-                        if (actualCounts.ContainsKey(kvp.Key))
-                            actualCounts[kvp.Key] += kvp.Value;
-                        else
-                            actualCounts[kvp.Key] = kvp.Value;
-                    }
-                }
-
-                if (expectedResourceCounts.All(kvp =>
-                    actualCounts.TryGetValue(kvp.Key, out int actual) && actual >= kvp.Value))
-                {
-                    break;
-                }
-                Thread.Sleep(pollIntervalMs);
-            }
-
-            if (actualCounts == null)
-                throw new Exception("Validation failed: Could not parse resourceType counts from JSON content.");
-            var mismatches = new List<string>();
-            var unexpected = new List<string>();
-
-            foreach (var expected in expectedResourceCounts)
-            {
-                actualCounts.TryGetValue(expected.Key, out int actualCount);
-                if (actualCount != expected.Value)
-                {
-                    mismatches.Add($"🔴 [ERROR] ResourceType '{expected.Key}': Expected {expected.Value}, Found {actualCount}");
-                }
-            }
-
-            foreach (var actual in actualCounts.Keys)
-            {
-                if (!expectedResourceCounts.ContainsKey(actual))
-                {
-                    unexpected.Add($"[WARNING] Unexpected resourceType found: '{actual}' (Count: {actualCounts[actual]})");
-                }
-            }
-            foreach (var line in mismatches.Concat(unexpected))
-                output.WriteLine(line);
-            if (mismatches.Any())
-                throw new Exception("Validation failed: One or more expected resourceType counts are incorrect.");
-            output.WriteLine("[PASS] All expected resourceType counts match, and no unexpected types found.");
-        }
+    
     public void ValidateSingleMeasureAdHocAggregateACHMFile()
     {
         string fileName = "manifest.ndjson";
@@ -830,7 +716,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
             throw new Exception($"{fileName} is missing from the ZIP archive.");
         var content = _zipContents[entry];
 
-        //loop through each line and find the MeasureReport resource
         var measureReportLine = content.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
                                         .FirstOrDefault(line => line.Contains("\"resourceType\":\"MeasureReport\"", StringComparison.OrdinalIgnoreCase));
 
@@ -869,7 +754,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
         HashSet<string>? previousNames = null;
         string? lastError = null;
 
-        // ✅ Always require the full expected set of files for this test
         var requiredFiles = TestConfig.SingleMeasureExpectedFiles;
 
         output.WriteLine("[INFO] Waiting for ZIP contents to stabilize and contain all expected files…");
@@ -885,25 +769,21 @@ public class SubmissionZipReader(ITestOutputHelper output)
                     .Where(n => n.EndsWith(".ndjson", StringComparison.OrdinalIgnoreCase))
                     .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-                // Do we have ALL expected files yet?
                 var haveAllRequired = requiredFiles.All(req =>
                     currentNames.Any(n => n.EndsWith(req, StringComparison.OrdinalIgnoreCase)));
 
                 if (!haveAllRequired)
                 {
-                    // We don't even have the full set yet → reset stability
                     stableCount = 0;
                 }
                 else
                 {
-                    // We have all required files; now check stability of the set
                     if (previousNames != null && currentNames.SetEquals(previousNames))
                     {
                         stableCount++;
                     }
                     else
                     {
-                        // First time we see "all required present" or set changed
                         stableCount = 1;
                     }
                 }
@@ -930,7 +810,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
         if (lastError != null)
             output.WriteLine($"[WARN] Last poll failure: {lastError}");
 
-        // Extra diagnostics on timeout: which files are still missing?
         var finalNames = _zipContents.Keys
             .Where(n => n.EndsWith(".ndjson", StringComparison.OrdinalIgnoreCase))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -951,24 +830,7 @@ public class SubmissionZipReader(ITestOutputHelper output)
             $"🔴 ZIP did not reach a stable state with all expected files within {timeoutInSeconds}s " +
             $"after {attempt} poll(s). Missing: {missingList}. Found: {foundList}");
     }
-    private static Dictionary<string, int> BuildResourceTypeCounts(IEnumerable<JsonElement> manifestLines)
-    {
-        var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var el in manifestLines)
-        {
-            if (el.TryGetProperty("resourceType", out var rt) &&
-                rt.ValueKind == JsonValueKind.String)
-            {
-                var key = rt.GetString() ?? string.Empty;
-                if (key.Length == 0) continue;
-
-                counts[key] = counts.TryGetValue(key, out var current) ? current + 1 : 1;
-            }
-        }
-
-        return counts;
-    }
     private static void ValidateResourceTypeCounts(
         Dictionary<string, int> actualCounts,
         Dictionary<string, int> expectedCounts)
@@ -992,7 +854,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
         List<JsonElement> manifestLines,
         IEnumerable<string> expectedPatientIds)
     {
-        // Find the OperationOutcome resource
         JsonElement operationOutcome = default;
         var found = false;
 
@@ -1020,7 +881,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
 
         foreach (var issue in issuesElement.EnumerateArray())
         {
-            // Optional extra checks (severity, code)
             if (issue.TryGetProperty("severity", out var severity) &&
                 severity.ValueKind == JsonValueKind.String &&
                 !string.Equals(severity.GetString(), "fatal", StringComparison.OrdinalIgnoreCase))
@@ -1043,7 +903,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
 
             var diagText = diag.GetString() ?? string.Empty;
 
-            // Your manifest uses: "Validation failed for patient {id}"
             const string prefix = "Validation failed for patient ";
             if (!diagText.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             {
@@ -1077,7 +936,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
         string mode,
         IEnumerable<string> expectedPatientRefs)
     {
-        // Find the List resource
         JsonElement listResource = default;
         var found = false;
 
@@ -1148,6 +1006,5 @@ public class SubmissionZipReader(ITestOutputHelper output)
                 $"Expected [{expectedList}], found [{actualList}].");
         }
     }
-
 }
 
