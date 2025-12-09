@@ -31,6 +31,6 @@ public class PatientController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "facilityId, reportId, or patientId not found");
         }
 
-        return patientStatusBundler.createBundle(patientReportStatus);
+        return patientStatusBundler.createBundle(facilityId, patientReportStatus.getCorrelationId());
     }
 }

@@ -5,9 +5,9 @@ import com.lantanagroup.link.measureeval.entities.ReportableEvent;
 import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.records.EvaluationRequested;
 import com.lantanagroup.link.measureeval.records.ResourceEvaluated;
-import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusTemplateRepository;
+import com.lantanagroup.link.measureeval.repositories.ResourceRepository;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
@@ -41,7 +41,7 @@ public class EvaluationRequestedConsumer {
     private final EvaluateMeasureService evaluateMeasureService;
     private final PatientReportingEvaluationStatusTemplateRepository patientReportingEvaluationStatusTemplateRepository;
 
-    EvaluationRequestedConsumer(AbstractResourceRepository resourceRepository,
+    EvaluationRequestedConsumer(ResourceRepository resourceRepository,
                                 PatientReportingEvaluationStatusRepository patientStatusRepository,
                                 MeasureReportNormalizer measureReportNormalizer,
                                 Predicate<MeasureReport> reportabilityPredicate,
@@ -77,7 +77,7 @@ public class EvaluationRequestedConsumer {
         var patientReportStatus = patientReportingEvaluationStatusTemplateRepository.getFirstByFacilityIdAndPatientIdAndReports_ReportTrackingId(facilityId, record.value().getPatientId(), record.value().getPreviousReportId());
 
         if (patientReportStatus != null) {
-            var bundle = patientStatusBundler.createBundle(patientReportStatus);
+            var bundle = patientStatusBundler.createBundle(facilityId, patientReportStatus.getCorrelationId());
             evaluateMeasures(reportTrackingId, correlationId, record.value(), patientReportStatus, bundle);
         } else {
             logger.warn("Patient status not found for facilityId: {}, patientId: {}, reportTrackingId: {}. EvaluationRequested event not fully processed.", facilityId, record.value().getPatientId(), record.value().getPreviousReportId());
@@ -100,7 +100,6 @@ public class EvaluationRequestedConsumer {
         newPatientStatus.setCorrelationId(correlationId);
         newPatientStatus.setReportableEvent(ReportableEvent.ADHOC.name());
         newPatientStatus.setReports(reports);
-        newPatientStatus.setResources(patientStatus.getResources());
         patientStatusRepository.insert(newPatientStatus);
 
         reports.forEach(r -> {
