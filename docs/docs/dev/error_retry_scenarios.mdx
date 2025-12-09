@@ -6,22 +6,10 @@ This document outlines the error retry and dead-letter handling strategies for s
 
 ## Tenant Service
 
-### ReportScheduled Message
+The Tenant service is responsible for producing the `ReportScheduled` Kafka message. It does not directly implement retry or dead-letter handling for this message. Instead, these actions are performed by downstream services that consume the message (such as Report, QueryDispatch, etc.).
 
-#### Retry Policy
-- **Retry Count:** Configurable (default: 3).
-- **Backoff Strategy:** Exponential backoff is used between retries.
-- **Error Types:** Retries are triggered for transient errors (e.g., network, broker unavailable). Non-retryable errors (e.g., validation errors) are sent directly to the DLQ.
-- **Configuration:** Retry settings are managed via `ConsumerSettings` in the service configuration (see `RetryDuration`, `DisableRetryConsumer`).
-
-#### Dead-letter Handling
-- **DLQ Usage:** If a message fails all retry attempts, it is sent to a dedicated dead-letter topic (`ReportScheduled-Error`).
-- **DLQ Message Content:** The original message, error details, and relevant headers (e.g., facilityId, correlationId) are included for troubleshooting.
-- **Monitoring:** DLQ topics should be monitored, and alerts generated for operational response.
-
-#### Implementation Notes
-- Retry and dead-letter logic is implemented using shared handlers (`TransientExceptionHandler`, `DeadLetterExceptionHandler`) and Quartz-based scheduled jobs for retrying failed messages.
-- Retry and DLQ topics follow the naming convention: `{TopicName}-Retry` and `{TopicName}-Error`.
-- All retry and dead-letter scenarios are consistent with the platform-wide pattern described in the [Retry Topics Architecture](../arch/retry_topics.mdx).
+- **Message Production:** Tenant produces the `ReportScheduled` event for downstream processing.
+- **Error Handling:** Retry and dead-letter logic for this message is managed by the consumer services, not by Tenant itself.
+- **See Also:** Refer to the relevant consumer service sections for details on how retry and dead-letter scenarios are handled for `ReportScheduled` and other messages.
 
 ---
