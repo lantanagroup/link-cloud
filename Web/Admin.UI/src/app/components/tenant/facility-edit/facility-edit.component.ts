@@ -100,7 +100,6 @@ export class FacilityEditComponent implements OnInit {
 
   @ViewChild(OperationsListComponent) operationsList!: OperationsListComponent;
 
-
   facilityId: string = '';
   facilityConfig!: IFacilityConfigModel;
   censusConfig!: ICensusConfiguration;
@@ -548,7 +547,7 @@ export class FacilityEditComponent implements OnInit {
     let dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
       width: '400px',
       data: {
-        message: `Are you sure you want to delete this operation?`
+        message: `Are you sure you want to delete this configuration?`
       }
     });
     dialogRef.afterClosed().subscribe(result => {
@@ -583,7 +582,7 @@ export class FacilityEditComponent implements OnInit {
     const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
       width: '400px',
       data: {
-        message: `Are you sure you want to delete this operation?`
+        message: `Are you sure you want to delete this configuration?`
       }
     });
     dialogRef.afterClosed().subscribe(result => {
@@ -603,6 +602,143 @@ export class FacilityEditComponent implements OnInit {
               error: () => {
                 this.showNoQueryDispatchConfigAlert = true;
                 this.queryDispatchConfig = {facilityId: this.facilityId, dispatchSchedules: []};
+              }
+            });
+          },
+          error: () => {
+            alert('Error deleting configuration');
+          }
+        });
+      }
+    });
+  }
+
+  onDeleteFhirQueryConfig(): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        message: `Are you sure you want to delete this configuration?`
+      }
+    });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.dataAcquisitionService.deleteFhirQueryConfiguration(this.dataAcqFhirQueryConfig.facilityId).subscribe({
+          next: () => {
+            this.dataAcquisitionService.getFhirQueryConfiguration(this.facilityId).subscribe({
+              next: (data: IDataAcquisitionQueryConfigModel | null) => {
+                if (data) {
+                  this.showNoDataAcqFhirQueryConfigAlert = false;
+                  this.dataAcqFhirQueryConfig = data;
+                } else {
+                  this.showNoDataAcqFhirQueryConfigAlert = true;
+                  this.dataAcqFhirQueryConfig = {fhirServerBaseUrl: "", timeZone: "", facilityId: this.facilityId};
+                }
+              },
+              error: () => {
+                this.showNoDataAcqFhirQueryConfigAlert = true;
+                this.dataAcqFhirQueryConfig = {fhirServerBaseUrl: "", timeZone: "", facilityId: this.facilityId};
+              }
+            });
+          },
+          error: () => {
+            alert('Error deleting configuration');
+          }
+        });
+      }
+    });
+  }
+
+  onDeleteFhirQueryListConfig(): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        message: `Are you sure you want to delete this configuration?`
+      }
+    });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.dataAcquisitionService.deleteFhirListConfiguration(this.dataAcqFhirListConfig.facilityId).subscribe({
+          next: () => {
+            this.dataAcquisitionService.getFhirListConfiguration(this.facilityId).subscribe({
+              complete(): void {
+              },
+              next: (data: IDataAcquisitionFhirListConfigModel | null) => {
+                if (data) {
+                  this.showNoDataAcqFhirListConfigAlert = false;
+                  this.dataAcqFhirListConfig = data;
+                } else {
+                  this.showNoDataAcqFhirListConfigAlert = true;
+                  this.dataAcqFhirListConfig = {
+                    ehrPatientLists: [],
+                    fhirBaseServerUrl: "",
+                    id: "",
+                    facilityId: this.facilityId
+                  };
+                }
+              },
+              error: () => {
+                this.showNoDataAcqFhirListConfigAlert = true;
+                this.dataAcqFhirListConfig = {
+                  ehrPatientLists: [],
+                  fhirBaseServerUrl: "",
+                  id: "",
+                  facilityId: this.facilityId
+                };
+              }
+            });
+          },
+          error: () => {
+            alert('Error deleting configuration');
+          }
+        });
+      }
+    });
+  }
+
+  onDeleteFhirQueryPlanConfig(): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        message: `Are you sure you want to delete this configuration?`
+      }
+    });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.dataAcquisitionService.deleteQueryPlanConfiguration(this.dataAcqQueryPlanConfig.facilityId, this.dataAcqQueryPlanConfig.type).subscribe({
+          next: () => {
+            this.dataAcquisitionService.getQueryPlanConfiguration(this.facilityId, this.dataAcqQueryPlanConfig.type).subscribe({
+              complete(): void {
+              },
+              next: (data: IQueryPlanModel | null) => {
+                if (data) {
+                  this.showNoDataAcqQueryPlanConfigAlert = false;
+                  this.dataAcqQueryPlanConfig = data;
+                } else {
+                  this.showNoDataAcqQueryPlanConfigAlert = true;
+                  this.dataAcqQueryPlanConfig = {
+                    ehrDescription: "",
+                    id: "",
+                    initialQueries: "",
+                    lookBack: "",
+                    planName: "",
+                    supplementalQueries: "",
+                    type: "Discharge",
+                    facilityId: this.facilityId
+                  };
+                }
+              },
+              error: () => {
+                this.showNoDataAcqQueryPlanConfigAlert = true;
+                this.dataAcqQueryPlanConfig = {
+                  ehrDescription: "",
+                  id: "",
+                  initialQueries: "",
+                  lookBack: "",
+                  planName: "",
+                  supplementalQueries: "",
+                  type: "Discharge",
+                  facilityId: this.facilityId
+                };
               }
             });
           },
