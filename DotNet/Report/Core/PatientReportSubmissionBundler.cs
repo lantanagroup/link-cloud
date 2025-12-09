@@ -171,7 +171,7 @@ namespace LantanaGroup.Link.Report.Core
             //TODO: Add missing entry check
 
             //The 'resourcesAdded' Dictionary will keep track of FHIR resource id's that have been added to the bundle to avoid adding duplicates across entries. The value of each dictionary entry will contain the associated FHIR types. It's a string List type in case there are different FHIR resources that share the same id. This is probably unlikely to happen, but is possible. 
-            Dictionary<string, List<string>> resourcesAdded = new Dictionary<string, List<string>>();
+            Dictionary<string, int> resourcesAdded = new Dictionary<string,int>();
 
             BlockBlobClient blockWriteBlobClient = _containerClient.GetBlockBlobClient("Patient_" + patientId + ".ndjson");
 
@@ -189,24 +189,16 @@ namespace LantanaGroup.Link.Report.Core
                         {
                             while (reader.Peek() >= 0)
                             {
-                                string[] resource_and_id = reader.ReadLine().Split("_");
+                                string resource_and_id = reader.ReadLine();
 
-                                if (resourcesAdded.ContainsKey(resource_and_id[1]) && resourcesAdded[resource_and_id[1]].Where(x => x == resource_and_id[0]).Any())
+                                if (resourcesAdded.ContainsKey(resource_and_id))
                                 {
                                     //Skip FHIR Resource line
                                     reader.Read();
                                     continue;
                                 }
 
-                                if (resourcesAdded.ContainsKey(resource_and_id[1]))
-                                {
-                                    resourcesAdded[resource_and_id[1]].Add(resource_and_id[0]);
-                                }
-                                else
-                                {
-                                    resourcesAdded.Add(resource_and_id[1], new List<string>() { resource_and_id[0] });
-                                }
-
+                                resourcesAdded.Add(resource_and_id, 1);
                                 writer.WriteLine(reader.ReadLine());
                             }
                         }
