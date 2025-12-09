@@ -81,7 +81,9 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task<ReportSchedule> AddAsync(ReportSchedule schedule, CancellationToken cancellationToken)
         {
-            return await _database.ReportScheduledRepository.AddAsync(schedule, cancellationToken);
+            var entity = await _database.ReportScheduledRepository.AddAsync(schedule, cancellationToken);
+            await _database.SaveChangesAsync();
+            return entity;
         }
 
         public async Task<PagedConfigModel<ScheduledReportListSummary>> GetScheduledReportSummaries(Expression<Func<ReportSchedule, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)

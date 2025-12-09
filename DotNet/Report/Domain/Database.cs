@@ -18,7 +18,7 @@ namespace LantanaGroup.Link.Report.Domain
         protected MongoDbContext DbContext { get; set; }
 
         public IEntityRepository<FhirResource> ResourceRepository { get; set; }
-        public IEntityRepository    <ReportSchedule> ReportScheduledRepository { get; set; }
+        public IEntityRepository<ReportSchedule> ReportScheduledRepository { get; set; }
         public IEntityRepository<PatientSubmissionEntry> SubmissionEntryRepository { get; set; }
         public IEntityRepository<ReportScheduleResourceMap> ReportScheduleResourceMapRepository { get; set; }
 
