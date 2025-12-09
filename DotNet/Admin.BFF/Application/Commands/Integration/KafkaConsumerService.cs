@@ -13,17 +13,17 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         private readonly ICacheService _cache;
 
 
-        public KafkaConsumerService(ICacheService cache, IServiceScopeFactory serviceScopeFactory, ILogger<KafkaConsumerService> logger)
+        public KafkaConsumerService(ICacheService cache, IServiceScopeFactory serviceScopeFactory,
+            ILogger<KafkaConsumerService> logger)
         {
-
             _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _cache = cache;
         }
 
-        public void StartConsumer(string groupId, string topic, string reportTrackingId, IConsumer<string, string> consumer, CancellationToken cancellationToken)
+        public void StartConsumer(string groupId, string topic, string reportTrackingId,
+            IConsumer<string, string> consumer, CancellationToken cancellationToken)
         {
-
             // get the cache
             using var scope = _serviceScopeFactory.CreateScope();
 
@@ -34,7 +34,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 {
                     while (!cancellationToken.IsCancellationRequested)
                     {
-
                         var consumeResult = consumer.Consume(cancellationToken);
 
                         // Extract headers
@@ -42,23 +41,26 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                         string traceId = string.Empty;
                         string errorMessage = null;
 
-                        if (consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var correlationHeader))
+                        if (consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id",
+                                out var correlationHeader))
                         {
-
                             correlationId = System.Text.Encoding.UTF8.GetString(correlationHeader);
 
                             // read the exceptions
-                            if (consumeResult.Message.Headers.TryGetLastBytes("X-Exception-Message", out var exceptionMessage))
+                            if (consumeResult.Message.Headers.TryGetLastBytes("X-Exception-Message",
+                                    out var exceptionMessage))
                             {
                                 errorMessage = System.Text.Encoding.UTF8.GetString(exceptionMessage);
                             }
 
-                            else if (consumeResult.Message.Headers.TryGetLastBytes("X-Retry-Exception-Message", out var retryExceptionMessage))
+                            else if (consumeResult.Message.Headers.TryGetLastBytes("X-Retry-Exception-Message",
+                                         out var retryExceptionMessage))
                             {
                                 errorMessage = System.Text.Encoding.UTF8.GetString(retryExceptionMessage);
                             }
 
-                            else if (consumeResult.Message.Headers.TryGetLastBytes("kafka_exception-message", out var kafkaErrorBytes))
+                            else if (consumeResult.Message.Headers.TryGetLastBytes("kafka_exception-message",
+                                         out var kafkaErrorBytes))
                             {
                                 errorMessage = System.Text.Encoding.UTF8.GetString(kafkaErrorBytes);
                             }
@@ -72,15 +74,18 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                                 string[] parts = traceParent.Split('-');
                                 if (parts.Length >= 2)
                                 {
-                                   traceId = parts[1];
+                                    traceId = parts[1];
                                 }
                             }
 
-                            if (!checkReportTrackingId(consumeResult.Message.Value, reportTrackingId) && !checkReportTrackingId(consumeResult.Message.Key, reportTrackingId))
+                            if (!checkReportTrackingId(consumeResult.Message.Value, reportTrackingId) &&
+                                !checkReportTrackingId(consumeResult.Message.Key, reportTrackingId))
                             {
                                 continue;
                             }
 
+                            string patientId = getPatientId(consumeResult.Message.Value);
+                            
                             // read the list from cache
                             var cacheKey = topic + KafkaConsumerManager.delimiter + reportTrackingId;
 
@@ -91,11 +96,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                             }
                             catch (Exception ex)
                             {
-                                _logger.LogError(ex, "Failed to retrieve correlation IDs from cache for key {key}", HtmlInputSanitizer.Sanitize(cacheKey));
+                                _logger.LogError(ex, "Failed to retrieve correlation IDs from cache for key {key}",
+                                    HtmlInputSanitizer.Sanitize(cacheKey));
                                 retrievedListJson = null;
                             }
 
-                            var retrievedList = string.IsNullOrEmpty(retrievedListJson) ? new List<CorrelationCacheEntry>() : JsonConvert.DeserializeObject<List<CorrelationCacheEntry>>(retrievedListJson);
+                            var retrievedList = string.IsNullOrEmpty(retrievedListJson)
+                                ? new List<CorrelationCacheEntry>()
+                                : JsonConvert.DeserializeObject<List<CorrelationCacheEntry>>(retrievedListJson);
 
                             // Add new entry if not present
                             var existingEntry = retrievedList.FirstOrDefault(x => x.CorrelationId == correlationId);
@@ -105,6 +113,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                                 retrievedList.Add(new CorrelationCacheEntry
                                 {
                                     CorrelationId = correlationId,
+                                    PatientId = patientId,
                                     ErrorMessage = !string.IsNullOrEmpty(errorMessage) ? errorMessage : null,
                                     TraceId = !string.IsNullOrEmpty(errorMessage) ? traceId : null
                                 });
@@ -121,16 +130,17 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
                             // Save updated list to Redis
                             _cache.Set(cacheKey, JsonConvert.SerializeObject(retrievedList), TimeSpan.FromMinutes(30));
-
                         }
-
                     }
                 }
                 catch (ConsumeException e)
                 {
                     if (e.ConsumerRecord != null)
                     {
-                        _logger.LogError(e, "Error occurred during consumption. Topic: {Topic}, Partition: {Partition}, Offset: {Offset}, Reason: {Reason}", e.ConsumerRecord.Topic, e.ConsumerRecord.Partition.Value, e.ConsumerRecord.Offset.Value, e.Error.Reason);
+                        _logger.LogError(e,
+                            "Error occurred during consumption. Topic: {Topic}, Partition: {Partition}, Offset: {Offset}, Reason: {Reason}",
+                            e.ConsumerRecord.Topic, e.ConsumerRecord.Partition.Value, e.ConsumerRecord.Offset.Value,
+                            e.Error.Reason);
                     }
                     else
                     {
@@ -152,11 +162,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             {
                 var jsonObject = JObject.Parse(input);
                 var allIds = jsonObject.Descendants()
-                            .OfType<JProperty>()
-                            .Where(p => p.Name.Equals("ReportTrackingId", StringComparison.OrdinalIgnoreCase)
-                                     || p.Name.Equals("ReportScheduleId", StringComparison.OrdinalIgnoreCase))
-                            .Select(p => p.Value.ToString())
-                            .ToList();
+                    .OfType<JProperty>()
+                    .Where(p => p.Name.Equals("ReportTrackingId", StringComparison.OrdinalIgnoreCase)
+                                || p.Name.Equals("ReportScheduleId", StringComparison.OrdinalIgnoreCase))
+                    .Select(p => p.Value.ToString())
+                    .ToList();
                 return allIds.Contains(reportTrackingId);
             }
             catch
@@ -164,15 +174,33 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 return false;
             }
         }
-    }
 
+        private string getPatientId(string input)
+        {
+            if (string.IsNullOrEmpty(input)) return null;
+
+            try
+            {
+                var jsonObject = JObject.Parse(input);
+                return jsonObject.Descendants()
+                    .OfType<JProperty>()
+                    .FirstOrDefault(p => p.Name.Equals("PatientId", StringComparison.OrdinalIgnoreCase))
+                    ?.Value.ToString();
+            }
+            catch (JsonException ex)
+             { 
+                 _logger.LogWarning(ex, "Failed to parse message body for PatientId"); 
+                 return null;
+             }
+        }
+    }
 }
 
 public class CorrelationCacheEntry
 {
     public string CorrelationId { get; set; }
+    
+    public string? PatientId { get; set; }
     public string ErrorMessage { get; set; }
     public string TraceId { get; set; }
 }
-
-

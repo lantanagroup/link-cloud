@@ -51,9 +51,9 @@ export class CensusConfigDialogComponent implements OnInit {
     this.formIsInvalid = formValidity;
   }
 
-  onSubmittedConfiguration(outcome: IEntityCreatedResponse) {
-    if (outcome.message.length > 0)  {
-      this.dialogRef.close(outcome.message);
+  onSubmittedConfiguration(outcome: any) {
+    if (outcome)  {
+      this.dialogRef.close(outcome);
     }
     else {
       this.snackBar.open(`Failed to create census configuration for the facility, see error for details.`, '', {
