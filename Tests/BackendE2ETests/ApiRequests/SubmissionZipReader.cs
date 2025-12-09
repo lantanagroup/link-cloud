@@ -52,7 +52,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
             _zipContents[entry.FullName] = content;
         }
     }
-
     public void SingleMeasureAdHocValidateFilesAppear()
     {
         var missingFiles = SingleMeasureExpectedFiles
@@ -97,9 +96,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
         }
         output.WriteLine("[PASS] No disallowed files were found in the ZIP archive.");
     }
-
-
-
     public void SingleMeasureAdHocValidateManifestContent()
     {
         const string manifestName = "manifest.ndjson";
@@ -167,106 +163,504 @@ public class SubmissionZipReader(ITestOutputHelper output)
     }
 
 
-
-
-
-
-
-
-
-
-    public void ValidateSpecificPatientFileContents(int timeoutSeconds = 10, int pollIntervalMs = 1000)
+    public void ValidatePatientFile_1()
     {
-        string fileName = "patient-x25sJU80vVa51mxJ6vSDcjbNC3BcdCQujJbXQwqdppFOO.ndjson";
+        const string fileName = "patient-CYUcGIlSrpJxCBMeEml30YSmE0Ea7loNBPVZfhCUkv7A3.ndjson";
 
-        var entry = _zipContents.Keys.FirstOrDefault(name => name.EndsWith(fileName, StringComparison.OrdinalIgnoreCase));
-        if (entry == null)
+        var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ServiceRequest"] = 20,
+            ["Observation"] = 11,
+            ["Medication"] = 2,
+            ["MedicationRequest"] = 2,
+            ["Condition"] = 2,
+            ["Encounter"] = 1,
+            ["Patient"] = 1,
+            ["Location"] = 1,
+            ["DiagnosticReport"] = 1,
+            ["Coverage"] = 1,
+            ["Procedure"] = 1,
+            ["OperationOutcome"] = 1,
+            ["MeasureReport"] = 1
+        };
+
+        var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["__TOTAL__"] = 43,
+            ["ServiceRequest"] = 20,
+            ["Observation"] = 11,
+            ["Medication"] = 2,
+            ["MedicationRequest"] = 2,
+            ["Condition"] = 2,
+            ["Encounter"] = 1,
+            ["Patient"] = 1,
+            ["Location"] = 1,
+            ["DiagnosticReport"] = 1,
+            ["Coverage"] = 1,
+            ["Procedure"] = 1
+        };
+
+        ValidateSinglePatientFile(
+            fileName,
+            expectedBundleCounts,
+            expectedEvalCounts);
+    }
+    public void ValidatePatientFile_2()
+    {
+        const string fileName = "patient-6tZ8Wt8maJdDFLvEsDcKmAaCAcSOxjr0mB8RjEi5Szw7H.ndjson";
+
+        var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Observation"] = 126,
+            ["ServiceRequest"] = 126,
+            ["MedicationRequest"] = 4,
+            ["Medication"] = 4,
+            ["Condition"] = 4,
+            ["Coverage"] = 2,
+            ["Encounter"] = 2,
+            ["Location"] = 2,
+            ["Patient"] = 1,
+            ["OperationOutcome"] = 1,
+            ["MeasureReport"] = 1
+        };
+
+        var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["__TOTAL__"] = 271,
+            ["Observation"] = 126,
+            ["ServiceRequest"] = 126,
+            ["MedicationRequest"] = 4,
+            ["Medication"] = 4,
+            ["Condition"] = 4,
+            ["Coverage"] = 2,
+            ["Encounter"] = 2,
+            ["Location"] = 2,
+            ["Patient"] = 1
+        };
+
+        ValidateSinglePatientFile(
+            fileName: fileName,
+            expectedBundleCounts: expectedBundleCounts,
+            expectedEvalCounts: expectedEvalCounts);
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    private void ValidateSinglePatientFile(
+        string fileName,
+        Dictionary<string, int> expectedBundleCounts,
+        Dictionary<string, int> expectedEvalCounts)
+    {
+        var excludedTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "OperationOutcome",
+            "MeasureReport"
+        };
+
+        // 1️⃣ Locate file in ZIP contents
+        var entryKey = _zipContents.Keys
+            .FirstOrDefault(name => name.EndsWith(fileName, StringComparison.OrdinalIgnoreCase));
+
+        if (entryKey == null)
             throw new Exception($"{fileName} is missing from the ZIP archive.");
 
-        var content = _zipContents[entry];
-        JObject json = null;
+        var content = _zipContents[entryKey];
+        if (string.IsNullOrWhiteSpace(content))
+            throw new Exception($"{fileName} is empty.");
 
-        var expectedResourceCounts = new Dictionary<string, int>
-            {
-                { "Encounter", 2 },
-                { "Observation", 23 },
-                { "Device", 1 },
-                { "MedicationRequest", 4 },
-                { "Procedure", 3 },
-                { "Condition", 4 },
-                { "Patient", 1 },
-                { "Coverage", 2 },
-                { "DiagnosticReport", 2 },
-                { "MeasureReport", 1 },
-                { "ServiceRequest", 116 },
-                { "Location", 2 },
-                {"Medication", 4 }
-            };
-        Dictionary<string, int> actualCounts = null;
-        DateTime startTime = DateTime.Now;
-        while ((DateTime.Now - startTime).TotalSeconds < timeoutSeconds)
+        // 2️⃣ Parse NDJSON to JsonElement list
+        var jsonOptions = new JsonSerializerOptions
         {
-            //the content is ndjson, so we need to split it into lines and parse each line as JSON
-            foreach (var line in content.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+            PropertyNameCaseInsensitive = true
+        };
+
+        var lines = content
+            .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => JsonSerializer.Deserialize<JsonElement>(line, jsonOptions))
+            .ToList();
+
+        if (lines.Count == 0)
+            throw new Exception($"{fileName} contained only whitespace.");
+
+        // 3️⃣ Build bundle counts and ID map
+        var bundleCounts = CountResourceTypes(lines);
+        var bundleIdsByType = BundleIdsByType(lines);
+
+        // 4️⃣ Parse MeasureReport.evaluatedResource
+        var (evalCounts, evalIdsByType, crossTypeRefs) =
+            ParseEvaluatedResource(lines, bundleIdsByType);
+
+        // 5️⃣ Validate bundle counts vs expectedBundleCounts
+        foreach (var kv in expectedBundleCounts)
+        {
+            var key = kv.Key;
+            var expected = kv.Value;
+            var actual = bundleCounts.TryGetValue(key, out var n) ? n : 0;
+
+            if (actual != expected)
             {
-                var lineJson = JObject.Parse(line);
-                var resourceType = (string)lineJson["resourceType"] ?? "null";
-                
-                if (actualCounts == null)
-                    actualCounts = new Dictionary<string, int>();
-                if (actualCounts.ContainsKey(resourceType))
-                    actualCounts[resourceType]++;
-                else
-                    actualCounts[resourceType] = 1;
+                var got = string.Join(", ",
+                    bundleCounts.OrderBy(x => x.Key)
+                                .Select(x => $"{x.Key}={x.Value}"));
+                throw new Exception(
+                    $"{fileName} bundle resourceType count mismatch for '{key}': " +
+                    $"expected {expected}, got {actual}. All counts: [{got}]");
+            }
+        }
 
-                var entryCounts = lineJson["entry"]?
-                    .GroupBy(e => (string)e["resource"]?["resourceType"])
-                    .ToDictionary(g => g.Key ?? "null", g => g.Count()) ?? new Dictionary<string, int>();
+        // 6️⃣ Validate evaluatedResource counts (including __TOTAL__)
+        foreach (var kv in expectedEvalCounts)
+        {
+            var key = kv.Key;
+            var expected = kv.Value;
+            var actual = evalCounts.TryGetValue(key, out var n) ? n : 0;
 
-                foreach (var kvp in entryCounts)
+            if (actual != expected)
+            {
+                var foundPretty = string.Join(", ",
+                    evalCounts.Where(kv2 => !kv2.Key.Equals("__TOTAL__", StringComparison.OrdinalIgnoreCase))
+                              .OrderBy(kv2 => kv2.Key, StringComparer.OrdinalIgnoreCase)
+                              .Select(kv2 => $"{kv2.Key}={kv2.Value}"));
+
+                var totalFound = evalCounts.TryGetValue("__TOTAL__", out var t) ? t : 0;
+
+                throw new Exception(
+                    $"{fileName} evaluatedResource mismatch for '{key}': " +
+                    $"expected {expected}, got {actual}. Found total {totalFound}. " +
+                    $"Breakdown: [{foundPretty}]");
+            }
+        }
+
+        // 7️⃣ No unexpected evaluated types
+        var expectedEvalKeys = new HashSet<string>(expectedEvalCounts.Keys, StringComparer.OrdinalIgnoreCase);
+        foreach (var extraKey in evalCounts.Keys.Where(k => !expectedEvalKeys.Contains(k)))
+        {
+            throw new Exception(
+                $"{fileName} evaluatedResource contains unexpected type '{extraKey}'.");
+        }
+
+        // 8️⃣ Exclusions: should exist in bundle, but not in evaluatedResource
+        foreach (var exType in excludedTypes)
+        {
+            var bundleHas = bundleCounts.TryGetValue(exType, out var c) && c > 0;
+            var evalHas = evalCounts.TryGetValue(exType, out var c2) && c2 > 0;
+
+            if (!bundleHas)
+                throw new Exception(
+                    $"{fileName} missing required excluded type in bundle: '{exType}' " +
+                    "(should exist in bundle but be omitted from evaluatedResource).");
+
+            if (evalHas)
+                throw new Exception(
+                    $"{fileName} excluded type '{exType}' found in evaluatedResource " +
+                    "(should be omitted).");
+        }
+
+        // 9️⃣ Per-type count equality (excluding excludedTypes)
+        foreach (var kv in bundleCounts)
+        {
+            var type = kv.Key;
+            if (excludedTypes.Contains(type))
+                continue;
+
+            var bundleCount = kv.Value;
+            var evalCount = evalCounts.TryGetValue(type, out var n) ? n : 0;
+
+            if (bundleCount != evalCount)
+            {
+                throw new Exception(
+                    $"{fileName} count mismatch for '{type}': " +
+                    $"bundle={bundleCount}, evaluatedResource={evalCount}.");
+            }
+        }
+
+        // 🔟 ID set equality (excluding excludedTypes)
+        foreach (var kv in bundleIdsByType)
+        {
+            var type = kv.Key;
+            if (excludedTypes.Contains(type))
+                continue;
+
+            var expectedIds = kv.Value;
+            var foundIds = evalIdsByType.TryGetValue(type, out var s)
+                ? s
+                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var missing = expectedIds.Where(id => !foundIds.Contains(id))
+                                     .OrderBy(x => x)
+                                     .ToArray();
+            var extra = foundIds.Where(id => !expectedIds.Contains(id))
+                                .OrderBy(x => x)
+                                .ToArray();
+
+            if (missing.Length > 0)
+            {
+                throw new Exception(
+                    $"{fileName} evaluatedResource missing {type} IDs: " +
+                    $"[{string.Join(", ", missing)}]");
+            }
+
+            if (extra.Length > 0)
+            {
+                throw new Exception(
+                    $"{fileName} evaluatedResource has unexpected {type} IDs: " +
+                    $"[{string.Join(", ", extra)}]");
+            }
+        }
+
+        // 1️⃣1️⃣ Cross-type guard
+        if (crossTypeRefs.Count > 0)
+        {
+            var details = string.Join("; ",
+                crossTypeRefs.Select(x =>
+                    $"ref={x.EvaluatedType}/{x.Id} but bundle type={x.ActualType}"));
+
+            throw new Exception(
+                $"{fileName} evaluatedResource contains cross-type references: {details}");
+        }
+
+        // 1️⃣2️⃣ Success log
+        var bundleSummary = string.Join(", ",
+            expectedBundleCounts.OrderBy(k => k.Key)
+                                .Select(kv => $"{kv.Key}={kv.Value}"));
+
+        var evalSummary = string.Join(", ",
+            expectedEvalCounts
+                .Where(kv => !kv.Key.Equals("__TOTAL__", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(kv => $"{kv.Key}={kv.Value}"));
+
+        var totalEval = expectedEvalCounts["__TOTAL__"];
+
+        output.WriteLine(
+            $"[PASS] {fileName} :: bundle OK [{bundleSummary}] | " +
+            $"evaluatedResource OK (total={totalEval}) [{evalSummary}]");
+    }
+    private static Dictionary<string, int> CountResourceTypes(IEnumerable<JsonElement> lines)
+    {
+        var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var el in lines)
+        {
+            if (el.TryGetProperty("resourceType", out var rt) &&
+                rt.ValueKind == JsonValueKind.String)
+            {
+                var key = rt.GetString() ?? string.Empty;
+                if (key.Length == 0) continue;
+
+                counts[key] = counts.TryGetValue(key, out var current)
+                    ? current + 1
+                    : 1;
+            }
+        }
+
+        return counts;
+    }
+    private static Dictionary<string, HashSet<string>> BundleIdsByType(IEnumerable<JsonElement> lines)
+    {
+        var map = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var el in lines)
+        {
+            if (!el.TryGetProperty("resourceType", out var rt) ||
+                rt.ValueKind != JsonValueKind.String)
+                continue;
+
+            if (!el.TryGetProperty("id", out var id) ||
+                id.ValueKind != JsonValueKind.String)
+                continue;
+
+            var type = rt.GetString() ?? string.Empty;
+            var rid = id.GetString() ?? string.Empty;
+            if (type.Length == 0 || rid.Length == 0)
+                continue;
+
+            if (!map.TryGetValue(type, out var set))
+            {
+                set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                map[type] = set;
+            }
+
+            set.Add(rid);
+        }
+
+        return map;
+    }
+
+    private static (Dictionary<string, int> counts,
+                    Dictionary<string, HashSet<string>> idsByType,
+                    List<(string EvaluatedType, string Id, string ActualType)> crossType)
+        ParseEvaluatedResource(
+            IEnumerable<JsonElement> lines,
+            Dictionary<string, HashSet<string>> bundleIdsByType)
+    {
+        var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var idsByType = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        var crossType = new List<(string EvaluatedType, string Id, string ActualType)>();
+        var total = 0;
+
+        // id → actual bundle type
+        var idToType = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var kv in bundleIdsByType)
+        {
+            foreach (var id in kv.Value)
+                idToType[id] = kv.Key;
+        }
+
+        foreach (var el in lines)
+        {
+            if (!el.TryGetProperty("resourceType", out var rt) ||
+                rt.ValueKind != JsonValueKind.String)
+                continue;
+
+            if (!string.Equals(rt.GetString(), "MeasureReport", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (!el.TryGetProperty("evaluatedResource", out var eval) ||
+                eval.ValueKind != JsonValueKind.Array)
+                continue;
+
+            foreach (var item in eval.EnumerateArray())
+            {
+                if (!item.TryGetProperty("reference", out var r) ||
+                    r.ValueKind != JsonValueKind.String)
+                    continue;
+
+                var reference = r.GetString() ?? string.Empty;
+                var slash = reference.IndexOf('/');
+                if (slash <= 0)
+                    continue;
+
+                var type = reference.Substring(0, slash).Trim();
+                var id = reference[(slash + 1)..].Trim();
+                if (type.Length == 0 || id.Length == 0)
+                    continue;
+
+                total++;
+                counts[type] = counts.TryGetValue(type, out var n) ? n + 1 : 1;
+
+                if (!idsByType.TryGetValue(type, out var set))
                 {
-                    if (actualCounts.ContainsKey(kvp.Key))
-                        actualCounts[kvp.Key] += kvp.Value;
+                    set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    idsByType[type] = set;
+                }
+                set.Add(id);
+
+                if (idToType.TryGetValue(id, out var actualType) &&
+                    !actualType.Equals(type, StringComparison.OrdinalIgnoreCase))
+                {
+                    crossType.Add((type, id, actualType));
+                }
+            }
+        }
+
+        counts["__TOTAL__"] = total;
+        return (counts, idsByType, crossType);
+    }
+    public void ValidateSpecificPatientFileContents(int timeoutSeconds = 10, int pollIntervalMs = 1000)
+        {
+            string fileName = "patient-x25sJU80vVa51mxJ6vSDcjbNC3BcdCQujJbXQwqdppFOO.ndjson";
+
+            var entry = _zipContents.Keys.FirstOrDefault(name => name.EndsWith(fileName, StringComparison.OrdinalIgnoreCase));
+            if (entry == null)
+                throw new Exception($"{fileName} is missing from the ZIP archive.");
+
+            var content = _zipContents[entry];
+            JObject json = null;
+
+            var expectedResourceCounts = new Dictionary<string, int>
+                {
+                    { "Encounter", 2 },
+                    { "Observation", 23 },
+                    { "Device", 1 },
+                    { "MedicationRequest", 4 },
+                    { "Procedure", 3 },
+                    { "Condition", 4 },
+                    { "Patient", 1 },
+                    { "Coverage", 2 },
+                    { "DiagnosticReport", 2 },
+                    { "MeasureReport", 1 },
+                    { "ServiceRequest", 116 },
+                    { "Location", 2 },
+                    {"Medication", 4 }
+                };
+            Dictionary<string, int> actualCounts = null;
+            DateTime startTime = DateTime.Now;
+            while ((DateTime.Now - startTime).TotalSeconds < timeoutSeconds)
+            {
+                //the content is ndjson, so we need to split it into lines and parse each line as JSON
+                foreach (var line in content.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var lineJson = JObject.Parse(line);
+                    var resourceType = (string)lineJson["resourceType"] ?? "null";
+                
+                    if (actualCounts == null)
+                        actualCounts = new Dictionary<string, int>();
+                    if (actualCounts.ContainsKey(resourceType))
+                        actualCounts[resourceType]++;
                     else
-                        actualCounts[kvp.Key] = kvp.Value;
+                        actualCounts[resourceType] = 1;
+
+                    var entryCounts = lineJson["entry"]?
+                        .GroupBy(e => (string)e["resource"]?["resourceType"])
+                        .ToDictionary(g => g.Key ?? "null", g => g.Count()) ?? new Dictionary<string, int>();
+
+                    foreach (var kvp in entryCounts)
+                    {
+                        if (actualCounts.ContainsKey(kvp.Key))
+                            actualCounts[kvp.Key] += kvp.Value;
+                        else
+                            actualCounts[kvp.Key] = kvp.Value;
+                    }
+                }
+
+                if (expectedResourceCounts.All(kvp =>
+                    actualCounts.TryGetValue(kvp.Key, out int actual) && actual >= kvp.Value))
+                {
+                    break;
+                }
+                Thread.Sleep(pollIntervalMs);
+            }
+
+            if (actualCounts == null)
+                throw new Exception("Validation failed: Could not parse resourceType counts from JSON content.");
+            var mismatches = new List<string>();
+            var unexpected = new List<string>();
+
+            foreach (var expected in expectedResourceCounts)
+            {
+                actualCounts.TryGetValue(expected.Key, out int actualCount);
+                if (actualCount != expected.Value)
+                {
+                    mismatches.Add($"🔴 [ERROR] ResourceType '{expected.Key}': Expected {expected.Value}, Found {actualCount}");
                 }
             }
 
-            if (expectedResourceCounts.All(kvp =>
-                actualCounts.TryGetValue(kvp.Key, out int actual) && actual >= kvp.Value))
+            foreach (var actual in actualCounts.Keys)
             {
-                break;
+                if (!expectedResourceCounts.ContainsKey(actual))
+                {
+                    unexpected.Add($"[WARNING] Unexpected resourceType found: '{actual}' (Count: {actualCounts[actual]})");
+                }
             }
-            Thread.Sleep(pollIntervalMs);
+            foreach (var line in mismatches.Concat(unexpected))
+                output.WriteLine(line);
+            if (mismatches.Any())
+                throw new Exception("Validation failed: One or more expected resourceType counts are incorrect.");
+            output.WriteLine("[PASS] All expected resourceType counts match, and no unexpected types found.");
         }
-
-        if (actualCounts == null)
-            throw new Exception("Validation failed: Could not parse resourceType counts from JSON content.");
-        var mismatches = new List<string>();
-        var unexpected = new List<string>();
-
-        foreach (var expected in expectedResourceCounts)
-        {
-            actualCounts.TryGetValue(expected.Key, out int actualCount);
-            if (actualCount != expected.Value)
-            {
-                mismatches.Add($"🔴 [ERROR] ResourceType '{expected.Key}': Expected {expected.Value}, Found {actualCount}");
-            }
-        }
-
-        foreach (var actual in actualCounts.Keys)
-        {
-            if (!expectedResourceCounts.ContainsKey(actual))
-            {
-                unexpected.Add($"[WARNING] Unexpected resourceType found: '{actual}' (Count: {actualCounts[actual]})");
-            }
-        }
-        foreach (var line in mismatches.Concat(unexpected))
-            output.WriteLine(line);
-        if (mismatches.Any())
-            throw new Exception("Validation failed: One or more expected resourceType counts are incorrect.");
-        output.WriteLine("[PASS] All expected resourceType counts match, and no unexpected types found.");
-    }
     public void ValidateSingleMeasureAdHocAggregateACHMFile()
     {
         string fileName = "manifest.ndjson";
@@ -305,18 +699,20 @@ public class SubmissionZipReader(ITestOutputHelper output)
         output.WriteLine($"[PASS] aggregate-ACHM.json: 'count' == 8 and 'measure' version == '{SingleMeasureAdHocAchDqmVersion}'.");
     }
     public async Task WaitForSingleMeasureZipContentsAsync(
-        int timeoutInSeconds = 600,
-        int stableCycles = 60,
-        List<string>? requiredFiles = null,
-        int pollingIntervalMs = 3000)
-        {
+    int timeoutInSeconds = 600,
+    int stableCycles = 5,
+    int pollingIntervalMs = 3000)
+    {
         DateTime deadline = DateTime.UtcNow.AddSeconds(timeoutInSeconds);
         int attempt = 0;
         int stableCount = 0;
         HashSet<string>? previousNames = null;
         string? lastError = null;
 
-        output.WriteLine("[INFO] Waiting for ZIP contents to stabilize…");
+        // ✅ Always require the full expected set of files for this test
+        var requiredFiles = TestConfig.SingleMeasureExpectedFiles;
+
+        output.WriteLine("[INFO] Waiting for ZIP contents to stabilize and contain all expected files…");
 
         while (DateTime.UtcNow < deadline)
         {
@@ -324,31 +720,41 @@ public class SubmissionZipReader(ITestOutputHelper output)
             try
             {
                 await DownloadAndExtractSingleMeasureZipAsync();
+
                 var currentNames = _zipContents.Keys
-                                               .Where(n => n.EndsWith(".ndjson", StringComparison.OrdinalIgnoreCase))
-                                               .ToHashSet(StringComparer.OrdinalIgnoreCase);
-                if (requiredFiles != null &&
-                    !requiredFiles.All(req => currentNames.Any(n => n.EndsWith(req, StringComparison.OrdinalIgnoreCase))))
+                    .Where(n => n.EndsWith(".ndjson", StringComparison.OrdinalIgnoreCase))
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                // Do we have ALL expected files yet?
+                var haveAllRequired = requiredFiles.All(req =>
+                    currentNames.Any(n => n.EndsWith(req, StringComparison.OrdinalIgnoreCase)));
+
+                if (!haveAllRequired)
                 {
+                    // We don't even have the full set yet → reset stability
                     stableCount = 0;
                 }
                 else
                 {
+                    // We have all required files; now check stability of the set
                     if (previousNames != null && currentNames.SetEquals(previousNames))
+                    {
                         stableCount++;
+                    }
                     else
-                        stableCount = 0;
+                    {
+                        // First time we see "all required present" or set changed
+                        stableCount = 1;
+                    }
                 }
 
                 previousNames = currentNames;
-                lastError = null; 
+                lastError = null;
 
                 if (stableCount >= stableCycles)
                 {
-                    if (lastError != null)
-                        output.WriteLine($"[WARN] Last poll failure: {lastError}");
-
-                    output.WriteLine($"[INFO] ZIP contents stable after {attempt} poll(s). File count: {currentNames.Count}");
+                    output.WriteLine(
+                        $"[INFO] ZIP contents stable after {attempt} poll(s). File count: {currentNames.Count}");
                     return;
                 }
             }
@@ -364,11 +770,27 @@ public class SubmissionZipReader(ITestOutputHelper output)
         if (lastError != null)
             output.WriteLine($"[WARN] Last poll failure: {lastError}");
 
+        // Extra diagnostics on timeout: which files are still missing?
+        var finalNames = _zipContents.Keys
+            .Where(n => n.EndsWith(".ndjson", StringComparison.OrdinalIgnoreCase))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var missing = requiredFiles
+            .Where(req => !finalNames.Any(n => n.EndsWith(req, StringComparison.OrdinalIgnoreCase)))
+            .ToArray();
+
+        var foundList = finalNames.Count == 0
+            ? "<no ndjson entries>"
+            : string.Join(", ", finalNames);
+
+        var missingList = missing.Length == 0
+            ? "<none>"
+            : string.Join(", ", missing);
+
         throw new TimeoutException(
-            $"🔴 ZIP did not reach a stable state within {timeoutInSeconds}s after {attempt} poll(s).");
+            $"🔴 ZIP did not reach a stable state with all expected files within {timeoutInSeconds}s " +
+            $"after {attempt} poll(s). Missing: {missingList}. Found: {foundList}");
     }
-
-
     private static Dictionary<string, int> BuildResourceTypeCounts(IEnumerable<JsonElement> manifestLines)
     {
         var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -387,7 +809,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
 
         return counts;
     }
-
     private static void ValidateResourceTypeCounts(
         Dictionary<string, int> actualCounts,
         Dictionary<string, int> expectedCounts)
@@ -407,7 +828,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
             }
         }
     }
-
     private static void ValidateOperationOutcomeIssuesForPatients(
         List<JsonElement> manifestLines,
         IEnumerable<string> expectedPatientIds)
@@ -491,7 +911,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
                 $"Expected [{expectedList}], found [{actualList}].");
         }
     }
-
     private static void ValidateListSnapshotBlockForPatients(
         List<JsonElement> manifestLines,
         string status,
@@ -569,11 +988,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
                 $"Expected [{expectedList}], found [{actualList}].");
         }
     }
-
-
-
-
-
 
 }
 
