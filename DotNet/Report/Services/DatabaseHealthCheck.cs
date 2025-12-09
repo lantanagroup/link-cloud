@@ -7,9 +7,9 @@ namespace LantanaGroup.Link.Report.Services
 {
     public class DatabaseHealthCheck : IHealthCheck
     {
-        private readonly IBaseEntityRepository<ReportSchedule> _datastore;
+        private readonly IEntityRepository<ReportSchedule> _datastore;
 
-        public DatabaseHealthCheck(IBaseEntityRepository<ReportSchedule> datastore)
+        public DatabaseHealthCheck(IEntityRepository<ReportSchedule> datastore)
         {
             _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
         }
