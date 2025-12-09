@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Tests.E2ETests;
 using Newtonsoft.Json.Linq;
 using System.IO.Compression;
+using System.Text.Json;
 using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests;
@@ -11,6 +12,8 @@ public class SubmissionZipReader(ITestOutputHelper output)
     protected static readonly string fhirServerBaseUrl = TestConfig.InternalFhirServerBase;
     protected static readonly string SingleMeasureAdHocFacility = TestConfig.SingleMeasureAdHocFacility;
     protected static readonly string SingleMeasureAdHocAchDqmVersion = TestConfig.SingleMeasureAdHocAchDqmVersion;
+    protected static readonly string[] SingleMeasureExpectedFiles = TestConfig.SingleMeasureExpectedFiles;
+    protected static readonly string[] SingleMeasureExpectedPatientIDs = TestConfig.SingleMeasureExpectedPatientIds;
     private readonly HttpClient _client = new HttpClient();
     private readonly Dictionary<string, string> _zipContents = new();
     string AdHocReportGuid => TestConfig.TestContextStore.AdHocReportTrackingIdGuid;
@@ -52,19 +55,9 @@ public class SubmissionZipReader(ITestOutputHelper output)
 
     public void SingleMeasureAdHocValidateFilesAppear()
     {
-        var expectedFiles = new List<string>
-        {
-            "manifest.ndjson",
-            "patient-x25sJU80vVa51mxJ6vSDcjbNC3BcdCQujJbXQwqdppFOO.ndjson",
-            "patient-MVLkMLWErl3gQGRCuA2mygtVuix7PMBFBh9WVayaCL7xM.ndjson",
-            "patient-CYUcGIlSrpJxCBMeEml30YSmE0Ea7loNBPVZfhCUkv7A3.ndjson",
-            "patient-VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA.ndjson",
-            "patient-jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg.ndjson",
-            "patient-6tZ8Wt8maJdDFLvEsDcKmAaCAcSOxjr0mB8RjEi5Szw7H.ndjson"
-        };
-
-        var missingFiles = expectedFiles
-            .Where(expected => !_zipContents.Keys.Any(actual => actual.EndsWith(expected, StringComparison.OrdinalIgnoreCase)))
+        var missingFiles = SingleMeasureExpectedFiles
+            .Where(expected => !_zipContents.Keys.Any(actual =>
+                actual.EndsWith(expected, StringComparison.OrdinalIgnoreCase)))
             .ToList();
 
         if (missingFiles.Any())
@@ -75,6 +68,7 @@ public class SubmissionZipReader(ITestOutputHelper output)
             string fileList = string.Join(", ", missingFiles);
             throw new Exception($"Verification failed: {missingFiles.Count} file(s) missing: {fileList}");
         }
+
         output.WriteLine("[PASS] All expected files appear in the ZIP archive.");
     }
     public void SingleMeasureAdHocValidateFilesDoNotAppear()
@@ -103,6 +97,84 @@ public class SubmissionZipReader(ITestOutputHelper output)
         }
         output.WriteLine("[PASS] No disallowed files were found in the ZIP archive.");
     }
+
+
+
+    public void SingleMeasureAdHocValidateManifestContent()
+    {
+        const string manifestName = "manifest.ndjson";
+
+        // 1️⃣ Locate manifest.ndjson
+        var manifestEntry = _zipContents
+            .FirstOrDefault(kvp => kvp.Key.EndsWith("manifest.ndjson", StringComparison.OrdinalIgnoreCase));
+
+        if (manifestEntry.Key == null)
+            throw new Exception("manifest.ndjson not found in ZIP archive.");
+
+        var manifestText = manifestEntry.Value;
+
+        if (string.IsNullOrWhiteSpace(manifestText))
+            throw new Exception("manifest.ndjson is empty.");
+
+        // 2️⃣ Parse NDJSON content into JsonElements
+        var jsonOptions = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+        var manifestLines = manifestText
+            .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => JsonSerializer.Deserialize<JsonElement>(line, jsonOptions))
+            .ToList();
+
+        if (manifestLines.Count == 0)
+            throw new Exception("manifest.ndjson contained only whitespace.");
+
+        // 3️⃣ Build resourceType counts
+        var counts = BuildResourceTypeCounts(manifestLines);
+
+        // Optional but recommended: ensure we have the 5 resources we expect
+        var expectedCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Organization"] = 1,
+            ["Device"] = 1,
+            ["List"] = 1,
+            ["MeasureReport"] = 1,
+            ["OperationOutcome"] = 1
+        };
+
+        ValidateResourceTypeCounts(counts, expectedCounts);
+
+        // 4️⃣ Validate OperationOutcome issues (one issue per patient)
+        ValidateOperationOutcomeIssuesForPatients(
+            manifestLines,
+            SingleMeasureExpectedPatientIDs);
+
+        // 5️⃣ Validate List snapshot block
+        var expectedPatientRefs = SingleMeasureExpectedPatientIDs
+            .Select(id => $"Patient/{id}")
+            .ToArray();
+
+        ValidateListSnapshotBlockForPatients(
+            manifestLines,
+            status: "current",
+            mode: "snapshot",
+            expectedPatientRefs: expectedPatientRefs);
+
+        // 6️⃣ If we got this far, everything passed
+        var countsString = string.Join(", ", counts.Select(kv => $"{kv.Key}={kv.Value}"));
+        output.WriteLine($"[PASS] manifest.ndjson validation passed. ResourceType counts: {countsString}");
+    }
+
+
+
+
+
+
+
+
+
+
     public void ValidateSpecificPatientFileContents(int timeoutSeconds = 10, int pollIntervalMs = 1000)
     {
         string fileName = "patient-x25sJU80vVa51mxJ6vSDcjbNC3BcdCQujJbXQwqdppFOO.ndjson";
@@ -295,5 +367,213 @@ public class SubmissionZipReader(ITestOutputHelper output)
         throw new TimeoutException(
             $"🔴 ZIP did not reach a stable state within {timeoutInSeconds}s after {attempt} poll(s).");
     }
+
+
+    private static Dictionary<string, int> BuildResourceTypeCounts(IEnumerable<JsonElement> manifestLines)
+    {
+        var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var el in manifestLines)
+        {
+            if (el.TryGetProperty("resourceType", out var rt) &&
+                rt.ValueKind == JsonValueKind.String)
+            {
+                var key = rt.GetString() ?? string.Empty;
+                if (key.Length == 0) continue;
+
+                counts[key] = counts.TryGetValue(key, out var current) ? current + 1 : 1;
+            }
+        }
+
+        return counts;
+    }
+
+    private static void ValidateResourceTypeCounts(
+        Dictionary<string, int> actualCounts,
+        Dictionary<string, int> expectedCounts)
+    {
+        foreach (var kvp in expectedCounts)
+        {
+            var key = kvp.Key;
+            var expected = kvp.Value;
+            var actual = actualCounts.TryGetValue(key, out var n) ? n : 0;
+
+            if (actual != expected)
+            {
+                var actualSummary = string.Join(", ", actualCounts.Select(x => $"{x.Key}={x.Value}"));
+                throw new Exception(
+                    $"manifest.ndjson resourceType count mismatch for '{key}': " +
+                    $"expected {expected}, got {actual}. All counts: {actualSummary}");
+            }
+        }
+    }
+
+    private static void ValidateOperationOutcomeIssuesForPatients(
+        List<JsonElement> manifestLines,
+        IEnumerable<string> expectedPatientIds)
+    {
+        // Find the OperationOutcome resource
+        JsonElement operationOutcome = default;
+        var found = false;
+
+        foreach (var el in manifestLines)
+        {
+            if (el.TryGetProperty("resourceType", out var rt) &&
+                string.Equals(rt.GetString(), "OperationOutcome", StringComparison.OrdinalIgnoreCase))
+            {
+                operationOutcome = el;
+                found = true;
+                break;
+            }
+        }
+
+        if (!found)
+            throw new Exception("OperationOutcome resource not found in manifest.ndjson.");
+
+        if (!operationOutcome.TryGetProperty("issue", out var issuesElement) ||
+            issuesElement.ValueKind != JsonValueKind.Array)
+        {
+            throw new Exception("OperationOutcome.issue array missing or invalid in manifest.ndjson.");
+        }
+
+        var actualPatientIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var issue in issuesElement.EnumerateArray())
+        {
+            // Optional extra checks (severity, code)
+            if (issue.TryGetProperty("severity", out var severity) &&
+                severity.ValueKind == JsonValueKind.String &&
+                !string.Equals(severity.GetString(), "fatal", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new Exception($"OperationOutcome.issue.severity expected 'fatal' but found '{severity.GetString()}'.");
+            }
+
+            if (issue.TryGetProperty("code", out var code) &&
+                code.ValueKind == JsonValueKind.String &&
+                !string.Equals(code.GetString(), "invalid", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new Exception($"OperationOutcome.issue.code expected 'invalid' but found '{code.GetString()}'.");
+            }
+
+            if (!issue.TryGetProperty("diagnostics", out var diag) ||
+                diag.ValueKind != JsonValueKind.String)
+            {
+                throw new Exception("OperationOutcome.issue.diagnostics missing or not a string.");
+            }
+
+            var diagText = diag.GetString() ?? string.Empty;
+
+            // Your manifest uses: "Validation failed for patient {id}"
+            const string prefix = "Validation failed for patient ";
+            if (!diagText.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new Exception($"Unexpected OperationOutcome.issue.diagnostics format: '{diagText}'.");
+            }
+
+            var patientId = diagText.Substring(prefix.Length).Trim();
+            if (string.IsNullOrWhiteSpace(patientId))
+            {
+                throw new Exception($"Could not extract patient ID from diagnostics: '{diagText}'.");
+            }
+
+            actualPatientIds.Add(patientId);
+        }
+
+        var expectedSet = new HashSet<string>(expectedPatientIds, StringComparer.OrdinalIgnoreCase);
+
+        if (!expectedSet.SetEquals(actualPatientIds))
+        {
+            string expectedList = string.Join(", ", expectedSet);
+            string actualList = string.Join(", ", actualPatientIds);
+
+            throw new Exception(
+                $"OperationOutcome patient IDs mismatch. " +
+                $"Expected [{expectedList}], found [{actualList}].");
+        }
+    }
+
+    private static void ValidateListSnapshotBlockForPatients(
+        List<JsonElement> manifestLines,
+        string status,
+        string mode,
+        IEnumerable<string> expectedPatientRefs)
+    {
+        // Find the List resource
+        JsonElement listResource = default;
+        var found = false;
+
+        foreach (var el in manifestLines)
+        {
+            if (el.TryGetProperty("resourceType", out var rt) &&
+                string.Equals(rt.GetString(), "List", StringComparison.OrdinalIgnoreCase))
+            {
+                listResource = el;
+                found = true;
+                break;
+            }
+        }
+
+        if (!found)
+            throw new Exception("List resource not found in manifest.ndjson.");
+
+        if (!listResource.TryGetProperty("status", out var statusElement) ||
+            statusElement.ValueKind != JsonValueKind.String ||
+            !string.Equals(statusElement.GetString(), status, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new Exception($"List.status expected '{status}' but found '{statusElement.GetString()}'.");
+        }
+
+        if (!listResource.TryGetProperty("mode", out var modeElement) ||
+            modeElement.ValueKind != JsonValueKind.String ||
+            !string.Equals(modeElement.GetString(), mode, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new Exception($"List.mode expected '{mode}' but found '{modeElement.GetString()}'.");
+        }
+
+        if (!listResource.TryGetProperty("entry", out var entryElement) ||
+            entryElement.ValueKind != JsonValueKind.Array)
+        {
+            throw new Exception("List.entry array missing or invalid in manifest.ndjson.");
+        }
+
+        var actualRefs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var entry in entryElement.EnumerateArray())
+        {
+            if (!entry.TryGetProperty("item", out var itemElement) ||
+                itemElement.ValueKind != JsonValueKind.Object ||
+                !itemElement.TryGetProperty("reference", out var refElement) ||
+                refElement.ValueKind != JsonValueKind.String)
+            {
+                throw new Exception("List.entry.item.reference missing or invalid in manifest.ndjson.");
+            }
+
+            var reference = refElement.GetString() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(reference))
+            {
+                throw new Exception("List.entry.item.reference is empty or whitespace.");
+            }
+
+            actualRefs.Add(reference);
+        }
+
+        var expectedSet = new HashSet<string>(expectedPatientRefs, StringComparer.OrdinalIgnoreCase);
+
+        if (!expectedSet.SetEquals(actualRefs))
+        {
+            string expectedList = string.Join(", ", expectedSet);
+            string actualList = string.Join(", ", actualRefs);
+
+            throw new Exception(
+                $"List.entry.item.reference mismatch. " +
+                $"Expected [{expectedList}], found [{actualList}].");
+        }
+    }
+
+
+
+
+
+
 }
 

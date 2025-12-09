@@ -29,6 +29,23 @@ public static class TestConfig
         public static readonly string TimeZone = "America/New_York"; // Default time zone, can be overridden in tests
     }
 
+    public static readonly string[] SingleMeasureExpectedFiles =
+    {
+        "manifest.ndjson",
+        "patient-x25sJU80vVa51mxJ6vSDcjbNC3BcdCQujJbXQwqdppFOO.ndjson",
+        "patient-MVLkMLWErl3gQGRCuA2mygtVuix7PMBFBh9WVayaCL7xM.ndjson",
+        "patient-CYUcGIlSrpJxCBMeEml30YSmE0Ea7loNBPVZfhCUkv7A3.ndjson",
+        "patient-VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA.ndjson",
+        "patient-jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg.ndjson",
+        "patient-6tZ8Wt8maJdDFLvEsDcKmAaCAcSOxjr0mB8RjEi5Szw7H.ndjson"
+    };
+
+    public static readonly string[] SingleMeasureExpectedPatientIds =
+        SingleMeasureExpectedFiles
+            .Where(f => f.StartsWith("patient-", StringComparison.OrdinalIgnoreCase))
+            .Select(f => f.Substring("patient-".Length, f.Length - "patient-".Length - ".ndjson".Length))
+            .ToArray();
+
     public static string GetEmbeddedResourceContent(string resourceName)
     {
         var assembly = Assembly.GetExecutingAssembly();
