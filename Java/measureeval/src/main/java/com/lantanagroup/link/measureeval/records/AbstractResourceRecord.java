@@ -57,7 +57,7 @@ public abstract class AbstractResourceRecord {
         if (resource == null) {
             return null;
         }
-        return String.format("%s/%s", getResourceType(), getResourceId());
+        return resource.getIdElement().toUnqualifiedVersionless().getValue();
     }
 
     @Getter
