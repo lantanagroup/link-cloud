@@ -59,7 +59,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             ResourceEvaluatedProducer resourceEvaluatedProducer) {
         this.resourceRepository = resourceRepository;
         this.patientStatusRepository = patientStatusRepository;
-        patientStatusCache = new PassiveExpiringMap<>(1L, TimeUnit.MINUTES);
+        patientStatusCache = Collections.synchronizedMap(new PassiveExpiringMap<>(1L, TimeUnit.MINUTES));
         this.reportabilityPredicate = reportabilityPredicate;
         this.measureEvalMetrics = measureEvalMetrics;
         this.dataAcquisitionRequestedTemplate = dataAcquisitionRequestedTemplate;
