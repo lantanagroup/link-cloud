@@ -57,7 +57,7 @@ export class DataAcquisitionService {
       .pipe(
         tap(_ => console.log(`Request for FHIR query configuration deletion was sent.`)),
         catchError((error) => {
-          return this.errorHandler.handleError(error);
+          throw error;
         })
       )
   }
@@ -122,6 +122,16 @@ export class DataAcquisitionService {
       )
   }
 
+  deleteAllQueryPlanConfiguration(facilityId: string): Observable<IEntityDeletedResponse> {
+    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/QueryPlan/All`)
+      .pipe(
+        tap(_ => console.log(`Delete All Query Plan configuration.`)),
+        catchError((error) => {
+          throw error;
+        })
+      )
+  }
+
   createFhirListConfiguration(facilityId: string, fhirListConfig: IDataAcquisitionFhirListConfigModel): Observable<IEntityCreatedResponse> {
     return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/fhirQueryList`, fhirListConfig)
       .pipe(
@@ -154,7 +164,7 @@ export class DataAcquisitionService {
       .pipe(
         tap(_ => console.log(`Request for FHIR list configuration deletion was sent.`)),
         catchError((error) => {
-          return this.errorHandler.handleError(error);
+          throw error;
         })
       )
   }
