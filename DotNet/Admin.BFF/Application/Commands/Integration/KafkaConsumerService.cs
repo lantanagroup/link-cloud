@@ -21,7 +21,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             _cache = cache;
         }
 
-        public void StartConsumer(string groupId, string topic, string reportTrackingId,
+        public void StartConsumer(string groupId, List<string> topics, string reportTrackingId,
             IConsumer<string, string> consumer, CancellationToken cancellationToken)
         {
             // get the cache
@@ -29,7 +29,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
             using (consumer)
             {
-                consumer.Subscribe(topic);
+                consumer.Subscribe(topics);
                 try
                 {
                     while (!cancellationToken.IsCancellationRequested)
@@ -87,7 +87,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                             string patientId = getPatientId(consumeResult.Message.Value);
                             
                             // read the list from cache
-                            var cacheKey = topic + KafkaConsumerManager.delimiter + reportTrackingId;
+                            string topicName = consumeResult.Topic;
+                            var cacheKey = topicName + KafkaConsumerManager.delimiter + reportTrackingId;
 
                             string retrievedListJson;
                             try

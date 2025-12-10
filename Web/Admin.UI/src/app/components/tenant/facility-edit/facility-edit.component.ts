@@ -1,6 +1,6 @@
 import {Component, OnInit, Input, ViewChild} from '@angular/core';
 
-import {ActivatedRoute, Router, RouterLink} from '@angular/router';
+import {ActivatedRoute, RouterLink} from '@angular/router';
 import {TenantService} from 'src/app/services/gateway/tenant/tenant.service';
 import {IFacilityConfigModel} from 'src/app/interfaces/tenant/facility-config-model.interface';
 import {MatToolbarModule} from '@angular/material/toolbar';
@@ -16,6 +16,7 @@ import {MatTabsModule} from '@angular/material/tabs';
 import {CensusConfigDialogComponent} from '../../census/census-config-dialog/census-config-dialog.component';
 import {CensusService} from 'src/app/services/gateway/census/census.service';
 import {DataAcquisitionService} from 'src/app/services/gateway/data-acquisition/data-acquisition.service';
+import {OperationService} from 'src/app/services/gateway/normalization/operation.service';
 import {ICensusConfiguration} from 'src/app/interfaces/census/census-config-model.interface';
 import {CensusConfigFormComponent} from "../../census/census-config-form/census-config-form.component";
 import {LinkAlertComponent} from "../../core/link-alert/link-alert.component";
@@ -65,6 +66,7 @@ import {IQueryDispatchConfiguration} from "../../../interfaces/query-dispatch/qu
 import {
   DeleteConfirmationDialogComponent
 } from "../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
+import { concatMap } from 'rxjs';
 
 
 @Component({
@@ -147,6 +149,7 @@ export class FacilityEditComponent implements OnInit {
     private censusService: CensusService,
     private dataAcquisitionService: DataAcquisitionService,
     private queryDispatchService: QueryDispatchService,
+    private operationService: OperationService,
     private dialog: MatDialog,
     private snackBar: MatSnackBar) {
   }
@@ -571,7 +574,12 @@ export class FacilityEditComponent implements OnInit {
             });
           },
           error: () => {
-            alert('Error deleting configuration');
+            this.snackBar.open('Error deleting census configuration', 'Close', {
+                duration: 3500,
+                panelClass: 'error-snackbar',
+                horizontalPosition: 'end',
+                verticalPosition: 'top'
+            });
           }
         });
       }
@@ -606,7 +614,12 @@ export class FacilityEditComponent implements OnInit {
             });
           },
           error: () => {
-            alert('Error deleting configuration');
+            this.snackBar.open('Error deleting query dispatch configuration', 'Close', {
+              duration: 3500,
+              panelClass: 'error-snackbar',
+              horizontalPosition: 'end',
+              verticalPosition: 'top'
+            });
           }
         });
       }
@@ -641,7 +654,12 @@ export class FacilityEditComponent implements OnInit {
             });
           },
           error: () => {
-            alert('Error deleting configuration');
+            this.snackBar.open('Error deleting fhir query configuration', 'Close', {
+              duration: 3500,
+              panelClass: 'error-snackbar',
+              horizontalPosition: 'end',
+              verticalPosition: 'top'
+            });
           }
         });
       }
@@ -688,7 +706,12 @@ export class FacilityEditComponent implements OnInit {
             });
           },
           error: () => {
-            alert('Error deleting configuration');
+            this.snackBar.open('Error deleting fhir query list configuration', 'Close', {
+              duration: 3500,
+              panelClass: 'error-snackbar',
+              horizontalPosition: 'end',
+              verticalPosition: 'top'
+            });
           }
         });
       }
@@ -743,11 +766,17 @@ export class FacilityEditComponent implements OnInit {
             });
           },
           error: () => {
-            alert('Error deleting configuration');
+            this.snackBar.open('Error deleting fhir query plan configuration', 'Close', {
+              duration: 3500,
+              panelClass: 'error-snackbar',
+              horizontalPosition: 'end',
+              verticalPosition: 'top'
+            });
           }
         });
       }
     });
   }
+
 
 }

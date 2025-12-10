@@ -38,7 +38,7 @@
             <button mat-icon-button  aria-label="Edit facility" color="primary" class="mat-elevation-z2"  title="Edit facility" matTooltip="Edit Facility" [routerLink]="['/tenant/facility', facility.facilityId, 'edit']">
               <mat-icon>edit</mat-icon>
             </button>
-            <button mat-icon-button  aria-label="Delete facility" color="warn" class="mat-elevation-z2" title="Delete facility" matTooltip="Delete Facility" (click)="deleteTenant()">
+            <button mat-icon-button  aria-label="Delete facility" color="warn" class="mat-elevation-z2" title="Delete facility" matTooltip="Delete Facility" (click)="onDeleteFacility(facility.facilityId)">
               <mat-icon>delete</mat-icon>
             </button>
             <button mat-icon-button  aria-label="View facility" color="primary" class="mat-elevation-z2" title="View facility" matTooltip="View Facility" [routerLink]="['/tenant/facility', facility.facilityId]">
