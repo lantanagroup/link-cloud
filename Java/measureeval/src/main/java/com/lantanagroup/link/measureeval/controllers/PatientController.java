@@ -1,6 +1,6 @@
 package com.lantanagroup.link.measureeval.controllers;
 
-import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusTemplateRepository;
+import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.measureeval.services.PatientStatusBundler;
 import org.hl7.fhir.r4.model.Bundle;
 import org.springframework.http.HttpStatus;
@@ -15,22 +15,22 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/patient")
 @PreAuthorize("hasRole('LinkUser')")
 public class PatientController {
-    private final PatientReportingEvaluationStatusTemplateRepository patientReportingEvaluationStatusTemplateRepository;
+    private final PatientReportingEvaluationStatusRepository patientReportingEvaluationStatusRepository;
     private final PatientStatusBundler patientStatusBundler;
 
-    public PatientController(PatientReportingEvaluationStatusTemplateRepository patientReportingEvaluationStatusTemplateRepository, PatientStatusBundler patientStatusBundler) {
-        this.patientReportingEvaluationStatusTemplateRepository = patientReportingEvaluationStatusTemplateRepository;
+    public PatientController(PatientReportingEvaluationStatusRepository patientReportingEvaluationStatusRepository, PatientStatusBundler patientStatusBundler) {
+        this.patientReportingEvaluationStatusRepository = patientReportingEvaluationStatusRepository;
         this.patientStatusBundler = patientStatusBundler;
     }
 
     @GetMapping("/{facilityId}/{reportId}/{patientId}")
     public Bundle getPatientData(@PathVariable String facilityId, @PathVariable String reportId, @PathVariable String patientId) {
-        var patientReportStatus = patientReportingEvaluationStatusTemplateRepository.getFirstByFacilityIdAndPatientIdAndReports_ReportTrackingId(facilityId, patientId, reportId);
+        var patientReportStatus = patientReportingEvaluationStatusRepository.findByFacilityIdAndPatientIdAndReportsReportTrackingId(facilityId, patientId, reportId).orElse(null);
 
         if (patientReportStatus == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "facilityId, reportId, or patientId not found");
         }
 
-        return patientStatusBundler.createBundle(patientReportStatus);
+        return patientStatusBundler.createBundle(facilityId, patientReportStatus.getCorrelationId());
     }
 }

@@ -1,15 +1,13 @@
 package com.lantanagroup.link.measureeval.services;
 
-import com.lantanagroup.link.measureeval.entities.*;
-import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository;
+import com.lantanagroup.link.measureeval.entities.Resource;
+import com.lantanagroup.link.measureeval.repositories.ResourceRepository;
 import com.lantanagroup.link.shared.Timer;
 import org.hl7.fhir.r4.model.Bundle;
-import org.hl7.fhir.r4.model.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -17,54 +15,36 @@ public class PatientStatusBundler {
 
     private static final Logger logger = LoggerFactory.getLogger(PatientStatusBundler.class);
 
-    private final AbstractResourceRepository resourceRepository;
+    private final ResourceRepository resourceRepository;
 
-    public PatientStatusBundler(AbstractResourceRepository resourceRepository) {
+    public PatientStatusBundler(ResourceRepository resourceRepository) {
         this.resourceRepository = resourceRepository;
     }
 
-    public Bundle createBundle (PatientReportingEvaluationStatus patientStatus) {
+    public Bundle createBundle (String facilityId, String correlationId) {
         if (logger.isDebugEnabled()) {
             logger.debug("Creating bundle");
         }
         Bundle bundle = new Bundle();
         bundle.setType(Bundle.BundleType.COLLECTION);
-        retrieveResources(patientStatus).stream()
-                .map(AbstractResourceEntity::getResource)
-                .map(Resource.class::cast)
+        retrieveResources(facilityId, correlationId).stream()
+                .map(Resource::getResource)
+                .map(org.hl7.fhir.r4.model.Resource.class::cast)
                 .forEachOrdered(resource -> bundle.addEntry().setResource(resource));
-        bundle.setTotal(patientStatus.getResources().size());
+        bundle.setTotal(bundle.getEntry().size());
         return bundle;
     }
 
-    private List<AbstractResourceEntity> retrieveResources(PatientReportingEvaluationStatus patientStatus) {
+    private List<Resource> retrieveResources(String facilityId, String correlationId) {
         if (logger.isDebugEnabled()) {
             logger.debug("Retrieving resources");
         }
 
-        var sharedResourcesRefs = patientStatus.getResources().stream()
-                .filter(resource -> resource.getNormalizationStatus() == NormalizationStatus.NORMALIZED)
-                .filter(resource -> !resource.getIsPatientResource())
-                .toList();
-        var patientResourcesRefs = patientStatus.getResources().stream()
-                .filter(resource -> resource.getNormalizationStatus() == NormalizationStatus.NORMALIZED)
-                .filter(PatientReportingEvaluationStatus.Resource::getIsPatientResource)
-                .toList();
-
-        logger.debug("Collecting patient resources for patient {} and {} shared resources from the database", patientStatus.getPatientId(), sharedResourcesRefs.size());
-
         try (Timer timer = Timer.start()) {
-            var patientResources = resourceRepository.findResources(patientStatus.getFacilityId(), false, patientResourcesRefs);
-            var sharedResources = resourceRepository.findResources(patientStatus.getFacilityId(), true, sharedResourcesRefs);
+            var resources  = resourceRepository.findByFacilityIdAndCorrelationId(facilityId, correlationId);
 
-            logger.debug("Retrieved {} patient resources and {} shared resources from the database in {} seconds",
-                    patientResources.size(), sharedResources.size(), timer.getSeconds());
-
-            List<AbstractResourceEntity> resources = new ArrayList<>();
-            resources.addAll(patientResources);
-            resources.addAll(sharedResources);
-
-            logger.debug("Collected a total of {} resources from the database", resources.size());
+            logger.debug("Retrieved {} resources from the database in {} seconds",
+                    resources.size(), timer.getSeconds());
 
             return resources;
         }

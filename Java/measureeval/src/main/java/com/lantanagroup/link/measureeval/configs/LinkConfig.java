@@ -15,12 +15,6 @@ import java.util.function.Predicate;
 @ConfigurationProperties("link")
 public class LinkConfig {
     private String reportabilityPredicate;
-
-    /**
-     * The maximum number of threads to use to collect resources from the mongo database when bundling a patient's resources.
-     */
-    private Integer maxCollectResourcesThreads;
-
     private boolean cqlDebug = false;
 
     @Bean
