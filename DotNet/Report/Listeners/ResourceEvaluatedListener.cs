@@ -287,11 +287,6 @@ namespace LantanaGroup.Link.Report.Listeners
                         await resourceManager.CreateResourceAsync(key.FacilityId, entry.ReportScheduleId, entry.Id, [value.ReportType], resource,  value.PatientId, cancellationToken );
                     }
                 }
-
-                if (entry.MeasureReport != null)
-                {
-                    entry.Status = await entryQueries.PatientEntryReadyForValidation(schedule.Id, entry.Id, cancellationToken) ? PatientSubmissionStatus.ReadyForValidation : entry.Status;
-                }
             }
             else
             {
@@ -302,6 +297,11 @@ namespace LantanaGroup.Link.Report.Listeners
                 {
                     entry.MeasureReport = (MeasureReport)resource;
                 }
+            }
+
+            if (entry.Status != PatientSubmissionStatus.NotReportable && entry.MeasureReport != null)
+            {
+                entry.Status = await entryQueries.PatientEntryReadyForValidation(schedule.Id, entry.Id, cancellationToken) ? PatientSubmissionStatus.ReadyForValidation : entry.Status;
             }
 
             entry = await submissionEntryManager.UpdateAsync(new PatientSubmissionEntryUpdateModel
