@@ -19,7 +19,6 @@ public class MongoDbContext : DbContext
     {
         MongoDatabase = mongoDatabase;
         _logger = logger;
-        Database.AutoTransactionBehavior = AutoTransactionBehavior.Never;
     }
 
     public DbSet<ReportSchedule> ReportSchedules { get; set; } = null!;
