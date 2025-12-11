@@ -337,11 +337,6 @@ public class LogController : Controller
             return BadRequest("ID cannot be null or empty.");
         }
 
-        if (updateModel.Id is null)
-        {
-            
-        }
-
         if (ModelState.IsValid)
         {
             try
