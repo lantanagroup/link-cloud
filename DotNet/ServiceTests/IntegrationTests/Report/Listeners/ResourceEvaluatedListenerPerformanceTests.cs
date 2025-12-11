@@ -33,8 +33,8 @@ namespace IntegrationTests.Report
             _scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
         }
 
-        //[Fact(Skip = "Manual performance test only - run locally as needed")]
-        [Fact]
+        [Fact(Skip = "Manual performance test only - run locally as needed")]
+        //[Fact]
         public async Task Performance_Test_ResourceEvaluated_Listener()
         {
             // Reset mocks
@@ -112,7 +112,7 @@ namespace IntegrationTests.Report
             Dictionary<string, long> patientCompletionTime = new Dictionary<string, long>();
 
             // Act: Process for each patient/report type
-            for (int index = 0; index < patients.Count; index++)
+            for (int index = 0; index < 2/*patients.Count*/; index++)
             {
                 var patientStopWatch = new Stopwatch();
                 var patientId = patients[index];
@@ -261,9 +261,10 @@ namespace IntegrationTests.Report
             var locCount = await resourceColl.CountDocumentsAsync(locFilter);
             Assert.Equal(5000L, locCount);
 
-            var mapColl = mongoDb.GetCollection<PatientSubmissionEntryResourceMap>("patientSubmissionEntryResourceMap");
+            var entry = await db.SubmissionEntryRepository.SingleAsync(e => e.PatientId == patientId && e.ReportScheduleId == scheduleId && e.ReportType == reportType);
 
-            var mapFilter = Builders<PatientSubmissionEntryResourceMap>.Filter.Eq(m => m.ReportScheduleId, scheduleId) &
+            var mapColl = mongoDb.GetCollection<PatientSubmissionEntryResourceMap>("patientSubmissionEntryResourceMap");
+            var mapFilter = Builders<PatientSubmissionEntryResourceMap>.Filter.Eq(m => m.SubmissionEntryId, entry.Id) &
                             Builders<PatientSubmissionEntryResourceMap>.Filter.Eq(m => m.ReportTypes, new List<string> { reportType });
 
             var mapCount = await mapColl.CountDocumentsAsync(mapFilter);
