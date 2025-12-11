@@ -1,0 +1,136 @@
+---
+title: Kafka DeadLetter/Retry Scenarios
+summary: Guidance on using Kafka DeadLetter and Retry Scenarios within the Link platform
+---
+
+# Error Retry and Dead-letter Scenarios
+
+This document outlines the error retry and dead-letter handling strategies for services in the platform. Each service section details its approach to Kafka message processing failures, including retry logic and dead-letter queue (DLQ) handling.
+
+---
+
+## Tenant Service
+
+The Tenant service is responsible for producing the `ReportScheduled` Kafka message. It does not directly implement retry or dead-letter handling for this message. Instead, these actions are performed by downstream services that consume the message (such as Report, QueryDispatch, etc.).
+
+- **Message Production:** Tenant produces the `ReportScheduled` event for downstream processing.
+- **Error Handling:** Retry and dead-letter logic for this message is managed by the consumer services, not by Tenant itself.
+- **See Also:** Refer to the relevant consumer service sections for details on how retry and dead-letter scenarios are handled for `ReportScheduled` and other messages.
+
+---
+
+## Census Service
+
+The Census service interacts with several Kafka topics as both a producer and consumer. Below are the error retry and dead-letter handling strategies for each relevant topic.
+
+### PatientListsAcquired (Consumer)
+- **Consumption:** Census consumes `PatientListsAcquired` events to process patient lists for facilities.
+- **Retry:**
+  - If message processing fails with a transient error, the message is retried according to the configured retry policy (using the shared `TransientExceptionHandler`).
+  - **Exceptions triggering retry:** Any exception of type `TransientException` (e.g., temporary network issues, database timeouts, or other recoverable errors) will trigger the retry workflow.
+  - Retry topics follow the `{TopicName}-Retry` naming convention.
+- **Dead-letter:**
+  - If all retries fail or a non-retryable error occurs, the message is sent to the `PatientListsAcquired-Error` dead-letter topic (using the shared `DeadLetterExceptionHandler`).
+  - **Exceptions triggering dead-letter:** Any exception of type `DeadLetterException` (e.g., validation errors, unrecoverable business logic errors) or unhandled exceptions not marked as transient.
+  - DLQ topics follow the `{TopicName}-Error` naming convention.
+
+### PatientEvent (Producer)
+- **Production:** Census produces `PatientEvent` messages to signal patient-related events (admit, discharge, etc.).
+- **Retry:**
+  - If message production fails, the error is logged and will enter retry topic for production failures in Census itself.
+- **Dead-letter:**
+  - If retry fails after 5 attempts, the message will be deadlettered.
+
+### PatientCensusScheduled (Producer)
+- **Production:** Census produces `PatientCensusScheduled` messages to schedule census-related jobs.
+- **Retry:**
+  - Production errors are logged, but there is no built-in retry topic for production failures in Census.
+- **Dead-letter:**
+  - There is no built-in DLQ for production failures in Census. Downstream consumers handle dead-letter scenarios.
+
+---
+
+## Report Service
+
+The Report service consumes and produces several Kafka topics. Below are the error retry and dead-letter handling strategies for each relevant topic, based on the actual code implementation.
+
+### ReportScheduled (Consumer)
+- **Consumption:** Report consumes `ReportScheduled` events to schedule reports for facilities.
+- **Retry:**
+  - If message processing fails with a transient error (e.g., temporary network issues, database timeouts), the message is retried using the shared `TransientExceptionHandler`.
+  - **Exceptions triggering retry:** Any exception of type `TransientException` or general exceptions not explicitly marked as dead-letter.
+  - Retry topics follow the `ReportScheduled-Retry` naming convention.
+- **Dead-letter:**
+  - If a non-retryable error occurs (e.g., validation errors, duplicate report IDs), the message is sent to the `ReportScheduled-Error` dead-letter topic using the shared `DeadLetterExceptionHandler`.
+  - **Exceptions triggering dead-letter:** Any exception of type `DeadLetterException` or unhandled validation/business logic errors.
+  - DLQ topics follow the `ReportScheduled-Error` naming convention.
+
+### PatientListsAcquired (Consumer)
+- **Consumption:** Report consumes `PatientListsAcquired` events to update patient submission entries for scheduled reports.
+- **Retry:**
+  - Transient errors (e.g., missing scheduled reports, temporary DB issues) trigger the retry workflow via `TransientExceptionHandler`.
+  - Retry topics follow the `PatientListsAcquired-Retry` naming convention.
+- **Dead-letter:**
+  - Non-retryable errors (e.g., invalid patient list data) are sent to the `PatientListsAcquired-Error` dead-letter topic via `DeadLetterExceptionHandler`.
+  - DLQ topics follow the `PatientListsAcquired-Error` naming convention.
+
+### GenerateReportRequested (Consumer)
+- **Consumption:** Report consumes `GenerateReportRequested` events to generate or regenerate reports.
+- **Retry:**
+  - Transient errors (e.g., missing report schedule, temporary failures) trigger the retry workflow via `TransientExceptionHandler`.
+  - Retry topics follow the `GenerateReportRequested-Retry` naming convention.
+- **Dead-letter:**
+  - Non-retryable errors (e.g., invalid facility ID, missing required fields) are sent to the `GenerateReportRequested-Error` dead-letter topic via `DeadLetterExceptionHandler`.
+  - DLQ topics follow the `GenerateReportRequested-Error` naming convention.
+
+### PayloadSubmitted (Consumer)
+- **Consumption:** Report consumes `PayloadSubmitted` events to update submission status for reports and patients.
+- **Retry:**
+  - Transient errors (e.g., DB update failures, timeouts) trigger the retry workflow via `TransientExceptionHandler`.
+  - Retry topics follow the `PayloadSubmitted-Retry` naming convention.
+- **Dead-letter:**
+  - Non-retryable errors (e.g., invalid payload data) are sent to the `PayloadSubmitted-Error` dead-letter topic via `DeadLetterExceptionHandler`.
+  - DLQ topics follow the `PayloadSubmitted-Error` naming convention.
+
+### ResourceEvaluated (Consumer)
+- **Consumption:** Report consumes `ResourceEvaluated` events to process evaluated resources and update submission entries.
+- **Retry:**
+  - Transient errors (e.g., missing report schedule, deserialization issues, timeouts) trigger the retry workflow via `TransientExceptionHandler`.
+  - Retry topics follow the `ResourceEvaluated-Retry` naming convention.
+- **Dead-letter:**
+  - Non-retryable errors (e.g., missing correlation ID, invalid resource data) are sent to the `ResourceEvaluated-Error` dead-letter topic via `DeadLetterExceptionHandler`.
+  - DLQ topics follow the `ResourceEvaluated-Error` naming convention.
+
+### Producers
+
+The Report service produces several Kafka topics. Below are the error handling and dead-letter strategies for each relevant producer, based on the actual code implementation.
+
+- **DataAcquisitionRequested (Producer):**
+  - Produces `DataAcquisitionRequested` messages for each patient to trigger data acquisition.
+  - **Error Handling:**
+    - If message production fails (e.g., Kafka unavailable), an exception is thrown and logged. There is no built-in retry or DLQ for production failures; failures are surfaced to the caller and may be retried by the job or service logic.
+
+- **ReadyForValidation (Producer):**
+  - Produces `ReadyForValidation` messages when patient data is ready for validation.
+  - **Error Handling:**
+    - If message production fails, an exception is thrown and logged. There is no built-in retry or DLQ for production failures; failures are surfaced to the caller and may be retried by the job or service logic.
+
+- **SubmitPayload (Producer):**
+  - Produces `SubmitPayload` messages to signal that a report or patient payload is ready for submission.
+  - **Error Handling:**
+    - If message production fails, an exception is thrown and logged. There is no built-in retry or DLQ for production failures; failures are surfaced to the caller and may be retried by the job or service logic.
+
+- **ReportManifest (Producer):**
+  - Produces report manifest payloads and triggers `SubmitPayload` production.
+  - **Error Handling:**
+    - If manifest upload to blob storage fails, an audit event is produced and the failure is logged. If producing the `SubmitPayload` message fails, the error is surfaced as above.
+
+- **AuditableEventOccurred (Producer):**
+  - Produces audit event messages for operational and error tracking.
+  - **Error Handling:**
+    - If message production fails, the error is logged. There is no retry or DLQ for audit event production failures.
+
+**Note:**
+- The Report service does not implement Kafka-level retry or dead-letter topics for producer failures. All error handling for producers is at the application/service level, with errors logged and surfaced to the caller for possible retry by the job or workflow logic.
+
+---
