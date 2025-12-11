@@ -171,8 +171,6 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             existingLog.Status = updateLog.Status.Value;
         }
 
-        existingLog.ExecutionDate = updateLog.ExecutionDate ?? existingLog.ExecutionDate;
-
         existingLog.ModifyDate = DateTime.UtcNow;
 
         await _database.DataAcquisitionLogRepository.SaveChangesAsync(cancellationToken);

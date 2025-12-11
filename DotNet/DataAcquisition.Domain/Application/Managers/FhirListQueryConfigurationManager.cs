@@ -97,13 +97,13 @@ public class FhirListQueryConfigurationManager : IFhirListQueryConfigurationMana
         if(string.IsNullOrEmpty(model.FacilityId))
         {
             activity?.SetStatus(ActivityStatusCode.Error, "FacilityId cannot be null");
-            throw new ArgumentNullException(model.FacilityId);
+            throw new ArgumentNullException(nameof(model.FacilityId));
         }
 
         if (string.IsNullOrEmpty(model.FhirBaseServerUrl))
         {
             activity?.SetStatus(ActivityStatusCode.Error, "FhirBaseServerUrl cannot be null");
-            throw new ArgumentNullException(model.FhirBaseServerUrl);
+            throw new ArgumentNullException(nameof(model.FhirBaseServerUrl));
         }
 
         var entity = new FhirListConfiguration()
