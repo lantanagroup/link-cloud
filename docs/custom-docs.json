@@ -59,10 +59,6 @@
           "slug": "dev/auth_policies"
         },
         {
-          "label": "FHIR Resource Consumption",
-          "slug": "dev/fhir_resource_consumption"
-        },
-        {
           "label": "Logging & Error Handling",
           "slug": "dev/logging_error_handling"
         },
