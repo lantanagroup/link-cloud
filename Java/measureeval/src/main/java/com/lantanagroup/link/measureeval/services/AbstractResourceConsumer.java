@@ -127,8 +127,8 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                 logger.trace("Setting patient status patient ID: {}", value.getPatientId());
                 patientStatus.setPatientId(value.getPatientId());
 
-                taskStopWatch.start("savePatientStatus");
-                patientStatus = patientStatusRepository.save(patientStatus);
+                taskStopWatch.start("setPatientStatusPatientId");
+                patientStatus = patientStatusRepository.setPatientId(patientStatus);
                 taskStopWatch.stop();
 
                 patientStatusCache.put(correlationId, patientStatus);
@@ -177,7 +177,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
 
     private PatientReportingEvaluationStatus retrievePatientStatus (String facilityId, String correlationId) {
         logger.trace("Retrieving patient status from database");
-        return patientStatusRepository.findOne(facilityId, correlationId).orElse(null);
+        return patientStatusRepository.findByFacilityIdAndCorrelationId(facilityId, correlationId).orElse(null);
     }
 
     private PatientReportingEvaluationStatus createPatientStatus (String facilityId, String correlationId, T value) {
@@ -185,6 +185,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         PatientReportingEvaluationStatus patientStatus = new PatientReportingEvaluationStatus();
         patientStatus.setFacilityId(facilityId);
         patientStatus.setCorrelationId(correlationId);
+        patientStatus.setPatientId(value.getPatientId());
         patientStatus.setReportableEvent(value.getReportableEvent().toString());
         patientStatus.setReports(value.getScheduledReports().stream()
                 .flatMap(scheduledReport -> Arrays.stream(scheduledReport.getReportTypes())
@@ -198,7 +199,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                             return report;
                         })
                 ).collect(Collectors.toList()));
-        return patientStatus;
+        return patientStatusRepository.insert(patientStatus);
     }
 
     private void evaluateMeasures (T value, PatientReportingEvaluationStatus patientStatus, Bundle bundle) {

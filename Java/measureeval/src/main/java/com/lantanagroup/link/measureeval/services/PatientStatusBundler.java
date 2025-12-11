@@ -41,7 +41,7 @@ public class PatientStatusBundler {
         }
 
         try (Timer timer = Timer.start()) {
-            var resources  = resourceRepository.findAll(facilityId, correlationId);
+            var resources  = resourceRepository.findByFacilityIdAndCorrelationId(facilityId, correlationId);
 
             logger.debug("Retrieved {} resources from the database in {} seconds",
                     resources.size(), timer.getSeconds());
