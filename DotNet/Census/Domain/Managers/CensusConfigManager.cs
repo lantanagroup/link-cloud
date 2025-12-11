@@ -1,4 +1,6 @@
-﻿using Census.Domain.Entities;
+﻿using AngleSharp.Dom;
+using Census.Domain.Entities;
+using Confluent.Kafka;
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Exceptions;
@@ -46,6 +48,10 @@ public class CensusConfigManager : ICensusConfigManager
     public async Task DeleteCensusConfigByFacilityId(string facilityId, CancellationToken cancellationToken = default)
     {
         var existing = await _censusConfigRepository.SingleOrDefaultAsync(c => c.FacilityID == facilityId, cancellationToken);
+        if (existing == null)
+        {
+            return;
+        }
         await _censusConfigRepository.DeleteAsync(existing, cancellationToken);
     }
 

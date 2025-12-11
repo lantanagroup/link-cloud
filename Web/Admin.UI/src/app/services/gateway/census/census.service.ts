@@ -62,7 +62,9 @@ export class CensusService {
     return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/census/config/${facilityId}`)
       .pipe(
         tap(_ => console.log(`Request for configuration deletion was sent.`)),
-        catchError((error) => this.errorHandler.handleError(error))
+        catchError((error) => {
+          throw error;
+        })
       )
   }
 

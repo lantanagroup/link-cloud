@@ -342,6 +342,6 @@ public class QueryListControllerTests : IClassFixture<DataAcquisitionIntegration
         var result = await controller.DeleteFhirConfiguration("NonExisting", CancellationToken.None);
 
         // Assert
-        Assert.IsType<BadRequestObjectResult>(result);
+        Assert.IsType<NotFoundObjectResult>(result);
     }
 }

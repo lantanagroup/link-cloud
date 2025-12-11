@@ -1,6 +1,6 @@
 import {Component, OnInit, Input, ViewChild} from '@angular/core';
 
-import {ActivatedRoute, Router, RouterLink} from '@angular/router';
+import {ActivatedRoute, RouterLink} from '@angular/router';
 import {TenantService} from 'src/app/services/gateway/tenant/tenant.service';
 import {IFacilityConfigModel} from 'src/app/interfaces/tenant/facility-config-model.interface';
 import {MatToolbarModule} from '@angular/material/toolbar';
@@ -16,6 +16,7 @@ import {MatTabsModule} from '@angular/material/tabs';
 import {CensusConfigDialogComponent} from '../../census/census-config-dialog/census-config-dialog.component';
 import {CensusService} from 'src/app/services/gateway/census/census.service';
 import {DataAcquisitionService} from 'src/app/services/gateway/data-acquisition/data-acquisition.service';
+import {OperationService} from 'src/app/services/gateway/normalization/operation.service';
 import {ICensusConfiguration} from 'src/app/interfaces/census/census-config-model.interface';
 import {CensusConfigFormComponent} from "../../census/census-config-form/census-config-form.component";
 import {LinkAlertComponent} from "../../core/link-alert/link-alert.component";
@@ -62,6 +63,10 @@ import {
   QueryDispatchConfigFormComponent
 } from "../../query-dispatch/query-dispatch-config-form/query-dispatch-config-form.component";
 import {IQueryDispatchConfiguration} from "../../../interfaces/query-dispatch/query-dispatch-config-model.interface";
+import {
+  DeleteConfirmationDialogComponent
+} from "../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
+import { concatMap } from 'rxjs';
 
 
 @Component({
@@ -90,13 +95,12 @@ import {IQueryDispatchConfiguration} from "../../../interfaces/query-dispatch/qu
     MatMenuItem,
     MatTooltip,
     QueryDispatchConfigFormComponent
-]
+  ]
 })
 export class FacilityEditComponent implements OnInit {
   @ViewChild(MatAccordion) accordion!: MatAccordion;
 
   @ViewChild(OperationsListComponent) operationsList!: OperationsListComponent;
-
 
   facilityId: string = '';
   facilityConfig!: IFacilityConfigModel;
@@ -145,6 +149,7 @@ export class FacilityEditComponent implements OnInit {
     private censusService: CensusService,
     private dataAcquisitionService: DataAcquisitionService,
     private queryDispatchService: QueryDispatchService,
+    private operationService: OperationService,
     private dialog: MatDialog,
     private snackBar: MatSnackBar) {
   }
@@ -280,36 +285,35 @@ export class FacilityEditComponent implements OnInit {
   }
 
 
-
   loadQueryDispatchConfig(): void {
-   // if (!this.queryDispatchConfig) {
-      this.queryDispatchService.getConfiguration(this.facilityId).subscribe((data: IQueryDispatchConfiguration) => {
-        this.queryDispatchConfig = data;
-        this.showNoQueryDispatchConfigAlert = !this.queryDispatchConfig;
-      }, error => {
-        if (error.status == 404) {
-          this.snackBar.open(`No current query dispatch configuration found for facility ${this.facilityId}, please create one.`, '', {
-            duration: 3500,
-            panelClass: 'info-snackbar',
-            horizontalPosition: 'end',
-            verticalPosition: 'top'
-          });
-          this.queryDispatchConfig = {
-            facilityId: this.facilityConfig.facilityId,
-            dispatchSchedules : []
-          } as IQueryDispatchConfiguration;
-          this.showNoQueryDispatchConfigAlert = true;
-          this.showQueryDispatchDialog();
-        } else {
-          this.snackBar.open(`Failed to load query dispatch configuration for the facility, see error for details.`, '', {
-            duration: 3500,
-            panelClass: 'error-snackbar',
-            horizontalPosition: 'end',
-            verticalPosition: 'top'
-          });
-        }
-      });
-  //  }
+    // if (!this.queryDispatchConfig) {
+    this.queryDispatchService.getConfiguration(this.facilityId).subscribe((data: IQueryDispatchConfiguration) => {
+      this.queryDispatchConfig = data;
+      this.showNoQueryDispatchConfigAlert = !this.queryDispatchConfig;
+    }, error => {
+      if (error.status == 404) {
+        this.snackBar.open(`No current query dispatch configuration found for facility ${this.facilityId}, please create one.`, '', {
+          duration: 3500,
+          panelClass: 'info-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
+        this.queryDispatchConfig = {
+          facilityId: this.facilityConfig.facilityId,
+          dispatchSchedules: []
+        } as IQueryDispatchConfiguration;
+        this.showNoQueryDispatchConfigAlert = true;
+        this.showQueryDispatchDialog();
+      } else {
+        this.snackBar.open(`Failed to load query dispatch configuration for the facility, see error for details.`, '', {
+          duration: 3500,
+          panelClass: 'error-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
+      }
+    });
+    //  }
   }
 
   showDataAcqFhirQueryDialog(): void {
@@ -541,5 +545,238 @@ export class FacilityEditComponent implements OnInit {
     // Insert a space before each uppercase letter that is preceded by a lowercase letter or number
     return enumValue.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
   }
+
+  onDeleteCensusConfig(): void {
+    let dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        message: `Are you sure you want to delete this configuration?`
+      }
+    });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.censusService.deleteConfiguration(this.censusConfig.facilityId).subscribe({
+          next: () => {
+            this.censusService.getConfiguration(this.facilityId).subscribe({
+              next: (data: ICensusConfiguration | null) => {
+                if (data) {
+                  this.showNoCensusConfigAlert = false;
+                  this.censusConfig = data;
+                } else {
+                  this.showNoCensusConfigAlert = true;
+                  this.censusConfig = {facilityId: this.facilityId, scheduledTrigger: "", enabled: false};
+                }
+              },
+              error: () => {
+                this.showNoCensusConfigAlert = true;
+                this.censusConfig = {facilityId: this.facilityId, scheduledTrigger: "", enabled: false};
+              }
+            });
+          },
+          error: () => {
+            this.snackBar.open('Error deleting census configuration', 'Close', {
+                duration: 3500,
+                panelClass: 'error-snackbar',
+                horizontalPosition: 'end',
+                verticalPosition: 'top'
+            });
+          }
+        });
+      }
+    });
+  }
+
+  onDeleteQueryDispatchConfig(): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        message: `Are you sure you want to delete this configuration?`
+      }
+    });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.queryDispatchService.deleteConfiguration(this.queryDispatchConfig.facilityId).subscribe({
+          next: () => {
+            this.queryDispatchService.getConfiguration(this.facilityId).subscribe({
+              next: (data: IQueryDispatchConfiguration | null) => {
+                if (data) {
+                  this.showNoQueryDispatchConfigAlert = false;
+                  this.queryDispatchConfig = data;
+                } else {
+                  this.showNoQueryDispatchConfigAlert = true;
+                  this.queryDispatchConfig = {facilityId: this.facilityId, dispatchSchedules: []};
+                }
+              },
+              error: () => {
+                this.showNoQueryDispatchConfigAlert = true;
+                this.queryDispatchConfig = {facilityId: this.facilityId, dispatchSchedules: []};
+              }
+            });
+          },
+          error: () => {
+            this.snackBar.open('Error deleting query dispatch configuration', 'Close', {
+              duration: 3500,
+              panelClass: 'error-snackbar',
+              horizontalPosition: 'end',
+              verticalPosition: 'top'
+            });
+          }
+        });
+      }
+    });
+  }
+
+  onDeleteFhirQueryConfig(): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        message: `Are you sure you want to delete this configuration?`
+      }
+    });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.dataAcquisitionService.deleteFhirQueryConfiguration(this.dataAcqFhirQueryConfig.facilityId).subscribe({
+          next: () => {
+            this.dataAcquisitionService.getFhirQueryConfiguration(this.facilityId).subscribe({
+              next: (data: IDataAcquisitionQueryConfigModel | null) => {
+                if (data) {
+                  this.showNoDataAcqFhirQueryConfigAlert = false;
+                  this.dataAcqFhirQueryConfig = data;
+                } else {
+                  this.showNoDataAcqFhirQueryConfigAlert = true;
+                  this.dataAcqFhirQueryConfig = {fhirServerBaseUrl: "", timeZone: "", facilityId: this.facilityId};
+                }
+              },
+              error: () => {
+                this.showNoDataAcqFhirQueryConfigAlert = true;
+                this.dataAcqFhirQueryConfig = {fhirServerBaseUrl: "", timeZone: "", facilityId: this.facilityId};
+              }
+            });
+          },
+          error: () => {
+            this.snackBar.open('Error deleting fhir query configuration', 'Close', {
+              duration: 3500,
+              panelClass: 'error-snackbar',
+              horizontalPosition: 'end',
+              verticalPosition: 'top'
+            });
+          }
+        });
+      }
+    });
+  }
+
+  onDeleteFhirQueryListConfig(): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        message: `Are you sure you want to delete this configuration?`
+      }
+    });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.dataAcquisitionService.deleteFhirListConfiguration(this.dataAcqFhirListConfig.facilityId).subscribe({
+          next: () => {
+            this.dataAcquisitionService.getFhirListConfiguration(this.facilityId).subscribe({
+              complete(): void {
+              },
+              next: (data: IDataAcquisitionFhirListConfigModel | null) => {
+                if (data) {
+                  this.showNoDataAcqFhirListConfigAlert = false;
+                  this.dataAcqFhirListConfig = data;
+                } else {
+                  this.showNoDataAcqFhirListConfigAlert = true;
+                  this.dataAcqFhirListConfig = {
+                    ehrPatientLists: [],
+                    fhirBaseServerUrl: "",
+                    id: "",
+                    facilityId: this.facilityId
+                  };
+                }
+              },
+              error: () => {
+                this.showNoDataAcqFhirListConfigAlert = true;
+                this.dataAcqFhirListConfig = {
+                  ehrPatientLists: [],
+                  fhirBaseServerUrl: "",
+                  id: "",
+                  facilityId: this.facilityId
+                };
+              }
+            });
+          },
+          error: () => {
+            this.snackBar.open('Error deleting fhir query list configuration', 'Close', {
+              duration: 3500,
+              panelClass: 'error-snackbar',
+              horizontalPosition: 'end',
+              verticalPosition: 'top'
+            });
+          }
+        });
+      }
+    });
+  }
+
+  onDeleteFhirQueryPlanConfig(): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        message: `Are you sure you want to delete this configuration?`
+      }
+    });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.dataAcquisitionService.deleteQueryPlanConfiguration(this.dataAcqQueryPlanConfig.facilityId, this.dataAcqQueryPlanConfig.type).subscribe({
+          next: () => {
+            this.dataAcquisitionService.getQueryPlanConfiguration(this.facilityId, this.dataAcqQueryPlanConfig.type).subscribe({
+              complete(): void {
+              },
+              next: (data: IQueryPlanModel | null) => {
+                if (data) {
+                  this.showNoDataAcqQueryPlanConfigAlert = false;
+                  this.dataAcqQueryPlanConfig = data;
+                } else {
+                  this.showNoDataAcqQueryPlanConfigAlert = true;
+                  this.dataAcqQueryPlanConfig = {
+                    ehrDescription: "",
+                    id: "",
+                    initialQueries: "",
+                    lookBack: "",
+                    planName: "",
+                    supplementalQueries: "",
+                    type: "Discharge",
+                    facilityId: this.facilityId
+                  };
+                }
+              },
+              error: () => {
+                this.showNoDataAcqQueryPlanConfigAlert = true;
+                this.dataAcqQueryPlanConfig = {
+                  ehrDescription: "",
+                  id: "",
+                  initialQueries: "",
+                  lookBack: "",
+                  planName: "",
+                  supplementalQueries: "",
+                  type: "Discharge",
+                  facilityId: this.facilityId
+                };
+              }
+            });
+          },
+          error: () => {
+            this.snackBar.open('Error deleting fhir query plan configuration', 'Close', {
+              duration: 3500,
+              panelClass: 'error-snackbar',
+              horizontalPosition: 'end',
+              verticalPosition: 'top'
+            });
+          }
+        });
+      }
+    });
+  }
+
 
 }

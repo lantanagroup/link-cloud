@@ -16,3 +16,7 @@ $primary: #398eb4;
   margin-right: 12px;
   color: #3f51b5;
 }
+
+button[color="warn"] {
+  color: #e53935; // Custom red
+}
