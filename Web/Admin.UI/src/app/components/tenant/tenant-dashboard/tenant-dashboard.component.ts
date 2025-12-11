@@ -13,6 +13,13 @@ import { FacilityConfigDialogComponent } from '../facility-config-dialog/facilit
 import { RouterLink } from '@angular/router';
 import { PaginationMetadata } from '../../../models/pagination-metadata.model';
 import {MatPaginatorModule, PageEvent} from "@angular/material/paginator";
+import {CensusService} from "../../../services/gateway/census/census.service";
+import {DataAcquisitionService} from "../../../services/gateway/data-acquisition/data-acquisition.service";
+import {QueryDispatchService} from "../../../services/gateway/query-dispatch/query-dispatch.service";
+import {OperationService} from "../../../services/gateway/normalization/operation.service";
+import {DeleteConfirmationDialogComponent} from "../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
+import { catchError, concatMap, take } from 'rxjs/operators';
+import {throwError, EMPTY, forkJoin, concat} from 'rxjs';
 
 @Component({
   selector: 'app-tenant-dashboard',
@@ -49,7 +56,10 @@ export class TenantDashboardComponent implements OnInit {
   sortBy: string = 'FacilityId';
   sortOrder: number = 0;
 
-  constructor(private tenantService: TenantService, private dialog: MatDialog, private snackBar: MatSnackBar) { }
+  constructor(private tenantService: TenantService,  private censusService: CensusService,
+              private dataAcquisitionService: DataAcquisitionService,
+              private queryDispatchService: QueryDispatchService,
+              private operationService: OperationService, private dialog: MatDialog, private snackBar: MatSnackBar) { }
 
   ngOnInit(): void {
     this.dataSource = new MatTableDataSource<IFacilityConfigModel>();
@@ -97,4 +107,53 @@ export class TenantDashboardComponent implements OnInit {
     this.getFacilities();
   }
 
+  onDeleteFacility(facilityId: string): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        message: 'Are you sure you want to delete this facility and all related configurations and operations?'
+      }
+    });
+
+    dialogRef.afterClosed().pipe(take(1)).subscribe(result => {
+      if (!result) return;
+
+      this.snackBar.open('Deleting facility, please wait...', 'Close');
+
+      // Helper to skip 404s
+      const safeDelete = (obs: any) =>
+        obs.pipe(
+          catchError(err => {
+            if (err.status === 404) {
+              console.warn('Resource not found, skipping');
+              return EMPTY;
+            }
+            else {
+              return throwError(() => err);
+            }
+          })
+        );
+
+      // Build sequential deletion sequence
+      concat(
+        safeDelete(this.dataAcquisitionService.deleteAllQueryPlanConfiguration(facilityId)),
+        safeDelete(this.dataAcquisitionService.deleteFhirListConfiguration(facilityId)),
+        safeDelete(this.dataAcquisitionService.deleteFhirQueryConfiguration(facilityId)),
+        safeDelete(this.censusService.deleteConfiguration(facilityId)),
+        safeDelete(this.queryDispatchService.deleteConfiguration(facilityId)),
+        safeDelete(this.operationService.deleteAllOperationsByFacility(facilityId)),
+        safeDelete(this.tenantService.deleteFacilityConfiguration(facilityId))
+      ).subscribe({
+        next: () => {},
+        complete: () => {
+          this.snackBar.open('Facility and all related configurations deleted successfully', 'Close', { duration: 3000 });
+          this.getFacilities();
+        },
+        error: (err) => {
+          console.error('Deletion failed', err);
+          this.snackBar.open('Failed to delete some configurations or operations', 'Close', { duration: 3000 });
+        }
+      });
+    });
+  }
 }
