@@ -16,6 +16,7 @@ public interface IQueryPlanManager
     Task<QueryPlanModel> AddAsync(CreateQueryPlanModel model, CancellationToken cancellationToken = default);
     Task<QueryPlanModel> UpdateAsync(UpdateQueryPlanModel model, CancellationToken cancellationToken = default);
     Task DeleteAsync(string facilityId, Frequency type, CancellationToken cancellationToken = default);
+    Task DeleteAllQueryPlansAsync(string facilityId, CancellationToken cancellationToken = default);
 }
 
 public class QueryPlanManager : IQueryPlanManager
@@ -103,6 +104,27 @@ public class QueryPlanManager : IQueryPlanManager
         else
         {
             throw new NotFoundException($"No Query Plan for FacilityId {facilityId} and Type {type} was found.");
+        }
+    }
+
+    public async Task DeleteAllQueryPlansAsync(string facilityId, CancellationToken cancellationToken = default)
+    {
+        // Get all query plans
+        var allPlans = await _database.QueryPlanRepository.GetAllAsync(cancellationToken);
+
+        // Filter by facilityId
+        var facilityPlans = allPlans.Where(q => q.FacilityId == facilityId).ToList();
+
+        // Remove each plan individually
+        foreach (var plan in facilityPlans)
+        {
+            _database.QueryPlanRepository.Remove(plan);
+        }
+
+        // Save changes once after all removals
+        if (facilityPlans.Any())
+        {
+            await _database.QueryPlanRepository.SaveChangesAsync(cancellationToken);
         }
     }
 
