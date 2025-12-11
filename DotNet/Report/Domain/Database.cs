@@ -8,7 +8,7 @@ namespace LantanaGroup.Link.Report.Domain
         IEntityRepository<FhirResource> ResourceRepository { get; set; }
         IEntityRepository<ReportSchedule> ReportScheduledRepository { get; set; }
         IEntityRepository<PatientSubmissionEntry> SubmissionEntryRepository { get; set; }
-        IEntityRepository<ReportScheduleResourceMap> ReportScheduleResourceMapRepository { get; set; }
+        IEntityRepository<PatientSubmissionEntryResourceMap> PatientSubmissionEntryResourceMapRepository { get; set; }
 
         Task SaveChangesAsync();
     }
@@ -20,20 +20,20 @@ namespace LantanaGroup.Link.Report.Domain
         public IEntityRepository<FhirResource> ResourceRepository { get; set; }
         public IEntityRepository<ReportSchedule> ReportScheduledRepository { get; set; }
         public IEntityRepository<PatientSubmissionEntry> SubmissionEntryRepository { get; set; }
-        public IEntityRepository<ReportScheduleResourceMap> ReportScheduleResourceMapRepository { get; set; }
+        public IEntityRepository<PatientSubmissionEntryResourceMap> PatientSubmissionEntryResourceMapRepository { get; set; }
 
         public Database(MongoDbContext context,
             IEntityRepository<FhirResource> resourceRepository,
             IEntityRepository<ReportSchedule> reportScheduledRepository,
             IEntityRepository<PatientSubmissionEntry> submissionEntryRepository,
-            IEntityRepository<ReportScheduleResourceMap> reportScheduleResourceMapRepository)
+            IEntityRepository<PatientSubmissionEntryResourceMap> reportScheduleResourceMapRepository)
         {
             DbContext = context;
 
             ResourceRepository = resourceRepository;
             ReportScheduledRepository = reportScheduledRepository;
             SubmissionEntryRepository = submissionEntryRepository;
-            ReportScheduleResourceMapRepository = reportScheduleResourceMapRepository;
+            PatientSubmissionEntryResourceMapRepository = reportScheduleResourceMapRepository;
         }
 
         public async Task SaveChangesAsync()

@@ -15,7 +15,6 @@ using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Services.ResourceMerger.Strategies;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
@@ -30,7 +29,6 @@ using Moq;
 using Quartz;
 using Testcontainers.Azurite;
 using Testcontainers.MongoDb;
-using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report
 {
@@ -148,7 +146,7 @@ namespace IntegrationTests.Report
                     services.AddTransient<IEntityRepository<PatientSubmissionEntry>, EntityRepository<PatientSubmissionEntry, MongoDbContext>>();
                     services.AddTransient<IEntityRepository<ReportModel>, EntityRepository<ReportModel, MongoDbContext>>();
                     services.AddTransient<IEntityRepository<FhirResource>, EntityRepository<FhirResource, MongoDbContext>>();
-                    services.AddTransient<IEntityRepository<ReportScheduleResourceMap>, EntityRepository<ReportScheduleResourceMap, MongoDbContext>>();
+                    services.AddTransient<IEntityRepository<PatientSubmissionEntryResourceMap>, EntityRepository<PatientSubmissionEntryResourceMap, MongoDbContext>>();
                     services.AddTransient<IDatabase, Database>();
 
                     services.AddTransient<IReportScheduledManager, ReportScheduledManager>();

@@ -249,7 +249,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 resource.Id = Guid.NewGuid().ToString();
             }
 
-            var createdResource = await _resourceManager.CreateResourceAsync(entry.FacilityId, entry.ReportScheduleId, [entry.ReportType], resource, entry.PatientId, cancellationToken);
+            var createdResource = await _resourceManager.CreateResourceAsync(entry.FacilityId, entry.ReportScheduleId, entry.Id, [entry.ReportType], resource, entry.PatientId, cancellationToken);
 
             return entry;
         }

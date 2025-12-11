@@ -11,7 +11,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
     public interface IResourceManager
     {
         Task<FhirResource> UpdateResourceAsync(FhirResource resource, CancellationToken cancellationToken = default);
-        Task<FhirResource> CreateResourceAsync(string facilityId, string reportScheduleId, List<string> reportTypes, Resource resource, string patientId = "", CancellationToken cancellationToken = default);
+        Task<FhirResource> CreateResourceAsync(string facilityId, string reportScheduleId, string submissionEntryId, List<string> reportTypes, Resource resource, string? patientId = null, CancellationToken cancellationToken = default);
+        Task CreateSubmissionEntryResourceMap(string reportScheduleId, string submissionEntryId, List<string> reportTypes, string resourceType, string resourceId, string? fhirResourceId = null, bool performSave = true, CancellationToken cancellationToken = default);
     }
 
     public class ResourceManager : IResourceManager
@@ -34,7 +35,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return fhirResource;
         }
 
-        public async Task<FhirResource> CreateResourceAsync(string facilityId, string reportScheduleId, List<string> reportTypes, Resource resource, string patientId = "", CancellationToken cancellationToken = default)
+        public async Task<FhirResource> CreateResourceAsync(string facilityId, string reportScheduleId, string submissionEntryId, List<string> reportTypes, Resource resource, string? patientId = null, CancellationToken cancellationToken = default)
         {
             var resourceTypeCategory = ResourceCategory.GetResourceCategoryByType(resource.TypeName);
 
@@ -58,40 +59,47 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
             await _context.SaveChangesAsync(cancellationToken);
 
-            await CreateReportResourceMap(reportScheduleId, reportTypes, fhirResource.Id, cancellationToken);
+            await CreateSubmissionEntryResourceMap(reportScheduleId, submissionEntryId, reportTypes, fhirResource.ResourceType, fhirResource.ResourceId, fhirResource.Id, true, cancellationToken);
 
             return fhirResource;
         }
 
-        public async Task CreateReportResourceMap(string reportScheduleId, List<string> reportTypes, string fhirResourceId, CancellationToken cancellationToken = default)
+        public async Task CreateSubmissionEntryResourceMap(string reportScheduleId, string submissionEntryId, List<string> reportTypes, string resourceType, string resourceId, string? fhirResourceId = null, bool performSave = true, CancellationToken cancellationToken = default)
         {
-            var resourceMap = await _context.ReportScheduleResourceMaps.SingleOrDefaultAsync(r => r.ReportScheduleId == reportScheduleId && r.FhirResourceId == fhirResourceId);
+            var resourceMap = await _context.PatientEntryResourceMaps.SingleOrDefaultAsync(r => r.SubmissionEntryId == submissionEntryId && r.FhirResourceId == fhirResourceId);
 
             if (resourceMap == null)
             {
-                await _context.ReportScheduleResourceMaps.AddAsync(resourceMap = new ReportScheduleResourceMap
+                await _context.PatientEntryResourceMaps.AddAsync(resourceMap = new PatientSubmissionEntryResourceMap
                 {
-                    FhirResourceId = fhirResourceId,
+                    ResourceType = resourceType,
+                    ResourceId = resourceId,
                     ReportScheduleId = reportScheduleId,
+                    FhirResourceId = fhirResourceId,
+                    SubmissionEntryId = submissionEntryId,
                     ReportTypes = reportTypes,
                     CreateDate = DateTime.UtcNow,
                     ModifyDate = DateTime.UtcNow
                 });
-
-                await _context.SaveChangesAsync(cancellationToken);
-                return;
             }
-
-            foreach (var reportType in reportTypes) 
+            else
             {
-                if(!resourceMap.ReportTypes.Contains(reportType))
+                resourceMap.FhirResourceId = fhirResourceId;
+                resourceMap.ModifyDate = DateTime.UtcNow;
+
+                foreach (var reportType in reportTypes)
                 {
-                    resourceMap.ReportTypes.Add(reportType);
+                    if (!resourceMap.ReportTypes.Contains(reportType))
+                    {
+                        resourceMap.ReportTypes.Add(reportType);
+                    }
                 }
             }
 
-            await _context.SaveChangesAsync(cancellationToken);
-
+            if (performSave)
+            {
+                await _context.SaveChangesAsync(cancellationToken);
+            }
         }
     }
 }

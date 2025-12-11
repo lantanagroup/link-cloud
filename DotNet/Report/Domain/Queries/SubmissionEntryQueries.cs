@@ -1,8 +1,11 @@
 ﻿using Hl7.Fhir.Model;
+using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.EntityFrameworkCore;
+using System.Threading.Tasks;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Domain.Queries;
 
@@ -25,16 +28,19 @@ public interface ISubmissionEntryQueries
         string? patientEntryId = null,
         CancellationToken cancellationToken = default);
 
-    Task<(PatientSubmissionEntry?, FhirResource?)> GetPatientResourceData(string facilityId,
-        string reportScheduleId,
-        string patientId,
-        string reportType,
+    Task<(PatientSubmissionEntry?, FhirResource?)> GetPatientResourceData(
+        string facilityId, 
+        string reportScheduleId, 
+        string patientId, 
+        string reportType, 
+        string resourceType, 
         string resourceId, 
         CancellationToken cancellationToken = default);
 
-    Task<bool> ReportReadyForValidation(
+    Task<bool> PatientAllReadyForValidation(
         string facilityId,
         string reportScheduleId,
+        string patientId,
         CancellationToken cancellationToken = default);
 
     Task<PagedConfigModel<ResourceSummary>> GetResourceSummary(
@@ -44,7 +50,15 @@ public interface ISubmissionEntryQueries
         int pageSize,
         int pageNumber,
         CancellationToken cancellationToken = default);
-    Task<List<string>> GetMeasureReportResourceTypeList(string facilityId, string reportId, CancellationToken requestAborted);
+    Task<List<string>> GetMeasureReportResourceTypeList(
+        string facilityId, 
+        string reportId, 
+        CancellationToken requestAborted);
+
+    Task<bool> PatientEntryReadyForValidation(
+        string reportScheduleId, 
+        string entryId, 
+        CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -121,13 +135,14 @@ public class SubmissionEntryQueries : ISubmissionEntryQueries
     /// This avoids complex correlated subqueries or joins that may lead to client-side evaluation.
     /// </summary>
     public async Task<PatientReportData> GetPatientReportData(
-        string facilityId,
-        string reportScheduleId,
-        string patientId,
-        string? patientEntryId = null,
-        CancellationToken cancellationToken = default)
+    string facilityId,
+    string reportScheduleId,
+    string patientId,
+    string? patientEntryId = null,
+    CancellationToken cancellationToken = default)
     {
         var report = await _context.ReportSchedules
+            .AsNoTracking()
             .FirstOrDefaultAsync(r => r.Id == reportScheduleId && r.FacilityId == facilityId, cancellationToken);
 
         if (report == null)
@@ -136,26 +151,38 @@ public class SubmissionEntryQueries : ISubmissionEntryQueries
         }
 
         var entriesQuery = _context.PatientSubmissionEntries
+            .AsNoTracking()
             .Where(e => e.ReportScheduleId == reportScheduleId
                 && e.PatientId == patientId
                 && (patientEntryId == null || e.Id == patientEntryId)
                 && report.ReportTypes.Contains(e.ReportType));
 
         var entries = await entriesQuery.ToListAsync(cancellationToken);
+        var entryIds = entries.Select(e => e.Id).ToList();
 
         var groupedEntries = entries
             .GroupBy(e => e.ReportType)
             .ToDictionary(g => g.Key, g => g.ToList());
 
-        var resourceIds = await _context.ReportScheduleResourceMaps
-            .Where(m => m.ReportScheduleId == reportScheduleId)
+        var resourceIds = await _context.PatientEntryResourceMaps
+            .AsNoTracking()
+            .Where(m => entryIds.Contains(m.SubmissionEntryId))
             .Select(m => m.FhirResourceId)
             .Distinct()
             .ToListAsync(cancellationToken);
 
-        var resources = await _context.FhirResources
-            .Where(r => resourceIds.Contains(r.Id))
-            .ToListAsync(cancellationToken);
+        // Batch fetching of resources
+        const int batchSize = 1000;
+        var resourceBatches = resourceIds.Chunk(batchSize).ToList();
+        var resourceTasks = resourceBatches.Select(batch =>
+            _context.FhirResources
+                .AsNoTracking()
+                .Where(r => batch.Contains(r.Id))
+                .ToListAsync(cancellationToken)
+        );
+
+        var batchedResources = await Task.WhenAll(resourceTasks);
+        var resources = batchedResources.SelectMany(r => r).ToList();
 
         var reportData = groupedEntries.ToDictionary(
             kv => kv.Key,
@@ -164,7 +191,6 @@ public class SubmissionEntryQueries : ISubmissionEntryQueries
                 Entries = kv.Value,
                 Resources = resources
             });
-
         return new PatientReportData
         {
             Schedule = report,
@@ -172,30 +198,37 @@ public class SubmissionEntryQueries : ISubmissionEntryQueries
         };
     }
 
-    public async Task<(PatientSubmissionEntry?, FhirResource?)> GetPatientResourceData(string facilityId, string reportScheduleId, string patientId, string reportType, string resourceId, CancellationToken cancellationToken = default)
+    public async Task<(PatientSubmissionEntry?, FhirResource?)> GetPatientResourceData(string facilityId, string reportScheduleId, string patientId, string reportType, string resourceType, string resourceId, CancellationToken cancellationToken = default)
     {
-        var entry = await _context.PatientSubmissionEntries.SingleOrDefaultAsync(e => e.FacilityId == facilityId && e.ReportScheduleId == reportScheduleId && e.PatientId == patientId && e.ReportType == reportType);
-        var resource = await _context.FhirResources.SingleOrDefaultAsync(r => r.FacilityId == facilityId 
-                                                                        && r.ResourceId == resourceId
-                                                                        && (r.PatientId == null || r.PatientId == patientId));
+        var entry = await _context.PatientSubmissionEntries.SingleAsync(e => e.FacilityId == facilityId && e.ReportScheduleId == reportScheduleId && e.PatientId == patientId && e.ReportType == reportType);
+
+        var resourceMap = await _context.PatientEntryResourceMaps.SingleOrDefaultAsync(m => m.SubmissionEntryId == entry.Id && m.ResourceId == resourceId && m.ResourceType == resourceType);
+
+        if (resourceMap == null)
+        {
+            return (entry, null);
+        }
+
+        var resource = await _context.FhirResources.SingleOrDefaultAsync(r => r.Id == resourceMap.FhirResourceId);
 
         return (entry, resource);
     }
 
-    public async Task<bool> ReportReadyForValidation(
+    public async Task<bool> PatientAllReadyForValidation(
         string facilityId,
         string reportScheduleId,
+        string patientId,
         CancellationToken cancellationToken = default)
     {
         return await (from entry in _context.PatientSubmissionEntries
-                      where entry.ReportScheduleId == reportScheduleId && entry.FacilityId == facilityId
-                      select entry.Status).AllAsync(s => s == Enums.PatientSubmissionStatus.ReadyForValidation || s == Enums.PatientSubmissionStatus.NotReportable);
+                      where entry.ReportScheduleId == reportScheduleId && entry.FacilityId == facilityId && entry.PatientId == patientId 
+                      select entry.Status).AllAsync(s => s == PatientSubmissionStatus.ReadyForValidation || s == PatientSubmissionStatus.NotReportable);
     }
 
     public async Task<PagedConfigModel<ResourceSummary>> GetResourceSummary(string facilityId, string reportScheduleId, ResourceType? resourceType, int pageSize, int pageNumber,
             CancellationToken cancellationToken = default)
     {
-        var resourceIds = await _context.ReportScheduleResourceMaps
+        var resourceIds = await _context.PatientEntryResourceMaps
             .Where(m => m.ReportScheduleId == reportScheduleId)
             .Select(m => m.FhirResourceId)
             .Distinct()
@@ -240,7 +273,7 @@ public class SubmissionEntryQueries : ISubmissionEntryQueries
 
     public async Task<List<string>> GetMeasureReportResourceTypeList(string facilityId, string reportId, CancellationToken cancellationToken)
     {
-        var resourceIds = await _context.ReportScheduleResourceMaps
+        var resourceIds = await _context.PatientEntryResourceMaps
             .Where(r => r.ReportScheduleId == reportId)
             .Select(r => r.FhirResourceId)
             .Distinct()
@@ -253,6 +286,21 @@ public class SubmissionEntryQueries : ISubmissionEntryQueries
             .ToListAsync(cancellationToken);
 
         return data;
+    }
+
+    public async Task<bool> PatientEntryReadyForValidation(string reportScheduleId, string entryId, CancellationToken cancellationToken)
+    {
+        bool hasMeasureReport = await (from entry in _context.PatientSubmissionEntries
+                                       where entry.Id == entryId
+                                       select entry).AllAsync(e => e.MeasureReport != null);
+        if(!hasMeasureReport)
+        {
+            return false;
+        }
+
+        return await (from map in _context.PatientEntryResourceMaps
+                      where map.SubmissionEntryId == entryId && map.ReportScheduleId == reportScheduleId
+                      select map).AllAsync(e => e.FhirResourceId != null);
     }
 }
 

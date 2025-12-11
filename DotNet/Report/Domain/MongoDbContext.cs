@@ -21,7 +21,7 @@ public class MongoDbContext : DbContext
     public DbSet<ReportSchedule> ReportSchedules { get; set; } = null!;
     public DbSet<PatientSubmissionEntry> PatientSubmissionEntries { get; set; } = null!;
     public DbSet<FhirResource> FhirResources { get; set; } = null!;
-    public DbSet<ReportScheduleResourceMap> ReportScheduleResourceMaps { get; set; } = null!;
+    public DbSet<PatientSubmissionEntryResourceMap> PatientEntryResourceMaps { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -36,8 +36,8 @@ public class MongoDbContext : DbContext
         modelBuilder.Entity<FhirResource>()
             .ToCollection("fhirResource");
 
-        modelBuilder.Entity<ReportScheduleResourceMap>()
-            .ToCollection("reportScheduleResourceMap");
+        modelBuilder.Entity<PatientSubmissionEntryResourceMap>()
+            .ToCollection("patientSubmissionEntryResourceMap");
 
         // Configure FHIR Resource properties with value converters for JSON serialization
         var fhirJsonOptions = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector, new FhirJsonPocoDeserializerSettings { Validator = null });

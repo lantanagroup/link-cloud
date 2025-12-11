@@ -1,6 +1,5 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Interfaces;
-using LantanaGroup.Link.Report.Application.ResourceCategories;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Queries;
 using LantanaGroup.Link.Report.Entities;
@@ -41,13 +40,11 @@ namespace LantanaGroup.Link.Report.Core
         {
             var queries = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
             var patientReportData = await queries.GetPatientReportData(facilityId, reportScheduleId, patientId, cancellationToken: CancellationToken.None);
-
             return await GenerateBundle(patientReportData, facilityId, patientId, reportScheduleId);
         }
 
         public async Task<PatientSubmissionModel> GenerateBundle(PatientReportData patientReportData, string facilityId, string patientId, string reportScheduleId)
         {
-            var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
             var schedule = patientReportData.Schedule;
 
             //The 'resourcesAdded' Dictionary will keep track of FHIR resource id's that have been added to the bundle to avoid adding duplicates across entries. The value of each dictionary entry will contain the associated FHIR types. It's a string List type in case there are different FHIR resources that share the same id. This is probably unlikely to happen, but is possible. 
@@ -59,43 +56,26 @@ namespace LantanaGroup.Link.Report.Core
                 var report = reportType.Key;
                 var data = reportType.Value;
 
-                foreach (var r in data.Resources)
+                foreach (var fhirResource in data.Resources)
                 {
-                    if (r.Id == null)
+                    if (fhirResource.Id == null)
                         continue;
 
-                    if (resourcesAdded.ContainsKey(r.ResourceId) && resourcesAdded[r.ResourceId].Contains(r.ResourceType))
+                    if (resourcesAdded.ContainsKey(fhirResource.ResourceId) && resourcesAdded[fhirResource.ResourceId].Contains(fhirResource.ResourceType))
                     {
                         continue;
                     }
 
-                    FhirResource facilityResource = null!;
+                    var fullUrl = GetFullUrl(fhirResource.Resource);
+                    bundle.AddResourceEntry(fhirResource.Resource, fullUrl);
 
-                    var resourceTypeCategory = ResourceCategory.GetResourceCategoryByType(r.ResourceType);
-
-                    Resource resource = null;
-
-                    try
+                    if (resourcesAdded.ContainsKey(fhirResource.ResourceId))
                     {
-                        facilityResource = await database.ResourceRepository.GetAsync(r.Id);
-                        resource = facilityResource.Resource;
-                        AddResourceToBundle(bundle, resource);
-                    }
-                    catch (Exception ex)
-                    {
-                        var message = "Contained resource could not be parsed into a valid Resource.";
-                        _logger.LogError(ex, "{ResourceTypeName} with ID {ResourceId} contained resource could not be parsed into a valid Resource.", r.ResourceType, r.ResourceId);
-
-                        throw new Exception(message, ex);
-                    }
-
-                    if (resourcesAdded.ContainsKey(r.ResourceId))
-                    {
-                        resourcesAdded[r.ResourceId].Add(r.ResourceType);
+                        resourcesAdded[fhirResource.ResourceId].Add(fhirResource.ResourceType);
                     }
                     else
                     {
-                        resourcesAdded.Add(r.ResourceId, new List<string>() { r.ResourceType });
+                        resourcesAdded.Add(fhirResource.ResourceId, new List<string>() { fhirResource.ResourceType });
                     }
                 }
 
@@ -122,7 +102,8 @@ namespace LantanaGroup.Link.Report.Core
                     // clean up resource
                     cleanupResource(mr);
 
-                    AddResourceToBundle(bundle, mr);
+                    var fullUrl = GetFullUrl(mr);
+                    bundle.AddResourceEntry(mr, fullUrl);
 
                     _metrics.IncrementReportGeneratedCounter(new List<KeyValuePair<string, object?>>() {
                     new KeyValuePair<string, object?>("facilityId", schedule.FacilityId),
@@ -206,20 +187,6 @@ namespace LantanaGroup.Link.Report.Core
         {
             return string.Format(ReportConstants.BundleSettings.BundlingFullUrlFormat, GetRelativeReference(resource));
         }
-
-        /// <summary>
-        /// Adds the given resource to the given bundle, if not already present.
-        /// </summary>
-        /// <param name="bundle"></param>
-        /// <param name="resource"></param>
-        /// <returns></returns>
-        protected Bundle.EntryComponent AddResourceToBundle(Bundle bundle, Resource resource)
-        {
-            var fullUrl = GetFullUrl(resource);
-            var existingEntry = bundle.FindEntry(fullUrl).FirstOrDefault();
-            return existingEntry ?? bundle.AddResourceEntry(resource, fullUrl);
-        }
-
         #endregion
 
     }

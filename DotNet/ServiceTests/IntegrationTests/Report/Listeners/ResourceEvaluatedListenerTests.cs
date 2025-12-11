@@ -112,14 +112,20 @@ namespace IntegrationTests.Report
                     patientResource.Resource = resource;
                     await _database.ResourceRepository.AddAsync(patientResource);
 
-                    await _database.ReportScheduleResourceMapRepository.AddAsync(new ReportScheduleResourceMap
+                    foreach (var entry in entries)
                     {
-                        FhirResourceId = patientResource.Id,
-                        ReportScheduleId = schedule.Id,
-                        ReportTypes = schedule.ReportTypes,
-                        CreateDate = DateTime.Now,
-                        ModifyDate = DateTime.Now,
-                    });
+                        await _database.PatientSubmissionEntryResourceMapRepository.AddAsync(new PatientSubmissionEntryResourceMap
+                        {
+                            FhirResourceId = patientResource.Id,
+                            ReportScheduleId = schedule.Id,
+                            SubmissionEntryId = entry.Id,
+                            ResourceType = resourceType,
+                            ResourceId = resourceId,
+                            ReportTypes = schedule.ReportTypes,
+                            CreateDate = DateTime.Now,
+                            ModifyDate = DateTime.Now,
+                        });
+                    }
                 }
             }
 

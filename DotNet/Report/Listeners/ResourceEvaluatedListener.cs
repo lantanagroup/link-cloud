@@ -4,9 +4,11 @@ using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Domain.Queries;
+using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Entities.Enums;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
@@ -203,6 +205,7 @@ namespace LantanaGroup.Link.Report.Listeners
             var facilityId = key.FacilityId;
 
             using var scope = _serviceScopeFactory.CreateScope();
+            var databse = scope.ServiceProvider.GetRequiredService<IDatabase>();
             var resourceManager = scope.ServiceProvider.GetRequiredService<IResourceManager>();
             var measureReportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
             var submissionEntryManager = scope.ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
@@ -245,7 +248,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             var schedule = await measureReportScheduledManager.GetReportSchedule(key.FacilityId, value.ReportTrackingId) ?? throw new TransientException("No Report Schedule Found.");
 
-            var patientReportData = await entryQueries.GetPatientResourceData(key.FacilityId, value.ReportTrackingId, value.PatientId, value.ReportType, resource.Id, cancellationToken: cancellationToken);
+            var patientReportData = await entryQueries.GetPatientResourceData(key.FacilityId, value.ReportTrackingId, value.PatientId, value.ReportType, resource.TypeName, resource.Id, cancellationToken: cancellationToken);
             var entry = patientReportData.Item1 ?? throw new TransientException("No Patient Submission Entry Found");
             var existingReportResource = patientReportData.Item2;
 
@@ -254,6 +257,17 @@ namespace LantanaGroup.Link.Report.Listeners
                 if (resource.TypeName == "MeasureReport")
                 {
                     entry.MeasureReport = (MeasureReport)resource;
+                    
+                    foreach(var resRef in entry.MeasureReport.EvaluatedResource)
+                    {
+                        var split = resRef.Reference.Split("/");
+                        var type = split[0];
+                        var id = split[1];
+
+                        await resourceManager.CreateSubmissionEntryResourceMap(schedule.Id, entry.Id, [entry.ReportType], type, id, null, false, cancellationToken);                       
+                    }
+
+                    await databse.SaveChangesAsync();
                 }
                 else
                 {
@@ -270,11 +284,14 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     else
                     {
-                        await resourceManager.CreateResourceAsync(key.FacilityId, entry.ReportScheduleId, [value.ReportType], resource, value.PatientId, cancellationToken );
+                        await resourceManager.CreateResourceAsync(key.FacilityId, entry.ReportScheduleId, entry.Id, [value.ReportType], resource, value.PatientId, cancellationToken );
                     }
                 }
 
-                entry.Status = entry.MeasureReport != null ? PatientSubmissionStatus.ReadyForValidation : PatientSubmissionStatus.PendingEvaluation;
+                if (entry.MeasureReport != null)
+                {
+                    entry.Status = await entryQueries.PatientEntryReadyForValidation(schedule.Id, entry.Id, cancellationToken) ? PatientSubmissionStatus.ReadyForValidation : entry.Status;
+                }
             }
             else
             {
@@ -296,7 +313,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 ValidationStatus = entry.ValidationStatus,
             }, cancellationToken);
 
-            var readyForValidation = await entryQueries.ReportReadyForValidation(facilityId, schedule.Id, cancellationToken);
+            var readyForValidation = await entryQueries.PatientAllReadyForValidation(facilityId, schedule.Id, entry.PatientId, cancellationToken);
 
             if (readyForValidation)
             {
@@ -324,6 +341,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     catch (Exception auditEventEx)
                     {
                         _logger.LogError(auditEventEx, "Failed to produce audit event.");
+                        throw;
                     }
                 }
 
@@ -339,6 +357,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 catch (ProduceException<ReadyForValidationKey, ReadyForValidationValue> ex)
                 {
                     _logger.LogError(ex, "An error was encountered generating a Ready For Validation event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
+                    throw;
                 }
             }
             else
