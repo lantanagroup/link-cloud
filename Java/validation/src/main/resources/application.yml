@@ -89,6 +89,10 @@ management:
     refresh:
       enabled: false
 
+logging:
+  level:
+    com.lantanagroup.link: debug
+
 secret-management:
   key-vault-uri: ''
 

@@ -385,4 +385,44 @@ public class QueryPlanConfigController : Controller
             return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
+
+    /// <summary>
+    /// Hard deletes all QueryPlanConfigs for a given facilityId.
+    /// </summary>
+    /// <param name="facilityId">The ID of the facility whose query plans will be deleted.</param>
+    /// <param name="cancellationToken">Cancellation token for async operations.</param>
+    /// <returns>
+    ///     Success: 202 Accepted
+    ///     Bad Facility ID: 400 Bad Request
+    ///     Server Error: 500 Internal Server Error
+    /// </returns>
+    [HttpDelete("QueryPlan/All")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult> DeleteAllQueryPlans(
+        string facilityId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId))
+        {
+            return BadRequest("Parameter 'facilityId' is required.");
+        }
+
+        try
+        {
+            facilityId = facilityId.SanitizeAndRemove();
+
+            // Call the manager/service method that deletes all query plans
+            await _queryPlanManager.DeleteAllQueryPlansAsync(facilityId, cancellationToken);
+
+            return Accepted(); // 202
+        }
+        catch (Exception ex)
+        {
+            string message = $"An error occurred while deleting all QueryPlans for facilityId '{facilityId}'.";
+            _logger.LogError(ex, "An exception occurred while attempting to update a QueryPlan for facility id of {facilityId}.", facilityId.Sanitize());
+            return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
 }

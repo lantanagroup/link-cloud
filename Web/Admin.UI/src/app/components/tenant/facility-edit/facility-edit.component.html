@@ -55,6 +55,9 @@
             (click)="showCensusDialog()">
             <mat-icon>edit</mat-icon>
           </button>
+          <button mat-mini-fab aria-label="Delete census configuration" color="warn" (click)="onDeleteCensusConfig()">
+            <mat-icon>delete</mat-icon>
+          </button>
         }
       </mat-action-row>
     </mat-expansion-panel>
@@ -83,6 +86,9 @@
           <button mat-mini-fab aria-label="Edit query dispatch configuration" matTooltip="Edit query dispatch configuration"
             (click)="showQueryDispatchDialog()">
             <mat-icon>edit</mat-icon>
+          </button>
+          <button mat-mini-fab aria-label="Delete query dispatch configuration" color="warn" (click)="onDeleteQueryDispatchConfig()">
+            <mat-icon>delete</mat-icon>
           </button>
         }
       </mat-action-row>
@@ -119,6 +125,9 @@
                 >
                 <mat-icon>edit</mat-icon>
               </button>
+              <button mat-mini-fab aria-label="Delete Fhir Resource Query configuration" color="warn" (click)="onDeleteFhirQueryConfig()">
+                <mat-icon>delete</mat-icon>
+              </button>
             }
           </mat-action-row>
         </mat-tab>
@@ -141,6 +150,9 @@
                 (click)="showDataAcqFhirListDialog()">
                 <mat-icon>edit</mat-icon>
               </button>
+              <button mat-mini-fab aria-label="Delete Fhir List Query configuration" color="warn" (click)="onDeleteFhirQueryListConfig()">
+                <mat-icon>delete</mat-icon>
+              </button>
             }
           </mat-action-row>
         </mat-tab>
@@ -162,6 +174,9 @@
               <button mat-mini-fab aria-label="Edit Query Plan configuration" matTooltip="Edit Query Plan configuration"
                 (click)="showDataAcqQueryPlanDialog()">
                 <mat-icon>edit</mat-icon>
+              </button>
+              <button mat-mini-fab aria-label="Delete Fhir Query Plan configuration" color="warn" (click)="onDeleteFhirQueryPlanConfig()">
+                <mat-icon>delete</mat-icon>
               </button>
             }
           </mat-action-row>
