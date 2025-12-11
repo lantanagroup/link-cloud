@@ -15,6 +15,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using System.Diagnostics;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -269,6 +270,23 @@ public class FhirApiService : IFhirApiService
 
     private async Task GenerateResourceAcquiredMessage(ResourceAcquired resourceAcquired, string facilityId, string correlationId, CancellationToken cancellationToken = default)
     {
+        var activitySource = new ActivitySource("FhirApiService", "1.0.0");
+        var parentContext = Activity.Current?.Context ?? default;
+
+        using var fanoutActivity = activitySource.StartActivity(
+            "ProduceResourceAcquired",
+            ActivityKind.Producer,
+            parentContext: parentContext  // ✅ Maintains trace hierarchy
+        );
+
+        //get resource type string from resourceAcquired.Resource
+        var resourceType = resourceAcquired.Resource?.TypeName;
+        fanoutActivity?.SetTag("messaging.destination", KafkaTopic.ResourceAcquired.ToString());
+        fanoutActivity?.SetTag("messaging.system", "kafka");
+        fanoutActivity?.SetTag("link.resource_type", resourceType);
+        fanoutActivity?.SetTag("link.facility_id", facilityId);
+        fanoutActivity?.SetTag("link.correlation_id", correlationId);
+
         await _kafkaProducer.ProduceAsync(
                     KafkaTopic.ResourceAcquired.ToString(),
                     new Message<string, ResourceAcquired>

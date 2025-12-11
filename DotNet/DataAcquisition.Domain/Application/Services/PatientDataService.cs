@@ -2,6 +2,7 @@
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
+using Hl7.Fhir.Utility;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
@@ -59,6 +60,8 @@ public class PatientDataService : IPatientDataService
     private readonly IFhirApiService _fhirApiService;
     private readonly IDistributedSemaphoreProvider _distributedSemaphoreProvider;
     private readonly IPatientCensusService _patientCensusService;
+
+    private static readonly ActivitySource _activitySource = new ActivitySource("PatientDataService", "1.0.0");
 
     public PatientDataService(
         IDatabase database,
@@ -346,32 +349,34 @@ public class PatientDataService : IPatientDataService
                     return;
                 }
 
-                using var activity = new Activity("PatientDataService.ExecuteLogRequest");
-
-                //set trace parent id based on log trace id
+                ActivityContext parentContext = default;
                 if (!string.IsNullOrWhiteSpace(log.TraceId))
                 {
                     try
                     {
-                        activity.SetParentId(log.TraceId);
+                        
+                        if (ActivityContext.TryParse(log.TraceId, null, out ActivityContext parsedContext))
+                        {
+                            parentContext = parsedContext;
+                        }
                     }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error setting Activity.Current for log ID {LogId} with TraceId {TraceId}", log.Id, log.TraceId.Sanitize());
-                        if (!string.IsNullOrWhiteSpace(Activity.Current?.Id))
-                        {
-                            activity.SetParentId(Activity.Current.Id);
-                        }
                     }
                 }
 
-                // helpful attributes for correlation
-                activity.AddTag("link.log_id", log.Id.ToString());
-                activity.AddTag("link.facility_id", log.FacilityId);
-                activity.AddTag("link.correlation_id", log.CorrelationId ?? string.Empty);
-                activity.AddTag("link.report_tracking_id", log.ReportTrackingId ?? string.Empty);
+                using var activity = _activitySource.StartActivity(
+                    "PatientDataService.ExecuteLogRequest",
+                    ActivityKind.Internal,
+                    parentContext
+                );
 
-                activity.Start();
+                // helpful attributes for correlation
+                activity?.AddTag("link.log_id", log.Id.ToString());
+                activity?.AddTag("link.facility_id", log.FacilityId);
+                activity?.AddTag("link.correlation_id", log.CorrelationId ?? string.Empty);
+                activity?.AddTag("link.report_tracking_id", log.ReportTrackingId ?? string.Empty);
 
                 //check if log is flagged as a reference, if yes, check if all non-reference logs for a facility, correlationId, and reportTrackingId are marked as 'Completed'
                 if (log.FhirQuery.Any(x => x.IsReference.HasValue && x.IsReference.Value))
