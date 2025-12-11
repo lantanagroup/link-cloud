@@ -89,7 +89,7 @@ def call_azure_openai(endpoint: str, deployment: str, api_key: str, changes_outp
 2. Summarize the ACTUAL changes that matter for deployment:
    - Database schema changes (new tables, columns, migrations)
    - Configuration setting changes (new settings, changed defaults, removed settings)
-   - Kafka topic changes (new topics, renamed topics, removed topics)
+   - Kafka topic changes (new topics, renamed topics, removed topics) - each row in the topics.txt file represents "<TOPIC_NAME>:<PARTITION_COUNT>:<REPLICATION_COUNT>". Ignore the partition count and replication count aspect, because those are only used for local testing using Docker Compose; only report on added/removed topic names and do not indicate to increase/decrease topic partitions/replications.
 
 Provide a concise summary focusing only on what deployment engineers need to know. When summarizing config changes, provide examples of what the configs should look like in an Azure App Config deployment scenario (i.e. 'Some:Property:Name=SomeValue')"""
 
