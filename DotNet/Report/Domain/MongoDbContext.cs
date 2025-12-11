@@ -12,11 +12,14 @@ namespace LantanaGroup.Link.Report.Domain;
 public class MongoDbContext : DbContext
 {
     public IMongoDatabase MongoDatabase { get; }
+    private readonly ILogger<MongoDbContext> _logger;
 
-    public MongoDbContext(DbContextOptions<MongoDbContext> options, IMongoDatabase mongoDatabase)
+    public MongoDbContext(DbContextOptions<MongoDbContext> options, IMongoDatabase mongoDatabase, ILogger<MongoDbContext> logger)
         : base(options)
     {
         MongoDatabase = mongoDatabase;
+        _logger = logger;
+        Database.AutoTransactionBehavior = AutoTransactionBehavior.Never;
     }
 
     public DbSet<ReportSchedule> ReportSchedules { get; set; } = null!;
@@ -126,79 +129,86 @@ public class MongoDbContext : DbContext
     /// </summary>
     public async Task EnsureIndexesAsync(CancellationToken cancellationToken = default)
     {
-        var indexOptions = new CreateIndexOptions { Background = true }; // Build in background to avoid blocking
+        try
+        {
+            var indexOptions = new CreateIndexOptions { Background = true }; // Build in background to avoid blocking
 
-        // Indexes for reportSchedule collection
-        var reportScheduleCollection = MongoDatabase.GetCollection<ReportSchedule>("reportSchedule");
-        var reportScheduleBuilders = Builders<ReportSchedule>.IndexKeys;
-        await reportScheduleCollection.Indexes.CreateOneAsync(
-            new CreateIndexModel<ReportSchedule>(reportScheduleBuilders.Ascending(x => x.FacilityId), indexOptions),
-            cancellationToken: cancellationToken);
-        await reportScheduleCollection.Indexes.CreateOneAsync(
-            new CreateIndexModel<ReportSchedule>(reportScheduleBuilders.Ascending(x => x.FacilityId).Ascending(x => x.Id), indexOptions),
-            cancellationToken: cancellationToken);
-        await reportScheduleCollection.Indexes.CreateOneAsync(
-            new CreateIndexModel<ReportSchedule>(reportScheduleBuilders.Ascending(x => x.FacilityId).Ascending(x => x.ReportStartDate).Ascending(x => x.ReportEndDate), indexOptions),
-            cancellationToken: cancellationToken);
-        await reportScheduleCollection.Indexes.CreateOneAsync(
-            new CreateIndexModel<ReportSchedule>(reportScheduleBuilders.Ascending(x => x.Status), indexOptions),
-            cancellationToken: cancellationToken);
-        await reportScheduleCollection.Indexes.CreateOneAsync(
-            new CreateIndexModel<ReportSchedule>(reportScheduleBuilders.Descending(x => x.CreateDate), indexOptions),
-            cancellationToken: cancellationToken);
+            // Indexes for reportSchedule collection
+            var reportScheduleCollection = MongoDatabase.GetCollection<ReportSchedule>("reportSchedule");
+            var reportScheduleBuilders = Builders<ReportSchedule>.IndexKeys;
+            await reportScheduleCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<ReportSchedule>(reportScheduleBuilders.Ascending(x => x.FacilityId), indexOptions),
+                cancellationToken: cancellationToken);
+            await reportScheduleCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<ReportSchedule>(reportScheduleBuilders.Ascending(x => x.FacilityId).Ascending(x => x.Id), indexOptions),
+                cancellationToken: cancellationToken);
+            await reportScheduleCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<ReportSchedule>(reportScheduleBuilders.Ascending(x => x.FacilityId).Ascending(x => x.ReportStartDate).Ascending(x => x.ReportEndDate), indexOptions),
+                cancellationToken: cancellationToken);
+            await reportScheduleCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<ReportSchedule>(reportScheduleBuilders.Ascending(x => x.Status), indexOptions),
+                cancellationToken: cancellationToken);
+            await reportScheduleCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<ReportSchedule>(reportScheduleBuilders.Descending(x => x.CreateDate), indexOptions),
+                cancellationToken: cancellationToken);
 
-        // Indexes for patientSubmissionEntry collection
-        var patientSubmissionEntryCollection = MongoDatabase.GetCollection<PatientSubmissionEntry>("patientSubmissionEntry");
-        var patientSubmissionEntryBuilders = Builders<PatientSubmissionEntry>.IndexKeys;
-        await patientSubmissionEntryCollection.Indexes.CreateOneAsync(
-            new CreateIndexModel<PatientSubmissionEntry>(patientSubmissionEntryBuilders.Ascending(x => x.FacilityId).Ascending(x => x.ReportScheduleId).Ascending(x => x.PatientId).Ascending(x => x.ReportType), indexOptions),
-            cancellationToken: cancellationToken);
-        await patientSubmissionEntryCollection.Indexes.CreateOneAsync(
-            new CreateIndexModel<PatientSubmissionEntry>(patientSubmissionEntryBuilders.Ascending(x => x.ReportScheduleId).Ascending(x => x.Status), indexOptions),
-            cancellationToken: cancellationToken);
-        await patientSubmissionEntryCollection.Indexes.CreateOneAsync(
-            new CreateIndexModel<PatientSubmissionEntry>(patientSubmissionEntryBuilders.Ascending(x => x.FacilityId).Ascending(x => x.PatientId), indexOptions),
-            cancellationToken: cancellationToken);
-        await patientSubmissionEntryCollection.Indexes.CreateOneAsync(
-            new CreateIndexModel<PatientSubmissionEntry>(patientSubmissionEntryBuilders.Ascending(x => x.Status).Ascending(x => x.ValidationStatus), indexOptions),
-            cancellationToken: cancellationToken);
-        await patientSubmissionEntryCollection.Indexes.CreateOneAsync(
-            new CreateIndexModel<PatientSubmissionEntry>(patientSubmissionEntryBuilders.Ascending(x => x.ReportScheduleId), indexOptions),
-            cancellationToken: cancellationToken);
-        await patientSubmissionEntryCollection.Indexes.CreateOneAsync(
-            new CreateIndexModel<PatientSubmissionEntry>(patientSubmissionEntryBuilders.Descending(x => x.CreateDate), indexOptions),
-            cancellationToken: cancellationToken);
+            // Indexes for patientSubmissionEntry collection
+            var patientSubmissionEntryCollection = MongoDatabase.GetCollection<PatientSubmissionEntry>("patientSubmissionEntry");
+            var patientSubmissionEntryBuilders = Builders<PatientSubmissionEntry>.IndexKeys;
+            await patientSubmissionEntryCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<PatientSubmissionEntry>(patientSubmissionEntryBuilders.Ascending(x => x.FacilityId).Ascending(x => x.ReportScheduleId).Ascending(x => x.PatientId).Ascending(x => x.ReportType), indexOptions),
+                cancellationToken: cancellationToken);
+            await patientSubmissionEntryCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<PatientSubmissionEntry>(patientSubmissionEntryBuilders.Ascending(x => x.ReportScheduleId).Ascending(x => x.Status), indexOptions),
+                cancellationToken: cancellationToken);
+            await patientSubmissionEntryCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<PatientSubmissionEntry>(patientSubmissionEntryBuilders.Ascending(x => x.FacilityId).Ascending(x => x.PatientId), indexOptions),
+                cancellationToken: cancellationToken);
+            await patientSubmissionEntryCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<PatientSubmissionEntry>(patientSubmissionEntryBuilders.Ascending(x => x.Status).Ascending(x => x.ValidationStatus), indexOptions),
+                cancellationToken: cancellationToken);
+            await patientSubmissionEntryCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<PatientSubmissionEntry>(patientSubmissionEntryBuilders.Ascending(x => x.ReportScheduleId), indexOptions),
+                cancellationToken: cancellationToken);
+            await patientSubmissionEntryCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<PatientSubmissionEntry>(patientSubmissionEntryBuilders.Descending(x => x.CreateDate), indexOptions),
+                cancellationToken: cancellationToken);
 
-        // Indexes for fhirResource collection
-        var fhirResourceCollection = MongoDatabase.GetCollection<FhirResource>("fhirResource");
-        var fhirResourceBuilders = Builders<FhirResource>.IndexKeys;
-        await fhirResourceCollection.Indexes.CreateOneAsync(
-            new CreateIndexModel<FhirResource>(fhirResourceBuilders.Ascending(x => x.FacilityId).Ascending(x => x.ResourceType).Ascending(x => x.ResourceId), indexOptions),
-            cancellationToken: cancellationToken);
-        await fhirResourceCollection.Indexes.CreateOneAsync(
-            new CreateIndexModel<FhirResource>(fhirResourceBuilders.Ascending(x => x.FacilityId).Ascending(x => x.PatientId), indexOptions),
-            cancellationToken: cancellationToken);
-        await fhirResourceCollection.Indexes.CreateOneAsync(
-            new CreateIndexModel<FhirResource>(fhirResourceBuilders.Ascending(x => x.ResourceType), indexOptions),
-            cancellationToken: cancellationToken);
-        await fhirResourceCollection.Indexes.CreateOneAsync(
-            new CreateIndexModel<FhirResource>(fhirResourceBuilders.Ascending(x => x.ResourceCategoryType), indexOptions),
-            cancellationToken: cancellationToken);
+            // Indexes for fhirResource collection
+            var fhirResourceCollection = MongoDatabase.GetCollection<FhirResource>("fhirResource");
+            var fhirResourceBuilders = Builders<FhirResource>.IndexKeys;
+            await fhirResourceCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<FhirResource>(fhirResourceBuilders.Ascending(x => x.FacilityId).Ascending(x => x.ResourceType).Ascending(x => x.ResourceId), indexOptions),
+                cancellationToken: cancellationToken);
+            await fhirResourceCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<FhirResource>(fhirResourceBuilders.Ascending(x => x.FacilityId).Ascending(x => x.PatientId), indexOptions),
+                cancellationToken: cancellationToken);
+            await fhirResourceCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<FhirResource>(fhirResourceBuilders.Ascending(x => x.ResourceType), indexOptions),
+                cancellationToken: cancellationToken);
+            await fhirResourceCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<FhirResource>(fhirResourceBuilders.Ascending(x => x.ResourceCategoryType), indexOptions),
+                cancellationToken: cancellationToken);
 
-        // Indexes for patientSubmissionEntryResourceMap collection
-        var patientEntryResourceMapCollection = MongoDatabase.GetCollection<PatientSubmissionEntryResourceMap>("patientSubmissionEntryResourceMap");
-        var patientEntryResourceMapBuilders = Builders<PatientSubmissionEntryResourceMap>.IndexKeys;
-        await patientEntryResourceMapCollection.Indexes.CreateOneAsync(
-            new CreateIndexModel<PatientSubmissionEntryResourceMap>(patientEntryResourceMapBuilders.Ascending(x => x.ReportScheduleId).Ascending(x => x.SubmissionEntryId).Ascending(x => x.ResourceType).Ascending(x => x.ResourceId), indexOptions),
-            cancellationToken: cancellationToken);
-        await patientEntryResourceMapCollection.Indexes.CreateOneAsync(
-            new CreateIndexModel<PatientSubmissionEntryResourceMap>(patientEntryResourceMapBuilders.Ascending(x => x.ReportScheduleId), indexOptions),
-            cancellationToken: cancellationToken);
-        await patientEntryResourceMapCollection.Indexes.CreateOneAsync(
-            new CreateIndexModel<PatientSubmissionEntryResourceMap>(patientEntryResourceMapBuilders.Ascending(x => x.SubmissionEntryId).Ascending(x => x.FhirResourceId), indexOptions),
-            cancellationToken: cancellationToken);
-        await patientEntryResourceMapCollection.Indexes.CreateOneAsync(
-            new CreateIndexModel<PatientSubmissionEntryResourceMap>(patientEntryResourceMapBuilders.Ascending(x => x.ReportTypes), indexOptions),
-            cancellationToken: cancellationToken);
+            // Indexes for patientSubmissionEntryResourceMap collection
+            var patientEntryResourceMapCollection = MongoDatabase.GetCollection<PatientSubmissionEntryResourceMap>("patientSubmissionEntryResourceMap");
+            var patientEntryResourceMapBuilders = Builders<PatientSubmissionEntryResourceMap>.IndexKeys;
+            await patientEntryResourceMapCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<PatientSubmissionEntryResourceMap>(patientEntryResourceMapBuilders.Ascending(x => x.ReportScheduleId).Ascending(x => x.SubmissionEntryId).Ascending(x => x.ResourceType).Ascending(x => x.ResourceId), indexOptions),
+                cancellationToken: cancellationToken);
+            await patientEntryResourceMapCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<PatientSubmissionEntryResourceMap>(patientEntryResourceMapBuilders.Ascending(x => x.ReportScheduleId), indexOptions),
+                cancellationToken: cancellationToken);
+            await patientEntryResourceMapCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<PatientSubmissionEntryResourceMap>(patientEntryResourceMapBuilders.Ascending(x => x.SubmissionEntryId).Ascending(x => x.FhirResourceId), indexOptions),
+                cancellationToken: cancellationToken);
+            await patientEntryResourceMapCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<PatientSubmissionEntryResourceMap>(patientEntryResourceMapBuilders.Ascending(x => x.ReportTypes), indexOptions),
+                cancellationToken: cancellationToken);
+        }
+        catch(Exception ex)
+        {
+            _logger.LogWarning(ex, "Exception While Creating Mongo Indexes");
+        }
     }
 }
