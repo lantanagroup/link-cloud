@@ -248,26 +248,31 @@ namespace LantanaGroup.Link.Report.Listeners
 
             var schedule = await measureReportScheduledManager.GetReportSchedule(key.FacilityId, value.ReportTrackingId) ?? throw new TransientException("No Report Schedule Found.");
 
-            var patientReportData = await entryQueries.GetPatientResourceData(key.FacilityId, value.ReportTrackingId, value.PatientId, value.ReportType, resource.TypeName, resource.Id, cancellationToken: cancellationToken);
-            var entry = patientReportData.Item1 ?? throw new TransientException("No Patient Submission Entry Found");
-            var existingReportResource = patientReportData.Item2;
+            var patientResourceData = await entryQueries.GetPatientResourceData(key.FacilityId, value.ReportTrackingId, value.PatientId, value.ReportType, resource.TypeName, resource.Id, cancellationToken: cancellationToken);
+            var entry = patientResourceData.Item1 ?? throw new TransientException("No Patient Submission Entry Found");
+            var existingReportResource = patientResourceData.Item2;
 
             if (value.IsReportable)
             {
                 if (resource.TypeName == "MeasureReport")
                 {
                     entry.MeasureReport = (MeasureReport)resource;
-                    
-                    foreach(var resRef in entry.MeasureReport.EvaluatedResource)
+
+                    var patientReportData = await entryQueries.GetPatientReportData(key.FacilityId, value.ReportTrackingId, entry.PatientId, entry.Id, cancellationToken);
+                    var resources = patientReportData.ReportData[value.ReportType].Resources;
+
+                    var allResourcsPresent = entry.MeasureReport.EvaluatedResource.All(resRef =>
                     {
                         var split = resRef.Reference.Split("/");
                         var type = split[0];
                         var id = split[1];
+                        return resources.Any(r => r.ResourceId == id && r.ResourceType == type);
+                    });
 
-                        await resourceManager.CreateSubmissionEntryResourceMap(schedule.Id, entry.Id, [entry.ReportType], type, id, null, false, cancellationToken);                       
+                    if (allResourcsPresent)
+                    {
+                        entry.Status = PatientSubmissionStatus.ReadyForValidation;
                     }
-
-                    await databse.SaveChangesAsync();
                 }
                 else
                 {
@@ -286,6 +291,11 @@ namespace LantanaGroup.Link.Report.Listeners
                     {
                         await resourceManager.CreateResourceAsync(key.FacilityId, entry.ReportScheduleId, entry.Id, [value.ReportType], resource,  value.PatientId, cancellationToken );
                     }
+
+                    if (entry.MeasureReport != null)
+                    {
+                        entry.Status = await entryQueries.PatientEntryReadyForValidation(schedule.Id, entry.Id, cancellationToken) ? PatientSubmissionStatus.ReadyForValidation : entry.Status;
+                    }
                 }
             }
             else
@@ -297,11 +307,6 @@ namespace LantanaGroup.Link.Report.Listeners
                 {
                     entry.MeasureReport = (MeasureReport)resource;
                 }
-            }
-
-            if (entry.Status != PatientSubmissionStatus.NotReportable && entry.MeasureReport != null)
-            {
-                entry.Status = await entryQueries.PatientEntryReadyForValidation(schedule.Id, entry.Id, cancellationToken) ? PatientSubmissionStatus.ReadyForValidation : entry.Status;
             }
 
             entry = await submissionEntryManager.UpdateAsync(new PatientSubmissionEntryUpdateModel
