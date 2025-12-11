@@ -284,7 +284,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     else
                     {
-                        await resourceManager.CreateResourceAsync(key.FacilityId, entry.ReportScheduleId, entry.Id, [value.ReportType], resource, value.PatientId, cancellationToken );
+                        await resourceManager.CreateResourceAsync(key.FacilityId, entry.ReportScheduleId, entry.Id, [value.ReportType], resource,  value.PatientId, cancellationToken );
                     }
                 }
 

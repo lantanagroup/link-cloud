@@ -1,5 +1,4 @@
 ﻿using Confluent.Kafka;
-using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
@@ -10,8 +9,8 @@ using LantanaGroup.Link.Report.Entities.Enums;
 using LantanaGroup.Link.Report.Listeners;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.DependencyInjection;
+using MongoDB.Driver;
 using Moq;
-using System.Data.Entity;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
@@ -40,6 +39,9 @@ namespace IntegrationTests.Report
         {
             // Reset mocks
             _fixture.ResetMocks();
+
+            var dbContext = _fixture.ServiceProvider.GetRequiredService<MongoDbContext>();
+            await dbContext.EnsureIndexesAsync();
 
             // Setup blob storage to return a dummy URI
             ReportIntegrationTestFixture.BlobStorageMock.Setup(b => b.UploadAsync(It.IsAny<ReportSchedule>(), It.IsAny<PatientSubmissionModel>(), It.IsAny<CancellationToken>()))
@@ -110,11 +112,11 @@ namespace IntegrationTests.Report
             Dictionary<string, long> patientCompletionTime = new Dictionary<string, long>();
 
             // Act: Process for each patient/report type
-            for (int idx = 0; idx < patients.Count; idx++)
+            for (int index = 0; index < patients.Count; index++)
             {
                 var patientStopWatch = new Stopwatch();
-                var patientId = patients[idx];
-                var reportType = reportTypes[idx];
+                var patientId = patients[index];
+                var reportType = reportTypes[index];
                 patientCompletionTime.Add(patientId, 0);
                 patientStopWatch.Start();
 
@@ -204,6 +206,7 @@ namespace IntegrationTests.Report
             using var assertScope = _scopeFactory.CreateScope();
             var queries = assertScope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
 
+            int idx = 1;
             foreach (var patient in patients)
             {
                 var bundler = _fixture.ServiceProvider.GetRequiredService<PatientReportSubmissionBundler>();
@@ -217,15 +220,19 @@ namespace IntegrationTests.Report
 
                 var bundleStopWatch = new Stopwatch();
                 bundleStopWatch.Start();
-                await bundler.GenerateBundle(patientReportData, facilityId, patient, schedule.Id);
+                var model = await bundler.GenerateBundle(patientReportData, facilityId, patient, schedule.Id);
                 bundleStopWatch.Stop();
 
                 _output.WriteLine($"Patient {patient} GenerateBundle Time: {bundleStopWatch.ElapsedMilliseconds} ms");
+
+                Assert.Equal(10000, patientReportData.ReportData["ReportType" + idx.ToString()].Resources.Count); //10k Resources
+                Assert.Equal(10001, model.Bundle.Entry.Count()); //10k resources + 1 Measure Report
+                idx++;
             }
 
 
             // Assertion phase: After all processing is complete
-            for (int idx = 0; idx < patients.Count; idx++)
+            for (idx = 0; idx < patients.Count; idx++)
             {
                 var patientId = patients[idx];
                 var reportType = reportTypes[idx];
@@ -236,19 +243,31 @@ namespace IntegrationTests.Report
         private async Task AssertPatientDataAsync(string facilityId, string scheduleId, string patientId, string reportType)
         {
             using var assertScope = _scopeFactory.CreateScope();
-            var db = assertScope.ServiceProvider.GetRequiredService<MongoDbContext>();
+            var mongoDb = assertScope.ServiceProvider.GetRequiredService<IMongoDatabase>();
+            var db = assertScope.ServiceProvider.GetRequiredService<IDatabase>();
 
-            // Assert 5k patient-specific resources (Observations)
-            var obsCount = await db.FhirResources.CountAsync(r => r.FacilityId == facilityId && r.PatientId == patientId && r.ResourceType == "Observation");
-            Assert.Equal(5000, obsCount);
+            var resourceColl = mongoDb.GetCollection<FhirResource>("fhirResource");
 
-            // Assert 5k facility-level resources (Locations) in total
-            var locCount = await db.FhirResources.CountAsync(r => r.FacilityId == facilityId && r.ResourceType == "Location");
-            Assert.Equal(5000, locCount);
+            var obsFilter = Builders<FhirResource>.Filter.Eq(r => r.FacilityId, facilityId) &
+                            Builders<FhirResource>.Filter.Eq(r => r.PatientId, patientId) &
+                            Builders<FhirResource>.Filter.Eq(r => r.ResourceType, "Observation");
 
-            // Assert 10k resource map records per patient (assuming ReportScheduleResourceMap is used)
-            var mapCount = await db.PatientEntryResourceMaps.CountAsync(m => m.ReportScheduleId == scheduleId && m.ReportTypes.SequenceEqual(new List<string> { reportType }));
-            Assert.Equal(10000, mapCount);
+            var obsCount = await resourceColl.CountDocumentsAsync(obsFilter);
+            Assert.Equal(5000L, obsCount);
+
+            var locFilter = Builders<FhirResource>.Filter.Eq(r => r.FacilityId, facilityId) &
+                            Builders<FhirResource>.Filter.Eq(r => r.ResourceType, "Location");
+
+            var locCount = await resourceColl.CountDocumentsAsync(locFilter);
+            Assert.Equal(5000L, locCount);
+
+            var mapColl = mongoDb.GetCollection<PatientSubmissionEntryResourceMap>("patientSubmissionEntryResourceMap");
+
+            var mapFilter = Builders<PatientSubmissionEntryResourceMap>.Filter.Eq(m => m.ReportScheduleId, scheduleId) &
+                            Builders<PatientSubmissionEntryResourceMap>.Filter.Eq(m => m.ReportTypes, new List<string> { reportType });
+
+            var mapCount = await mapColl.CountDocumentsAsync(mapFilter);
+            Assert.Equal(10000L, mapCount);
 
             // Verify GetPatientReportData returns correct data
             var queries = assertScope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
@@ -260,9 +279,10 @@ namespace IntegrationTests.Report
             // Check types in the returned data (load resources to count types)
             var resourceTypes = await Task.WhenAll(reportData.Resources.Select(async m =>
             {
-                var fhirResource = await db.FhirResources.SingleAsync(r => r.Id == m.Id);
+                var fhirResource = await db.ResourceRepository.GetAsync(m.Id);
                 return fhirResource?.ResourceType ?? string.Empty;
             }));
+
             var returnedObsCount = resourceTypes.Count(t => t == "Observation");
             var returnedLocCount = resourceTypes.Count(t => t == "Location");
             Assert.Equal(5000, returnedObsCount);

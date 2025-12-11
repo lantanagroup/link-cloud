@@ -44,20 +44,28 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 throw new DeadLetterException(resource.TypeName + " is not a valid FHIR resouce");
             }
 
-            var fhirResource = new FhirResource()
+            var fhirResource = await _context.FhirResources.SingleOrDefaultAsync(r => r.ResourceId == resource.Id 
+                                                                                    && r.ResourceType == resource.TypeName 
+                                                                                    && r.FacilityId == facilityId 
+                                                                                    && (resourceTypeCategory.Value == ResourceCategoryType.Shared || r.PatientId == patientId));
+
+            if (fhirResource == null)
             {
-                FacilityId = facilityId,
-                PatientId = resourceTypeCategory == ResourceCategoryType.Patient ? patientId : null,
-                Resource = resource,
-                ResourceId = resource.Id,
-                ResourceType = resource.TypeName,
-                ResourceCategoryType = (ResourceCategoryType)resourceTypeCategory,
-                CreateDate = DateTime.UtcNow
-            };
+                fhirResource = new FhirResource()
+                {
+                    FacilityId = facilityId,
+                    PatientId = resourceTypeCategory == ResourceCategoryType.Patient ? patientId : null,
+                    Resource = resource,
+                    ResourceId = resource.Id,
+                    ResourceType = resource.TypeName,
+                    ResourceCategoryType = (ResourceCategoryType)resourceTypeCategory,
+                    CreateDate = DateTime.UtcNow
+                };
 
-            await _context.FhirResources.AddAsync(fhirResource, cancellationToken);
+                await _context.FhirResources.AddAsync(fhirResource, cancellationToken);
 
-            await _context.SaveChangesAsync(cancellationToken);
+                await _context.SaveChangesAsync(cancellationToken);
+            }
 
             await CreateSubmissionEntryResourceMap(reportScheduleId, submissionEntryId, reportTypes, fhirResource.ResourceType, fhirResource.ResourceId, fhirResource.Id, true, cancellationToken);
 
