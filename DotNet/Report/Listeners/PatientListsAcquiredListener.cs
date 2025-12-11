@@ -23,13 +23,13 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ITransientExceptionHandler<string, PatientListMessage> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, PatientListMessage> _deadLetterExceptionHandler;
         private readonly IServiceScopeFactory _serviceScopeFactory;
-        private readonly ISubmissionEntryManager _submissionEntryManager;
+        private readonly IReportEntryStatusManager _reportEntryStatusManager;
         private string Name => this.GetType().Name;
 
         public PatientListsAcquiredListener(
             ILogger<PatientListsAcquiredListener> logger, 
             IKafkaConsumerFactory<string, PatientListMessage> kafkaConsumerFactory,
-            ISubmissionEntryManager submissionEntryManager,
+            IReportEntryStatusManager reportEntryStatusManager,
             ITransientExceptionHandler<string, PatientListMessage> transientExceptionHandler,
             IDeadLetterExceptionHandler<string, PatientListMessage> deadLetterExceptionHandler, 
             IServiceScopeFactory serviceScopeFactory)
@@ -38,7 +38,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _serviceScopeFactory = serviceScopeFactory;
 
-            _submissionEntryManager = submissionEntryManager;
+            _reportEntryStatusManager = reportEntryStatusManager;
 
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
@@ -118,14 +118,14 @@ namespace LantanaGroup.Link.Report.Listeners
                                             {
                                                 var patientId = pId.Split('/').Last();
 
-                                                var entry = await _submissionEntryManager.SingleOrDefaultAsync(e =>
+                                                var entry = await _reportEntryStatusManager.SingleOrDefaultAsync(e =>
                                                            e.ReportScheduleId == scheduledReport.Id
                                                            && e.PatientId == patientId
                                                            && e.ReportType == reportType, consumeCancellationToken);
 
                                                 if (entry == null)
                                                 {
-                                                    await _submissionEntryManager.AddAsync(new MeasureReportSubmissionEntryModel()
+                                                    await _reportEntryStatusManager.AddAsync(new ReportEntryStatusModel()
                                                     {
                                                         PatientId = patientId,
                                                         Status = PatientSubmissionStatus.PendingEvaluation,
@@ -133,12 +133,12 @@ namespace LantanaGroup.Link.Report.Listeners
                                                         FacilityId = scheduledReport.FacilityId,
                                                         ReportType = reportType,
                                                         CreateDate = DateTime.UtcNow,
-                                                    });
+                                                    }, cancellationToken);
                                                 }
                                                 else
                                                 {
                                                     entry.Status = PatientSubmissionStatus.PendingEvaluation;
-                                                    await _submissionEntryManager.UpdateAsync(entry);
+                                                    await _reportEntryStatusManager.UpdateAsync(entry, cancellationToken);
                                                 } 
                                             }
                                         }

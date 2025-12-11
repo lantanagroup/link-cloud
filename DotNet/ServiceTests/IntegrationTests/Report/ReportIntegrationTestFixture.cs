@@ -233,6 +233,7 @@ namespace IntegrationTests.Report
         public IBaseEntityRepository<SharedResourceModel> SharedResourceRepository { get; set; } = new InMemoryEntityRepository<SharedResourceModel>();
         public IBaseEntityRepository<ReportScheduleModel> ReportScheduledRepository { get; set; } = new InMemoryEntityRepository<ReportScheduleModel>();
         public IBaseEntityRepository<MeasureReportSubmissionEntryModel> SubmissionEntryRepository { get; set; } = new InMemoryEntityRepository<MeasureReportSubmissionEntryModel>();
+        public IBaseEntityRepository<ReportEntryStatusModel> ReportEntryStatusRepository { get; set; } = new InMemoryEntityRepository<ReportEntryStatusModel>();
     }
 
     public class InMemoryEntityRepository<T> : IBaseEntityRepository<T> where T : class, new()

@@ -1,12 +1,20 @@
-﻿using Hl7.Fhir.Model;
+﻿using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Specialized;
+using Google.Protobuf.WellKnownTypes;
+using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Interfaces;
+using LantanaGroup.Link.Report.Application.Options;
 using LantanaGroup.Link.Report.Application.ResourceCategories;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
+using Microsoft.Extensions.Options;
+using System.Text;
+using System.Threading;
 
 namespace LantanaGroup.Link.Report.Core
 {
@@ -20,6 +28,9 @@ namespace LantanaGroup.Link.Report.Core
         private readonly IReportServiceMetrics _metrics;
         private readonly IDatabase _database;
         private readonly IReportScheduledManager _reportScheduledManager;
+        private readonly BlobStorageService _blobStorageService;
+        private readonly BlobContainerClient _containerClient;
+        private readonly BlobStorageSettings _settings;
 
         private readonly List<string> REMOVE_EXTENSIONS = new List<string> {
         "http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.population.description",
@@ -33,12 +44,19 @@ namespace LantanaGroup.Link.Report.Core
         "http://open.epic.com/FHIR/StructureDefinition/extension/team-name",
         "https://open.epic.com/FHIR/StructureDefinition/extension/patient-merge-unmerge-instant"};
 
-        public PatientReportSubmissionBundler(ILogger<PatientReportSubmissionBundler> logger, IDatabase database, IReportServiceMetrics metrics, IReportScheduledManager reportScheduledManager)
+        public PatientReportSubmissionBundler(ILogger<PatientReportSubmissionBundler> logger, IDatabase database, IReportServiceMetrics metrics, IReportScheduledManager reportScheduledManager, BlobStorageService blobStorageService, IOptions<BlobStorageSettings> settings)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _metrics = metrics ?? throw new ArgumentException(nameof(metrics));
             _database = database ?? throw new ArgumentNullException(nameof(database));
             _reportScheduledManager = reportScheduledManager ?? throw new ArgumentNullException(nameof(reportScheduledManager));
+            _blobStorageService = blobStorageService;
+
+            _settings = settings.Value;
+            if (_settings.ConnectionString != null)
+            {
+                _containerClient = new BlobContainerClient(_settings.ConnectionString, _settings.BlobContainerName);
+            }
         }
 
 
@@ -144,6 +162,136 @@ namespace LantanaGroup.Link.Report.Core
             };
 
             return patientSubmissionModel;
+        }
+
+        public async Task<Uri> GenerateBundleToABS(string patientId, string reportScheduleId)
+        {
+            var entries = (await _database.ReportEntryStatusRepository.FindAsync(x => x.ReportScheduleId == reportScheduleId && x.PatientId == patientId)).ToList();
+
+            //TODO: Add missing entry check
+
+            //The 'resourcesAdded' Dictionary will keep track of FHIR resource id's that have been added to the bundle to avoid adding duplicates across entries. The value of each dictionary entry will contain the associated FHIR types. It's a string List type in case there are different FHIR resources that share the same id. This is probably unlikely to happen, but is possible. 
+            Dictionary<string, int> resourcesAdded = new Dictionary<string,int>();
+
+            BlockBlobClient blockWriteBlobClient = _containerClient.GetBlockBlobClient("Patient_" + patientId + ".ndjson");
+
+            using (Stream write_stream = await blockWriteBlobClient.OpenWriteAsync(true))
+            using (StreamWriter writer = new StreamWriter(write_stream))
+            {
+                foreach (var entry in entries)
+                {
+                    BlockBlobClient blockReadBlobClient = _containerClient.GetBlockBlobClient(entry.MeasureReportFileName);
+                    
+                    try
+                    {
+                        using (Stream read_stream = await blockReadBlobClient.OpenReadAsync(true))
+                        using (StreamReader reader = new StreamReader(read_stream))
+                        {
+                            while (reader.Peek() >= 0)
+                            {
+                                string resource_and_id = reader.ReadLine();
+
+                                if (resourcesAdded.ContainsKey(resource_and_id))
+                                {
+                                    //Skip FHIR Resource line
+                                    reader.Read();
+                                    continue;
+                                }
+
+                                resourcesAdded.Add(resource_and_id, 1);
+                                writer.WriteLine(reader.ReadLine());
+                            }
+                        }
+                    }
+                    catch (Exception ex) {
+                        //TODO: Do something with this catch
+                        throw ex;
+                    }
+                }
+            }
+
+            return blockWriteBlobClient.Uri;
+        }
+
+        public async Task<bool> GenerateBundleFromABS()
+        {
+            //The 'resourcesAdded' Dictionary will keep track of FHIR resource id's that have been added to the bundle to avoid adding duplicates across entries. The value of each dictionary entry will contain the associated FHIR types. It's a string List type in case there are different FHIR resources that share the same id. This is probably unlikely to happen, but is possible. 
+            Dictionary<string, List<string>> resourcesAdded = new Dictionary<string, List<string>>();
+            BlockBlobClient blockReadBlobClient = _containerClient.GetBlockBlobClient("Patient_3f993147-8cd4-44c6-bbb5-9f25fe428517");
+            BlockBlobClient blockWriteBlobClient = _containerClient.GetBlockBlobClient("Patient_3f993147-8cd4-44c6-bbb5-9f25fe428517.ndjson");
+
+            using (Stream read_stream = await blockReadBlobClient.OpenReadAsync(true))
+            using (Stream write_stream = await blockWriteBlobClient.OpenWriteAsync(true))
+            using (StreamReader reader = new StreamReader(read_stream)) 
+            using (StreamWriter writer = new StreamWriter(write_stream))
+                
+            while (reader.Peek() >= 0)
+            {
+                string[] resource_and_id = reader.ReadLine().Split("_");
+
+                if (resourcesAdded.ContainsKey(resource_and_id[1]) && resourcesAdded[resource_and_id[1]].Where(x => x == resource_and_id[0]).Any())
+                {
+                    //Skip resource line
+                    reader.Read();
+                    continue;
+                }
+
+                if (resourcesAdded.ContainsKey(resource_and_id[1]))
+                {
+                    resourcesAdded[resource_and_id[1]].Add(resource_and_id[0]);
+                }
+                else
+                {
+                    resourcesAdded.Add(resource_and_id[1], new List<string>() { resource_and_id[0] });
+                }
+
+                writer.WriteLine(reader.ReadLine());        
+            }
+
+
+            return true;
+        }
+
+        public async Task<bool> GenerateBundleFromABSMulti()
+        {
+            //The 'resourcesAdded' Dictionary will keep track of FHIR resource id's that have been added to the bundle to avoid adding duplicates across entries. The value of each dictionary entry will contain the associated FHIR types. It's a string List type in case there are different FHIR resources that share the same id. This is probably unlikely to happen, but is possible. 
+            Dictionary<string, List<string>> resourcesAdded = new Dictionary<string, List<string>>();
+            
+            BlockBlobClient blockWriteBlobClient = _containerClient.GetBlockBlobClient("Patient_3f993147-8cd4-44c6-bbb5-9f25fe428517.ndjson");
+
+            using (Stream write_stream = await blockWriteBlobClient.OpenWriteAsync(true))
+            using (StreamWriter writer = new StreamWriter(write_stream))
+
+                for (int i = 0; i < 2; i++) {
+                    BlockBlobClient blockReadBlobClient = _containerClient.GetBlockBlobClient("Patient_3f993147-8cd4-44c6-bbb5-9f25fe428517_multi_" + (i + 1));
+                    using (Stream read_stream = await blockReadBlobClient.OpenReadAsync(true))
+                    using (StreamReader reader = new StreamReader(read_stream))
+
+                        while (reader.Peek() >= 0)
+                        {
+                            string[] resource_and_id = reader.ReadLine().Split("_");
+
+                            if (resourcesAdded.ContainsKey(resource_and_id[1]) && resourcesAdded[resource_and_id[1]].Where(x => x == resource_and_id[0]).Any())
+                            {
+                                //Skip resource line
+                                reader.Read();
+                                continue;
+                            }
+
+                            if (resourcesAdded.ContainsKey(resource_and_id[1]))
+                            {
+                                resourcesAdded[resource_and_id[1]].Add(resource_and_id[0]);
+                            }
+                            else
+                            {
+                                resourcesAdded.Add(resource_and_id[1], new List<string>() { resource_and_id[0] });
+                            }
+
+                            writer.WriteLine(reader.ReadLine());
+                        }
+                }
+
+            return true;
         }
 
         #region Bundling Options
