@@ -19,6 +19,7 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
@@ -61,24 +62,26 @@ public class PatientCensusService : IPatientCensusService
 
     public async Task CreateLog(string facilityId, CancellationToken cancellationToken)
     {
-        List<PatientListModel> results = new List<PatientListModel>();
+        using var activity = Activity.Current?.Source.StartActivity();
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+    
         var facilityConfig = await _fhirQueryListConfigurationQueries.GetByFacilityIdAsync(facilityId, cancellationToken);
 
         if (facilityConfig == null)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, "Missing FHIR list configuration");
             throw new Exception(
                 $"Missing census configuration for facility {facilityId}. Unable to proceed with request.");
         }
 
-        var fhirQueryConfig = await _fhirQueryConfigurationQueries.GetByFacilityIdAsync(facilityConfig.FacilityId);
+        var fhirQueryConfig = await _fhirQueryConfigurationQueries.GetByFacilityIdAsync(facilityConfig.FacilityId, cancellationToken);
 
         if (fhirQueryConfig == null)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, "Missing FHIR query configuration");
             throw new Exception(
                 $"Missing FHIR query configuration for facility {facilityId}. Unable to proceed with request.");
         }
-
-        List<List> resultLists = new List<List>();
 
         try
         {
@@ -90,20 +93,36 @@ public class PatientCensusService : IPatientCensusService
                 ExecutionDate = DateTime.UtcNow,
                 Priority = AcquisitionPriority.Normal,
                 IsCensus = true,
-                ScheduledReport = new()
+                ScheduledReport = new ScheduledReport()
             };
 
             facilityConfig.EHRPatientLists.ForEach(x =>
             {
+                if (x.TimeFrame is null)
+                {
+                    activity?.SetStatus(ActivityStatusCode.Error, "Timeframe is null for list");
+                    activity?.AddTag("fhir.list.id", x.FhirId);
+                    activity?.AddTag("fhir.list.internal.id", x.InternalId );
+                    _logger.LogError("TimeFrame is null for list {listId} for facility {facilityId}.", x.FhirId, facilityId);
+                }
+
+                if (x.Status is null)
+                {
+                    activity?.SetStatus(ActivityStatusCode.Error, "Status is null for list");
+                    activity?.AddTag("fhir.list.id", x.FhirId);
+                    activity?.AddTag("fhir.list.internal.id", x.InternalId );
+                    _logger.LogError("Status is null for list {listId} for facility {facilityId}.", x.FhirId, facilityId);
+                }
+
                 log.FhirQuery.Add(
                     new CreateFhirQueryModel
                     {
                         FacilityId = facilityId,
                         QueryType = FhirQueryType.Read,
-                        ResourceTypes = new List<ResourceType> { ResourceType.List },
+                        ResourceTypes = [ResourceType.List],
                         IsReference = false,
-                        CensusTimeFrame = x.TimeFrame,
-                        CensusPatientStatus = x.Status,
+                        CensusTimeFrame = x.TimeFrame ?? throw new ArgumentNullException(nameof(x.TimeFrame)),
+                        CensusPatientStatus = x.Status ?? throw new ArgumentNullException(nameof(x.Status)),
                         CensusListId = x.FhirId
                     });
             });
@@ -112,6 +131,8 @@ public class PatientCensusService : IPatientCensusService
         }
         catch (Exception ex)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.AddTag(DiagnosticNames.StackTrace, ex.StackTrace);
             _logger.LogError(ex, "An error occurred while attempting to create the log entry. FacilityId: {facilityId}", facilityId);
             throw;
         }
