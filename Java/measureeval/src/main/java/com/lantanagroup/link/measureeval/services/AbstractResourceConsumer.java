@@ -1,9 +1,13 @@
 package com.lantanagroup.link.measureeval.services;
 
+import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.parser.IParser;
+import com.azure.storage.blob.BlobUrlParts;
 import com.lantanagroup.link.measureeval.entities.AbstractResourceEntity;
 import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
 import com.lantanagroup.link.measureeval.entities.PatientResource;
 import com.lantanagroup.link.measureeval.entities.SharedResource;
+import com.lantanagroup.link.shared.entities.ReportScheduleSummaryModel;
 import com.lantanagroup.link.shared.exceptions.ValidationException;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
@@ -14,6 +18,7 @@ import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.records.ResourceEvaluated;
 import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
+import com.lantanagroup.link.shared.services.ReportClient;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
@@ -49,6 +54,9 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     private final EvaluateMeasureService evaluateMeasureService;
     private final PatientStatusBundler patientStatusBundler;
     private final ResourceEvaluatedProducer resourceEvaluatedProducer;
+    private final BlobStorageService blobStorageService;
+    private final ReportClient reportClient;
+    private final FhirContext fhirContext;
 
     protected abstract NormalizationStatus getNormalizationStatus ();
 
@@ -63,7 +71,9 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             MeasureEvalMetrics measureEvalMetrics,
             EvaluateMeasureService evaluateMeasureService,
             PatientStatusBundler patientStatusBundler,
-            ResourceEvaluatedProducer resourceEvaluatedProducer) {
+            ResourceEvaluatedProducer resourceEvaluatedProducer,
+            BlobStorageService blobStorageService,
+            ReportClient reportClient, FhirContext fhirContext) {
         this.resourceRepository = resourceRepository;
         this.patientStatusRepository = patientStatusRepository;
         this.measureReportNormalizer = measureReportNormalizer;
@@ -74,6 +84,9 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         this.evaluateMeasureService = evaluateMeasureService;
         this.patientStatusBundler = patientStatusBundler;
         this.resourceEvaluatedProducer = resourceEvaluatedProducer;
+        this.blobStorageService = blobStorageService;
+        this.reportClient = reportClient;
+        this.fhirContext = fhirContext;
     }
 
     protected void doConsume (String correlationId, ConsumerRecord<String, T> record) {
@@ -111,23 +124,89 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             throw new ValidationException("Reportable Event is null or empty.");
         }
 
+        // If we've acquired/consumed all the resources for the patient, evaluate the patient's data against the measures;
+        // otherwise this instance of ResourceNormalized is intended to just persist the resource defined in the record within the database
         if (value.isAcquisitionComplete()) {
-            if (logger.isInfoEnabled()) {
-                logger.info("Consuming record: RECORD=[{}] FACILITY=[{}] CORRELATION=[{}] ACQUISITION COMPLETE=[{}]", KafkaUtils.format(record), facilityId, correlationId, value.isAcquisitionComplete());
-            }
+            this.evaluatePatient(facilityId, correlationId, record, value);
+        } else {
+            this.persistPatientResource(facilityId, correlationId, record, value);
+        }
+    }
 
-            PatientReportingEvaluationStatus patientStatus = retrievePatientStatus(facilityId, correlationId);
-
-            if (patientStatus == null) {
-                logger.debug("Patient status for facilityId: {}, correlationId: {} not found. Creating a temporary PatientStatus...", facilityId, correlationId);
-                patientStatus = createPatientStatus(facilityId, correlationId, value);
-            }
-
-            Bundle bundle = patientStatusBundler.createBundle(patientStatus);
-            evaluateMeasures(value, patientStatus, bundle);
-            return;
+    private void evaluatePatient(String facilityId, String correlationId, ConsumerRecord<String, T> record, T value) {
+        if (logger.isInfoEnabled()) {
+            logger.info("Consuming record: RECORD=[{}] FACILITY=[{}] CORRELATION=[{}] ACQUISITION COMPLETE=[{}]", KafkaUtils.format(record), facilityId, correlationId, value.isAcquisitionComplete());
         }
 
+        PatientReportingEvaluationStatus patientStatus = retrievePatientStatus(facilityId, correlationId);
+
+        if (patientStatus == null) {
+            logger.debug("Patient status for facilityId: {}, correlationId: {} not found. Creating a temporary PatientStatus...", facilityId, correlationId);
+            patientStatus = createPatientStatus(facilityId, correlationId, value);
+        }
+
+        Bundle bundle = patientStatusBundler.createBundle(patientStatus);
+
+        if (logger.isDebugEnabled()) {
+            logger.debug("Evaluating measures");
+        }
+
+        for (PatientReportingEvaluationStatus.Report report : patientStatus.getReports()) {
+            MeasureReport measureReport = evaluateMeasureService.evaluateMeasure(value.getQueryType().toString(), patientStatus, report, bundle);
+            this.storePatientInBlobStorage(patientStatus, measureReport);
+            /*
+            switch (value.getQueryType()) {
+                case INITIAL -> {
+                    updateReportability(patientStatus, report, measureReport);
+                    resourceEvaluatedProducer.produceResourceEvaluatedRecords(value.getQueryType(), patientStatus, report, measureReport);
+                }
+                case SUPPLEMENTAL -> resourceEvaluatedProducer.produceResourceEvaluatedRecords(value.getQueryType(), patientStatus, report, measureReport);
+                default -> throw new IllegalStateException(String.format("Unexpected query type: %s", value.getQueryType()));
+            }
+            */
+        }
+
+        boolean reportablePatient = patientStatus.getReports().stream().anyMatch(PatientReportingEvaluationStatus.Report::getReportable);
+
+        // if at least one reportable measure, increment the reportable patient counter otherwise increment the non-reportable patient counter
+        updatePatientMetrics(value, patientStatus, reportablePatient);
+
+        // if the query type is INITIAL and at least one measure is reportable, produce the DataAcquisitionRequested record
+        if (value.getQueryType() == QueryType.INITIAL && reportablePatient) {
+            produceDataAcquisitionRequestedRecord(value, patientStatus);
+        }
+    }
+
+    private void storePatientInBlobStorage(PatientReportingEvaluationStatus status, MeasureReport measureReport) {
+        IParser jsonParser = this.fhirContext.newJsonParser()
+                //.setSuppressNarratives(true)    // consider this if narrative "text" fields aren't desired downstream
+                .setPrettyPrint(false);     // Ensure no tab delim so that it serializes to a single line per each resource
+
+        for (PatientReportingEvaluationStatus.Report report : status.getReports()) {
+            ReportScheduleSummaryModel summary = this.reportClient.getReportScheduleSummaryModel(status.getFacilityId(), report.getReportTrackingId());
+            String payloadUri = summary.getPayloadRootUri();
+
+            if (payloadUri == null) {
+                throw new ValidationException("Payload URI for report " + report.getReportTrackingId() + " is null");
+            }
+
+            String patientIdPart = "patient-" + status.getPatientId();
+            String patientPayloadUri = payloadUri.endsWith("/") ? payloadUri + patientIdPart : payloadUri + "/" + patientIdPart;
+            StringBuilder sb = new StringBuilder();
+            List<Resource> resources = measureReportNormalizer.normalize(measureReport);
+            resources.add(0, measureReport);
+
+            for (Resource resource : resources) {
+                String idLine = resource.getResourceType() + "/" + resource.getId();
+                sb.append(idLine).append("\n");
+                sb.append(jsonParser.encodeResourceToString(resource)).append("\n");
+            }
+
+            blobStorageService.upload(payloadUri, sb.toString());
+        }
+    }
+
+    private void persistPatientResource(String facilityId, String correlationId, ConsumerRecord<String, T> record, T value) {
         if (logger.isInfoEnabled()) {
             logger.info("Consuming record: RECORD=[{}] FACILITY=[{}] CORRELATION=[{}] RESOURCE=[{}/{}] ACQUISITION COMPLETE=[{}]", KafkaUtils.format(record), facilityId, correlationId, value.getResourceType(), value.getResourceId(), value.isAcquisitionComplete());
             logger.info("Beginning resource update");
@@ -140,6 +219,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         if (logger.isInfoEnabled()) {
             logger.info("Beginning patient status update");
         }
+
         PatientReportingEvaluationStatus patientStatus = Objects.requireNonNullElseGet(retrievePatientStatus(facilityId, correlationId), () -> createPatientStatus(facilityId, correlationId, value));
 
         if (patientStatus.getPatientId() == null) {
@@ -222,32 +302,6 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                         })
                 ).collect(Collectors.toList()));
         return patientStatus;
-    }
-
-    private void evaluateMeasures (T value, PatientReportingEvaluationStatus patientStatus, Bundle bundle) {
-        if (logger.isDebugEnabled()) {
-            logger.debug("Evaluating measures");
-        }
-        for (PatientReportingEvaluationStatus.Report report : patientStatus.getReports()) {
-            MeasureReport measureReport = evaluateMeasureService.evaluateMeasure(value.getQueryType().toString(), patientStatus, report, bundle);
-            switch (value.getQueryType()) {
-                case INITIAL -> {
-                    updateReportability(patientStatus, report, measureReport);
-                    resourceEvaluatedProducer.produceResourceEvaluatedRecords(value.getQueryType(), patientStatus, report, measureReport);
-                }
-                case SUPPLEMENTAL -> resourceEvaluatedProducer.produceResourceEvaluatedRecords(value.getQueryType(), patientStatus, report, measureReport);
-                default -> throw new IllegalStateException(String.format("Unexpected query type: %s", value.getQueryType()));
-            }
-        }
-
-        boolean reportablePatient = patientStatus.getReports().stream().anyMatch(PatientReportingEvaluationStatus.Report::getReportable);
-        // if at least one reportable measure, increment the reportable patient counter otherwise increment the non-reportable patient counter
-        updatePatientMetrics(value, patientStatus, reportablePatient);
-
-        // if the query type is INITIAL and at least one measure is reportable, produce the DataAcquisitionRequested record
-        if (value.getQueryType() == QueryType.INITIAL && reportablePatient) {
-            produceDataAcquisitionRequestedRecord(value, patientStatus);
-        }
     }
 
     private void updatePatientMetrics (T value, PatientReportingEvaluationStatus patientStatus, boolean reportablePatient) {

@@ -1,6 +1,7 @@
 package com.lantanagroup.link.validation.controllers;
 
 import ca.uhn.fhir.context.FhirContext;
+import com.lantanagroup.link.shared.entities.ReportScheduleSummaryModel;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.CategorySnapshot;
 import com.lantanagroup.link.validation.entities.Result;
@@ -11,7 +12,7 @@ import com.lantanagroup.link.validation.entities.*;
 import com.lantanagroup.link.validation.repositories.ResultRepository;
 import com.lantanagroup.link.validation.services.CategorizationService;
 import com.lantanagroup.link.validation.services.PreQualService;
-import com.lantanagroup.link.validation.services.ReportClient;
+import com.lantanagroup.link.shared.services.ReportClient;
 import com.lantanagroup.link.validation.services.MetricService;
 import com.lantanagroup.link.validation.services.ValidationService;
 import io.swagger.v3.oas.annotations.Operation;

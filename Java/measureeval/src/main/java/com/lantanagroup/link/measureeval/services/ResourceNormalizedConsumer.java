@@ -1,5 +1,6 @@
 package com.lantanagroup.link.measureeval.services;
 
+import ca.uhn.fhir.context.FhirContext;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.measureeval.entities.NormalizationStatus;
@@ -9,6 +10,7 @@ import com.lantanagroup.link.measureeval.records.ResourceNormalized;
 import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 
+import com.lantanagroup.link.shared.services.ReportClient;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.hl7.fhir.r4.model.MeasureReport;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -32,7 +34,10 @@ public class ResourceNormalizedConsumer extends AbstractResourceConsumer<Resourc
           MeasureEvalMetrics measureEvalMetrics,
           EvaluateMeasureService evaluateMeasureService,
           PatientStatusBundler patientStatusBundler,
-          ResourceEvaluatedProducer resourceEvaluatedProducer){
+          ResourceEvaluatedProducer resourceEvaluatedProducer,
+          BlobStorageService blobStorageService,
+          ReportClient reportClient,
+          FhirContext fhirContext){
     super(
             resourceRepository,
             patientStatusRepository,
@@ -43,7 +48,10 @@ public class ResourceNormalizedConsumer extends AbstractResourceConsumer<Resourc
             measureEvalMetrics,
             evaluateMeasureService,
             patientStatusBundler,
-            resourceEvaluatedProducer);
+            resourceEvaluatedProducer,
+            blobStorageService,
+            reportClient,
+            fhirContext);
   }
 
   @Override

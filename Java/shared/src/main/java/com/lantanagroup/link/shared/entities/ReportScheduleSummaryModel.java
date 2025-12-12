@@ -1,4 +1,4 @@
-package com.lantanagroup.link.validation.entities;
+package com.lantanagroup.link.shared.entities;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -15,4 +15,5 @@ public class ReportScheduleSummaryModel {
     public Date endDate;
     public Date submitReportDateTime;
     public List<String> measures;
+    public String payloadRootUri;
 }

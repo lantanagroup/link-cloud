@@ -1,9 +1,8 @@
-package com.lantanagroup.link.validation.services;
+package com.lantanagroup.link.shared.services;
 
 import com.lantanagroup.link.shared.auth.JwtService;
-import com.lantanagroup.link.shared.services.Router;
-import com.lantanagroup.link.validation.entities.PatientSubmissionModel;
-import com.lantanagroup.link.validation.entities.ReportScheduleSummaryModel;
+import com.lantanagroup.link.shared.entities.PatientSubmissionModel;
+import com.lantanagroup.link.shared.entities.ReportScheduleSummaryModel;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.client.RestClient;
 
@@ -45,7 +44,7 @@ public class ReportClient extends Router {
     }
 
     private static class Routes {
-        public static final String SUBMISSION_MODEL = "submission-model";
-        public static final String REPORT_SCHEDULE_SUMMARY_MODEL = "report-schedule-summary-model";
+        public static final String SUBMISSION_MODEL = "api/Report/Submission";
+        public static final String REPORT_SCHEDULE_SUMMARY_MODEL = "api/Report/Schedule";
     }
 }
