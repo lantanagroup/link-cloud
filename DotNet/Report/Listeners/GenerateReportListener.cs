@@ -228,7 +228,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     
                                     _logger.LogDebug("Found {PatientCount} patients to re-generate for facility {FacilityId} from {StartDate} to {EndDate} with ID {ReportId}", patientMeasureReports.Count(), facilityId, startDate, endDate, reportId);
 
-                                    patientMeasureReports.AsParallel().ForAll(async p =>
+                                    foreach (var p in patientMeasureReports)
                                     {
                                         foreach (var reportType in reportTypes)
                                         {
@@ -265,7 +265,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                             _logger.LogError(ex, "An error was encountered generating an Evaluation Requested event.\n\tFacilityId: {facilityId}\n\tPatientId: {patientId}\n\tReportTrackingId: {reportTrackingId}",
                                                 facilityId, p, reportSchedule.Id);
                                         }
-                                    });
+                                    }
                                 }
                                 else
                                 {
@@ -281,7 +281,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     _logger.LogDebug("Found {PatientCount} patients to re-generate for facility {FacilityId} from {StartDate} to {EndDate}", value.PatientIds.Count, facilityId, startDate, endDate);
 
-                                    value.PatientIds.AsParallel().ForAll(async patient =>
+                                    foreach (var patient in value.PatientIds)
                                     {
                                         //For each patient and report type, Create Submission Entries for each Patient and Report Type
                                         foreach (var reportType in reportTypes)
@@ -296,7 +296,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                                 CreateDate = DateTime.UtcNow
                                             }, cancellationToken);
                                         }
-                                    });
+                                    }
 
                                     try
                                     {
