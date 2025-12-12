@@ -3,6 +3,7 @@
     public static class DiagnosticNames
     {
         //Diagnostic tag names
+        public const string StackTrace = "stack.trace";
         public const string Service = "service";
         public const string CorrelationId = "correlation.id";
         public const string ReportId = "report.id";

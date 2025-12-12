@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
@@ -5,6 +6,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
@@ -113,68 +115,65 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task<DataAcquisitionLogModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default)
     {
-        if (updateLog == null)
+        using var activity = Activity.Current?.Source.StartActivity();
+        
+        if (updateLog.Id is null or 0)
         {
-            throw new ArgumentNullException(nameof(updateLog));
-        }
-
-        if(updateLog.Id == default)
-        {
+            activity?.SetStatus(ActivityStatusCode.Error, "Log ID cannot be zero or null");
             throw new InvalidOperationException("Log ID cannot be zero or null");
         }
 
-        var existingLog = await _database.DataAcquisitionLogRepository.GetAsync(updateLog.Id);
+        var existingLog = await _database.DataAcquisitionLogRepository.GetAsync(updateLog.Id, cancellationToken);
 
-        if (existingLog == null)
+        if (existingLog is null)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, "Data acquisition log not found");
             throw new DataAcquisitionLogNotFoundException($"Data acquisition log with ID {updateLog.Id} not found.");
         }
 
-        if(updateLog.RetryAttempts != null)
+        if(updateLog.RetryAttempts is not null)
         {
             existingLog.RetryAttempts = updateLog.RetryAttempts;
         }
 
-        if (updateLog.ResourceAcquiredIds?.Any() ?? false)
+        if (updateLog.ResourceAcquiredIds is not null && updateLog.ResourceAcquiredIds.Count > 0)
         {
             existingLog.ResourceAcquiredIds = updateLog.ResourceAcquiredIds;
         }
 
-        if (updateLog.TraceId != null)
+        if (updateLog.TraceId is not null)
         {
             existingLog.TraceId = updateLog.TraceId;
         }
 
-        if (updateLog.ExecutionDate != null)
+        if (updateLog.ExecutionDate is not null)
         {
             existingLog.ExecutionDate = updateLog.ExecutionDate;
         }
 
-        if (updateLog.CompletionDate != null)
+        if (updateLog.CompletionDate is not null)
         {
             existingLog.CompletionDate = updateLog.CompletionDate;
         }
 
-        if (updateLog.CompletionTimeMilliseconds != null)
+        if (updateLog.CompletionTimeMilliseconds is not null)
         {
             existingLog.CompletionTimeMilliseconds = updateLog.CompletionTimeMilliseconds;
         }
 
-        if (updateLog.Notes != null)
+        if (updateLog.Notes is not null)
         {
             existingLog.Notes = updateLog.Notes;
         }
 
-        if (updateLog.Status != null)
+        if (updateLog.Status is not null)
         {
             existingLog.Status = updateLog.Status.Value;
         }
 
-        existingLog.ExecutionDate = updateLog.ExecutionDate != default ? updateLog.ExecutionDate : existingLog.ExecutionDate;
-
         existingLog.ModifyDate = DateTime.UtcNow;
 
-        await _database.DataAcquisitionLogRepository.SaveChangesAsync();
+        await _database.DataAcquisitionLogRepository.SaveChangesAsync(cancellationToken);
 
         return DataAcquisitionLogModel.FromDomain(existingLog);
     }

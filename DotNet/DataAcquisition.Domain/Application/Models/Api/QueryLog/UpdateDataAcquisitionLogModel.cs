@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryL
     public class UpdateDataAcquisitionLogModel
     {
         [Required, DataMember]
-        public required long Id { get; set; }
+        public required long? Id { get; set; }
         public RequestStatus? Status { get; set; }
         public int? RetryAttempts { get; set; }
         public List<string>? Notes { get; set; }
