@@ -155,223 +155,273 @@ public class SubmissionZipReader(ITestOutputHelper output)
             expectedEvalCounts, 
             issues);
     }
-    //public void ValidatePatientFile_2(List<ValidationIssue> issues)
-    //{
-    //    const string fileName = TestConfig.singleMeasureAdHocTestPatient_Two;
+    public void ValidatePatientFile_2(List<ValidationIssue> issues)
+    {
+        const string fileName = TestConfig.singleMeasureAdHocTestPatient_Two;
 
-    //    var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
-    //    {
-    //        ["Observation"] = 126,
-    //        ["ServiceRequest"] = 126,
-    //        ["MedicationRequest"] = 4,
-    //        ["Medication"] = 4,
-    //        ["Condition"] = 4,
-    //        ["Coverage"] = 2,
-    //        ["Encounter"] = 2,
-    //        ["Location"] = 2,
-    //        ["Patient"] = 1,
-    //        ["OperationOutcome"] = 1,
-    //        ["MeasureReport"] = 1
-    //    };
+        // ✅ INPUT is source-of-truth expectations (+ pipeline-added MR/OO)
+        var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ServiceRequest"] = 126,
+            ["Observation"] = 126,
+            ["Specimen"] = 126,
+            ["MedicationAdministration"] = 4,
+            ["MedicationRequest"] = 4,
+            ["Medication"] = 4,
+            ["Condition"] = 4,
+            ["Location"] = 4,
+            ["Encounter"] = 2,
+            ["Coverage"] = 2,
+            ["Patient"] = 1,
 
-    //    var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
-    //    {
-    //        ["__TOTAL__"] = 271,
-    //        ["Observation"] = 126,
-    //        ["ServiceRequest"] = 126,
-    //        ["MedicationRequest"] = 4,
-    //        ["Medication"] = 4,
-    //        ["Condition"] = 4,
-    //        ["Coverage"] = 2,
-    //        ["Encounter"] = 2,
-    //        ["Location"] = 2,
-    //        ["Patient"] = 1
-    //    };
+            // pipeline-created
+            ["OperationOutcome"] = 1,
+            ["MeasureReport"] = 1
+        };
 
-    //    ValidateSinglePatientFile(
-    //        fileName,
-    //        expectedBundleCounts,
-    //        expectedEvalCounts,
-    //        issues);
-    //}
-    //public void ValidatePatientFile_3(List<ValidationIssue> issues)
-    //{
-    //    const string fileName = TestConfig.singleMeasureAdHocTestPatient_Three;
+        // ✅ evaluatedResource should “reflect” what makes it into the output.
+        // But since you're enforcing INPUT as truth, it’s useful to ALSO expect input totals here,
+        // because it will highlight omissions (as warnings/errors per your config).
+        var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["__TOTAL__"] = 403, // sum of all non-excluded input types below
 
-    //    var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
-    //    {
-    //        ["ServiceRequest"] = 16,
-    //        ["Observation"] = 5,
-    //        ["Condition"] = 2,
-    //        ["Procedure"] = 2,
-    //        ["Encounter"] = 1,
-    //        ["DiagnosticReport"] = 1,
-    //        ["Coverage"] = 1,
-    //        ["MedicationRequest"] = 1,
-    //        ["Medication"] = 1,
-    //        ["Device"] = 1,
-    //        ["Patient"] = 1,
-    //        ["Location"] = 1,
-    //        ["OperationOutcome"] = 1,
-    //        ["MeasureReport"] = 1
-    //    };
+            ["ServiceRequest"] = 126,
+            ["Observation"] = 126,
+            ["Specimen"] = 126,
+            ["MedicationAdministration"] = 4,
+            ["MedicationRequest"] = 4,
+            ["Medication"] = 4,
+            ["Condition"] = 4,
+            ["Location"] = 4,
+            ["Encounter"] = 2,
+            ["Coverage"] = 2,
+            ["Patient"] = 1
+            // excluded: MeasureReport, OperationOutcome
+        };
 
-    //    var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
-    //    {
-    //        ["__TOTAL__"] = 33,
-    //        ["ServiceRequest"] = 16,
-    //        ["Observation"] = 5,
-    //        ["Condition"] = 2,
-    //        ["Procedure"] = 2,
-    //        ["Encounter"] = 1,
-    //        ["DiagnosticReport"] = 1,
-    //        ["Coverage"] = 1,
-    //        ["MedicationRequest"] = 1,
-    //        ["Medication"] = 1,
-    //        ["Device"] = 1,
-    //        ["Patient"] = 1,
-    //        ["Location"] = 1
-    //    };
+        ValidateSinglePatientFile(fileName, expectedBundleCounts, expectedEvalCounts, issues);
+    }
+    public void ValidatePatientFile_3(List<ValidationIssue> issues)
+    {
+        const string fileName = TestConfig.singleMeasureAdHocTestPatient_Three;
 
-    //    ValidateSinglePatientFile(
-    //        fileName,
-    //        expectedBundleCounts,
-    //        expectedEvalCounts,
-    //        issues);
-    //}
-    //public void ValidatePatientFile_4(List<ValidationIssue> issues)
-    //{
-    //    const string fileName = TestConfig.singleMeasureAdHocTestPatient_Four;
+        // 🔹 Bundle-level expectations (INPUT bundle + MR + OO created by pipeline)
+        var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ServiceRequest"] = 16,
+            ["Observation"] = 5,
+            ["MedicationAdministration"] = 4,
+            ["Specimen"] = 4,
+            ["Location"] = 3,
+            ["Condition"] = 2,
+            ["Medication"] = 2,
+            ["MedicationRequest"] = 2,
+            ["Procedure"] = 2,
+            ["Patient"] = 1,
+            ["Encounter"] = 1,
+            ["Coverage"] = 1,
+            ["Device"] = 1,
+            ["DiagnosticReport"] = 1,
 
-    //    var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
-    //    {
-    //        ["ServiceRequest"] = 27,
-    //        ["Observation"] = 9,
-    //        ["Procedure"] = 4,
-    //        ["MedicationRequest"] = 2,
-    //        ["DiagnosticReport"] = 2,
-    //        ["Encounter"] = 2,
-    //        ["Medication"] = 2,
-    //        ["Device"] = 2,
-    //        ["Coverage"] = 2,
-    //        ["Condition"] = 2,
-    //        ["Location"] = 1,
-    //        ["Patient"] = 1,
-    //        ["OperationOutcome"] = 1,
-    //        ["MeasureReport"] = 1
-    //    };
+            // Created by the pipeline, not in the raw input:
+            ["OperationOutcome"] = 1,
+            ["MeasureReport"] = 1
+        };
 
-    //    var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
-    //    {
-    //        ["__TOTAL__"] = 56,
-    //        ["ServiceRequest"] = 27,
-    //        ["Observation"] = 9,
-    //        ["Procedure"] = 4,
-    //        ["MedicationRequest"] = 2,
-    //        ["DiagnosticReport"] = 2,
-    //        ["Encounter"] = 2,
-    //        ["Medication"] = 2,
-    //        ["Device"] = 2,
-    //        ["Coverage"] = 2,
-    //        ["Condition"] = 2,
-    //        ["Location"] = 1,
-    //        ["Patient"] = 1
-    //    };
+        // 🔹 evaluatedResource expectations (exclude OO + MR)
+        var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["__TOTAL__"] = 45, // sum of all non-excluded resources above
 
-    //    ValidateSinglePatientFile(
-    //        fileName,
-    //        expectedBundleCounts,
-    //        expectedEvalCounts,
-    //        issues);
-    //}
-    //public void ValidatePatientFile_5(List<ValidationIssue> issues)
-    //{
-    //    const string fileName = TestConfig.singleMeasureAdHocTestPatient_Five;
+            ["ServiceRequest"] = 16,
+            ["Observation"] = 5,
+            ["MedicationAdministration"] = 4,
+            ["Specimen"] = 4,
+            ["Location"] = 3,
+            ["Condition"] = 2,
+            ["Medication"] = 2,
+            ["MedicationRequest"] = 2,
+            ["Procedure"] = 2,
+            ["Patient"] = 1,
+            ["Encounter"] = 1,
+            ["Coverage"] = 1,
+            ["Device"] = 1,
+            ["DiagnosticReport"] = 1
+        };
 
-    //    var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
-    //    {
-    //        ["ServiceRequest"] = 31,
-    //        ["Observation"] = 11,
-    //        ["Condition"] = 2,
-    //        ["MedicationRequest"] = 2,
-    //        ["Medication"] = 2,
-    //        ["Encounter"] = 1,
-    //        ["Procedure"] = 1,
-    //        ["Location"] = 1,
-    //        ["DiagnosticReport"] = 1,
-    //        ["Patient"] = 1,
-    //        ["Coverage"] = 1,
-    //        ["OperationOutcome"] = 1,
-    //        ["MeasureReport"] = 1
-    //    };
+        ValidateSinglePatientFile(
+            fileName,
+            expectedBundleCounts,
+            expectedEvalCounts,
+            issues);
+    }
 
-    //    var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
-    //    {
-    //        ["__TOTAL__"] = 54,
-    //        ["ServiceRequest"] = 31,
-    //        ["Observation"] = 11,
-    //        ["Condition"] = 2,
-    //        ["MedicationRequest"] = 2,
-    //        ["Medication"] = 2,
-    //        ["Encounter"] = 1,
-    //        ["Procedure"] = 1,
-    //        ["Location"] = 1,
-    //        ["DiagnosticReport"] = 1,
-    //        ["Patient"] = 1,
-    //        ["Coverage"] = 1
-    //    };
+    public void ValidatePatientFile_4(List<ValidationIssue> issues)
+    {
+        const string fileName = TestConfig.singleMeasureAdHocTestPatient_Four;
 
-    //    ValidateSinglePatientFile(
-    //        fileName,
-    //        expectedBundleCounts,
-    //        expectedEvalCounts,
-    //        issues);
-    //}
-    //public void ValidatePatientFile_6(List<ValidationIssue> issues)
-    //{
-    //    const string fileName = TestConfig.singleMeasureAdHocTestPatient_Six;
+        // 🔹 Bundle-level expectations (INPUT bundle + MR + OO created by pipeline)
+        var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ServiceRequest"] = 27,
+            ["MedicationAdministration"] = 13,
+            ["Observation"] = 9,
+            ["Location"] = 6,
+            ["Condition"] = 4,
+            ["Medication"] = 4,
+            ["MedicationRequest"] = 4,
+            ["Specimen"] = 4,
+            ["Procedure"] = 4,
+            ["Encounter"] = 2,
+            ["Coverage"] = 2,
+            ["Device"] = 2,
+            ["DiagnosticReport"] = 2,
+            ["Patient"] = 1,
 
-    //    var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
-    //    {
-    //        ["ServiceRequest"] = 116,
-    //        ["Observation"] = 23,
-    //        ["Medication"] = 4,
-    //        ["MedicationRequest"] = 4,
-    //        ["Condition"] = 4,
-    //        ["Procedure"] = 3,
-    //        ["Coverage"] = 2,
-    //        ["Location"] = 2,
-    //        ["Encounter"] = 2,
-    //        ["DiagnosticReport"] = 2,
-    //        ["Patient"] = 1,
-    //        ["Device"] = 1,
-    //        ["OperationOutcome"] = 1,
-    //        ["MeasureReport"] = 1
-    //    };
+            // Created by the pipeline, not in the raw input:
+            ["OperationOutcome"] = 1,
+            ["MeasureReport"] = 1
+        };
 
-    //    var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
-    //    {
-    //        ["__TOTAL__"] = 164,
-    //        ["ServiceRequest"] = 116,
-    //        ["Observation"] = 23,
-    //        ["Medication"] = 4,
-    //        ["MedicationRequest"] = 4,
-    //        ["Condition"] = 4,
-    //        ["Procedure"] = 3,
-    //        ["Coverage"] = 2,
-    //        ["Location"] = 2,
-    //        ["Encounter"] = 2,
-    //        ["DiagnosticReport"] = 2,
-    //        ["Patient"] = 1,
-    //        ["Device"] = 1
-    //    };
+        // 🔹 evaluatedResource expectations (exclude OO + MR)
+        var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["__TOTAL__"] = 84, // sum of all non-excluded resources above
 
-    //    ValidateSinglePatientFile(
-    //        fileName,
-    //        expectedBundleCounts,
-    //        expectedEvalCounts,
-    //        issues);
-    //}
+            ["ServiceRequest"] = 27,
+            ["MedicationAdministration"] = 13,
+            ["Observation"] = 9,
+            ["Location"] = 6,
+            ["Condition"] = 4,
+            ["Medication"] = 4,
+            ["MedicationRequest"] = 4,
+            ["Specimen"] = 4,
+            ["Procedure"] = 4,
+            ["Encounter"] = 2,
+            ["Coverage"] = 2,
+            ["Device"] = 2,
+            ["DiagnosticReport"] = 2,
+            ["Patient"] = 1
+        };
+
+        ValidateSinglePatientFile(
+            fileName,
+            expectedBundleCounts,
+            expectedEvalCounts,
+            issues);
+    }
+
+    public void ValidatePatientFile_5(List<ValidationIssue> issues)
+    {
+        const string fileName = TestConfig.singleMeasureAdHocTestPatient_Five;
+
+        // 🔹 Bundle-level expectations (INPUT bundle + MR + OO created by pipeline)
+        var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ServiceRequest"] = 31,
+            ["Observation"] = 11,
+            ["Specimen"] = 8,
+            ["MedicationAdministration"] = 3,
+            ["Location"] = 3,
+            ["Condition"] = 2,
+            ["Medication"] = 2,
+            ["MedicationRequest"] = 2,
+            ["Patient"] = 1,
+            ["Encounter"] = 1,
+            ["Coverage"] = 1,
+            ["Device"] = 1,
+            ["Procedure"] = 1,
+            ["DiagnosticReport"] = 1,
+
+            // Created by the pipeline, not in the raw input:
+            ["OperationOutcome"] = 1,
+            ["MeasureReport"] = 1
+        };
+
+        // 🔹 evaluatedResource expectations (exclude OO + MR)
+        var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["__TOTAL__"] = 68, // sum of all non-excluded resources above
+
+            ["ServiceRequest"] = 31,
+            ["Observation"] = 11,
+            ["Specimen"] = 8,
+            ["MedicationAdministration"] = 3,
+            ["Location"] = 3,
+            ["Condition"] = 2,
+            ["Medication"] = 2,
+            ["MedicationRequest"] = 2,
+            ["Patient"] = 1,
+            ["Encounter"] = 1,
+            ["Coverage"] = 1,
+            ["Device"] = 1,
+            ["Procedure"] = 1,
+            ["DiagnosticReport"] = 1
+        };
+
+        ValidateSinglePatientFile(
+            fileName,
+            expectedBundleCounts,
+            expectedEvalCounts,
+            issues);
+    }
+
+    public void ValidatePatientFile_6(List<ValidationIssue> issues)
+    {
+        const string fileName = TestConfig.singleMeasureAdHocTestPatient_Six;
+
+        // 🔹 Bundle-level expectations (INPUT bundle + MR + OO created by pipeline)
+        var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ServiceRequest"] = 116,
+            ["Observation"] = 23,
+            ["MedicationAdministration"] = 19,
+            ["Specimen"] = 19,
+            ["Procedure"] = 3,
+            ["Condition"] = 4,
+            ["MedicationRequest"] = 4,
+            ["Medication"] = 4,
+            ["DiagnosticReport"] = 2,
+            ["Encounter"] = 2,
+            ["Coverage"] = 2,
+            ["Device"] = 2,
+            ["Location"] = 4,
+            ["Patient"] = 1,
+
+            // Created by the pipeline, not in the raw input:
+            ["OperationOutcome"] = 1,
+            ["MeasureReport"] = 1
+        };
+
+        // 🔹 evaluatedResource expectations (exclude OO + MR)
+        var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["__TOTAL__"] = 205, // sum of all non-excluded types above (i.e., INPUT total)
+
+            ["ServiceRequest"] = 116,
+            ["Observation"] = 23,
+            ["MedicationAdministration"] = 19,
+            ["Specimen"] = 19,
+            ["Procedure"] = 3,
+            ["Condition"] = 4,
+            ["MedicationRequest"] = 4,
+            ["Medication"] = 4,
+            ["DiagnosticReport"] = 2,
+            ["Encounter"] = 2,
+            ["Coverage"] = 2,
+            ["Device"] = 2,
+            ["Location"] = 4,
+            ["Patient"] = 1
+        };
+
+        ValidateSinglePatientFile(
+            fileName,
+            expectedBundleCounts,
+            expectedEvalCounts,
+            issues);
+    }
+
     private void ValidateSinglePatientFile(
     string fileName,
     Dictionary<string, int> expectedBundleCounts,
@@ -446,20 +496,24 @@ public class SubmissionZipReader(ITestOutputHelper output)
         {
             var type = kv.Key;
             var expected = kv.Value;
-            var actual = bundleCounts.TryGetValue(type, out var n) ? n : 0;
+
+            var exists = bundleCounts.TryGetValue(type, out var actual);
+
+            if (!exists && expected > 0)
+            {
+                ReportIssue(fileName, type,
+                    ValidationIssueType.MissingResourceTypeInBundle,
+                    $"Missing required resourceType '{type}' (expected {expected}, got 0).",
+                    issues);
+                continue;
+            }
 
             if (actual != expected)
             {
-                var got = string.Join(", ",
-                    bundleCounts.OrderBy(x => x.Key)
-                                .Select(x => $"{x.Key}={x.Value}"));
-
-                ReportIssue(
-                    fileName,
-                    resourceType: type,
-                    issueType: ValidationIssueType.BundleCountMismatch,
-                    message: $"Bundle count mismatch for '{type}': expected {expected}, got {actual}.",
-                    issues: issues);
+                ReportIssue(fileName, type,
+                    ValidationIssueType.BundleCountMismatch,
+                    $"Bundle count mismatch for '{type}': expected {expected}, got {actual}.",
+                    issues);
             }
         }
 
@@ -1112,13 +1166,13 @@ public class SubmissionZipReader(ITestOutputHelper output)
     {
         var issues = new List<ValidationIssue>();
 
-        // 🔹 Run validations for all patients (you can uncomment others as you bring them online)
+        // 🩺 Run whichever patients you want right now
         ValidatePatientFile_1(issues);
-        //ValidatePatientFile_2(issues);
-        //ValidatePatientFile_3(issues);
-        //ValidatePatientFile_4(issues);
-        //ValidatePatientFile_5(issues);
-        //ValidatePatientFile_6(issues);
+        ValidatePatientFile_2(issues);
+        ValidatePatientFile_3(issues);
+        ValidatePatientFile_4(issues);
+        ValidatePatientFile_5(issues);
+        ValidatePatientFile_6(issues);
 
         if (issues.Count == 0)
         {
@@ -1126,81 +1180,92 @@ public class SubmissionZipReader(ITestOutputHelper output)
             return;
         }
 
-        // Column widths so pipes line up nicely
-        const int issueWidth = 24;
-        const int severityWidth = 8;
-        const int fileWidth = 60;
-        const int resourceWidth = 14;
-        const int descWidth = 120;
+        // ==========================================
+        //           OVERALL SUMMARY HEADER
+        // ==========================================
+        output.WriteLine(string.Empty);
+        output.WriteLine("==========================================");
+        output.WriteLine("        PATIENT VALIDATION SUMMARY");
+        output.WriteLine("==========================================");
+        output.WriteLine(string.Empty);
 
-        // Group by patient file so each has its own block
+        // Group issues by patient file
         var groups = issues
             .GroupBy(i => i.FileName)
             .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase);
 
-        output.WriteLine(""); // spacing before everything
-        output.WriteLine("====================================");
-        output.WriteLine("        PATIENT VALIDATION SUMMARY");
-        output.WriteLine("====================================");
-        output.WriteLine("");
-
         foreach (var group in groups)
         {
-            var fileName = group.Key;
+            output.WriteLine("------------------------------------------");
+            output.WriteLine($" PATIENT FILE: {group.Key}");
+            output.WriteLine("------------------------------------------");
+            output.WriteLine(string.Empty);
 
-            // ----- Per-patient header -----
-            output.WriteLine("------------------------------------------------------------");
-            output.WriteLine($" PATIENT FILE: {fileName}");
-            output.WriteLine("------------------------------------------------------------");
-            output.WriteLine("");
-
-            // Table header for this patient
             string header =
-                $"| {"Issue Type".PadRight(issueWidth)} " +
-                $"| {"Severity".PadRight(severityWidth)} " +
-                $"| {"Resource".PadRight(resourceWidth)} " +
-                $"| Description";
+                $"| {"Issue Type",-24} | {"Severity",-7} | {"Resource",-12} | Description";
 
             output.WriteLine(header);
             output.WriteLine(new string('-', header.Length));
 
-            // Rows for this patient
             foreach (var issue in group)
             {
-                string issueCol = Truncate(issue.IssueType.ToString(), issueWidth).PadRight(issueWidth);
-                string severityCol = Truncate(issue.Severity.ToString(), severityWidth).PadRight(severityWidth);
-                string resourceCol = Truncate(issue.ResourceType, resourceWidth).PadRight(resourceWidth);
+                string description = issue.Message;
 
-                // Description is already trimmed in ReportIssue (except TOTAL breakdown),
-                // but we still guard it to avoid overflowing too hard.
-                string descCol = Truncate(issue.Message, descWidth);
+                // Shorten TOTAL row message for table display
+                if (issue.IssueType == ValidationIssueType.EvaluatedCountMismatch &&
+                    string.Equals(issue.ResourceType, "__TOTAL__", StringComparison.OrdinalIgnoreCase))
+                {
+                    var idx = description.IndexOf("Breakdown:", StringComparison.OrdinalIgnoreCase);
+                    if (idx > 0)
+                        description = description[..idx].TrimEnd();
+                }
 
                 string row =
-                    $"| {issueCol} | {severityCol} | {resourceCol} | {descCol}";
+                    $"| {issue.IssueType,-24} | {issue.Severity,-7} | {issue.ResourceType,-12} | {description}";
                 output.WriteLine(row);
             }
 
-            output.WriteLine(""); // blank line after each patient section
+            // blank line between patients
+            output.WriteLine(string.Empty);
         }
 
-        // ===== Global totals across all patients =====
-        int totalErrors = issues.Count(i => i.Severity == ValidationSeverity.Error);
+        // ======= TOTALS FOR ALL PATIENTS =======
         int totalWarnings = issues.Count(i => i.Severity == ValidationSeverity.Warning);
+        int totalErrors = issues.Count(i => i.Severity == ValidationSeverity.Error);
 
-        output.WriteLine("====================================");
+        output.WriteLine("==========================================");
         output.WriteLine($"TOTAL WARNINGS (all patients): {totalWarnings}");
         output.WriteLine($"TOTAL ERRORS   (all patients): {totalErrors}");
-        output.WriteLine("====================================");
-        output.WriteLine("");
-        output.WriteLine("");
+        output.WriteLine("==========================================");
+        output.WriteLine(string.Empty);
+        output.WriteLine(string.Empty);
 
-        bool hasError = totalErrors > 0;
+        // ======= FULL BREAKDOWN FOR TOTAL ROWS =======
+        var totalBreakdowns = issues
+            .Where(i =>
+                i.IssueType == ValidationIssueType.EvaluatedCountMismatch &&
+                string.Equals(i.ResourceType, "__TOTAL__", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(i => i.FileName)
+            .ToList();
+
+        if (totalBreakdowns.Count > 0)
+        {
+            output.WriteLine("Detailed evaluatedResource '__TOTAL__' breakdowns:");
+            foreach (var issue in totalBreakdowns)
+            {
+                output.WriteLine($"- {issue.FileName}: {issue.Message}");
+            }
+            output.WriteLine(string.Empty);
+        }
+
+        // Final result behavior depends on severity settings
+        bool hasError = issues.Any(i => i.Severity == ValidationSeverity.Error);
 
         if (hasError)
         {
             throw new Exception(
-                $"Found {totalErrors} error-level validation issue(s) across all patients. " +
-                "See summary tables above.");
+                $"Found {issues.Count(i => i.Severity == ValidationSeverity.Error)} error-level validation issue(s). " +
+                "See summary table above.");
         }
 
         output.WriteLine("🟠 Validation completed with warnings but no errors.");
