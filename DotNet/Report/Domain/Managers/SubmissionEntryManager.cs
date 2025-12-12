@@ -190,7 +190,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         public async Task<PatientSubmissionEntry> AddAsync(PatientSubmissionEntry entity, CancellationToken cancellationToken = default)
         {
             var result = await _database.SubmissionEntryRepository.AddAsync(entity, cancellationToken);
-            _database.SaveChangesAsync();
+            await _database.SaveChangesAsync();
             return result;
         }
 
