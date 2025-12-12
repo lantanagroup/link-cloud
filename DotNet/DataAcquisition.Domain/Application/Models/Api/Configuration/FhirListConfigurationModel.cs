@@ -95,9 +95,9 @@ public class FhirListConfigurationModel
 public class EhrPatientListModel
 {
     [Required]
-    public ListType Status { get; set; }
+    public ListType? Status { get; set; }
     [Required]
-    public TimeFrame TimeFrame { get; set; }
+    public TimeFrame? TimeFrame { get; set; }
     public string? InternalId { get; set; }
     [Required]
     public string FhirId { get; set; }

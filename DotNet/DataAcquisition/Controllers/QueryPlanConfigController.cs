@@ -217,7 +217,6 @@ public class QueryPlanConfigController : Controller
     /// Updates a QueryPlanConfig record for a facilityId, queryPlanType, and queryPlan.
     /// </summary>
     /// <param name="facilityId"></param>
-    /// <param name="queryPlanType"></param>
     /// <param name="queryPlan"></param>
     /// <param name="cancellationToken"></param>
     /// <returns>
@@ -317,6 +316,7 @@ public class QueryPlanConfigController : Controller
     /// Hard deletes a QueryPlanConfig for a given facilityId and queryPlanType.
     /// </summary>
     /// <param name="facilityId"></param>
+    /// <param name="parameters"></param>
     /// <param name="cancellationToken"></param>
     /// <returns>
     ///     Success: 202
