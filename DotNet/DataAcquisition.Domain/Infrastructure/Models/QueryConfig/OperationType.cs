@@ -2,5 +2,7 @@
 
 public enum OperationType
 {
-    Read, Search
+    Read, 
+    Search,
+    SearchPost
 }
