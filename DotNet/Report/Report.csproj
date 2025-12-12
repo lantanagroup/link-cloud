@@ -54,6 +54,7 @@
     <PackageReference Include="StackExchange.Redis.Extensions.System.Text.Json" Version="11.*" />
 	<PackageReference Include="StackExchange.Redis.Extensions.AspNetCore" Version="11.*" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
+    <PackageReference Include="System.Text.Json" Version="8.0.6" />
   </ItemGroup>
 
   <ItemGroup>

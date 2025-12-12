@@ -44,13 +44,14 @@
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.*" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.0.0-beta.11" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.14.0-beta.2" />
     <PackageReference Include="Serilog.AspNetCore" Version="8.*" />
     <PackageReference Include="Serilog.Enrichers.Span" Version="3.*" />
     <PackageReference Include="Serilog.Exceptions" Version="8.*" />
     <PackageReference Include="Serilog.Expressions" Version="4.*" />
     <PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.*" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
+    <PackageReference Include="System.Text.Json" Version="8.0.6" />
   </ItemGroup>
 
 	<ItemGroup>
