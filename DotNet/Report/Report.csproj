@@ -31,7 +31,7 @@
 	</ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.*" />
+    <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.*" />
     <PackageReference Include="AutoMapper" Version="13.*" />
     <PackageReference Include="Azure.Identity" Version="1.*" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.*" />
@@ -54,7 +54,7 @@
     <PackageReference Include="StackExchange.Redis.Extensions.System.Text.Json" Version="11.*" />
 	<PackageReference Include="StackExchange.Redis.Extensions.AspNetCore" Version="11.*" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
-    <PackageReference Include="System.Text.Json" Version="8.0.6" />
+    <PackageReference Include="System.Text.Json" Version="8.*" />
   </ItemGroup>
 
   <ItemGroup>
