@@ -151,7 +151,7 @@ All times are stored in UTC format. The tenant's time zone is configured with a 
 
 **Initial / Supplemental Queries**
 
-The previously mentioned progression query phases (initial, supplemental) are configurable through the query plan. Each configured phase can contain a list of FHIR resources that must be acquired from the configured endpoint.  
+The previously mentioned progressive query phases (initial, supplemental) are configurable through the query plan. Each configured phase can contain a list of FHIR resources that must be acquired from the configured endpoint.  
 
 **Query Types**
 
@@ -170,7 +170,7 @@ Below is an example of a monthly query plan that's configured to acquire the fol
 | -------   | ---------  | ---------------------------------------------------------------------------------------------------    |
 | Patient   | N/A        | Patient resources will always be queried for each configured query plan. No configuration is needed.   |
 | Encounter | Parameter  | The following parameters are included in the search: patient id, period start date and period end date |
-| Location  | Reference  | Any Location FHIR references found in other acquired initial resources will be queried for. 'SearchPost' will perform a HTTP POST search for Locations rather than a GET. If an OperationType is not added, it will default to performing a GET search. [Link Here](https://hl7.org/fhir/R4/search.html#Introduction) for more info on FHIR searches. |
+| Location  | Reference  | Any Location FHIR references found in other acquired initial resources will be queried for. 'SearchPost' will perform an HTTP POST search for Locations rather than a GET. If an OperationType is not added, it will default to performing a GET search. [Link Here](https://hl7.org/fhir/R4/search.html#Introduction) for more info on FHIR searches. |
 
 2. Supplemental Query Phase:
 
