@@ -1,4 +1,3 @@
-using Azure.Identity;
 using HealthChecks.UI.Client;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Extensions;
@@ -9,6 +8,7 @@ using LantanaGroup.Link.Report.Application.Options;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Report.Domain.Queries;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.KafkaProducers;
@@ -37,8 +37,10 @@ using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
+using MongoDB.Driver;
 using Quartz;
 using Quartz.Spi;
 using Reddoxx.Quartz.MongoDbJobStore.Locking;
@@ -96,6 +98,32 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
     builder.Services.Configure<BlobStorageSettings>(builder.Configuration.GetSection(BlobStorageSettings.Key));
 
+    // Bind MongoConnection settings from configuration (e.g., appsettings.json)
+    builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.Mongo));
+
+    // Register IMongoClient as a singleton using the configured connection string
+    builder.Services.AddSingleton<IMongoClient>(sp =>
+    {
+        var mongoSettings = sp.GetRequiredService<IOptions<MongoConnection>>().Value;
+        return new MongoClient(mongoSettings.ConnectionString);
+    });
+
+    // Register IMongoDatabase as a singleton using the shared client and database name
+    builder.Services.AddSingleton<IMongoDatabase>(sp =>
+    {
+        var mongoSettings = sp.GetRequiredService<IOptions<MongoConnection>>().Value;
+        var client = sp.GetRequiredService<IMongoClient>();
+        return client.GetDatabase(mongoSettings.DatabaseName);
+    });
+
+    // Add the MongoDbContext to the DI container, using the shared client
+    builder.Services.AddDbContext<MongoDbContext>((sp, options) =>
+    {
+        var client = sp.GetRequiredService<IMongoClient>();
+        var mongoSettings = sp.GetRequiredService<IOptions<MongoConnection>>().Value;
+        options.UseMongoDB(client, mongoSettings.DatabaseName);
+    });
+
     // Add services to the container
     builder.Services.AddHttpClient();
 
@@ -103,7 +131,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>, KafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
     builder.Services.AddTransient<ScheduledReportFactory>();
     builder.Services.AddTransient<MeasureReportSummaryFactory>();
-    builder.Services.AddTransient<ResourceSummaryFactory>();
 
     builder.Services.AddTransient<IKafkaConsumerFactory<string, GenerateReportValue>, KafkaConsumerFactory<string, GenerateReportValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, ReportScheduledValue>, KafkaConsumerFactory<string, ReportScheduledValue>>();
@@ -128,16 +155,17 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
 
     // Add repositories
-    builder.Services.AddTransient<IBaseEntityRepository<ReportScheduleModel>, MongoEntityRepository<ReportScheduleModel>>();
-    builder.Services.AddTransient<IBaseEntityRepository<MeasureReportSubmissionEntryModel>, MongoEntityRepository<MeasureReportSubmissionEntryModel>>();
-    builder.Services.AddTransient<IBaseEntityRepository<ReportModel>, MongoEntityRepository<ReportModel>>();
-    builder.Services.AddTransient<IBaseEntityRepository<SharedResourceModel>, MongoEntityRepository<SharedResourceModel>>();
-    builder.Services.AddTransient<IBaseEntityRepository<PatientResourceModel>, MongoEntityRepository<PatientResourceModel>>();
+    builder.Services.AddTransient<IEntityRepository<ReportSchedule>, EntityRepository<ReportSchedule, MongoDbContext>>();
+    builder.Services.AddTransient<IEntityRepository<PatientSubmissionEntry>, EntityRepository<PatientSubmissionEntry, MongoDbContext>>();
+    builder.Services.AddTransient<IEntityRepository<ReportModel>, EntityRepository<ReportModel, MongoDbContext>>();
+    builder.Services.AddTransient<IEntityRepository<FhirResource>, EntityRepository<FhirResource, MongoDbContext>>();
+    builder.Services.AddTransient<IEntityRepository<PatientSubmissionEntryResourceMap>, EntityRepository<PatientSubmissionEntryResourceMap, MongoDbContext>>();
     builder.Services.AddTransient<IDatabase, Database>();
 
     // Add Managers
     builder.Services.AddTransient<IReportScheduledManager, ReportScheduledManager>();
     builder.Services.AddTransient<ISubmissionEntryManager, SubmissionEntryManager>();
+    builder.Services.AddTransient<ISubmissionEntryQueries, SubmissionEntryQueries>();
     builder.Services.AddTransient<IResourceManager, ResourceManager>();
 
     // Add Link Security
@@ -220,7 +248,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddKeyedSingleton<ISchedulerFactory>("MongoScheduler", (provider, key) =>
     {
         var logger = provider.GetRequiredService<ILogger<ReportMongoSchedulerFactory>>();
-        return new ReportMongoSchedulerFactory(provider, logger);
+        var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
+        return new ReportMongoSchedulerFactory(scopeFactory, logger);
     });
 
     // 2. In-memory scheduler for RetryJob

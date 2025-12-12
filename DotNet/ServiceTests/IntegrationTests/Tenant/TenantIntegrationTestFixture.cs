@@ -53,7 +53,7 @@ namespace IntegrationTests.Tenant
                     services.AddDbContext<TenantDbContext>((sp, options) =>
                     {
                         var updateBaseEntityInterceptor = sp.GetRequiredService<UpdateBaseEntityInterceptor>();
-                        options.UseInMemoryDatabase("TestDatabase");
+                        options.UseInMemoryDatabase("TenantDatabase");
                         options.ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning));
                         options.AddInterceptors(updateBaseEntityInterceptor);
                     });

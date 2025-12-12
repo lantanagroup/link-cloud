@@ -93,7 +93,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             catch(Exception ex)
             {
                 taskResult.IsSuccess = false;
-                taskResult.ErrorMessage = ex.Message;                
+                taskResult.ErrorMessage = ex.Message + Environment.NewLine + ex.StackTrace;                
             }
 
             return taskResult;

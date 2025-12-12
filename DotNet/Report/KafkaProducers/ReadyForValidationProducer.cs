@@ -17,7 +17,6 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _serviceScopeFactory = serviceScopeFactory;
         }
 
-
         public class ProduceValidationModel
         {
             public required string ReportScheduleId { get; set; }

@@ -1,10 +1,8 @@
 ﻿using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Interfaces;
-using LantanaGroup.Link.Report.Application.ResourceCategories;
 using LantanaGroup.Link.Report.Domain;
-using LantanaGroup.Link.Report.Domain.Enums;
-using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Report.Domain.Queries;
+using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 
@@ -18,8 +16,7 @@ namespace LantanaGroup.Link.Report.Core
     {
         private readonly ILogger<PatientReportSubmissionBundler> _logger;
         private readonly IReportServiceMetrics _metrics;
-        private readonly IDatabase _database;
-        private readonly IReportScheduledManager _reportScheduledManager;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
         private readonly List<string> REMOVE_EXTENSIONS = new List<string> {
         "http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.population.description",
@@ -33,104 +30,87 @@ namespace LantanaGroup.Link.Report.Core
         "http://open.epic.com/FHIR/StructureDefinition/extension/team-name",
         "https://open.epic.com/FHIR/StructureDefinition/extension/patient-merge-unmerge-instant"};
 
-        public PatientReportSubmissionBundler(ILogger<PatientReportSubmissionBundler> logger, IDatabase database, IReportServiceMetrics metrics, IReportScheduledManager reportScheduledManager)
+        public PatientReportSubmissionBundler(ILogger<PatientReportSubmissionBundler> logger, IServiceScopeFactory serviceScopeFactory, IReportServiceMetrics metrics)
         {
+            _serviceScopeFactory = serviceScopeFactory;
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _metrics = metrics ?? throw new ArgumentException(nameof(metrics));
-            _database = database ?? throw new ArgumentNullException(nameof(database));
-            _reportScheduledManager = reportScheduledManager ?? throw new ArgumentNullException(nameof(reportScheduledManager));
         }
-
-
         public async Task<PatientSubmissionModel> GenerateBundle(string facilityId, string patientId, string reportScheduleId)
         {
-            var schedule = await _reportScheduledManager.SingleOrDefaultAsync(s => s.Id == reportScheduleId) ?? throw new Exception($"No Measure Reports Scheduled for reportScheduleId of {reportScheduleId}");
+            var queries = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
+            var patientReportData = await queries.GetPatientReportData(facilityId, reportScheduleId, patientId, cancellationToken: CancellationToken.None);
+            return await GenerateBundle(patientReportData, facilityId, patientId, reportScheduleId);
+        }
 
-            var entries = await _database.SubmissionEntryRepository.FindAsync(e =>
-                e.FacilityId == facilityId && e.PatientId == patientId &&
-                schedule.Id == e.ReportScheduleId);
+        public async Task<PatientSubmissionModel> GenerateBundle(PatientReportData patientReportData, string facilityId, string patientId, string reportScheduleId)
+        {
+            var schedule = patientReportData.Schedule;
 
             //The 'resourcesAdded' Dictionary will keep track of FHIR resource id's that have been added to the bundle to avoid adding duplicates across entries. The value of each dictionary entry will contain the associated FHIR types. It's a string List type in case there are different FHIR resources that share the same id. This is probably unlikely to happen, but is possible. 
             Dictionary<string, List<string>> resourcesAdded = new Dictionary<string, List<string>>();
-            Bundle bundle = CreateNewBundle();
 
-            foreach (var entry in entries)
+            Bundle bundle = CreateNewBundle();
+            foreach (var reportType in patientReportData.ReportData)
             {
-                if (entry.MeasureReport == null) 
+                var report = reportType.Key;
+                var data = reportType.Value;
+
+                foreach (var fhirResource in data.Resources)
                 {
-                    continue;
+                    if (fhirResource.Id == null)
+                        continue;
+
+                    if (resourcesAdded.ContainsKey(fhirResource.ResourceId) && resourcesAdded[fhirResource.ResourceId].Contains(fhirResource.ResourceType))
+                    {
+                        continue;
+                    }
+
+                    var fullUrl = GetFullUrl(fhirResource.Resource);
+                    bundle.AddResourceEntry(fhirResource.Resource, fullUrl);
+
+                    if (resourcesAdded.ContainsKey(fhirResource.ResourceId))
+                    {
+                        resourcesAdded[fhirResource.ResourceId].Add(fhirResource.ResourceType);
+                    }
+                    else
+                    {
+                        resourcesAdded.Add(fhirResource.ResourceId, new List<string>() { fhirResource.ResourceType });
+                    }
                 }
 
-                MeasureReport mr = entry.MeasureReport;
-
-                foreach (var r in entry.ContainedResources)
+                foreach (var entry in data.Entries)
                 {
-                    if (r.DocumentId == null)
-                    {
-                        //TODO: Log if this happens?
-                        continue;
-                    }
-
-                    if (resourcesAdded.ContainsKey(r.ResourceId) && resourcesAdded[r.ResourceId].Where(x => x == r.ResourceType).Any())
+                    if (entry.MeasureReport == null)
                     {
                         continue;
                     }
 
-                    IFacilityResource facilityResource = null!;
-                    
-                    var resourceTypeCategory = ResourceCategory.GetResourceCategoryByType(r.ResourceType);
+                    MeasureReport mr = entry.MeasureReport;
 
-                    try
+                    // ensure we have an id to reference
+                    if (string.IsNullOrEmpty(mr.Id))
+                        mr.Id = Guid.NewGuid().ToString();
+
+                    // ensure we have a meta object
+                    // set individual measure report profile
+                    mr.Meta = new Meta
                     {
-                        if (resourceTypeCategory == ResourceCategoryType.Patient)
-                        {
-                            facilityResource = await _database.PatientResourceRepository.GetAsync(r.DocumentId);
-                            AddResourceToBundle(bundle, facilityResource.GetResource());
-                        }
-                        else
-                        {
-                            facilityResource = await _database.SharedResourceRepository.GetAsync(r.DocumentId);
-                            AddResourceToBundle(bundle, facilityResource.GetResource());
-                        }
+                        Profile = new List<string> { ReportConstants.BundleSettings.IndividualMeasureReportProfileUrl }
+                    };
 
-                        if (resourcesAdded.ContainsKey(r.ResourceId))
-                        {
-                            resourcesAdded[r.ResourceId].Add(r.ResourceType);
-                        }
-                        else
-                        {
-                            resourcesAdded.Add(r.ResourceId, new List<string>() { r.ResourceType });
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        var message = "Contained resource could not be parsed into a valid Resource.";
-                        _logger.LogError(ex, "{ResourceTypeName} with ID {ResourceId} contained resource could not be parsed into a valid Resource.", r.ResourceType, r.ResourceId);
+                    // clean up resource
+                    cleanupResource(mr);
 
-                        throw new Exception(message, ex);
-                    }
-                }                
+                    var fullUrl = GetFullUrl(mr);
+                    bundle.AddResourceEntry(mr, fullUrl);
 
-                // ensure we have an id to reference
-                if (string.IsNullOrEmpty(mr.Id))
-                    mr.Id = Guid.NewGuid().ToString();
-                // ensure we have a meta object
-                // set individual measure report profile
-                mr.Meta = new Meta
-                {
-                    Profile = new List<string> { ReportConstants.BundleSettings.IndividualMeasureReportProfileUrl }
-                };
-
-                // clean up resource
-                cleanupResource(mr);
-
-                AddResourceToBundle(bundle, mr);
-
-                _metrics.IncrementReportGeneratedCounter(new List<KeyValuePair<string, object?>>() {
+                    _metrics.IncrementReportGeneratedCounter(new List<KeyValuePair<string, object?>>() {
                     new KeyValuePair<string, object?>("facilityId", schedule.FacilityId),
                     new KeyValuePair<string, object?>("measure.schedule.id", reportScheduleId),
                     new KeyValuePair<string, object?>("measure", mr.Measure)
                 });
+                }
             }
 
             PatientSubmissionModel patientSubmissionModel = new PatientSubmissionModel()
@@ -153,7 +133,7 @@ namespace LantanaGroup.Link.Report.Core
             if (resource is DomainResource)
             {
                 DomainResource domainResource = (DomainResource)resource;
-                
+
                 // Remove extensions from resources
                 domainResource.Extension.RemoveAll(e => e.Url != null && REMOVE_EXTENSIONS.Contains(e.Url));
 
@@ -207,20 +187,8 @@ namespace LantanaGroup.Link.Report.Core
         {
             return string.Format(ReportConstants.BundleSettings.BundlingFullUrlFormat, GetRelativeReference(resource));
         }
-
-        /// <summary>
-        /// Adds the given resource to the given bundle, if not already present.
-        /// </summary>
-        /// <param name="bundle"></param>
-        /// <param name="resource"></param>
-        /// <returns></returns>
-        protected void AddResourceToBundle(Bundle bundle, Resource resource)
-        {
-            var fullUrl = GetFullUrl(resource);
-
-            bundle.AddResourceEntry(resource, fullUrl);
-        }
-
         #endregion
+
     }
+
 }

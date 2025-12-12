@@ -11,17 +11,17 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 {
     public class SubmitPayloadProducer
     {
-        private readonly IDatabase _database;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly IProducer<SubmitPayloadKey, SubmitPayloadValue> _submitPayloadProducer;
 
 
-        public SubmitPayloadProducer(IDatabase database, IProducer<SubmitPayloadKey, SubmitPayloadValue> submitPayloadProducer) 
+        public SubmitPayloadProducer(IServiceScopeFactory serviceScopeFactory, IProducer<SubmitPayloadKey, SubmitPayloadValue> submitPayloadProducer) 
         {
             _submitPayloadProducer = submitPayloadProducer;
-            _database = database;
+            _serviceScopeFactory = serviceScopeFactory;
         }
 
-        public async Task<bool> Produce(ReportScheduleModel schedule, PayloadType payloadType, string? patientId = null, string? correlationId = null, string? payloadUri = null)
+        public async Task<bool> Produce(ReportSchedule schedule, PayloadType payloadType, string? patientId = null, string? correlationId = null, string? payloadUri = null)
         {
 
             var corrId = string.IsNullOrWhiteSpace(correlationId)
@@ -33,7 +33,9 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 return false;
             }
 
-            var submissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && (patientId == null || (x.PatientId == patientId && x.Status != PatientSubmissionStatus.NotReportable)));
+            var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
+
+            var submissionEntries = await database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && (patientId == null || (x.PatientId == patientId && x.Status != PatientSubmissionStatus.NotReportable)));
 
             _submitPayloadProducer.Produce(nameof(KafkaTopic.SubmitPayload),
                 new Message<SubmitPayloadKey, SubmitPayloadValue>

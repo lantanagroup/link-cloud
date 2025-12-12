@@ -1,5 +1,4 @@
-﻿using LantanaGroup.Link.Report.Application.Interfaces;
-using LantanaGroup.Link.Report.Domain;
+﻿using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.Settings;
@@ -15,7 +14,7 @@ public class MeasureReportScheduleService : BackgroundService
     private readonly ILogger<MeasureReportScheduleService> _logger;
     private readonly IJobFactory _jobFactory;
     private readonly ISchedulerFactory _schedulerFactory;
-    private readonly IDatabase _database;
+    private readonly IServiceScopeFactory _serviceScopeFactory;
 
     public IScheduler Scheduler { get; set; } = default!;
 
@@ -23,12 +22,13 @@ public class MeasureReportScheduleService : BackgroundService
         ILogger<MeasureReportScheduleService> logger,
         IJobFactory jobFactory,
         [FromKeyedServices("MongoScheduler")] ISchedulerFactory schedulerFactory,
-        IDatabase database)
+        IServiceScopeFactory serviceScopeFactory)
     {
         _logger = logger;
         _jobFactory = jobFactory;
         _schedulerFactory = schedulerFactory;
-        _database = database;
+        _serviceScopeFactory = serviceScopeFactory;
+
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -37,7 +37,8 @@ public class MeasureReportScheduleService : BackgroundService
         Scheduler.JobFactory = _jobFactory;
 
 		// find all reports that have not been submitted yet
-        var reportSchedules = await _database.ReportScheduledRepository.FindAsync(s => !s.EndOfReportPeriodJobHasRun && s.Frequency != Frequency.Adhoc, cancellationToken);
+        var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
+        var reportSchedules = await database.ReportScheduledRepository.FindAsync(s => !s.EndOfReportPeriodJobHasRun && s.Frequency != Frequency.Adhoc, cancellationToken);
 
         foreach (var reportSchedule in reportSchedules)
         {
@@ -67,7 +68,7 @@ public class MeasureReportScheduleService : BackgroundService
         _logger.LogInformation("MeasureReportScheduleService stopped.");
     }
 
-    public static async Task CreateJobAndTrigger(ReportScheduleModel reportSchedule, IScheduler scheduler, ILogger? logger = null)
+    public static async Task CreateJobAndTrigger(ReportSchedule reportSchedule, IScheduler scheduler, ILogger? logger = null)
     {
         var job = CreateJob(reportSchedule);
         var trigger = CreateTrigger(reportSchedule, job.Key);
@@ -79,7 +80,7 @@ public class MeasureReportScheduleService : BackgroundService
             await scheduler.ScheduleJob(trigger);
     }
 
-    public static IJobDetail CreateJob(ReportScheduleModel reportSchedule)
+    public static IJobDetail CreateJob(ReportSchedule reportSchedule)
     {
         JobDataMap jobDataMap = new JobDataMap();
         jobDataMap.Put("ReportScheduleId", reportSchedule.Id);
@@ -95,7 +96,7 @@ public class MeasureReportScheduleService : BackgroundService
             .Build();
     }
 
-    private static ITrigger CreateTrigger(ReportScheduleModel reportSchedule, JobKey jobKey)
+    private static ITrigger CreateTrigger(ReportSchedule reportSchedule, JobKey jobKey)
     {
         JobDataMap jobDataMap = new JobDataMap();
         string reportScheduleJson = JsonSerializer.Serialize(reportSchedule);
@@ -121,13 +122,13 @@ public class MeasureReportScheduleService : BackgroundService
             .Build();
     }
 
-    public static async Task DeleteJob(ReportScheduleModel reportSchedule, IScheduler scheduler)
+    public static async Task DeleteJob(ReportSchedule reportSchedule, IScheduler scheduler)
     {
         JobKey jobKey = new JobKey(reportSchedule.Id, ReportConstants.MeasureReportSubmissionScheduler.Group);
         await scheduler.DeleteJob(jobKey);
     }
 
-    public static async Task RescheduleJob(ReportScheduleModel reportSchedule, IScheduler scheduler)
+    public static async Task RescheduleJob(ReportSchedule reportSchedule, IScheduler scheduler)
     {
         await DeleteJob(reportSchedule, scheduler);
         await CreateJobAndTrigger(reportSchedule, scheduler);

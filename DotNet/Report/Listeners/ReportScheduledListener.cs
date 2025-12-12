@@ -100,7 +100,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     throw new DeadLetterException("Invalid Report Scheduled event");
                                 }
 
-                                var scope = _serviceScopeFactory.CreateScope();
+                                using var scope = _serviceScopeFactory.CreateScope();
                                 var measureReportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
 
                                 facilityId = key;
@@ -111,7 +111,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var reportId = value.ReportTrackingId;
 
                                 // Check if this already exists
-                                ReportScheduleModel? existing = null;
+                                ReportSchedule? existing = null;
 
                                 if (!string.IsNullOrEmpty(reportId))
                                 {
@@ -125,7 +125,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     reportId = Guid.NewGuid().ToString();
                                 }
 
-                                ReportScheduleModel? reportSchedule;
+                                ReportSchedule? reportSchedule;
                                 if (existing != null) 
                                 {
                                     _logger.LogError("Report with id {ReportId} already exists. Creating dead letter for event/message.", reportId);
@@ -134,7 +134,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 else
                                 {
                                     _logger.LogInformation("Report with id {ReportId} does not exist... Creating.", reportId);
-                                    reportSchedule = new ReportScheduleModel
+                                    reportSchedule = new ReportSchedule
                                     {
                                         Id = reportId,
                                         FacilityId = facilityId,

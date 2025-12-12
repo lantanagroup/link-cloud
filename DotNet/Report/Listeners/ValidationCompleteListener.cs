@@ -1,12 +1,11 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
-using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Entities.Enums;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
@@ -207,7 +206,14 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 entry.ValidationStatus = value.IsValid ? ValidationStatus.Passed : ValidationStatus.Failed;
                 entry.Status = PatientSubmissionStatus.ValidationComplete;
-                await submissionEntryManager.UpdateAsync(entry, cancellationToken);
+                await submissionEntryManager.UpdateAsync(new PatientSubmissionEntryUpdateModel
+                {
+                    Id = entry.Id,
+                    MeasureReport = entry.MeasureReport,
+                    PayloadUri = entry.PayloadUri,
+                    Status = entry.Status,
+                    ValidationStatus = entry.ValidationStatus,
+                }, cancellationToken);
             }
 
             if (!value.IsValid)
@@ -237,7 +243,14 @@ namespace LantanaGroup.Link.Report.Listeners
                     foreach (var entry in submissionEntries)
                     {
                         entry.PayloadUri = uri;
-                        await submissionEntryManager.UpdateAsync(entry, cancellationToken);
+                        await submissionEntryManager.UpdateAsync(new PatientSubmissionEntryUpdateModel
+                        {
+                            Id = entry.Id,
+                            MeasureReport = entry.MeasureReport,
+                            PayloadUri = entry.PayloadUri,
+                            Status = entry.Status,
+                            ValidationStatus = entry.ValidationStatus,
+                        }, cancellationToken);
                     }
                 }
             }
@@ -251,7 +264,6 @@ namespace LantanaGroup.Link.Report.Listeners
                 _logger.LogError(ex, "An error was encountered generating a Submit Payload event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
                 throw new TransientException($"An error was encountered generating a Submit Payload event.\n\tFacilityId: {facilityId}\n\t", ex);
             }
-
 
             await _reportManifestProducer.Produce(schedule, correlationIdStr);
         }

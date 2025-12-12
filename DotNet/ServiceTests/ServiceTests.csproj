@@ -26,18 +26,20 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Core" Version="2.3.0" />
-    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="9.0.10" />
-    <PackageReference Include="FluentAssertions" Version="8.7.1" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.7" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.10" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Core" Version="2.*" />
+    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="8.*" />
+    <PackageReference Include="FluentAssertions" Version="8.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.*" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
     <PackageReference Include="Moq" Version="4.*" />
     <PackageReference Include="Moq.AutoMock" Version="*-*" />
-    <PackageReference Include="Testcontainers" Version="4.6.0" />
-    <PackageReference Include="Testcontainers.Azurite" Version="4.6.0" />
+    <PackageReference Include="System.Text.Json" Version="8.*" />
+    <PackageReference Include="Testcontainers" Version="4.*" />
+    <PackageReference Include="Testcontainers.Azurite" Version="4.*" />
+    <PackageReference Include="Testcontainers.MongoDb" Version="4.*" />
     <PackageReference Include="xunit" Version="2.*" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.2">
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.*">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>

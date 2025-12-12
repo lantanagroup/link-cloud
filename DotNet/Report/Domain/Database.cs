@@ -1,41 +1,44 @@
 ﻿using LantanaGroup.Link.Report.Entities;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
-using Microsoft.Extensions.Options;
-using MongoDB.Driver;
 
 namespace LantanaGroup.Link.Report.Domain
 {
     public interface IDatabase
     {
-        IBaseEntityRepository<PatientResourceModel> PatientResourceRepository { get; set; }
-        IBaseEntityRepository<SharedResourceModel> SharedResourceRepository { get; set; }
-        IBaseEntityRepository<ReportScheduleModel> ReportScheduledRepository { get; set; }
-        IBaseEntityRepository<MeasureReportSubmissionEntryModel> SubmissionEntryRepository { get; set; }
+        IEntityRepository<FhirResource> ResourceRepository { get; set; }
+        IEntityRepository<ReportSchedule> ReportScheduledRepository { get; set; }
+        IEntityRepository<PatientSubmissionEntry> SubmissionEntryRepository { get; set; }
+        IEntityRepository<PatientSubmissionEntryResourceMap> PatientSubmissionEntryResourceMapRepository { get; set; }
+
+        Task SaveChangesAsync();
     }
 
     public class Database : IDatabase
     {
-        protected IMongoDatabase DbContext { get; set; }
+        protected MongoDbContext DbContext { get; set; }
 
-        public IBaseEntityRepository<PatientResourceModel> PatientResourceRepository { get; set; }
-        public IBaseEntityRepository<SharedResourceModel> SharedResourceRepository { get; set; }
-        public IBaseEntityRepository<ReportScheduleModel> ReportScheduledRepository { get; set; }
-        public IBaseEntityRepository<MeasureReportSubmissionEntryModel> SubmissionEntryRepository { get; set; }
+        public IEntityRepository<FhirResource> ResourceRepository { get; set; }
+        public IEntityRepository<ReportSchedule> ReportScheduledRepository { get; set; }
+        public IEntityRepository<PatientSubmissionEntry> SubmissionEntryRepository { get; set; }
+        public IEntityRepository<PatientSubmissionEntryResourceMap> PatientSubmissionEntryResourceMapRepository { get; set; }
 
-        public Database(IOptions<MongoConnection> mongoSettings,
-            IBaseEntityRepository<PatientResourceModel> patientResourceRepository,
-            IBaseEntityRepository<SharedResourceModel> sharedResourceRepository,
-            IBaseEntityRepository<ReportScheduleModel> reportScheduledRepository,
-            IBaseEntityRepository<MeasureReportSubmissionEntryModel> submissionEntryRepository)
+        public Database(MongoDbContext context,
+            IEntityRepository<FhirResource> resourceRepository,
+            IEntityRepository<ReportSchedule> reportScheduledRepository,
+            IEntityRepository<PatientSubmissionEntry> submissionEntryRepository,
+            IEntityRepository<PatientSubmissionEntryResourceMap> reportScheduleResourceMapRepository)
         {
-            var client = new MongoClient(mongoSettings.Value.ConnectionString);
-            DbContext = client.GetDatabase(mongoSettings.Value.DatabaseName);
+            DbContext = context;
 
-            PatientResourceRepository = patientResourceRepository;
-            SharedResourceRepository = sharedResourceRepository;
+            ResourceRepository = resourceRepository;
             ReportScheduledRepository = reportScheduledRepository;
             SubmissionEntryRepository = submissionEntryRepository;
+            PatientSubmissionEntryResourceMapRepository = reportScheduleResourceMapRepository;
+        }
+
+        public async Task SaveChangesAsync()
+        {
+            await DbContext.SaveChangesAsync();
         }
     }
 }

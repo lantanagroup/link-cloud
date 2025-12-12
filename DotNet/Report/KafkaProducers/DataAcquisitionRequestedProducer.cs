@@ -2,29 +2,31 @@
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using System.Diagnostics;
 using System.Text;
-using LantanaGroup.Link.Report.Services;
 
 namespace LantanaGroup.Link.Report.KafkaProducers
 {
     public class DataAcquisitionRequestedProducer
     {
-        private readonly IDatabase _database;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly IProducer<string, DataAcquisitionRequestedValue> _dataAcqProducer;
 
         private static readonly ActivitySource _fallbackActivitySource = new ActivitySource("FallbackSource");
 
-        public DataAcquisitionRequestedProducer(IDatabase database, IProducer<string, DataAcquisitionRequestedValue> dataAcqProducer) 
+        public DataAcquisitionRequestedProducer(IServiceScopeFactory serviceScopeFactory, IProducer<string, DataAcquisitionRequestedValue> dataAcqProducer) 
         {
-            _database = database;
+            _serviceScopeFactory = serviceScopeFactory;
             _dataAcqProducer = dataAcqProducer;
         }
 
-        public async Task<bool> Produce(ReportScheduleModel schedule, List<string>? patientsToEvaluate = null)
+        public async Task<bool> Produce(ReportSchedule schedule, List<string>? patientsToEvaluate = null)
         {
+            var _database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
+
             if (patientsToEvaluate == null || patientsToEvaluate.Count == 0)
             {
                 patientsToEvaluate = (await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.PendingEvaluation)).Select(x => x.PatientId).Distinct().ToList();

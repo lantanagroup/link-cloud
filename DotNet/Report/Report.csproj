@@ -31,28 +31,30 @@
 	</ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.*" />
+    <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.*" />
     <PackageReference Include="AutoMapper" Version="13.*" />
-    <PackageReference Include="Azure.Identity" Version="1.12.0" />
-    <PackageReference Include="Azure.Storage.Blobs" Version="12.24.0" />
+    <PackageReference Include="Azure.Identity" Version="1.*" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.*" />
     <PackageReference Include="Confluent.Kafka" Version="2.*" />
-    <PackageReference Include="LinqKit.Core" Version="1.2.5" />
+    <PackageReference Include="LinqKit.Core" Version="1.*" />
     <PackageReference Include="Microsoft.AspNetCore.Grpc.JsonTranscoding" Version="8.*" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
-    <PackageReference Include="MongoDB.Driver" Version="3.2.0" />
+    <PackageReference Include="MongoDB.Driver" Version="3.*" />
+    <PackageReference Include="MongoDB.EntityFrameworkCore" Version="8.*" />
     <PackageReference Include="Quartz" Version="3.*" />
-    <PackageReference Include="Quartz.Serialization.Json" Version="3.15.0" />
-    <PackageReference Include="Reddoxx.Quartz.MongoDbJobStore" Version="2.1.2" />
-    <PackageReference Include="Reddoxx.Quartz.MongoDbJobStore.Redlock" Version="2.1.2" />
+    <PackageReference Include="Quartz.Serialization.Json" Version="3.*" />
+    <PackageReference Include="Reddoxx.Quartz.MongoDbJobStore" Version="2.*" />
+    <PackageReference Include="Reddoxx.Quartz.MongoDbJobStore.Redlock" Version="2.*" />
     <PackageReference Include="Serilog.AspNetCore" Version="8.*" />
     <PackageReference Include="Serilog.Enrichers.Span" Version="3.*" />
     <PackageReference Include="Serilog.Exceptions" Version="8.*" />
-    <PackageReference Include="Serilog.Expressions" Version="4.0.0" />
+    <PackageReference Include="Serilog.Expressions" Version="4.*" />
     <PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.*" />
-    <PackageReference Include="StackExchange.Redis.Extensions.Core" Version="11.0.0" />
-    <PackageReference Include="StackExchange.Redis.Extensions.System.Text.Json" Version="11.0.0" />
-	<PackageReference Include="StackExchange.Redis.Extensions.AspNetCore" Version="11.0.0" />
+    <PackageReference Include="StackExchange.Redis.Extensions.Core" Version="11.*" />
+    <PackageReference Include="StackExchange.Redis.Extensions.System.Text.Json" Version="11.*" />
+	<PackageReference Include="StackExchange.Redis.Extensions.AspNetCore" Version="11.*" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
+    <PackageReference Include="System.Text.Json" Version="8.*" />
   </ItemGroup>
 
   <ItemGroup>
