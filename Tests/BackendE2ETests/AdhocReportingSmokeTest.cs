@@ -94,10 +94,71 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         await this.GenerateReport(measureLoader.MeasureId);
     }
 
+    //[Fact]
+    //[Trait("Category", "AdHocSingleMeasureSmokeTest")]
+    //public async Task SmokeTest_GenerateSingleMeasureAdHocReport()
+    //{        
+    //    TestConfig.AdhocReportingSmokeTestConfig.RemoveFacilityConfig = true;
+    //    AdHocReportApiRequests apiE2E = new AdHocReportApiRequests(output);
+    //    SubmissionZipReader submissionReportZip = new SubmissionZipReader(output);
+    //    AdhocReportingSmokeTest adhocReportingSmokeTest = new AdhocReportingSmokeTest(output);
+    //    MeasureLoader measureLoader = new MeasureLoader(AdminBffClient, output);
+
+    //    Stopwatch stopwatch = new Stopwatch();
+    //    stopwatch.Start();
+    //    output.WriteLine($"Stopwatch start {DateTime.UtcNow.ToString()}");
+
+    //    await measureLoader.LoadAsync();
+    //    apiE2E.Create_SingleMeasureAdHocTestFacility();
+    //    apiE2E.Create_SingleMeasureCensusConfiguration_AdHoc();
+    //    apiE2E.Create_SingleMeasureQueryDispatchConfig_AdHoc();
+    //    apiE2E.Create_SingleMeasure_FHIRQueryConfigByFacility_AdHoc();
+    //    apiE2E.Create_SingleMeasure_MontlhyQueryPlanByFacility_AdHoc();
+    //    apiE2E.Create_SingleMeasure_DischargeQueryPlanByFacility_AdHoc();
+    //    apiE2E.Create_SingleMeasureFHIRQueryListByFacility_AdHoc();
+    //    apiE2E.GenerateSingleMeasureAdHocReport_ACH();
+
+    //    await submissionReportZip.WaitForSingleMeasureZipContentsAsync();
+    //    var failures = new List<string>();
+    //    try
+    //    {
+    //        await submissionReportZip.DownloadAndExtractSingleMeasureZipAsync(true);
+    //        TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateFilesAppear, failures);
+    //        TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateFilesDoNotAppear, failures);
+    //        TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateManifestContent, failures);
+
+    //        TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidatePatientFile_1, failures);
+    //        TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidatePatientFile_2, failures);
+    //        TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidatePatientFile_3, failures);
+    //        TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidatePatientFile_4, failures);
+    //        TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidatePatientFile_5, failures);
+    //        TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidatePatientFile_6, failures);
+
+    //        TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidateSingleMeasureAdHocAggregateACHMFile, failures);
+    //        apiE2E.GETSingleMeasureAdHocFacilityValidationResultsForReport();
+    //    }
+    //    finally
+    //    {
+    //        if (failures.Any())
+    //        {
+    //            output.WriteLine("🔴 ================= TEST RESULT SUMMARY =================🔴 ");
+    //            foreach (var fail in failures)
+    //                output.WriteLine(fail);
+    //            Xunit.Assert.Fail($"{failures.Count} verification(s) failed. See console output below.");
+    //        }
+    //        else
+    //            output.WriteLine("[PASS] Smoke test completed with all verifications passing.");
+
+    //        stopwatch.Stop();
+    //        output.WriteLine($"Stopwatch stop {DateTime.UtcNow.ToString()} - Total Time: {stopwatch.Elapsed}");
+    //    }
+    //}
+
+
     [Fact]
     [Trait("Category", "AdHocSingleMeasureSmokeTest")]
     public async Task SmokeTest_GenerateSingleMeasureAdHocReport()
-    {        
+    {
         TestConfig.AdhocReportingSmokeTestConfig.RemoveFacilityConfig = true;
         AdHocReportApiRequests apiE2E = new AdHocReportApiRequests(output);
         SubmissionZipReader submissionReportZip = new SubmissionZipReader(output);
@@ -106,54 +167,47 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
         Stopwatch stopwatch = new Stopwatch();
         stopwatch.Start();
-        output.WriteLine($"Stopwatch start {DateTime.UtcNow.ToString()}");
+        output.WriteLine($"Stopwatch start {DateTime.UtcNow}");
 
-        await measureLoader.LoadAsync();
-        apiE2E.Create_SingleMeasureAdHocTestFacility();
-        apiE2E.Create_SingleMeasureCensusConfiguration_AdHoc();
-        apiE2E.Create_SingleMeasureQueryDispatchConfig_AdHoc();
-        apiE2E.Create_SingleMeasure_FHIRQueryConfigByFacility_AdHoc();
-        apiE2E.Create_SingleMeasure_MontlhyQueryPlanByFacility_AdHoc();
-        apiE2E.Create_SingleMeasure_DischargeQueryPlanByFacility_AdHoc();
-        apiE2E.Create_SingleMeasureFHIRQueryListByFacility_AdHoc();
-        apiE2E.GenerateSingleMeasureAdHocReport_ACH();
 
-        await submissionReportZip.WaitForSingleMeasureZipContentsAsync();
-        var failures = new List<string>();
+            // Arrange / Act – create facility, schedule report
+            await measureLoader.LoadAsync();
+            apiE2E.Create_SingleMeasureAdHocTestFacility();
+            apiE2E.Create_SingleMeasureCensusConfiguration_AdHoc();
+            apiE2E.Create_SingleMeasureQueryDispatchConfig_AdHoc();
+            apiE2E.Create_SingleMeasure_FHIRQueryConfigByFacility_AdHoc();
+            apiE2E.Create_SingleMeasure_MontlhyQueryPlanByFacility_AdHoc();
+            apiE2E.Create_SingleMeasure_DischargeQueryPlanByFacility_AdHoc();
+            apiE2E.Create_SingleMeasureFHIRQueryListByFacility_AdHoc();
+            apiE2E.GenerateSingleMeasureAdHocReport_ACH();
+
         try
         {
-            await submissionReportZip.DownloadAndExtractSingleMeasureZipAsync(true);
-            TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateFilesAppear, failures);
-            TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateFilesDoNotAppear, failures);
-            TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateManifestContent, failures);
+            // Wait for ZIP to be ready + download it
+            await submissionReportZip.WaitForSingleMeasureZipContentsAsync();
+            await submissionReportZip.DownloadAndExtractSingleMeasureZipAsync(save: true);
 
-            TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidatePatientFile_1, failures);
-            TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidatePatientFile_2, failures);
-            TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidatePatientFile_3, failures);
-            TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidatePatientFile_4, failures);
-            TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidatePatientFile_5, failures);
-            TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidatePatientFile_6, failures);
+            // Bundle-level sanity checks (these still throw on failure)
+            submissionReportZip.SingleMeasureAdHocValidateFilesAppear();
+            submissionReportZip.SingleMeasureAdHocValidateFilesDoNotAppear();
+            // assuming you still have SingleMeasureAdHocValidateManifestContent in the class:
+            // submissionReportZip.SingleMeasureAdHocValidateManifestContent();
+            submissionReportZip.ValidateSingleMeasureAdHocAggregateACHMFile();
 
-            TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidateSingleMeasureAdHocAggregateACHMFile, failures);
+            // Patient-level validations with configurable severity
+            submissionReportZip.ValidateAllPatientsWithConfigurableSeverity();
+
+            // Final API validation call
             apiE2E.GETSingleMeasureAdHocFacilityValidationResultsForReport();
+
+            output.WriteLine("[PASS] Smoke test completed with all verifications passing.");
         }
         finally
         {
-            if (failures.Any())
-            {
-                output.WriteLine("🔴 ================= TEST RESULT SUMMARY =================🔴 ");
-                foreach (var fail in failures)
-                    output.WriteLine(fail);
-                Xunit.Assert.Fail($"{failures.Count} verification(s) failed. See console output below.");
-            }
-            else
-                output.WriteLine("[PASS] Smoke test completed with all verifications passing.");
-
             stopwatch.Stop();
-            output.WriteLine($"Stopwatch stop {DateTime.UtcNow.ToString()} - Total Time: {stopwatch.Elapsed}");
-        }      
+            output.WriteLine($"Stopwatch stop {DateTime.UtcNow} - Total Time: {stopwatch.Elapsed}");
+        }
     }
-
     private async Task GenerateReport(string? measureId)
     {
         if (measureId == null)

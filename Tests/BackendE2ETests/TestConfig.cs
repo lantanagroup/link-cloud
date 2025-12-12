@@ -115,35 +115,79 @@ public static class TestConfig
         /// <summary>
         /// Attempts to run a validation method. Captures and logs, does not stop test. 
         /// </summary>
-        public static void TryRunValidation(Action validationMethod, List<string> failures)
-        {
-            try
-            {
-                validationMethod();
-            }
-            catch (Exception ex)
-            {
-                string methodName = validationMethod.Method.Name;
-                Console.WriteLine($"[FAIL] {methodName} - {ex.Message}");
-                failures.Add($"{methodName}: {ex.Message}");
-            }
-        }
+        //public static void TryRunValidation(Action validationMethod, List<string> failures)
+        //{
+        //    try
+        //    {
+        //        validationMethod();
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        string methodName = validationMethod.Method.Name;
+        //        Console.WriteLine($"[FAIL] {methodName} - {ex.Message}");
+        //        failures.Add($"{methodName}: {ex.Message}");
+        //    }
+        //}
 
         /// <summary>
         /// Async version for use with asynchronous validations.
         /// </summary>
-        public static async Task TryRunValidationAsync(Func<Task> validationMethod, List<string> failures)
+        //public static async Task TryRunValidationAsync(Func<Task> validationMethod, List<string> failures)
+        //{
+        //    try
+        //    {
+        //        await validationMethod();
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        string methodName = validationMethod.Method.Name;
+        //        Console.WriteLine($"[FAIL] {methodName} - {ex.Message}");
+        //        failures.Add($"{methodName}: {ex.Message}");
+        //    }
+        //}
+
+        public enum ValidationSeverity
         {
-            try
+            Info,
+            Warning,
+            Error
+        }
+
+        public enum ValidationIssueType
+        {
+            MissingResourceTypeInBundle,
+            BundleCountMismatch,
+            EvaluatedCountMismatch,
+            UnexpectedEvaluatedType,
+            ExcludedTypeMissingFromBundle,
+            ExcludedTypePresentInEvaluated,
+            BundleVsEvaluatedCountMismatch,
+            BundleVsEvaluatedIdMismatch,
+            CrossTypeReference
+        }
+
+        public sealed class ValidationIssue
+        {
+            public string FileName { get; }
+            public ValidationIssueType IssueType { get; }
+            public ValidationSeverity Severity { get; }
+            public string ResourceType { get; }
+            public string Message { get; }
+
+            public ValidationIssue(
+                string fileName,
+                ValidationIssueType issueType,
+                ValidationSeverity severity,
+                string resourceType,
+                string message)
             {
-                await validationMethod();
-            }
-            catch (Exception ex)
-            {
-                string methodName = validationMethod.Method.Name;
-                Console.WriteLine($"[FAIL] {methodName} - {ex.Message}");
-                failures.Add($"{methodName}: {ex.Message}");
+                FileName = fileName;
+                IssueType = issueType;
+                Severity = severity;
+                ResourceType = resourceType;
+                Message = message;
             }
         }
+
     }
 }
