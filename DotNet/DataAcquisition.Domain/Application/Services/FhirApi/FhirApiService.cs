@@ -270,35 +270,48 @@ public class FhirApiService : IFhirApiService
 
     private async Task GenerateResourceAcquiredMessage(ResourceAcquired resourceAcquired, string facilityId, string correlationId, CancellationToken cancellationToken = default)
     {
-        var activitySource = new ActivitySource("FhirApiService", "1.0.0");
-        var parentContext = Activity.Current?.Context ?? default;
+        var previousActivity = Activity.Current;
+        var parentContext = previousActivity?.Context ?? default;
+        var links = new List<ActivityLink>
+        {
+            new ActivityLink(parentContext)
+        };
 
-        using var fanoutActivity = activitySource.StartActivity(
-            "ProduceResourceAcquired",
-            ActivityKind.Producer,
-            parentContext: parentContext  // ✅ Maintains trace hierarchy
-        );
+        try
+        {
+            Activity.Current = null;
 
-        //get resource type string from resourceAcquired.Resource
-        var resourceType = resourceAcquired.Resource?.TypeName;
-        fanoutActivity?.SetTag("messaging.destination", KafkaTopic.ResourceAcquired.ToString());
-        fanoutActivity?.SetTag("messaging.system", "kafka");
-        fanoutActivity?.SetTag("link.resource_type", resourceType);
-        fanoutActivity?.SetTag("link.facility_id", facilityId);
-        fanoutActivity?.SetTag("link.correlation_id", correlationId);
+            using var fanoutActivity = ServiceActivitySource.Instance.StartActivity(
+                ActivityKind.Producer,
+                name: "ProduceResourceAcquired",
+                links: links
+            );
 
-        await _kafkaProducer.ProduceAsync(
-                    KafkaTopic.ResourceAcquired.ToString(),
-                    new Message<string, ResourceAcquired>
+            var resourceType = resourceAcquired.Resource?.TypeName;
+            fanoutActivity?.SetTag("messaging.destination", KafkaTopic.ResourceAcquired.ToString());
+            fanoutActivity?.SetTag("messaging.system", "kafka");
+            fanoutActivity?.SetTag("link.resource_type", resourceType);
+            fanoutActivity?.SetTag("link.facility_id", facilityId);
+            fanoutActivity?.SetTag("link.correlation_id", correlationId);
+
+            await _kafkaProducer.ProduceAsync(
+                KafkaTopic.ResourceAcquired.ToString(),
+                new Message<string, ResourceAcquired>
+                {
+                    Key = facilityId,
+                    Headers = new Headers
                     {
-                        Key = facilityId,
-                        Headers = new Headers
-                        {
-                                new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(correlationId))
-                        },
-                        Value = resourceAcquired
-                    }, cancellationToken);
-        _kafkaProducer.Flush(cancellationToken);
+                        new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(correlationId))
+                    },
+                    Value = resourceAcquired
+                }, cancellationToken);
+
+            _kafkaProducer.Flush(cancellationToken);
+        }
+        finally
+        {
+            Activity.Current = previousActivity;
+        }
     }
 
     private void InsertDateExtension(DomainResource resource) 

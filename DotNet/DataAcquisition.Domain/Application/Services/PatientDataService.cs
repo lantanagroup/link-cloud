@@ -61,8 +61,6 @@ public class PatientDataService : IPatientDataService
     private readonly IDistributedSemaphoreProvider _distributedSemaphoreProvider;
     private readonly IPatientCensusService _patientCensusService;
 
-    private static readonly ActivitySource _activitySource = new ActivitySource("PatientDataService", "1.0.0");
-
     public PatientDataService(
         IDatabase database,
         ILogger<PatientDataService> logger,
@@ -366,7 +364,7 @@ public class PatientDataService : IPatientDataService
                     }
                 }
 
-                using var activity = _activitySource.StartActivity(
+                using var activity = ServiceActivitySource.Instance.StartActivity(
                     "PatientDataService.ExecuteLogRequest",
                     ActivityKind.Internal,
                     parentContext
