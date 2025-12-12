@@ -100,8 +100,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
     public void ValidatePatientFile_1(List<ValidationIssue> issues)
     {
         const string fileName = TestConfig.singleMeasureAdHocTestPatient_One;
-
-        // 🔹 Bundle-level expectations (should match the INPUT bundle + MR + OO)
         var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
             ["ServiceRequest"] = 20,
@@ -118,19 +116,13 @@ public class SubmissionZipReader(ITestOutputHelper output)
             ["Device"] = 1,
             ["Procedure"] = 1,
             ["DiagnosticReport"] = 1,
-
-            // Created by the pipeline, not in the raw input:
             ["OperationOutcome"] = 1,
             ["MeasureReport"] = 1
         };
 
-        // 🔹 evaluatedResource expectations:
-        //     - All non-excluded types must appear with identical counts
-        //     - Excluded types: OperationOutcome, MeasureReport
-        //     - __TOTAL__ = sum of all non-excluded counts
         var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
-            ["__TOTAL__"] = 61,  // sum of all non-excluded resources
+            ["__TOTAL__"] = 61,  
 
             ["ServiceRequest"] = 20,
             ["Observation"] = 11,
@@ -146,7 +138,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
             ["Device"] = 1,
             ["Procedure"] = 1,
             ["DiagnosticReport"] = 1
-            // NOTE: OperationOutcome + MeasureReport are intentionally excluded here
         };
 
         ValidateSinglePatientFile(
@@ -158,8 +149,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
     public void ValidatePatientFile_2(List<ValidationIssue> issues)
     {
         const string fileName = TestConfig.singleMeasureAdHocTestPatient_Two;
-
-        // ✅ INPUT is source-of-truth expectations (+ pipeline-added MR/OO)
         var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
             ["ServiceRequest"] = 126,
@@ -173,18 +162,13 @@ public class SubmissionZipReader(ITestOutputHelper output)
             ["Encounter"] = 2,
             ["Coverage"] = 2,
             ["Patient"] = 1,
-
-            // pipeline-created
             ["OperationOutcome"] = 1,
             ["MeasureReport"] = 1
         };
 
-        // ✅ evaluatedResource should “reflect” what makes it into the output.
-        // But since you're enforcing INPUT as truth, it’s useful to ALSO expect input totals here,
-        // because it will highlight omissions (as warnings/errors per your config).
         var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
-            ["__TOTAL__"] = 403, // sum of all non-excluded input types below
+            ["__TOTAL__"] = 403,
 
             ["ServiceRequest"] = 126,
             ["Observation"] = 126,
@@ -197,7 +181,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
             ["Encounter"] = 2,
             ["Coverage"] = 2,
             ["Patient"] = 1
-            // excluded: MeasureReport, OperationOutcome
         };
 
         ValidateSinglePatientFile(fileName, expectedBundleCounts, expectedEvalCounts, issues);
@@ -205,8 +188,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
     public void ValidatePatientFile_3(List<ValidationIssue> issues)
     {
         const string fileName = TestConfig.singleMeasureAdHocTestPatient_Three;
-
-        // 🔹 Bundle-level expectations (INPUT bundle + MR + OO created by pipeline)
         var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
             ["ServiceRequest"] = 16,
@@ -223,16 +204,13 @@ public class SubmissionZipReader(ITestOutputHelper output)
             ["Coverage"] = 1,
             ["Device"] = 1,
             ["DiagnosticReport"] = 1,
-
-            // Created by the pipeline, not in the raw input:
             ["OperationOutcome"] = 1,
             ["MeasureReport"] = 1
         };
 
-        // 🔹 evaluatedResource expectations (exclude OO + MR)
         var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
-            ["__TOTAL__"] = 45, // sum of all non-excluded resources above
+            ["__TOTAL__"] = 45,
 
             ["ServiceRequest"] = 16,
             ["Observation"] = 5,
@@ -256,12 +234,9 @@ public class SubmissionZipReader(ITestOutputHelper output)
             expectedEvalCounts,
             issues);
     }
-
     public void ValidatePatientFile_4(List<ValidationIssue> issues)
     {
         const string fileName = TestConfig.singleMeasureAdHocTestPatient_Four;
-
-        // 🔹 Bundle-level expectations (INPUT bundle + MR + OO created by pipeline)
         var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
             ["ServiceRequest"] = 27,
@@ -278,16 +253,13 @@ public class SubmissionZipReader(ITestOutputHelper output)
             ["Device"] = 2,
             ["DiagnosticReport"] = 2,
             ["Patient"] = 1,
-
-            // Created by the pipeline, not in the raw input:
             ["OperationOutcome"] = 1,
             ["MeasureReport"] = 1
         };
 
-        // 🔹 evaluatedResource expectations (exclude OO + MR)
         var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
-            ["__TOTAL__"] = 84, // sum of all non-excluded resources above
+            ["__TOTAL__"] = 84, 
 
             ["ServiceRequest"] = 27,
             ["MedicationAdministration"] = 13,
@@ -311,12 +283,9 @@ public class SubmissionZipReader(ITestOutputHelper output)
             expectedEvalCounts,
             issues);
     }
-
     public void ValidatePatientFile_5(List<ValidationIssue> issues)
     {
         const string fileName = TestConfig.singleMeasureAdHocTestPatient_Five;
-
-        // 🔹 Bundle-level expectations (INPUT bundle + MR + OO created by pipeline)
         var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
             ["ServiceRequest"] = 31,
@@ -333,16 +302,13 @@ public class SubmissionZipReader(ITestOutputHelper output)
             ["Device"] = 1,
             ["Procedure"] = 1,
             ["DiagnosticReport"] = 1,
-
-            // Created by the pipeline, not in the raw input:
             ["OperationOutcome"] = 1,
             ["MeasureReport"] = 1
         };
 
-        // 🔹 evaluatedResource expectations (exclude OO + MR)
         var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
-            ["__TOTAL__"] = 68, // sum of all non-excluded resources above
+            ["__TOTAL__"] = 68, 
 
             ["ServiceRequest"] = 31,
             ["Observation"] = 11,
@@ -366,12 +332,9 @@ public class SubmissionZipReader(ITestOutputHelper output)
             expectedEvalCounts,
             issues);
     }
-
     public void ValidatePatientFile_6(List<ValidationIssue> issues)
     {
         const string fileName = TestConfig.singleMeasureAdHocTestPatient_Six;
-
-        // 🔹 Bundle-level expectations (INPUT bundle + MR + OO created by pipeline)
         var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
             ["ServiceRequest"] = 116,
@@ -388,16 +351,13 @@ public class SubmissionZipReader(ITestOutputHelper output)
             ["Device"] = 2,
             ["Location"] = 4,
             ["Patient"] = 1,
-
-            // Created by the pipeline, not in the raw input:
             ["OperationOutcome"] = 1,
             ["MeasureReport"] = 1
         };
 
-        // 🔹 evaluatedResource expectations (exclude OO + MR)
         var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
-            ["__TOTAL__"] = 205, // sum of all non-excluded types above (i.e., INPUT total)
+            ["__TOTAL__"] = 205,
 
             ["ServiceRequest"] = 116,
             ["Observation"] = 23,
@@ -434,7 +394,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
         "MeasureReport"
     };
 
-        // 1️⃣ Locate file
         var entryKey = _zipContents.Keys
             .FirstOrDefault(name => name.EndsWith(fileName, StringComparison.OrdinalIgnoreCase));
 
@@ -461,7 +420,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
             return;
         }
 
-        // 2️⃣ Parse NDJSON to JsonElement list
         var jsonOptions = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true
@@ -483,15 +441,12 @@ public class SubmissionZipReader(ITestOutputHelper output)
             return;
         }
 
-        // 3️⃣ Build bundle counts & IDs
         var bundleCounts = CountResourceTypes(lines);
         var bundleIdsByType = BundleIdsByType(lines);
 
-        // 4️⃣ Parse evaluatedResource
         var (evalCounts, evalIdsByType, crossTypeRefs) =
             ParseEvaluatedResource(lines, bundleIdsByType);
 
-        // 5️⃣ Bundle counts vs expectedBundleCounts
         foreach (var kv in expectedBundleCounts)
         {
             var type = kv.Key;
@@ -517,7 +472,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
             }
         }
 
-        // 6️⃣ Evaluated counts (including __TOTAL__)
         foreach (var kv in expectedEvalCounts)
         {
             var type = kv.Key;
@@ -533,8 +487,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
 
                 var totalFound = evalCounts.TryGetValue("__TOTAL__", out var t) ? t : 0;
 
-                // 🔹 For __TOTAL__, keep the breakdown in the *message*
-                // 🔹 For all other types, keep the message short
                 string msg;
                 if (string.Equals(type, "__TOTAL__", StringComparison.OrdinalIgnoreCase))
                 {
@@ -558,8 +510,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
             }
         }
 
-
-        // 7️⃣ Unexpected evaluated types
         var expectedEvalKeys = new HashSet<string>(expectedEvalCounts.Keys, StringComparer.OrdinalIgnoreCase);
         foreach (var extraKey in evalCounts.Keys.Where(k => !expectedEvalKeys.Contains(k)))
         {
@@ -571,7 +521,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
                 issues: issues);
         }
 
-        // 8️⃣ Exclusions: must exist in bundle, be absent in evaluatedResource
         foreach (var exType in excludedTypes)
         {
             var bundleHas = bundleCounts.TryGetValue(exType, out var c) && c > 0;
@@ -598,7 +547,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
             }
         }
 
-        // 9️⃣ Per-type count equality (excluding excludedTypes)
         foreach (var kv in bundleCounts)
         {
             var type = kv.Key;
@@ -619,7 +567,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
             }
         }
 
-        // 🔟 ID set equality (excluding excludedTypes)
         foreach (var kv in bundleIdsByType)
         {
             var type = kv.Key;
@@ -659,7 +606,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
             }
         }
 
-        // 1️⃣1️⃣ Cross-type guard
         if (crossTypeRefs.Count > 0)
         {
             var details = string.Join("; ",
@@ -674,7 +620,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
                 issues: issues);
         }
 
-        // 1️⃣2️⃣ Success log (only if no issues for this file)
         if (!issues.Any(i => i.FileName == fileName))
         {
             var bundleSummary = string.Join(", ",
@@ -1149,11 +1094,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
         List<ValidationIssue> issues)
     {
         var severity = SeverityConfig[issueType];
-
-        // REMOVE this line ↓↓↓
-        // output.WriteLine($"{prefix} [{severity}] {fileName} :: {message}");
-
-        // Only collect issues — the summary table handles all display.
         issues.Add(new ValidationIssue(
             fileName: fileName,
             issueType: issueType,
@@ -1201,17 +1141,33 @@ public class SubmissionZipReader(ITestOutputHelper output)
             output.WriteLine("------------------------------------------");
             output.WriteLine(string.Empty);
 
+            // ✅ Compute widths per-patient so columns align within each patient block
+            int issueW = Clamp(
+                Math.Max("Issue Type".Length, group.Max(i => i.IssueType.ToString().Length)),
+                min: 18,
+                max: 32);
+
+            int sevW = Clamp(
+                Math.Max("Severity".Length, group.Max(i => i.Severity.ToString().Length)),
+                min: 7,
+                max: 10);
+
+            int resW = Clamp(
+                Math.Max("Resource".Length, group.Max(i => (i.ResourceType ?? string.Empty).Length)),
+                min: 10,
+                max: 22);
+
             string header =
-                $"| {"Issue Type",-24} | {"Severity",-7} | {"Resource",-12} | Description";
+                $"| {Cell("Issue Type", issueW)} | {Cell("Severity", sevW)} | {Cell("Resource", resW)} | Description";
 
             output.WriteLine(header);
             output.WriteLine(new string('-', header.Length));
 
             foreach (var issue in group)
             {
-                string description = issue.Message;
+                string description = issue.Message ?? string.Empty;
 
-                // Shorten TOTAL row message for table display
+                // ✅ Keep breakdown OUT of the table for the TOTAL row (you print it below)
                 if (issue.IssueType == ValidationIssueType.EvaluatedCountMismatch &&
                     string.Equals(issue.ResourceType, "__TOTAL__", StringComparison.OrdinalIgnoreCase))
                 {
@@ -1221,7 +1177,8 @@ public class SubmissionZipReader(ITestOutputHelper output)
                 }
 
                 string row =
-                    $"| {issue.IssueType,-24} | {issue.Severity,-7} | {issue.ResourceType,-12} | {description}";
+                    $"| {Cell(issue.IssueType.ToString(), issueW)} | {Cell(issue.Severity.ToString(), sevW)} | {Cell(issue.ResourceType, resW)} | {description}";
+
                 output.WriteLine(row);
             }
 
@@ -1270,5 +1227,17 @@ public class SubmissionZipReader(ITestOutputHelper output)
 
         output.WriteLine("🟠 Validation completed with warnings but no errors.");
     }
+
+    private static string Cell(string? value, int width)
+    {
+        value ??= string.Empty;
+        if (value.Length > width)
+            return value.Substring(0, Math.Max(0, width - 1)) + "…"; 
+
+        return value.PadRight(width);
+    }
+
+    private static int Clamp(int value, int min, int max)
+        => Math.Max(min, Math.Min(max, value));
 }
 
