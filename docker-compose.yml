@@ -184,7 +184,7 @@ services:
   ###########################################
       
   loki:
-    image: grafana/loki:2.9.0
+    image: grafana/loki:3.3.1
     ports:
       - "3100:3100"
     container_name: loki
@@ -1061,7 +1061,7 @@ services:
       springdoc.swagger-ui.enabled: true
       authentication.anonymous: true
       spring_profiles_active: dev
-      loki.enabled: false
+      loki.enabled: true
       loki.url: http://loki:3100
       LINK_REPORT_BASE-URL: http://report:8072
       internal-blob-storage.connection-string: ${AZURITE_CONNECTION_STRING}
@@ -1069,6 +1069,7 @@ services:
       spring.data.redis.host: redis_cache
       spring.data.redis.port: 6379
       spring.data.redis.password: ${REDIS_PASS}
+      telemetry.exporter_endpoint: http://otel-collector:4317
     ports:
       - "8075:8075"
     build:

@@ -14,11 +14,17 @@ import java.util.Date;
 
 @Getter
 @Setter
-public abstract class AbstractResourceEntity {
+public class Resource {
     @Id
     private String id;
 
     private String facilityId;
+
+    private String correlationId;
+
+    @JsonDeserialize(using = FhirIdDeserializer.class)
+    private String patientId;
+
     private ResourceType resourceType;
 
     @JsonDeserialize(using = FhirIdDeserializer.class)
