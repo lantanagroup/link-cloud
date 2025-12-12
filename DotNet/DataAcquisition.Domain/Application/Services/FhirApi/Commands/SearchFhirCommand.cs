@@ -22,7 +22,9 @@ public record SearchFhirCommandRequest(
     string? facilityId,
     string? patientId,
     string? correlationId,
-    QueryPhase? queryPhase);
+    QueryPhase? queryPhase, 
+    FhirQueryType queryType
+    );
 
 public interface ISearchFhirCommand
 {
@@ -88,7 +90,14 @@ public class SearchFhirCommand : ISearchFhirCommand
 
             try
             {
-                resultBundle = await fhirClient.SearchAsync(request.searchParams, request.resourceType.ToString(), cancellationToken);
+                if (request.queryType == FhirQueryType.SearchPost)
+                {
+                    resultBundle = await fhirClient.SearchUsingPostAsync(request.searchParams, request.resourceType.ToString(), cancellationToken);
+                }
+                else
+                {
+                    resultBundle = await fhirClient.SearchAsync(request.searchParams, request.resourceType.ToString(), cancellationToken);
+                }
             }
             catch(Exception ex)
             {

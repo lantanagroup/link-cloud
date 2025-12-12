@@ -15,7 +15,7 @@
             <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
                 <labels>
                     app=${loki.app}
-                    component=MeasureEval
+                    component=Validation
                 </labels>
                 <message>
                     <pattern>[%-20.20thread] %-5level %-40.40logger{40} %message%n</pattern>
