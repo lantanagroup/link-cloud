@@ -1162,9 +1162,22 @@ public class SubmissionZipReader(ITestOutputHelper output)
 
             output.WriteLine(header);
             output.WriteLine(new string('-', header.Length));
+            ValidationIssueType? previousType = null;
 
-            foreach (var issue in group)
+            foreach (var issue in group
+                .OrderBy(i => i.IssueType == ValidationIssueType.EvaluatedCountMismatch ? 1 : 0)
+                .ThenBy(i =>
+                    i.IssueType == ValidationIssueType.EvaluatedCountMismatch &&
+                    string.Equals(i.ResourceType, "__TOTAL__", StringComparison.OrdinalIgnoreCase)
+                        ? 1
+                        : 0)
+                .ThenBy(i => i.ResourceType, StringComparer.OrdinalIgnoreCase))
             {
+                if (previousType != null && previousType != issue.IssueType)
+                {
+                    output.WriteLine(string.Empty);
+                }
+
                 string description = issue.Message ?? string.Empty;
 
                 // ✅ Keep breakdown OUT of the table for the TOTAL row (you print it below)
@@ -1180,6 +1193,7 @@ public class SubmissionZipReader(ITestOutputHelper output)
                     $"| {Cell(issue.IssueType.ToString(), issueW)} | {Cell(issue.Severity.ToString(), sevW)} | {Cell(issue.ResourceType, resW)} | {description}";
 
                 output.WriteLine(row);
+                previousType = issue.IssueType;
             }
 
             // blank line between patients
