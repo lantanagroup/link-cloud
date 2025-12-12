@@ -1105,7 +1105,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
     {
         var issues = new List<ValidationIssue>();
 
-        // 🩺 Run whichever patients you want right now
         ValidatePatientFile_1(issues);
         ValidatePatientFile_2(issues);
         ValidatePatientFile_3(issues);
@@ -1118,17 +1117,12 @@ public class SubmissionZipReader(ITestOutputHelper output)
             output.WriteLine("✅ All patients passed validation with no issues.");
             return;
         }
-
-        // ==========================================
-        //           OVERALL SUMMARY HEADER
-        // ==========================================
         output.WriteLine(string.Empty);
         output.WriteLine("==========================================");
         output.WriteLine("        PATIENT VALIDATION SUMMARY");
         output.WriteLine("==========================================");
         output.WriteLine(string.Empty);
 
-        // Group issues by patient file
         var groups = issues
             .GroupBy(i => i.FileName)
             .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase);
@@ -1140,7 +1134,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
             output.WriteLine("------------------------------------------");
             output.WriteLine(string.Empty);
 
-            // ✅ Compute widths per-patient so columns align within each patient block
             int issueW = Clamp(
                 Math.Max("Issue Type".Length, group.Max(i => i.IssueType.ToString().Length)),
                 min: 18,
@@ -1179,7 +1172,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
 
                 string description = issue.Message ?? string.Empty;
 
-                // ✅ Keep breakdown OUT of the table for the TOTAL row (you print it below)
                 if (issue.IssueType == ValidationIssueType.EvaluatedCountMismatch &&
                     string.Equals(issue.ResourceType, "__TOTAL__", StringComparison.OrdinalIgnoreCase))
                 {
@@ -1195,11 +1187,9 @@ public class SubmissionZipReader(ITestOutputHelper output)
                 previousType = issue.IssueType;
             }
 
-            // blank line between patients
             output.WriteLine(string.Empty);
         }
 
-        // ======= TOTALS FOR ALL PATIENTS =======
         int totalWarnings = issues.Count(i => i.Severity == ValidationSeverity.Warning);
         int totalErrors = issues.Count(i => i.Severity == ValidationSeverity.Error);
 
@@ -1210,7 +1200,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
         output.WriteLine(string.Empty);
         output.WriteLine(string.Empty);
 
-        // ======= FULL BREAKDOWN FOR TOTAL ROWS =======
         var totalBreakdowns = issues
             .Where(i =>
                 i.IssueType == ValidationIssueType.EvaluatedCountMismatch &&
@@ -1227,8 +1216,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
             }
             output.WriteLine(string.Empty);
         }
-
-        // Final result behavior depends on severity settings
         bool hasError = issues.Any(i => i.Severity == ValidationSeverity.Error);
 
         if (hasError)
