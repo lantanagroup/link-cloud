@@ -99,7 +99,7 @@ namespace IntegrationTests.Report
                 entries.Add(entry);
             }
 
-            await database.SaveChangesAsync();  // NEW: Persist changes
+            await database.SaveChangesAsync();
 
             return (schedule, entries);
         }
