@@ -30,7 +30,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/measure-definition")
+@RequestMapping("/api/measureeval/measure-definition")
 @PreAuthorize("hasRole('LinkUser')")
 public class MeasureDefinitionController {
 

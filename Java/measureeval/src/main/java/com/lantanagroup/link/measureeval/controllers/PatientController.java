@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
-@RequestMapping("/api/patient")
+@RequestMapping("/api/measureeval/patient")
 @PreAuthorize("hasRole('LinkUser')")
 public class PatientController {
     private final PatientReportingEvaluationStatusRepository patientReportingEvaluationStatusRepository;

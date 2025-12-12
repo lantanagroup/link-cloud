@@ -15,7 +15,7 @@
     <div class="left-pane">
       <div class="data-label">
         Report
-        <span class="data-value selectable-value">{{measureReport.id}}</span>
+        <span class="data-value selectable-value">{{measureReport.reportScheduleId }}</span>
       </div>
       <div class="data-label">
         Facility
@@ -27,8 +27,13 @@
       </div>
       <div class="data-label">
         Patient
-        <span class="data-value selectable-value">{{measureReport.patientId}}</span>
+        <span class="data-value selectable-value">{{measureReport.patientId}}
+          <button class="link-button primary" (click)="downloadReport()">
+            <fa-icon [icon]="faDownload"></fa-icon>
+            Download Measure Eval Input
+          </button></span>
       </div>
+
       <div class="data-label">
         Validation Status
         <span class="data-value">{{measureReport.validationStatus}}</span>
@@ -38,9 +43,8 @@
         <span class="data-value">{{measureReport.status}}</span>
       </div>
     </div>
-    <div class="right-pane">
-      <app-donut-chart [data]="this.measureReport?.resourceCountSummary"></app-donut-chart>
-      <!-- <app-pie-chart [data]="this.measureReport?.resourceCountSummary"></app-pie-chart> -->
+    <div class="right-pane" style="display: flex; align-items: center;">
+      <app-donut-chart [data]="measureReport?.resourceCountSummary"></app-donut-chart>
     </div>
   </div>
 

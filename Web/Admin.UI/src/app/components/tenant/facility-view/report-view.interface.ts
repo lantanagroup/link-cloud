@@ -38,6 +38,7 @@ export interface IMeasureReportSummary {
   validationStatus: string;
   resourceCount: number;
   resourceCountSummary: Record<string, number>;
+  reportScheduleId : string;
 }
 
 export class IPagedMeasureReportSummary {

@@ -6,9 +6,6 @@ import { Artifact } from "../../../interfaces/validation/artifact.interface";
 import { ErrorHandlingService } from '../../error-handling.service';
 import { HttpClient } from '@angular/common/http';
 import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
-import {
-  IMeasureDefinitionConfigModel
-} from "../../../interfaces/measure-definition/measure-definition-config-model.interface";
 import { IValidationConfiguration } from "../../../interfaces/validation/validation-configuration.interface";
 import { Injectable } from '@angular/core';
 
@@ -57,14 +54,14 @@ export class ValidationService {
   }
 
   getValidationCategory(id: string): Observable<IValidationIssueCategory> {
-    
+
     return this.http.get<IValidationIssueCategory>(`${this.appConfigService.config?.baseApiUrl}/validation/category/${id}`).pipe(
       catchError((error) => this.errorHandler.handleError(error))
     );
   }
 
   updateValidationCategory(id: string, category: IValidationIssueCategory): Observable<IValidationIssueCategory> {
-    
+
     return this.http.put<IValidationIssueCategory>(`${this.appConfigService.config?.baseApiUrl}/validation/category/${id}`, category).pipe(
       catchError((error) => this.errorHandler.handleError(error))
     );

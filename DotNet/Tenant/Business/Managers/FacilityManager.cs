@@ -254,7 +254,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
                     throw new ApplicationException($"MeasureEval service configuration from \"ServiceRegistry.MeasureServiceUrl\" is missing");
 
 
-                var requestUrl = new Uri(new Uri(_serviceRegistry.Value.MeasureServiceUrl), $"api/measure-definition/{HtmlInputSanitizer.SanitizeAndRemove(reportType)}");
+                var requestUrl = new Uri(new Uri(_serviceRegistry.Value.MeasureServiceUrl), $"api/measureeval/measure-definition/{HtmlInputSanitizer.SanitizeAndRemove(reportType)}");
 
                 //get link token
                 if (!_linkBearerServiceOptions.Value.AllowAnonymous)

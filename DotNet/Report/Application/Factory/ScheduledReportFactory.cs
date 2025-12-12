@@ -34,7 +34,8 @@ public class MeasureReportSummaryFactory
             ReportType = measureReport.ReportType,
             Status = measureReport.Status.ToString(),
             ValidationStatus = measureReport.ValidationStatus.ToString(),
-            ResourceCount = measureReport.ContainedResources.Count
+            ResourceCount = measureReport.ContainedResources.Count,
+            ReportScheduleId = measureReport.ReportScheduleId
         };
         
         summary.ResourceCountSummary = measureReport.ContainedResources
