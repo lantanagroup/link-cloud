@@ -1,6 +1,9 @@
 package com.lantanagroup.link.measureeval.configs;
 
+import ca.uhn.fhir.context.FhirContext;
 import com.lantanagroup.link.measureeval.services.BlobStorageService;
+import com.lantanagroup.link.measureeval.services.MeasureReportGeneratedProducer;
+import com.lantanagroup.link.shared.services.ReportClient;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
@@ -17,10 +20,10 @@ public class BlobStorageConfig {
     private String blobContainerName;
 
     @Bean
-    public BlobStorageService blobStorageService() {
+    public BlobStorageService blobStorageService(FhirContext fhirContext, ReportClient reportClient, MeasureReportGeneratedProducer measureReportGeneratedProducer) {
         if (StringUtils.isAnyEmpty(connectionString, blobContainerName)) {
             return null;
         }
-        return new BlobStorageService(connectionString, blobContainerName);
+        return new BlobStorageService(connectionString, blobContainerName, fhirContext, reportClient, measureReportGeneratedProducer);
     }
 }
