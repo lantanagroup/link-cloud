@@ -479,15 +479,31 @@ public class SubmissionZipReader(ITestOutputHelper output)
 
                 var totalFound = evalCounts.TryGetValue("__TOTAL__", out var t) ? t : 0;
 
+                // 🔹 For __TOTAL__, keep the breakdown in the *message*
+                // 🔹 For all other types, keep the message short
+                string msg;
+                if (string.Equals(type, "__TOTAL__", StringComparison.OrdinalIgnoreCase))
+                {
+                    msg =
+                        $"evaluatedResource mismatch for '__TOTAL__': expected {expected}, got {actual}. " +
+                        $"Found total {totalFound}. Breakdown: [{foundPretty}]";
+                }
+                else
+                {
+                    msg =
+                        $"evaluatedResource mismatch for '{type}': expected {expected}, got {actual}. " +
+                        $"Found total {totalFound}.";
+                }
+
                 ReportIssue(
                     fileName,
                     resourceType: type,
                     issueType: ValidationIssueType.EvaluatedCountMismatch,
-                    message: $"evaluatedResource mismatch for '{type}': expected {expected}, got {actual}. " +
-                             $"Found total {totalFound}. Breakdown: [{foundPretty}]",
+                    message: msg,
                     issues: issues);
             }
         }
+
 
         // 7️⃣ Unexpected evaluated types
         var expectedEvalKeys = new HashSet<string>(expectedEvalCounts.Keys, StringComparer.OrdinalIgnoreCase);
@@ -1062,24 +1078,28 @@ public class SubmissionZipReader(ITestOutputHelper output)
         [ValidationIssueType.CrossTypeReference] = ValidationSeverity.Warning
     };
 
+    private static string Truncate(string? value, int maxLength)
+    {
+        if (string.IsNullOrEmpty(value) || value.Length <= maxLength)
+            return value ?? string.Empty;
+
+        // leave space for "..."
+        return value.Substring(0, maxLength - 3) + "...";
+    }
 
     private void ReportIssue(
-    string fileName,
-    string resourceType,
-    ValidationIssueType issueType,
-    string message,
-    List<ValidationIssue> issues)
+        string fileName,
+        string resourceType,
+        ValidationIssueType issueType,
+        string message,
+        List<ValidationIssue> issues)
     {
         var severity = SeverityConfig[issueType];
 
-        var prefix = severity == ValidationSeverity.Error
-            ? "🔴"
-            : severity == ValidationSeverity.Warning
-                ? "🟠"
-                : "ℹ️";
+        // REMOVE this line ↓↓↓
+        // output.WriteLine($"{prefix} [{severity}] {fileName} :: {message}");
 
-        output.WriteLine($"{prefix} [{severity}] {fileName} :: {message}");
-
+        // Only collect issues — the summary table handles all display.
         issues.Add(new ValidationIssue(
             fileName: fileName,
             issueType: issueType,
@@ -1092,6 +1112,7 @@ public class SubmissionZipReader(ITestOutputHelper output)
     {
         var issues = new List<ValidationIssue>();
 
+        // 🔹 Run validations for all patients (you can uncomment others as you bring them online)
         ValidatePatientFile_1(issues);
         //ValidatePatientFile_2(issues);
         //ValidatePatientFile_3(issues);
@@ -1099,63 +1120,89 @@ public class SubmissionZipReader(ITestOutputHelper output)
         //ValidatePatientFile_5(issues);
         //ValidatePatientFile_6(issues);
 
-        // If nothing failed, exit early.
         if (issues.Count == 0)
         {
             output.WriteLine("✅ All patients passed validation with no issues.");
             return;
         }
 
-        // ========== FORMATTED SUMMARY TABLE ==========
+        // Column widths so pipes line up nicely
+        const int issueWidth = 24;
+        const int severityWidth = 8;
+        const int fileWidth = 60;
+        const int resourceWidth = 14;
+        const int descWidth = 120;
+
+        // Group by patient file so each has its own block
+        var groups = issues
+            .GroupBy(i => i.FileName)
+            .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase);
+
+        output.WriteLine(""); // spacing before everything
+        output.WriteLine("====================================");
+        output.WriteLine("        PATIENT VALIDATION SUMMARY");
+        output.WriteLine("====================================");
         output.WriteLine("");
-        output.WriteLine("====================================");
-        output.WriteLine("         PATIENT VALIDATION SUMMARY");
-        output.WriteLine("====================================");
 
-        // Column headers
-        string header =
-            $"| {"Issue Type",-28} | {"Severity",-7} | {"File",-25} | {"Resource",-12} | Description";
-
-        output.WriteLine(header);
-        output.WriteLine(new string('-', header.Length));
-
-        // Table rows
-        foreach (var issue in issues)
+        foreach (var group in groups)
         {
-            string row =
-                $"| {issue.IssueType,-28} | {issue.Severity,-7} | {issue.FileName,-25} | {issue.ResourceType,-12} | {issue.Message}";
-            output.WriteLine(row);
+            var fileName = group.Key;
+
+            // ----- Per-patient header -----
+            output.WriteLine("------------------------------------------------------------");
+            output.WriteLine($" PATIENT FILE: {fileName}");
+            output.WriteLine("------------------------------------------------------------");
+            output.WriteLine("");
+
+            // Table header for this patient
+            string header =
+                $"| {"Issue Type".PadRight(issueWidth)} " +
+                $"| {"Severity".PadRight(severityWidth)} " +
+                $"| {"Resource".PadRight(resourceWidth)} " +
+                $"| Description";
+
+            output.WriteLine(header);
+            output.WriteLine(new string('-', header.Length));
+
+            // Rows for this patient
+            foreach (var issue in group)
+            {
+                string issueCol = Truncate(issue.IssueType.ToString(), issueWidth).PadRight(issueWidth);
+                string severityCol = Truncate(issue.Severity.ToString(), severityWidth).PadRight(severityWidth);
+                string resourceCol = Truncate(issue.ResourceType, resourceWidth).PadRight(resourceWidth);
+
+                // Description is already trimmed in ReportIssue (except TOTAL breakdown),
+                // but we still guard it to avoid overflowing too hard.
+                string descCol = Truncate(issue.Message, descWidth);
+
+                string row =
+                    $"| {issueCol} | {severityCol} | {resourceCol} | {descCol}";
+                output.WriteLine(row);
+            }
+
+            output.WriteLine(""); // blank line after each patient section
         }
 
-        // 🆕 Add one blank row above totals
-        output.WriteLine("");
-
-        // Compute summary totals
+        // ===== Global totals across all patients =====
         int totalErrors = issues.Count(i => i.Severity == ValidationSeverity.Error);
         int totalWarnings = issues.Count(i => i.Severity == ValidationSeverity.Warning);
 
-        // 🆕 Summary totals block
         output.WriteLine("====================================");
-        output.WriteLine($"TOTAL WARNINGS: {totalWarnings}");
-        output.WriteLine($"TOTAL ERRORS:   {totalErrors}");
+        output.WriteLine($"TOTAL WARNINGS (all patients): {totalWarnings}");
+        output.WriteLine($"TOTAL ERRORS   (all patients): {totalErrors}");
         output.WriteLine("====================================");
-
-        // 🆕 Two blank rows after totals
         output.WriteLine("");
         output.WriteLine("");
 
-
-        // Determine outcome
-        bool hasError = issues.Any(i => i.Severity == ValidationSeverity.Error);
+        bool hasError = totalErrors > 0;
 
         if (hasError)
         {
             throw new Exception(
-                $"Found {issues.Count(i => i.Severity == ValidationSeverity.Error)} error-level validation issue(s). " +
-                "See summary table above.");
+                $"Found {totalErrors} error-level validation issue(s) across all patients. " +
+                "See summary tables above.");
         }
 
-        // No errors → warnings only
         output.WriteLine("🟠 Validation completed with warnings but no errors.");
     }
 }
