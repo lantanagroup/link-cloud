@@ -175,7 +175,8 @@ public class FhirApiService : IFhirApiService
                             log.FacilityId,
                             log.PatientId,
                             log.CorrelationId,
-                            log.QueryPhase),
+                            log.QueryPhase,
+                            fhirQuery.QueryType),
                             cancellationToken))
             {
                 var refResources = ReferenceResourceBundleExtractor.Extract(bundle, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());

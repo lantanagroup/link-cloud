@@ -93,14 +93,9 @@ During progressive querying, data is acquired in stages to meet the evaluation p
 
 This method minimizes the data retrieved from the EHR by acquiring only what is necessary at each stage of the pipeline:
 
-1. **Initial Querying**:
- - Focuses on essential data needed to evaluate measures and determine patient inclusion.
-
-2. **Supplemental Querying**:
- - Retrieves additional data elements after initial evaluations confirm patient relevance.
-
-3. **Final Evaluation**:
- - Combines initial and supplemental data for comprehensive measure evaluation and reporting.
+1. **Initial Querying**: Focuses on essential data needed to evaluate measures and determine patient inclusion.
+2. **Supplemental Querying**: Retrieves additional data elements after initial evaluations confirm patient relevance.
+3. **Final Evaluation**: Combines initial and supplemental data for comprehensive measure evaluation and reporting.
 
 #### Benefits of Progressive Querying
 - **Efficiency**: Reduces the volume of data retrieved from the EHR, optimizing system performance.
@@ -139,9 +134,9 @@ Data acquisition is configurable per tenant, ensuring flexibility to accommodate
 - **EHR Query Throttling/Limitations**:
   - Configurable settings to respect EHR query limitations (e.g., maximum queries per minute).
 
-#### Configuring Query Plans
+### Configuring Query Plans
 
-Types of query plans:
+**Types of query plans:**
 
 * Daily
 * Weekly
@@ -154,15 +149,123 @@ All other types of query plans are used to acquire data for patients who are cur
 
 All times are stored in UTC format. The tenant's time zone is configured with a valid value from [IANA](https://www.iana.org/time-zones).
 
+**Initial / Supplemental Queries**
+
+The previously mentioned progressive query phases (initial, supplemental) are configurable through the query plan. Each configured phase can contain a list of FHIR resources that must be acquired from the configured endpoint.  
+
+**Query Types**
+
+For each FHIR resource that must be queried, there are two main query types that are supported:
+
+1. Parameter: Parameters that will be appended to the FHIR search for the configured resource.
+2. Reference: Any FHIR references for the configured resource found in other acquired resources for that phase will be queried for. 
+
+**Example Plan**
+
+Below is an example of a monthly query plan that's configured to acquire the following resources:
+
+1. Initial Query Phase:
+
+| Resource  | Query Type | Description                                                                                            |
+| -------   | ---------  | ---------------------------------------------------------------------------------------------------    |
+| Patient   | N/A        | Patient resources will always be queried for each configured query plan. No configuration is needed.   |
+| Encounter | Parameter  | The following parameters are included in the search: patient id, period start date and period end date |
+| Location  | Reference  | Any Location FHIR references found in other acquired initial resources will be queried for. 'SearchPost' will perform an HTTP POST search for Locations rather than a GET. If an OperationType is not added, it will default to performing a GET search. [Link Here](https://hl7.org/fhir/R4/search.html#Introduction) for more info on FHIR searches. |
+
+2. Supplemental Query Phase:
+
+| Resource  | Query Type | Description                                                                                         |
+| -------   | ---------  | --------------------------------------------------------------------------------------------------  |
+| MedicationRequest | Parameter | The following parameters are included in the search: patient Id, period start date, period end date, and the literal value 'order' in the `MedicationRequest.intent` element. |
+| Medication | Reference | Any Medication FHIR references found in other acquired supplemental resources will be queried for.  |
+
+```
+{
+  "PlanName": "NHSNdQMAcuteCareHospitalInitialPopulation",
+  "FacilityId": "st-marys-hospital",
+  "EHRDescription": "",
+  "LookBack": "P0D",
+  "Type": "Monthly",
+  "InitialQueries": {
+    "0": {
+      "ResourceType": "Encounter",
+      "QueryConfigType": "Parameter",
+      "Parameters": [
+        {
+          "ParameterType": "Variable",
+          "Name": "patient",
+          "Variable": 0,
+          "Format": null
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "date",
+          "Variable": 1,
+          "Format": "ge{0}"
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "date",
+          "Variable": 3,
+          "Format": "le{0}"
+        }
+      ]
+    },
+    "1": {
+      "QueryConfigType": "Reference",
+      "ResourceType": "Location",
+      "OperationType": "SearchPost",
+      "Paged": 100
+    }
+  },
+  "SupplementalQueries": {
+    "0": {
+      "QueryConfigType": "Parameter",
+      "ResourceType": "MedicationRequest",
+      "Parameters": [
+        {
+          "ParameterType": "Variable",
+          "Name": "patient",
+          "Variable": 0,
+          "Format": null
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "authoredon",
+          "Variable": 1,
+          "Format": "ge{0}"
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "authoredon",
+          "Variable": 3,
+          "Format": "le{0}"
+        },
+        {
+          "ParameterType": "Literal",
+          "Name": "intent",
+          "Literal": "order"
+        }
+      ]
+    },
+    "1": {
+      "QueryConfigType": "Reference",
+      "ResourceType": "Medication",
+      "OperationType": "SearchPost",
+      "Paged": 100
+    }
+  }
+}
+```
+
 #### Configuring Census and Data Sources
 
 Data sources (where the FHIR server is located and how to authenticate) are configured via "Query Configs". There is currently no association between a query _plan_ and data source. Whenever data acquisition attempts to execute a query plan against a data source, it uses the FHIR server and authentication method specified by the "Query Config", for the specified facility/tenant.
 
 TODO: Add details about how to authenticate against Epic, Cerner, Basic, and/or OAuth data sources.
 
-#### Application Configuration
 
-# Logging
+## Logging
 
 The Logging configuration defines the logging levels for different parts of the application.
 

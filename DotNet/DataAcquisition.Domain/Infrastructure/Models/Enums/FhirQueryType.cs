@@ -7,6 +7,8 @@ public enum FhirQueryType
     Read,
     [StringValue("Search")]
     Search,
+    [StringValue("SearchPost")]
+    SearchPost,
     [StringValue("BulkDataRequest")]
     BulkDataRequest,
     [StringValue("BulkDataPoll")]
@@ -21,6 +23,7 @@ public static class FhirQueryTypeUtilities
         {
             "Read" => FhirQueryType.Read,
             "Search" => FhirQueryType.Search,
+            "SearchPost" => FhirQueryType.SearchPost,
             "BulkDataRequest" => FhirQueryType.BulkDataRequest,
             "BulkDataPoll" => FhirQueryType.BulkDataPoll,
             _ => throw new ArgumentOutOfRangeException(nameof(fhirQueryType), fhirQueryType, null)

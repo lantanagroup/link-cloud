@@ -499,7 +499,7 @@ public class PatientDataService : IPatientDataService
                                 var ids = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType, fhirQueryConfiguration, cancellationToken);
                                 if (ids != null) foreach (var id in ids) resourceIds.Add(id);
                             }
-                            else if (fhirQuery.QueryType == FhirQueryType.Search)
+                            else if (fhirQuery.QueryType == FhirQueryType.Search || fhirQuery.QueryType == FhirQueryType.SearchPost)
                             {
                                 var ids = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, resourceType, cancellationToken);
                                 if (ids != null) foreach (var id in ids) resourceIds.Add(id);
