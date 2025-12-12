@@ -108,7 +108,7 @@ This approach ensures consistent, reliable evaluation of healthcare quality meas
 The measure engine may be tested against arbitrary data using the $evaluate operation (which is custom-built for this purpose in the measure evaluation service) or using the `measureeval-cli.jar` that can be built separately from the service; see <a href="https://github.com/lantanagroup/link-cloud/blob/dev/Java/measureeval/README.md" target="new">measureeval/README.md</a> for more information.
 
 ### Upload & Storage
-- Bundles are uploaded via: `PUT /api/measureDefinition`
+- Bundles are uploaded via: `PUT /api/measureeval/measureDefinition`
 - The uploaded bundle is a FHIR JSON Bundle and typically includes: `Measure`, `Library`, `StructureDefinition` (Profile), `ValueSet`, `CodeSystem`
 - Bundles are stored **as-is** in the measureeval service's database.
 
