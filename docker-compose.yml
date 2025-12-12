@@ -664,7 +664,7 @@ services:
      container_name: link-dataacquisitionworker
      environment:
        ASPNETCORE_ENVIRONMENT: Docker
-       ServiceInformation__ServiceName: Link Data Acquisition - Acquisition Worker Service
+       ServiceInformation__ServiceName: Link Data Acquisition Worker Service
        ServiceInformation__ProductVersion: dev
        KafkaConnection__BootstrapServers__0: kafka_b:9094
        KafkaConnection__SaslProtocolEnabled: true

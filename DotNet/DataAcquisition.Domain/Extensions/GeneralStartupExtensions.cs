@@ -97,6 +97,9 @@ public static class GeneralStartupExtensions
         if (serviceInformation != null)
         {
             ServiceActivitySource.Initialize(serviceInformation);
+            Log.Information("ServiceActivitySource initialized with name: {ServiceName}, version: {Version}",
+            ServiceActivitySource.ServiceName,
+            serviceInformation.Version);
         }
         else
         {
@@ -286,11 +289,6 @@ public static class GeneralStartupExtensions
             options.Environment = environment;
             options.ServiceName = serviceName;
             options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?
-        });
-
-        services.ConfigureOpenTelemetryTracerProvider(builder =>
-        {
-            builder.AddSource("FhirApiService");
         });
     }
 
