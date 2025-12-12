@@ -1,11 +1,14 @@
 package com.lantanagroup.link.measureeval.configs;
 
+import com.lantanagroup.link.shared.auth.JwtService;
+import com.lantanagroup.link.shared.services.ReportClient;
 import lombok.Getter;
 import lombok.Setter;
 import org.hl7.fhir.r4.model.MeasureReport;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestClient;
 
 import java.util.function.Predicate;
 
@@ -14,6 +17,12 @@ import java.util.function.Predicate;
 @Configuration
 @ConfigurationProperties("link")
 public class LinkConfig {
+    @Bean
+    @ConfigurationProperties("link.report")
+    public ReportClient reportClient(JwtService jwtService, RestClient restClient) {
+        return new ReportClient(jwtService, restClient);
+    }
+
     private String reportabilityPredicate;
 
     /**

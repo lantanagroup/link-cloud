@@ -1,5 +1,6 @@
 package com.lantanagroup.link.validation.entities;
 
+import com.lantanagroup.link.shared.entities.ReportScheduleSummaryModel;
 import lombok.Getter;
 import lombok.Setter;
 import org.hl7.fhir.r4.model.Device;

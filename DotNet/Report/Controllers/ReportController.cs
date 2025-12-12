@@ -237,7 +237,8 @@ namespace LantanaGroup.Link.Report.Controllers
                     StartDate = model.ReportStartDate,
                     EndDate = model.ReportEndDate,
                     SubmitReportDateTime = model.SubmitReportDateTime,
-                    Measures = model.ReportTypes
+                    Measures = model.ReportTypes,
+                    PayloadRootUri = model.PayloadRootUri
                 });
             }
             catch (Exception ex)

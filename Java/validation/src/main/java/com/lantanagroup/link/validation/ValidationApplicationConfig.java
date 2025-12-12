@@ -6,7 +6,7 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@ComponentScan({"com.lantanagroup.link.shared.health"})
+@ComponentScan({"com.lantanagroup.link.shared.health", "com.lantanagroup.link.shared.services"})
 @ConfigurationPropertiesScan("com.lantanagroup.link.shared.config")
 public class ValidationApplicationConfig extends BaseSpringConfig {
 }
