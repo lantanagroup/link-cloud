@@ -492,13 +492,12 @@ public class SubmissionZipReader(ITestOutputHelper output)
                 {
                     msg =
                         $"evaluatedResource mismatch for '__TOTAL__': expected {expected}, got {actual}. " +
-                        $"Found total {totalFound}. Breakdown: [{foundPretty}]";
+                        $"Breakdown: [{foundPretty}]";
                 }
                 else
                 {
                     msg =
-                        $"evaluatedResource mismatch for '{type}': expected {expected}, got {actual}. " +
-                        $"Found total {totalFound}.";
+                        $"evaluatedResource mismatch for '{type}': expected {expected}, got {actual}.";
                 }
 
                 ReportIssue(
