@@ -6,7 +6,7 @@ import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.measureeval.entities.NormalizationStatus;
 import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.records.ResourceAcquired;
-import com.lantanagroup.link.measureeval.records.ResourceEvaluated;
+import com.lantanagroup.link.measureeval.records.MeasureReportGenerated;
 import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.shared.services.ReportClient;
@@ -25,29 +25,27 @@ public class ResourceAcquiredErrorConsumer extends AbstractResourceConsumer<Reso
     public ResourceAcquiredErrorConsumer(
             AbstractResourceRepository resourceRepository,
             PatientReportingEvaluationStatusRepository patientStatusRepository,
-            MeasureReportNormalizer measureReportNormalizer,
             Predicate<MeasureReport> reportabilityPredicate,
             KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate,
             @Qualifier("compressedKafkaTemplate")
-            KafkaTemplate<ResourceEvaluated.Key, ResourceEvaluated> resourceEvaluatedTemplate,
+            KafkaTemplate<String, MeasureReportGenerated> measureReportGeneratedTemplate,
             MeasureEvalMetrics measureEvalMetrics,
             EvaluateMeasureService evaluateMeasureService,
             PatientStatusBundler patientStatusBundler,
-            ResourceEvaluatedProducer resourceEvaluatedProducer,
+            MeasureReportGeneratedProducer measureReportGeneratedProducer,
             BlobStorageService blobStorageService,
             ReportClient reportClient,
             FhirContext fhirContext){
         super(
                 resourceRepository,
                 patientStatusRepository,
-                measureReportNormalizer,
                 reportabilityPredicate,
                 dataAcquisitionRequestedTemplate,
-                resourceEvaluatedTemplate,
+                measureReportGeneratedTemplate,
                 measureEvalMetrics,
                 evaluateMeasureService,
                 patientStatusBundler,
-                resourceEvaluatedProducer,
+                measureReportGeneratedProducer,
                 blobStorageService,
                 reportClient,
                 fhirContext);

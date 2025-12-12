@@ -21,7 +21,6 @@ import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
 import org.springframework.kafka.core.*;
 import org.springframework.kafka.listener.CommonErrorHandler;
 import org.springframework.kafka.retrytopic.RetryTopicConfiguration;
@@ -86,23 +85,11 @@ public class KafkaConfig {
                         .trustedPackages("*")
                         .ignoreTypeHeaders()
                         .typeResolver(KafkaConfig::resolveType),
-                Topics.RESOURCE_EVALUATED, new JsonDeserializer<>(ResourceEvaluated.class, objectMapper)
+                Topics.MEASURE_REPORT_GENERATED, new JsonDeserializer<>(MeasureReportGenerated.class, objectMapper)
                         .trustedPackages("*")
                         .ignoreTypeHeaders()
                         .typeResolver(KafkaConfig::resolveType),
                 Topics.RESOURCE_NORMALIZED_RETRY, new JsonDeserializer<>(ResourceNormalized.class, objectMapper)
-                        .trustedPackages("*")
-                        .ignoreTypeHeaders()
-                        .typeResolver(KafkaConfig::resolveType),
-                Topics.EVALUATION_REQUESTED, new JsonDeserializer<>(EvaluationRequested.class, objectMapper)
-                        .trustedPackages("*")
-                        .ignoreTypeHeaders()
-                        .typeResolver(KafkaConfig::resolveType),
-                Topics.EVALUATION_REQUESTED_ERROR, new JsonDeserializer<>(EvaluationRequested.class, objectMapper)
-                        .trustedPackages("*")
-                        .ignoreTypeHeaders()
-                        .typeResolver(KafkaConfig::resolveType),
-                Topics.EVALUATION_REQUESTED_RETRY, new JsonDeserializer<>(EvaluationRequested.class, objectMapper)
                         .trustedPackages("*")
                         .ignoreTypeHeaders()
                         .typeResolver(KafkaConfig::resolveType));
@@ -116,12 +103,9 @@ public class KafkaConfig {
             case Topics.DATA_ACQUISITION_REQUESTED -> new ObjectMapper().constructType(DataAcquisitionRequested.class);
             case Topics.RESOURCE_ACQUIRED_ERROR -> new ObjectMapper().constructType(ResourceAcquired.class);
             case Topics.RESOURCE_NORMALIZED -> new ObjectMapper().constructType(ResourceNormalized.class);
-            case Topics.RESOURCE_EVALUATED -> new ObjectMapper().constructType(ResourceEvaluated.class);
+            case Topics.MEASURE_REPORT_GENERATED -> new ObjectMapper().constructType(MeasureReportGenerated.class);
             case Topics.RESOURCE_NORMALIZED_ERROR -> new ObjectMapper().constructType(ResourceNormalized.class);
             case Topics.RESOURCE_NORMALIZED_RETRY -> new ObjectMapper().constructType(ResourceNormalized.class);
-            case Topics.EVALUATION_REQUESTED -> new ObjectMapper().constructType(EvaluationRequested.class);
-            case Topics.EVALUATION_REQUESTED_ERROR -> new ObjectMapper().constructType(EvaluationRequested.class);
-            case Topics.EVALUATION_REQUESTED_RETRY -> new ObjectMapper().constructType(EvaluationRequested.class);
             default -> new ObjectMapper().constructType(Object.class);
         };
     }
@@ -146,7 +130,6 @@ public class KafkaConfig {
 
         Map<Class<?>, Serializer<?>> serializers = Map.of(
                 String.class, new StringSerializer(),
-                ResourceEvaluated.Key.class, new JsonSerializer<>(objectMapper.constructType(ResourceEvaluated.Key.class), objectMapper),
                 Object.class, new JsonSerializer<>(),
                 byte[].class, new ByteArraySerializer()
         );
@@ -159,9 +142,8 @@ public class KafkaConfig {
                 ResourceAcquired.class, new JsonSerializer<>(objectMapper.constructType(ResourceAcquired.class), objectMapper).noTypeInfo(),
                 ResourceNormalized.class, new JsonSerializer<>(objectMapper.constructType(ResourceNormalized.class), objectMapper).noTypeInfo(),
                 DataAcquisitionRequested.class, new JsonSerializer<>(objectMapper.constructType(DataAcquisitionRequested.class), objectMapper).noTypeInfo(),
-                ResourceEvaluated.class, new JsonSerializer<>(objectMapper.constructType(ResourceEvaluated.class), objectMapper).noTypeInfo(),
+                MeasureReportGenerated.class, new JsonSerializer<>(objectMapper.constructType(MeasureReportGenerated.class), objectMapper).noTypeInfo(),
                 AbstractResourceRecord.class, new JsonSerializer<>(objectMapper.constructType(AbstractResourceRecord.class), objectMapper).noTypeInfo(),
-                EvaluationRequested.class, new JsonSerializer<>(objectMapper.constructType(EvaluationRequested.class), objectMapper).noTypeInfo(),
                 String.class, new StringSerializer(),
                 byte[].class, new ByteArraySerializer(),
                 LinkedHashMap.class, new JsonSerializer<>(objectMapper.constructType(LinkedHashMap.class), objectMapper).noTypeInfo()

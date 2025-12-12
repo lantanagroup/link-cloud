@@ -1,13 +1,10 @@
 package com.lantanagroup.link.measureeval.services;
 
 import ca.uhn.fhir.context.FhirContext;
-import ca.uhn.fhir.parser.IParser;
-import com.azure.storage.blob.BlobUrlParts;
 import com.lantanagroup.link.measureeval.entities.AbstractResourceEntity;
 import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
 import com.lantanagroup.link.measureeval.entities.PatientResource;
 import com.lantanagroup.link.measureeval.entities.SharedResource;
-import com.lantanagroup.link.shared.entities.ReportScheduleSummaryModel;
 import com.lantanagroup.link.shared.exceptions.ValidationException;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
@@ -15,7 +12,7 @@ import com.lantanagroup.link.measureeval.entities.NormalizationStatus;
 import com.lantanagroup.link.measureeval.entities.QueryType;
 import com.lantanagroup.link.measureeval.records.AbstractResourceRecord;
 import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
-import com.lantanagroup.link.measureeval.records.ResourceEvaluated;
+import com.lantanagroup.link.measureeval.records.MeasureReportGenerated;
 import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.shared.services.ReportClient;
@@ -27,7 +24,6 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.MeasureReport;
-import org.hl7.fhir.r4.model.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -45,15 +41,14 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     private static final Logger logger = LoggerFactory.getLogger(AbstractResourceConsumer.class);
     private final AbstractResourceRepository resourceRepository;
     private final PatientReportingEvaluationStatusRepository patientStatusRepository;
-    private final MeasureReportNormalizer measureReportNormalizer;
     private final Predicate<MeasureReport> reportabilityPredicate;
     private final MeasureEvalMetrics measureEvalMetrics;
     private final KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate;
     @Qualifier("compressedKafkaTemplate")
-    private final KafkaTemplate<ResourceEvaluated.Key, ResourceEvaluated> resourceEvaluatedTemplate;
+    private final KafkaTemplate<String, MeasureReportGenerated> measureReportGeneratedTemplate;
     private final EvaluateMeasureService evaluateMeasureService;
     private final PatientStatusBundler patientStatusBundler;
-    private final ResourceEvaluatedProducer resourceEvaluatedProducer;
+    private final MeasureReportGeneratedProducer measureReportGeneratedProducer;
     private final BlobStorageService blobStorageService;
     private final ReportClient reportClient;
     private final FhirContext fhirContext;
@@ -63,27 +58,25 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     public AbstractResourceConsumer (
             AbstractResourceRepository resourceRepository,
             PatientReportingEvaluationStatusRepository patientStatusRepository,
-            MeasureReportNormalizer measureReportNormalizer,
             Predicate<MeasureReport> reportabilityPredicate,
             KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate,
             @Qualifier("compressedKafkaTemplate")
-            KafkaTemplate<ResourceEvaluated.Key, ResourceEvaluated> resourceEvaluatedTemplate,
+            KafkaTemplate<String, MeasureReportGenerated> measureReportGeneratedTemplate,
             MeasureEvalMetrics measureEvalMetrics,
             EvaluateMeasureService evaluateMeasureService,
             PatientStatusBundler patientStatusBundler,
-            ResourceEvaluatedProducer resourceEvaluatedProducer,
+            MeasureReportGeneratedProducer measureReportGeneratedProducer,
             BlobStorageService blobStorageService,
             ReportClient reportClient, FhirContext fhirContext) {
         this.resourceRepository = resourceRepository;
         this.patientStatusRepository = patientStatusRepository;
-        this.measureReportNormalizer = measureReportNormalizer;
         this.reportabilityPredicate = reportabilityPredicate;
         this.dataAcquisitionRequestedTemplate = dataAcquisitionRequestedTemplate;
-        this.resourceEvaluatedTemplate = resourceEvaluatedTemplate;
+        this.measureReportGeneratedTemplate = measureReportGeneratedTemplate;
         this.measureEvalMetrics = measureEvalMetrics;
         this.evaluateMeasureService = evaluateMeasureService;
         this.patientStatusBundler = patientStatusBundler;
-        this.resourceEvaluatedProducer = resourceEvaluatedProducer;
+        this.measureReportGeneratedProducer = measureReportGeneratedProducer;
         this.blobStorageService = blobStorageService;
         this.reportClient = reportClient;
         this.fhirContext = fhirContext;
@@ -153,7 +146,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
 
         for (PatientReportingEvaluationStatus.Report report : patientStatus.getReports()) {
             MeasureReport measureReport = evaluateMeasureService.evaluateMeasure(value.getQueryType().toString(), patientStatus, report, bundle);
-            this.storePatientInBlobStorage(patientStatus, measureReport);
+            this.blobStorageService.storePatientInBlobStorage(patientStatus, measureReport);
             /*
             switch (value.getQueryType()) {
                 case INITIAL -> {
@@ -174,35 +167,6 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         // if the query type is INITIAL and at least one measure is reportable, produce the DataAcquisitionRequested record
         if (value.getQueryType() == QueryType.INITIAL && reportablePatient) {
             produceDataAcquisitionRequestedRecord(value, patientStatus);
-        }
-    }
-
-    private void storePatientInBlobStorage(PatientReportingEvaluationStatus status, MeasureReport measureReport) {
-        IParser jsonParser = this.fhirContext.newJsonParser()
-                //.setSuppressNarratives(true)    // consider this if narrative "text" fields aren't desired downstream
-                .setPrettyPrint(false);     // Ensure no tab delim so that it serializes to a single line per each resource
-
-        for (PatientReportingEvaluationStatus.Report report : status.getReports()) {
-            ReportScheduleSummaryModel summary = this.reportClient.getReportScheduleSummaryModel(status.getFacilityId(), report.getReportTrackingId());
-            String payloadUri = summary.getPayloadRootUri();
-
-            if (payloadUri == null) {
-                throw new ValidationException("Payload URI for report " + report.getReportTrackingId() + " is null");
-            }
-
-            String patientIdPart = "patient-" + status.getPatientId();
-            String patientPayloadUri = payloadUri.endsWith("/") ? payloadUri + patientIdPart : payloadUri + "/" + patientIdPart;
-            StringBuilder sb = new StringBuilder();
-            List<Resource> resources = measureReportNormalizer.normalize(measureReport);
-            resources.add(0, measureReport);
-
-            for (Resource resource : resources) {
-                String idLine = resource.getResourceType() + "/" + resource.getId();
-                sb.append(idLine).append("\n");
-                sb.append(jsonParser.encodeResourceToString(resource)).append("\n");
-            }
-
-            blobStorageService.upload(payloadUri, sb.toString());
         }
     }
 
