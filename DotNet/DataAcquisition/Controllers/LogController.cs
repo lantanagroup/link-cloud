@@ -40,19 +40,8 @@ public class LogController : Controller
     /// <remarks>
     /// This endpoint retrieves a list of data acquisition logs.
     /// </remarks>
+    /// <param name="queryParameters"></param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <param name="facilityId">The ID of the facility.</param>
-    /// <param name="patientId">The ID of the patient.</param>
-    /// <param name="reportId"></param>
-    /// <param name="resourceId"></param>
-    /// <param name="queryPhase">The phase of the query.</param>
-    /// <param name="queryType"></param>
-    /// <param name="status">The status of the request.</param>
-    /// <param name="priority">The priority of the acquisition.</param>
-    /// <param name="pageNumber">The page number to retrieve.</param>
-    /// <param name="pageSize">The number of items per page.</param>
-    /// <param name="sortBy">The field to sort by.</param>
-    /// <param name="sortOrder">The order to sort by (ascending or descending).</param>
     /// <returns>A list of data acquisition logs.</returns>
     /// <response code="200">Returns a list of data acquisition logs.</response>
     /// <response code="400">If the request is invalid.</response>
@@ -184,7 +173,6 @@ public class LogController : Controller
     /// <summary>
     /// Get a list of data acquisition logs for a facility.
     /// </summary>
-    /// <remarks>
     /// This endpoint retrieves a list of data acquisition logs.
     /// <param name="facilityId"></param>
     /// <param name="queryParameters"></param>

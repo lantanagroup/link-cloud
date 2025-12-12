@@ -32,8 +32,6 @@ public class FhirQueriesController : ControllerBase
     /// <param name="patientId"></param>
     /// <param name="resourceType"></param>
     /// <param name="cancellationToken"></param>
-    /// <param name="queryType"></param>
-    /// <param name="successOnly"></param>
     /// <returns>
     /// Success: 200
     /// Bad Request: 400
