@@ -3,7 +3,7 @@ info:
   version: 0.3.0
   title: Measure Evaluation Service
 paths:
-  /api/measure-definition:
+  /api/measureeval/measure-definition:
     get:
       tags:
       - Measure Definitions
@@ -31,7 +31,7 @@ paths:
         "200":
           description: OK
           content: {}
-  /api/measure-definition/{id}/$evaluate:
+  /api/measureeval/measure-definition/{id}/$evaluate:
     post:
       tags:
       - Measure Definitions
@@ -65,7 +65,7 @@ paths:
         "200":
           description: OK
           content: {}
-  /api/patient/{facilityId}/{reportId}/{patientId}:
+  /api/measureeval/patient/{facilityId}/{reportId}/{patientId}:
     get:
       tags:
       - patient-controller
@@ -90,7 +90,7 @@ paths:
         "200":
           description: OK
           content: {}
-  /api/measure-definition/{id}:
+  /api/measureeval/measure-definition/{id}:
     get:
       tags:
       - Measure Definitions
@@ -106,7 +106,7 @@ paths:
         "200":
           description: OK
           content: {}
-  /api/measure-definition/{id}/{library-id}/$cql:
+  /api/measureeval/measure-definition/{id}/{library-id}/$cql:
     get:
       tags:
       - Measure Definitions
@@ -138,7 +138,7 @@ paths:
             '*/*':
               schema:
                 type: string
-  /api/measure-definition/info:
+  /api/measureeval/measure-definition/info:
     get:
       tags:
       - api-info-controller

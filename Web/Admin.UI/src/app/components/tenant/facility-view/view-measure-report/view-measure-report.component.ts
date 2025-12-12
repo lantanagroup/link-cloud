@@ -1,16 +1,18 @@
-import { Component, Inject, OnInit } from '@angular/core';
-import { FacilityViewService } from '../facility-view.service';
-import { IMeasureReportSummary, IResourceSummary } from '../report-view.interface';
-import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import {Component, Inject, OnInit} from '@angular/core';
+import {FacilityViewService} from '../facility-view.service';
+import {IMeasureReportSummary, IResourceSummary} from '../report-view.interface';
+import {PaginationMetadata} from 'src/app/models/pagination-metadata.model';
+import {MatPaginatorModule, PageEvent} from '@angular/material/paginator';
 
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { forkJoin } from 'rxjs';
-import { HttpErrorResponse } from '@angular/common/http';
-import { FormsModule } from '@angular/forms';
-import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faXmark } from '@fortawesome/free-solid-svg-icons';
-import { DonutChartComponent } from 'src/app/components/core/donut-chart/donut-chart.component';
+import {MAT_DIALOG_DATA, MatDialogRef} from '@angular/material/dialog';
+import {forkJoin} from 'rxjs';
+import {HttpErrorResponse} from '@angular/common/http';
+import {FormsModule} from '@angular/forms';
+import {FontAwesomeModule} from '@fortawesome/angular-fontawesome';
+import {faDownload, faXmark} from '@fortawesome/free-solid-svg-icons';
+import {DonutChartComponent} from 'src/app/components/core/donut-chart/donut-chart.component';
+import {FileDownloadService} from "../../../core/file-downlaod/file-download.service";
+import {AppConfigService} from "../../../../services/app-config.service";
 
 @Component({
   selector: 'app-view-measure-report',
@@ -19,7 +21,7 @@ import { DonutChartComponent } from 'src/app/components/core/donut-chart/donut-c
     FormsModule,
     MatPaginatorModule,
     DonutChartComponent
-],
+  ],
   templateUrl: './view-measure-report.component.html',
   styleUrl: './view-measure-report.component.scss'
 })
@@ -28,11 +30,11 @@ export class ViewMeasureReportComponent implements OnInit {
 
   title: string = '';
   facilityId: string = '';
-  measureReport!: IMeasureReportSummary; 
+  measureReport!: IMeasureReportSummary;
 
   defaultPageNumber: number = 0;
   defaultPageSize: number = 10;
-  resources: IResourceSummary[] = [];  
+  resources: IResourceSummary[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
 
   resourceTypes: string[] = [];
@@ -40,9 +42,14 @@ export class ViewMeasureReportComponent implements OnInit {
 
   constructor(
     public dialogRef: MatDialogRef<ViewMeasureReportComponent>,
-    @Inject(MAT_DIALOG_DATA) public data: { dialogTitle: string, facilityId: string, measureReport: IMeasureReportSummary },
-    private facilityViewService: FacilityViewService) { }
-  
+    @Inject(MAT_DIALOG_DATA) public data: {
+      dialogTitle: string,
+      facilityId: string,
+      measureReport: IMeasureReportSummary
+    },
+    private facilityViewService: FacilityViewService, private fileService: FileDownloadService, private appConfigService: AppConfigService) {
+  }
+
   ngOnInit(): void {
     this.title = this.data.dialogTitle;
     this.facilityId = this.data.facilityId;
@@ -53,10 +60,10 @@ export class ViewMeasureReportComponent implements OnInit {
         summary: this.facilityViewService.getMeasureReportResourceDetails(this.facilityId, this.measureReport.id, null, this.defaultPageNumber, this.defaultPageSize),
         resourceTypes: this.facilityViewService.getMeasureReportResourceTypes(this.facilityId, this.measureReport.id)
       }).subscribe({
-        next: ({ summary, resourceTypes }) => {
+        next: ({summary, resourceTypes}) => {
           this.resources = summary.records;
           this.paginationMetadata = summary.metadata;
-          this.resourceTypes = resourceTypes;          
+          this.resourceTypes = resourceTypes;
         },
         error: (error: HttpErrorResponse) => {
           console.error('Error loading measure report data:', error.message);
@@ -64,7 +71,7 @@ export class ViewMeasureReportComponent implements OnInit {
       });
     }
   }
-  
+
   loadMeasureReportSummary(pageNumber: number, pageSize: number): void {
     let resourceType: string | null = this.selectedResourceType === 'any' ? null : this.selectedResourceType;
     this.facilityViewService.getMeasureReportResourceDetails(this.facilityId, this.measureReport?.id, resourceType, pageNumber, pageSize).subscribe({
@@ -89,7 +96,7 @@ export class ViewMeasureReportComponent implements OnInit {
     });
   }
 
-  onResourceTypeChange(event: Event): void {    
+  onResourceTypeChange(event: Event): void {
     this.loadMeasureReportSummary(this.defaultPageNumber, this.defaultPageSize);
   }
 
@@ -107,6 +114,17 @@ export class ViewMeasureReportComponent implements OnInit {
     this.dialogRef.close();
   }
 
+  downloadReport() {
+    this.fileService.downloadFileFromJson(`${this.appConfigService.config?.baseApiUrl}/measureeval/patient/${this.facilityId}/${this.measureReport?.reportScheduleId}/${this.measureReport?.patientId}`)
+      .subscribe({
+        next: () => console.log('Download started'),
+        error: (error: HttpErrorResponse) => {
+          console.error('Error downloading patient bundle:', error.message);
+        }
+      });
+  }
+
+  protected readonly faDownload = faDownload;
 }
 
-  
+
