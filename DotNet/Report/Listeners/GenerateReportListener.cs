@@ -269,7 +269,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
                                 else
                                 {
-                                    _logger.LogInformation("Generating new Adhoc report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, value.ReportId, DateTime.UtcNow);
+                                    _logger.LogInformation("Generating new Adhoc report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, reportSchedule.Id, DateTime.UtcNow);
                                     
                                     // Get Patient List if none was provided
                                     if (value.PatientIds == null || value.PatientIds.Count == 0)
