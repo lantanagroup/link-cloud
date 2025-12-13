@@ -10,7 +10,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 {
     public interface IReportEntryStatusManager 
     {
-        Task<ReportEntryStatusModel?> GetPatientEntry(string reportId, string reportType, string patientId, CancellationToken cancellationToken = default);
+        Task<ReportEntryStatusModel?> GetEntry(string reportScheduleId, string patientId, CancellationToken cancellationToken = default);
 
         Task<ReportEntryStatusModel> UpdateAsync(ReportEntryStatusModel entry,
             CancellationToken cancellationToken);
@@ -25,7 +25,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             Expression<Func<ReportEntryStatusModel, bool>> predicate,
             CancellationToken cancellationToken = default);
 
-        Task UpdateStatusToValidationRequested(string reportScheduleId, string patientId, CancellationToken cancellationToken = default);
+        //Task UpdateStatusToValidationRequested(string reportScheduleId, string patientId, CancellationToken cancellationToken = default);
     }
 
     public class ReportEntryStatusManager : IReportEntryStatusManager
@@ -47,9 +47,9 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return await _database.ReportEntryStatusRepository.FindAsync(predicate, cancellationToken);
         }
 
-        public async Task<ReportEntryStatusModel?> GetPatientEntry(string reportId, string reportType, string patientId, CancellationToken cancellationToken = default)
+        public async Task<ReportEntryStatusModel?> GetEntry(string reportScheduleId, string patientId, CancellationToken cancellationToken = default)
         {
-            return (await _database.ReportEntryStatusRepository.FindAsync(r => r.ReportScheduleId == reportId && r.PatientId == patientId && r.ReportType == reportType, cancellationToken)).SingleOrDefault();
+            return (await _database.ReportEntryStatusRepository.FindAsync(r => r.ReportScheduleId == reportScheduleId && r.PatientId == patientId, cancellationToken)).SingleOrDefault();
         }
 
         public async Task<ReportEntryStatusModel?> SingleOrDefaultAsync(Expression<Func<ReportEntryStatusModel, bool>> predicate, CancellationToken cancellationToken = default)
@@ -62,17 +62,22 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return await _database.ReportEntryStatusRepository.UpdateAsync(entry, cancellationToken);
         }
 
-        public async Task UpdateStatusToValidationRequested(string reportScheduleId, string patientId, CancellationToken cancellationToken = default)
-        {
-            var entries = await _database.ReportEntryStatusRepository.FindAsync(s => s.ReportScheduleId == reportScheduleId && s.PatientId == patientId, cancellationToken) ?? new();
+        //public async Task UpdateStatusToValidationRequested(string reportScheduleId, string patientId, CancellationToken cancellationToken = default)
+        //{
+        //    var entry = await _database.ReportEntryStatusRepository.FirstOrDefaultAsync(s => s.ReportScheduleId == reportScheduleId && s.PatientId == patientId, cancellationToken) ?? new();
 
-            foreach (var entry in entries)
-            {
-                entry.Status = PatientSubmissionStatus.ValidationRequested;
-                entry.ValidationStatus = ValidationStatus.Requested;
-                await _database.ReportEntryStatusRepository.UpdateAsync(entry, cancellationToken);
-            }
-        }
+        //    entry.ValidationStatus = ValidationStatus.Requested;
+
+        //    foreach (var measureReportEntry in entry.MeasureReportEntryList) {
+        //        if (measureReportEntry.Status == PatientSubmissionStatus.NotReportable) {
+        //            continue;
+        //        }
+
+        //        measureReportEntry.Status = PatientSubmissionStatus.ValidationRequested;
+        //    }
+
+        //    await _database.ReportEntryStatusRepository.UpdateAsync(entry, cancellationToken);
+        //}
     }
 }
     

@@ -66,7 +66,9 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             _readyForValidationProducer.Flush();
 
-            await _reportEntryStatusManager.UpdateStatusToValidationRequested(scheduleId, patientId, CancellationToken.None);
+            var entry = await _reportEntryStatusManager.GetEntry(scheduleId, patientId);
+            entry.ValidationStatus = Domain.Enums.ValidationStatus.Requested;
+            await _reportEntryStatusManager.UpdateAsync(entry, CancellationToken.None);
         }
     }
 }

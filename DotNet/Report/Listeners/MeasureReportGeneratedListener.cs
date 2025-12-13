@@ -118,58 +118,56 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             var correlationId = Encoding.UTF8.GetString(headerValue);
 
-                            var reportEntry = await _reportEntryManager.GetPatientEntry(result.Value.ReportTrackingId, result.Value.ReportType, result.Value.PatientId);
+                            var reportEntry = await _reportEntryManager.GetEntry(result.Value.ReportTrackingId, result.Value.PatientId, cancellationToken);
 
                             if (reportEntry == null) {
                                 //TODO: Throw error? Create an entry?
                                 throw new NotImplementedException();
                             } 
 
-                            reportEntry.MeasureReportFileName = result.Value.MeasureReportFileName;
-                            reportEntry.MeasureReportUri = result.Value.MeasureReportURI;
+                            //reportEntry.MeasureReportFileName = result.Value.MeasureReportFileName;
+                            //reportEntry.MeasureReportUri = result.Value.MeasureReportURI;
 
-                            if (result.Value.IsReportable)
-                            {
-                                reportEntry.Status = PatientSubmissionStatus.ReadyForValidation;
-                            }
-                            else 
-                            {
-                                reportEntry.Status = PatientSubmissionStatus.NotReportable;
-                                reportEntry.ValidationStatus = ValidationStatus.NotReportable;
-                            }
+                            //if (result.Value.IsReportable)
+                            //{
+                            //    reportEntry.Status = PatientSubmissionStatus.ReadyForValidation;
+                            //}
+                            //else 
+                            //{
+                            //    reportEntry.Status = PatientSubmissionStatus.NotReportable;
+                            //    reportEntry.ValidationStatus = ValidationStatus.NotReportable;
+                            //}
 
                             await _reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
 
-                            var entries = await _reportEntryManager.FindAsync(x => x.PatientId == result.Value.PatientId && x.FacilityId == result.Value.FacilityId && x.ReportScheduleId == result.Value.ReportTrackingId);
+                            //var entries = await _reportEntryManager.FindAsync(x => x.PatientId == result.Value.PatientId && x.FacilityId == result.Value.FacilityId && x.ReportScheduleId == result.Value.ReportTrackingId);
 
-                           var readyForValidation = entries.All(e =>
-                                e.Status == PatientSubmissionStatus.NotReportable ||
-                                e.Status == PatientSubmissionStatus.ReadyForValidation) &&
-                                entries.Any(e => e.Status == PatientSubmissionStatus.ReadyForValidation);
-
+                            //var readyForValidation = entries.All(e =>
+                            //        e.Status == PatientSubmissionStatus.NotReportable ||
+                            //        e.Status == PatientSubmissionStatus.ReadyForValidation) &&
+                            //        entries.Any(e => e.Status == PatientSubmissionStatus.ReadyForValidation);
 
                             var schedule = await _reportScheduledManager.GetReportSchedule(result.Value.FacilityId, result.Value.ReportTrackingId, cancellationToken);
 
                             //TODO: Follow up on this logic
+                            var readyForValidation = reportEntry.MeasureReportEntryList.All(x => x.Status == PatientSubmissionStatus.NotReportable || x.Status == PatientSubmissionStatus.ReadyForValidation);
+
                             if (!readyForValidation)
                             {
                                 await _reportManifestProducer.Produce(schedule, correlationId);
                                 return;
                             }
 
-                            Uri ndjson_blob_uri = await _patientReportSubmissionBundler.GenerateBundleToABS(result.Value.PatientId, result.Value.ReportTrackingId);
+                            AggregateResult aggregateResult = await _patientReportSubmissionBundler.GenerateBundleToABS(result.Value.PatientId, result.Value.ReportTrackingId);
 
-                            foreach (var entry in entries.Where(s => s.Status == PatientSubmissionStatus.ReadyForValidation))
-                            {
-                                entry.AggregateReportUri = ndjson_blob_uri.AbsoluteUri;
-                                entry.AggregateReportFileName = ndjson_blob_uri.Segments.Last();
-                                entry.ModifyDate = DateTime.UtcNow;
-                                await _reportEntryManager.UpdateAsync(entry, cancellationToken);
-                            }
-
+                            reportEntry.AggregateReportUri = aggregateResult.Uri.AbsoluteUri;
+                            reportEntry.AggregateReportFileName = aggregateResult.Uri.Segments.Last();
+                            reportEntry.ModifyDate = DateTime.UtcNow;
+                            await _reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
+                            
                             try
                             {
-                                await _readyForValidationProducer.Produce(schedule.Id, schedule.ReportTypes, schedule.FacilityId, result.Value.PatientId, ndjson_blob_uri.AbsolutePath, correlationId);
+                                await _readyForValidationProducer.Produce(schedule.Id, schedule.ReportTypes, schedule.FacilityId, result.Value.PatientId, aggregateResult.Uri.AbsolutePath, correlationId);
                             }
                             catch (ProduceException<ReadyForValidationKey, ReadyForValidationValue> ex)
                             {

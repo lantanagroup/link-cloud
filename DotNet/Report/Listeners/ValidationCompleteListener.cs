@@ -188,19 +188,23 @@ namespace LantanaGroup.Link.Report.Listeners
             }
 
             var correlationIdStr = Encoding.UTF8.GetString(headerValue);
-            var submissionEntries = await _reportEntryManager.FindAsync(e => e.ReportScheduleId == schedule.Id && e.PatientId == value.PatientId, cancellationToken);
+            var reportEntry = await _reportEntryManager.GetEntry(schedule.Id, value.PatientId, cancellationToken);
 
-            if(!submissionEntries.Any())
+            if(reportEntry == null)
             {
-                throw new DeadLetterException($"No Patient Submission Entries were found for schedule ID {schedule.Id}, patient ID {value.PatientId}, in status {PatientSubmissionStatus.ValidationRequested}");
+                throw new DeadLetterException($"No Patient Submission Entries were found for schedule ID {schedule.Id}, patient ID {value.PatientId}");
             }
 
-            foreach (var entry in submissionEntries)
-            {
-                entry.ValidationStatus = value.IsValid ? ValidationStatus.Passed : ValidationStatus.Failed;
-                entry.Status = PatientSubmissionStatus.ValidationComplete;
-                await _reportEntryManager.UpdateAsync(entry, cancellationToken);
-            }
+            //foreach (var entry in submissionEntries)
+            //{
+            //    entry.ValidationStatus = value.IsValid ? ValidationStatus.Passed : ValidationStatus.Failed;
+            //    entry.Status = PatientSubmissionStatus.ValidationComplete;
+            //    await _reportEntryManager.UpdateAsync(entry, cancellationToken);
+            //}
+
+            reportEntry.ValidationStatus = value.IsValid ? ValidationStatus.Passed : ValidationStatus.Failed;
+            await _reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
+
 
             if (!value.IsValid) 
             {
@@ -218,12 +222,12 @@ namespace LantanaGroup.Link.Report.Listeners
                 var serializer = new FhirJsonSerializer();
                 string json = serializer.SerializeToString(operationOutcome);
 
-                _patientReportSubmissionBundler.AppendToBlob(submissionEntries.First().AggregateReportFileName, operationOutcome);
+                _patientReportSubmissionBundler.AppendToBlob(reportEntry.AggregateReportFileName, operationOutcome);
             }
 
             try
             {
-                await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, correlationIdStr, submissionEntries.First().AggregateReportUri);
+                await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, correlationIdStr, reportEntry.AggregateReportUri);
             }
             catch (ProduceException<SubmitPayloadKey, SubmitPayloadValue> ex)
             {

@@ -59,17 +59,18 @@ public class PayloadSubmittedListener(
                         {
                             if (result.Message.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry)
                             {
-                                var submissionEntries = await database.ReportEntryStatusRepository.FindAsync(e => e.FacilityId == facilityId 
-                                                                                                                && e.Status != PatientSubmissionStatus.NotReportable
-                                                                                                                && e.PatientId == result.Message.Value.PatientId 
-                                                                                                                && e.ReportScheduleId == result.Message.Key.ReportScheduleId);
+                                var reportEntry = await database.ReportEntryStatusRepository.FirstAsync(e => e.PatientId == result.Message.Value.PatientId && e.ReportScheduleId == result.Message.Key.ReportScheduleId);
 
-                                foreach (var item in submissionEntries)
-                                {
-                                    item.Status = PatientSubmissionStatus.Submitted;
-                                    item.ModifyDate = DateTime.UtcNow;
-                                    await database.ReportEntryStatusRepository.UpdateAsync(item);
-                                }
+                                //foreach (var item in submissionEntries)
+                                //{
+                                //    item.Status = PatientSubmissionStatus.Submitted;
+                                //    item.ModifyDate = DateTime.UtcNow;
+                                //    await database.ReportEntryStatusRepository.UpdateAsync(item);
+                                //}
+
+                                reportEntry.IsSubmitted = true;
+                                reportEntry.ModifyDate = DateTime.UtcNow;
+                                await database.ReportEntryStatusRepository.UpdateAsync(reportEntry);
                             }
                             else if (result.Message.Value.PayloadType == PayloadType.ReportSchedule)
                             {

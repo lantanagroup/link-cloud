@@ -11,6 +11,7 @@ using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using Microsoft.Identity.Client;
 
 namespace LantanaGroup.Link.Report.KafkaProducers
 {
@@ -44,8 +45,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public async Task<List<Resource>> Generate(ReportScheduleModel schedule)
         {
-            //TODO: Add back in once consumer logic is stable
-            throw new NotImplementedException();
+            throw new NotImplementedException(); 
             //var allSubmissionEntries = await _database.ReportEntryStatusRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
 
             //var submissionEntries = allSubmissionEntries.Where(x => x.Status != PatientSubmissionStatus.NotReportable).ToList();
@@ -118,42 +118,43 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public async Task<bool> Produce(ReportScheduleModel schedule, string correlationId = null)
         {
-            var allReady = !await _database.ReportEntryStatusRepository.AnyAsync(e => e.FacilityId == schedule.FacilityId
-                && e.ReportScheduleId == schedule.Id
-                && e.Status != PatientSubmissionStatus.NotReportable
-                && e.Status != PatientSubmissionStatus.ValidationComplete
-                && e.Status != PatientSubmissionStatus.Submitted, CancellationToken.None);
+            throw new NotImplementedException();
+            //var allReady = !await _database.ReportEntryStatusRepository.AnyAsync(e => e.FacilityId == schedule.FacilityId
+            //    && e.ReportScheduleId == schedule.Id
+            //    && e.Status != PatientSubmissionStatus.NotReportable
+            //    && e.Status != PatientSubmissionStatus.ValidationComplete
+            //    && e.Status != PatientSubmissionStatus.Submitted, CancellationToken.None);
 
-            if (!allReady)
-            {
-                return false;
-            }
+            //if (!allReady)
+            //{
+            //    return false;
+            //}
 
-            List<Resource> manifestResources = await Generate(schedule);
+            //List<Resource> manifestResources = await Generate(schedule);
 
-            Uri? payloadUri;
-            try
-            {
-                payloadUri = await _blobStorageService.UploadManifestAsync(schedule, manifestResources);
-            }
-            catch (Exception ex)
-            {
-                payloadUri = null;
-                _logger.LogError(ex, "Failed to upload to blob storage.");
-                AuditEventMessage auditEvent = new()
-                {
-                    FacilityId = schedule.FacilityId,
-                    CorrelationId = correlationId,
-                    EventDate = DateTime.UtcNow,
-                    Notes = $"Failed to upload to blob storage: {ex}"
-                };
-                await _auditableEventOccurredProducer.ProduceAsync(auditEvent);
+            //Uri? payloadUri;
+            //try
+            //{
+            //    payloadUri = await _blobStorageService.UploadManifestAsync(schedule, manifestResources);
+            //}
+            //catch (Exception ex)
+            //{
+            //    payloadUri = null;
+            //    _logger.LogError(ex, "Failed to upload to blob storage.");
+            //    AuditEventMessage auditEvent = new()
+            //    {
+            //        FacilityId = schedule.FacilityId,
+            //        CorrelationId = correlationId,
+            //        EventDate = DateTime.UtcNow,
+            //        Notes = $"Failed to upload to blob storage: {ex}"
+            //    };
+            //    await _auditableEventOccurredProducer.ProduceAsync(auditEvent);
 
-                // Return false to indicate failure
-                return false;
-            }
+            //    // Return false to indicate failure
+            //    return false;
+            //}
 
-            await _payloadSubmittedProducer.Produce(schedule, PayloadType.ReportSchedule, payloadUri: payloadUri?.ToString());
+            //await _payloadSubmittedProducer.Produce(schedule, PayloadType.ReportSchedule, payloadUri: payloadUri?.ToString());
 
             return true;
         }

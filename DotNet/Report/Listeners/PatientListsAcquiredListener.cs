@@ -110,36 +110,42 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 foreach (var scheduledReport in scheduledReports)
                                 {
-                                    foreach (var reportType in scheduledReport.ReportTypes)
+                                    foreach (var patientListItem in value)
                                     {
-                                        foreach (var patientListItem in value)
+                                        foreach (var pId in patientListItem.PatientIds)
                                         {
-                                            foreach (var pId in patientListItem.PatientIds)
+                                            var patientId = pId.Split('/').Last();
+
+                                            var entry = await _reportEntryStatusManager.SingleOrDefaultAsync(e =>
+                                                        e.ReportScheduleId == scheduledReport.Id
+                                                        && e.PatientId == patientId, consumeCancellationToken);
+
+                                            if (entry == null) {
+                                                entry = new ReportEntryStatusModel() { 
+                                                    PatientId = patientId,
+                                                    FacilityId = scheduledReport.FacilityId,
+                                                    CreateDate = DateTime.Now
+                                                };
+                                            }
+
+                                            foreach (var reportType in scheduledReport.ReportTypes)
                                             {
-                                                var patientId = pId.Split('/').Last();
+                                                var measureReportEntry = entry.MeasureReportEntryList.Where(x => x.ReportType == reportType).FirstOrDefault();
 
-                                                var entry = await _reportEntryStatusManager.SingleOrDefaultAsync(e =>
-                                                           e.ReportScheduleId == scheduledReport.Id
-                                                           && e.PatientId == patientId
-                                                           && e.ReportType == reportType, consumeCancellationToken);
-
-                                                if (entry == null)
+                                                if (measureReportEntry == null)
                                                 {
-                                                    await _reportEntryStatusManager.AddAsync(new ReportEntryStatusModel()
+                                                    entry.MeasureReportEntryList.Add(new MeasureReportEntry()
                                                     {
-                                                        PatientId = patientId,
-                                                        Status = PatientSubmissionStatus.PendingEvaluation,
-                                                        ReportScheduleId = scheduledReport.Id,
-                                                        FacilityId = scheduledReport.FacilityId,
                                                         ReportType = reportType,
-                                                        CreateDate = DateTime.UtcNow,
-                                                    }, cancellationToken);
+                                                        Status = PatientSubmissionStatus.PendingEvaluation
+                                                    });
                                                 }
-                                                else
+                                                else 
                                                 {
-                                                    entry.Status = PatientSubmissionStatus.PendingEvaluation;
-                                                    await _reportEntryStatusManager.UpdateAsync(entry, cancellationToken);
-                                                } 
+                                                    measureReportEntry.Status = PatientSubmissionStatus.PendingEvaluation;
+                                                }
+
+                                                await _reportEntryStatusManager.UpdateAsync(entry, cancellationToken);
                                             }
                                         }
                                     }

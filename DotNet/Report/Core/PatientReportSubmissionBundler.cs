@@ -5,6 +5,7 @@ using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Interfaces;
+using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Application.Options;
 using LantanaGroup.Link.Report.Application.ResourceCategories;
 using LantanaGroup.Link.Report.Domain;
@@ -55,9 +56,11 @@ namespace LantanaGroup.Link.Report.Core
             }
         }
 
-        public async Task<Uri> GenerateBundleToABS(string patientId, string reportScheduleId)
+        public async Task<AggregateResult> GenerateBundleToABS(string patientId, string reportScheduleId)
         {
-            var entries = (await _database.ReportEntryStatusRepository.FindAsync(x => x.ReportScheduleId == reportScheduleId && x.PatientId == patientId)).ToList();
+            AggregateResult aggregateResult = new AggregateResult();
+
+            var entry = (await _database.ReportEntryStatusRepository.SingleOrDefaultAsync(x => x.ReportScheduleId == reportScheduleId && x.PatientId == patientId));
 
             //TODO: Add missing entry check
 
@@ -66,13 +69,14 @@ namespace LantanaGroup.Link.Report.Core
 
             //TODO: Need to get the actual source file
             AppendBlobClient blockWriteBlobClient = _containerClient.GetAppendBlobClient("Patient_" + patientId + ".ndjson");
+            aggregateResult.Uri = blockWriteBlobClient.Uri;
 
             using (Stream write_stream = await blockWriteBlobClient.OpenWriteAsync(true))
             using (StreamWriter writer = new StreamWriter(write_stream))
             {
-                foreach (var entry in entries)
+                foreach (var measureReportEntry in entry.MeasureReportEntryList)
                 {
-                    BlockBlobClient blockReadBlobClient = _containerClient.GetBlockBlobClient(entry.MeasureReportFileName);
+                    BlockBlobClient blockReadBlobClient = _containerClient.GetBlockBlobClient(measureReportEntry.MeasureReportFileName);
                     
                     try
                     {
@@ -100,7 +104,7 @@ namespace LantanaGroup.Link.Report.Core
                             new KeyValuePair<string, object?>("facilityId", entry.FacilityId),
                             new KeyValuePair<string, object?>("measure.schedule.id", reportScheduleId),
                             //new KeyValuePair<string, object?>("measure", mr.Measure)
-                });
+                        });
                     }
                     catch (Exception ex) {
                         //TODO: Do something with this catch
@@ -109,7 +113,7 @@ namespace LantanaGroup.Link.Report.Core
                 }
             }
 
-            return blockWriteBlobClient.Uri;
+            return aggregateResult;
         }
 
         public async void AppendToBlob(string uri, DomainResource domainResource)  
