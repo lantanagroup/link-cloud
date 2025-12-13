@@ -10,11 +10,13 @@ namespace LantanaGroup.Link.Report.KafkaProducers
     {
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly IProducer<ReadyForValidationKey, ReadyForValidationValue> _readyForValidationProducer;
+        private readonly IReportEntryStatusManager _reportEntryStatusManager;
 
-        public ReadyForValidationProducer(IProducer<ReadyForValidationKey, ReadyForValidationValue> readyForValidationProducer, IServiceScopeFactory serviceScopeFactory)
+        public ReadyForValidationProducer(IProducer<ReadyForValidationKey, ReadyForValidationValue> readyForValidationProducer, IServiceScopeFactory serviceScopeFactory, IReportEntryStatusManager reportEntryStatusManager)
         {
             _readyForValidationProducer = readyForValidationProducer;
             _serviceScopeFactory = serviceScopeFactory;
+            _reportEntryStatusManager = reportEntryStatusManager;
         }
 
 
@@ -29,15 +31,13 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public async Task Produce(List<ProduceValidationModel> needValidation)
         {
-            var submissionEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
-
             foreach (var entry in needValidation)
             {
-               await Produce(entry.ReportScheduleId, entry.ReportTypes, entry.FacilityId, entry.PatientId, entry.PayloadUri, Guid.NewGuid().ToString(), submissionEntryManager);
+               await Produce(entry.ReportScheduleId, entry.ReportTypes, entry.FacilityId, entry.PatientId, entry.PayloadUri, Guid.NewGuid().ToString());
             }
         }
 
-        public async Task Produce(string scheduleId, List<string> reportTypes, string facilityId, string patientId, string? payloadUri, string correlationId, ISubmissionEntryManager? manager = null)
+        public async Task Produce(string scheduleId, List<string> reportTypes, string facilityId, string patientId, string? payloadUri, string correlationId)
         {
             var corrId = string.IsNullOrWhiteSpace(correlationId)
                        ? Guid.NewGuid().ToString()
@@ -66,12 +66,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             _readyForValidationProducer.Flush();
 
-            if(manager == null)
-            {
-                manager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
-            }
-
-            await manager.UpdateStatusToValidationRequested(scheduleId, facilityId, patientId, CancellationToken.None);
+            await _reportEntryStatusManager.UpdateStatusToValidationRequested(scheduleId, patientId, CancellationToken.None);
         }
     }
 }

@@ -44,58 +44,60 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public async Task<List<Resource>> Generate(ReportScheduleModel schedule)
         {
-            var allSubmissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
+            //TODO: Add back in once consumer logic is stable
+            throw new NotImplementedException();
+            //var allSubmissionEntries = await _database.ReportEntryStatusRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
 
-            var submissionEntries = allSubmissionEntries.Where(x => x.Status != PatientSubmissionStatus.NotReportable).ToList();
+            //var submissionEntries = allSubmissionEntries.Where(x => x.Status != PatientSubmissionStatus.NotReportable).ToList();
 
-            var measureReports = submissionEntries
-                        .Select(e => e.MeasureReport)
-                        .Where(report => report != null).ToList();
+            //var measureReports = submissionEntries
+            //            .Select(e => e.MeasureReport)
+            //            .Where(report => report != null).ToList();
 
-            var allPatientIds = allSubmissionEntries.Select(s => s.PatientId).Distinct().ToList();
+            //var allPatientIds = allSubmissionEntries.Select(s => s.PatientId).Distinct().ToList();
 
-            var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ValidationComplete || s.Status == PatientSubmissionStatus.Submitted).Select(s => s.PatientId).Distinct().ToList();
+            //var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ValidationComplete || s.Status == PatientSubmissionStatus.Submitted).Select(s => s.PatientId).Distinct().ToList();
 
-            var failedEntries = submissionEntries.Where(s => s.ValidationStatus == ValidationStatus.Failed).ToList();
+            //var failedEntries = submissionEntries.Where(s => s.ValidationStatus == ValidationStatus.Failed).ToList();
 
-            var facilityConfig = await _tenantApiService.GetFacilityConfig(schedule.FacilityId, CancellationToken.None);
+            //var facilityConfig = await _tenantApiService.GetFacilityConfig(schedule.FacilityId, CancellationToken.None);
 
-            var organization = FhirHelperMethods.CreateOrganization(facilityConfig.FacilityName, schedule.FacilityId, ReportConstants.BundleSettings.SubmittingOrganizationProfile, ReportConstants.BundleSettings.OrganizationTypeSystem,
-                                                                            ReportConstants.BundleSettings.CdcOrgIdSystem, ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);
+            //var organization = FhirHelperMethods.CreateOrganization(facilityConfig.FacilityName, schedule.FacilityId, ReportConstants.BundleSettings.SubmittingOrganizationProfile, ReportConstants.BundleSettings.OrganizationTypeSystem,
+            //                                                                ReportConstants.BundleSettings.CdcOrgIdSystem, ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);
 
-            var aggregates = _aggregator.Aggregate(measureReports, organization.Id, schedule.ReportStartDate, schedule.ReportEndDate);
+            //var aggregates = _aggregator.Aggregate(measureReports, organization.Id, schedule.ReportStartDate, schedule.ReportEndDate);
 
-            var measureIds = measureReports.Select(mr => mr.Measure).Distinct().ToList();
+            //var measureIds = measureReports.Select(mr => mr.Measure).Distinct().ToList();
 
-            var reportName = _blobStorageService.GetReportName(schedule);
+            //var reportName = _blobStorageService.GetReportName(schedule);
 
-            var patientFileDict = patientIds.ToDictionary(pid => pid, pid => $"{reportName}_{pid}.ndjson");
+            //var patientFileDict = patientIds.ToDictionary(pid => pid, pid => $"{reportName}_{pid}.ndjson");
 
-            List<Resource> manifestResources =
-            [
-                organization,
-                CreateDevice(),
-                CreatePatientList(allPatientIds, schedule.ReportStartDate, schedule.ReportEndDate),
-            ];
+            //List<Resource> manifestResources =
+            //[
+            //    organization,
+            //    CreateDevice(),
+            //    CreatePatientList(allPatientIds, schedule.ReportStartDate, schedule.ReportEndDate),
+            //];
 
-            foreach (var aggregate in aggregates)
-            {
-                AddExtensionsToAggregate(aggregate, patientFileDict);
-                manifestResources.Add(aggregate);
-            }
+            //foreach (var aggregate in aggregates)
+            //{
+            //    AddExtensionsToAggregate(aggregate, patientFileDict);
+            //    manifestResources.Add(aggregate);
+            //}
 
-            var operationOutcome = CreateOperationOutcome(failedEntries);
-            if (operationOutcome.Issue.Any())
-            {
-                manifestResources.Add(operationOutcome);
-            }
+            //var operationOutcome = CreateOperationOutcome(failedEntries);
+            //if (operationOutcome.Issue.Any())
+            //{
+            //    manifestResources.Add(operationOutcome);
+            //}
 
-            foreach (var resource in manifestResources)
-            {
-                resource.Id ??= Guid.NewGuid().ToString();
-            }
+            //foreach (var resource in manifestResources)
+            //{
+            //    resource.Id ??= Guid.NewGuid().ToString();
+            //}
 
-            return manifestResources;
+            //return manifestResources;
         }
 
         public async Task<Bundle> GenerateAsBundle(ReportScheduleModel schedule)
@@ -116,7 +118,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public async Task<bool> Produce(ReportScheduleModel schedule, string correlationId = null)
         {
-            var allReady = !await _database.SubmissionEntryRepository.AnyAsync(e => e.FacilityId == schedule.FacilityId
+            var allReady = !await _database.ReportEntryStatusRepository.AnyAsync(e => e.FacilityId == schedule.FacilityId
                 && e.ReportScheduleId == schedule.Id
                 && e.Status != PatientSubmissionStatus.NotReportable
                 && e.Status != PatientSubmissionStatus.ValidationComplete
@@ -222,20 +224,20 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             }
         }
 
-        private OperationOutcome CreateOperationOutcome(List<MeasureReportSubmissionEntryModel> failedEntries)
-        {
-            var operationOutcome = new OperationOutcome();
-            foreach (var entry in failedEntries)
-            {
-                // Assuming PatientSubmissionEntry has a ValidationMessage property; adjust as per actual model
-                operationOutcome.Issue.Add(new OperationOutcome.IssueComponent
-                {
-                    Severity = OperationOutcome.IssueSeverity.Fatal,
-                    Code = OperationOutcome.IssueType.Invalid,
-                    Diagnostics = $"Validation failed for patient {entry.PatientId}"
-                });
-            }
-            return operationOutcome;
-        }
+        //private OperationOutcome CreateOperationOutcome(List<MeasureReportSubmissionEntryModel> failedEntries)
+        //{
+        //    var operationOutcome = new OperationOutcome();
+        //    foreach (var entry in failedEntries)
+        //    {
+        //        // Assuming PatientSubmissionEntry has a ValidationMessage property; adjust as per actual model
+        //        operationOutcome.Issue.Add(new OperationOutcome.IssueComponent
+        //        {
+        //            Severity = OperationOutcome.IssueSeverity.Fatal,
+        //            Code = OperationOutcome.IssueType.Invalid,
+        //            Diagnostics = $"Validation failed for patient {entry.PatientId}"
+        //        });
+        //    }
+        //    return operationOutcome;
+        //}
     }
 }

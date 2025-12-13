@@ -27,7 +27,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
         {
             if (patientsToEvaluate == null || patientsToEvaluate.Count == 0)
             {
-                patientsToEvaluate = (await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.PendingEvaluation)).Select(x => x.PatientId).Distinct().ToList();
+                patientsToEvaluate = (await _database.ReportEntryStatusRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.PendingEvaluation)).Select(x => x.PatientId).Distinct().ToList();
             }
 
             string reportableEvent = string.Empty;

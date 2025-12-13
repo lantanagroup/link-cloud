@@ -33,7 +33,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 return false;
             }
 
-            var submissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && (patientId == null || (x.PatientId == patientId && x.Status != PatientSubmissionStatus.NotReportable)));
+            var submissionEntries = await _database.ReportEntryStatusRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && (patientId == null || (x.PatientId == patientId && x.Status != PatientSubmissionStatus.NotReportable)));
 
             _submitPayloadProducer.Produce(nameof(KafkaTopic.SubmitPayload),
                 new Message<SubmitPayloadKey, SubmitPayloadValue>

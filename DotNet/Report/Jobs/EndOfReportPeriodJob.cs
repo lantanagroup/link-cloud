@@ -77,7 +77,7 @@ namespace LantanaGroup.Link.Report.Jobs
 
                 if (!manifestProduced)
                 {
-                    var patientsToEvaluate = await _database.SubmissionEntryRepository.AnyAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.PendingEvaluation, CancellationToken.None);
+                    var patientsToEvaluate = await _database.ReportEntryStatusRepository.AnyAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.PendingEvaluation, CancellationToken.None);
 
                     if (patientsToEvaluate)
                     {
@@ -91,7 +91,7 @@ namespace LantanaGroup.Link.Report.Jobs
                         }
                     }
 
-                    var needsValidation = (await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.ReadyForValidation && x.ValidationStatus != ValidationStatus.Requested)).ToList();
+                    var needsValidation = (await _database.ReportEntryStatusRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.ReadyForValidation && x.ValidationStatus != ValidationStatus.Requested)).ToList();
 
                     if (needsValidation.Any())
                     {
@@ -103,7 +103,7 @@ namespace LantanaGroup.Link.Report.Jobs
                                 FacilityId = v.FacilityId,
                                 ReportTypes = schedule.ReportTypes,
                                 PatientId = v.PatientId,
-                                PayloadUri = v.PayloadUri
+                                PayloadUri = v.AggregateReportUri
                             }).ToList());
                         }
                         catch (ProduceException<string, string> ex)

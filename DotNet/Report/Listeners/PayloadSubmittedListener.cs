@@ -59,7 +59,7 @@ public class PayloadSubmittedListener(
                         {
                             if (result.Message.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry)
                             {
-                                var submissionEntries = await database.SubmissionEntryRepository.FindAsync(e => e.FacilityId == facilityId 
+                                var submissionEntries = await database.ReportEntryStatusRepository.FindAsync(e => e.FacilityId == facilityId 
                                                                                                                 && e.Status != PatientSubmissionStatus.NotReportable
                                                                                                                 && e.PatientId == result.Message.Value.PatientId 
                                                                                                                 && e.ReportScheduleId == result.Message.Key.ReportScheduleId);
@@ -68,7 +68,7 @@ public class PayloadSubmittedListener(
                                 {
                                     item.Status = PatientSubmissionStatus.Submitted;
                                     item.ModifyDate = DateTime.UtcNow;
-                                    await database.SubmissionEntryRepository.UpdateAsync(item);
+                                    await database.ReportEntryStatusRepository.UpdateAsync(item);
                                 }
                             }
                             else if (result.Message.Value.PayloadType == PayloadType.ReportSchedule)

@@ -94,7 +94,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
             // Get Census and IP information from individual measure report entries
             var uniqueReportIds = summaries.Select(x => x.Id).Distinct().ToList();
-            var reportEntries = await _database.SubmissionEntryRepository
+            var reportEntries = await _database.ReportEntryStatusRepository
                 .FindAsync(x => uniqueReportIds.Contains(x.ReportScheduleId), cancellationToken);
 
             foreach (var summary in summaries)
@@ -129,7 +129,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
             //TODO: Eventually may need to check validation results
             // Get individual measure report entries for this report
-            var measureReportEntries = await _database.SubmissionEntryRepository
+            var measureReportEntries = await _database.ReportEntryStatusRepository
                 .FindAsync(x => x.ReportScheduleId == reportId, cancellationToken);
 
             // Get the initial population count for each report

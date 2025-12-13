@@ -1,6 +1,6 @@
 ﻿using AngleSharp.Dom;
-using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Factory;
+using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
@@ -24,6 +24,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         Task<ReportEntryStatusModel?> SingleOrDefaultAsync(
             Expression<Func<ReportEntryStatusModel, bool>> predicate,
             CancellationToken cancellationToken = default);
+
+        Task UpdateStatusToValidationRequested(string reportScheduleId, string patientId, CancellationToken cancellationToken = default);
     }
 
     public class ReportEntryStatusManager : IReportEntryStatusManager
@@ -59,5 +61,18 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         {
             return await _database.ReportEntryStatusRepository.UpdateAsync(entry, cancellationToken);
         }
+
+        public async Task UpdateStatusToValidationRequested(string reportScheduleId, string patientId, CancellationToken cancellationToken = default)
+        {
+            var entries = await _database.ReportEntryStatusRepository.FindAsync(s => s.ReportScheduleId == reportScheduleId && s.PatientId == patientId, cancellationToken) ?? new();
+
+            foreach (var entry in entries)
+            {
+                entry.Status = PatientSubmissionStatus.ValidationRequested;
+                entry.ValidationStatus = ValidationStatus.Requested;
+                await _database.ReportEntryStatusRepository.UpdateAsync(entry, cancellationToken);
+            }
+        }
     }
 }
+    
