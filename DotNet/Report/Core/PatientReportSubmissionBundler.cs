@@ -2,6 +2,7 @@
 using Azure.Storage.Blobs.Specialized;
 using Google.Protobuf.WellKnownTypes;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Rest;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Options;
@@ -64,7 +65,7 @@ namespace LantanaGroup.Link.Report.Core
             Dictionary<string, int> resourcesAdded = new Dictionary<string,int>();
 
             //TODO: Need to get the actual source file
-            BlockBlobClient blockWriteBlobClient = _containerClient.GetBlockBlobClient("Patient_" + patientId + ".ndjson");
+            AppendBlobClient blockWriteBlobClient = _containerClient.GetAppendBlobClient("Patient_" + patientId + ".ndjson");
 
             using (Stream write_stream = await blockWriteBlobClient.OpenWriteAsync(true))
             using (StreamWriter writer = new StreamWriter(write_stream))
@@ -82,7 +83,7 @@ namespace LantanaGroup.Link.Report.Core
                             {
                                 string resource_and_id = reader.ReadLine();
 
-                                if (resourcesAdded.ContainsKey(resource_and_id))
+                                if (string.IsNullOrWhiteSpace(resource_and_id) || resourcesAdded.ContainsKey(resource_and_id))
                                 {
                                     //Skip FHIR Resource line
                                     reader.Read();
@@ -111,19 +112,14 @@ namespace LantanaGroup.Link.Report.Core
             return blockWriteBlobClient.Uri;
         }
 
-        public async void AddLineToExistingABSBlob(ReportEntryStatusModel entry, string resourceString, string resourceReference)  
+        public async void AppendToBlob(string uri, DomainResource domainResource)  
         {
-            //TODO: Look if initial file should be a block or append blob
-            //TODO: Need to get the actual source file
-            AppendBlobClient appendBlobClient = _containerClient.GetAppendBlobClient("Patient_" + entry.PatientId + ".ndjson");
+            AppendBlobClient appendBlobClient = _containerClient.GetAppendBlobClient(uri);
 
-            StringBuilder sb = new StringBuilder();
-            sb.Append(Environment.NewLine);
-            sb.Append(resourceReference);
-            sb.Append(Environment.NewLine);
-            sb.Append(resourceString);
+            var serializer = new FhirJsonSerializer();
+            string resourceString = serializer.SerializeToString(domainResource);
 
-            byte[] string_bytes = Encoding.UTF8.GetBytes(sb.ToString());
+            byte[] string_bytes = Encoding.UTF8.GetBytes(resourceString);
 
             using (var stream = new MemoryStream(string_bytes))
             {

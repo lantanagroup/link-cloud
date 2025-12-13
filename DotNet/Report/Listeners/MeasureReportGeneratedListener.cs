@@ -120,8 +120,9 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             var reportEntry = await _reportEntryManager.GetPatientEntry(result.Value.ReportTrackingId, result.Value.ReportType, result.Value.PatientId);
 
-                            if (reportEntry == null) { 
+                            if (reportEntry == null) {
                                 //TODO: Throw error? Create an entry?
+                                throw new NotImplementedException();
                             } 
 
                             reportEntry.MeasureReportFileName = result.Value.MeasureReportFileName;
@@ -161,7 +162,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             foreach (var entry in entries.Where(s => s.Status == PatientSubmissionStatus.ReadyForValidation))
                             {
                                 entry.AggregateReportUri = ndjson_blob_uri.AbsoluteUri;
-                                //TODO: Add AggregateFileName
+                                entry.AggregateReportFileName = ndjson_blob_uri.Segments.Last();
                                 entry.ModifyDate = DateTime.UtcNow;
                                 await _reportEntryManager.UpdateAsync(entry, cancellationToken);
                             }

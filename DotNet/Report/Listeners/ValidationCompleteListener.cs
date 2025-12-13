@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
@@ -204,6 +205,7 @@ namespace LantanaGroup.Link.Report.Listeners
             if (!value.IsValid) 
             {
                 var operationOutcome = new OperationOutcome() { 
+                    Id = Guid.NewGuid().ToString(),
                     Issue = new List<OperationOutcome.IssueComponent>() { 
                         new OperationOutcome.IssueComponent() {
                             Severity = OperationOutcome.IssueSeverity.Fatal,
@@ -213,8 +215,10 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                 };
 
-                //TODO: Fix this
-                //_patientReportSubmissionBundler.AddLineToExistingABSBlob()
+                var serializer = new FhirJsonSerializer();
+                string json = serializer.SerializeToString(operationOutcome);
+
+                _patientReportSubmissionBundler.AppendToBlob(submissionEntries.First().AggregateReportFileName, operationOutcome);
             }
 
             try
