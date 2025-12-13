@@ -11,7 +11,6 @@ namespace LantanaGroup.Link.Report.Domain
         IBaseEntityRepository<PatientResourceModel> PatientResourceRepository { get; set; }
         IBaseEntityRepository<SharedResourceModel> SharedResourceRepository { get; set; }
         IBaseEntityRepository<ReportScheduleModel> ReportScheduledRepository { get; set; }
-        IBaseEntityRepository<MeasureReportSubmissionEntryModel> SubmissionEntryRepository { get; set; }
         IBaseEntityRepository<ReportEntryStatusModel> ReportEntryStatusRepository { get; set; }
     }
 
@@ -22,14 +21,12 @@ namespace LantanaGroup.Link.Report.Domain
         public IBaseEntityRepository<PatientResourceModel> PatientResourceRepository { get; set; }
         public IBaseEntityRepository<SharedResourceModel> SharedResourceRepository { get; set; }
         public IBaseEntityRepository<ReportScheduleModel> ReportScheduledRepository { get; set; }
-        public IBaseEntityRepository<MeasureReportSubmissionEntryModel> SubmissionEntryRepository { get; set; }
         public IBaseEntityRepository<ReportEntryStatusModel> ReportEntryStatusRepository { get; set; }
 
         public Database(IOptions<MongoConnection> mongoSettings,
             IBaseEntityRepository<PatientResourceModel> patientResourceRepository,
             IBaseEntityRepository<SharedResourceModel> sharedResourceRepository,
             IBaseEntityRepository<ReportScheduleModel> reportScheduledRepository,
-            IBaseEntityRepository<MeasureReportSubmissionEntryModel> submissionEntryRepository,
             IBaseEntityRepository<ReportEntryStatusModel> reportEntryStatusRepository)
         {
             var client = new MongoClient(mongoSettings.Value.ConnectionString);
@@ -38,7 +35,6 @@ namespace LantanaGroup.Link.Report.Domain
             PatientResourceRepository = patientResourceRepository;
             SharedResourceRepository = sharedResourceRepository;
             ReportScheduledRepository = reportScheduledRepository;
-            SubmissionEntryRepository = submissionEntryRepository;
             ReportEntryStatusRepository = reportEntryStatusRepository;
         }
     }

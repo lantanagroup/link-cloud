@@ -37,15 +37,15 @@ namespace LantanaGroup.Link.Report.Controllers
         private readonly ILogger<ReportController> _logger;
         private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
         private readonly IDatabase _database;
-        private readonly ISubmissionEntryManager _submissionEntryManager;
+        private readonly IReportEntryStatusManager _reportEntryStatusManager;
         private readonly IReportScheduledManager _reportingScheduledManager;
         private readonly ReportManifestProducer _reportManifestProducer;
-        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler, IDatabase database, ISubmissionEntryManager submissionEntryManager, IReportScheduledManager reportingScheduledManager, ReportManifestProducer reportManifestProducer)
+        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler, IDatabase database, IReportEntryStatusManager reportEntryStatusManager, IReportScheduledManager reportingScheduledManager, ReportManifestProducer reportManifestProducer)
         {
             _logger = logger;
             _patientReportSubmissionBundler = patientReportSubmissionBundler;
             _database = database;
-            _submissionEntryManager = submissionEntryManager;
+            _reportEntryStatusManager = reportEntryStatusManager;
             _reportingScheduledManager = reportingScheduledManager;
             _reportManifestProducer = reportManifestProducer;
         }
@@ -169,12 +169,13 @@ namespace LantanaGroup.Link.Report.Controllers
             {
                 return Problem(detail: "No Report Schedule found for the provided FacilityId and ReportId", statusCode: (int)HttpStatusCode.NotFound);
             }
-            var submissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.FacilityId == facilityId && x.ReportScheduleId == reportScheduleId && x.Status != PatientSubmissionStatus.NotReportable);
+            var submissionEntries = await _database.ReportEntryStatusRepository.FindAsync(x => x.FacilityId == facilityId && x.ReportScheduleId == reportScheduleId && x.Status != PatientSubmissionStatus.NotReportable);
             var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ValidationComplete || s.Status == PatientSubmissionStatus.Submitted).Select(s => s.PatientId).Distinct().ToList();
             foreach (var patientId in patientIds)
             {
-                var model = await _patientReportSubmissionBundler.GenerateBundle(facilityId, patientId, reportScheduleId);
-                bundles.Add($"patient-{patientId}", model.Bundle);
+                //TODO: Look into a way to support this 
+                //var model = await _patientReportSubmissionBundler.GenerateBundle(facilityId, patientId, reportScheduleId);
+                //bundles.Add($"patient-{patientId}", model.Bundle);
             }
             bundles.Add("manifest", await _reportManifestProducer.GenerateAsBundle(schedule));
 

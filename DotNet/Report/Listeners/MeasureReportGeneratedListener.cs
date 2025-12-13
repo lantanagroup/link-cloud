@@ -112,15 +112,17 @@ namespace LantanaGroup.Link.Report.Listeners
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
                             if (!result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue)) 
-                            { 
-                                //TODO: Add error
+                            {
+                                throw new DeadLetterException("Correlation Id missing");
                             }
 
                             var correlationId = Encoding.UTF8.GetString(headerValue);
 
                             var reportEntry = await _reportEntryManager.GetPatientEntry(result.Value.ReportTrackingId, result.Value.ReportType, result.Value.PatientId);
 
-                            //TODO: Add null check 
+                            if (reportEntry == null) { 
+                                //TODO: Throw error? Create an entry?
+                            } 
 
                             reportEntry.MeasureReportFileName = result.Value.MeasureReportFileName;
                             reportEntry.MeasureReportUri = result.Value.MeasureReportURI;
@@ -156,12 +158,12 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             Uri ndjson_blob_uri = await _patientReportSubmissionBundler.GenerateBundleToABS(result.Value.PatientId, result.Value.ReportTrackingId);
 
-                            foreach (var ent in entries.Where(s => s.Status == PatientSubmissionStatus.ReadyForValidation))
+                            foreach (var entry in entries.Where(s => s.Status == PatientSubmissionStatus.ReadyForValidation))
                             {
-                                ent.AggregateReportUri = ndjson_blob_uri.AbsoluteUri;
+                                entry.AggregateReportUri = ndjson_blob_uri.AbsoluteUri;
                                 //TODO: Add AggregateFileName
-                                ent.ModifyDate = DateTime.UtcNow;
-                                await _reportEntryManager.UpdateAsync(ent, cancellationToken);
+                                entry.ModifyDate = DateTime.UtcNow;
+                                await _reportEntryManager.UpdateAsync(entry, cancellationToken);
                             }
 
                             try
@@ -171,6 +173,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             catch (ProduceException<ReadyForValidationKey, ReadyForValidationValue> ex)
                             {
                                 //TODO: Add logic
+                                _logger.LogError(ex, "An error was encountered generating a Ready For Validation event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
                             }           
                         }, cancellationToken);
                     }
