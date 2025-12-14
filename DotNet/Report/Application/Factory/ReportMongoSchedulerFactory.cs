@@ -1,24 +1,23 @@
-using Microsoft.Extensions.Options;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Jobs.JobStoreFactories;
 using Quartz;
+using Quartz.Impl;
+using Quartz.Simpl;
 using Quartz.Spi;
 using Reddoxx.Quartz.MongoDbJobStore;
-using Quartz.Simpl;
-using Quartz.Impl;
 
 namespace LantanaGroup.Link.Report.Application.Factory;
 
 public class ReportMongoSchedulerFactory : ISchedulerFactory
 {
-    private readonly IServiceProvider _serviceProvider;
+    private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly ILogger<ReportMongoSchedulerFactory> _logger;
     private IScheduler? _scheduler;
     private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
 
-    public ReportMongoSchedulerFactory(IServiceProvider serviceProvider, ILogger<ReportMongoSchedulerFactory> logger)
+    public ReportMongoSchedulerFactory(IServiceScopeFactory serviceScopeFactory, ILogger<ReportMongoSchedulerFactory> logger)
     {
-        _serviceProvider = serviceProvider;
+        _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
     }
 
@@ -28,28 +27,28 @@ public class ReportMongoSchedulerFactory : ISchedulerFactory
             return _scheduler;
 
         await _lock.WaitAsync(cancellationToken);
+
         try
         {
             if (_scheduler != null)
                 return _scheduler;
 
-            _logger.LogInformation("Creating MongoDB scheduler...");
+            using var scope = _serviceScopeFactory.CreateScope();
 
-            var loggerFactory = _serviceProvider.GetRequiredService<ILoggerFactory>();
-            var mongoOptions = _serviceProvider.GetRequiredService<IOptions<MongoConnection>>();
+            var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
+            var context = scope.ServiceProvider.GetRequiredService<MongoDbContext>();
 
-
-            var quartzFactory = new ReportQuartzMongoDbJobStoreFactory(mongoOptions);
+            var quartzFactory = new ReportQuartzMongoDbJobStoreFactory(context);
 
             // Create the MongoDbJobStore
             var mongoJobStore = new MongoDbJobStore(
                 loggerFactory,
                 quartzFactory,
-                _serviceProvider
+                scope.ServiceProvider
             );
 
             //get prefix from configuration, default to "reportjobs" if not set
-            var configuration = _serviceProvider.GetRequiredService<IConfiguration>();
+            var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
             var mongoCollectionPrefix = configuration.GetValue<string>("QuartzMongoCollectionPrefix") ?? "reportjobs";
 
             // Set properties
@@ -69,16 +68,12 @@ public class ReportMongoSchedulerFactory : ISchedulerFactory
             mongoJobStore.InstanceName = schedulerName;
             mongoJobStore.InstanceId = schedulerInstanceId;
 
-            _logger.LogInformation("Scheduler Name: {SchedulerName}, Instance ID: {InstanceId}", schedulerName, schedulerInstanceId);
-
             var schedulerSignaler = new SchedulerSignalerImpl(loggerFactory);
 
             var loadHelper = new SimpleTypeLoadHelper();
             loadHelper.Initialize();
 
             await mongoJobStore.Initialize(loadHelper, schedulerSignaler, cancellationToken);
-
-            _logger.LogInformation("MongoDB job store initialized successfully");
 
             DirectSchedulerFactory.Instance.CreateScheduler(
                 schedulerName,
@@ -89,19 +84,18 @@ public class ReportMongoSchedulerFactory : ISchedulerFactory
 
             _scheduler = await DirectSchedulerFactory.Instance.GetScheduler(schedulerName, cancellationToken);
 
-            _logger.LogInformation("Scheduler created successfully: {SchedulerName}", _scheduler.SchedulerName);
-
             return _scheduler;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to create MongoDB scheduler");
-            throw;
         }
         finally
         {
             _lock.Release();
         }
+
+        return null;
     }
 
     public async Task<IReadOnlyList<IScheduler>> GetAllSchedulers(CancellationToken cancellationToken = default)

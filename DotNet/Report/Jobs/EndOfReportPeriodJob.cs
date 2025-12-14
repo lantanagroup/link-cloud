@@ -1,16 +1,14 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Entities.Enums;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
-using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Quartz;
-using System.Threading;
 using static LantanaGroup.Link.Report.KafkaProducers.ReadyForValidationProducer;
 using Task = System.Threading.Tasks.Task;
 
@@ -21,7 +19,7 @@ namespace LantanaGroup.Link.Report.Jobs
     {
         private readonly ILogger<EndOfReportPeriodJob> _logger;
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly IDatabase _database;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ReadyForValidationProducer _readyForValidationProducer;
         private readonly DataAcquisitionRequestedProducer _dataAcqProducer;
         private readonly ReportManifestProducer _reportManifestProducer;
@@ -29,14 +27,14 @@ namespace LantanaGroup.Link.Report.Jobs
         public EndOfReportPeriodJob(
             ILogger<EndOfReportPeriodJob> logger,
             [FromKeyedServices("MongoScheduler")] ISchedulerFactory schedulerFactory,
-            IDatabase database,
+            IServiceScopeFactory serviceScopeFactory,
             DataAcquisitionRequestedProducer dataAcqProducer,
             ReadyForValidationProducer readyForValidationProducer,
             ReportManifestProducer reportManifestProducer)
         {
             _logger = logger;
             _schedulerFactory = schedulerFactory;
-            _database = database;
+            _serviceScopeFactory = serviceScopeFactory;
             _dataAcqProducer = dataAcqProducer;
             _readyForValidationProducer = readyForValidationProducer;
             _reportManifestProducer = reportManifestProducer;
@@ -44,7 +42,7 @@ namespace LantanaGroup.Link.Report.Jobs
 
         public async Task Execute(IJobExecutionContext context)
         {
-            ReportScheduleModel? schedule = null;
+            ReportSchedule? schedule = null;
             try
             {
                 // Get the schedule ID from the job data map
@@ -63,8 +61,12 @@ namespace LantanaGroup.Link.Report.Jobs
                     return;
                 }
 
+                using var scope = _serviceScopeFactory.CreateScope();
+                var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+                var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
                 // Fetch the schedule from the database
-                schedule = await _database.ReportScheduledRepository.GetAsync(scheduleId);
+                schedule = await database.ReportScheduledRepository.GetAsync(scheduleId);
 
                 if (schedule == null)
                 {
@@ -77,7 +79,7 @@ namespace LantanaGroup.Link.Report.Jobs
 
                 if (!manifestProduced)
                 {
-                    var patientsToEvaluate = await _database.SubmissionEntryRepository.AnyAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.PendingEvaluation, CancellationToken.None);
+                    var patientsToEvaluate = await database.SubmissionEntryRepository.AnyAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.PendingEvaluation, CancellationToken.None);
 
                     if (patientsToEvaluate)
                     {
@@ -91,7 +93,7 @@ namespace LantanaGroup.Link.Report.Jobs
                         }
                     }
 
-                    var needsValidation = (await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.ReadyForValidation && x.ValidationStatus != ValidationStatus.Requested)).ToList();
+                    var needsValidation = (await database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.ReadyForValidation && x.ValidationStatus != ValidationStatus.Requested)).ToList();
 
                     if (needsValidation.Any())
                     {
@@ -115,7 +117,7 @@ namespace LantanaGroup.Link.Report.Jobs
 
                 schedule.Status = ScheduleStatus.EndOfPeriod;
                 schedule.EndOfReportPeriodJobHasRun = true;
-                await _database.ReportScheduledRepository.UpdateAsync(schedule);
+                await reportScheduledManager.UpdateAsync(schedule, CancellationToken.None);
 
                 // remove the job from the scheduler
                 await MeasureReportScheduleService.DeleteJob(schedule, await _schedulerFactory.GetScheduler());

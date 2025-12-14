@@ -19,6 +19,14 @@ namespace IntegrationTests.Normalization
             _fixture = fixture;
         }
 
+        private async Task EnsureResourcesCreated()
+        {
+            using var scope = _fixture.ServiceProvider.CreateScope();
+            var manager = scope.ServiceProvider.GetRequiredService<IResourceManager>();
+
+            var result = await manager.InitializeResources();
+        }
+
         [Fact]
         public async Task CreateVendor_NewName_CreatesSuccessfully()
         {
@@ -53,9 +61,8 @@ namespace IntegrationTests.Normalization
         [Fact]
         public async Task CreateVendorVersion_Valid_CreatesSuccessfully()
         {
-            using var scope = _fixture.ServiceProvider.CreateScope();
-            var vendorManager = scope.ServiceProvider.GetRequiredService<IVendorManager>();
-            var vendorQueries = scope.ServiceProvider.GetRequiredService<IVendorQueries>();
+            var vendorManager = _fixture.ServiceProvider.GetRequiredService<IVendorManager>();
+            var vendorQueries = _fixture.ServiceProvider.GetRequiredService<IVendorQueries>();
 
             string vendorName = Guid.NewGuid().ToString();
             var vendor = await vendorManager.CreateVendor(vendorName);
@@ -71,10 +78,11 @@ namespace IntegrationTests.Normalization
         [Fact]
         public async Task CreateVendorVersionOperationPreset_Valid_CreatesSuccessfully()
         {
-            using var scope = _fixture.ServiceProvider.CreateScope();
-            var vendorManager = scope.ServiceProvider.GetRequiredService<IVendorManager>();
-            var vendorQueries = scope.ServiceProvider.GetRequiredService<IVendorQueries>();
-            var operationManager = scope.ServiceProvider.GetRequiredService<IOperationManager>();
+            await EnsureResourcesCreated();
+
+            var vendorManager = _fixture.ServiceProvider.GetRequiredService<IVendorManager>();
+            var vendorQueries = _fixture.ServiceProvider.GetRequiredService<IVendorQueries>();
+            var operationManager = _fixture.ServiceProvider.GetRequiredService<IOperationManager>();
 
             // Create vendor and version
             string vendorName = Guid.NewGuid().ToString();
