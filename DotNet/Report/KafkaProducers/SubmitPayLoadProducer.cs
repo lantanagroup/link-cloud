@@ -21,7 +21,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _database = database;
         }
 
-        public async Task<bool> Produce(ReportScheduleModel schedule, PayloadType payloadType, string? patientId = null, string? correlationId = null, string? payloadUri = null)
+        public async Task<bool> Produce(ReportScheduleModel schedule, PayloadType payloadType, string? patientId = null, string correlationId = null, string? payloadUri = null)
         {
 
             var corrId = string.IsNullOrWhiteSpace(correlationId)
@@ -32,8 +32,6 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             {
                 return false;
             }
-
-            var submissionEntries = await _database.ReportEntryStatusRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && (patientId == null || (x.PatientId == patientId && x.Status != PatientSubmissionStatus.NotReportable)));
 
             _submitPayloadProducer.Produce(nameof(KafkaTopic.SubmitPayload),
                 new Message<SubmitPayloadKey, SubmitPayloadValue>

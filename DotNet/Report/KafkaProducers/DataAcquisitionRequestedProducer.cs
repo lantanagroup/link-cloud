@@ -25,9 +25,10 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public async Task<bool> Produce(ReportScheduleModel schedule, List<string>? patientsToEvaluate = null)
         {
+            //TODO: Ensure that ReportEntry statuses are updated for each entry
             if (patientsToEvaluate == null || patientsToEvaluate.Count == 0)
             {
-                patientsToEvaluate = (await _database.ReportEntryStatusRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.PendingEvaluation)).Select(x => x.PatientId).Distinct().ToList();
+                patientsToEvaluate = (await _database.ReportEntryStatusRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.ReportingStatus == ReportingStatus.PatientIdentified)).Select(x => x.PatientId).Distinct().ToList();
             }
 
             string reportableEvent = string.Empty;

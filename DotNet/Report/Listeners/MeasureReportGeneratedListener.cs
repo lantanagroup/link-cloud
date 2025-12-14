@@ -123,20 +123,22 @@ namespace LantanaGroup.Link.Report.Listeners
                             if (reportEntry == null) {
                                 //TODO: Throw error? Create an entry?
                                 throw new NotImplementedException();
-                            } 
+                            }
 
-                            //reportEntry.MeasureReportFileName = result.Value.MeasureReportFileName;
-                            //reportEntry.MeasureReportUri = result.Value.MeasureReportURI;
+                            MeasureReportEntry measureReportEntry = reportEntry.MeasureReportEntryList.First(x => x.ReportType == result.Value.ReportType);
 
-                            //if (result.Value.IsReportable)
-                            //{
-                            //    reportEntry.Status = PatientSubmissionStatus.ReadyForValidation;
-                            //}
-                            //else 
-                            //{
-                            //    reportEntry.Status = PatientSubmissionStatus.NotReportable;
-                            //    reportEntry.ValidationStatus = ValidationStatus.NotReportable;
-                            //}
+                            measureReportEntry.MeasureReportId = result.Value.MeasureReportId;
+                            measureReportEntry.MeasureReportFileName = result.Value.MeasureReportFileName;
+                            measureReportEntry.MeasureReportUri = result.Value.MeasureReportURI;
+
+                            if (result.Value.IsReportable)
+                            {
+                                measureReportEntry.Status = MeasureReportStatus.ReadyForValidation;
+                            }
+                            else
+                            {
+                                measureReportEntry.Status = MeasureReportStatus.NotReportable;
+                            }
 
                             await _reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
 
@@ -150,7 +152,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             var schedule = await _reportScheduledManager.GetReportSchedule(result.Value.FacilityId, result.Value.ReportTrackingId, cancellationToken);
 
                             //TODO: Follow up on this logic
-                            var readyForValidation = reportEntry.MeasureReportEntryList.All(x => x.Status == PatientSubmissionStatus.NotReportable || x.Status == PatientSubmissionStatus.ReadyForValidation);
+                            var readyForValidation = reportEntry.MeasureReportEntryList.All(x => x.Status == MeasureReportStatus.NotReportable || x.Status == MeasureReportStatus.ReadyForValidation);
 
                             if (!readyForValidation)
                             {

@@ -15,10 +15,13 @@ namespace LantanaGroup.Link.Report.Entities
         public string PatientId { get; set; } = string.Empty;
         //public string ReportType { get; set; } = string.Empty;
         //public PatientSubmissionStatus Status { get; set; } = PatientSubmissionStatus.PendingEvaluation;
-        public ValidationStatus ValidationStatus { get; set; } = ValidationStatus.Pending;
+        //public ValidationStatus ValidationStatus { get; set; } = ValidationStatus.Pending;
         //public string MeasureReportUri { get; set; } = string.Empty;
         //public string MeasureReportFileName { get; set; } = string.Empty;
-        public bool IsSubmitted { get; set; } = false;
+        [BsonRepresentation(MongoDB.Bson.BsonType.String)]
+        public ReportingStatus ReportingStatus = ReportingStatus.PatientIdentified;
+        [BsonRepresentation(MongoDB.Bson.BsonType.String)]
+        public SubmissionStatus? SubmissionStatus = null;
         public string AggregateReportUri { get; set; } = string.Empty;
         public string AggregateReportFileName { get; set; } = string.Empty;
         public List<MeasureReportEntry> MeasureReportEntryList { get; set; } = new List<MeasureReportEntry>();
@@ -27,7 +30,8 @@ namespace LantanaGroup.Link.Report.Entities
     public class MeasureReportEntry 
     {
         public string MeasureReportId { get; set; } = string.Empty;
-        public PatientSubmissionStatus Status { get; set; } = PatientSubmissionStatus.PendingEvaluation;
+        [BsonRepresentation(MongoDB.Bson.BsonType.String)]
+        public MeasureReportStatus Status { get; set; } = MeasureReportStatus.PendingEvaluation;
         public string ReportType { get; set; } = string.Empty;
         public string MeasureReportUri { get; set; } = string.Empty;
         public string MeasureReportFileName { get; set; } = string.Empty;

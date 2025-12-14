@@ -124,8 +124,11 @@ namespace LantanaGroup.Link.Report.Listeners
                                                 entry = new ReportEntryStatusModel() { 
                                                     PatientId = patientId,
                                                     FacilityId = scheduledReport.FacilityId,
-                                                    CreateDate = DateTime.Now
+                                                    CreateDate = DateTime.Now,
+                                                    ReportingStatus = ReportingStatus.PatientIdentified, 
+                                                    ReportScheduleId = scheduledReport.Id
                                                 };
+                                                await _reportEntryStatusManager.AddAsync(entry, cancellationToken);
                                             }
 
                                             foreach (var reportType in scheduledReport.ReportTypes)
@@ -137,12 +140,12 @@ namespace LantanaGroup.Link.Report.Listeners
                                                     entry.MeasureReportEntryList.Add(new MeasureReportEntry()
                                                     {
                                                         ReportType = reportType,
-                                                        Status = PatientSubmissionStatus.PendingEvaluation
+                                                        Status = MeasureReportStatus.EntryCreated,
                                                     });
                                                 }
                                                 else 
                                                 {
-                                                    measureReportEntry.Status = PatientSubmissionStatus.PendingEvaluation;
+                                                    measureReportEntry.Status = MeasureReportStatus.EntryCreated;
                                                 }
 
                                                 await _reportEntryStatusManager.UpdateAsync(entry, cancellationToken);

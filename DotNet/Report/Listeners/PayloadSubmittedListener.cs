@@ -68,7 +68,7 @@ public class PayloadSubmittedListener(
                                 //    await database.ReportEntryStatusRepository.UpdateAsync(item);
                                 //}
 
-                                reportEntry.IsSubmitted = true;
+                                reportEntry.SubmissionStatus = SubmissionStatus.Submitted;
                                 reportEntry.ModifyDate = DateTime.UtcNow;
                                 await database.ReportEntryStatusRepository.UpdateAsync(reportEntry);
                             }

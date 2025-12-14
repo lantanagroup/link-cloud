@@ -202,10 +202,6 @@ namespace LantanaGroup.Link.Report.Listeners
             //    await _reportEntryManager.UpdateAsync(entry, cancellationToken);
             //}
 
-            reportEntry.ValidationStatus = value.IsValid ? ValidationStatus.Passed : ValidationStatus.Failed;
-            await _reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
-
-
             if (!value.IsValid) 
             {
                 var operationOutcome = new OperationOutcome() { 
@@ -227,6 +223,10 @@ namespace LantanaGroup.Link.Report.Listeners
 
             try
             {
+                reportEntry.ReportingStatus = value.IsValid ? ReportingStatus.PassedValidation : ReportingStatus.FailedValidation;
+                reportEntry.SubmissionStatus = SubmissionStatus.Submitting;
+                await _reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
+
                 await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, correlationIdStr, reportEntry.AggregateReportUri);
             }
             catch (ProduceException<SubmitPayloadKey, SubmitPayloadValue> ex)
