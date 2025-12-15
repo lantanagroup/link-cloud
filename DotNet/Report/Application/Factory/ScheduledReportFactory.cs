@@ -23,41 +23,41 @@ public class ScheduledReportFactory
     }
 }
 
-public class MeasureReportSummaryFactory
-{
-    public MeasureReportSummary FromDomain(MeasureReportSubmissionEntryModel measureReport)
-    {
-        var summary = new MeasureReportSummary()
-        {
-            Id = measureReport.Id ?? string.Empty,
-            PatientId = measureReport.PatientId,
-            ReportType = measureReport.ReportType,
-            Status = measureReport.Status.ToString(),
-            ValidationStatus = measureReport.ValidationStatus.ToString(),
-            ResourceCount = measureReport.ContainedResources.Count
-        };
+//public class MeasureReportSummaryFactory
+//{
+//    public MeasureReportSummary FromDomain(MeasureReportSubmissionEntryModel measureReport)
+//    {
+//        var summary = new MeasureReportSummary()
+//        {
+//            Id = measureReport.Id ?? string.Empty,
+//            PatientId = measureReport.PatientId,
+//            ReportType = measureReport.ReportType,
+//            Status = measureReport.Status.ToString(),
+//            ValidationStatus = measureReport.ValidationStatus.ToString(),
+//            ResourceCount = measureReport.ContainedResources.Count
+//        };
         
-        summary.ResourceCountSummary = measureReport.ContainedResources
-            .GroupBy(x => x.ResourceType)
-            .ToDictionary(x => x.Key, x => x.Count());
+//        summary.ResourceCountSummary = measureReport.ContainedResources
+//            .GroupBy(x => x.ResourceType)
+//            .ToDictionary(x => x.Key, x => x.Count());
         
-        return summary;
-    }
-}
+//        return summary;
+//    }
+//}
 
-public class ResourceSummaryFactory
-{
-    public ResourceSummary FromDomain(string facilityId, string measureReportId, string patientId, MeasureReportSubmissionEntryModel.ContainedResource resource)
-    {
-        return new ResourceSummary()
-        {
-            FacilityId = facilityId,
-            MeasureReportId = measureReportId,
-            PatientId = patientId,
-            ResourceId = resource.DocumentId,
-            FhirId = resource.ResourceId,
-            ResourceType = Enum.Parse<ResourceType>(resource.ResourceType),
-            ResourceCategory = resource.CategoryType.ToString()
-        };
-    }
-}
+//public class ResourceSummaryFactory
+//{
+//    public ResourceSummary FromDomain(string facilityId, string measureReportId, string patientId, MeasureReportSubmissionEntryModel.ContainedResource resource)
+//    {
+//        return new ResourceSummary()
+//        {
+//            FacilityId = facilityId,
+//            MeasureReportId = measureReportId,
+//            PatientId = patientId,
+//            ResourceId = resource.DocumentId,
+//            FhirId = resource.ResourceId,
+//            ResourceType = Enum.Parse<ResourceType>(resource.ResourceType),
+//            ResourceCategory = resource.CategoryType.ToString()
+//        };
+//    }
+//}

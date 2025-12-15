@@ -11,8 +11,8 @@ namespace LantanaGroup.Link.Report.Domain
         IBaseEntityRepository<PatientResourceModel> PatientResourceRepository { get; set; }
         IBaseEntityRepository<SharedResourceModel> SharedResourceRepository { get; set; }
         IBaseEntityRepository<ReportScheduleModel> ReportScheduledRepository { get; set; }
-        IBaseEntityRepository<MeasureReportSubmissionEntryModel> SubmissionEntryRepository { get; set; }
         IBaseEntityRepository<ReportEntryStatusModel> ReportEntryStatusRepository { get; set; }
+        IBaseEntityRepository<ReportPopulationModel> ReportPopulationRepository { get; set; }
     }
 
     public class Database : IDatabase
@@ -22,15 +22,15 @@ namespace LantanaGroup.Link.Report.Domain
         public IBaseEntityRepository<PatientResourceModel> PatientResourceRepository { get; set; }
         public IBaseEntityRepository<SharedResourceModel> SharedResourceRepository { get; set; }
         public IBaseEntityRepository<ReportScheduleModel> ReportScheduledRepository { get; set; }
-        public IBaseEntityRepository<MeasureReportSubmissionEntryModel> SubmissionEntryRepository { get; set; }
         public IBaseEntityRepository<ReportEntryStatusModel> ReportEntryStatusRepository { get; set; }
+        public IBaseEntityRepository<ReportPopulationModel> ReportPopulationRepository { get; set; }
 
         public Database(IOptions<MongoConnection> mongoSettings,
             IBaseEntityRepository<PatientResourceModel> patientResourceRepository,
             IBaseEntityRepository<SharedResourceModel> sharedResourceRepository,
             IBaseEntityRepository<ReportScheduleModel> reportScheduledRepository,
-            IBaseEntityRepository<MeasureReportSubmissionEntryModel> submissionEntryRepository,
-            IBaseEntityRepository<ReportEntryStatusModel> reportEntryStatusRepository)
+            IBaseEntityRepository<ReportEntryStatusModel> reportEntryStatusRepository,
+            IBaseEntityRepository<ReportPopulationModel> reportPopulationRepository)
         {
             var client = new MongoClient(mongoSettings.Value.ConnectionString);
             DbContext = client.GetDatabase(mongoSettings.Value.DatabaseName);
@@ -38,8 +38,8 @@ namespace LantanaGroup.Link.Report.Domain
             PatientResourceRepository = patientResourceRepository;
             SharedResourceRepository = sharedResourceRepository;
             ReportScheduledRepository = reportScheduledRepository;
-            SubmissionEntryRepository = submissionEntryRepository;
             ReportEntryStatusRepository = reportEntryStatusRepository;
+            ReportPopulationRepository = reportPopulationRepository;
         }
     }
 }

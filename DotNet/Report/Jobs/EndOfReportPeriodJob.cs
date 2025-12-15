@@ -77,7 +77,7 @@ namespace LantanaGroup.Link.Report.Jobs
 
                 if (!manifestProduced)
                 {
-                    var patientsToEvaluate = await _database.SubmissionEntryRepository.AnyAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.PendingEvaluation, CancellationToken.None);
+                    var patientsToEvaluate = await _database.ReportEntryStatusRepository.AnyAsync(x => x.ReportScheduleId == schedule.Id && x.ReportingStatus == ReportingStatus.PatientIdentified, CancellationToken.None);
 
                     if (patientsToEvaluate)
                     {
@@ -91,26 +91,27 @@ namespace LantanaGroup.Link.Report.Jobs
                         }
                     }
 
-                    var needsValidation = (await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.ReadyForValidation && x.ValidationStatus != ValidationStatus.Requested)).ToList();
+                    //TODO: Is this needed?
+                    //var needsValidation = (await _database.ReportEntryStatusRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status == MeasureReportStatus.ReadyForValidation && x.ValidationStatus != ValidationStatus.Requested)).ToList();
 
-                    if (needsValidation.Any())
-                    {
-                        try
-                        {
-                            await _readyForValidationProducer.Produce(needsValidation.Select(v => new ProduceValidationModel()
-                            {
-                                ReportScheduleId = schedule.Id,
-                                FacilityId = v.FacilityId,
-                                ReportTypes = schedule.ReportTypes,
-                                PatientId = v.PatientId,
-                                PayloadUri = v.PayloadUri
-                            }).ToList());
-                        }
-                        catch (ProduceException<string, string> ex)
-                        {
-                            _logger.LogError(ex, "An error was encountered generating a Ready For Validation event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
-                        }
-                    }
+                    //if (needsValidation.Any())
+                    //{
+                    //    try
+                    //    {
+                    //        await _readyForValidationProducer.Produce(needsValidation.Select(v => new ProduceValidationModel()
+                    //        {
+                    //            ReportScheduleId = schedule.Id,
+                    //            FacilityId = v.FacilityId,
+                    //            ReportTypes = schedule.ReportTypes,
+                    //            PatientId = v.PatientId,
+                    //            PayloadUri = v.AggregateReportUri
+                    //        }).ToList());
+                    //    }
+                    //    catch (ProduceException<string, string> ex)
+                    //    {
+                    //        _logger.LogError(ex, "An error was encountered generating a Ready For Validation event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
+                    //    }
+                    //}
                 }
 
                 schedule.Status = ScheduleStatus.EndOfPeriod;
