@@ -2,6 +2,7 @@ using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
+using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
@@ -18,7 +19,9 @@ public class PayloadSubmittedListener(
     ITransientExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue> transientExceptionHandler,
     IDeadLetterExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue> deadLetterExceptionHandler,
     ILogger<PayloadSubmittedListener> logger,
-    IDatabase database)
+    IDatabase database,
+    //TODO: TEST CODE ONLY! REMOVE AFTER TESTING
+    ReportManifestProducer reportManifestProducer)
     : BackgroundService
 {
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -59,17 +62,24 @@ public class PayloadSubmittedListener(
                         {
                             if (result.Message.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry)
                             {
-                                var submissionEntries = await database.SubmissionEntryRepository.FindAsync(e => e.FacilityId == facilityId 
-                                                                                                                && e.Status != PatientSubmissionStatus.NotReportable
-                                                                                                                && e.PatientId == result.Message.Value.PatientId 
-                                                                                                                && e.ReportScheduleId == result.Message.Key.ReportScheduleId);
+                                var reportEntry = await database.ReportEntryStatusRepository.FirstAsync(e => e.PatientId == result.Message.Value.PatientId && e.ReportScheduleId == result.Message.Key.ReportScheduleId);
 
-                                foreach (var item in submissionEntries)
-                                {
-                                    item.Status = PatientSubmissionStatus.Submitted;
-                                    item.ModifyDate = DateTime.UtcNow;
-                                    await database.SubmissionEntryRepository.UpdateAsync(item);
-                                }
+                                //foreach (var item in submissionEntries)
+                                //{
+                                //    item.Status = PatientSubmissionStatus.Submitted;
+                                //    item.ModifyDate = DateTime.UtcNow;
+                                //    await database.ReportEntryStatusRepository.UpdateAsync(item);
+                                //}
+
+                                reportEntry.SubmissionStatus = SubmissionStatus.Submitted;
+                                reportEntry.ModifyDate = DateTime.UtcNow;
+                                await database.ReportEntryStatusRepository.UpdateAsync(reportEntry);
+
+                                //TODO: START - TEST CODE ONLY! REMOVE AFTER TESTING
+                                var reportSchedule = await database.ReportScheduledRepository
+                                    .FirstAsync(x => x.Id == result.Message.Key.ReportScheduleId, consumeCancellationToken);
+                                reportManifestProducer.Produce(reportSchedule);
+                                //TODO: END - TEST CODE ONLY! REMOVE AFTER TESTING
                             }
                             else if (result.Message.Value.PayloadType == PayloadType.ReportSchedule)
                             {

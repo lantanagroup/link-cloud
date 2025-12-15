@@ -46,6 +46,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
         private readonly IReportEntryStatusManager _reportEntryManager;
         private readonly IReportScheduledManager _reportScheduledManager;
+        private readonly IReportPopulationManager _reportPopulationManager;
 
         private string Name => this.GetType().Name;
 
@@ -61,7 +62,8 @@ namespace LantanaGroup.Link.Report.Listeners
             ReportManifestProducer reportManifestProducer,
             AuditableEventOccurredProducer auditableEventOccurredProducer, 
             IReportEntryStatusManager reportEntryManager,
-            IReportScheduledManager reportScheduledManager)
+            IReportScheduledManager reportScheduledManager,
+            IReportPopulationManager reportPopulationManager)
         {
 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -84,6 +86,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _auditableEventOccurredProducer = auditableEventOccurredProducer;
             _reportEntryManager = reportEntryManager;
             _reportScheduledManager = reportScheduledManager;
+            _reportPopulationManager = reportPopulationManager;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -112,65 +115,105 @@ namespace LantanaGroup.Link.Report.Listeners
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
                             if (!result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue)) 
-                            { 
-                                //TODO: Add error
+                            {
+                                throw new DeadLetterException("Correlation Id missing");
                             }
 
                             var correlationId = Encoding.UTF8.GetString(headerValue);
 
-                            var reportEntry = await _reportEntryManager.GetPatientEntry(result.Value.ReportTrackingId, result.Value.ReportType, result.Value.PatientId);
+                            var reportEntry = await _reportEntryManager.GetEntry(result.Value.ReportTrackingId, result.Value.PatientId, cancellationToken);
 
-                            //TODO: Add null check 
+                            if (reportEntry == null) {
+                                //TODO: Throw error? Create an entry?
+                                throw new NotImplementedException();
+                            }
 
-                            reportEntry.MeasureReportFileName = result.Value.MeasureReportFileName;
-                            reportEntry.MeasureReportUri = result.Value.MeasureReportURI;
+                            MeasureReportEntry measureReportEntry = reportEntry.MeasureReportEntryList.First(x => x.ReportType == result.Value.ReportType);
+
+                            measureReportEntry.MeasureReportId = result.Value.MeasureReportId;
+                            measureReportEntry.MeasureReportFileName = result.Value.MeasureReportFileName;
+                            measureReportEntry.MeasureReportUri = result.Value.MeasureReportURI;
 
                             if (result.Value.IsReportable)
                             {
-                                reportEntry.Status = PatientSubmissionStatus.ReadyForValidation;
+                                measureReportEntry.Status = MeasureReportStatus.ReadyForValidation;
                             }
-                            else 
+                            else
                             {
-                                reportEntry.Status = PatientSubmissionStatus.NotReportable;
-                                reportEntry.ValidationStatus = ValidationStatus.NotReportable;
+                                measureReportEntry.Status = MeasureReportStatus.NotReportable;
                             }
 
                             await _reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
 
-                            var entries = await _reportEntryManager.FindAsync(x => x.PatientId == result.Value.PatientId && x.FacilityId == result.Value.FacilityId && x.ReportScheduleId == result.Value.ReportTrackingId);
-
-                           var readyForValidation = entries.All(e =>
-                                e.Status == PatientSubmissionStatus.NotReportable ||
-                                e.Status == PatientSubmissionStatus.ReadyForValidation) &&
-                                entries.Any(e => e.Status == PatientSubmissionStatus.ReadyForValidation);
-
-
                             var schedule = await _reportScheduledManager.GetReportSchedule(result.Value.FacilityId, result.Value.ReportTrackingId, cancellationToken);
 
                             //TODO: Follow up on this logic
+                            var readyForValidation = reportEntry.MeasureReportEntryList.All(x => x.Status == MeasureReportStatus.NotReportable || x.Status == MeasureReportStatus.ReadyForValidation);
+
                             if (!readyForValidation)
                             {
                                 await _reportManifestProducer.Produce(schedule, correlationId);
                                 return;
                             }
 
-                            Uri ndjson_blob_uri = await _patientReportSubmissionBundler.GenerateBundleToABS(result.Value.PatientId, result.Value.ReportTrackingId);
+                            AggregateResult aggregateResult = await _patientReportSubmissionBundler.GenerateBundleToABS(result.Value.PatientId, result.Value.ReportTrackingId);
 
-                            foreach (var ent in entries.Where(s => s.Status == PatientSubmissionStatus.ReadyForValidation))
-                            {
-                                ent.AggregateReportUri = ndjson_blob_uri.AbsoluteUri;
-                                //TODO: Add AggregateFileName
-                                ent.ModifyDate = DateTime.UtcNow;
-                                await _reportEntryManager.UpdateAsync(ent, cancellationToken);
+                            reportEntry.AggregateReportUri = aggregateResult.Uri.AbsoluteUri;
+                            reportEntry.AggregateReportFileName = aggregateResult.Uri.Segments.Last();
+                            reportEntry.ModifyDate = DateTime.UtcNow;
+
+                            await _reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
+
+                            foreach (var measureReportResult in aggregateResult.MeasureReportResults) {
+                                var reportPopulationModel = await _reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == result.Value.ReportTrackingId && x.Measure == measureReportEntry.ReportType);
+
+                                if (reportPopulationModel == null)
+                                {
+                                    reportPopulationModel = new ReportPopulationModel()
+                                    {
+                                        Measure = measureReportResult.Measure,
+                                        CreateDate = DateTime.UtcNow,
+                                        FacilityId = result.Value.FacilityId,
+                                        ReportScheduleId = result.Value.ReportTrackingId
+                                    };
+
+                                    //TODO: Temporary to get things saving. Figure out CodeableConcept deserialization
+                                    var serializer = new FhirJsonSerializer();
+
+                                    foreach (var measureReportpopulation in measureReportResult.PopulationList) {
+                                        ReportPopulation population = new ReportPopulation();
+                                        population.PopulationId = measureReportpopulation.PopulationId;
+
+                                        string json = serializer.SerializeToString(measureReportpopulation.PopulationCode);
+                                        population.PopulationCode = measureReportpopulation.PopulationCode; //json;
+
+                                        population.TotalPopulationCount = measureReportpopulation.PopulationCount;
+                                        population.MeasureReportIds = new List<MeasureReportPopulation>() {
+                                            new MeasureReportPopulation() {
+                                                MeasureReportId = measureReportResult.MeasureReportId,
+                                                PopulationCount = measureReportpopulation.PopulationCount
+                                            }
+                                        };
+
+                                        reportPopulationModel.ReportPopulations.Add(population);
+                                    }
+
+                                    await _reportPopulationManager.AddAsync(reportPopulationModel, cancellationToken);
+                                }
+                                else 
+                                { 
+                                    //TODO: Add
+                                }
                             }
-
+                            
                             try
                             {
-                                await _readyForValidationProducer.Produce(schedule.Id, schedule.ReportTypes, schedule.FacilityId, result.Value.PatientId, ndjson_blob_uri.AbsolutePath, correlationId);
+                                await _readyForValidationProducer.Produce(schedule.Id, schedule.ReportTypes, schedule.FacilityId, result.Value.PatientId, aggregateResult.Uri.AbsolutePath, correlationId);
                             }
                             catch (ProduceException<ReadyForValidationKey, ReadyForValidationValue> ex)
                             {
                                 //TODO: Add logic
+                                _logger.LogError(ex, "An error was encountered generating a Ready For Validation event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
                             }           
                         }, cancellationToken);
                     }

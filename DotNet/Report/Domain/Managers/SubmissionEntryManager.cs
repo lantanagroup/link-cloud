@@ -1,258 +1,258 @@
-﻿using Hl7.Fhir.Model;
-using Hl7.Fhir.Rest;
-using LantanaGroup.Link.Report.Application.Factory;
-using LantanaGroup.Link.Report.Domain.Enums;
-using LantanaGroup.Link.Report.Entities;
-using LantanaGroup.Link.Shared.Application.Models.Report;
-using LantanaGroup.Link.Shared.Application.Models.Responses;
-using System.Linq.Expressions;
-using Task = System.Threading.Tasks.Task;
-using SortOrder = LantanaGroup.Link.Shared.Application.Enums.SortOrder;
+﻿//using Hl7.Fhir.Model;
+//using Hl7.Fhir.Rest;
+//using LantanaGroup.Link.Report.Application.Factory;
+//using LantanaGroup.Link.Report.Domain.Enums;
+//using LantanaGroup.Link.Report.Entities;
+//using LantanaGroup.Link.Shared.Application.Models.Report;
+//using LantanaGroup.Link.Shared.Application.Models.Responses;
+//using System.Linq.Expressions;
+//using Task = System.Threading.Tasks.Task;
+//using SortOrder = LantanaGroup.Link.Shared.Application.Enums.SortOrder;
 
-namespace LantanaGroup.Link.Report.Domain.Managers
-{
-    public interface ISubmissionEntryManager
-    {
-        Task<List<MeasureReportSubmissionEntryModel>> FindAsync(
-            Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate,
-            CancellationToken cancellationToken = default);
+//namespace LantanaGroup.Link.Report.Domain.Managers
+//{
+//    public interface ISubmissionEntryManager
+//    {
+//        Task<List<MeasureReportSubmissionEntryModel>> FindAsync(
+//            Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate,
+//            CancellationToken cancellationToken = default);
 
-        Task<MeasureReportSubmissionEntryModel?> SingleOrDefaultAsync(
-            Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate,
-            CancellationToken cancellationToken = default);
+//        Task<MeasureReportSubmissionEntryModel?> SingleOrDefaultAsync(
+//            Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate,
+//            CancellationToken cancellationToken = default);
 
-        Task<MeasureReportSubmissionEntryModel> SingleAsync(
-            Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate,
-            CancellationToken cancellationToken = default);
+//        Task<MeasureReportSubmissionEntryModel> SingleAsync(
+//            Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate,
+//            CancellationToken cancellationToken = default);
 
-        Task<MeasureReportSubmissionEntryModel?> FirstOrDefaultAsync(
-            Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate,
-            CancellationToken cancellationToken = default);
+//        Task<MeasureReportSubmissionEntryModel?> FirstOrDefaultAsync(
+//            Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate,
+//            CancellationToken cancellationToken = default);
 
-        Task<MeasureReportSubmissionEntryModel> AddAsync(MeasureReportSubmissionEntryModel entity,
-            CancellationToken cancellationToken = default);
+//        Task<MeasureReportSubmissionEntryModel> AddAsync(MeasureReportSubmissionEntryModel entity,
+//            CancellationToken cancellationToken = default);
 
-        Task<MeasureReportSubmissionEntryModel> UpdateAsync(MeasureReportSubmissionEntryModel entity,
-            CancellationToken cancellationToken = default);
+//        Task<MeasureReportSubmissionEntryModel> UpdateAsync(MeasureReportSubmissionEntryModel entity,
+//            CancellationToken cancellationToken = default);
 
-        Task<bool> AnyAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default);
+//        Task<bool> AnyAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default);
 
-        Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(
-            Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber,
-            CancellationToken cancellationToken = default);
+//        Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(
+//            Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber,
+//            CancellationToken cancellationToken = default);
 
-        Task<PagedConfigModel<ResourceSummary>> GetMeasureReportResourceSummary(
-            string facilityId, string reportId, ResourceType? resourceType, int pageSize, int pageNumber,
-            CancellationToken cancellationToken = default);
+//        Task<PagedConfigModel<ResourceSummary>> GetMeasureReportResourceSummary(
+//            string facilityId, string reportId, ResourceType? resourceType, int pageSize, int pageNumber,
+//            CancellationToken cancellationToken = default);
 
-        Task<List<string>> GetMeasureReportResourceTypeList(
-            string facilityId, string reportId, CancellationToken cancellationToken = default);
+//        Task<List<string>> GetMeasureReportResourceTypeList(
+//            string facilityId, string reportId, CancellationToken cancellationToken = default);
 
 
-        Task UpdateStatusToValidationRequested(string reportScheduleId, string facilityId, string patientId, CancellationToken cancellationToken = default);
+//        Task UpdateStatusToValidationRequested(string reportScheduleId, string facilityId, string patientId, CancellationToken cancellationToken = default);
 
-        Task<PatientReportSummary> GetPatients(string facilityId, string reportId, int page, int count, CancellationToken cancellationToken = default);
-        Task<MeasureReportSubmissionEntryModel> AddResourceAsync(MeasureReportSubmissionEntryModel entry, DomainResource resource, ResourceCategoryType resourceCategoryType, CancellationToken cancellationToken = default);
-    }
+//        Task<PatientReportSummary> GetPatients(string facilityId, string reportId, int page, int count, CancellationToken cancellationToken = default);
+//        Task<MeasureReportSubmissionEntryModel> AddResourceAsync(MeasureReportSubmissionEntryModel entry, DomainResource resource, ResourceCategoryType resourceCategoryType, CancellationToken cancellationToken = default);
+//    }
 
-    public class SubmissionEntryManager : ISubmissionEntryManager
-    {
+//    public class SubmissionEntryManager : ISubmissionEntryManager
+//    {
 
-        private readonly IDatabase _database;
-        private readonly IResourceManager _resourceManager;
-        private readonly MeasureReportSummaryFactory _measureReportSummaryFactory;
-        private readonly ResourceSummaryFactory _resourceSummaryFactory;
+//        private readonly IDatabase _database;
+//        private readonly IResourceManager _resourceManager;
+//        private readonly MeasureReportSummaryFactory _measureReportSummaryFactory;
+//        private readonly ResourceSummaryFactory _resourceSummaryFactory;
 
-        public SubmissionEntryManager(IDatabase database, IResourceManager resourceManager, MeasureReportSummaryFactory measureReportSummaryFactory, ResourceSummaryFactory resourceSummaryFactory)
-        {
-            _database = database;
-            _resourceManager = resourceManager;
-            _measureReportSummaryFactory = measureReportSummaryFactory;
-            _resourceSummaryFactory = resourceSummaryFactory;
-        }
+//        public SubmissionEntryManager(IDatabase database, IResourceManager resourceManager, MeasureReportSummaryFactory measureReportSummaryFactory, ResourceSummaryFactory resourceSummaryFactory)
+//        {
+//            _database = database;
+//            _resourceManager = resourceManager;
+//            _measureReportSummaryFactory = measureReportSummaryFactory;
+//            _resourceSummaryFactory = resourceSummaryFactory;
+//        }
 
-        public async Task<bool> AnyAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default)
-        {
-            return await _database.SubmissionEntryRepository.AnyAsync(predicate, cancellationToken);
-        }
+//        public async Task<bool> AnyAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default)
+//        {
+//            return await _database.SubmissionEntryRepository.AnyAsync(predicate, cancellationToken);
+//        }
 
-        public async Task<PatientReportSummary> GetPatients(string facilityId, string reportId, int page, int count, CancellationToken cancellationToken = default)
-        {
-            var scheduledReport = await _database.ReportScheduledRepository.SingleOrDefaultAsync(x => x.FacilityId == facilityId && x.Id == reportId, cancellationToken);
+//        public async Task<PatientReportSummary> GetPatients(string facilityId, string reportId, int page, int count, CancellationToken cancellationToken = default)
+//        {
+//            var scheduledReport = await _database.ReportScheduledRepository.SingleOrDefaultAsync(x => x.FacilityId == facilityId && x.Id == reportId, cancellationToken);
 
-            if (scheduledReport is null) throw new ArgumentNullException($"Scheduled report with ID {reportId} not found.");
+//            if (scheduledReport is null) throw new ArgumentNullException($"Scheduled report with ID {reportId} not found.");
 
-            var measureReportEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == reportId, cancellationToken);
+//            var measureReportEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == reportId, cancellationToken);
 
-            var patientIds = measureReportEntries.Select(x => x.PatientId).Distinct().ToList();
+//            var patientIds = measureReportEntries.Select(x => x.PatientId).Distinct().ToList();
 
-            var pagedPatients = patientIds.Skip((page - 1) * count).Take(count).ToList();
+//            var pagedPatients = patientIds.Skip((page - 1) * count).Take(count).ToList();
 
-            var patientSummaries = new List<PatientSummary>();
+//            var patientSummaries = new List<PatientSummary>();
 
-            foreach (var patientId in pagedPatients)
-            {
-                try
-                {
-                    var patientResource = (await _database.PatientResourceRepository.FindAsync(r => r.FacilityId == facilityId && r.PatientId == patientId && r.ResourceId == patientId && r.ResourceType == "Patient", cancellationToken)).SingleOrDefault();
+//            foreach (var patientId in pagedPatients)
+//            {
+//                try
+//                {
+//                    var patientResource = (await _database.PatientResourceRepository.FindAsync(r => r.FacilityId == facilityId && r.PatientId == patientId && r.ResourceId == patientId && r.ResourceType == "Patient", cancellationToken)).SingleOrDefault();
 
-                    if (patientResource?.GetResource() is not Patient patient)
-                    {
-                        patientSummaries.Add(new PatientSummary { id = patientId, name = string.Empty });
-                        continue;
-                    }
+//                    if (patientResource?.GetResource() is not Patient patient)
+//                    {
+//                        patientSummaries.Add(new PatientSummary { id = patientId, name = string.Empty });
+//                        continue;
+//                    }
 
-                    var name = patient.Name?.FirstOrDefault();
-                    var fullName = name != null ? $"{string.Join(" ", name.Given ?? Enumerable.Empty<string>())} {name.Family}".Trim() : string.Empty;
+//                    var name = patient.Name?.FirstOrDefault();
+//                    var fullName = name != null ? $"{string.Join(" ", name.Given ?? Enumerable.Empty<string>())} {name.Family}".Trim() : string.Empty;
 
-                    patientSummaries.Add(new PatientSummary
-                    {
-                        id = patientId,
-                        name = fullName
-                    });
-                }
-                catch (Exception ex)
-                {
-                    // Handle exception if GetResource fails
-                    patientSummaries.Add(new PatientSummary
-                    {
-                        id = patientId,
-                        name = string.Empty
-                    });
-                }
-            }
+//                    patientSummaries.Add(new PatientSummary
+//                    {
+//                        id = patientId,
+//                        name = fullName
+//                    });
+//                }
+//                catch (Exception ex)
+//                {
+//                    // Handle exception if GetResource fails
+//                    patientSummaries.Add(new PatientSummary
+//                    {
+//                        id = patientId,
+//                        name = string.Empty
+//                    });
+//                }
+//            }
 
-            PatientReportSummary patientReportSummary = new PatientReportSummary();
-            patientReportSummary.total = patientIds.Count;
-            patientReportSummary.Patients = patientSummaries;
+//            PatientReportSummary patientReportSummary = new PatientReportSummary();
+//            patientReportSummary.total = patientIds.Count;
+//            patientReportSummary.Patients = patientSummaries;
 
-            return patientReportSummary;
-        }
+//            return patientReportSummary;
+//        }
 
-        public async Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
-        {
+//        public async Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
+//        {
             
-            // Get individual measure report entries for this report
-            var searchResults = await _database.SubmissionEntryRepository
-                .SearchAsync(
-                    predicate,
-                    sortBy: sortBy,
-                    sortOrder: sortOrder, 
-                    pageSize: pageSize, pageNumber: pageNumber, 
-                    cancellationToken); 
-            
-            
-            // Build patient report summaries
-            var measureReports = searchResults.Item1.Select(_measureReportSummaryFactory.FromDomain).ToList();
-            
-            return new PagedConfigModel<MeasureReportSummary>(measureReports, searchResults.Item2);
-        }
-
-        public async Task<PagedConfigModel<ResourceSummary>> GetMeasureReportResourceSummary(
-            string facilityId, string reportId, ResourceType? resourceType, int pageSize, int pageNumber,
-            CancellationToken cancellationToken = default)
-        {
+//            // Get individual measure report entries for this report
+//            var searchResults = await _database.SubmissionEntryRepository
+//                .SearchAsync(
+//                    predicate,
+//                    sortBy: sortBy,
+//                    sortOrder: sortOrder, 
+//                    pageSize: pageSize, pageNumber: pageNumber, 
+//                    cancellationToken); 
             
             
-            var measureReport = await _database.SubmissionEntryRepository.SingleOrDefaultAsync(
-                x => x.FacilityId == facilityId && x.Id == reportId, cancellationToken);
-
-            if (measureReport is null)
-                return new PagedConfigModel<ResourceSummary>();
+//            // Build patient report summaries
+//            var measureReports = searchResults.Item1.Select(_measureReportSummaryFactory.FromDomain).ToList();
             
-            var resourceQuery = measureReport.ContainedResources.AsQueryable();
+//            return new PagedConfigModel<MeasureReportSummary>(measureReports, searchResults.Item2);
+//        }
 
-            if (resourceType.HasValue)
-            {
-                resourceQuery = resourceQuery.Where(x => x.ResourceType == resourceType.ToString());
-            }
+//        public async Task<PagedConfigModel<ResourceSummary>> GetMeasureReportResourceSummary(
+//            string facilityId, string reportId, ResourceType? resourceType, int pageSize, int pageNumber,
+//            CancellationToken cancellationToken = default)
+//        {
+            
+            
+//            var measureReport = await _database.SubmissionEntryRepository.SingleOrDefaultAsync(
+//                x => x.FacilityId == facilityId && x.Id == reportId, cancellationToken);
 
-            var pagedResources = resourceQuery
-                .OrderBy(x => x.ResourceType)
-                .Skip((pageNumber - 1) * pageSize)
-                .Take(pageSize).ToList();
+//            if (measureReport is null)
+//                return new PagedConfigModel<ResourceSummary>();
             
-            var resourceSummaries = pagedResources.Select(x => _resourceSummaryFactory.FromDomain(facilityId, reportId, measureReport.PatientId, x)).ToList();
+//            var resourceQuery = measureReport.ContainedResources.AsQueryable();
+
+//            if (resourceType.HasValue)
+//            {
+//                resourceQuery = resourceQuery.Where(x => x.ResourceType == resourceType.ToString());
+//            }
+
+//            var pagedResources = resourceQuery
+//                .OrderBy(x => x.ResourceType)
+//                .Skip((pageNumber - 1) * pageSize)
+//                .Take(pageSize).ToList();
             
-            return new PagedConfigModel<ResourceSummary>(resourceSummaries, new PaginationMetadata()
-            {
-                PageSize = pageSize,
-                PageNumber = pageNumber,
-                TotalCount = resourceQuery.ToList().Count
-            });
-        }
+//            var resourceSummaries = pagedResources.Select(x => _resourceSummaryFactory.FromDomain(facilityId, reportId, measureReport.PatientId, x)).ToList();
+            
+//            return new PagedConfigModel<ResourceSummary>(resourceSummaries, new PaginationMetadata()
+//            {
+//                PageSize = pageSize,
+//                PageNumber = pageNumber,
+//                TotalCount = resourceQuery.ToList().Count
+//            });
+//        }
         
-        public async Task<List<string>> GetMeasureReportResourceTypeList(
-            string facilityId, string reportId, CancellationToken cancellationToken = default)
-        {
-            var measureReport = await _database.SubmissionEntryRepository.SingleOrDefaultAsync(
-                x => x.FacilityId == facilityId && x.Id == reportId, cancellationToken);
+//        public async Task<List<string>> GetMeasureReportResourceTypeList(
+//            string facilityId, string reportId, CancellationToken cancellationToken = default)
+//        {
+//            var measureReport = await _database.SubmissionEntryRepository.SingleOrDefaultAsync(
+//                x => x.FacilityId == facilityId && x.Id == reportId, cancellationToken);
 
-            if (measureReport is null || measureReport.ContainedResources.Count == 0)
-                return [];
+//            if (measureReport is null || measureReport.ContainedResources.Count == 0)
+//                return [];
                 
-            var resourceList = measureReport.ContainedResources.Select(x => x.ResourceType).Distinct().Order().ToList();
+//            var resourceList = measureReport.ContainedResources.Select(x => x.ResourceType).Distinct().Order().ToList();
             
-            return resourceList;
-        }
+//            return resourceList;
+//        }
 
-        public async Task<List<MeasureReportSubmissionEntryModel>> FindAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default)
-        {
-            return await _database.SubmissionEntryRepository.FindAsync(predicate, cancellationToken);
-        }
+//        public async Task<List<MeasureReportSubmissionEntryModel>> FindAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default)
+//        {
+//            return await _database.SubmissionEntryRepository.FindAsync(predicate, cancellationToken);
+//        }
 
-        public async Task<MeasureReportSubmissionEntryModel?> FirstOrDefaultAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default)
-        {
-            return await _database.SubmissionEntryRepository.FirstOrDefaultAsync(predicate, cancellationToken);
-        }
+//        public async Task<MeasureReportSubmissionEntryModel?> FirstOrDefaultAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default)
+//        {
+//            return await _database.SubmissionEntryRepository.FirstOrDefaultAsync(predicate, cancellationToken);
+//        }
 
 
-        public async Task<MeasureReportSubmissionEntryModel?> SingleOrDefaultAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default)
-        {
-            return await _database.SubmissionEntryRepository.SingleOrDefaultAsync(predicate, cancellationToken);
-        }
+//        public async Task<MeasureReportSubmissionEntryModel?> SingleOrDefaultAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default)
+//        {
+//            return await _database.SubmissionEntryRepository.SingleOrDefaultAsync(predicate, cancellationToken);
+//        }
 
-        public async Task<MeasureReportSubmissionEntryModel> SingleAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default)
-        {
-            return await _database.SubmissionEntryRepository.SingleAsync(predicate, cancellationToken);
-        }
+//        public async Task<MeasureReportSubmissionEntryModel> SingleAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default)
+//        {
+//            return await _database.SubmissionEntryRepository.SingleAsync(predicate, cancellationToken);
+//        }
 
-        public async Task<MeasureReportSubmissionEntryModel> AddAsync(MeasureReportSubmissionEntryModel entity, CancellationToken cancellationToken = default)
-        {
-            return await _database.SubmissionEntryRepository.AddAsync(entity, cancellationToken);
-        }
+//        public async Task<MeasureReportSubmissionEntryModel> AddAsync(MeasureReportSubmissionEntryModel entity, CancellationToken cancellationToken = default)
+//        {
+//            return await _database.SubmissionEntryRepository.AddAsync(entity, cancellationToken);
+//        }
 
-        public async Task<MeasureReportSubmissionEntryModel> UpdateAsync(MeasureReportSubmissionEntryModel entity, CancellationToken cancellationToken = default)
-        {
-            return await _database.SubmissionEntryRepository.UpdateAsync(entity, cancellationToken);
-        }
+//        public async Task<MeasureReportSubmissionEntryModel> UpdateAsync(MeasureReportSubmissionEntryModel entity, CancellationToken cancellationToken = default)
+//        {
+//            return await _database.SubmissionEntryRepository.UpdateAsync(entity, cancellationToken);
+//        }
 
-        public async Task UpdateStatusToValidationRequested(string reportScheduleId, string facilityId, string patientId, CancellationToken cancellationToken = default)
-        {
-            var entries = await _database.SubmissionEntryRepository.FindAsync(s => s.Status == PatientSubmissionStatus.ReadyForValidation && s.ReportScheduleId == reportScheduleId && s.FacilityId == facilityId && s.PatientId == patientId, cancellationToken) ?? new();
+//        public async Task UpdateStatusToValidationRequested(string reportScheduleId, string facilityId, string patientId, CancellationToken cancellationToken = default)
+//        {
+//            var entries = await _database.SubmissionEntryRepository.FindAsync(s => s.Status == PatientSubmissionStatus.ReadyForValidation && s.ReportScheduleId == reportScheduleId && s.FacilityId == facilityId && s.PatientId == patientId, cancellationToken) ?? new();
 
-            foreach (var entry in entries)
-            {
-                entry.Status = PatientSubmissionStatus.ValidationRequested;
-                entry.ValidationStatus = ValidationStatus.Requested;
-                await _database.SubmissionEntryRepository.UpdateAsync(entry, cancellationToken);
-            }
-        }
+//            foreach (var entry in entries)
+//            {
+//                entry.Status = PatientSubmissionStatus.ValidationRequested;
+//                entry.ValidationStatus = ValidationStatus.Requested;
+//                await _database.SubmissionEntryRepository.UpdateAsync(entry, cancellationToken);
+//            }
+//        }
 
-        public async Task<MeasureReportSubmissionEntryModel> AddResourceAsync(MeasureReportSubmissionEntryModel entry, DomainResource resource, ResourceCategoryType resourceCategoryType, CancellationToken cancellationToken = default)
-        {
-            if(string.IsNullOrEmpty(resource.Id))
-            {
-                resource.Id = Guid.NewGuid().ToString();   
-            }
+//        public async Task<MeasureReportSubmissionEntryModel> AddResourceAsync(MeasureReportSubmissionEntryModel entry, DomainResource resource, ResourceCategoryType resourceCategoryType, CancellationToken cancellationToken = default)
+//        {
+//            if(string.IsNullOrEmpty(resource.Id))
+//            {
+//                resource.Id = Guid.NewGuid().ToString();   
+//            }
            
-            var createdResource = await _resourceManager.CreateResourceAsync(entry.FacilityId, resource, entry.PatientId, cancellationToken);
+//            var createdResource = await _resourceManager.CreateResourceAsync(entry.FacilityId, resource, entry.PatientId, cancellationToken);
 
-            entry.UpdateContainedResource(createdResource);
+//            entry.UpdateContainedResource(createdResource);
 
-            await UpdateAsync(entry);
+//            await UpdateAsync(entry);
 
-            return entry;
-        }
-    }
-}
+//            return entry;
+//        }
+//    }
+//}

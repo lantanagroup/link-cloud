@@ -58,7 +58,7 @@ namespace IntegrationTests.Report
                 FacilityId = schedule.FacilityId,
                 ReportScheduleId = schedule.Id,
                 PatientId = "Patient2",
-                Status = PatientSubmissionStatus.PendingEvaluation
+                Status = MeasureReportStatus.PendingEvaluation
             };
             await db.SubmissionEntryRepository.AddAsync(entry);
 
@@ -120,7 +120,7 @@ namespace IntegrationTests.Report
                 FacilityId = schedule.FacilityId,
                 ReportScheduleId = schedule.Id,
                 PatientId = "Patient3",
-                Status = PatientSubmissionStatus.ReadyForValidation,
+                Status = MeasureReportStatus.ReadyForValidation,
                 ValidationStatus = ValidationStatus.Pending,
                 PayloadUri = "test://payload/patient3"
             };
@@ -196,7 +196,7 @@ namespace IntegrationTests.Report
                 FacilityId = schedule.FacilityId,
                 ReportScheduleId = schedule.Id,
                 PatientId = "Patient1",
-                Status = PatientSubmissionStatus.PendingEvaluation
+                Status = MeasureReportStatus.PendingEvaluation
             };
             await database.SubmissionEntryRepository.AddAsync(entry);
 
