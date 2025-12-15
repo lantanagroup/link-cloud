@@ -2,6 +2,7 @@
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
+using Hl7.Fhir.Utility;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
@@ -236,7 +237,7 @@ public class PatientDataService : IPatientDataService
                                 QueryType = FhirQueryType.Read,
                                 QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),
                                 ScheduledReport = schedReport,
-                                TraceId = Activity.Current?.ParentId,
+                                TraceId = Activity.Current?.TraceId.ToHexString(),
                                 FhirQuery = new List<CreateFhirQueryModel>
                                 {
                                         new CreateFhirQueryModel
@@ -346,32 +347,31 @@ public class PatientDataService : IPatientDataService
                     return;
                 }
 
-                using var activity = new Activity("PatientDataService.ExecuteLogRequest");
+                ActivityContext parentContext = default;
 
-                //set trace parent id based on log trace id
-                if (!string.IsNullOrWhiteSpace(log.TraceId))
+                if (!string.IsNullOrWhiteSpace(log.TraceId) && log.TraceId.Length == 32 && IsValidHex(log.TraceId))
                 {
                     try
                     {
-                        activity.SetParentId(log.TraceId);
+                        var traceId = ActivityTraceId.CreateFromString(log.TraceId.AsSpan());
+                        parentContext = new ActivityContext(traceId, default, ActivityTraceFlags.None);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error setting Activity.Current for log ID {LogId} with TraceId {TraceId}", log.Id, log.TraceId.Sanitize());
-                        if (!string.IsNullOrWhiteSpace(Activity.Current?.Id))
-                        {
-                            activity.SetParentId(Activity.Current.Id);
-                        }
+                        _logger.LogWarning(ex, "Failed to create ActivityTraceId from TraceId {TraceId} for log {LogId}", log.TraceId.Sanitize(), log.Id);
                     }
                 }
 
-                // helpful attributes for correlation
-                activity.AddTag("link.log_id", log.Id.ToString());
-                activity.AddTag("link.facility_id", log.FacilityId);
-                activity.AddTag("link.correlation_id", log.CorrelationId ?? string.Empty);
-                activity.AddTag("link.report_tracking_id", log.ReportTrackingId ?? string.Empty);
+                using var activity = ServiceActivitySource.Instance.StartActivity(
+                    "PatientDataService.ExecuteLogRequest",
+                    ActivityKind.Internal,
+                    parentContext);
 
-                activity.Start();
+                activity?.SetTag("link.log_id", log.Id.ToString());
+                activity?.SetTag("link.facility_id", log.FacilityId);
+                activity?.SetTag("link.correlation_id", log.CorrelationId ?? string.Empty);
+                activity?.SetTag("link.report_tracking_id", log.ReportTrackingId ?? string.Empty);
+                activity?.SetTag("link.patient_id", log.PatientId?.Sanitize());
 
                 //check if log is flagged as a reference, if yes, check if all non-reference logs for a facility, correlationId, and reportTrackingId are marked as 'Completed'
                 if (log.FhirQuery is not null && log.FhirQuery.Any(x => x.IsReference.HasValue && x.IsReference.Value))
@@ -566,6 +566,16 @@ public class PatientDataService : IPatientDataService
         var separatedPatientUrl = fullPatientUrl.Split('/');
         var patientIdPart = string.Join("/", separatedPatientUrl.Skip(Math.Max(0, separatedPatientUrl.Length - 2)));
         return patientIdPart;
+    }
+
+    private static bool IsValidHex(string s)
+    {
+        foreach (char c in s)
+        {
+            if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')))
+                return false;
+        }
+        return true;
     }
 }
 

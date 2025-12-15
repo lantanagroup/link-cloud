@@ -136,7 +136,10 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 GroupId = groupId + delimiter + reportTrackingId,
                 ClientId = reportTrackingId,
                 BootstrapServers = string.Join(", ", _kafkaConnection.BootstrapServers),
-                AutoOffsetReset = AutoOffsetReset.Latest
+                AutoOffsetReset = AutoOffsetReset.Latest,
+                SessionTimeoutMs = 6000,
+                HeartbeatIntervalMs = 2000,
+                MaxPollIntervalMs = 60000
             };
 
             if (_kafkaConnection.SaslProtocolEnabled)
