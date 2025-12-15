@@ -54,18 +54,21 @@ public class ValidationService {
         if (linkConfig.getFhirTerminologyServiceUrl() != null && !linkConfig.getFhirTerminologyServiceUrl().isEmpty()) {
             var remoteTerm = new RemoteTermServiceValidation(validationCacheService, fhirContext, linkConfig.getFhirTerminologyServiceUrl(), linkConfig.getWhiteListCodeSystemRegex(), linkConfig.getWhiteListValueSetRegex());
             validationSupportChain.addValidationSupport(remoteTerm);
+            logger.info("Using remote terminology service at {}", linkConfig.getFhirTerminologyServiceUrl());
         } else if (linkConfig.getTerminologyServiceUrl() != null && !linkConfig.getTerminologyServiceUrl().isEmpty()) {
             // RemoteTerminologyServiceValidationSupport expects the base url to be the root of a FHIR interface
             // Append /api/terminology/fhir to the terminology service URL since this is the link terminology service.
             String terminologyServiceUrl = (linkConfig.getTerminologyServiceUrl().endsWith("/") ? linkConfig.getTerminologyServiceUrl() : linkConfig.getTerminologyServiceUrl() + "/") + "api/terminology/fhir";
             var remoteTerm = new RemoteTermServiceValidation(validationCacheService, fhirContext, terminologyServiceUrl, linkConfig.getWhiteListCodeSystemRegex(), linkConfig.getWhiteListValueSetRegex());
             validationSupportChain.addValidationSupport(remoteTerm);
+            logger.info("Using Link terminology service at {}", terminologyServiceUrl);
         } else {
             var commonCodeSystemsTerminologyService = new CommonCodeSystemsTerminologyService(fhirContext);
             var inMemTerm = new InMemoryTerminologyServerValidationSupport(fhirContext);
 
             validationSupportChain.addValidationSupport(commonCodeSystemsTerminologyService);
             validationSupportChain.addValidationSupport(inMemTerm);
+            logger.info("Using in-memory terminology service");
         }
     }
 

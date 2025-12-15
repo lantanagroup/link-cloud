@@ -180,9 +180,8 @@ public class QueryListProcessor : IQueryListProcessor
             {
                 var config = (ReferenceQueryConfig)queryConfig;
                 _logger.LogInformation("Resource: {resourceType}", config.ResourceType);
-                OperationType operationType = config.OperationType ?? OperationType.Search;
-                fhirQueryType = FhirQueryTypeUtilities.ToDomain(operationType.ToString());
-                
+
+                fhirQueryType = FhirQueryTypeUtilities.ToDomain(config.OperationType.ToString());
                 fhirQuery.QueryType = fhirQueryType;
                 fhirQuery.ResourceTypes = [Enum.Parse<ResourceType>(config.ResourceType)];
                 fhirQuery.QueryParameters = ["_id="];

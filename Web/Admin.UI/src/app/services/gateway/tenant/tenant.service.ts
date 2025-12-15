@@ -10,6 +10,7 @@ import {
 import {Observable, catchError, map, tap, of} from 'rxjs';
 import {IEntityCreatedResponse} from 'src/app/interfaces/entity-created-response.model';
 import {AppConfigService} from '../../app-config.service';
+import {IEntityDeletedResponse} from "../../../interfaces/entity-deleted-response.interface";
 
 @Injectable({
   providedIn: 'root'
@@ -53,6 +54,16 @@ export class TenantService {
           return response;
         }),
         catchError((error) => this.errorHandler.handleError(error))
+      )
+  }
+
+  deleteFacilityConfiguration(facilityId: string): Observable<IEntityDeletedResponse> {
+    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/facility/${facilityId}`)
+      .pipe(
+        tap(_ => console.log(`Delete Facility configuration.`)),
+        catchError((error) => {
+          return this.errorHandler.handleError(error);
+        })
       )
   }
 

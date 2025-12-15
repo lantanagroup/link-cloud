@@ -73,7 +73,7 @@ export class CensusConfigFormComponent implements OnInit, OnChanges {
       this.facilityIdControl.updateValueAndValidity();
 
       this.enabledControl.setValue(this.item.enabled !== undefined ? this.item.enabled : true);
-
+      this.enabledControl.updateValueAndValidity();
 
       this.scheduledTriggerControl.setValue(this.item.scheduledTrigger);
       this.scheduledTriggerControl.updateValueAndValidity();
@@ -92,6 +92,9 @@ export class CensusConfigFormComponent implements OnInit, OnChanges {
 
       this.scheduledTriggerControl.setValue(this.item.scheduledTrigger);
       this.scheduledTriggerControl.updateValueAndValidity();
+
+      this.enabledControl.setValue(this.item.enabled !== undefined ? this.item.enabled : true);
+      this.enabledControl.updateValueAndValidity();
 
       // toggle view
       this.toggleViewOnly(this.viewOnly);

@@ -121,18 +121,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             ClearCache(reportTrackingId);
 
             // create consumers
+            var topicsList = kafkaTopics.Select(t => t.Item2).ToList();
 
-            foreach (var topic in kafkaTopics)
-            {
-                if (topic.Item2 != string.Empty)
-                {
-                    CreateConsumer(topic.Item1, topic.Item2, reportTrackingId);
-                }
-            }
+            CreateConsumer("Dynamic", topicsList, reportTrackingId);
+
         }
 
 
-        public void CreateConsumer(string groupId, string topic, string reportTrackingId)
+        private void CreateConsumer(string groupId, List<string> topics, string reportTrackingId)
         {
             var cts = new CancellationTokenSource();
             var config = new ConsumerConfig
@@ -140,7 +136,10 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 GroupId = groupId + delimiter + reportTrackingId,
                 ClientId = reportTrackingId,
                 BootstrapServers = string.Join(", ", _kafkaConnection.BootstrapServers),
-                AutoOffsetReset = AutoOffsetReset.Latest
+                AutoOffsetReset = AutoOffsetReset.Latest,
+                SessionTimeoutMs = 6000,
+                HeartbeatIntervalMs = 2000,
+                MaxPollIntervalMs = 60000
             };
 
             if (_kafkaConnection.SaslProtocolEnabled)
@@ -155,7 +154,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
             _consumers.Add((consumer, cts));
 
-            Task.Run(() => _kafkaConsumerService.StartConsumer(groupId, topic, reportTrackingId, consumer, cts.Token));
+            Task.Run(() =>  _kafkaConsumerService.StartConsumer(groupId, topics, reportTrackingId, consumer, cts.Token));
 
         }
 
@@ -215,6 +214,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                         try
                         {
                             consumer.Item2.Cancel();
+                            consumer.Item2.Dispose();
                         }
                         catch (Exception ex)
                         {

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
@@ -16,19 +16,20 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Hl7.Fhir.R4" Version="5.12.0" />
+        <PackageReference Include="Hl7.Fhir.R4" Version="5.*" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
         <PackageReference Include="Moq.AutoMock" Version="*-*" />
         <PackageReference Include="coverlet.collector" Version="6.*">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="xunit" Version="2.9.0" />
-        <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+        <PackageReference Include="System.Text.Json" Version="8.*" />
+        <PackageReference Include="xunit" Version="2.*" />
+        <PackageReference Include="xunit.runner.visualstudio" Version="3.*">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="RestSharp" Version="112.1.0" />
+        <PackageReference Include="RestSharp" Version="112.*" />
     </ItemGroup>
 
     <ItemGroup>

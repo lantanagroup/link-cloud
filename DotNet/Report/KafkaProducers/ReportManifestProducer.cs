@@ -1,10 +1,10 @@
 ﻿using Hl7.Fhir.Model;
-using LantanaGroup.Link.Report.Application.Interfaces;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Entities.Enums;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
@@ -17,16 +17,17 @@ namespace LantanaGroup.Link.Report.KafkaProducers
     public class ReportManifestProducer
     {
         private readonly ILogger<ReportManifestProducer> _logger;
-        private readonly IDatabase _database;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly MeasureReportAggregator _aggregator;
         private readonly ITenantApiService _tenantApiService;
         private readonly BlobStorageService _blobStorageService;
         private readonly SubmitPayloadProducer _payloadSubmittedProducer;
         private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
 
+
         public ReportManifestProducer(
             ILogger<ReportManifestProducer> logger,
-            IDatabase database,
+            IServiceScopeFactory serviceScopeFactory,
             MeasureReportAggregator aggregator,
             ITenantApiService tenantApiService,
             BlobStorageService blobStorageService,
@@ -34,7 +35,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             AuditableEventOccurredProducer auditableEventOccurredProducer)
         {
             _logger = logger;
-            _database = database;
+            _serviceScopeFactory = serviceScopeFactory;
             _aggregator = aggregator;
             _tenantApiService = tenantApiService;
             _blobStorageService = blobStorageService;
@@ -42,9 +43,11 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _auditableEventOccurredProducer = auditableEventOccurredProducer;
         }
 
-        public async Task<List<Resource>> Generate(ReportScheduleModel schedule)
+        public async Task<List<Resource>> Generate(ReportSchedule schedule)
         {
-            var allSubmissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
+            var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
+
+            var allSubmissionEntries = await database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
 
             var submissionEntries = allSubmissionEntries.Where(x => x.Status != PatientSubmissionStatus.NotReportable).ToList();
 
@@ -98,7 +101,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             return manifestResources;
         }
 
-        public async Task<Bundle> GenerateAsBundle(ReportScheduleModel schedule)
+        public async Task<Bundle> GenerateAsBundle(ReportSchedule schedule)
         {
             List<Resource> resources = await Generate(schedule);
             Bundle bundle = new()
@@ -114,9 +117,11 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             return bundle;
         }
 
-        public async Task<bool> Produce(ReportScheduleModel schedule, string correlationId = null)
+        public async Task<bool> Produce(ReportSchedule schedule, string correlationId = null)
         {
-            var allReady = !await _database.SubmissionEntryRepository.AnyAsync(e => e.FacilityId == schedule.FacilityId
+            var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
+
+            var allReady = !await database.SubmissionEntryRepository.AnyAsync(e => e.FacilityId == schedule.FacilityId
                 && e.ReportScheduleId == schedule.Id
                 && e.Status != PatientSubmissionStatus.NotReportable
                 && e.Status != PatientSubmissionStatus.ValidationComplete
@@ -222,7 +227,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             }
         }
 
-        private OperationOutcome CreateOperationOutcome(List<MeasureReportSubmissionEntryModel> failedEntries)
+        private OperationOutcome CreateOperationOutcome(List<PatientSubmissionEntry> failedEntries)
         {
             var operationOutcome = new OperationOutcome();
             foreach (var entry in failedEntries)

@@ -374,7 +374,7 @@ public class PatientDataService : IPatientDataService
                 activity.Start();
 
                 //check if log is flagged as a reference, if yes, check if all non-reference logs for a facility, correlationId, and reportTrackingId are marked as 'Completed'
-                if (log.FhirQuery.Any(x => x.IsReference.HasValue && x.IsReference.Value))
+                if (log.FhirQuery is not null && log.FhirQuery.Any(x => x.IsReference.HasValue && x.IsReference.Value))
                 {
                     var nonReferenceLogsCnt = await _dataAcquisitionLogQueries.GetCountOfNonRefLogsIncompleteAsync(
                         log.FacilityId,
@@ -499,7 +499,7 @@ public class PatientDataService : IPatientDataService
                                 var ids = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType, fhirQueryConfiguration, cancellationToken);
                                 if (ids != null) foreach (var id in ids) resourceIds.Add(id);
                             }
-                            else if (fhirQuery.QueryType == FhirQueryType.Search)
+                            else if (fhirQuery.QueryType == FhirQueryType.Search || fhirQuery.QueryType == FhirQueryType.SearchPost)
                             {
                                 var ids = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, resourceType, cancellationToken);
                                 if (ids != null) foreach (var id in ids) resourceIds.Add(id);

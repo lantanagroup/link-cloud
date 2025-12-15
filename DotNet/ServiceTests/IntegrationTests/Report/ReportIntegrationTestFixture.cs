@@ -1,5 +1,4 @@
-﻿using Azure.Storage.Blobs;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Models;
@@ -7,66 +6,98 @@ using LantanaGroup.Link.Report.Application.Options;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Report.Domain.Queries;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Listeners;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Services.ResourceMerger.Strategies;
-using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Models.Responses;
-using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using MongoDB.Driver;
 using Moq;
 using Quartz;
-using System.Linq.Expressions;
 using Testcontainers.Azurite;
-using Task = System.Threading.Tasks.Task;
+using Testcontainers.MongoDb;
 
 namespace IntegrationTests.Report
 {
     [CollectionDefinition("ReportIntegrationTests")]
-    public class DatabaseCollection : ICollectionFixture<ReportIntegrationTestFixture>
-    {
-        // This class is a marker for the collection
-    }
+    public class DatabaseCollection : ICollectionFixture<ReportIntegrationTestFixture> { }
 
     public class ReportIntegrationTestFixture : IDisposable
     {
         public IServiceProvider ServiceProvider { get; private set; }
+        public IServiceScopeFactory ScopeFactory { get; private set; }
         private readonly IHost _host;
         private readonly AzuriteContainer _azuriteContainer;
+        private readonly MongoDbContainer _mongoContainer;
 
+        // Public static mocks
         public static Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> SubmitPayloadProducerMock { get; private set; }
         public static Mock<IProducer<ReadyForValidationKey, ReadyForValidationValue>> ReadyForValidationProducerMock { get; private set; }
         public static Mock<IProducer<string, DataAcquisitionRequestedValue>> DataAcquisitionRequestedProducerMock { get; private set; }
-        public static Mock<ISchedulerFactory> SchedulerFactoryMock { get; private set; }
-        public static Mock<BlobStorageService> BlobStorageMock { get; private set; }
         public static Mock<IProducer<string, AuditEventMessage>> AuditableEventOccurredProducerMock { get; private set; }
+        public static Mock<IProducer<string, EvaluationRequestedValue>> EvaluationRequestedProducerMock { get; private set; }
+        public static Mock<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>> ResourceEvaluatedConsumerFactoryMock { get; private set; }
+        public static Mock<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>> ResourceEvaluatedTransientHandlerMock { get; private set; }
+        public static Mock<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>> ResourceEvaluatedDeadLetterHandlerMock { get; private set; }
+        public static Mock<IKafkaConsumerFactory<string, ValidationCompleteValue>> ValidationCompleteConsumerFactoryMock { get; private set; }
+        public static Mock<ITransientExceptionHandler<string, ValidationCompleteValue>> ValidationCompleteTransientHandlerMock { get; private set; }
+        public static Mock<IDeadLetterExceptionHandler<string, ValidationCompleteValue>> ValidationCompleteDeadLetterHandlerMock { get; private set; }
+        public static Mock<BlobStorageService> BlobStorageMock { get; private set; }
+        public static Mock<ISchedulerFactory> SchedulerFactoryMock { get; private set; }
+        public static Mock<IReportServiceMetrics> ReportServiceMetricsMock { get; private set; }
+        public static Mock<ITenantApiService> TenantApiServiceMock { get; private set; }
 
         public string AzuriteConnectionString => _azuriteContainer.GetConnectionString();
+        public string MongoConnectionString { get; }
 
         public ReportIntegrationTestFixture()
         {
+            // Mocks setup
             SubmitPayloadProducerMock = new Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>>();
             ReadyForValidationProducerMock = new Mock<IProducer<ReadyForValidationKey, ReadyForValidationValue>>();
             DataAcquisitionRequestedProducerMock = new Mock<IProducer<string, DataAcquisitionRequestedValue>>();
             AuditableEventOccurredProducerMock = new Mock<IProducer<string, AuditEventMessage>>();
+            EvaluationRequestedProducerMock = new Mock<IProducer<string, EvaluationRequestedValue>>();
+            ResourceEvaluatedConsumerFactoryMock = new Mock<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
+            ResourceEvaluatedTransientHandlerMock = new Mock<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
+            ResourceEvaluatedDeadLetterHandlerMock = new Mock<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
+            ValidationCompleteConsumerFactoryMock = new Mock<IKafkaConsumerFactory<string, ValidationCompleteValue>>();
+            ValidationCompleteTransientHandlerMock = new Mock<ITransientExceptionHandler<string, ValidationCompleteValue>>();
+            ValidationCompleteDeadLetterHandlerMock = new Mock<IDeadLetterExceptionHandler<string, ValidationCompleteValue>>();
+            SchedulerFactoryMock = new Mock<ISchedulerFactory>();
+            ReportServiceMetricsMock = new Mock<IReportServiceMetrics>();
+            TenantApiServiceMock = new Mock<ITenantApiService>();
 
+            // Azurite
             _azuriteContainer = new AzuriteBuilder()
-                .WithImage("mcr.microsoft.com/azure-storage/azurite")
+                .WithImage("mcr.microsoft.com/azure-storage/azurite:latest")
                 .Build();
             _azuriteContainer.StartAsync().GetAwaiter().GetResult();
 
+            // MongoDB
+            _mongoContainer = new MongoDbBuilder()
+                .WithImage("mongo:7.0")
+                .WithName($"mongo-report-{Guid.NewGuid():N}")
+                .WithReplicaSet("rs0")
+                .Build();
+
+            _mongoContainer.StartAsync().GetAwaiter().GetResult();
+            MongoConnectionString = $"{_mongoContainer.GetConnectionString()}&replicaSet=rs0";
+
+            // Blob settings
             var blobSettings = new BlobStorageSettings
             {
                 ConnectionString = _azuriteContainer.GetConnectionString(),
@@ -76,8 +107,8 @@ namespace IntegrationTests.Report
             var options = Options.Create(blobSettings);
             BlobStorageMock = new Mock<BlobStorageService>(MockBehavior.Default, options);
 
+            // Host & DI setup
             var schedulerMock = new Mock<IScheduler>();
-            SchedulerFactoryMock = new Mock<ISchedulerFactory>();
             SchedulerFactoryMock
                 .Setup(f => f.GetScheduler(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(schedulerMock.Object);
@@ -85,339 +116,140 @@ namespace IntegrationTests.Report
             _host = Host.CreateDefaultBuilder()
                 .ConfigureServices((context, services) =>
                 {
-                    // Register logging for real ILogger instances, but mock listener loggers
-                    services.AddLogging();
+                    services.AddLogging(builder => builder.AddConsole());
                     services.AddTransient<ILogger<ValidationCompleteListener>>(sp => Mock.Of<ILogger<ValidationCompleteListener>>());
                     services.AddTransient<ILogger<ResourceEvaluatedListener>>(sp => Mock.Of<ILogger<ResourceEvaluatedListener>>());
                     services.AddTransient<ILogger<ReportManifestProducer>>(sp => Mock.Of<ILogger<ReportManifestProducer>>());
                     services.AddTransient<ILogger<UseLatestStrategy>>(sp => Mock.Of<ILogger<UseLatestStrategy>>());
 
-                    // InMemory DB for testing
-                    services.AddSingleton<IDatabase, InMemoryDatabase>();
+                    // Register IMongoClient as a singleton using the configured connection string
+                    services.AddSingleton<IMongoClient>(sp =>
+                    {
+                        return new MongoClient(MongoConnectionString);
+                    });
 
-                    // Core app logic
+                    // Register IMongoDatabase as a singleton using the shared client and database name
+                    services.AddSingleton<IMongoDatabase>(sp =>
+                    {
+                        var client = sp.GetRequiredService<IMongoClient>();
+                        return client.GetDatabase("reportTestDb");
+                    });
+
+                    // Add the MongoDbContext to the DI container, using the shared client
+                    services.AddDbContext<MongoDbContext>((sp, options) =>
+                    {
+                        var client = sp.GetRequiredService<IMongoClient>();
+                        options.UseMongoDB(client, "reportTestDb");
+                    });
+
+                    services.AddTransient<IEntityRepository<ReportSchedule>, EntityRepository<ReportSchedule, MongoDbContext>>();
+                    services.AddTransient<IEntityRepository<PatientSubmissionEntry>, EntityRepository<PatientSubmissionEntry, MongoDbContext>>();
+                    services.AddTransient<IEntityRepository<ReportModel>, EntityRepository<ReportModel, MongoDbContext>>();
+                    services.AddTransient<IEntityRepository<FhirResource>, EntityRepository<FhirResource, MongoDbContext>>();
+                    services.AddTransient<IEntityRepository<PatientSubmissionEntryResourceMap>, EntityRepository<PatientSubmissionEntryResourceMap, MongoDbContext>>();
+                    services.AddTransient<IDatabase, Database>();
+
+                    services.AddTransient<IReportScheduledManager, ReportScheduledManager>();
+                    services.AddTransient<ISubmissionEntryManager, SubmissionEntryManager>();
+                    services.AddTransient<ISubmissionEntryQueries, SubmissionEntryQueries>();
+                    services.AddTransient<IResourceManager, ResourceManager>();
+
+                    services.AddTransient<ScheduledReportFactory>();
+                    services.AddTransient<MeasureReportSummaryFactory>();
                     services.AddTransient<MeasureReportAggregator>();
 
-                    // SubmitPayloadProducer must use the Kafka mock!
                     services.AddTransient<SubmitPayloadProducer>(sp =>
-                        new SubmitPayloadProducer(sp.GetRequiredService<IDatabase>(), SubmitPayloadProducerMock.Object));
-                    services.AddTransient<DataAcquisitionRequestedProducer>();
-                    services.AddTransient<ReadyForValidationProducer>();
+                        new SubmitPayloadProducer(sp.GetRequiredService<IServiceScopeFactory>(), SubmitPayloadProducerMock.Object));
+                    services.AddTransient<DataAcquisitionRequestedProducer>(sp =>
+                        new DataAcquisitionRequestedProducer(sp.GetRequiredService<IServiceScopeFactory>(), DataAcquisitionRequestedProducerMock.Object));
+                    services.AddTransient<ReadyForValidationProducer>(sp =>
+                        new ReadyForValidationProducer(ReadyForValidationProducerMock.Object, sp.GetRequiredService<IServiceScopeFactory>()));
+                    services.AddTransient<AuditableEventOccurredProducer>(sp =>
+                        new AuditableEventOccurredProducer(sp.GetRequiredService<ILogger<AuditableEventOccurredProducer>>(), AuditableEventOccurredProducerMock.Object));
 
-                    // BlobStorageService (use mock)
-                    services.AddSingleton<BlobStorageService>();
+                    services.AddSingleton(Options.Create(blobSettings));
+                    services.AddSingleton<BlobStorageService>(BlobStorageMock.Object);
 
-                    // Real ReportManifestProducer (so logic is exercised)
-                    services.AddTransient<ReportManifestProducer>();
+                    services.AddTransient<ReportManifestProducer>(sp =>
+                        new ReportManifestProducer(
+                            sp.GetRequiredService<ILogger<ReportManifestProducer>>(),
+                            sp.GetRequiredService<IServiceScopeFactory>(),
+                            sp.GetRequiredService<MeasureReportAggregator>(),
+                            TenantApiServiceMock.Object,
+                            BlobStorageMock.Object,
+                            sp.GetRequiredService<SubmitPayloadProducer>(),
+                            sp.GetRequiredService<AuditableEventOccurredProducer>()
+                        ));
 
                     services.AddTransient<EndOfReportPeriodJob>();
                     services.AddTransient<PatientReportSubmissionBundler>();
                     services.AddTransient<ValidationCompleteListener>();
-                    services.AddTransient<ResourceEvaluatedListener>();
-                    services.AddTransient<AuditableEventOccurredProducer>();
 
-                    // Managers
-                    services.AddTransient<IResourceManager, ResourceManager>();
-                    services.AddTransient<ISubmissionEntryManager, SubmissionEntryManager>();
-                    services.AddTransient<IReportScheduledManager, ReportScheduledManager>();
+                    services.AddSingleton<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>(ResourceEvaluatedConsumerFactoryMock.Object);
+                    services.AddSingleton<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>(ResourceEvaluatedTransientHandlerMock.Object);
+                    services.AddSingleton<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>(ResourceEvaluatedDeadLetterHandlerMock.Object);
+                    services.AddSingleton<IKafkaConsumerFactory<string, ValidationCompleteValue>>(ValidationCompleteConsumerFactoryMock.Object);
+                    services.AddSingleton<ITransientExceptionHandler<string, ValidationCompleteValue>>(ValidationCompleteTransientHandlerMock.Object);
+                    services.AddSingleton<IDeadLetterExceptionHandler<string, ValidationCompleteValue>>(ValidationCompleteDeadLetterHandlerMock.Object);
 
-                    // Factories
-                    services.AddTransient<MeasureReportSummaryFactory>();
-                    services.AddTransient<ResourceSummaryFactory>();
-                    services.AddTransient<ScheduledReportFactory>();
+                    services.AddSingleton<IReportServiceMetrics>(ReportServiceMetricsMock.Object);
+                    services.AddSingleton<ITenantApiService>(TenantApiServiceMock.Object);
 
-                    // BlobStorageService dependencies (emulator)
-                    services.AddSingleton<IOptions<BlobStorageSettings>>(sp =>
+                    //Add as a singleton so we can retrieve the instance for tests.
+                    services.AddSingleton<ResourceEvaluatedListener>();
+
+                    services.AddKeyedSingleton<ISchedulerFactory>("MongoScheduler", (provider, key) =>
                     {
-                        var settings = new BlobStorageSettings
-                        {
-                            ConnectionString = _azuriteContainer.GetConnectionString(),
-                            BlobContainerName = "report-test-container"
-                        };
-                        return Options.Create(settings);
+                        var logger = provider.GetRequiredService<ILogger<ReportMongoSchedulerFactory>>();
+                        var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
+                        return new ReportMongoSchedulerFactory(scopeFactory, logger);
                     });
-
-                    // Metrics mock
-                    services.AddTransient<IReportServiceMetrics>(sp => Mock.Of<IReportServiceMetrics>());
-
-                    // Tenant API mock
-                    services.AddTransient(sp =>
-                    {
-                        var tenantApiServiceMock = new Mock<ITenantApiService>();
-                        tenantApiServiceMock.Setup(t => t.GetFacilityConfig(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-                            .ReturnsAsync(new FacilityModel { FacilityName = "Test Facility" });
-                        return tenantApiServiceMock.Object;
-                    });
-
-                    // Kafka consumer factories
-                    var mockFactoryValidation = new Mock<IKafkaConsumerFactory<string, ValidationCompleteValue>>();
-                    var mockConsumerValidation = new Mock<IConsumer<string, ValidationCompleteValue>>();
-                    mockConsumerValidation.Setup(c => c.Commit(It.IsAny<ConsumeResult<string, ValidationCompleteValue>>())).Verifiable();
-                    mockFactoryValidation.Setup(f => f.CreateConsumer(It.IsAny<ConsumerConfig>(), null, null)).Returns(mockConsumerValidation.Object);
-                    services.AddTransient(sp => mockFactoryValidation.Object);
-
-                    var mockFactoryResource = new Mock<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
-                    var mockConsumerResource = new Mock<IConsumer<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
-                    mockConsumerResource.Setup(c => c.Commit(It.IsAny<ConsumeResult<ResourceEvaluatedKey, ResourceEvaluatedValue>>())).Verifiable();
-                    mockFactoryResource.Setup(f => f.CreateConsumer(It.IsAny<ConsumerConfig>(), null, null)).Returns(mockConsumerResource.Object);
-                    services.AddTransient(sp => mockFactoryResource.Object);
-
-                    // Exception handler mocks
-                    services.AddScoped(sp => Mock.Of<ITransientExceptionHandler<string, ValidationCompleteValue>>());
-                    services.AddScoped(sp => Mock.Of<IDeadLetterExceptionHandler<string, ValidationCompleteValue>>());
-                    services.AddScoped(sp => Mock.Of<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>());
-                    services.AddScoped(sp => Mock.Of<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>());
-
-                    // Kafka producer mocks
-                    services.AddTransient<IProducer<string, DataAcquisitionRequestedValue>>(sp => DataAcquisitionRequestedProducerMock.Object);
-                    services.AddTransient<IProducer<ReadyForValidationKey, ReadyForValidationValue>>(sp => ReadyForValidationProducerMock.Object);
-                    services.AddTransient<IProducer<SubmitPayloadKey, SubmitPayloadValue>>(sp => SubmitPayloadProducerMock.Object);
-                    services.AddTransient<IProducer<string, AuditEventMessage>>(sp => AuditableEventOccurredProducerMock.Object);
-
-                    // SchedulerFactory mock
-                    services.AddTransient<ISchedulerFactory>(sp => SchedulerFactoryMock.Object);
-                    services.AddKeyedTransient<ISchedulerFactory>("MongoScheduler", (sp, key) => SchedulerFactoryMock.Object);
-                    services.AddKeyedTransient<ISchedulerFactory>("InMemoryScheduler", (sp, key) => SchedulerFactoryMock.Object);
-
-                    // Register repositories as Scoped delegates
-                    services.AddScoped<IBaseEntityRepository<PatientResourceModel>>(sp => sp.GetRequiredService<IDatabase>().PatientResourceRepository);
-                    services.AddScoped<IBaseEntityRepository<SharedResourceModel>>(sp => sp.GetRequiredService<IDatabase>().SharedResourceRepository);
-                    services.AddScoped<IBaseEntityRepository<ReportScheduleModel>>(sp => sp.GetRequiredService<IDatabase>().ReportScheduledRepository);
-                    services.AddScoped<IBaseEntityRepository<MeasureReportSubmissionEntryModel>>(sp => sp.GetRequiredService<IDatabase>().SubmissionEntryRepository);
                 })
                 .Build();
 
             ServiceProvider = _host.Services;
-
-            // Ensure the Azurite container exists and is clean
-            SetupAzuriteContainer().GetAwaiter().GetResult();
-
-            using var scope = ServiceProvider.CreateScope();
-            var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
-            InitializeDatabase(database).GetAwaiter().GetResult();
+            ScopeFactory = ServiceProvider.GetRequiredService<IServiceScopeFactory>();
         }
 
-        private async Task SetupAzuriteContainer()
+        //private IMongoDatabase GetMongoDatabase()
+        //{
+        //    var client = new MongoClient(MongoConnectionString);
+        //    return client.GetDatabase("reportTestDb");
+        //}
+
+        //public async Task ClearDatabaseAsync()
+        //{
+        //    var db = GetMongoDatabase();
+        //    await db.DropCollectionAsync("reportSchedule");
+        //    await db.DropCollectionAsync("measureReportSubmissionEntry");
+        //    await db.DropCollectionAsync("fhirResource");
+        //    await db.DropCollectionAsync("reportScheduleResourceMap");
+        //}
+
+        public void ResetMocks()
         {
-            var settings = ServiceProvider.GetRequiredService<IOptions<BlobStorageSettings>>().Value;
-            var containerClient = new BlobContainerClient(settings.ConnectionString, settings.BlobContainerName);
-            await containerClient.DeleteIfExistsAsync();
-            await containerClient.CreateAsync();
+            SubmitPayloadProducerMock.Reset();
+            ReadyForValidationProducerMock.Reset();
+            DataAcquisitionRequestedProducerMock.Reset();
+            AuditableEventOccurredProducerMock.Reset();
+            EvaluationRequestedProducerMock.Reset();
+            ResourceEvaluatedConsumerFactoryMock.Reset();
+            ResourceEvaluatedTransientHandlerMock.Reset();
+            ResourceEvaluatedDeadLetterHandlerMock.Reset();
+            ValidationCompleteConsumerFactoryMock.Reset();
+            ValidationCompleteTransientHandlerMock.Reset();
+            ValidationCompleteDeadLetterHandlerMock.Reset();
+            BlobStorageMock.Reset();
+            SchedulerFactoryMock.Reset();
+            ReportServiceMetricsMock.Reset();
+            TenantApiServiceMock.Reset();
         }
 
         public void Dispose()
         {
-            SubmitPayloadProducerMock?.Reset();
-            ReadyForValidationProducerMock?.Reset();
-            AuditableEventOccurredProducerMock?.Reset();
-            _azuriteContainer.StopAsync().GetAwaiter().GetResult();
-            _azuriteContainer.DisposeAsync().GetAwaiter().GetResult();
-            _host.Dispose();
-        }
-
-        private async Task InitializeDatabase(IDatabase database)
-        {
-            // Seed data if necessary
-            await Task.CompletedTask;
-        }
-
-        // Accessor helpers for tests
-        public static Mock<IProducer<string, DataAcquisitionRequestedValue>> GetDataAcquisitionRequestedProducerMock() => DataAcquisitionRequestedProducerMock;
-        public static Mock<ISchedulerFactory> GetSchedulerFactoryMock() => SchedulerFactoryMock;
-        public static Mock<BlobStorageService> GetBlobStorageMock() => BlobStorageMock;
-    }
-
-    public class InMemoryDatabase : IDatabase
-    {
-        public IBaseEntityRepository<PatientResourceModel> PatientResourceRepository { get; set; } = new InMemoryEntityRepository<PatientResourceModel>();
-        public IBaseEntityRepository<SharedResourceModel> SharedResourceRepository { get; set; } = new InMemoryEntityRepository<SharedResourceModel>();
-        public IBaseEntityRepository<ReportScheduleModel> ReportScheduledRepository { get; set; } = new InMemoryEntityRepository<ReportScheduleModel>();
-        public IBaseEntityRepository<MeasureReportSubmissionEntryModel> SubmissionEntryRepository { get; set; } = new InMemoryEntityRepository<MeasureReportSubmissionEntryModel>();
-    }
-
-    public class InMemoryEntityRepository<T> : IBaseEntityRepository<T> where T : class, new()
-    {
-        private readonly List<T> _items = new List<T>();
-
-        public T Add(T entity)
-        {
-            return AddAsync(entity).GetAwaiter().GetResult();
-        }
-
-        public async Task<T> AddAsync(T entity, CancellationToken cancellationToken = default)
-        {
-            var idProp = typeof(T).GetProperty("Id");
-            if (idProp != null && idProp.PropertyType == typeof(string) && string.IsNullOrEmpty((string)idProp.GetValue(entity)))
-            {
-                idProp.SetValue(entity, Guid.NewGuid().ToString());
-            }
-            _items.Add(entity);
-            return await Task.FromResult(entity);
-        }
-
-        public T Get(object id)
-        {
-            return GetAsync(id).GetAwaiter().GetResult();
-        }
-
-        public async Task<T> GetAsync(object id, CancellationToken cancellationToken = default)
-        {
-            var idProp = typeof(T).GetProperty("Id");
-            if (idProp == null) throw new InvalidOperationException("No Id property");
-            return await Task.FromResult(_items.FirstOrDefault(e => idProp.GetValue(e).Equals(id)));
-        }
-
-        public async Task<List<T>> GetAllAsync(CancellationToken cancellationToken = default)
-        {
-            return await Task.FromResult(_items.ToList());
-        }
-
-        public async Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
-        {
-            var compiled = predicate.Compile();
-            return await Task.FromResult(_items.Where(compiled).ToList());
-        }
-
-        public async Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
-        {
-            var compiled = predicate.Compile();
-            return await Task.FromResult(_items.FirstOrDefault(compiled));
-        }
-
-        public async Task<T> FirstAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
-        {
-            var compiled = predicate.Compile();
-            return await Task.FromResult(_items.First(compiled));
-        }
-
-        public async Task<T?> SingleOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
-        {
-            var compiled = predicate.Compile();
-            return await Task.FromResult(_items.SingleOrDefault(compiled));
-        }
-
-        public async Task<T> SingleAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
-        {
-            var compiled = predicate.Compile();
-            return await Task.FromResult(_items.Single(compiled));
-        }
-
-        public T Update(T entity)
-        {
-            return UpdateAsync(entity).GetAwaiter().GetResult();
-        }
-
-        public async Task<T> UpdateAsync(T entity, CancellationToken cancellationToken = default)
-        {
-            var idProp = typeof(T).GetProperty("Id");
-            if (idProp == null) throw new InvalidOperationException("No Id property");
-            var id = idProp.GetValue(entity);
-            var existing = await GetAsync(id, cancellationToken);
-            if (existing != null)
-            {
-                _items.Remove(existing);
-                _items.Add(entity);
-                return entity;
-            }
-            throw new KeyNotFoundException();
-        }
-
-        public void Delete(object id)
-        {
-            DeleteAsync(id).GetAwaiter().GetResult();
-        }
-
-        public async Task DeleteAsync(object id, CancellationToken cancellationToken = default)
-        {
-            var entity = await GetAsync(id, cancellationToken);
-            if (entity != null)
-            {
-                _items.Remove(entity);
-            }
-        }
-
-        public async Task DeleteAsync(T? entity, CancellationToken cancellationToken)
-        {
-            if (entity != null)
-            {
-                _items.Remove(entity);
-            }
-            await Task.CompletedTask;
-        }
-
-        public async Task RemoveAsync(T entity)
-        {
-            if (entity != null)
-            {
-                _items.Remove(entity);
-            }
-            await Task.CompletedTask;
-        }
-
-        public async Task<(List<T>, PaginationMetadata)> SearchAsync(Expression<Func<T, bool>> predicate, string? sortBy = null, SortOrder? sortOrder = null, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
-        {
-            var compiled = predicate.Compile();
-            var query = _items.Where(compiled).AsQueryable();
-
-            if (!string.IsNullOrEmpty(sortBy))
-            {
-                var prop = typeof(T).GetProperty(sortBy);
-                if (prop != null)
-                {
-                    if (sortOrder == SortOrder.Descending)
-                    {
-                        query = query.OrderByDescending(e => prop.GetValue(e));
-                    }
-                    else
-                    {
-                        query = query.OrderBy(e => prop.GetValue(e));
-                    }
-                }
-            }
-
-            var total = query.Count();
-            var paged = query.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToList();
-
-            var metadata = new PaginationMetadata
-            {
-                TotalCount = total,
-                PageSize = pageSize,
-                PageNumber = pageNumber
-            };
-
-            return await Task.FromResult((paged, metadata));
-        }
-
-        public async Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
-        {
-            var compiled = predicate.Compile();
-            return await Task.FromResult(_items.Any(compiled));
-        }
-
-        public async Task<HealthCheckResult> HealthCheck(int eventId)
-        {
-            return await Task.FromResult(HealthCheckResult.Healthy());
-        }
-
-        public void StartTransaction() { }
-
-        public void CommitTransaction() { }
-
-        public void RollbackTransaction() { }
-
-        public async Task StartTransactionAsync(CancellationToken cancellationToken = default)
-        {
-            await Task.CompletedTask;
-        }
-
-        public async Task CommitTransactionAsync(CancellationToken cancellationToken = default)
-        {
-            await Task.CompletedTask;
-        }
-
-        public async Task RollbackTransactionAsync(CancellationToken cancellationToken = default)
-        {
-            await Task.CompletedTask;
+            _azuriteContainer?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            _mongoContainer?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            _host?.Dispose();
         }
     }
 }
