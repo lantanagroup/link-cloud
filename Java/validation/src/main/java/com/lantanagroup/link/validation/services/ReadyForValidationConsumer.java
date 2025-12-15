@@ -135,8 +135,10 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
         value.setValid(results.stream()
                 .flatMap(result -> result.getCategories().stream())
                 .allMatch(Category::isAcceptable));
-        org.apache.kafka.common.header.Headers headers = new RecordHeaders()
-                .add(Headers.CORRELATION_ID, Headers.getBytes(correlationId));
+        org.apache.kafka.common.header.Headers headers = new RecordHeaders();
+        if (correlationId != null) {
+            headers.add(Headers.CORRELATION_ID, Headers.getBytes(correlationId));
+        }
         validationCompleteTemplate.send(new ProducerRecord<>(Topics.VALIDATION_COMPLETE, null, facilityId, value, headers));
     }
 
