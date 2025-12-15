@@ -13,6 +13,7 @@ import {faDownload, faXmark} from '@fortawesome/free-solid-svg-icons';
 import {DonutChartComponent} from 'src/app/components/core/donut-chart/donut-chart.component';
 import {FileDownloadService} from "../../../core/file-downlaod/file-download.service";
 import {AppConfigService} from "../../../../services/app-config.service";
+import {MatSnackBar} from "@angular/material/snack-bar";
 
 @Component({
   selector: 'app-view-measure-report',
@@ -47,7 +48,7 @@ export class ViewMeasureReportComponent implements OnInit {
       facilityId: string,
       measureReport: IMeasureReportSummary
     },
-    private facilityViewService: FacilityViewService, private fileService: FileDownloadService, private appConfigService: AppConfigService) {
+    private facilityViewService: FacilityViewService, private fileService: FileDownloadService, private appConfigService: AppConfigService, private snackBar: MatSnackBar) {
   }
 
   ngOnInit(): void {
@@ -120,6 +121,14 @@ export class ViewMeasureReportComponent implements OnInit {
         next: () => console.log('Download started'),
         error: (error: HttpErrorResponse) => {
           console.error('Error downloading patient bundle:', error.message);
+          if (error.status === 404) {
+            this.snackBar.open(`Error downloading patient bundle. Bundle not found.`, '', {
+              duration: 3500,
+              panelClass: 'error-snackbar',
+              horizontalPosition: 'end',
+              verticalPosition: 'top'
+            });
+          }
         }
       });
   }
