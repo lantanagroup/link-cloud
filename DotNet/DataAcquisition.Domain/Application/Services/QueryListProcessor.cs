@@ -204,7 +204,7 @@ public class QueryListProcessor : IQueryListProcessor
                 ScheduledReport = scheduledReport,
                 ExecutionDate = DateTime.UtcNow,
                 FhirQuery = new List<CreateFhirQueryModel>() { fhirQuery },
-                TraceId = Activity.Current?.ParentId
+                TraceId = Activity.Current?.TraceId.ToHexString() ?? string.Empty,
             }, cancellationToken);
         }
     }

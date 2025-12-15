@@ -15,6 +15,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using System.Diagnostics;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -270,17 +271,24 @@ public class FhirApiService : IFhirApiService
 
     private async Task GenerateResourceAcquiredMessage(ResourceAcquired resourceAcquired, string facilityId, string correlationId, CancellationToken cancellationToken = default)
     {
+        // No manual context manipulation needed!
+        Activity.Current?.SetTag("link.resource_type", resourceAcquired.Resource?.TypeName);
+        Activity.Current?.SetTag("messaging.destination", KafkaTopic.ResourceAcquired.ToString());
+
         await _kafkaProducer.ProduceAsync(
-                    KafkaTopic.ResourceAcquired.ToString(),
-                    new Message<string, ResourceAcquired>
-                    {
-                        Key = facilityId,
-                        Headers = new Headers
-                        {
-                                new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(correlationId))
-                        },
-                        Value = resourceAcquired
-                    }, cancellationToken);
+            KafkaTopic.ResourceAcquired.ToString(),
+            new Message<string, ResourceAcquired>
+            {
+                Key = facilityId,
+                Headers = new Headers
+                {
+                new Header(DataAcquisitionConstants.HeaderNames.CorrelationId,
+                    Encoding.UTF8.GetBytes(correlationId))
+                },
+                Value = resourceAcquired
+            },
+            cancellationToken);
+
         _kafkaProducer.Flush(cancellationToken);
     }
 

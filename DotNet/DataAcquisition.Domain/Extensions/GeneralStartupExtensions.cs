@@ -3,8 +3,10 @@ using DataAcquisition.Domain.Application.Queries;
 using FluentValidation;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
@@ -36,13 +38,12 @@ using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Settings.Configuration;
 using System.Diagnostics;
 using System.Net;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 public static class GeneralStartupExtensions
@@ -96,6 +97,9 @@ public static class GeneralStartupExtensions
         if (serviceInformation != null)
         {
             ServiceActivitySource.Initialize(serviceInformation);
+            Log.Information("ServiceActivitySource initialized with name: {ServiceName}, version: {Version}",
+            ServiceActivitySource.ServiceName,
+            serviceInformation.Version);
         }
         else
         {
@@ -284,7 +288,7 @@ public static class GeneralStartupExtensions
         {
             options.Environment = environment;
             options.ServiceName = serviceName;
-            options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+            options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?
         });
     }
 
