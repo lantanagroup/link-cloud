@@ -30,6 +30,7 @@ None
 * ReportTrackingId: string
 * PatientId: string
 * ReportType: string
+* MeasureReportId: string - The ID of the report from the `MeasureReport` resource
 * MeasureReportURI: string - The base URL of the report in blob storage
 * MeasureReportFileName: string - The name of the file for the patient in the report directory
 
@@ -40,6 +41,7 @@ Example:
     "FacilityId": "123456789",
     "ReportTrackingId": "123456789",
     "PatientId": "12345",
+    "MeasureReportId": "98234",
     "ReportType": "Hypo",
     "MeasureReportURI": "https://storageaccount/container/report",
     "MeasureReportFileName": "patient-12345.json"
