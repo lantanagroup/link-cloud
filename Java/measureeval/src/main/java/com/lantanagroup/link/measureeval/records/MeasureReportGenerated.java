@@ -22,6 +22,7 @@ public class MeasureReportGenerated {
     private String patientId;
 
     private String reportType;
+    private String measureReportId;
     private String measureReportURI;
     private String measureReportFileName;
     private boolean isReportable;

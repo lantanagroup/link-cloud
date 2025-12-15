@@ -52,6 +52,7 @@ public class MeasureReportGeneratedProducer {
                 report.getReportTrackingId(),
                 patientStatus.getPatientId(),
                 report.getReportType(),
+                measureReport.getIdPart(),
                 reportUri,
                 fileName,
                 report.getReportable()
