@@ -3,6 +3,7 @@ package com.lantanagroup.link.validation.services;
 import ca.uhn.fhir.context.FhirContext;
 import com.azure.core.util.BinaryData;
 import com.azure.storage.blob.BlobUrlParts;
+import com.lantanagroup.link.shared.kafka.AsyncListener;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
@@ -19,11 +20,9 @@ import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.hl7.fhir.r4.model.Bundle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.messaging.handler.annotation.Header;
+import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.HttpServerErrorException;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -31,7 +30,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
-public class ReadyForValidationConsumer {
+public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation.Key, ReadyForValidation> {
     private final Logger _logger = LoggerFactory.getLogger(ReadyForValidationConsumer.class);
     private final FhirContext fhirContext;
     private final ReportClient reportClient;
@@ -50,7 +49,9 @@ public class ReadyForValidationConsumer {
             ResultRepository resultRepository,
             KafkaTemplate<String, ValidationComplete> validationCompleteTemplate,
             ValidationMetrics validationMetrics,
-            Optional<BlobStorageService> blobStorageService) {
+            Optional<BlobStorageService> blobStorageService,
+            ConsumerRecordRecoverer recoverer) {
+        super(recoverer);
         this.fhirContext = fhirContext;
         this.reportClient = reportClient;
         this.validationService = validationService;
@@ -61,32 +62,24 @@ public class ReadyForValidationConsumer {
         this.blobStorageService = blobStorageService.orElse(null);
     }
 
-    @KafkaListener(topics = Topics.READY_FOR_VALIDATION)
-    public void consume(
-            @Header(Headers.CORRELATION_ID) String correlationId,
-            ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record) {
-        try {
-            _logger.debug("Processing {} message for facility {}, patient {}, report {}",
-                    record.topic(), record.key().getFacilityId(), record.value().getPatientId(), record.value().getReportTrackingId());
-            String facilityId = record.key().getFacilityId();
-            String patientId = record.value().getPatientId();
-            String reportId = record.value().getReportTrackingId();
-            Bundle bundle = getBundleFromBlobStorage(record.value().getPayloadUri());
-            if (bundle == null) {
-                bundle = getBundleViaRest(facilityId, patientId, reportId);
-            }
-            Instant start = Instant.now();
-            List<Result> results = validate(facilityId, patientId, reportId, bundle);
-            Instant end = Instant.now();
-            Duration duration = Duration.between(start, end);
-            produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results);
-            produceMetrics(correlationId, facilityId, patientId, reportId, bundle, results, duration);
-        } catch (HttpServerErrorException ex) {
-            _logger.error("HTTP error while processing message: {}", ex.getResponseBodyAsString(), ex);
-        } catch (Exception ex) {
-            _logger.error("Unexpected error while processing message", ex);
-            throw ex; // Re-throw to allow Kafka to handle retries
+    @Override
+    protected void process(ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record) {
+        String correlationId = Headers.getCorrelationId(record.headers());
+        _logger.debug("Processing {} message for facility {}, patient {}, report {}",
+                record.topic(), record.key().getFacilityId(), record.value().getPatientId(), record.value().getReportTrackingId());
+        String facilityId = record.key().getFacilityId();
+        String patientId = record.value().getPatientId();
+        String reportId = record.value().getReportTrackingId();
+        Bundle bundle = getBundleFromBlobStorage(record.value().getPayloadUri());
+        if (bundle == null) {
+            bundle = getBundleViaRest(facilityId, patientId, reportId);
         }
+        Instant start = Instant.now();
+        List<Result> results = validate(facilityId, patientId, reportId, bundle);
+        Instant end = Instant.now();
+        Duration duration = Duration.between(start, end);
+        produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results);
+        produceMetrics(correlationId, facilityId, patientId, reportId, bundle, results, duration);
     }
 
     private Bundle getBundleFromBlobStorage(String payloadUri) {
@@ -142,8 +135,10 @@ public class ReadyForValidationConsumer {
         value.setValid(results.stream()
                 .flatMap(result -> result.getCategories().stream())
                 .allMatch(Category::isAcceptable));
-        org.apache.kafka.common.header.Headers headers = new RecordHeaders()
-                .add(Headers.CORRELATION_ID, Headers.getBytes(correlationId));
+        org.apache.kafka.common.header.Headers headers = new RecordHeaders();
+        if (correlationId != null) {
+            headers.add(Headers.CORRELATION_ID, Headers.getBytes(correlationId));
+        }
         validationCompleteTemplate.send(new ProducerRecord<>(Topics.VALIDATION_COMPLETE, null, facilityId, value, headers));
     }
 

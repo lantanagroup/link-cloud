@@ -4,6 +4,7 @@ import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStat
 import com.lantanagroup.link.measureeval.entities.Resource;
 import com.lantanagroup.link.measureeval.repositories.ResourceRepository;
 import com.lantanagroup.link.shared.exceptions.ValidationException;
+import com.lantanagroup.link.shared.kafka.AsyncListener;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.measureeval.entities.QueryType;
@@ -23,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.support.KafkaUtils;
 import org.springframework.util.StopWatch;
 
@@ -33,7 +35,7 @@ import java.util.stream.Collectors;
 
 import static io.opentelemetry.api.common.AttributeKey.stringKey;
 
-public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord> {
+public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord> extends AsyncListener<String, T> {
     private static final Logger logger = LoggerFactory.getLogger(AbstractResourceConsumer.class);
     private static final Logger performanceLogger =LoggerFactory.getLogger(
             "com.lantanagroup.link.performance." + AbstractResourceConsumer.class.getSimpleName());
@@ -56,7 +58,9 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate,
             EvaluateMeasureService evaluateMeasureService,
             PatientStatusBundler patientStatusBundler,
-            ResourceEvaluatedProducer resourceEvaluatedProducer) {
+            ResourceEvaluatedProducer resourceEvaluatedProducer,
+            ConsumerRecordRecoverer recoverer) {
+        super(recoverer);
         this.resourceRepository = resourceRepository;
         this.patientStatusRepository = patientStatusRepository;
         patientStatusCache = Collections.synchronizedMap(new PassiveExpiringMap<>(1L, TimeUnit.MINUTES));
@@ -68,7 +72,10 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         this.resourceEvaluatedProducer = resourceEvaluatedProducer;
     }
 
-    protected void doConsume (String correlationId, ConsumerRecord<String, T> record) {
+    @Override
+    protected void process(ConsumerRecord<String, T> record) {
+        String correlationId = Headers.getCorrelationId(record.headers());
+
         StopWatch totalStopWatch = new StopWatch();
         StopWatch taskStopWatch = new StopWatch();
         totalStopWatch.start();
