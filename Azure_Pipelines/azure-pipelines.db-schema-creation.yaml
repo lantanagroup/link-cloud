@@ -132,6 +132,11 @@ stages:
   - job: Account
     displayName: "Generate Account Schema Script"
     steps:
+      - task: UseDotNet@2
+        displayName: Use DotNet 8
+        inputs:
+          packageType: 'sdk'
+          version: '8.0.x'
       - task: DotNetCoreCLI@2
         displayName: Install dotnet-ef
         inputs:
@@ -153,6 +158,11 @@ stages:
   - job: Audit
     displayName: "Generate Audit Schema Script"
     steps:
+      - task: UseDotNet@2
+        displayName: Use DotNet 8
+        inputs:
+          packageType: 'sdk'
+          version: '8.0.x'
       - task: DotNetCoreCLI@2
         displayName: Install dotnet-ef
         inputs:
@@ -174,6 +184,11 @@ stages:
   - job: Census
     displayName: "Generate Census Schema Script"
     steps:
+      - task: UseDotNet@2
+        displayName: Use DotNet 8
+        inputs:
+          packageType: 'sdk'
+          version: '8.0.x'
       - task: DotNetCoreCLI@2
         displayName: Install dotnet-ef
         inputs:
@@ -195,6 +210,11 @@ stages:
   - job: DataAcquisition
     displayName: "Generate Data Acquisition Schema Script"
     steps:
+      - task: UseDotNet@2
+        displayName: Use DotNet 8
+        inputs:
+          packageType: 'sdk'
+          version: '8.0.x'
       - task: DotNetCoreCLI@2
         displayName: Install dotnet-ef
         inputs:
@@ -217,6 +237,11 @@ stages:
   - job: Normalization
     displayName: "Generate Normalization Schema Script"
     steps:
+      - task: UseDotNet@2
+        displayName: Use DotNet 8
+        inputs:
+          packageType: 'sdk'
+          version: '8.0.x'
       - task: DotNetCoreCLI@2
         displayName: Install dotnet-ef
         inputs:
@@ -238,27 +263,37 @@ stages:
   - job: QueryDispatch
     displayName: "Generate QueryDispatch Schema Script"
     steps:
-    - task: DotNetCoreCLI@2
-      displayName: Install dotnet-ef
-      inputs:
-       command: 'custom'
-       custom: 'tool'
-       arguments: 'install --global dotnet-ef'
-    - script: |
-        dotnet restore $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj
-        dotnet ef migrations script --idempotent --verbose -c QueryDispatchDbContext -s $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj -p $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/queryDispatchDb.sql
-      displayName: Generate QueryDispatch SQL Script
-    - task: PublishBuildArtifacts@1
-      inputs:
-       PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-       ArtifactName: 'scripts'
-       publishLocation: 'container'
-      displayName: Generate Tenant SQL Script  
+      - task: UseDotNet@2
+        displayName: Use DotNet 8
+        inputs:
+          packageType: 'sdk'
+          version: '8.0.x'
+      - task: DotNetCoreCLI@2
+        displayName: Install dotnet-ef
+        inputs:
+         command: 'custom'
+         custom: 'tool'
+         arguments: 'install --global dotnet-ef'
+      - script: |
+          dotnet restore $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj
+          dotnet ef migrations script --idempotent --verbose -c QueryDispatchDbContext -s $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj -p $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/queryDispatchDb.sql
+        displayName: Generate QueryDispatch SQL Script
+      - task: PublishBuildArtifacts@1
+        inputs:
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+         ArtifactName: 'scripts'
+         publishLocation: 'container'
+        displayName: Generate Tenant SQL Script  
   ###
   # Submission
   - job: Submission
     displayName: "Generate Submission Schema Script"
     steps:
+      - task: UseDotNet@2
+        displayName: Use DotNet 8
+        inputs:
+          packageType: 'sdk'
+          version: '8.0.x'
       - task: DotNetCoreCLI@2
         displayName: Install dotnet-ef
         inputs:
@@ -281,22 +316,27 @@ stages:
   - job: Tenant
     displayName: "Build Tenant"
     steps:
-    - task: DotNetCoreCLI@2
-      displayName: Install dotnet-ef
-      inputs:
-       command: 'custom'
-       custom: 'tool'
-       arguments: 'install --global dotnet-ef'
-    - script: |
-        dotnet restore $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj
-        dotnet ef migrations script --idempotent --verbose -c TenantDbContext -s $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj -p $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/tenantDb.sql
-      displayName: Generate Tenant SQL Script
-    - task: PublishBuildArtifacts@1
-      inputs:
-       PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-       ArtifactName: 'scripts'
-       publishLocation: 'container'
-      displayName: Generate Tenant SQL Script  
+      - task: UseDotNet@2
+        displayName: Use DotNet 8
+        inputs:
+          packageType: 'sdk'
+          version: '8.0.x'
+      - task: DotNetCoreCLI@2
+        displayName: Install dotnet-ef
+        inputs:
+         command: 'custom'
+         custom: 'tool'
+         arguments: 'install --global dotnet-ef'
+      - script: |
+          dotnet restore $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj
+          dotnet ef migrations script --idempotent --verbose -c TenantDbContext -s $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj -p $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/tenantDb.sql
+        displayName: Generate Tenant SQL Script
+      - task: PublishBuildArtifacts@1
+        inputs:
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+         ArtifactName: 'scripts'
+         publishLocation: 'container'
+        displayName: Generate Tenant SQL Script  
     ###
   # Validation
   - job: Validation
