@@ -203,7 +203,8 @@ def main() -> None:
                 f"{base}/Application/Settings/*.cs",
                 f"{base}/Application/Config/*.cs",
                 f"{base}/Application/Models/Configuration/*.cs",
-                f"{base}/Domain/Settings/*.cs"
+                f"{base}/Domain/Settings/*.cs",
+                f"{base}/app[sS]ettings.json"
             ])
         else:
             # Check Java config packages
