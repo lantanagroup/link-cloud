@@ -751,6 +751,8 @@ services:
       springdoc.swagger-ui.enabled: true
       authentication.anonymous: true
       link.data-acquisition.base-url: http://dataacquisition:8065
+      internal-blob-storage.connection-string: ${AZURITE_CONNECTION_STRING}
+      internal-blob-storage.blob-container-name: ${INTERNAL_BLOB_CONTAINER_NAME}
       spring_profiles_active: dev
       telemetry.exporter_endpoint: http://otel-collector:4317
       loki.enabled: true
