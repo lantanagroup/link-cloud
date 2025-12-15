@@ -132,17 +132,13 @@ stages:
   - job: Account
     displayName: "Generate Account Schema Script"
     steps:
-      - task: UseDotNet@2
-        displayName: Use DotNet 8
-        inputs:
-          packageType: 'sdk'
-          version: '8.0.x'
-      - task: DotNetCoreCLI@2
-        displayName: Install dotnet-ef
-        inputs:
-         command: 'custom'
-         custom: 'tool'
-         arguments: 'install --global dotnet-ef'
+      - script: |
+          cd DotNet/Account
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
       - script: |
           dotnet restore $(build.sourcesdirectory)/DotNet/Account/Account.csproj
           dotnet ef migrations script --idempotent --verbose -c AccountDbContext -s $(build.sourcesdirectory)/DotNet/Account/Account.csproj -p $(build.sourcesdirectory)/DotNet/Account/Account.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/accountDb.sql
@@ -158,17 +154,13 @@ stages:
   - job: Audit
     displayName: "Generate Audit Schema Script"
     steps:
-      - task: UseDotNet@2
-        displayName: Use DotNet 8
-        inputs:
-          packageType: 'sdk'
-          version: '8.0.x'
-      - task: DotNetCoreCLI@2
-        displayName: Install dotnet-ef
-        inputs:
-         command: 'custom'
-         custom: 'tool'
-         arguments: 'install --global dotnet-ef'
+      - script: |
+          cd DotNet/Account
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
       - script: |
           dotnet restore $(build.sourcesdirectory)/DotNet/Audit/Audit.csproj
           dotnet ef migrations script --idempotent --verbose -c AuditDbContext -s $(build.sourcesdirectory)/DotNet/Audit/Audit.csproj -p $(build.sourcesdirectory)/DotNet/Audit/Audit.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/auditDb.sql
@@ -184,17 +176,13 @@ stages:
   - job: Census
     displayName: "Generate Census Schema Script"
     steps:
-      - task: UseDotNet@2
-        displayName: Use DotNet 8
-        inputs:
-          packageType: 'sdk'
-          version: '8.0.x'
-      - task: DotNetCoreCLI@2
-        displayName: Install dotnet-ef
-        inputs:
-         command: 'custom'
-         custom: 'tool'
-         arguments: 'install --global dotnet-ef'
+      - script: |
+          cd DotNet/Account
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
       - script: |
           dotnet restore $(build.sourcesdirectory)/DotNet/Census/Census.csproj
           dotnet ef migrations script --idempotent --verbose -c CensusContext -s $(build.sourcesdirectory)/DotNet/Census/Census.csproj -p $(build.sourcesdirectory)/DotNet/Census/Census.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/censusDb.sql
@@ -210,17 +198,13 @@ stages:
   - job: DataAcquisition
     displayName: "Generate Data Acquisition Schema Script"
     steps:
-      - task: UseDotNet@2
-        displayName: Use DotNet 8
-        inputs:
-          packageType: 'sdk'
-          version: '8.0.x'
-      - task: DotNetCoreCLI@2
-        displayName: Install dotnet-ef
-        inputs:
-         command: 'custom'
-         custom: 'tool'
-         arguments: 'install --global dotnet-ef'
+      - script: |
+          cd DotNet/Account
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
       - script: |
           dotnet restore $(build.sourcesdirectory)/DotNet/DataAcquisition/DataAcquisition.csproj
           dotnet restore $(build.sourcesdirectory)/DotNet/DataAcquisition.Domain/DataAcquisition.Domain.csproj
@@ -237,17 +221,13 @@ stages:
   - job: Normalization
     displayName: "Generate Normalization Schema Script"
     steps:
-      - task: UseDotNet@2
-        displayName: Use DotNet 8
-        inputs:
-          packageType: 'sdk'
-          version: '8.0.x'
-      - task: DotNetCoreCLI@2
-        displayName: Install dotnet-ef
-        inputs:
-         command: 'custom'
-         custom: 'tool'
-         arguments: 'install --global dotnet-ef'
+      - script: |
+          cd DotNet/Account
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
       - script: |
           dotnet restore $(build.sourcesdirectory)/DotNet/Normalization/Normalization.csproj
           dotnet ef migrations script --idempotent --verbose -c NormalizationDbContext -s $(build.sourcesdirectory)/DotNet/Normalization/Normalization.csproj -p $(build.sourcesdirectory)/DotNet/Normalization/Normalization.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/normalizationDb.sql
@@ -263,17 +243,13 @@ stages:
   - job: QueryDispatch
     displayName: "Generate QueryDispatch Schema Script"
     steps:
-      - task: UseDotNet@2
-        displayName: Use DotNet 8
-        inputs:
-          packageType: 'sdk'
-          version: '8.0.x'
-      - task: DotNetCoreCLI@2
-        displayName: Install dotnet-ef
-        inputs:
-         command: 'custom'
-         custom: 'tool'
-         arguments: 'install --global dotnet-ef'
+      - script: |
+          cd DotNet/Account
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
       - script: |
           dotnet restore $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj
           dotnet ef migrations script --idempotent --verbose -c QueryDispatchDbContext -s $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj -p $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/queryDispatchDb.sql
@@ -289,17 +265,13 @@ stages:
   - job: Submission
     displayName: "Generate Submission Schema Script"
     steps:
-      - task: UseDotNet@2
-        displayName: Use DotNet 8
-        inputs:
-          packageType: 'sdk'
-          version: '8.0.x'
-      - task: DotNetCoreCLI@2
-        displayName: Install dotnet-ef
-        inputs:
-         command: 'custom'
-         custom: 'tool'
-         arguments: 'install --global dotnet-ef'
+      - script: |
+          cd DotNet/Account
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
       - script: |
           dotnet restore $(build.sourcesdirectory)/DotNet/Submission/Submission.csproj
           dotnet restore $(build.sourcesdirectory)/DotNet/Submission.Data/Submission.Data.csproj
@@ -316,17 +288,13 @@ stages:
   - job: Tenant
     displayName: "Build Tenant"
     steps:
-      - task: UseDotNet@2
-        displayName: Use DotNet 8
-        inputs:
-          packageType: 'sdk'
-          version: '8.0.x'
-      - task: DotNetCoreCLI@2
-        displayName: Install dotnet-ef
-        inputs:
-         command: 'custom'
-         custom: 'tool'
-         arguments: 'install --global dotnet-ef'
+      - script: |
+          cd DotNet/Account
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
       - script: |
           dotnet restore $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj
           dotnet ef migrations script --idempotent --verbose -c TenantDbContext -s $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj -p $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/tenantDb.sql
