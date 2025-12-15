@@ -129,7 +129,7 @@ public class MeasureReportAggregator
 
                 measureReport.Contained.Add(measureReportList);
 
-                CodeableConcept codeableConcept = parser.Parse<CodeableConcept>(reportPopulation.PopulationCode);
+                CodeableConcept codeableConcept = reportPopulation.PopulationCode; //parser.Parse<CodeableConcept>(reportPopulation.PopulationCode);
                 
                 measureReport.Group.Add(new MeasureReport.GroupComponent()
                 {

@@ -185,7 +185,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         population.PopulationId = measureReportpopulation.PopulationId;
 
                                         string json = serializer.SerializeToString(measureReportpopulation.PopulationCode);
-                                        population.PopulationCode = json;
+                                        population.PopulationCode = measureReportpopulation.PopulationCode; //json;
 
                                         population.TotalPopulationCount = measureReportpopulation.PopulationCount;
                                         population.MeasureReportIds = new List<MeasureReportPopulation>() {

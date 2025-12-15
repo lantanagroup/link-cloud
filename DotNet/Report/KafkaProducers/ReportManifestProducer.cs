@@ -115,16 +115,11 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             //var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ValidationComplete || s.Status == PatientSubmissionStatus.Submitted).Select(s => s.PatientId).Distinct().ToList();
             var patientIds = reportEntries.Where(x => x.SubmissionStatus == SubmissionStatus.Submitted).Select(x => x.PatientId).ToList();
 
-            //var failedEntries = submissionEntries.Where(s => s.ValidationStatus == ValidationStatus.Failed).ToList();
+            var facilityConfig = await _tenantApiService.GetFacilityConfig(schedule.FacilityId, CancellationToken.None);
 
-            //var facilityConfig = await _tenantApiService.GetFacilityConfig(schedule.FacilityId, CancellationToken.None);
+            var organization = FhirHelperMethods.CreateOrganization(facilityConfig.FacilityName, schedule.FacilityId, ReportConstants.BundleSettings.SubmittingOrganizationProfile, ReportConstants.BundleSettings.OrganizationTypeSystem, ReportConstants.BundleSettings.CdcOrgIdSystem, ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);
 
-            //var organization = FhirHelperMethods.CreateOrganization(facilityConfig.FacilityName, schedule.FacilityId, ReportConstants.BundleSettings.SubmittingOrganizationProfile, ReportConstants.BundleSettings.OrganizationTypeSystem,
-                                                                            //ReportConstants.BundleSettings.CdcOrgIdSystem, ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);
-
-            //var aggregates = _aggregator.Aggregate(measureReports, organization.Id, schedule.ReportStartDate, schedule.ReportEndDate);
-            //TODO: Test org id added 
-            var aggregates = await _aggregator.CreateMeasureReportAggregate(schedule, "org-1");
+            var aggregates = await _aggregator.CreateMeasureReportAggregate(schedule, organization.Id);
 
             //var measureIds = measureReports.Select(mr => mr.Measure).Distinct().ToList();
 
@@ -134,7 +129,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             List<Resource> manifestResources =
             [
-                //organization,
+                organization,
                 CreateDevice(),
                 //CreatePatientList(allPatientIds, schedule.ReportStartDate, schedule.ReportEndDate),
             ];
@@ -145,11 +140,13 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 manifestResources.Add(aggregate);
             }
 
-            //var operationOutcome = CreateOperationOutcome(failedEntries);
-            //if (operationOutcome.Issue.Any())
-            //{
-            //    manifestResources.Add(operationOutcome);
-            //}
+            var failedEntries = reportEntries.Where(x => x.ReportingStatus == ReportingStatus.FailedValidation).ToList();
+            var operationOutcome = CreateOperationOutcome(failedEntries);
+            
+            if (operationOutcome.Issue.Any())
+            {
+                manifestResources.Add(operationOutcome);
+            }
 
             foreach (var resource in manifestResources)
             {
@@ -288,20 +285,20 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             }
         }
 
-        //private OperationOutcome CreateOperationOutcome(List<MeasureReportSubmissionEntryModel> failedEntries)
-        //{
-        //    var operationOutcome = new OperationOutcome();
-        //    foreach (var entry in failedEntries)
-        //    {
-        //        // Assuming PatientSubmissionEntry has a ValidationMessage property; adjust as per actual model
-        //        operationOutcome.Issue.Add(new OperationOutcome.IssueComponent
-        //        {
-        //            Severity = OperationOutcome.IssueSeverity.Fatal,
-        //            Code = OperationOutcome.IssueType.Invalid,
-        //            Diagnostics = $"Validation failed for patient {entry.PatientId}"
-        //        });
-        //    }
-        //    return operationOutcome;
-        //}
+        private OperationOutcome CreateOperationOutcome(List<ReportEntryStatusModel> failedEntries)
+        {
+            var operationOutcome = new OperationOutcome();
+            foreach (var entry in failedEntries)
+            {
+                // Assuming PatientSubmissionEntry has a ValidationMessage property; adjust as per actual model
+                operationOutcome.Issue.Add(new OperationOutcome.IssueComponent
+                {
+                    Severity = OperationOutcome.IssueSeverity.Fatal,
+                    Code = OperationOutcome.IssueType.Invalid,
+                    Diagnostics = $"Validation failed for patient {entry.PatientId}"
+                });
+            }
+            return operationOutcome;
+        }
     }
 }
