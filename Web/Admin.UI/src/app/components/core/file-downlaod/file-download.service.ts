@@ -37,8 +37,7 @@ export class FileDownloadService {
 
       catchError(err => {
         console.error('JSON download failed', err);
-        alert('Failed to download JSON.');
-        return throwError(() => err);
+        throw err;
       })
     );
   }
