@@ -1,5 +1,7 @@
 package com.lantanagroup.link.shared.kafka;
 
+import org.apache.kafka.common.header.Header;
+
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
@@ -18,5 +20,10 @@ public class Headers {
 
     public static byte[] getBytes(String string) {
         return string.getBytes(CHARSET);
+    }
+
+    public static String getCorrelationId(org.apache.kafka.common.header.Headers headers) {
+        Header header = headers.lastHeader(CORRELATION_ID);
+        return header == null ? null : getString(header.value());
     }
 }

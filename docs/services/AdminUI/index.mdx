@@ -73,3 +73,23 @@ The Admin UI supports authentication using:
 | LINK_OAUTH2_RESPONSE_TYPE | `oauth2.responseType` | The response type for the OAuth2 application.                  | `code`                 | If oauth2 enabled        |
 | GRAFANA_URL               | `grafanaUrl`          | URL for the Grafana UI.                                        | `http://localhost:3000`| Yes                      |
 | KAFKA_URL                 | `kafkaUrl`            | URL for the Kafka UI.                                          | `http://localhost:9095`| If Kafka UI is available |
+
+## Local Development with Proxy Configuration
+To facilitate local development and testing, the Admin UI can be configured to proxy API requests to a local or remote instance of the Admin BFF service. This is achieved by setting up a proxy configuration file.
+
+```json
+{
+    "/api": {
+      "target": "http://localhost:5218",
+      "secure": false,
+      "changeOrigin": true,
+      "logLevel": "debug"
+    }
+}
+```
+
+To use the proxy configuration, start the Angular development server with the following command:
+
+```bash 
+ng serve --proxy-config proxy.conf.json --configuration=development
+```

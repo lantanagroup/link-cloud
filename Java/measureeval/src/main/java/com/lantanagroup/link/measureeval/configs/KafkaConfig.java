@@ -3,31 +3,29 @@ package com.lantanagroup.link.measureeval.configs;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.measureeval.records.*;
-import com.lantanagroup.link.shared.config.KafkaRetryConfig;
-import com.lantanagroup.link.shared.exceptions.FhirParseException;
-import com.lantanagroup.link.shared.exceptions.ValidationException;
-import com.lantanagroup.link.shared.kafka.ErrorHandler;
+import com.lantanagroup.link.measureeval.services.EvaluationRequestedConsumer;
+import com.lantanagroup.link.measureeval.services.ResourceAcquiredErrorConsumer;
+import com.lantanagroup.link.measureeval.services.ResourceNormalizedConsumer;
+import com.lantanagroup.link.shared.kafka.AsyncListener;
 import com.lantanagroup.link.shared.kafka.Properties;
 import com.lantanagroup.link.shared.kafka.Topics;
 import io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingConsumerInterceptor;
 import io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingProducerInterceptor;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.serialization.*;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
+import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.*;
-import org.springframework.kafka.listener.CommonErrorHandler;
-import org.springframework.kafka.retrytopic.RetryTopicConfiguration;
-import org.springframework.kafka.retrytopic.RetryTopicConfigurationBuilder;
+import org.springframework.kafka.listener.*;
 import org.springframework.kafka.support.serializer.*;
-import org.springframework.messaging.MessageHandlingException;
+import org.springframework.util.backoff.FixedBackOff;
 
 import java.text.SimpleDateFormat;
 import java.util.Collections;
@@ -39,13 +37,6 @@ import java.util.stream.Collectors;
 
 @Configuration
 public class KafkaConfig {
-
-    private final KafkaRetryConfig KafkaRetryConfig;
-
-    public KafkaConfig(KafkaRetryConfig KafkaRetryConfig) {
-        this.KafkaRetryConfig = KafkaRetryConfig;
-    }
-
     private static <T> Map<Pattern, T> byPattern(Map<String, T> map) {
         return map.entrySet().stream().collect(Collectors.toMap(
                 entry -> Pattern.compile(Pattern.quote(entry.getKey())),
@@ -53,8 +44,18 @@ public class KafkaConfig {
     }
 
     @Bean
-    public CommonErrorHandler errorHandler() {
-        return new ErrorHandler();
+    public DeadLetterPublishingRecoverer deadLetterPublishingRecoverer(KafkaTemplate<?, ?> compressedKafkaTemplate) {
+        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(compressedKafkaTemplate, (record, exception) ->
+                new TopicPartition(record.topic() + "-Error", record.partition()));
+        recoverer.setLogRecoveryRecord(true);
+        return recoverer;
+    }
+
+    @Bean
+    public DefaultErrorHandler defaultErrorHandler(ConsumerRecordRecoverer recoverer) {
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, new FixedBackOff(0L, 0L));
+        errorHandler.setSeekAfterError(false);
+        return errorHandler;
     }
 
     @Bean
@@ -197,39 +198,6 @@ public class KafkaConfig {
 
 
     @Bean
-    public RetryTopicConfiguration resourceNormalizedRetryTopic(@Qualifier("compressedKafkaTemplate") KafkaTemplate<String, ResourceNormalized> template) {
-        return RetryTopicConfigurationBuilder
-                .newInstance()
-                .fixedBackOff(KafkaRetryConfig.getRetryBackoffMs())
-                .maxAttempts(KafkaRetryConfig.getMaxAttempts())
-                .concurrency(1)
-                .includeTopic(Topics.RESOURCE_NORMALIZED)
-                .retryTopicSuffix("-Retry")
-                .dltSuffix("-Error")
-                .notRetryOn(ValidationException.class).notRetryOn(FhirParseException.class).notRetryOn(MessageHandlingException.class)
-                .useSingleTopicForSameIntervals()
-                .doNotAutoCreateRetryTopics()
-                .create(template);
-    }
-
-    @Bean
-    public RetryTopicConfiguration evaluationRequestedRetryTopic(@Qualifier("compressedKafkaTemplate") KafkaTemplate<String, EvaluationRequested> template) {
-        return RetryTopicConfigurationBuilder
-                .newInstance()
-                .fixedBackOff(KafkaRetryConfig.getRetryBackoffMs())
-                .maxAttempts(KafkaRetryConfig.getMaxAttempts())
-                .concurrency(1)
-                .includeTopic(Topics.EVALUATION_REQUESTED)
-                .retryTopicSuffix("-Retry")
-                .dltSuffix("-Error")
-                .notRetryOn(ValidationException.class).notRetryOn(FhirParseException.class).notRetryOn(MessageHandlingException.class)
-                .useSingleTopicForSameIntervals()
-                .doNotAutoCreateRetryTopics()
-                .create(template);
-    }
-
-
-    @Bean
     public KafkaTemplate<?, ?> compressedKafkaTemplate(KafkaProperties properties,
                                                        ObjectProvider<SslBundles> sslBundles,
                                                        Serializer<?> keySerializer,
@@ -256,5 +224,39 @@ public class KafkaConfig {
         overrides.put(ProducerConfig.RETRIES_CONFIG, 0);
 
         return new KafkaTemplate<>(producerFactoryWithOverrides(properties, sslBundles, keySerializer, valueSerializer, overrides));
+    }
+
+
+    @Bean
+    public ConcurrentMessageListenerContainer<String, EvaluationRequested> evaluationRequestedContainer(
+            ConcurrentKafkaListenerContainerFactory<String, EvaluationRequested> factory,
+            EvaluationRequestedConsumer consumer) {
+        return getAsyncListenerContainer(factory, consumer, Topics.EVALUATION_REQUESTED);
+    }
+
+    @Bean
+    public ConcurrentMessageListenerContainer<String, ResourceAcquired> resourceAcquiredErrorContainer(
+            ConcurrentKafkaListenerContainerFactory<String, ResourceAcquired> factory,
+            ResourceAcquiredErrorConsumer consumer) {
+        return getAsyncListenerContainer(factory, consumer, Topics.RESOURCE_ACQUIRED_ERROR);
+    }
+
+    @Bean
+    public ConcurrentMessageListenerContainer<String, ResourceNormalized> resourceNormalizedContainer(
+            ConcurrentKafkaListenerContainerFactory<String, ResourceNormalized> factory,
+            ResourceNormalizedConsumer consumer) {
+        return getAsyncListenerContainer(factory, consumer, Topics.RESOURCE_NORMALIZED);
+    }
+
+    private <K, V> ConcurrentMessageListenerContainer<K, V> getAsyncListenerContainer(
+            ConcurrentKafkaListenerContainerFactory<K, V> factory,
+            AsyncListener<?, ?> listener,
+            String... topics) {
+        ConcurrentMessageListenerContainer<K, V> container = factory.createContainer(topics);
+        ContainerProperties containerProperties = container.getContainerProperties();
+        containerProperties.setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
+        containerProperties.setAsyncAcks(true);
+        containerProperties.setMessageListener(listener);
+        return container;
     }
 }
