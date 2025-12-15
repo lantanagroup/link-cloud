@@ -101,7 +101,7 @@ namespace LantanaGroup.Link.Report.Core
                                     string measureReportString = reader.ReadLine();
                                     MeasureReport measureReport = parser.Parse<MeasureReport>(measureReportString);
 
-                                    var aggregateMeasureReport = new AggregateMeasureReportResult() { Measure = measureReport.Measure };
+                                    var aggregateMeasureReport = new AggregateMeasureReportResult() { Measure = measureReport.Measure, MeasureReportId = measureReport.Id };
 
                                     foreach (var group in measureReport.Group) {
                                         foreach (var population in group.Population) {

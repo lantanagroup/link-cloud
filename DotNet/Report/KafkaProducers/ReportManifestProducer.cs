@@ -102,44 +102,48 @@ namespace LantanaGroup.Link.Report.KafkaProducers
         public async Task<List<Resource>> Generate(ReportScheduleModel schedule)
         {
             var reportEntries = await _database.ReportEntryStatusRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
-            throw new NotImplementedException();
+
             //var submissionEntries = reportEntries.Where(x => x.Status != PatientSubmissionStatus.NotReportable).ToList();
 
             //var measureReports = submissionEntries
             //            .Select(e => e.MeasureReport)
             //            .Where(report => report != null).ToList();
 
+
             //var allPatientIds = reportEntries.Select(s => s.PatientId).Distinct().ToList();
 
             //var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ValidationComplete || s.Status == PatientSubmissionStatus.Submitted).Select(s => s.PatientId).Distinct().ToList();
+            var patientIds = reportEntries.Where(x => x.SubmissionStatus == SubmissionStatus.Submitted).Select(x => x.PatientId).ToList();
 
             //var failedEntries = submissionEntries.Where(s => s.ValidationStatus == ValidationStatus.Failed).ToList();
 
             //var facilityConfig = await _tenantApiService.GetFacilityConfig(schedule.FacilityId, CancellationToken.None);
 
             //var organization = FhirHelperMethods.CreateOrganization(facilityConfig.FacilityName, schedule.FacilityId, ReportConstants.BundleSettings.SubmittingOrganizationProfile, ReportConstants.BundleSettings.OrganizationTypeSystem,
-            //                                                                ReportConstants.BundleSettings.CdcOrgIdSystem, ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);
+                                                                            //ReportConstants.BundleSettings.CdcOrgIdSystem, ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);
 
             //var aggregates = _aggregator.Aggregate(measureReports, organization.Id, schedule.ReportStartDate, schedule.ReportEndDate);
+            //TODO: Test org id added 
+            var aggregates = await _aggregator.CreateMeasureReportAggregate(schedule, "org-1");
 
             //var measureIds = measureReports.Select(mr => mr.Measure).Distinct().ToList();
 
-            //var reportName = _blobStorageService.GetReportName(schedule);
+            var reportName = _blobStorageService.GetReportName(schedule);
 
-            //var patientFileDict = patientIds.ToDictionary(pid => pid, pid => $"{reportName}_{pid}.ndjson");
+            var patientFileDict = patientIds.ToDictionary(pid => pid, pid => $"{reportName}_{pid}.ndjson");
 
-            //List<Resource> manifestResources =
-            //[
-            //    organization,
-            //    CreateDevice(),
-            //    CreatePatientList(allPatientIds, schedule.ReportStartDate, schedule.ReportEndDate),
-            //];
+            List<Resource> manifestResources =
+            [
+                //organization,
+                CreateDevice(),
+                //CreatePatientList(allPatientIds, schedule.ReportStartDate, schedule.ReportEndDate),
+            ];
 
-            //foreach (var aggregate in aggregates)
-            //{
-            //    AddExtensionsToAggregate(aggregate, patientFileDict);
-            //    manifestResources.Add(aggregate);
-            //}
+            foreach (var aggregate in aggregates)
+            {
+                AddExtensionsToAggregate(aggregate, patientFileDict);
+                manifestResources.Add(aggregate);
+            }
 
             //var operationOutcome = CreateOperationOutcome(failedEntries);
             //if (operationOutcome.Issue.Any())
@@ -147,12 +151,12 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             //    manifestResources.Add(operationOutcome);
             //}
 
-            //foreach (var resource in manifestResources)
-            //{
-            //    resource.Id ??= Guid.NewGuid().ToString();
-            //}
+            foreach (var resource in manifestResources)
+            {
+                resource.Id ??= Guid.NewGuid().ToString();
+            }
 
-            //return manifestResources;
+            return manifestResources;
         }
 
         public async Task<Bundle> GenerateAsBundle(ReportScheduleModel schedule)
@@ -173,46 +177,49 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public async Task<bool> Produce(ReportScheduleModel schedule, string correlationId = null)
         {
-            throw new NotImplementedException();
-
             //var allReady = !await _database.ReportEntryStatusRepository.AnyAsync(e => e.FacilityId == schedule.FacilityId
             //    && e.ReportScheduleId == schedule.Id
             //    && e.Status != PatientSubmissionStatus.NotReportable
             //    && e.Status != PatientSubmissionStatus.ValidationComplete
             //    && e.Status != PatientSubmissionStatus.Submitted, CancellationToken.None);
 
-            //if (!allReady)
-            //{
-            //    return false;
-            //}
+            var reportEntries = await _database.ReportEntryStatusRepository.FindAsync(x => x.FacilityId == schedule.FacilityId && x.ReportScheduleId == schedule.Id);
 
-            //List<Resource> manifestResources = await Generate(schedule);
+            foreach (var entry in reportEntries) {
+                if ((entry.ReportingStatus == ReportingStatus.NoReportableReports || entry.ReportingStatus == ReportingStatus.PassedValidation || entry.ReportingStatus == ReportingStatus.FailedValidation) && entry.SubmissionStatus == SubmissionStatus.Submitted) {
+                    continue;
+                }
 
-            //Uri? payloadUri;
-            //try
-            //{
-            //    payloadUri = await _blobStorageService.UploadManifestAsync(schedule, manifestResources);
-            //}
-            //catch (Exception ex)
-            //{
-            //    payloadUri = null;
-            //    _logger.LogError(ex, "Failed to upload to blob storage.");
-            //    AuditEventMessage auditEvent = new()
-            //    {
-            //        FacilityId = schedule.FacilityId,
-            //        CorrelationId = correlationId,
-            //        EventDate = DateTime.UtcNow,
-            //        Notes = $"Failed to upload to blob storage: {ex}"
-            //    };
-            //    await _auditableEventOccurredProducer.ProduceAsync(auditEvent);
+                return false;
+            }
 
-            //    // Return false to indicate failure
-            //    return false;
-            //}
+            List<Resource> manifestResources = await Generate(schedule);
 
-            //await _payloadSubmittedProducer.Produce(schedule, PayloadType.ReportSchedule, payloadUri: payloadUri?.ToString());
+            Uri? payloadUri;
+            try
+            {
+                payloadUri = await _blobStorageService.UploadManifestAsync(schedule, manifestResources);
+            }
+            catch (Exception ex)
+            {
+                payloadUri = null;
+                _logger.LogError(ex, "Failed to upload to blob storage.");
+                AuditEventMessage auditEvent = new()
+                {
+                    FacilityId = schedule.FacilityId,
+                    CorrelationId = correlationId,
+                    EventDate = DateTime.UtcNow,
+                    Notes = $"Failed to upload to blob storage: {ex}"
+                };
+                await _auditableEventOccurredProducer.ProduceAsync(auditEvent);
 
-            //return true;
+                // Return false to indicate failure
+                return false;
+            }
+
+            await _payloadSubmittedProducer.Produce(schedule, PayloadType.ReportSchedule, payloadUri: payloadUri?.ToString());
+
+            return true;
         }
 
         private Device CreateDevice()

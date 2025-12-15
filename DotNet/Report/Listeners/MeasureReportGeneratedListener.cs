@@ -46,6 +46,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
         private readonly IReportEntryStatusManager _reportEntryManager;
         private readonly IReportScheduledManager _reportScheduledManager;
+        private readonly IReportPopulationManager _reportPopulationManager;
 
         private string Name => this.GetType().Name;
 
@@ -61,7 +62,8 @@ namespace LantanaGroup.Link.Report.Listeners
             ReportManifestProducer reportManifestProducer,
             AuditableEventOccurredProducer auditableEventOccurredProducer, 
             IReportEntryStatusManager reportEntryManager,
-            IReportScheduledManager reportScheduledManager)
+            IReportScheduledManager reportScheduledManager,
+            IReportPopulationManager reportPopulationManager)
         {
 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -84,6 +86,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _auditableEventOccurredProducer = auditableEventOccurredProducer;
             _reportEntryManager = reportEntryManager;
             _reportScheduledManager = reportScheduledManager;
+            _reportPopulationManager = reportPopulationManager;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -161,7 +164,47 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             await _reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
 
-                            
+                            foreach (var measureReportResult in aggregateResult.MeasureReportResults) {
+                                var reportPopulationModel = await _reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == result.Value.ReportTrackingId && x.Measure == measureReportEntry.ReportType);
+
+                                if (reportPopulationModel == null)
+                                {
+                                    reportPopulationModel = new ReportPopulationModel()
+                                    {
+                                        Measure = measureReportResult.Measure,
+                                        CreateDate = DateTime.UtcNow,
+                                        FacilityId = result.Value.FacilityId,
+                                        ReportScheduleId = result.Value.ReportTrackingId
+                                    };
+
+                                    //TODO: Temporary to get things saving. Figure out CodeableConcept deserialization
+                                    var serializer = new FhirJsonSerializer();
+
+                                    foreach (var measureReportpopulation in measureReportResult.PopulationList) {
+                                        ReportPopulation population = new ReportPopulation();
+                                        population.PopulationId = measureReportpopulation.PopulationId;
+
+                                        string json = serializer.SerializeToString(measureReportpopulation.PopulationCode);
+                                        population.PopulationCode = json;
+
+                                        population.TotalPopulationCount = measureReportpopulation.PopulationCount;
+                                        population.MeasureReportIds = new List<MeasureReportPopulation>() {
+                                            new MeasureReportPopulation() {
+                                                MeasureReportId = measureReportResult.MeasureReportId,
+                                                PopulationCount = measureReportpopulation.PopulationCount
+                                            }
+                                        };
+
+                                        reportPopulationModel.ReportPopulations.Add(population);
+                                    }
+
+                                    await _reportPopulationManager.AddAsync(reportPopulationModel, cancellationToken);
+                                }
+                                else 
+                                { 
+                                    //TODO: Add
+                                }
+                            }
                             
                             try
                             {

@@ -138,6 +138,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IBaseEntityRepository<SharedResourceModel>, MongoEntityRepository<SharedResourceModel>>();
     builder.Services.AddTransient<IBaseEntityRepository<PatientResourceModel>, MongoEntityRepository<PatientResourceModel>>();
     builder.Services.AddTransient<IBaseEntityRepository<ReportEntryStatusModel>, MongoEntityRepository<ReportEntryStatusModel>>();
+    builder.Services.AddTransient<IBaseEntityRepository<ReportPopulationModel>, MongoEntityRepository<ReportPopulationModel>>();
     builder.Services.AddTransient<IDatabase, Database>();
 
     // Add Managers
@@ -145,6 +146,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     //builder.Services.AddTransient<ISubmissionEntryManager, SubmissionEntryManager>();
     builder.Services.AddTransient<IResourceManager, ResourceManager>();
     builder.Services.AddTransient<IReportEntryStatusManager, ReportEntryStatusManager>();
+    builder.Services.AddTransient<IReportPopulationManager, ReportPopulationManager>();
 
     // Add Link Security
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");

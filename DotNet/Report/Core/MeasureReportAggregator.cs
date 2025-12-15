@@ -2,6 +2,7 @@
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Options;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Entities;
@@ -90,25 +91,63 @@ public class MeasureReportAggregator
         return aggregates;
     }
 
-    public async void AggregateABS(string reportScheduleId) 
+    public async Task<List<MeasureReport>> CreateMeasureReportAggregate(ReportScheduleModel reportSchedule, string organizationId) 
     {
-        var reportEntries = (await _database.ReportEntryStatusRepository.FindAsync(x => x.ReportScheduleId == reportScheduleId));
+        var parser = new FhirJsonParser();
+        var populationModels = (await _database.ReportPopulationRepository.FindAsync(x => x.ReportScheduleId == reportSchedule.Id));
 
-        foreach (var entry in reportEntries) {
-            BlockBlobClient blockReadBlobClient = _containerClient.GetBlockBlobClient(entry.AggregateReportFileName);
+        List<MeasureReport> aggregates = new List<MeasureReport>();
 
-            try
+        foreach (var populationModel in populationModels) {
+            MeasureReport measureReport = new MeasureReport();
+
+            measureReport.Meta = new Meta()
             {
-                using (Stream read_stream = await blockReadBlobClient.OpenReadAsync(true))
-                using (StreamReader reader = new StreamReader(read_stream))
-                {
+                Profile = ImmutableList.Create<string>(AggregateMeasureReportProfile)
+            };
+            measureReport.Id = Guid.NewGuid().ToString();
+            measureReport.Type = MeasureReport.MeasureReportType.SubjectList;
+            measureReport.Status = MeasureReport.MeasureReportStatus.Complete;
+            measureReport.DateElement = FhirDateTime.Now();
+            measureReport.Measure = populationModel.Measure;
+            measureReport.Period = new Period(new FhirDateTime(new DateTimeOffset(reportSchedule.ReportStartDate)), new FhirDateTime(new DateTimeOffset(reportSchedule.ReportEndDate)));
+            measureReport.Reporter = new ResourceReference($"Organization/{organizationId}");
 
+            foreach (var reportPopulation in populationModel.ReportPopulations) {
+                List measureReportList = new List();
+                measureReportList.Id = reportPopulation.PopulationId + "-list";
+
+                foreach (var measureReportPopulation in reportPopulation.MeasureReportIds) {
+                    measureReportList.Entry.Add(new List.EntryComponent()
+                    {
+                        Item = new ResourceReference()
+                        {
+                            Reference = "MeasureReport/" + measureReportPopulation.MeasureReportId
+                        }
+                    });
                 }
+
+                measureReport.Contained.Add(measureReportList);
+
+                CodeableConcept codeableConcept = parser.Parse<CodeableConcept>(reportPopulation.PopulationCode);
+                
+                measureReport.Group.Add(new MeasureReport.GroupComponent()
+                {
+                    Population = new List<MeasureReport.PopulationComponent>() { 
+                        new MeasureReport.PopulationComponent() { 
+                            ElementId = reportPopulation.PopulationId + "-list",
+                            Code = codeableConcept,
+                            Count = reportPopulation.TotalPopulationCount
+                        }
+                    },
+                    ElementId = reportPopulation.PopulationId
+                });
             }
-            catch (Exception ex) { 
             
-            }
+            aggregates.Add(measureReport);
         }
+
+        return aggregates;
     }
 
     private List GetOrCreateContainedList(MeasureReport aggregate, MeasureReport.PopulationComponent population)
