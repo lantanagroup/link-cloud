@@ -129,6 +129,14 @@ export class ViewMeasureReportComponent implements OnInit {
               verticalPosition: 'top'
             });
           }
+          else{
+            this.snackBar.open(`Error downloading patient bundle.`, '', {
+              duration: 3500,
+              panelClass: 'error-snackbar',
+              horizontalPosition: 'end',
+              verticalPosition: 'top'
+            });
+          }
         }
       });
   }
