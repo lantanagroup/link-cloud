@@ -235,15 +235,15 @@ public class KafkaConfig {
     }
 
     @Bean
-    public ConcurrentMessageListenerContainer<String, EvaluationRequested> resourceAcquiredErrorContainer(
-            ConcurrentKafkaListenerContainerFactory<String, EvaluationRequested> factory,
+    public ConcurrentMessageListenerContainer<String, ResourceAcquired> resourceAcquiredErrorContainer(
+            ConcurrentKafkaListenerContainerFactory<String, ResourceAcquired> factory,
             ResourceAcquiredErrorConsumer consumer) {
         return getAsyncListenerContainer(factory, consumer, Topics.RESOURCE_ACQUIRED_ERROR);
     }
 
     @Bean
-    public ConcurrentMessageListenerContainer<String, EvaluationRequested> resourceNormalizedContainer(
-            ConcurrentKafkaListenerContainerFactory<String, EvaluationRequested> factory,
+    public ConcurrentMessageListenerContainer<String, ResourceNormalized> resourceNormalizedContainer(
+            ConcurrentKafkaListenerContainerFactory<String, ResourceNormalized> factory,
             ResourceNormalizedConsumer consumer) {
         return getAsyncListenerContainer(factory, consumer, Topics.RESOURCE_NORMALIZED);
     }
