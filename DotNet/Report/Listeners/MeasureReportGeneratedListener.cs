@@ -142,13 +142,6 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             await _reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
 
-                            //var entries = await _reportEntryManager.FindAsync(x => x.PatientId == result.Value.PatientId && x.FacilityId == result.Value.FacilityId && x.ReportScheduleId == result.Value.ReportTrackingId);
-
-                            //var readyForValidation = entries.All(e =>
-                            //        e.Status == PatientSubmissionStatus.NotReportable ||
-                            //        e.Status == PatientSubmissionStatus.ReadyForValidation) &&
-                            //        entries.Any(e => e.Status == PatientSubmissionStatus.ReadyForValidation);
-
                             var schedule = await _reportScheduledManager.GetReportSchedule(result.Value.FacilityId, result.Value.ReportTrackingId, cancellationToken);
 
                             //TODO: Follow up on this logic
@@ -165,7 +158,10 @@ namespace LantanaGroup.Link.Report.Listeners
                             reportEntry.AggregateReportUri = aggregateResult.Uri.AbsoluteUri;
                             reportEntry.AggregateReportFileName = aggregateResult.Uri.Segments.Last();
                             reportEntry.ModifyDate = DateTime.UtcNow;
+
                             await _reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
+
+                            
                             
                             try
                             {

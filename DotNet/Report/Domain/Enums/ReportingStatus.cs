@@ -2,7 +2,8 @@
 {
     public enum ReportingStatus { 
         PatientIdentified, 
-        PendingEvaluation,
+        //TODO: EvaluatingPatient
+        NoReportableReports,
         PendingValidation,
         PassedValidation,
         FailedValidation

@@ -66,6 +66,7 @@ namespace LantanaGroup.Link.Report.Core
 
             //The 'resourcesAdded' Dictionary will keep track of FHIR resource id's that have been added to the bundle to avoid adding duplicates across entries. The value of each dictionary entry will contain the associated FHIR types. It's a string List type in case there are different FHIR resources that share the same id. This is probably unlikely to happen, but is possible. 
             Dictionary<string, int> resourcesAdded = new Dictionary<string,int>();
+            var parser = new FhirJsonParser();
 
             //TODO: Need to get the actual source file
             AppendBlobClient blockWriteBlobClient = _containerClient.GetAppendBlobClient("Patient_" + patientId + ".ndjson");
@@ -77,7 +78,7 @@ namespace LantanaGroup.Link.Report.Core
                 foreach (var measureReportEntry in entry.MeasureReportEntryList)
                 {
                     BlockBlobClient blockReadBlobClient = _containerClient.GetBlockBlobClient(measureReportEntry.MeasureReportFileName);
-                    
+
                     try
                     {
                         using (Stream read_stream = await blockReadBlobClient.OpenReadAsync(true))
@@ -94,8 +95,33 @@ namespace LantanaGroup.Link.Report.Core
                                     continue;
                                 }
 
-                                resourcesAdded.Add(resource_and_id, 1);
-                                writer.WriteLine(reader.ReadLine());
+                                //TODO: Change to '/'
+                                if (resource_and_id.Split('_')[0] == "MeasureReport")
+                                {
+                                    string measureReportString = reader.ReadLine();
+                                    MeasureReport measureReport = parser.Parse<MeasureReport>(measureReportString);
+
+                                    var aggregateMeasureReport = new AggregateMeasureReportResult() { Measure = measureReport.Measure };
+
+                                    foreach (var group in measureReport.Group) {
+                                        foreach (var population in group.Population) {
+                                            aggregateMeasureReport.PopulationList.Add(new AggregateMeasureReportPopulation()
+                                            {
+                                                PopulationCode = population.Code,
+                                                PopulationCount = population.Count ?? 0,
+                                                PopulationId = population.ElementId
+                                            });
+                                        }
+                                    }
+
+                                    aggregateResult.MeasureReportResults.Add(aggregateMeasureReport);
+                                    resourcesAdded.Add(resource_and_id, 1);
+                                    writer.WriteLine(measureReportString);
+                                }
+                                else {
+                                    resourcesAdded.Add(resource_and_id, 1);
+                                    writer.WriteLine(reader.ReadLine());
+                                }
                             }
                         }
 

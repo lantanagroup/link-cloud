@@ -1,4 +1,12 @@
-﻿using Hl7.Fhir.Model;
+﻿using Azure.Messaging.EventGrid.SystemEvents;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Specialized;
+using Hl7.Fhir.Model;
+using LantanaGroup.Link.Report.Application.Options;
+using LantanaGroup.Link.Report.Domain;
+using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Services;
+using Microsoft.Extensions.Options;
 using Serilog;
 using System.Collections.Immutable;
 
@@ -14,10 +22,22 @@ public class MeasureReportAggregator
         "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/subjectlist-measurereport";
     
     private readonly ILogger<MeasureReportAggregator> _logger;
-    
-    public MeasureReportAggregator(ILogger<MeasureReportAggregator> logger)
+    private readonly BlobStorageService _blobStorageService;
+    private readonly BlobContainerClient _containerClient;
+    private readonly BlobStorageSettings _settings;
+    private readonly IDatabase _database;
+
+    public MeasureReportAggregator(ILogger<MeasureReportAggregator> logger, BlobStorageService blobStorageService, IOptions<BlobStorageSettings> settings, IDatabase database)
     {
         _logger = logger;
+        _blobStorageService = blobStorageService;
+        _settings = settings.Value;
+        _database = database ?? throw new ArgumentNullException(nameof(database));
+
+        if (_settings.ConnectionString != null)
+        {
+            _containerClient = new BlobContainerClient(_settings.ConnectionString, _settings.BlobContainerName);
+        }
     }
 
     public List<MeasureReport> Aggregate(List<MeasureReport> individuals, string organizationId, DateTime startDate, DateTime endDate)
@@ -68,6 +88,27 @@ public class MeasureReportAggregator
         }
 
         return aggregates;
+    }
+
+    public async void AggregateABS(string reportScheduleId) 
+    {
+        var reportEntries = (await _database.ReportEntryStatusRepository.FindAsync(x => x.ReportScheduleId == reportScheduleId));
+
+        foreach (var entry in reportEntries) {
+            BlockBlobClient blockReadBlobClient = _containerClient.GetBlockBlobClient(entry.AggregateReportFileName);
+
+            try
+            {
+                using (Stream read_stream = await blockReadBlobClient.OpenReadAsync(true))
+                using (StreamReader reader = new StreamReader(read_stream))
+                {
+
+                }
+            }
+            catch (Exception ex) { 
+            
+            }
+        }
     }
 
     private List GetOrCreateContainedList(MeasureReport aggregate, MeasureReport.PopulationComponent population)

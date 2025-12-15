@@ -12,6 +12,7 @@ namespace LantanaGroup.Link.Report.Domain
         IBaseEntityRepository<SharedResourceModel> SharedResourceRepository { get; set; }
         IBaseEntityRepository<ReportScheduleModel> ReportScheduledRepository { get; set; }
         IBaseEntityRepository<ReportEntryStatusModel> ReportEntryStatusRepository { get; set; }
+        IBaseEntityRepository<ReportPopulationModel> ReportPopulationRepository { get; set; }
     }
 
     public class Database : IDatabase
@@ -22,12 +23,14 @@ namespace LantanaGroup.Link.Report.Domain
         public IBaseEntityRepository<SharedResourceModel> SharedResourceRepository { get; set; }
         public IBaseEntityRepository<ReportScheduleModel> ReportScheduledRepository { get; set; }
         public IBaseEntityRepository<ReportEntryStatusModel> ReportEntryStatusRepository { get; set; }
+        public IBaseEntityRepository<ReportPopulationModel> ReportPopulationRepository { get; set; }
 
         public Database(IOptions<MongoConnection> mongoSettings,
             IBaseEntityRepository<PatientResourceModel> patientResourceRepository,
             IBaseEntityRepository<SharedResourceModel> sharedResourceRepository,
             IBaseEntityRepository<ReportScheduleModel> reportScheduledRepository,
-            IBaseEntityRepository<ReportEntryStatusModel> reportEntryStatusRepository)
+            IBaseEntityRepository<ReportEntryStatusModel> reportEntryStatusRepository,
+            IBaseEntityRepository<ReportPopulationModel> reportPopulationRepository)
         {
             var client = new MongoClient(mongoSettings.Value.ConnectionString);
             DbContext = client.GetDatabase(mongoSettings.Value.DatabaseName);
@@ -36,6 +39,7 @@ namespace LantanaGroup.Link.Report.Domain
             SharedResourceRepository = sharedResourceRepository;
             ReportScheduledRepository = reportScheduledRepository;
             ReportEntryStatusRepository = reportEntryStatusRepository;
+            ReportPopulationRepository = reportPopulationRepository;
         }
     }
 }
