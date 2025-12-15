@@ -139,7 +139,8 @@ stages:
          custom: 'tool'
          arguments: 'install --global dotnet-ef'
       - script: |
-         dotnet ef migrations script --idempotent --verbose -c AccountDbContext -s $(build.sourcesdirectory)/DotNet/Account/Account.csproj -p $(build.sourcesdirectory)/DotNet/Account/Account.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/accountDb.sql
+          dotnet restore $(build.sourcesdirectory)/DotNet/Account/Account.csproj
+          dotnet ef migrations script --idempotent --verbose -c AccountDbContext -s $(build.sourcesdirectory)/DotNet/Account/Account.csproj -p $(build.sourcesdirectory)/DotNet/Account/Account.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/accountDb.sql
         displayName: Generate Account SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
@@ -159,7 +160,8 @@ stages:
          custom: 'tool'
          arguments: 'install --global dotnet-ef'
       - script: |
-         dotnet ef migrations script --idempotent --verbose -c AuditDbContext -s $(build.sourcesdirectory)/DotNet/Audit/Audit.csproj -p $(build.sourcesdirectory)/DotNet/Audit/Audit.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/auditDb.sql
+          dotnet restore $(build.sourcesdirectory)/DotNet/Audit/Audit.csproj
+          dotnet ef migrations script --idempotent --verbose -c AuditDbContext -s $(build.sourcesdirectory)/DotNet/Audit/Audit.csproj -p $(build.sourcesdirectory)/DotNet/Audit/Audit.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/auditDb.sql
         displayName: Generate Audit SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
@@ -179,7 +181,8 @@ stages:
          custom: 'tool'
          arguments: 'install --global dotnet-ef'
       - script: |
-         dotnet ef migrations script --idempotent --verbose -c CensusContext -s $(build.sourcesdirectory)/DotNet/Census/Census.csproj -p $(build.sourcesdirectory)/DotNet/Census/Census.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/censusDb.sql
+          dotnet restore $(build.sourcesdirectory)/DotNet/Census/Census.csproj
+          dotnet ef migrations script --idempotent --verbose -c CensusContext -s $(build.sourcesdirectory)/DotNet/Census/Census.csproj -p $(build.sourcesdirectory)/DotNet/Census/Census.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/censusDb.sql
         displayName: Generate Census SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
@@ -199,7 +202,9 @@ stages:
          custom: 'tool'
          arguments: 'install --global dotnet-ef'
       - script: |
-         dotnet ef migrations script --idempotent --verbose -c DataAcquisitionDbContext -s $(build.sourcesdirectory)/DotNet/DataAcquisition/DataAcquisition.csproj -p $(build.sourcesdirectory)/DotNet/DataAcquisition.Domain/DataAcquisition.Domain.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/dataDb.sql
+          dotnet restore $(build.sourcesdirectory)/DotNet/DataAcquisition/DataAcquisition.csproj
+          dotnet restore $(build.sourcesdirectory)/DotNet/DataAcquisition.Domain/DataAcquisition.Domain.csproj
+          dotnet ef migrations script --idempotent --verbose -c DataAcquisitionDbContext -s $(build.sourcesdirectory)/DotNet/DataAcquisition/DataAcquisition.csproj -p $(build.sourcesdirectory)/DotNet/DataAcquisition.Domain/DataAcquisition.Domain.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/dataDb.sql
         displayName: Generate DataAcquisition SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
@@ -219,7 +224,8 @@ stages:
          custom: 'tool'
          arguments: 'install --global dotnet-ef'
       - script: |
-           dotnet ef migrations script --idempotent --verbose -c NormalizationDbContext -s $(build.sourcesdirectory)/DotNet/Normalization/Normalization.csproj -p $(build.sourcesdirectory)/DotNet/Normalization/Normalization.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/normalizationDb.sql
+          dotnet restore $(build.sourcesdirectory)/DotNet/Normalization/Normalization.csproj
+          dotnet ef migrations script --idempotent --verbose -c NormalizationDbContext -s $(build.sourcesdirectory)/DotNet/Normalization/Normalization.csproj -p $(build.sourcesdirectory)/DotNet/Normalization/Normalization.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/normalizationDb.sql
         displayName: Generate Normalization SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
@@ -239,7 +245,8 @@ stages:
        custom: 'tool'
        arguments: 'install --global dotnet-ef'
     - script: |
-         dotnet ef migrations script --idempotent --verbose -c QueryDispatchDbContext -s $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj -p $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/queryDispatchDb.sql
+        dotnet restore $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj
+        dotnet ef migrations script --idempotent --verbose -c QueryDispatchDbContext -s $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj -p $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/queryDispatchDb.sql
       displayName: Generate QueryDispatch SQL Script
     - task: PublishBuildArtifacts@1
       inputs:
@@ -259,7 +266,9 @@ stages:
          custom: 'tool'
          arguments: 'install --global dotnet-ef'
       - script: |
-         dotnet ef migrations script --idempotent --verbose -c SubmissionContext -s $(build.sourcesdirectory)/DotNet/Submission/Submission.csproj -p $(build.sourcesdirectory)/DotNet/Submission.Data/Submission.Data.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/submissionDb.sql
+          dotnet restore $(build.sourcesdirectory)/DotNet/Submission/Submission.csproj
+          dotnet restore $(build.sourcesdirectory)/DotNet/Submission.Data/Submission.Data.csproj
+          dotnet ef migrations script --idempotent --verbose -c SubmissionContext -s $(build.sourcesdirectory)/DotNet/Submission/Submission.csproj -p $(build.sourcesdirectory)/DotNet/Submission.Data/Submission.Data.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/submissionDb.sql
         displayName: Generate Submission SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
@@ -279,7 +288,8 @@ stages:
        custom: 'tool'
        arguments: 'install --global dotnet-ef'
     - script: |
-         dotnet ef migrations script --idempotent --verbose -c TenantDbContext -s $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj -p $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/tenantDb.sql
+        dotnet restore $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj
+        dotnet ef migrations script --idempotent --verbose -c TenantDbContext -s $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj -p $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/tenantDb.sql
       displayName: Generate Tenant SQL Script
     - task: PublishBuildArtifacts@1
       inputs:
