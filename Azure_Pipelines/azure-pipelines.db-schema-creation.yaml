@@ -329,7 +329,7 @@ stages:
             azureSubscription: "NHSNLink Resource Manager"
             ServerName: 'link-db.database.windows.net'
             DatabaseName: 'link-qa-botw-account'
-            SqlUsername: 'it@link-db'
-            SqlPassword: 'Link#Database#Password1'
+            SqlUsername: '$(link-db_username)'
+            SqlPassword: '$(link-db_pass)'
             deployType: 'SqlTask'
             SqlFile: '$(Pipeline.Workspace)/scripts/DatabaseScripts/accountDb.sql'
