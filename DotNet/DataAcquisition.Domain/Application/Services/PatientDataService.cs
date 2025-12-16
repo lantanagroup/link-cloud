@@ -466,7 +466,7 @@ public class PatientDataService : IPatientDataService
                     }
 
                     //check if log is search and not census, if true,
-                    if (fhirQuery.QueryType == FhirQueryType.Search && !log.IsCensus)
+                    if ((fhirQuery.QueryType == FhirQueryType.Search || fhirQuery.QueryType == FhirQueryType.SearchPost)&& !log.IsCensus)
                     {
                         var idParams = fhirQuery.QueryParameters.Where(x => x.StartsWith("_id=", StringComparison.InvariantCultureIgnoreCase)).ToList();
                         if(idParams.Any())
@@ -484,7 +484,7 @@ public class PatientDataService : IPatientDataService
                             if (!ids.Any())
                             {
                                 log.Notes ??= [];
-                                log.Notes.Add($"[{DateTime.UtcNow}] No IDs found in _id query parameter for Search FHIR query. Marking log as Completed.");
+                                log.Notes.Add($"[{DateTime.UtcNow}] No IDs found in _id query parameter for {fhirQuery.QueryType} FHIR query. Marking log as Completed.");
                                 skipFetch = true;
                             }
                         }
