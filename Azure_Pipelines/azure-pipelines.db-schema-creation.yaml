@@ -15,6 +15,9 @@ pr: none
 pool:
   vmImage: 'ubuntu-latest'
 
+variables:
+- group: MSSQL_DBCreation
+
 parameters:
 - name: previous_release
   displayName: "What is the Tag of the Previous Release? (i.e. : v0.2.0-beta.1)"
@@ -305,3 +308,28 @@ stages:
        publishLocation: 'container'
       displayName: Generate Validation SQL Script  
   ###
+
+############################################################################################
+# Apply SQL Changes to QA ENV
+############################################################################################
+- stage: Update_Account_DB
+  displayName: Update Account Database Schema
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+    - job: UpdateAuditSchema
+      displayName: Update Account DB Schema
+      steps:
+        - download: current
+          artifact: scripts
+
+        - task: SqlAzureDacpacDeployment@1
+          displayName: Update Account DB Schema
+          inputs:
+            azureSubscription: "NHSNLink Resource Manager"
+            ServerName: 'link-db.database.windows.net'
+            DatabaseName: 'link-qa-botw-account'
+            SqlUsername: 'it@link-db'
+            SqlPassword: 'Link#Database#Password1'
+            deployType: 'SqlTask'
+            SqlFile: '$(Pipeline.Workspace)/scripts/DatabaseScripts/accountDb.sql'
