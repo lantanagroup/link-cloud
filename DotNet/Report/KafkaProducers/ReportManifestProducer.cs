@@ -102,37 +102,20 @@ namespace LantanaGroup.Link.Report.KafkaProducers
         public async Task<List<Resource>> Generate(ReportScheduleModel schedule)
         {
             var reportEntries = await _database.ReportEntryStatusRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
-
-            //var submissionEntries = reportEntries.Where(x => x.Status != PatientSubmissionStatus.NotReportable).ToList();
-
-            //var measureReports = submissionEntries
-            //            .Select(e => e.MeasureReport)
-            //            .Where(report => report != null).ToList();
-
-
-            //var allPatientIds = reportEntries.Select(s => s.PatientId).Distinct().ToList();
-
-            //var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ValidationComplete || s.Status == PatientSubmissionStatus.Submitted).Select(s => s.PatientId).Distinct().ToList();
-            var patientIds = reportEntries.Where(x => x.SubmissionStatus == SubmissionStatus.Submitted).Select(x => x.PatientId).ToList();
-
             var facilityConfig = await _tenantApiService.GetFacilityConfig(schedule.FacilityId, CancellationToken.None);
-
             var organization = FhirHelperMethods.CreateOrganization(facilityConfig.FacilityName, schedule.FacilityId, ReportConstants.BundleSettings.SubmittingOrganizationProfile, ReportConstants.BundleSettings.OrganizationTypeSystem, ReportConstants.BundleSettings.CdcOrgIdSystem, ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);
-
-            var aggregates = await _aggregator.CreateMeasureReportAggregate(schedule, organization.Id);
-
-            //var measureIds = measureReports.Select(mr => mr.Measure).Distinct().ToList();
-
-            var reportName = _blobStorageService.GetReportName(schedule);
-
-            var patientFileDict = patientIds.ToDictionary(pid => pid, pid => $"{reportName}_{pid}.ndjson");
 
             List<Resource> manifestResources =
             [
                 organization,
                 CreateDevice(),
-                //CreatePatientList(allPatientIds, schedule.ReportStartDate, schedule.ReportEndDate),
+                CreatePatientList(reportEntries.Select(x => x.PatientId).ToList(), schedule.ReportStartDate, schedule.ReportEndDate),
             ];
+
+            var reportName = _blobStorageService.GetReportName(schedule);
+            var submittedPatientIds = reportEntries.Where(x => x.SubmissionStatus == SubmissionStatus.Submitted).Select(x => x.PatientId).ToList();
+            var patientFileDict = submittedPatientIds.ToDictionary(pid => pid, pid => $"{reportName}_{pid}.ndjson");
+            var aggregates = await _aggregator.CreateMeasureReportAggregate(schedule, organization.Id);
 
             foreach (var aggregate in aggregates)
             {
@@ -141,10 +124,10 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             }
 
             var failedEntries = reportEntries.Where(x => x.ReportingStatus == ReportingStatus.FailedValidation).ToList();
-            var operationOutcome = CreateOperationOutcome(failedEntries);
-            
-            if (operationOutcome.Issue.Any())
+
+            if (failedEntries.Count > 0)
             {
+                var operationOutcome = CreateOperationOutcome(failedEntries);
                 manifestResources.Add(operationOutcome);
             }
 
