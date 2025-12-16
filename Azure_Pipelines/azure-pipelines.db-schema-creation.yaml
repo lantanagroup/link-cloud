@@ -314,7 +314,6 @@ stages:
 ############################################################################################
 - stage: Update_Account_DB
   displayName: Update Account Database Schema
-  dependsOn: Build
   jobs:
   - job: UpdateAuditSchema
     displayName: Update Account DB Schema
