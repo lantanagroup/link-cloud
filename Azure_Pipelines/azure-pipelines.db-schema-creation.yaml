@@ -144,12 +144,12 @@ stages:
       - script: |
          dotnet ef migrations script --idempotent --verbose -c AccountDbContext -s $(build.sourcesdirectory)/DotNet/Account/Account.csproj -p $(build.sourcesdirectory)/DotNet/Account/Account.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/accountDb.sql
         displayName: Generate Account SQL Script
-      # - task: PublishBuildArtifacts@1
-      #   inputs:
-      #    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-      #    ArtifactName: 'scripts'
-      #    publishLocation: 'container'
-      #   displayName: Generate Tenant SQL Script  
+      - task: PublishBuildArtifacts@1
+        inputs:
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+         ArtifactName: 'scripts'
+         publishLocation: 'container'
+        displayName: Generate Tenant SQL Script  
   ###
   # Audit
   - job: Audit
@@ -164,12 +164,12 @@ stages:
       - script: |
          dotnet ef migrations script --idempotent --verbose -c AuditDbContext -s $(build.sourcesdirectory)/DotNet/Audit/Audit.csproj -p $(build.sourcesdirectory)/DotNet/Audit/Audit.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/auditDb.sql
         displayName: Generate Audit SQL Script
-      # - task: PublishBuildArtifacts@1
-      #   inputs:
-      #    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-      #    ArtifactName: 'scripts'
-      #    publishLocation: 'container'
-      #   displayName: Generate Tenant SQL Script  
+      - task: PublishBuildArtifacts@1
+        inputs:
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+         ArtifactName: 'scripts'
+         publishLocation: 'container'
+        displayName: Generate Tenant SQL Script  
   ###
   # Census
   - job: Census
@@ -184,12 +184,12 @@ stages:
       - script: |
          dotnet ef migrations script --idempotent --verbose -c CensusContext -s $(build.sourcesdirectory)/DotNet/Census/Census.csproj -p $(build.sourcesdirectory)/DotNet/Census/Census.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/censusDb.sql
         displayName: Generate Census SQL Script
-      # - task: PublishBuildArtifacts@1
-      #   inputs:
-      #    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-      #    ArtifactName: 'scripts'
-      #    publishLocation: 'container'
-      #   displayName: Generate Tenant SQL Script  
+      - task: PublishBuildArtifacts@1
+        inputs:
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+         ArtifactName: 'scripts'
+         publishLocation: 'container'
+        displayName: Generate Tenant SQL Script  
   ###
   # DataAcquisition
   - job: DataAcquisition
@@ -204,12 +204,12 @@ stages:
       - script: |
          dotnet ef migrations script --idempotent --verbose -c DataAcquisitionDbContext -s $(build.sourcesdirectory)/DotNet/DataAcquisition/DataAcquisition.csproj -p $(build.sourcesdirectory)/DotNet/DataAcquisition.Domain/DataAcquisition.Domain.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/dataDb.sql
         displayName: Generate DataAcquisition SQL Script
-      # - task: PublishBuildArtifacts@1
-      #   inputs:
-      #    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-      #    ArtifactName: 'scripts'
-      #    publishLocation: 'container'
-      #   displayName: Generate Tenant SQL Script  
+      - task: PublishBuildArtifacts@1
+        inputs:
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+         ArtifactName: 'scripts'
+         publishLocation: 'container'
+        displayName: Generate Tenant SQL Script  
   ###
   # Normalization
   - job: Normalization
@@ -224,12 +224,12 @@ stages:
       - script: |
            dotnet ef migrations script --idempotent --verbose -c NormalizationDbContext -s $(build.sourcesdirectory)/DotNet/Normalization/Normalization.csproj -p $(build.sourcesdirectory)/DotNet/Normalization/Normalization.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/normalizationDb.sql
         displayName: Generate Normalization SQL Script
-      # - task: PublishBuildArtifacts@1
-      #   inputs:
-      #    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-      #    ArtifactName: 'scripts'
-      #    publishLocation: 'container'
-      #   displayName: Generate Tenant SQL Script  
+      - task: PublishBuildArtifacts@1
+        inputs:
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+         ArtifactName: 'scripts'
+         publishLocation: 'container'
+        displayName: Generate Tenant SQL Script  
   ###
   # QueryDispatch
   - job: QueryDispatch
@@ -244,12 +244,12 @@ stages:
     - script: |
          dotnet ef migrations script --idempotent --verbose -c QueryDispatchDbContext -s $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj -p $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/queryDispatchDb.sql
       displayName: Generate QueryDispatch SQL Script
-    # - task: PublishBuildArtifacts@1
-    #   inputs:
-    #    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-    #    ArtifactName: 'scripts'
-    #    publishLocation: 'container'
-    #   displayName: Generate Tenant SQL Script  
+    - task: PublishBuildArtifacts@1
+      inputs:
+       PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+       ArtifactName: 'scripts'
+       publishLocation: 'container'
+      displayName: Generate Tenant SQL Script  
   ###
   # Submission
   - job: Submission
@@ -264,12 +264,12 @@ stages:
       - script: |
          dotnet ef migrations script --idempotent --verbose -c SubmissionContext -s $(build.sourcesdirectory)/DotNet/Submission/Submission.csproj -p $(build.sourcesdirectory)/DotNet/Submission.Data/Submission.Data.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/submissionDb.sql
         displayName: Generate Submission SQL Script
-      # - task: PublishBuildArtifacts@1
-      #   inputs:
-      #    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-      #    ArtifactName: 'scripts'
-      #    publishLocation: 'container'
-      #   displayName: Generate Submission SQL Script  
+      - task: PublishBuildArtifacts@1
+        inputs:
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+         ArtifactName: 'scripts'
+         publishLocation: 'container'
+        displayName: Generate Submission SQL Script  
   ###
   # Tenant
   - job: Tenant
@@ -284,12 +284,12 @@ stages:
     - script: |
          dotnet ef migrations script --idempotent --verbose -c TenantDbContext -s $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj -p $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/tenantDb.sql
       displayName: Generate Tenant SQL Script
-    # - task: PublishBuildArtifacts@1
-    #   inputs:
-    #    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-    #    ArtifactName: 'scripts'
-    #    publishLocation: 'container'
-    #   displayName: Generate Tenant SQL Script  
+    - task: PublishBuildArtifacts@1
+      inputs:
+       PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+       ArtifactName: 'scripts'
+       publishLocation: 'container'
+      displayName: Generate Tenant SQL Script  
     ###
   # Validation
   - job: Validation
@@ -301,12 +301,12 @@ stages:
        SourceFolder: '$(build.sourcesdirectory)/Java/validation/src/main/resources/database/migrations/'
        TargetFolder: $(Build.ArtifactStagingDirectory)/DatabaseScripts
        Contents: '*.sql'
-    # - task: PublishBuildArtifacts@1
-    #   inputs:
-    #    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-    #    ArtifactName: 'scripts'
-    #    publishLocation: 'container'
-    #   displayName: Generate Validation SQL Script  
+    - task: PublishBuildArtifacts@1
+      inputs:
+       PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+       ArtifactName: 'scripts'
+       publishLocation: 'container'
+      displayName: Generate Validation SQL Script  
 
   - job: PublishScripts
     displayName: Publish All SQL Scripts
