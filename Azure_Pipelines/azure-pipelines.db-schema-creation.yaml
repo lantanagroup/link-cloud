@@ -15,9 +15,6 @@ pr: none
 pool:
   vmImage: 'ubuntu-latest'
 
-variables:
-- group: MSSQL_DBCreation
-
 parameters:
 - name: previous_release
   displayName: "What is the Tag of the Previous Release? (i.e. : v0.2.0-beta.1)"
@@ -307,26 +304,6 @@ stages:
        ArtifactName: 'scripts'
        publishLocation: 'container'
       displayName: Generate Validation SQL Script  
-
-  - job: PublishScripts
-    displayName: Publish All SQL Scripts
-    dependsOn:
-      - Account
-      - Audit
-      - Census
-      - DataAcquisition
-      - Normalization
-      - QueryDispatch
-      - Submission
-      - Tenant
-      - Validation
-    condition: always()
-    steps:
-      - task: PublishBuildArtifacts@1
-        inputs:
-          PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-          ArtifactName: 'scripts'
-          publishLocation: 'container'
   ###
 
 ############################################################################################
