@@ -115,8 +115,7 @@ public class MeasureReportAggregator
 
             foreach (var reportPopulation in populationModel.ReportPopulations) {
                 List measureReportList = new List();
-                measureReportList.Id = reportPopulation.PopulationId + "-list";
-
+                
                 foreach (var measureReportPopulation in reportPopulation.MeasureReportIds) {
                     measureReportList.Entry.Add(new List.EntryComponent()
                     {
@@ -129,18 +128,17 @@ public class MeasureReportAggregator
 
                 measureReport.Contained.Add(measureReportList);
 
-                CodeableConcept codeableConcept = reportPopulation.PopulationCode; //parser.Parse<CodeableConcept>(reportPopulation.PopulationCode);
+                CodeableConcept codeableConcept = reportPopulation.PopulationCode; 
                 
                 measureReport.Group.Add(new MeasureReport.GroupComponent()
                 {
                     Population = new List<MeasureReport.PopulationComponent>() { 
                         new MeasureReport.PopulationComponent() { 
-                            ElementId = reportPopulation.PopulationId + "-list",
                             Code = codeableConcept,
-                            Count = reportPopulation.TotalPopulationCount
+                            Count = reportPopulation.TotalPopulationCount,
+                            SubjectResults = new ResourceReference("#" + reportPopulation.PopulationId + "-list")
                         }
-                    },
-                    ElementId = reportPopulation.PopulationId
+                    }
                 });
             }
             

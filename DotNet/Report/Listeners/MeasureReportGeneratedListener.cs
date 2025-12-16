@@ -177,21 +177,18 @@ namespace LantanaGroup.Link.Report.Listeners
                                         ReportScheduleId = result.Value.ReportTrackingId
                                     };
 
-                                    //TODO: Temporary to get things saving. Figure out CodeableConcept deserialization
                                     var serializer = new FhirJsonSerializer();
 
                                     foreach (var measureReportpopulation in measureReportResult.PopulationList) {
-                                        ReportPopulation population = new ReportPopulation();
-                                        population.PopulationId = measureReportpopulation.PopulationId;
-
-                                        string json = serializer.SerializeToString(measureReportpopulation.PopulationCode);
-                                        population.PopulationCode = measureReportpopulation.PopulationCode; //json;
-
-                                        population.TotalPopulationCount = measureReportpopulation.PopulationCount;
-                                        population.MeasureReportIds = new List<MeasureReportPopulation>() {
-                                            new MeasureReportPopulation() {
-                                                MeasureReportId = measureReportResult.MeasureReportId,
-                                                PopulationCount = measureReportpopulation.PopulationCount
+                                        ReportPopulation population = new ReportPopulation() {
+                                            PopulationId = measureReportpopulation.PopulationId,
+                                            PopulationCode = measureReportpopulation.PopulationCode,
+                                            TotalPopulationCount = measureReportpopulation.PopulationCount,
+                                            MeasureReportIds = new List<MeasureReportPopulation>() {
+                                                new MeasureReportPopulation() {
+                                                    MeasureReportId = measureReportResult.MeasureReportId,
+                                                    PopulationCount = measureReportpopulation.PopulationCount
+                                                }
                                             }
                                         };
 
@@ -219,20 +216,21 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (ConsumeException ex)
                     {
-
+                        //TODO: ADD
                     }
                     catch (OperationCanceledException oce)
                     {
-
+                        //TODO: ADD
                     }
                     catch (Exception ex)
                     {
-
+                        //TODO: ADD
                     }
                 }
             }
             catch (OperationCanceledException oce)
             {
+                //TODO: ADD
             }
         }
     }
