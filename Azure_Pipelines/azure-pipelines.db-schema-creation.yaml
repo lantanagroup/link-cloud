@@ -132,161 +132,185 @@ stages:
   - job: Account
     displayName: "Generate Account Schema Script"
     steps:
-      - task: DotNetCoreCLI@2
-        displayName: Install dotnet-ef
-        inputs:
-         command: 'custom'
-         custom: 'tool'
-         arguments: 'install --global dotnet-ef'
       - script: |
-         dotnet ef migrations script --idempotent --verbose -c AccountDbContext -s $(build.sourcesdirectory)/DotNet/Account/Account.csproj -p $(build.sourcesdirectory)/DotNet/Account/Account.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/accountDb.sql
+          cd DotNet/Account
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
+      - script: |
+          cd DotNet/Account
+          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c AccountDbContext -s $(build.sourcesdirectory)/DotNet/Account/Account.csproj -p $(build.sourcesdirectory)/DotNet/Account/Account.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/accountDb.sql
         displayName: Generate Account SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
          PathtoPublish: '$(Build.ArtifactStagingDirectory)'
          ArtifactName: 'scripts'
          publishLocation: 'container'
-        displayName: Generate Account SQL Script  
+        displayName: Publish Account SQL Script  
   ###
   # Audit
   - job: Audit
     displayName: "Generate Audit Schema Script"
     steps:
-      - task: DotNetCoreCLI@2
-        displayName: Install dotnet-ef
-        inputs:
-         command: 'custom'
-         custom: 'tool'
-         arguments: 'install --global dotnet-ef'
       - script: |
-         dotnet ef migrations script --idempotent --verbose -c AuditDbContext -s $(build.sourcesdirectory)/DotNet/Audit/Audit.csproj -p $(build.sourcesdirectory)/DotNet/Audit/Audit.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/auditDb.sql
+          cd DotNet/Audit
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
+      - script: |
+          cd DotNet/Audit
+          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c AuditDbContext -s $(build.sourcesdirectory)/DotNet/Audit/Audit.csproj -p $(build.sourcesdirectory)/DotNet/Audit/Audit.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/auditDb.sql
         displayName: Generate Audit SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
          PathtoPublish: '$(Build.ArtifactStagingDirectory)'
          ArtifactName: 'scripts'
          publishLocation: 'container'
-        displayName: Generate Audit SQL Script  
+        displayName: Publish Audit SQL Script  
   ###
   # Census
   - job: Census
     displayName: "Generate Census Schema Script"
     steps:
-      - task: DotNetCoreCLI@2
-        displayName: Install dotnet-ef
-        inputs:
-         command: 'custom'
-         custom: 'tool'
-         arguments: 'install --global dotnet-ef'
       - script: |
-         dotnet ef migrations script --idempotent --verbose -c CensusContext -s $(build.sourcesdirectory)/DotNet/Census/Census.csproj -p $(build.sourcesdirectory)/DotNet/Census/Census.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/censusDb.sql
+          cd DotNet/Census
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
+      - script: |
+          cd DotNet/Census
+          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c CensusContext -s $(build.sourcesdirectory)/DotNet/Census/Census.csproj -p $(build.sourcesdirectory)/DotNet/Census/Census.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/censusDb.sql
         displayName: Generate Census SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
          PathtoPublish: '$(Build.ArtifactStagingDirectory)'
          ArtifactName: 'scripts'
          publishLocation: 'container'
-        displayName: Generate Census SQL Script  
+        displayName: Publish Census SQL Script  
   ###
   # DataAcquisition
   - job: DataAcquisition
     displayName: "Generate Data Acquisition Schema Script"
     steps:
-      - task: DotNetCoreCLI@2
-        displayName: Install dotnet-ef
-        inputs:
-         command: 'custom'
-         custom: 'tool'
-         arguments: 'install --global dotnet-ef'
       - script: |
-         dotnet ef migrations script --idempotent --verbose -c DataAcquisitionDbContext -s $(build.sourcesdirectory)/DotNet/DataAcquisition/DataAcquisition.csproj -p $(build.sourcesdirectory)/DotNet/DataAcquisition.Domain/DataAcquisition.Domain.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/dataDb.sql
+          cd DotNet/DataAcquisition
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
+      - script: |
+          cd DotNet/DataAcquisition
+          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c DataAcquisitionDbContext -s $(build.sourcesdirectory)/DotNet/DataAcquisition/DataAcquisition.csproj -p $(build.sourcesdirectory)/DotNet/DataAcquisition.Domain/DataAcquisition.Domain.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/dataDb.sql
         displayName: Generate DataAcquisition SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
          PathtoPublish: '$(Build.ArtifactStagingDirectory)'
          ArtifactName: 'scripts'
          publishLocation: 'container'
-        displayName: Generate DataAcquisition SQL Script  
+        displayName: Publish Data Acquisition SQL Script  
   ###
   # Normalization
   - job: Normalization
     displayName: "Generate Normalization Schema Script"
     steps:
-      - task: DotNetCoreCLI@2
-        displayName: Install dotnet-ef
-        inputs:
-         command: 'custom'
-         custom: 'tool'
-         arguments: 'install --global dotnet-ef'
       - script: |
-           dotnet ef migrations script --idempotent --verbose -c NormalizationDbContext -s $(build.sourcesdirectory)/DotNet/Normalization/Normalization.csproj -p $(build.sourcesdirectory)/DotNet/Normalization/Normalization.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/normalizationDb.sql
+          cd DotNet/Normalization
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
+      - script: |
+          cd DotNet/Normalization
+          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c NormalizationDbContext -s $(build.sourcesdirectory)/DotNet/Normalization/Normalization.csproj -p $(build.sourcesdirectory)/DotNet/Normalization/Normalization.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/normalizationDb.sql
         displayName: Generate Normalization SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
          PathtoPublish: '$(Build.ArtifactStagingDirectory)'
          ArtifactName: 'scripts'
          publishLocation: 'container'
-        displayName: Generate Normalization SQL Script  
+        displayName: Publish Normalization SQL Script  
   ###
   # QueryDispatch
   - job: QueryDispatch
     displayName: "Generate QueryDispatch Schema Script"
     steps:
-    - task: DotNetCoreCLI@2
-      displayName: Install dotnet-ef
-      inputs:
-       command: 'custom'
-       custom: 'tool'
-       arguments: 'install --global dotnet-ef'
-    - script: |
-         dotnet ef migrations script --idempotent --verbose -c QueryDispatchDbContext -s $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj -p $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/queryDispatchDb.sql
-      displayName: Generate QueryDispatch SQL Script
-    - task: PublishBuildArtifacts@1
-      inputs:
-       PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-       ArtifactName: 'scripts'
-       publishLocation: 'container'
-      displayName: Generate QueryDispatch SQL Script  
+      - script: |
+          cd DotNet/QueryDispatch
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
+      - script: |
+          cd DotNet/QueryDispatch
+          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c QueryDispatchDbContext -s $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj -p $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/queryDispatchDb.sql
+        displayName: Generate QueryDispatch SQL Script
+      - task: PublishBuildArtifacts@1
+        inputs:
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+         ArtifactName: 'scripts'
+         publishLocation: 'container'
+        displayName: Publish Query Dispatch SQL Script  
   ###
   # Submission
   - job: Submission
     displayName: "Generate Submission Schema Script"
     steps:
-      - task: DotNetCoreCLI@2
-        displayName: Install dotnet-ef
-        inputs:
-         command: 'custom'
-         custom: 'tool'
-         arguments: 'install --global dotnet-ef'
       - script: |
-         dotnet ef migrations script --idempotent --verbose -c SubmissionContext -s $(build.sourcesdirectory)/DotNet/Submission/Submission.csproj -p $(build.sourcesdirectory)/DotNet/Submission.Data/Submission.Data.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/submissionDb.sql
+          cd DotNet/Submission
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
+      - script: |
+          cd DotNet/Submission
+          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c SubmissionContext -s $(build.sourcesdirectory)/DotNet/Submission/Submission.csproj -p $(build.sourcesdirectory)/DotNet/Submission.Data/Submission.Data.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/submissionDb.sql
         displayName: Generate Submission SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
          PathtoPublish: '$(Build.ArtifactStagingDirectory)'
          ArtifactName: 'scripts'
          publishLocation: 'container'
-        displayName: Generate Submission SQL Script  
+        displayName: Publish Submission SQL Script  
   ###
   # Tenant
   - job: Tenant
     displayName: "Build Tenant"
     steps:
-    - task: DotNetCoreCLI@2
-      displayName: Install dotnet-ef
-      inputs:
-       command: 'custom'
-       custom: 'tool'
-       arguments: 'install --global dotnet-ef'
-    - script: |
-         dotnet ef migrations script --idempotent --verbose -c TenantDbContext -s $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj -p $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/tenantDb.sql
-      displayName: Generate Tenant SQL Script
-    - task: PublishBuildArtifacts@1
-      inputs:
-       PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-       ArtifactName: 'scripts'
-       publishLocation: 'container'
-      displayName: Generate Tenant SQL Script  
+      - script: |
+          cd DotNet/Tenant
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
+      - script: |
+          cd DotNet/Tenant
+          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c TenantDbContext -s $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj -p $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/tenantDb.sql
+        displayName: Generate Tenant SQL Script
+      - task: PublishBuildArtifacts@1
+        inputs:
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+         ArtifactName: 'scripts'
+         publishLocation: 'container'
+        displayName: Publish Tenant SQL Script  
     ###
   # Validation
   - job: Validation
@@ -303,7 +327,7 @@ stages:
        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
        ArtifactName: 'scripts'
        publishLocation: 'container'
-      displayName: Generate Validation SQL Script  
+      displayName: Publish Validation SQL Script  
   ###
 
 ############################################################################################
