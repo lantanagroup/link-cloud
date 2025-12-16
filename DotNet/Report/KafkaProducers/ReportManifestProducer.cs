@@ -43,66 +43,16 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _auditableEventOccurredProducer = auditableEventOccurredProducer;
         }
 
-        //public async Task<List<Resource>> Generate(ReportScheduleModel schedule)
-        //{
-        //    var allSubmissionEntries = await _database.ReportEntryStatusRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
-
-        //    var submissionEntries = allSubmissionEntries.Where(x => x.Status != PatientSubmissionStatus.NotReportable).ToList();
-
-        //    var measureReports = submissionEntries
-        //                .Select(e => e.MeasureReport)
-        //                .Where(report => report != null).ToList();
-
-        //    var allPatientIds = allSubmissionEntries.Select(s => s.PatientId).Distinct().ToList();
-
-        //    var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ValidationComplete || s.Status == PatientSubmissionStatus.Submitted).Select(s => s.PatientId).Distinct().ToList();
-
-        //    var failedEntries = submissionEntries.Where(s => s.ValidationStatus == ValidationStatus.Failed).ToList();
-
-        //    var facilityConfig = await _tenantApiService.GetFacilityConfig(schedule.FacilityId, CancellationToken.None);
-
-        //    var organization = FhirHelperMethods.CreateOrganization(facilityConfig.FacilityName, schedule.FacilityId, ReportConstants.BundleSettings.SubmittingOrganizationProfile, ReportConstants.BundleSettings.OrganizationTypeSystem,
-        //                                                                    ReportConstants.BundleSettings.CdcOrgIdSystem, ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);
-
-        //    var aggregates = _aggregator.Aggregate(measureReports, organization.Id, schedule.ReportStartDate, schedule.ReportEndDate);
-
-        //    var measureIds = measureReports.Select(mr => mr.Measure).Distinct().ToList();
-
-        //    var reportName = _blobStorageService.GetReportName(schedule);
-
-        //    var patientFileDict = patientIds.ToDictionary(pid => pid, pid => $"{reportName}_{pid}.ndjson");
-
-        //    List<Resource> manifestResources =
-        //    [
-        //        organization,
-        //        CreateDevice(),
-        //        CreatePatientList(allPatientIds, schedule.ReportStartDate, schedule.ReportEndDate),
-        //    ];
-
-        //    foreach (var aggregate in aggregates)
-        //    {
-        //        AddExtensionsToAggregate(aggregate, patientFileDict);
-        //        manifestResources.Add(aggregate);
-        //    }
-
-        //    var operationOutcome = CreateOperationOutcome(failedEntries);
-        //    if (operationOutcome.Issue.Any())
-        //    {
-        //        manifestResources.Add(operationOutcome);
-        //    }
-
-        //    foreach (var resource in manifestResources)
-        //    {
-        //        resource.Id ??= Guid.NewGuid().ToString();
-        //    }
-
-        //    return manifestResources;
-        //}
-
         public async Task<List<Resource>> Generate(ReportScheduleModel schedule)
         {
             var reportEntries = await _database.ReportEntryStatusRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
+
+            //TODO: ADD ERROR
+
             var facilityConfig = await _tenantApiService.GetFacilityConfig(schedule.FacilityId, CancellationToken.None);
+
+            //TODO: ADD ERROR
+
             var organization = FhirHelperMethods.CreateOrganization(facilityConfig.FacilityName, schedule.FacilityId, ReportConstants.BundleSettings.SubmittingOrganizationProfile, ReportConstants.BundleSettings.OrganizationTypeSystem, ReportConstants.BundleSettings.CdcOrgIdSystem, ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);
 
             List<Resource> manifestResources =
@@ -119,7 +69,6 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             foreach (var aggregate in aggregates)
             {
-                AddExtensionsToAggregate(aggregate, patientFileDict);
                 manifestResources.Add(aggregate);
             }
 
@@ -248,24 +197,6 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             }
 
             return admittedPatients;
-        }
-
-        private void AddExtensionsToAggregate(MeasureReport measureReport, Dictionary<string, string> patientFileDict)
-        {
-            foreach (var list in measureReport.Contained.OfType<List>())
-            {
-                foreach (var entry in list.Entry)
-                {
-                    string? patRef = entry.Item?.Reference;
-                    if (string.IsNullOrEmpty(patRef)) continue;
-
-                    string patId = patRef.Replace("Patient/", "");
-                    if (patientFileDict.TryGetValue(patId, out var filename))
-                    {
-                        entry.AddExtension("https://measures.nhsnlink.org/StructureDefinition/link-file-reference-extension", new FhirString(filename));
-                    }
-                }
-            }
         }
 
         private OperationOutcome CreateOperationOutcome(List<ReportEntryStatusModel> failedEntries)
