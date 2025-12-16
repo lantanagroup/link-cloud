@@ -315,7 +315,6 @@ stages:
 - stage: Update_Account_DB
   displayName: Update Account Database Schema
   dependsOn: Build
-  condition: succeeded()
   jobs:
     - job: UpdateAuditSchema
       displayName: Update Account DB Schema
