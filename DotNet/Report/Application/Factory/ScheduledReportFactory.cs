@@ -35,6 +35,7 @@ public class MeasureReportSummaryFactory
             PatientId = measureReport.PatientId,
             ReportType = measureReport.ReportType,
             Status = measureReport.Status.ToString(),
+            ValidationStatus = measureReport.ValidationStatus.ToString(),
         };
         
         
