@@ -146,7 +146,7 @@ stages:
          PathtoPublish: '$(Build.ArtifactStagingDirectory)'
          ArtifactName: 'scripts'
          publishLocation: 'container'
-        displayName: Generate Tenant SQL Script  
+        displayName: Generate Account SQL Script  
   ###
   # Audit
   - job: Audit
@@ -166,7 +166,7 @@ stages:
          PathtoPublish: '$(Build.ArtifactStagingDirectory)'
          ArtifactName: 'scripts'
          publishLocation: 'container'
-        displayName: Generate Tenant SQL Script  
+        displayName: Generate Audit SQL Script  
   ###
   # Census
   - job: Census
@@ -186,7 +186,7 @@ stages:
          PathtoPublish: '$(Build.ArtifactStagingDirectory)'
          ArtifactName: 'scripts'
          publishLocation: 'container'
-        displayName: Generate Tenant SQL Script  
+        displayName: Generate Census SQL Script  
   ###
   # DataAcquisition
   - job: DataAcquisition
@@ -206,7 +206,7 @@ stages:
          PathtoPublish: '$(Build.ArtifactStagingDirectory)'
          ArtifactName: 'scripts'
          publishLocation: 'container'
-        displayName: Generate Tenant SQL Script  
+        displayName: Generate DataAcquisition SQL Script  
   ###
   # Normalization
   - job: Normalization
@@ -226,7 +226,7 @@ stages:
          PathtoPublish: '$(Build.ArtifactStagingDirectory)'
          ArtifactName: 'scripts'
          publishLocation: 'container'
-        displayName: Generate Tenant SQL Script  
+        displayName: Generate Normalization SQL Script  
   ###
   # QueryDispatch
   - job: QueryDispatch
@@ -246,7 +246,7 @@ stages:
        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
        ArtifactName: 'scripts'
        publishLocation: 'container'
-      displayName: Generate Tenant SQL Script  
+      displayName: Generate QueryDispatch SQL Script  
   ###
   # Submission
   - job: Submission
@@ -309,24 +309,24 @@ stages:
 ############################################################################################
 # Apply SQL Changes to QA ENV
 ############################################################################################
-- stage: Update_Account_DB
-  displayName: Update Account Database Schema
-  dependsOn: Build
-  condition: always()
-  jobs:
-  - job: UpdateAccountSchema
-    displayName: Update Account DB Schema
-    steps:
-      - download: current
-        artifact: scripts
+# - stage: Update_Account_DB
+#   displayName: Update Account Database Schema
+#   dependsOn: Build
+#   condition: always()
+#   jobs:
+#   - job: UpdateAccountSchema
+#     displayName: Update Account DB Schema
+#     steps:
+#       - download: current
+#         artifact: scripts
 
-      - task: SqlAzureDacpacDeployment@1
-        displayName: Apply Account DB Schema
-        inputs:
-          azureSubscription: "NHSNLink Resource Manager"
-          ServerName: 'link-db.database.windows.net'
-          DatabaseName: 'link-qa-botw-account'
-          SqlUsername: '$(link-db_username)'
-          SqlPassword: '$(link-db_pass)'
-          deployType: 'SqlTask'
-          SqlFile: '$(Pipeline.Workspace)/scripts/DatabaseScripts/accountDb.sql'
+#       - task: SqlAzureDacpacDeployment@1
+#         displayName: Apply Account DB Schema
+#         inputs:
+#           azureSubscription: "NHSNLink Resource Manager"
+#           ServerName: 'link-db.database.windows.net'
+#           DatabaseName: 'link-qa-botw-account'
+#           SqlUsername: '$(link-db_username)'
+#           SqlPassword: '$(link-db_pass)'
+#           deployType: 'SqlTask'
+#           SqlFile: '$(Pipeline.Workspace)/scripts/DatabaseScripts/accountDb.sql'
