@@ -253,6 +253,19 @@ services:
       - .docker/grafana.yml:/etc/grafana/provisioning/datasources/ds.yaml
     networks:
       - link-nw
+
+  promtail:
+    image: grafana/promtail:3.2.0
+    container_name: promtail
+    volumes:
+      - .docker/promtail-kafka.yaml:/etc/promtail/config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/config.yaml
+    networks:
+      - link-nw
+    depends_on:
+      - loki
+      - kafka_b
       
   ###########################################
   ### KAFKA
