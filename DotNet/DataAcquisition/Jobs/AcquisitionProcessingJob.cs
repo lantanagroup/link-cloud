@@ -24,7 +24,7 @@ public class AcquisitionProcessingJob : IJob
     private readonly IProducer<long, ReadyToAcquire> _readyToAcquireProducer;
     private readonly IProducer<string, ResourceAcquired> _resourceAcquiredProducer;
     private const int BatchSize = 25;
-    private const int MaxRetryAttempts = 10;
+    private const int MaxRetryAttempts = 1;
     private const int MaxConcurrency = 8;
 
     public AcquisitionProcessingJob(
