@@ -10,6 +10,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 
 namespace LantanaGroup.Link.Report.Listeners;
@@ -93,7 +94,9 @@ public class PayloadSubmittedListener(
                                     throw new Exception($"Report schedule {reportTrackingId} not found");
                                 }
 
-                                logger.LogInformation("Report submitted for {FacilityId} at {SubmissionTime}", reportSchedule.FacilityId, DateTime.UtcNow);
+                                logger.LogInformation("Report submitted for {FacilityId} at {SubmissionTime}", 
+                                    reportSchedule.FacilityId.SanitizeAndRemove(), 
+                                    DateTime.UtcNow);
 
                                 reportSchedule.Status = ScheduleStatus.Submitted;
                                 reportSchedule.SubmitReportDateTime = DateTime.UtcNow;

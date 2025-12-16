@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Report.Domain;
+﻿using System.Globalization;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.Settings;
@@ -6,6 +7,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using Quartz;
 using Quartz.Spi;
 using System.Text.Json;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Report.Services;
 
@@ -45,17 +47,17 @@ public class MeasureReportScheduleService : BackgroundService
             try
             {
                 _logger.LogInformation("Scheduling job for ReportSchedule ID: {ScheduleId}, FacilityId: {FacilityId}, EndDate: {EndDate}",
-                    reportSchedule.Id,
-                    reportSchedule.FacilityId,
-                    reportSchedule.ReportEndDate);
+                    reportSchedule.Id.SanitizeAndRemove(),
+                    reportSchedule.FacilityId.SanitizeAndRemove(),
+                    reportSchedule.ReportEndDate.ToString(CultureInfo.InvariantCulture).SanitizeAndRemove());
 
                 await CreateJobAndTrigger(reportSchedule, Scheduler, _logger);
 
-                _logger.LogInformation("Successfully scheduled job for ReportSchedule ID: {ScheduleId}", reportSchedule.Id);
+                _logger.LogInformation("Successfully scheduled job for ReportSchedule ID: {ScheduleId}", reportSchedule.Id.SanitizeAndRemove());
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Could not schedule {ScheduleId}: {Message}", reportSchedule.Id, ex.Message);
+                _logger.LogError(ex, "Could not schedule {ScheduleId}: {Message}", reportSchedule.Id.SanitizeAndRemove(), ex.Message);
             }
         }
 

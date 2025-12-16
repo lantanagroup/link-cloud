@@ -25,6 +25,7 @@ using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Listeners
@@ -361,7 +362,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 }
                 catch (ProduceException<ReadyForValidationKey, ReadyForValidationValue> ex)
                 {
-                    _logger.LogError(ex, "An error was encountered generating a Ready For Validation event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
+                    _logger.LogError(ex, "An error was encountered generating a Ready For Validation event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId.SanitizeAndRemove());
                     throw;
                 }
             }
