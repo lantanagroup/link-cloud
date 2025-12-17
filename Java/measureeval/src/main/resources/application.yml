@@ -72,6 +72,8 @@ spring:
 
     producer:
       client-id: ${spring.application.name}
+      properties:
+        max.request.size: 10485760
 
     retry:
       maxAttempts: 3
