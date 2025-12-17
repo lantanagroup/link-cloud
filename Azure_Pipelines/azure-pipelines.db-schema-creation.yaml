@@ -15,6 +15,9 @@ pr: none
 pool:
   vmImage: 'ubuntu-latest'
 
+variables:
+- group: 'MSSQL_DBCreation'
+
 parameters:
 - name: previous_release
   displayName: "What is the Tag of the Previous Release? (i.e. : v0.2.0-beta.1)"
@@ -257,11 +260,11 @@ stages:
       - script: |
           cd DotNet/QueryDispatch
           mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
-          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c QueryDispatchDbContext -s $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj -p $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/queryDispatchDb.sql
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c QueryDispatchDbContext -s $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj -p $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/querydispatchDb.sql
         displayName: Generate QueryDispatch SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
-         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/queryDispatchDb.sql'
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/querydispatchDb.sql'
          ArtifactName: 'querydispatch-db'
          publishLocation: 'container'
         displayName: Publish Query Dispatch SQL Script  
@@ -321,7 +324,7 @@ stages:
       inputs:
        SourceFolder: '$(build.sourcesdirectory)/Java/validation/src/main/resources/database/migrations/'
        TargetFolder: '$(Build.ArtifactStagingDirectory)/validation-db'
-       Contents: '*.sql'
+       Contents: 'validationDb.sql'
     - task: PublishBuildArtifacts@1
       inputs:
        PathtoPublish: '$(Build.ArtifactStagingDirectory)/validation-db'
@@ -330,9 +333,9 @@ stages:
       displayName: Publish Validation SQL Script  
   ###
 
-- stage: Update_Account_DB
+- stage: Update_SQL_DBs
   trigger: manual
-  displayName: Update Account Database Schema
+  displayName: Update SQL Schema on Databases
   # dependsOn: Build
   condition: always()
 
@@ -341,6 +344,7 @@ stages:
     vmImage: 'windows-latest'
 
   jobs:
+  ### Account
   - job: UpdateAccountSchema
     displayName: Update Account DB Schema
     steps:
@@ -357,3 +361,147 @@ stages:
           SqlPassword: '$(link-db_pass)'
           deployType: 'SqlTask'
           SqlFile: '$(Pipeline.Workspace)/account-db/accountDb.sql'
+
+  ### Audit
+  - job: UpdateauditSchema
+    displayName: Update audit DB Schema
+    steps:
+      - download: current
+        artifact: audit-db
+
+      - task: SqlAzureDacpacDeployment@1
+        displayName: Apply audit DB Schema
+        inputs:
+          azureSubscription: "NHSNLink Resource Manager"
+          ServerName: 'link-db.database.windows.net'
+          DatabaseName: 'link-qa-botw-audit'
+          SqlUsername: '$(link-db_username)'
+          SqlPassword: '$(link-db_pass)'
+          deployType: 'SqlTask'
+          SqlFile: '$(Pipeline.Workspace)/audit-db/auditDb.sql'
+
+  ### Census
+  - job: UpdatecensusSchema
+    displayName: Update census DB Schema
+    steps:
+      - download: current
+        artifact: census-db
+
+      - task: SqlAzureDacpacDeployment@1
+        displayName: Apply census DB Schema
+        inputs:
+          azureSubscription: "NHSNLink Resource Manager"
+          ServerName: 'link-db.database.windows.net'
+          DatabaseName: 'link-qa-botw-census'
+          SqlUsername: '$(link-db_username)'
+          SqlPassword: '$(link-db_pass)'
+          deployType: 'SqlTask'
+          SqlFile: '$(Pipeline.Workspace)/census-db/censusDb.sql'
+
+  ### Data
+  - job: UpdatedataSchema
+    displayName: Update data DB Schema
+    steps:
+      - download: current
+        artifact: data-db
+
+      - task: SqlAzureDacpacDeployment@1
+        displayName: Apply data DB Schema
+        inputs:
+          azureSubscription: "NHSNLink Resource Manager"
+          ServerName: 'link-db.database.windows.net'
+          DatabaseName: 'link-qa-botw-data'
+          SqlUsername: '$(link-db_username)'
+          SqlPassword: '$(link-db_pass)'
+          deployType: 'SqlTask'
+          SqlFile: '$(Pipeline.Workspace)/data-db/dataDb.sql'
+
+  ### Normalization
+  - job: UpdatenormalizationSchema
+    displayName: Update normalization DB Schema
+    steps:
+      - download: current
+        artifact: normalization-db
+
+      - task: SqlAzureDacpacDeployment@1
+        displayName: Apply normalization DB Schema
+        inputs:
+          azureSubscription: "NHSNLink Resource Manager"
+          ServerName: 'link-db.database.windows.net'
+          DatabaseName: 'link-qa-botw-normalization'
+          SqlUsername: '$(link-db_username)'
+          SqlPassword: '$(link-db_pass)'
+          deployType: 'SqlTask'
+          SqlFile: '$(Pipeline.Workspace)/normalization-db/normalizationDb.sql'
+
+  ### QueryDispatch
+  - job: UpdatequerydispatchSchema
+    displayName: Update querydispatch DB Schema
+    steps:
+      - download: current
+        artifact: querydispatch-db
+
+      - task: SqlAzureDacpacDeployment@1
+        displayName: Apply querydispatch DB Schema
+        inputs:
+          azureSubscription: "NHSNLink Resource Manager"
+          ServerName: 'link-db.database.windows.net'
+          DatabaseName: 'link-qa-botw-querydispatch'
+          SqlUsername: '$(link-db_username)'
+          SqlPassword: '$(link-db_pass)'
+          deployType: 'SqlTask'
+          SqlFile: '$(Pipeline.Workspace)/querydispatch-db/querydispatchDb.sql'
+
+  ### Submission
+  - job: UpdatesubmissionSchema
+    displayName: Update submission DB Schema
+    steps:
+      - download: current
+        artifact: submission-db
+
+      - task: SqlAzureDacpacDeployment@1
+        displayName: Apply submission DB Schema
+        inputs:
+          azureSubscription: "NHSNLink Resource Manager"
+          ServerName: 'link-db.database.windows.net'
+          DatabaseName: 'link-qa-botw-submission'
+          SqlUsername: '$(link-db_username)'
+          SqlPassword: '$(link-db_pass)'
+          deployType: 'SqlTask'
+          SqlFile: '$(Pipeline.Workspace)/submission-db/submissionDb.sql'
+
+  ### Tenant
+  - job: UpdatetenantSchema
+    displayName: Update tenant DB Schema
+    steps:
+      - download: current
+        artifact: tenant-db
+
+      - task: SqlAzureDacpacDeployment@1
+        displayName: Apply tenant DB Schema
+        inputs:
+          azureSubscription: "NHSNLink Resource Manager"
+          ServerName: 'link-db.database.windows.net'
+          DatabaseName: 'link-qa-botw-tenant'
+          SqlUsername: '$(link-db_username)'
+          SqlPassword: '$(link-db_pass)'
+          deployType: 'SqlTask'
+          SqlFile: '$(Pipeline.Workspace)/tenant-db/tenantDb.sql'
+
+  ### Validation
+  - job: UpdatevalidationSchema
+    displayName: Update validation DB Schema
+    steps:
+      - download: current
+        artifact: validation-db
+
+      - task: SqlAzureDacpacDeployment@1
+        displayName: Apply validation DB Schema
+        inputs:
+          azureSubscription: "NHSNLink Resource Manager"
+          ServerName: 'link-db.database.windows.net'
+          DatabaseName: 'link-qa-botw-validation'
+          SqlUsername: '$(link-db_username)'
+          SqlPassword: '$(link-db_pass)'
+          deployType: 'SqlTask'
+          SqlFile: '$(Pipeline.Workspace)/validation-db/validationDb.sql'
