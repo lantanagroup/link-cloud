@@ -382,7 +382,7 @@ public class PatientDataService : IPatientDataService
                         log.ReportTrackingId,
                         cancellationToken);
 
-                    if (nonReferenceLogsCnt > 0 && (log.RetryAttempts ?? 0) < 10)
+                    if (nonReferenceLogsCnt > 0 && (log.RetryAttempts ?? 0) < DataAcquisitionLog.MaxRetryAttempts)
                     {
                         log.Status = RequestStatus.Pending;
                         log.RetryAttempts = (log.RetryAttempts ?? 0) + 1;
@@ -399,11 +399,11 @@ public class PatientDataService : IPatientDataService
                         }, cancellationToken);
                         return;
                     }
-                    else if ((log.RetryAttempts ?? 0) >= 10)
+                    else if ((log.RetryAttempts ?? 0) >= DataAcquisitionLog.MaxRetryAttempts)
                     {
                         log.Notes ??= new List<string>();
                         log.Status = RequestStatus.Failed;
-                        log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has exceeded the maximum retry attempts of 10. Not all Non-reference resource queries are completed. Marking as Failed.");
+                        log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has exceeded the maximum retry attempts. Not all Non-reference resource queries are completed. Marking as Failed.");
                         await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                         {
                             Id = log.Id,

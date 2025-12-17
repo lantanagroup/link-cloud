@@ -238,7 +238,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         {
             FacilityId = "TestFacility",
             Status = RequestStatus.Failed,
-            RetryAttempts = 9,
+            RetryAttempts = DataAcquisitionLog.MaxRetryAttempts - 1,
             CorrelationId = Guid.NewGuid().ToString(),
             ReportTrackingId = "TestReportId",
             PatientId = "Patient/123",
@@ -257,7 +257,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         {
             FacilityId = "TestFacility",
             Status = RequestStatus.Failed,
-            RetryAttempts = 10,
+            RetryAttempts = DataAcquisitionLog.MaxRetryAttempts,
             CorrelationId = Guid.NewGuid().ToString(),
             ReportTrackingId = "TestReportId",
             PatientId = "Patient/123",
@@ -303,7 +303,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var updatedLog1 = await assertDbContext.DataAcquisitionLogs.FindAsync(log1.Id);
         Assert.Equal(RequestStatus.Ready, updatedLog1.Status);
-        Assert.Equal(10, updatedLog1.RetryAttempts);
+        Assert.Equal(DataAcquisitionLog.MaxRetryAttempts, updatedLog1.RetryAttempts);
 
         var updatedLog2 = await assertDbContext.DataAcquisitionLogs.FindAsync(log2.Id);
         Assert.Equal(RequestStatus.MaxRetriesReached, updatedLog2.Status);
@@ -534,7 +534,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
                 {
                     FacilityId = facilityId,
                     Status = RequestStatus.Failed,
-                    RetryAttempts = 5,
+                    RetryAttempts = 0,
                     CorrelationId = Guid.NewGuid().ToString(),
                     ReportTrackingId = $"FailedRetry{i}",
                     PatientId = $"Patient/{i + pendingPerFacility}",
@@ -556,7 +556,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
                 {
                     FacilityId = facilityId,
                     Status = RequestStatus.Failed,
-                    RetryAttempts = 10,
+                    RetryAttempts = DataAcquisitionLog.MaxRetryAttempts,
                     CorrelationId = Guid.NewGuid().ToString(),
                     ReportTrackingId = $"MaxRetry{i}",
                     PatientId = $"Patient/{i + pendingPerFacility + failedRetryablePerFacility}",
@@ -613,7 +613,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
             Assert.All(retryableLogs, log =>
             {
                 Assert.Equal(RequestStatus.Ready, log.Status);
-                Assert.Equal(6, log.RetryAttempts);
+                Assert.Equal(1, log.RetryAttempts);
             });
 
             var maxRetryLogs = allLogs.Where(l => l.ReportTrackingId.StartsWith("MaxRetry")).ToList();
