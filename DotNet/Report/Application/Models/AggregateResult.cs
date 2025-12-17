@@ -11,6 +11,7 @@ namespace LantanaGroup.Link.Report.Application.Models
 
     public class AggregateMeasureReportResult {
         public string Measure;
+        public string ReportType;
         public string MeasureReportId;
         public List<AggregateMeasureReportPopulation> PopulationList = new List<AggregateMeasureReportPopulation>();
     }

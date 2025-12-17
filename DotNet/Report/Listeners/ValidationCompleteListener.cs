@@ -171,10 +171,6 @@ namespace LantanaGroup.Link.Report.Listeners
             var value = result.Message.Value;
             var reportId = value.ReportTrackingId;
 
-            //using var scope = _serviceScopeFactory.CreateScope();
-            //var measureReportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
-            //var reportEntryStatusManager = scope.ServiceProvider.GetRequiredService<IReportEntryStatusManager>();
-
             var schedule = await _reportScheduledManager.SingleOrDefaultAsync(s => s.Id == reportId, cancellationToken);
             
             if (schedule == null)
@@ -194,13 +190,6 @@ namespace LantanaGroup.Link.Report.Listeners
             {
                 throw new DeadLetterException($"No Patient Submission Entries were found for schedule ID {schedule.Id}, patient ID {value.PatientId}");
             }
-
-            //foreach (var entry in submissionEntries)
-            //{
-            //    entry.ValidationStatus = value.IsValid ? ValidationStatus.Passed : ValidationStatus.Failed;
-            //    entry.Status = PatientSubmissionStatus.ValidationComplete;
-            //    await _reportEntryManager.UpdateAsync(entry, cancellationToken);
-            //}
 
             if (!value.IsValid) 
             {

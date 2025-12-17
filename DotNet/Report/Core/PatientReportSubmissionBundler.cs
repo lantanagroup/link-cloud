@@ -62,7 +62,9 @@ namespace LantanaGroup.Link.Report.Core
 
             var entry = (await _database.ReportEntryStatusRepository.SingleOrDefaultAsync(x => x.ReportScheduleId == reportScheduleId && x.PatientId == patientId));
 
-            //TODO: Add missing entry check
+            if (entry == null) {
+                return null;
+            }
 
             //The 'resourcesAdded' Dictionary will keep track of FHIR resource id's that have been added to the bundle to avoid adding duplicates across entries. The value of each dictionary entry will contain the associated FHIR types. It's a string List type in case there are different FHIR resources that share the same id. This is probably unlikely to happen, but is possible. 
             Dictionary<string, int> resourcesAdded = new Dictionary<string,int>();
@@ -95,13 +97,12 @@ namespace LantanaGroup.Link.Report.Core
                                     continue;
                                 }
 
-                                //TODO: Change to '/'
-                                if (resource_and_id.Split('_')[0] == "MeasureReport")
+                                if (resource_and_id.Split('/')[0] == "MeasureReport")
                                 {
                                     string measureReportString = reader.ReadLine();
                                     MeasureReport measureReport = parser.Parse<MeasureReport>(measureReportString);
 
-                                    var aggregateMeasureReport = new AggregateMeasureReportResult() { Measure = measureReport.Measure, MeasureReportId = measureReport.Id };
+                                    var aggregateMeasureReport = new AggregateMeasureReportResult() { Measure = measureReport.Measure, MeasureReportId = measureReport.Id, ReportType = measureReportEntry.ReportType };
 
                                     foreach (var group in measureReport.Group) {
                                         foreach (var population in group.Population) {
