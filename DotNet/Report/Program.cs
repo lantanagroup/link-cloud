@@ -103,10 +103,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add factories
     builder.Services.AddTransient<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>, KafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
     builder.Services.AddTransient<ScheduledReportFactory>();
-    //builder.Services.AddTransient<MeasureReportSummaryFactory>();
-    //builder.Services.AddTransient<ResourceSummaryFactory>();
-
-
     builder.Services.AddTransient<IKafkaConsumerFactory<string, GenerateReportValue>, KafkaConsumerFactory<string, GenerateReportValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, ReportScheduledValue>, KafkaConsumerFactory<string, ReportScheduledValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
@@ -133,18 +129,13 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add repositories
     builder.Services.AddTransient<IBaseEntityRepository<ReportScheduleModel>, MongoEntityRepository<ReportScheduleModel>>();
-    //builder.Services.AddTransient<IBaseEntityRepository<MeasureReportSubmissionEntryModel>, MongoEntityRepository<MeasureReportSubmissionEntryModel>>();
     builder.Services.AddTransient<IBaseEntityRepository<ReportModel>, MongoEntityRepository<ReportModel>>();
-    builder.Services.AddTransient<IBaseEntityRepository<SharedResourceModel>, MongoEntityRepository<SharedResourceModel>>();
-    builder.Services.AddTransient<IBaseEntityRepository<PatientResourceModel>, MongoEntityRepository<PatientResourceModel>>();
     builder.Services.AddTransient<IBaseEntityRepository<ReportEntryStatusModel>, MongoEntityRepository<ReportEntryStatusModel>>();
     builder.Services.AddTransient<IBaseEntityRepository<ReportPopulationModel>, MongoEntityRepository<ReportPopulationModel>>();
     builder.Services.AddTransient<IDatabase, Database>();
 
     // Add Managers
     builder.Services.AddTransient<IReportScheduledManager, ReportScheduledManager>();
-    //builder.Services.AddTransient<ISubmissionEntryManager, SubmissionEntryManager>();
-    builder.Services.AddTransient<IResourceManager, ResourceManager>();
     builder.Services.AddTransient<IReportEntryStatusManager, ReportEntryStatusManager>();
     builder.Services.AddTransient<IReportPopulationManager, ReportPopulationManager>();
 
@@ -252,7 +243,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     ]));
     builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<GenerateReportListener>();
-    //builder.Services.AddHostedService<ResourceEvaluatedListener>();
     builder.Services.AddHostedService<ReportScheduledListener>();
     builder.Services.AddHostedService<PatientListsAcquiredListener>();
     builder.Services.AddHostedService<ValidationCompleteListener>();
@@ -323,7 +313,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.Environment = builder.Environment;
         options.ServiceName = ReportConstants.ServiceName;
-        options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+        options.ServiceVersion = serviceInformation.Version;                
     });
 
     // Logging using Serilog

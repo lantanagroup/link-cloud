@@ -76,62 +76,62 @@
 //            return await _database.SubmissionEntryRepository.AnyAsync(predicate, cancellationToken);
 //        }
 
-//        public async Task<PatientReportSummary> GetPatients(string facilityId, string reportId, int page, int count, CancellationToken cancellationToken = default)
+//public async Task<PatientReportSummary> GetPatients(string facilityId, string reportId, int page, int count, CancellationToken cancellationToken = default)
+//{
+//    var scheduledReport = await _database.ReportScheduledRepository.SingleOrDefaultAsync(x => x.FacilityId == facilityId && x.Id == reportId, cancellationToken);
+
+//    if (scheduledReport is null) throw new ArgumentNullException($"Scheduled report with ID {reportId} not found.");
+
+//    var measureReportEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == reportId, cancellationToken);
+
+//    var patientIds = measureReportEntries.Select(x => x.PatientId).Distinct().ToList();
+
+//    var pagedPatients = patientIds.Skip((page - 1) * count).Take(count).ToList();
+
+//    var patientSummaries = new List<PatientSummary>();
+
+//    foreach (var patientId in pagedPatients)
+//    {
+//        try
 //        {
-//            var scheduledReport = await _database.ReportScheduledRepository.SingleOrDefaultAsync(x => x.FacilityId == facilityId && x.Id == reportId, cancellationToken);
+//            var patientResource = (await _database.PatientResourceRepository.FindAsync(r => r.FacilityId == facilityId && r.PatientId == patientId && r.ResourceId == patientId && r.ResourceType == "Patient", cancellationToken)).SingleOrDefault();
 
-//            if (scheduledReport is null) throw new ArgumentNullException($"Scheduled report with ID {reportId} not found.");
-
-//            var measureReportEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == reportId, cancellationToken);
-
-//            var patientIds = measureReportEntries.Select(x => x.PatientId).Distinct().ToList();
-
-//            var pagedPatients = patientIds.Skip((page - 1) * count).Take(count).ToList();
-
-//            var patientSummaries = new List<PatientSummary>();
-
-//            foreach (var patientId in pagedPatients)
+//            if (patientResource?.GetResource() is not Patient patient)
 //            {
-//                try
-//                {
-//                    var patientResource = (await _database.PatientResourceRepository.FindAsync(r => r.FacilityId == facilityId && r.PatientId == patientId && r.ResourceId == patientId && r.ResourceType == "Patient", cancellationToken)).SingleOrDefault();
-
-//                    if (patientResource?.GetResource() is not Patient patient)
-//                    {
-//                        patientSummaries.Add(new PatientSummary { id = patientId, name = string.Empty });
-//                        continue;
-//                    }
-
-//                    var name = patient.Name?.FirstOrDefault();
-//                    var fullName = name != null ? $"{string.Join(" ", name.Given ?? Enumerable.Empty<string>())} {name.Family}".Trim() : string.Empty;
-
-//                    patientSummaries.Add(new PatientSummary
-//                    {
-//                        id = patientId,
-//                        name = fullName
-//                    });
-//                }
-//                catch (Exception ex)
-//                {
-//                    // Handle exception if GetResource fails
-//                    patientSummaries.Add(new PatientSummary
-//                    {
-//                        id = patientId,
-//                        name = string.Empty
-//                    });
-//                }
+//                patientSummaries.Add(new PatientSummary { id = patientId, name = string.Empty });
+//                continue;
 //            }
 
-//            PatientReportSummary patientReportSummary = new PatientReportSummary();
-//            patientReportSummary.total = patientIds.Count;
-//            patientReportSummary.Patients = patientSummaries;
+//            var name = patient.Name?.FirstOrDefault();
+//            var fullName = name != null ? $"{string.Join(" ", name.Given ?? Enumerable.Empty<string>())} {name.Family}".Trim() : string.Empty;
 
-//            return patientReportSummary;
+//            patientSummaries.Add(new PatientSummary
+//            {
+//                id = patientId,
+//                name = fullName
+//            });
 //        }
+//        catch (Exception ex)
+//        {
+//            // Handle exception if GetResource fails
+//            patientSummaries.Add(new PatientSummary
+//            {
+//                id = patientId,
+//                name = string.Empty
+//            });
+//        }
+//    }
+
+//    PatientReportSummary patientReportSummary = new PatientReportSummary();
+//    patientReportSummary.total = patientIds.Count;
+//    patientReportSummary.Patients = patientSummaries;
+
+//    return patientReportSummary;
+//}
 
 //        public async Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
 //        {
-            
+
 //            // Get individual measure report entries for this report
 //            var searchResults = await _database.SubmissionEntryRepository
 //                .SearchAsync(
@@ -140,11 +140,11 @@
 //                    sortOrder: sortOrder, 
 //                    pageSize: pageSize, pageNumber: pageNumber, 
 //                    cancellationToken); 
-            
-            
+
+
 //            // Build patient report summaries
 //            var measureReports = searchResults.Item1.Select(_measureReportSummaryFactory.FromDomain).ToList();
-            
+
 //            return new PagedConfigModel<MeasureReportSummary>(measureReports, searchResults.Item2);
 //        }
 
@@ -152,14 +152,14 @@
 //            string facilityId, string reportId, ResourceType? resourceType, int pageSize, int pageNumber,
 //            CancellationToken cancellationToken = default)
 //        {
-            
-            
+
+
 //            var measureReport = await _database.SubmissionEntryRepository.SingleOrDefaultAsync(
 //                x => x.FacilityId == facilityId && x.Id == reportId, cancellationToken);
 
 //            if (measureReport is null)
 //                return new PagedConfigModel<ResourceSummary>();
-            
+
 //            var resourceQuery = measureReport.ContainedResources.AsQueryable();
 
 //            if (resourceType.HasValue)
@@ -171,9 +171,9 @@
 //                .OrderBy(x => x.ResourceType)
 //                .Skip((pageNumber - 1) * pageSize)
 //                .Take(pageSize).ToList();
-            
+
 //            var resourceSummaries = pagedResources.Select(x => _resourceSummaryFactory.FromDomain(facilityId, reportId, measureReport.PatientId, x)).ToList();
-            
+
 //            return new PagedConfigModel<ResourceSummary>(resourceSummaries, new PaginationMetadata()
 //            {
 //                PageSize = pageSize,
@@ -181,7 +181,7 @@
 //                TotalCount = resourceQuery.ToList().Count
 //            });
 //        }
-        
+
 //        public async Task<List<string>> GetMeasureReportResourceTypeList(
 //            string facilityId, string reportId, CancellationToken cancellationToken = default)
 //        {
@@ -190,9 +190,9 @@
 
 //            if (measureReport is null || measureReport.ContainedResources.Count == 0)
 //                return [];
-                
+
 //            var resourceList = measureReport.ContainedResources.Select(x => x.ResourceType).Distinct().Order().ToList();
-            
+
 //            return resourceList;
 //        }
 
@@ -245,7 +245,7 @@
 //            {
 //                resource.Id = Guid.NewGuid().ToString();   
 //            }
-           
+
 //            var createdResource = await _resourceManager.CreateResourceAsync(entry.FacilityId, resource, entry.PatientId, cancellationToken);
 
 //            entry.UpdateContainedResource(createdResource);
