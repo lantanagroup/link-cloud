@@ -340,7 +340,7 @@ stages:
     displayName: Update Account DB Schema
     steps:
       - download: current
-        artifact: scripts
+        artifact: account-db
 
       - task: SqlAzureDacpacDeployment@1
         displayName: Apply Account DB Schema
@@ -351,4 +351,4 @@ stages:
           SqlUsername: '$(link-db_username)'
           SqlPassword: '$(link-db_pass)'
           deployType: 'SqlTask'
-          SqlFile: '$(Pipeline.Workspace)/scripts/DatabaseScripts/accountDb.sql'
+          SqlFile: '$(Pipeline.Workspace)/account-db/accountDb.sql'
