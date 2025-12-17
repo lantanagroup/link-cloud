@@ -146,8 +146,8 @@ stages:
         displayName: Generate Account SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
-         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-         ArtifactName: 'scripts'
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/accountDb.sql'
+         ArtifactName: 'account-db'
          publishLocation: 'container'
         displayName: Publish Account SQL Script  
   ###
@@ -169,8 +169,8 @@ stages:
         displayName: Generate Audit SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
-         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-         ArtifactName: 'scripts'
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/auditDb.sql'
+         ArtifactName: 'audit-db'
          publishLocation: 'container'
         displayName: Publish Audit SQL Script  
   ###
@@ -192,8 +192,8 @@ stages:
         displayName: Generate Census SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
-         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-         ArtifactName: 'scripts'
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/censusDb.sql'
+         ArtifactName: 'census-db'
          publishLocation: 'container'
         displayName: Publish Census SQL Script  
   ###
@@ -215,8 +215,8 @@ stages:
         displayName: Generate DataAcquisition SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
-         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-         ArtifactName: 'scripts'
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/dataDb.sql'
+         ArtifactName: 'data-db'
          publishLocation: 'container'
         displayName: Publish Data Acquisition SQL Script  
   ###
@@ -238,8 +238,8 @@ stages:
         displayName: Generate Normalization SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
-         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-         ArtifactName: 'scripts'
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/normalizationDb.sql'
+         ArtifactName: 'normalization-db'
          publishLocation: 'container'
         displayName: Publish Normalization SQL Script  
   ###
@@ -261,8 +261,8 @@ stages:
         displayName: Generate QueryDispatch SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
-         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-         ArtifactName: 'scripts'
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/queryDispatchDb.sql'
+         ArtifactName: 'querydispatch-db'
          publishLocation: 'container'
         displayName: Publish Query Dispatch SQL Script  
   ###
@@ -284,8 +284,8 @@ stages:
         displayName: Generate Submission SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
-         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-         ArtifactName: 'scripts'
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/submissionDb.sql'
+         ArtifactName: 'submission-db'
          publishLocation: 'container'
         displayName: Publish Submission SQL Script  
   ###
@@ -307,8 +307,8 @@ stages:
         displayName: Generate Tenant SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
-         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-         ArtifactName: 'scripts'
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/tenantDb.sql'
+         ArtifactName: 'tenant-db'
          publishLocation: 'container'
         displayName: Publish Tenant SQL Script  
     ###
@@ -320,12 +320,12 @@ stages:
       displayName: Copy Validation SQL Scripts to Artifact Staging Directory
       inputs:
        SourceFolder: '$(build.sourcesdirectory)/Java/validation/src/main/resources/database/migrations/'
-       TargetFolder: $(Build.ArtifactStagingDirectory)/DatabaseScripts
+       TargetFolder: '$(Build.ArtifactStagingDirectory)/validation-db'
        Contents: '*.sql'
     - task: PublishBuildArtifacts@1
       inputs:
-       PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-       ArtifactName: 'scripts'
+       PathtoPublish: '$(Build.ArtifactStagingDirectory)/validation-db'
+       ArtifactName: 'validation-db'
        publishLocation: 'container'
       displayName: Publish Validation SQL Script  
   ###
@@ -333,7 +333,7 @@ stages:
 - stage: Update_Account_DB
   trigger: manual
   displayName: Update Account Database Schema
-  dependsOn: Build
+  # dependsOn: Build
   condition: always()
   jobs:
   - job: UpdateAccountSchema
