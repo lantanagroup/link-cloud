@@ -291,7 +291,7 @@ stages:
   ###
   # Tenant
   - job: Tenant
-    displayName: "Build Tenant"
+    displayName: "Generate Tenant Schema Script"
     steps:
       - script: |
           cd DotNet/Tenant
@@ -314,7 +314,7 @@ stages:
     ###
   # Validation
   - job: Validation
-    displayName: "Build Validation"
+    displayName: "Generate Validation Schema Script"
     steps:
     - task: CopyFiles@2
       displayName: Copy Validation SQL Scripts to Artifact Staging Directory
