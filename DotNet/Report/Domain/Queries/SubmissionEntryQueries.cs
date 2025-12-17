@@ -220,9 +220,11 @@ public class SubmissionEntryQueries : ISubmissionEntryQueries
         string patientId,
         CancellationToken cancellationToken = default)
     {
-        return await (from entry in _context.PatientSubmissionEntries
-                      where entry.ReportScheduleId == reportScheduleId && entry.FacilityId == facilityId && entry.PatientId == patientId 
-                      select entry.Status).AllAsync(s => s == PatientSubmissionStatus.ReadyForValidation || s == PatientSubmissionStatus.NotReportable);
+        List<PatientSubmissionStatus> statuses = await (from entry in _context.PatientSubmissionEntries
+                                                        where entry.ReportScheduleId == reportScheduleId && entry.FacilityId == facilityId && entry.PatientId == patientId
+                                                        select entry.Status).ToListAsync(cancellationToken);
+        return statuses.All(s => s == PatientSubmissionStatus.ReadyForValidation || s == PatientSubmissionStatus.NotReportable) &&
+            statuses.Any(s => s == PatientSubmissionStatus.ReadyForValidation);
     }
 
     public async Task<PagedConfigModel<ResourceSummary>> GetResourceSummary(string facilityId, string reportScheduleId, ResourceType? resourceType, int pageSize, int pageNumber,
