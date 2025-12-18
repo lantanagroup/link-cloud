@@ -248,7 +248,7 @@ namespace IntegrationTests.Report
             var assertQueries = assertScope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
 
             var updatedData = await assertQueries.GetPatientReportData(schedule.FacilityId, schedule.Id, entry.PatientId, cancellationToken: CancellationToken.None);
-            var updatedEntry = updatedData.ReportData[schedule.ReportTypes[0]].Entries.First();
+            var updatedEntry = updatedData.ReportData[schedule.ReportTypes[0]].Entry;
 
             AssertEntryStatusAndValidation(updatedEntry, PatientSubmissionStatus.ValidationComplete, ValidationStatus.Failed, expectedUri);
 

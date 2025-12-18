@@ -256,7 +256,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 if (resource.TypeName == "MeasureReport")
                 {
                     var patientReportData = await entryQueries.GetPatientReportData(key.FacilityId, value.ReportTrackingId, value.PatientId, null, cancellationToken);
-                    entry = patientReportData.ReportData[value.ReportType].Entries.Single(e => e.PatientId == value.PatientId && e.ReportType == value.ReportType);
+                    entry = patientReportData.ReportData[value.ReportType].Entry;
                     var resources = patientReportData.ReportData[value.ReportType].Resources;
 
                     entry.MeasureReport = (MeasureReport)resource;
@@ -273,6 +273,8 @@ namespace LantanaGroup.Link.Report.Listeners
                     {
                         entry.Status = PatientSubmissionStatus.ReadyForValidation;
                     }
+
+                    entry.MeasureReport.EvaluatedResource.Clear();
                 }
                 else
                 {
@@ -312,6 +314,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 if (resource.TypeName == "MeasureReport")
                 {
                     entry.MeasureReport = (MeasureReport)resource;
+                    entry.MeasureReport.EvaluatedResource.Clear();
                 }
             }
 

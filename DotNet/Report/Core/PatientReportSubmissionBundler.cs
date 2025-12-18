@@ -55,10 +55,17 @@ namespace LantanaGroup.Link.Report.Core
             {
                 var report = reportType.Key;
                 var data = reportType.Value;
+                var entry = data.Entry;
+                var resources = data.Resources;
 
-                foreach (var fhirResource in data.Resources)
+                if (entry.MeasureReport == null)
                 {
-                    if (fhirResource.Id == null)
+                    continue;
+                }
+
+                foreach (var fhirResource in resources)
+                {
+                    if (fhirResource.ResourceId == null)
                         continue;
 
                     if (resourcesAdded.ContainsKey(fhirResource.ResourceId) && resourcesAdded[fhirResource.ResourceId].Contains(fhirResource.ResourceType))
@@ -79,38 +86,37 @@ namespace LantanaGroup.Link.Report.Core
                     }
                 }
 
-                foreach (var entry in data.Entries)
+                MeasureReport mr = entry.MeasureReport;
+
+                mr.EvaluatedResource.AddRange(data.Resources.Select(r => new ResourceReference
                 {
-                    if (entry.MeasureReport == null)
-                    {
-                        continue;
-                    }
+                    Reference = $"{r.ResourceType}/{r.ResourceId}"
+                }));
 
-                    MeasureReport mr = entry.MeasureReport;
+                // ensure we have an id to reference
+                if (string.IsNullOrEmpty(mr.Id))
+                    mr.Id = Guid.NewGuid().ToString();
 
-                    // ensure we have an id to reference
-                    if (string.IsNullOrEmpty(mr.Id))
-                        mr.Id = Guid.NewGuid().ToString();
+                // ensure we have a meta object
+                // set individual measure report profile
+                mr.Meta = new Meta
+                {
+                    Profile = new List<string> { ReportConstants.BundleSettings.IndividualMeasureReportProfileUrl }
+                };
 
-                    // ensure we have a meta object
-                    // set individual measure report profile
-                    mr.Meta = new Meta
-                    {
-                        Profile = new List<string> { ReportConstants.BundleSettings.IndividualMeasureReportProfileUrl }
-                    };
+                // clean up resource
+                cleanupResource(mr);
 
-                    // clean up resource
-                    cleanupResource(mr);
+                var mrUrl = GetFullUrl(mr);
+                bundle.AddResourceEntry(mr, mrUrl);
 
-                    var fullUrl = GetFullUrl(mr);
-                    bundle.AddResourceEntry(mr, fullUrl);
-
-                    _metrics.IncrementReportGeneratedCounter(new List<KeyValuePair<string, object?>>() {
+                _metrics.IncrementReportGeneratedCounter(new List<KeyValuePair<string, object?>>() 
+                {
                     new KeyValuePair<string, object?>("facilityId", schedule.FacilityId),
                     new KeyValuePair<string, object?>("measure.schedule.id", reportScheduleId),
                     new KeyValuePair<string, object?>("measure", mr.Measure)
                 });
-                }
+                
             }
 
             PatientSubmissionModel patientSubmissionModel = new PatientSubmissionModel()

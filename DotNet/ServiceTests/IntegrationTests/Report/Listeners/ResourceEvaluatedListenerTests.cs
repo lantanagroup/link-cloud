@@ -245,7 +245,7 @@ namespace IntegrationTests.Report
             var _subEntryQueries = scope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
 
             var updatedData = await _subEntryQueries.GetPatientReportData(facilityId, schedule.Id, patientId, cancellationToken: CancellationToken.None);
-            var updatedEntry = updatedData.ReportData[schedule.ReportTypes[0]].Entries.First();
+            var updatedEntry = updatedData.ReportData[schedule.ReportTypes[0]].Entry;
 
             AssertEntryStatusAndMeasureReport(updatedEntry, PatientSubmissionStatus.PendingEvaluation);
 
@@ -344,7 +344,7 @@ namespace IntegrationTests.Report
             var queries = scope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
 
             var data = await queries.GetPatientReportData(facilityId, schedule.Id, patientId, entry.Id);
-            var updatedEntry = data.ReportData[entry.ReportType].Entries.Single();
+            var updatedEntry = data.ReportData[entry.ReportType].Entry;
 
             AssertEntryStatusAndMeasureReport(updatedEntry, PatientSubmissionStatus.NotReportable, "MeasureReport1");
 
@@ -378,7 +378,7 @@ namespace IntegrationTests.Report
             var _subEntryQueries = scope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
 
             var updatedData = await _subEntryQueries.GetPatientReportData(facilityId, schedule.Id, patientId, cancellationToken: CancellationToken.None);
-            var updatedEntry = updatedData.ReportData[schedule.ReportTypes[0]].Entries.First();
+            var updatedEntry = updatedData.ReportData[schedule.ReportTypes[0]].Entry;
 
             AssertEntryStatusAndMeasureReport(updatedEntry, PatientSubmissionStatus.PendingEvaluation);
 
