@@ -33,8 +33,8 @@ namespace IntegrationTests.Report
             _scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
         }
 
-        [Fact(Skip = "Manual performance test only - run locally as needed")]
-        //[Fact]
+        //[Fact(Skip = "Manual performance test only - run locally as needed")]
+        [Fact]
         public async Task Performance_Test_ResourceEvaluated_Listener()
         {
             // Reset mocks

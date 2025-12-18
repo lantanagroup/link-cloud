@@ -191,7 +191,7 @@ public class SubmissionEntryQueries : ISubmissionEntryQueries
             kv => kv.Key,
             kv => new ReportData
             {
-                Entries = kv.Value,
+                Entry = kv.Value.Single(),
                 Resources = resources
             });
         return new PatientReportData
@@ -329,6 +329,6 @@ public class PatientReportData
 
 public class ReportData
 {
-    public List<PatientSubmissionEntry> Entries { get; set; } = new();
+    public PatientSubmissionEntry Entry { get; set; } = new();
     public List<FhirResource> Resources { get; set; } = new();
 }
