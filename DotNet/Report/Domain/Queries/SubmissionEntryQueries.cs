@@ -177,15 +177,16 @@ public class SubmissionEntryQueries : ISubmissionEntryQueries
         // Batch fetching of resources
         const int batchSize = 1000;
         var resourceBatches = resourceIds.Chunk(batchSize).ToList();
-        var resourceTasks = resourceBatches.Select(batch =>
-            _context.FhirResources
+
+        var resources = new List<FhirResource>();
+        foreach(var batch in resourceBatches)
+        {
+            var results = await _context.FhirResources
                 .AsNoTracking()
                 .Where(r => batch.Contains(r.Id))
-                .ToListAsync(cancellationToken)
-        );
-
-        var batchedResources = await Task.WhenAll(resourceTasks);
-        var resources = batchedResources.SelectMany(r => r).ToList();
+                .ToListAsync(cancellationToken);
+            resources.AddRange(results);
+        }
 
         var reportData = groupedEntries.ToDictionary(
             kv => kv.Key,
