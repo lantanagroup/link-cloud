@@ -5,6 +5,7 @@ using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Shared.Application.Enums;
 using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
@@ -28,16 +29,19 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         Task<PatientReportSummary> GetPatients(string facilityId, string reportId, int page, int count, CancellationToken cancellationToken = default);
 
+        Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(Expression<Func<ReportEntryStatusModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default);
         //Task UpdateStatusToValidationRequested(string reportScheduleId, string patientId, CancellationToken cancellationToken = default);
     }
 
     public class ReportEntryStatusManager : IReportEntryStatusManager
     {
         private readonly IDatabase _database;
+        private readonly MeasureReportSummaryFactory _measureReportSummaryFactory;
 
-        public ReportEntryStatusManager(IDatabase database)
+        public ReportEntryStatusManager(IDatabase database, MeasureReportSummaryFactory measureReportSummaryFactory)
         {
             _database = database;
+            _measureReportSummaryFactory = measureReportSummaryFactory;
         }
 
         public async Task<ReportEntryStatusModel> AddAsync(ReportEntryStatusModel entry, CancellationToken cancellationToken)
@@ -118,6 +122,26 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
             return patientReportSummary;
         }
+
+        public async Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(Expression<Func<ReportEntryStatusModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
+        {
+            //TODO: Refactors are probably needed here to support the new report entry model
+            // Get individual measure report entries for this report
+            var searchResults = await _database.ReportEntryStatusRepository
+                .SearchAsync(
+                    predicate,
+                    sortBy: sortBy,
+                    sortOrder: sortOrder,
+                    pageSize: pageSize, pageNumber: pageNumber,
+                    cancellationToken);
+
+
+            // Build patient report summaries
+            var measureReports = searchResults.Item1.Select(_measureReportSummaryFactory.FromDomain).ToList();
+
+            return new PagedConfigModel<MeasureReportSummary>(measureReports, searchResults.Item2);
+        }
+
     }
 }
     
