@@ -9,7 +9,7 @@ public record SftpAcquisitionLogModel(
     string FacilityName, 
     int PatientCount, 
     int EncounterCount, 
-    DateTime? ProcessDate);
+    DateTime ProcessDate);
 
 
 public static class SftpAcquisitionLogModelExtensions
@@ -32,7 +32,7 @@ public static class SftpAcquisitionLogModelExtensions
         FacilityName = model.FacilityName,
         PatientCount = model.PatientCount,
         EncounterCount = model.EncounterCount,
-        ProcessDate = model.ProcessDate ?? DateTime.UtcNow
+        ProcessDate = model.ProcessDate
     };
 
 }
