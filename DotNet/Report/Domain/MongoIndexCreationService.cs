@@ -13,7 +13,8 @@ namespace LantanaGroup.Link.Report.Domain
 
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
-            var context = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<MongoDbContext>();
+            using var scope = _serviceScopeFactory.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<MongoDbContext>();
             await context.EnsureIndexesAsync(cancellationToken);
 
             await StopAsync(cancellationToken);
