@@ -26,6 +26,9 @@ namespace IntegrationTests.Report
         private readonly ITestOutputHelper _output;
         private readonly IServiceScopeFactory _scopeFactory;
 
+        //This many patient specific resources will be created, and also the same number of shared resoures
+        private readonly long _resourceCount = 5000;
+
         public ResourceEvaluatedListenerPerformanceTests(ReportIntegrationTestFixture fixture, ITestOutputHelper output)
         {
             _fixture = fixture;
@@ -33,8 +36,8 @@ namespace IntegrationTests.Report
             _scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
         }
 
-        //[Fact(Skip = "Manual performance test only - run locally as needed")]
-        [Fact]
+        [Fact(Skip = "Manual performance test only - run locally as needed")]
+        //[Fact]
         public async Task Performance_Test_ResourceEvaluated_Listener()
         {
             // Reset mocks
@@ -49,7 +52,7 @@ namespace IntegrationTests.Report
 
             // Arrange: Create shared resources
             var sharedResources = new List<Resource>();
-            for (int j = 0; j < 5000; j++)
+            for (int j = 0; j < _resourceCount; j++)
             {
                 var loc = new Location
                 {
@@ -112,7 +115,7 @@ namespace IntegrationTests.Report
             Dictionary<string, long> patientCompletionTime = new Dictionary<string, long>();
 
             // Act: Process for each patient/report type
-            for (int index = 0; index < 2/*patients.Count*/; index++)
+            for (int index = 0; index < patients.Count; index++)
             {
                 var patientStopWatch = new Stopwatch();
                 var patientId = patients[index];
@@ -122,7 +125,7 @@ namespace IntegrationTests.Report
 
                 // Create patient-specific resources
                 var patientResources = new List<Resource>();
-                for (int j = 0; j < 5000; j++)
+                for (int j = 0; j < _resourceCount; j++)
                 {
                     var obs = new Observation
                     {
@@ -147,18 +150,7 @@ namespace IntegrationTests.Report
                     mr.EvaluatedResource.Add(resRef);
                 }
 
-                // Serialize and process MeasureReport first
                 var serializer = new FhirJsonSerializer();
-                var mrJson = serializer.SerializeToString(mr);
-                var mrElem = JsonDocument.Parse(mrJson).RootElement;
-
-                var mrConsumeResult = CreateConsumeResult(facilityId, schedule.Id, patientId, reportType, mrElem, true, correlationId);
-
-                var mrSw = Stopwatch.StartNew();
-                await listener.ProcessMessageAsync(mrConsumeResult, default);
-                mrSw.Stop();
-
-                measureReportRunTimes.Add((mr.TypeName, mrSw.ElapsedMilliseconds));
 
                 // Process all resources
                 for (int j = 0; j < allResources.Count; j++)
@@ -178,6 +170,18 @@ namespace IntegrationTests.Report
 
                 patientStopWatch.Stop();
                 patientCompletionTime[patientId] = patientStopWatch.ElapsedMilliseconds;
+
+                // Serialize and process MeasureReport last                
+                var mrJson = serializer.SerializeToString(mr);
+                var mrElem = JsonDocument.Parse(mrJson).RootElement;
+
+                var mrConsumeResult = CreateConsumeResult(facilityId, schedule.Id, patientId, reportType, mrElem, true, correlationId);
+
+                var mrSw = Stopwatch.StartNew();
+                await listener.ProcessMessageAsync(mrConsumeResult, default);
+                mrSw.Stop();
+
+                measureReportRunTimes.Add((mr.TypeName, mrSw.ElapsedMilliseconds));
             }
 
             var resourceAverage = resourceRunTimes.Average(i => i.Item2);
@@ -225,8 +229,8 @@ namespace IntegrationTests.Report
 
                 _output.WriteLine($"Patient {patient} GenerateBundle Time: {bundleStopWatch.ElapsedMilliseconds} ms");
 
-                Assert.Equal(10000, patientReportData.ReportData["ReportType" + idx.ToString()].Resources.Count); //10k Resources
-                Assert.Equal(10001, model.Bundle.Entry.Count()); //10k resources + 1 Measure Report
+                Assert.Equal(_resourceCount * 2, patientReportData.ReportData["ReportType" + idx.ToString()].Resources.Count);
+                Assert.Equal((_resourceCount * 2) + 1, model.Bundle.Entry.Count());
                 idx++;
             }
 
@@ -253,13 +257,13 @@ namespace IntegrationTests.Report
                             Builders<FhirResource>.Filter.Eq(r => r.ResourceType, "Observation");
 
             var obsCount = await resourceColl.CountDocumentsAsync(obsFilter);
-            Assert.Equal(5000L, obsCount);
+            Assert.Equal(_resourceCount, obsCount);
 
             var locFilter = Builders<FhirResource>.Filter.Eq(r => r.FacilityId, facilityId) &
                             Builders<FhirResource>.Filter.Eq(r => r.ResourceType, "Location");
 
             var locCount = await resourceColl.CountDocumentsAsync(locFilter);
-            Assert.Equal(5000L, locCount);
+            Assert.Equal(_resourceCount, locCount);
 
             var entry = await db.SubmissionEntryRepository.SingleAsync(e => e.PatientId == patientId && e.ReportScheduleId == scheduleId && e.ReportType == reportType);
 
@@ -268,14 +272,14 @@ namespace IntegrationTests.Report
                             Builders<PatientSubmissionEntryResourceMap>.Filter.Eq(m => m.ReportTypes, new List<string> { reportType });
 
             var mapCount = await mapColl.CountDocumentsAsync(mapFilter);
-            Assert.Equal(10000L, mapCount);
+            Assert.Equal(_resourceCount * 2, mapCount);
 
             // Verify GetPatientReportData returns correct data
             var queries = assertScope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
             var patientData = await queries.GetPatientReportData(facilityId, scheduleId, patientId, null, CancellationToken.None);
             Assert.True(patientData.ReportData.ContainsKey(reportType));
             var reportData = patientData.ReportData[reportType];
-            Assert.Equal(10000, reportData.Resources.Count);
+            Assert.Equal(_resourceCount * 2, reportData.Resources.Count);
 
             // Check types in the returned data (load resources to count types)
             var resourceTypes = await Task.WhenAll(reportData.Resources.Select(async m =>
@@ -286,8 +290,8 @@ namespace IntegrationTests.Report
 
             var returnedObsCount = resourceTypes.Count(t => t == "Observation");
             var returnedLocCount = resourceTypes.Count(t => t == "Location");
-            Assert.Equal(5000, returnedObsCount);
-            Assert.Equal(5000, returnedLocCount);
+            Assert.Equal(_resourceCount, returnedObsCount);
+            Assert.Equal(_resourceCount, returnedLocCount);
         }
 
         private ConsumeResult<ResourceEvaluatedKey, ResourceEvaluatedValue> CreateConsumeResult(string facilityId, string reportTrackingId, string patientId, string reportType, JsonElement resourceElement, bool isReportable, string correlationId)

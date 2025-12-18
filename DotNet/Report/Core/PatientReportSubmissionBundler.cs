@@ -1,8 +1,6 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Interfaces;
-using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Queries;
-using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 
@@ -38,7 +36,8 @@ namespace LantanaGroup.Link.Report.Core
         }
         public async Task<PatientSubmissionModel> GenerateBundle(string facilityId, string patientId, string reportScheduleId)
         {
-            var queries = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
+            using var scope = _serviceScopeFactory.CreateScope();
+            var queries = scope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
             var patientReportData = await queries.GetPatientReportData(facilityId, reportScheduleId, patientId, cancellationToken: CancellationToken.None);
             return await GenerateBundle(patientReportData, facilityId, patientId, reportScheduleId);
         }
@@ -88,10 +87,7 @@ namespace LantanaGroup.Link.Report.Core
 
                 MeasureReport mr = entry.MeasureReport;
 
-                mr.EvaluatedResource.AddRange(data.Resources.Select(r => new ResourceReference
-                {
-                    Reference = $"{r.ResourceType}/{r.ResourceId}"
-                }));
+                mr.EvaluatedResource.AddRange(data.Resources.Select(r => new ResourceReference($"{r.ResourceType}/{r.ResourceId}")));
 
                 // ensure we have an id to reference
                 if (string.IsNullOrEmpty(mr.Id))
