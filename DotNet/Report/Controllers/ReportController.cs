@@ -248,207 +248,209 @@ namespace LantanaGroup.Link.Report.Controllers
         //    }
         //}
 
-        ///// <summary>
-        ///// Returns a summary list item of a ReportSchedule based on the provided search criteria
-        ///// </summary>
-        ///// <param name="facilityId"></param>
-        ///// <param name="pageNumber"></param>
-        ///// <param name="pageSize"></param>
-        ///// <returns></returns>
-        //[HttpGet("summaries")]
-        //[ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<ScheduledReportListSummary>))]
-        //[ProducesResponseType(StatusCodes.Status400BadRequest)]
-        //[ProducesResponseType(StatusCodes.Status404NotFound)]
-        //[ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        //public async Task<ActionResult<PagedConfigModel<ScheduledReportListSummary>>> GetReportSummaryList(
-        //    string? facilityId, int pageNumber = 1, int pageSize = 10)
-        //{
-        //    //TODO: Add search criteria when requirements have been determined
+        /// <summary>
+        /// Returns a summary list item of a ReportSchedule based on the provided search criteria
+        /// </summary>
+        /// <param name="facilityId"></param>
+        /// <param name="pageNumber"></param>
+        /// <param name="pageSize"></param>
+        /// <returns></returns>
+        [HttpGet("summaries")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<ScheduledReportListSummary>))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<PagedConfigModel<ScheduledReportListSummary>>> GetReportSummaryList(
+            string? facilityId, int pageNumber = 1, int pageSize = 10)
+        {
+            //TODO: Add search criteria when requirements have been determined
 
-        //    if (pageNumber < 1)
-        //    {
-        //        return BadRequest("Parameter pageNumber must be greater than 0");
-        //    }
+            if (pageNumber < 1)
+            {
+                return BadRequest("Parameter pageNumber must be greater than 0");
+            }
 
-        //    if (pageSize < 1)
-        //    {
-        //        return BadRequest("Parameter pageSize must be greater than 0");
-        //    }
+            if (pageSize < 1)
+            {
+                return BadRequest("Parameter pageSize must be greater than 0");
+            }
 
-        //    try
-        //    {
-        //        // Create search predicates
-        //        //TODO: design way to dynamically build predicates or change search to use custom method
-        //        Expression<Func<ReportScheduleModel, bool>> predicate;
-        //        if (facilityId is null)
-        //        {
-        //            predicate = r => true;
-        //        }
-        //        else
-        //        {
+            try
+            {
+                // Create search predicates
+                //TODO: design way to dynamically build predicates or change search to use custom method
+                Expression<Func<ReportScheduleModel, bool>> predicate;
+                if (facilityId is null)
+                {
+                    predicate = r => true;
+                }
+                else
+                {
 
-        //            predicate = r => r.FacilityId == facilityId;
-        //        }
+                    predicate = r => r.FacilityId == facilityId;
+                }
 
-        //        var summaries =
-        //            await _reportingScheduledManager.GetScheduledReportSummaries(predicate, "CreateDate", SortOrder.Descending, pageSize, pageNumber, HttpContext.RequestAborted);
+                var summaries =
+                    await _reportingScheduledManager.GetScheduledReportSummaries(predicate, "CreateDate", SortOrder.Descending, pageSize, pageNumber, HttpContext.RequestAborted);
 
-        //        return Ok(summaries);
+                return Ok(summaries);
 
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        _logger.LogError(ex, "Exception in ReportController.GetReportSummaryList");
-        //        return Problem("An error occurred while retrieving the report summary list.",
-        //            statusCode: (int)HttpStatusCode.InternalServerError);
-        //    }
-        //}
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Exception in ReportController.GetReportSummaryList");
+                return Problem("An error occurred while retrieving the report summary list.",
+                    statusCode: (int)HttpStatusCode.InternalServerError);
+            }
+        }
 
-        ///// <summary>
-        ///// Returns a summary of a scheduled report based on the provided reportId
-        ///// </summary>
-        ///// <param name="facilityId"></param>
-        ///// <param name="reportId"></param>
-        ///// <returns></returns>
-        //[HttpGet("summaries/{facilityId}")]
-        //[ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ScheduledReportListSummary))]
-        //[ProducesResponseType(StatusCodes.Status400BadRequest)]
-        //[ProducesResponseType(StatusCodes.Status404NotFound)]
-        //[ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        //public async Task<ActionResult<ScheduledReportListSummary>> GetReportSummary(string facilityId, string reportId)
-        //{
-        //    //TODO: Add search criteria when requirements have been determined
+        /// <summary>
+        /// Returns a summary of a scheduled report based on the provided reportId
+        /// </summary>
+        /// <param name="facilityId"></param>
+        /// <param name="reportId"></param>
+        /// <returns></returns>
+        [HttpGet("summaries/{facilityId}")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ScheduledReportListSummary))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<ScheduledReportListSummary>> GetReportSummary(string facilityId, string reportId)
+        {
+            //TODO: Add search criteria when requirements have been determined
 
-        //    if (string.IsNullOrEmpty(facilityId))
-        //    {
-        //        return BadRequest("Parameter facility cannot be null or empty");
-        //    }
+            if (string.IsNullOrEmpty(facilityId))
+            {
+                return BadRequest("Parameter facility cannot be null or empty");
+            }
 
-        //    if (string.IsNullOrEmpty(reportId))
-        //    {
-        //        return BadRequest("A report id needs to be specified");
-        //    }
+            if (string.IsNullOrEmpty(reportId))
+            {
+                return BadRequest("A report id needs to be specified");
+            }
 
-        //    try
-        //    {
-        //        var summary =
-        //            await _reportingScheduledManager.GetScheduledReportSummary(facilityId, reportId, HttpContext.RequestAborted);
+            try
+            {
+                var summary =
+                    await _reportingScheduledManager.GetScheduledReportSummary(facilityId, reportId, HttpContext.RequestAborted);
 
-        //        return Ok(summary);
+                return Ok(summary);
 
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        _logger.LogError(ex, "Exception in ReportController.GetReportSummary");
-        //        return Problem("An error occurred while retrieving the report summary.", statusCode: (int)HttpStatusCode.InternalServerError);
-        //    }
-        //}
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Exception in ReportController.GetReportSummary");
+                return Problem("An error occurred while retrieving the report summary.", statusCode: (int)HttpStatusCode.InternalServerError);
+            }
+        }
 
-        ///// <summary>
-        ///// Returns a summary list item of a ReportSchedule based on the provided search criteria
-        ///// </summary>
-        ///// <param name="facilityId"></param>
-        ///// <param name="reportId"></param>
-        ///// <param name="sortOrder"></param>
-        ///// <param name="pageNumber"></param>
-        ///// <param name="pageSize"></param>
-        ///// <param name="patientId"></param>
-        ///// <param name="measureReportId"></param>
-        ///// <param name="measure"></param>
-        ///// <param name="reportStatus"></param>
-        ///// <param name="validationStatus"></param>
-        ///// <param name="sortBy"></param>
-        ///// <returns></returns>
-        //[HttpGet("summaries/{facilityId}/measure-reports")]
-        //[ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<MeasureReportSummary>))]
-        //[ProducesResponseType(StatusCodes.Status400BadRequest)]
-        //[ProducesResponseType(StatusCodes.Status404NotFound)]
-        //[ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        //public async Task<ActionResult<PagedConfigModel<MeasureReportSummary>>> GetMeasureReports(
-        //    string facilityId, [FromQuery] GetMeasureReportsQueryParameters parameters)
-        //{
-        //    //TODO: Add search criteria when requirements have been determined
+        /// <summary>
+        /// Returns a summary list item of a ReportSchedule based on the provided search criteria
+        /// </summary>
+        /// <param name="facilityId"></param>
+        /// <param name="reportId"></param>
+        /// <param name="sortOrder"></param>
+        /// <param name="pageNumber"></param>
+        /// <param name="pageSize"></param>
+        /// <param name="patientId"></param>
+        /// <param name="measureReportId"></param>
+        /// <param name="measure"></param>
+        /// <param name="reportStatus"></param>
+        /// <param name="validationStatus"></param>
+        /// <param name="sortBy"></param>
+        /// <returns></returns>
+        [HttpGet("summaries/{facilityId}/measure-reports")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<MeasureReportSummary>))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<PagedConfigModel<MeasureReportSummary>>> GetMeasureReports(
+            string facilityId, [FromQuery] GetMeasureReportsQueryParameters parameters)
+        {
+            //TODO: Add search criteria when requirements have been determined
 
-        //    if (parameters.PageNumber < 1)
-        //    {
-        //        return BadRequest("Parameter pageNumber must be greater than 0");
-        //    }
+            if (parameters.PageNumber < 1)
+            {
+                return BadRequest("Parameter pageNumber must be greater than 0");
+            }
 
-        //    if (parameters.PageSize < 1)
-        //    {
-        //        return BadRequest("Parameter pageSize must be greater than 0");
-        //    }
+            if (parameters.PageSize < 1)
+            {
+                return BadRequest("Parameter pageSize must be greater than 0");
+            }
 
-        //    if (string.IsNullOrEmpty(facilityId))
-        //    {
-        //        return BadRequest("Parameter facilityId cannot be null or empty");
-        //    }
+            if (string.IsNullOrEmpty(facilityId))
+            {
+                return BadRequest("Parameter facilityId cannot be null or empty");
+            }
 
-        //    try
-        //    {
-        //        // Create search predicates
-        //        //TODO: design way to dynamically build predicates or change search to use custom method
-        //        Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate = r => r.FacilityId == facilityId;
+            try
+            {
+                // Create search predicates
+                //TODO: design way to dynamically build predicates or change search to use custom method
+                Expression<Func<ReportEntryStatusModel, bool>> predicate = r => r.FacilityId == facilityId;
 
-        //        if (!string.IsNullOrEmpty(parameters.ReportId))
-        //        {
-        //            predicate = predicate.And(r => r.ReportScheduleId == parameters.ReportId);
-        //        }
+                if (!string.IsNullOrEmpty(parameters.ReportId))
+                {
+                    predicate = predicate.And(r => r.ReportScheduleId == parameters.ReportId);
+                }
 
-        //        if (!string.IsNullOrEmpty(parameters.PatientId))
-        //        {
-        //            predicate = predicate.And(r => r.PatientId == parameters.PatientId);
-        //        }
+                if (!string.IsNullOrEmpty(parameters.PatientId))
+                {
+                    predicate = predicate.And(r => r.PatientId == parameters.PatientId);
+                }
 
-        //        if (!string.IsNullOrEmpty(parameters.MeasureReportId))
-        //        {
-        //            predicate = predicate.And(r => r.Id == parameters.MeasureReportId);
-        //        }
+                if (!string.IsNullOrEmpty(parameters.MeasureReportId))
+                {
+                    predicate = predicate.And(r => r.Id == parameters.MeasureReportId);
+                }
 
-        //        if (!string.IsNullOrEmpty(parameters.Measure))
-        //        {
-        //            predicate = predicate.And(r => r.ReportType == parameters.Measure);
-        //        }
+                //TODO: Look into re-implementing commented section
 
-        //        if (parameters.ReportStatus is not null)
-        //        {
-        //            predicate = predicate.And(r => r.Status == parameters.ReportStatus);
-        //        }
+                //if (!string.IsNullOrEmpty(parameters.Measure))
+                //{
+                //    predicate = predicate.And(r => r.ReportType == parameters.Measure);
+                //}
 
-        //        if (parameters.ValidationStatus is not null)
-        //        {
-        //            predicate = predicate.And(r => r.ValidationStatus == parameters.ValidationStatus);
-        //        }
+                //if (parameters.ReportStatus is not null)
+                //{
+                //    predicate = predicate.And(r => r.Status == parameters.ReportStatus);
+                //}
 
-        //        if (string.IsNullOrEmpty(parameters.SortBy))
-        //        {
-        //            parameters.SortBy = "CreateDate";
-        //        }
+                //if (parameters.ValidationStatus is not null)
+                //{
+                //    predicate = predicate.And(r => r.ValidationStatus == parameters.ValidationStatus);
+                //}
 
-        //        var sortCol = parameters.SortBy.ToLowerInvariant() switch
-        //        {
-        //            "createdate" => "CreateDate",
-        //            "patientid" => "PatientId",
-        //            "reporttype" => "ReportType",
-        //            "status" => "Status",
-        //            "validationstatus" => "ValidationStatus",
-        //            _ => "CreateDate"
-        //        };
+                if (string.IsNullOrEmpty(parameters.SortBy))
+                {
+                    parameters.SortBy = "CreateDate";
+                }
+
+                var sortCol = parameters.SortBy.ToLowerInvariant() switch
+                {
+                    "createdate" => "CreateDate",
+                    "patientid" => "PatientId",
+                    "reporttype" => "ReportType",
+                    "status" => "Status",
+                    "validationstatus" => "ValidationStatus",
+                    _ => "CreateDate"
+                };
 
 
-        //        var summaries =
-        //            await _submissionEntryManager.GetMeasureReports(predicate, sortCol, parameters.SortOrder, parameters.PageSize, parameters.PageNumber, HttpContext.RequestAborted);
+                var summaries =
+                    await _reportEntryStatusManager.GetMeasureReports(predicate, sortCol, parameters.SortOrder, parameters.PageSize, parameters.PageNumber, HttpContext.RequestAborted);
 
-        //        return Ok(summaries);
+                return Ok(summaries);
 
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        _logger.LogError(ex, "Exception in ReportController.GetMeasureReports");
-        //        return Problem("An error occurred while retrieving measures reports.",
-        //            statusCode: (int)HttpStatusCode.InternalServerError);
-        //    }
-        //}
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Exception in ReportController.GetMeasureReports");
+                return Problem("An error occurred while retrieving measures reports.",
+                    statusCode: (int)HttpStatusCode.InternalServerError);
+            }
+        }
 
         ///// <summary>
         ///// Returns a summary list item of a ReportSchedule based on the provided search criteria
@@ -598,49 +600,49 @@ namespace LantanaGroup.Link.Report.Controllers
         ////    }
         ////}
 
-        ///// <summary>
-        ///// Returns a list of unique resouces types contained in a measure report
-        ///// </summary>
-        ///// <param name="facilityId"></param>
-        ///// <param name="reportId"></param>
-        ///// <param name="page"></param>
-        ///// <param name="count"></param>
-        ///// <returns></returns>
-        //[HttpGet("{facilityId}/{reportId}/patient")]
-        //[ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<string>))]
-        //[ProducesResponseType(StatusCodes.Status400BadRequest)]
-        //[ProducesResponseType(StatusCodes.Status404NotFound)]
-        //[ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        //public async Task<ActionResult<PagedConfigModel<PatientSummary>>> GetPatients(string facilityId, string reportId, int page = 1, int count = 10)
-        //{
-        //    if (page < 1)
-        //    {
-        //        return BadRequest("Parameter pageNumber must be greater than 0");
-        //    }
+        /// <summary>
+        /// Returns a list of unique resouces types contained in a measure report
+        /// </summary>
+        /// <param name="facilityId"></param>
+        /// <param name="reportId"></param>
+        /// <param name="page"></param>
+        /// <param name="count"></param>
+        /// <returns></returns>
+        [HttpGet("{facilityId}/{reportId}/patient")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<string>))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<PagedConfigModel<PatientSummary>>> GetPatients(string facilityId, string reportId, int page = 1, int count = 10)
+        {
+            if (page < 1)
+            {
+                return BadRequest("Parameter pageNumber must be greater than 0");
+            }
 
-        //    if (count < 1)
-        //    {
-        //        return BadRequest("Parameter pageSize must be greater than 0");
-        //    }
+            if (count < 1)
+            {
+                return BadRequest("Parameter pageSize must be greater than 0");
+            }
 
-        //    if (string.IsNullOrEmpty(facilityId))
-        //    {
-        //        return BadRequest("Parameter facilityId cannot be null or empty");
-        //    }
+            if (string.IsNullOrEmpty(facilityId))
+            {
+                return BadRequest("Parameter facilityId cannot be null or empty");
+            }
 
-        //    try
-        //    {
-        //        var patients = await _reportEntryStatusManager.GetPatients(facilityId, reportId, page, count, HttpContext.RequestAborted);
+            try
+            {
+                var patients = await _reportEntryStatusManager.GetPatients(facilityId, reportId, page, count, HttpContext.RequestAborted);
 
-        //        return Ok(patients);
+                return Ok(patients);
 
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        _logger.LogError(ex, "Exception in ReportController.GetMeasureReportResourceTypes");
-        //        return Problem("An error occurred while retrieving resource types within a measure report.",
-        //            statusCode: (int)HttpStatusCode.InternalServerError);
-        //    }
-        //}
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Exception in ReportController.GetMeasureReportResourceTypes");
+                return Problem("An error occurred while retrieving resource types within a measure report.",
+                    statusCode: (int)HttpStatusCode.InternalServerError);
+            }
+        }
     }
 }
