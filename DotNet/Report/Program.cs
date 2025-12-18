@@ -124,6 +124,8 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.UseMongoDB(client, mongoSettings.DatabaseName);
     });
 
+    builder.Services.AddHostedService<MongoIndexCreationService>();
+
     // Add services to the container
     builder.Services.AddHttpClient();
 
@@ -242,14 +244,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddQuartz(q =>
     {
         q.UseJobFactory<QuartzJobFactory>();
-        q.UseMicrosoftDependencyInjectionJobFactory();
     });
 
     builder.Services.AddKeyedSingleton<ISchedulerFactory>("MongoScheduler", (provider, key) =>
     {
         var logger = provider.GetRequiredService<ILogger<ReportMongoSchedulerFactory>>();
-        var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
-        return new ReportMongoSchedulerFactory(scopeFactory, logger);
+        return new ReportMongoSchedulerFactory(provider, logger);
     });
 
     // 2. In-memory scheduler for RetryJob
