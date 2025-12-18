@@ -102,16 +102,16 @@ export class ViewReportComponent implements OnInit {
       forkJoin([
           this.facilityViewService.getReportSummary(this.facilityId, this.reportId),
           this.facilityViewService.getMeasureReportSummaryList(this.facilityId, this.reportId, null, null, null, null, null, null, null, this.defaultPageNumber, this.defaultPageSize),
-          this.facilityViewService.getReportSubmissionStatuses(),
-          this.facilityViewService.getReportValidationStatuses()
+          //this.facilityViewService.getReportSubmissionStatuses(),
+          //this.facilityViewService.getReportValidationStatuses()
         ]).subscribe({
           next: (response) => {
             this.reportSummary = response[0];
             this.measureReports = response[1].records;
             this.paginationMetadata = response[1].metadata;
             this.measures = this.reportSummary.reportTypes;
-            this.reportStatuses = response[2];
-            this.validationStatuses = response[3];
+            //this.reportStatuses = response[2];
+            //this.validationStatuses = response[3];
             this.loadingService.hide();
           },
           error: (error) => {

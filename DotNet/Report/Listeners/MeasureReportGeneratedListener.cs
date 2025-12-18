@@ -115,7 +115,6 @@ namespace LantanaGroup.Link.Report.Listeners
 
                     try
                     {
-                        
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
                             try
