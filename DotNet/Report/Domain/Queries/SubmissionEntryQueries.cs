@@ -4,7 +4,6 @@ using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.EntityFrameworkCore;
-using System.Threading.Tasks;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Domain.Queries;
@@ -59,6 +58,10 @@ public interface ISubmissionEntryQueries
         string reportScheduleId, 
         string entryId, 
         CancellationToken cancellationToken);
+    Task<PatientSubmissionEntry> GetPatientSubmissionEntry(string facilityId,
+        string reportScheduleId,
+        string reportType,
+        string patientId);
 }
 
 /// <summary>
@@ -301,6 +304,16 @@ public class SubmissionEntryQueries : ISubmissionEntryQueries
         return await (from map in _context.PatientEntryResourceMaps
                       where map.SubmissionEntryId == entryId && map.ReportScheduleId == reportScheduleId
                       select map).AllAsync(e => e.FhirResourceId != null);
+    }
+
+    public async Task<PatientSubmissionEntry> GetPatientSubmissionEntry(string facilityId, string reportScheduleId, string reportType, string patientId)
+    {
+        return await (from e in _context.PatientSubmissionEntries
+                      where e.FacilityId == facilityId
+                      && e.ReportScheduleId == reportScheduleId 
+                      && e.ReportType == reportType
+                      && e.PatientId == patientId
+                      select e).SingleAsync();
     }
 }
 
