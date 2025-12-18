@@ -20,12 +20,12 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Settings;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
-using LantanaGroup.Link.Shared.Application.Services.Security;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Listeners
@@ -249,18 +249,17 @@ namespace LantanaGroup.Link.Report.Listeners
 
             var schedule = await measureReportScheduledManager.GetReportSchedule(key.FacilityId, value.ReportTrackingId) ?? throw new TransientException("No Report Schedule Found.");
 
-            var patientResourceData = await entryQueries.GetPatientResourceData(key.FacilityId, value.ReportTrackingId, value.PatientId, value.ReportType, resource.TypeName, resource.Id, cancellationToken: cancellationToken);
-            var entry = patientResourceData.Item1 ?? throw new TransientException("No Patient Submission Entry Found");
-            var existingReportResource = patientResourceData.Item2;
+            PatientSubmissionEntry? entry = null;
 
             if (value.IsReportable)
             {
                 if (resource.TypeName == "MeasureReport")
                 {
-                    entry.MeasureReport = (MeasureReport)resource;
-
                     var patientReportData = await entryQueries.GetPatientReportData(key.FacilityId, value.ReportTrackingId, entry.PatientId, entry.Id, cancellationToken);
+                    entry = patientReportData.ReportData[value.ReportType].Entries.Single(e => e.PatientId == value.PatientId);
                     var resources = patientReportData.ReportData[value.ReportType].Resources;
+
+                    entry.MeasureReport = (MeasureReport)resource;
 
                     var allResourcsPresent = entry.MeasureReport.EvaluatedResource.All(resRef =>
                     {
@@ -277,6 +276,10 @@ namespace LantanaGroup.Link.Report.Listeners
                 }
                 else
                 {
+                    var patientResourceData = await entryQueries.GetPatientResourceData(key.FacilityId, value.ReportTrackingId, value.PatientId, value.ReportType, resource.TypeName, resource.Id, cancellationToken: cancellationToken);
+                    entry = patientResourceData.Item1 ?? throw new TransientException("No Patient Submission Entry Found");
+                    var existingReportResource = patientResourceData.Item2;
+
                     if (existingReportResource != null)
                     {
                         // Set up the ResourceMerger with the UseLatestStrategy
@@ -301,6 +304,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
             else
             {
+                entry = await entryQueries.GetPatientSubmissionEntry(facilityId, schedule.Id, value.ReportType, value.PatientId);
                 entry.Status = PatientSubmissionStatus.NotReportable;
                 entry.ValidationStatus = ValidationStatus.NotReportable;
 
@@ -319,7 +323,11 @@ namespace LantanaGroup.Link.Report.Listeners
                 ValidationStatus = entry.ValidationStatus,
             }, cancellationToken);
 
-            var readyForValidation = await entryQueries.PatientAllReadyForValidation(facilityId, schedule.Id, entry.PatientId, cancellationToken);
+            bool readyForValidation = false;
+            if (entry.MeasureReport != null)
+            {
+                readyForValidation = await entryQueries.PatientAllReadyForValidation(facilityId, schedule.Id, entry.PatientId, cancellationToken);
+            }
 
             if (readyForValidation)
             {
@@ -372,7 +380,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
             
             stopwatch.Stop();
-            _logger.LogDebug("ResourceEvaluated consumed in {ElapsedSeconds} seconds for FacilityId: {FacilityId}, PatientId: {PatientId}", stopwatch.Elapsed.TotalSeconds, facilityId, value.PatientId);
+            _logger.LogInformation("ResourceEvaluated consumed in {ElapsedSeconds} seconds for FacilityId: {FacilityId}, PatientId: {PatientId}", stopwatch.Elapsed.TotalSeconds, facilityId, value.PatientId);
         }
 
         private static string GetFacilityIdFromHeader(Headers headers)
