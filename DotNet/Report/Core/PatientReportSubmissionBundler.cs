@@ -39,10 +39,10 @@ namespace LantanaGroup.Link.Report.Core
             using var scope = _serviceScopeFactory.CreateScope();
             var queries = scope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
             var patientReportData = await queries.GetPatientReportData(facilityId, reportScheduleId, patientId, cancellationToken: CancellationToken.None);
-            return await GenerateBundle(patientReportData, facilityId, patientId, reportScheduleId);
+            return GenerateBundle(patientReportData, facilityId, patientId, reportScheduleId);
         }
 
-        public async Task<PatientSubmissionModel> GenerateBundle(PatientReportData patientReportData, string facilityId, string patientId, string reportScheduleId)
+        public PatientSubmissionModel GenerateBundle(PatientReportData patientReportData, string facilityId, string patientId, string reportScheduleId)
         {
             var schedule = patientReportData.Schedule;
 
