@@ -10,14 +10,14 @@ namespace LantanaGroup.Link.Report.Application.Factory;
 
 public class ReportMongoSchedulerFactory : ISchedulerFactory
 {
-    private readonly IServiceProvider _serviceProvider;
+    private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly ILogger<ReportMongoSchedulerFactory> _logger;
     private IScheduler? _scheduler;
     private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
 
-    public ReportMongoSchedulerFactory(IServiceProvider serviceProvider, ILogger<ReportMongoSchedulerFactory> logger)
+    public ReportMongoSchedulerFactory(IServiceScopeFactory serviceScopeFactory, ILogger<ReportMongoSchedulerFactory> logger)
     {
-        _serviceProvider = serviceProvider;
+        _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
     }
 
@@ -33,7 +33,7 @@ public class ReportMongoSchedulerFactory : ISchedulerFactory
             if (_scheduler != null)
                 return _scheduler;
 
-            using var scope = _serviceProvider.CreateScope();
+            using var scope = _serviceScopeFactory.CreateScope();
 
             var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
             var context = scope.ServiceProvider.GetRequiredService<MongoDbContext>();
