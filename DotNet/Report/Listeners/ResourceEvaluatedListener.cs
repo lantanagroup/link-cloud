@@ -255,8 +255,8 @@ namespace LantanaGroup.Link.Report.Listeners
             {
                 if (resource.TypeName == "MeasureReport")
                 {
-                    var patientReportData = await entryQueries.GetPatientReportData(key.FacilityId, value.ReportTrackingId, entry.PatientId, entry.Id, cancellationToken);
-                    entry = patientReportData.ReportData[value.ReportType].Entries.Single(e => e.PatientId == value.PatientId);
+                    var patientReportData = await entryQueries.GetPatientReportData(key.FacilityId, value.ReportTrackingId, value.PatientId, null, cancellationToken);
+                    entry = patientReportData.ReportData[value.ReportType].Entries.Single(e => e.PatientId == value.PatientId && e.ReportType == value.ReportType);
                     var resources = patientReportData.ReportData[value.ReportType].Resources;
 
                     entry.MeasureReport = (MeasureReport)resource;
@@ -304,6 +304,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
             else
             {
+                //Get just the entry, since we don't need to 
                 entry = await entryQueries.GetPatientSubmissionEntry(facilityId, schedule.Id, value.ReportType, value.PatientId);
                 entry.Status = PatientSubmissionStatus.NotReportable;
                 entry.ValidationStatus = ValidationStatus.NotReportable;
