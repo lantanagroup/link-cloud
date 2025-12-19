@@ -121,7 +121,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         var client = sp.GetRequiredService<IMongoClient>();
         var mongoSettings = sp.GetRequiredService<IOptions<MongoConnection>>().Value;
-        options.UseMongoDB(client, mongoSettings.DatabaseName);
+        var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+
+        options.UseMongoDB(client, mongoSettings.DatabaseName)
+        .UseLoggerFactory(loggerFactory)
+        .EnableSensitiveDataLogging();
     });
 
     builder.Services.AddHostedService<MongoIndexCreationService>();
