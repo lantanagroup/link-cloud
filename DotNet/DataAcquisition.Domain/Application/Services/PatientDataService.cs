@@ -202,7 +202,9 @@ public class PatientDataService : IPatientDataService
 
         var traceId = Activity.Current?.TraceId.ToHexString();
         var spanId = Activity.Current?.SpanId.ToHexString();
-        var traceAndSpanDelimited = traceId + "|" + spanId;
+        var traceAndSpanDelimited = (traceId != null && spanId != null)
+            ? $"{traceId}|{spanId}"
+            : null;
 
         if (queryPlan != null)
         {
