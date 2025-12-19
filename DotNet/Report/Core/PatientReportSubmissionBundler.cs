@@ -47,7 +47,7 @@ namespace LantanaGroup.Link.Report.Core
         {
             var schedule = patientReportData.Schedule;
 
-            Dictionary<string, string> resourcesAddedv2 = new Dictionary<string, string>();
+            Dictionary<string, string> resourcesAdded = new Dictionary<string, string>();
 
             Bundle bundle = CreateNewBundle();
             foreach (var reportType in patientReportData.ReportData)
@@ -66,7 +66,7 @@ namespace LantanaGroup.Link.Report.Core
                 {
                     var resourceRef = $"{fhirResource.ResourceType}/{fhirResource.ResourceId}";
 
-                    if (!resourcesAddedv2.TryAdd(resourceRef, fhirResource.Id))
+                    if (!resourcesAdded.TryAdd(resourceRef, fhirResource.Id))
                     {
                         continue;
                     }
