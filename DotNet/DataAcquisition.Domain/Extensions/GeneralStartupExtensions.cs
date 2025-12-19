@@ -79,17 +79,36 @@ public static class GeneralStartupExtensions
 
     public static void RegisterMonitoring(this IConfigurationManager configuration, ILoggingBuilder logging, IServiceCollection services)
     {
+        var env = configuration.GetValue<string>("ASPNETCORE_ENVIRONMENT") ?? "Production"; // Or inject IHostEnvironment if available
+
         // Logging using Serilog
         logging.AddSerilog();
         var loggerOptions = new ConfigurationReaderOptions { SectionName = DataAcquisitionConstants.AppSettingsSectionNames.Serilog };
-        Log.Logger = new LoggerConfiguration()
-                        .ReadFrom.Configuration(configuration, loggerOptions)
-                        .Filter.ByExcluding("RequestPath like '/health%'")
-                        //.Enrich.WithExceptionDetails()
-                        .Enrich.FromLogContext()
-                        .Enrich.WithSpan()
-                        .Enrich.With<ActivityEnricher>()
-                        .CreateLogger();
+        var serilogConfig = new LoggerConfiguration()
+            .ReadFrom.Configuration(configuration, loggerOptions)
+            .Filter.ByExcluding("RequestPath like '/health%'")
+            .Enrich.FromLogContext()
+            .Enrich.WithSpan()
+            .Enrich.With<ActivityEnricher>();
+
+        // Add rich console only in Development (for local debugging)
+        if (env == "Development")
+        {
+            serilogConfig.WriteTo.Console(
+                outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}",
+                theme: Serilog.Sinks.SystemConsole.Themes.AnsiConsoleTheme.Code  // Colorful output like default console
+            );
+        }
+        else
+        {
+            // In non-Development (e.g., Docker, Prod), no console or minimal
+        }
+
+        Log.Logger = serilogConfig.CreateLogger();
+
+        // Clear defaults and use Serilog everywhere
+        logging.ClearProviders();
+        logging.AddSerilog(Log.Logger, dispose: true);
 
         var serviceInformation = configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
         services.Configure<ServiceInformation>(configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation));
