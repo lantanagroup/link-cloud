@@ -288,8 +288,8 @@ namespace IntegrationTests.Report
 
             // Create reportable MeasureReport resource
             var measureReport = new MeasureReport { Id = "mr-1", Type = MeasureReport.MeasureReportType.Individual };
-            var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
-            var mrStr = JsonSerializer.Serialize(measureReport, options);
+
+            var mrStr = JsonSerializer.Serialize(measureReport, SerializerOptions.ForFhirWithModelInspector);
 
             var consumeResult = CreateConsumeResult(facilityId, schedule.Id, patientId, reportType,
                 JsonDocument.Parse(mrStr).RootElement, isReportable: true);
@@ -406,8 +406,8 @@ namespace IntegrationTests.Report
 
             var patient = new Patient();
             patient.Id = patientId;
-            var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
-            var patientStr = JsonSerializer.Serialize(patient, options);
+
+            var patientStr = JsonSerializer.Serialize(patient, SerializerOptions.ForFhirWithModelInspector);
 
             var consumeResult = CreateConsumeResult(facilityId, "nonexistent", patientId, "TestReport", JsonDocument.Parse(patientStr).RootElement, true);
 
@@ -448,8 +448,8 @@ namespace IntegrationTests.Report
 
             var patient = new Patient();
             patient.Id = patientId;
-            var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
-            var patientStr = JsonSerializer.Serialize(patient, options);
+
+            var patientStr = JsonSerializer.Serialize(patient, SerializerOptions.ForFhirWithModelInspector);
 
             var consumeResult = CreateConsumeResult(facilityId, "testid", patientId, "TestReport", JsonDocument.Parse(patientStr).RootElement, true);
 
@@ -497,8 +497,8 @@ namespace IntegrationTests.Report
 
             var patient = new Patient();
             patient.Id = patientId;
-            var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
-            var patientStr = JsonSerializer.Serialize(patient, options);
+
+            var patientStr = JsonSerializer.Serialize(patient, SerializerOptions.ForFhirWithModelInspector);
 
             var consumeResult = CreateConsumeResult(facilityId, "testid", patientId, "TestReport", JsonDocument.Parse(patientStr).RootElement, true);
 

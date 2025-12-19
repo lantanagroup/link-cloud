@@ -224,7 +224,7 @@ namespace IntegrationTests.Report
 
                 var bundleStopWatch = new Stopwatch();
                 bundleStopWatch.Start();
-                var model = await bundler.GenerateBundle(patientReportData, facilityId, patient, schedule.Id);
+                var model = bundler.GenerateBundle(patientReportData, facilityId, patient, schedule.Id);
                 bundleStopWatch.Stop();
 
                 _output.WriteLine($"Patient {patient} GenerateBundle Time: {bundleStopWatch.ElapsedMilliseconds} ms");
