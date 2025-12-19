@@ -1,6 +1,5 @@
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
@@ -10,8 +9,8 @@ using LantanaGroup.Link.Report.Domain.Queries;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Entities.Enums;
 using LantanaGroup.Link.Report.KafkaProducers;
+using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
-using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
@@ -33,9 +32,6 @@ namespace LantanaGroup.Link.Report.Controllers
     [ApiController]
     public class ReportController : ControllerBase
     {
-        private static readonly JsonSerializerOptions lenientJsonOptions =
-            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector).UsingMode(DeserializerModes.Ostrich);
-
         private readonly ILogger<ReportController> _logger;
         private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
         private readonly IDatabase _database;
@@ -197,7 +193,7 @@ namespace LantanaGroup.Link.Report.Controllers
                     ReadOnlyMemory<byte> lineFeed = new([0x0a]);
                     foreach (var bundleEntry in bundle.Value.Entry)
                     {
-                        await JsonSerializer.SerializeAsync(zipEntryStream, bundleEntry.Resource, lenientJsonOptions);
+                        await JsonSerializer.SerializeAsync(zipEntryStream, bundleEntry.Resource, SerializerOptions.ForFhirLenientDeserialization);
                         await zipEntryStream.WriteAsync(lineFeed);
                     }
                 }
