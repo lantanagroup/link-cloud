@@ -353,18 +353,6 @@ public class PatientDataService : IPatientDataService
 
                 ActivityContext parentContext = default;
 
-                //if (!string.IsNullOrWhiteSpace(log.TraceId) && log.TraceId.Length == 32 && IsValidHex(log.TraceId))
-                //{
-                //    try
-                //    {
-                //        var traceId = ActivityTraceId.CreateFromString(log.TraceId.AsSpan());
-                //        parentContext = new ActivityContext(traceId, default, ActivityTraceFlags.None);
-                //    }
-                //    catch (Exception ex)
-                //    {
-                //        _logger.LogWarning(ex, "Failed to create ActivityTraceId from TraceId {TraceId} for log {LogId}", log.TraceId.Sanitize(), log.Id);
-                //    }
-                //}
 
                 if (!string.IsNullOrWhiteSpace(log.TraceId))
                 {
