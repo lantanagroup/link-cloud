@@ -47,6 +47,9 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ReportManifestProducer _reportManifestProducer;
         private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
 
+        private static readonly JsonSerializerOptions _fhirResourceSerializaerOptions = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector,
+                        new FhirJsonPocoDeserializerSettings { Validator = null });
+
         private string Name => this.GetType().Name;
 
         public ResourceEvaluatedListener(
@@ -238,9 +241,7 @@ namespace LantanaGroup.Link.Report.Listeners
             Resource? resource = null;
             try
             {
-                resource = JsonSerializer.Deserialize<Resource>(value.Resource.ToString(),
-                    new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector,
-                        new FhirJsonPocoDeserializerSettings { Validator = null })) ?? throw new Exception($"{Name}: Unable to deserialize event resource");
+                resource = JsonSerializer.Deserialize<Resource>(value.Resource.ToString(), _fhirResourceSerializaerOptions) ?? throw new Exception($"{Name}: Unable to deserialize event resource");
             }
             catch (Exception ex)
             {
