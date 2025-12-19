@@ -368,7 +368,7 @@ public class PatientDataService : IPatientDataService
 
                 if (!string.IsNullOrWhiteSpace(log.TraceId))
                 {
-                    var parts = log.TraceId.Split('-');  // Or whatever delimiter you choose
+                    var parts = log.TraceId.Split('|');  // Or whatever delimiter you choose
                     if (parts.Length == 2 &&
                         parts[0].Length == 32 && IsValidHex(parts[0]) &&
                         parts[1].Length == 16 && IsValidHex(parts[1]))
