@@ -74,10 +74,20 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task CreateSubmissionEntryResourceMap(string reportScheduleId, string submissionEntryId, List<string> reportTypes, string resourceType, string resourceId, string? fhirResourceId = null, bool performSave = true, CancellationToken cancellationToken = default)
         {
-            var resourceMap = await _context.PatientEntryResourceMaps.SingleOrDefaultAsync(r => r.SubmissionEntryId == submissionEntryId 
-                                                                                    && r.ResourceType == resourceType     
-                                                                                    && r.ResourceId == resourceId
-                                                                                    && (fhirResourceId == null || r.FhirResourceId == fhirResourceId));
+            PatientSubmissionEntryResourceMap? resourceMap;
+
+            if (fhirResourceId == null)
+            {
+                //Slightly more expensive query if we don't have a fhirResourceId value.
+                resourceMap = await _context.PatientEntryResourceMaps.SingleOrDefaultAsync(r => r.SubmissionEntryId == submissionEntryId
+                                                                                        && r.ResourceType == resourceType
+                                                                                        && r.ResourceId == resourceId, cancellationToken);
+            }
+            else
+            {
+                resourceMap = await _context.PatientEntryResourceMaps.SingleOrDefaultAsync(r => r.SubmissionEntryId == submissionEntryId
+                                                                                                  && r.FhirResourceId == fhirResourceId, cancellationToken);
+            }
 
             if (resourceMap == null)
             {
