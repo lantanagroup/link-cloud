@@ -354,25 +354,31 @@ public class PatientDataService : IPatientDataService
                 ActivityContext parentContext = default;
 
                 if (!string.IsNullOrWhiteSpace(log.TraceId))
-				{
-                    try
-                    {
-                        var traceId = ActivityTraceId.CreateFromString(parts[0].AsSpan());
-                        var spanId = ActivitySpanId.CreateFromString(parts[1].AsSpan());
-                        var traceFlags = ActivityTraceFlags.Recorded;
-
-                        parentContext = new ActivityContext(traceId, spanId, traceFlags);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Failed to parse combined TraceId/SpanId {TraceId} for log {LogId}", log.TraceId.Sanitize(), log.Id);
-                    }
-                }
-                else
                 {
-                    _logger.LogWarning("Invalid combined TraceId format (expected 32-16 hex chars) for log {LogId}", log.Id);
+                    var parts = log.TraceId.Split('|');  // Or whatever delimiter you choose
+                    if (parts.Length == 2 &&
+                        parts[0].Length == 32 && IsValidHex(parts[0]) &&
+                        parts[1].Length == 16 && IsValidHex(parts[1]))
+                    {
+                        try
+                        {
+                            var traceId = ActivityTraceId.CreateFromString(parts[0].AsSpan());
+                            var spanId = ActivitySpanId.CreateFromString(parts[1].AsSpan());
+                            var traceFlags = ActivityTraceFlags.Recorded;
+
+                            parentContext = new ActivityContext(traceId, spanId, traceFlags);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to parse combined TraceId/SpanId {TraceId} for log {LogId}", log.TraceId.Sanitize(), log.Id);
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Invalid combined TraceId format (expected 32-16 hex chars) for log {LogId}", log.Id);
+                    }
                 }
-            
+
 
                 using var activity = ServiceActivitySource.Instance.StartActivity(
                     "PatientDataService.ExecuteLogRequest",
