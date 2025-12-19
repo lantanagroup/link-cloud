@@ -4,6 +4,7 @@ using LantanaGroup.Link.Report.Domain.Queries;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
+using System.Collections.Generic;
 
 namespace LantanaGroup.Link.Report.Core
 {
@@ -47,7 +48,7 @@ namespace LantanaGroup.Link.Report.Core
         {
             var schedule = patientReportData.Schedule;
 
-            Dictionary<string, string> resourcesAdded = new Dictionary<string, string>();
+            HashSet<string> resourcesAdded = new HashSet<string>();
 
             Bundle bundle = CreateNewBundle();
             foreach (var reportType in patientReportData.ReportData)
@@ -66,7 +67,7 @@ namespace LantanaGroup.Link.Report.Core
                 {
                     var resourceRef = $"{fhirResource.ResourceType}/{fhirResource.ResourceId}";
 
-                    if (!resourcesAdded.TryAdd(resourceRef, fhirResource.Id))
+                    if (!resourcesAdded.Add(resourceRef))
                     {
                         continue;
                     }
