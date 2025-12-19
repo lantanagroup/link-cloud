@@ -64,9 +64,6 @@ namespace LantanaGroup.Link.Report.Core
 
                 foreach (var fhirResource in resources)
                 {
-                    if (fhirResource.ResourceId == null)
-                        continue;
-
                     if (resourcesAdded.ContainsKey(fhirResource.ResourceId) && resourcesAdded[fhirResource.ResourceId].Contains(fhirResource.ResourceType))
                     {
                         continue;

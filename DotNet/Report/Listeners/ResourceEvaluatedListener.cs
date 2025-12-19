@@ -1,7 +1,6 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
@@ -260,13 +259,24 @@ namespace LantanaGroup.Link.Report.Listeners
 
                     entry.MeasureReport = (MeasureReport)resource;
 
-                    var allResourcsPresent = entry.MeasureReport.EvaluatedResource.All(resRef =>
+                    bool allResourcsPresent = true;
+                    foreach (var resRef in entry.MeasureReport.EvaluatedResource)
                     {
                         var split = resRef.Reference.Split("/");
                         var type = split[0];
                         var id = split[1];
-                        return resources.Any(r => r.ResourceId == id && r.ResourceType == type);
-                    });
+                        var exists = resources.Any(r => r.ResourceId == id && r.ResourceType == type);
+
+                        if (!exists)
+                        {
+                            //Create a placeholder resource map, which will be filled in with a FhirResourceId when that resource comes through the listener.
+                            //This is an edge case guard in the event where we receive the measure report, which should be the last resource through, but we don't have all
+                            //the resources on disk. This could happen if a resource came through and went into retries, for example.
+                            //We are delaying the save with performSave: false so that it can be written out all at once when we update the entry and call SaveChangesAsync() there.
+                            await resourceManager.CreateSubmissionEntryResourceMap(schedule.Id, entry.Id, [value.ReportType], type, id, fhirResourceId: null, performSave: false, cancellationToken);
+                            allResourcsPresent = false;
+                        }
+                    }
 
                     if (allResourcsPresent)
                     {
@@ -278,7 +288,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 else
                 {
                     var patientResourceData = await entryQueries.GetPatientResourceData(key.FacilityId, value.ReportTrackingId, value.PatientId, value.ReportType, resource.TypeName, resource.Id, cancellationToken: cancellationToken);
-                    entry = patientResourceData.Item1 ?? throw new TransientException("No Patient Submission Entry Found");
+                    entry = patientResourceData.Item1;
                     var existingReportResource = patientResourceData.Item2;
 
                     if (existingReportResource != null)

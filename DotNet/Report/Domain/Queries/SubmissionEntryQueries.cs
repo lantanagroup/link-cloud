@@ -26,7 +26,7 @@ public interface ISubmissionEntryQueries
         string? patientEntryId = null,
         CancellationToken cancellationToken = default);
 
-    Task<(PatientSubmissionEntry?, FhirResource?)> GetPatientResourceData(
+    Task<(PatientSubmissionEntry, FhirResource?)> GetPatientResourceData(
         string facilityId, 
         string reportScheduleId, 
         string patientId, 
@@ -224,7 +224,7 @@ public class SubmissionEntryQueries : ISubmissionEntryQueries
     /// <param name="resourceId"></param>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
-    public async Task<(PatientSubmissionEntry?, FhirResource?)> GetPatientResourceData(string facilityId, string reportScheduleId, string patientId, string reportType, string resourceType, string resourceId, CancellationToken cancellationToken = default)
+    public async Task<(PatientSubmissionEntry, FhirResource?)> GetPatientResourceData(string facilityId, string reportScheduleId, string patientId, string reportType, string resourceType, string resourceId, CancellationToken cancellationToken = default)
     {
         var entry = await _context.PatientSubmissionEntries.SingleAsync(e => e.FacilityId == facilityId && e.ReportScheduleId == reportScheduleId && e.PatientId == patientId && e.ReportType == reportType);
 
