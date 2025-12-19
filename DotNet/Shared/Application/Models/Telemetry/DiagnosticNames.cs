@@ -6,6 +6,7 @@
         public const string StackTrace = "stack.trace";
         public const string Service = "service";
         public const string CorrelationId = "correlation.id";
+        public const string EntityId = "entity.id";
         public const string ReportId = "report.id";
         public const string ReportTrackingId = "report.tracking.id";
         public const string ReportScheduledId = "report.scheduled.id";
