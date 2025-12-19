@@ -353,32 +353,26 @@ public class PatientDataService : IPatientDataService
 
                 ActivityContext parentContext = default;
 
-
                 if (!string.IsNullOrWhiteSpace(log.TraceId))
-                {
-                    var parts = log.TraceId.Split('|');  // Or whatever delimiter you choose
-                    if (parts.Length == 2 &&
-                        parts[0].Length == 32 && IsValidHex(parts[0]) &&
-                        parts[1].Length == 16 && IsValidHex(parts[1]))
+				{
+                    try
                     {
-                        try
-                        {
-                            var traceId = ActivityTraceId.CreateFromString(parts[0].AsSpan());
-                            var spanId = ActivitySpanId.CreateFromString(parts[1].AsSpan());
-                            var traceFlags = ActivityTraceFlags.Recorded;
+                        var traceId = ActivityTraceId.CreateFromString(parts[0].AsSpan());
+                        var spanId = ActivitySpanId.CreateFromString(parts[1].AsSpan());
+                        var traceFlags = ActivityTraceFlags.Recorded;
 
-                            parentContext = new ActivityContext(traceId, spanId, traceFlags);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "Failed to parse combined TraceId/SpanId {TraceId} for log {LogId}", log.TraceId.Sanitize(), log.Id);
-                        }
+                        parentContext = new ActivityContext(traceId, spanId, traceFlags);
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        _logger.LogWarning("Invalid combined TraceId format (expected 32-16 hex chars) for log {LogId}", log.Id);
+                        _logger.LogWarning(ex, "Failed to parse combined TraceId/SpanId {TraceId} for log {LogId}", log.TraceId.Sanitize(), log.Id);
                     }
                 }
+                else
+                {
+                    _logger.LogWarning("Invalid combined TraceId format (expected 32-16 hex chars) for log {LogId}", log.Id);
+                }
+            
 
                 using var activity = ServiceActivitySource.Instance.StartActivity(
                     "PatientDataService.ExecuteLogRequest",
@@ -400,7 +394,7 @@ public class PatientDataService : IPatientDataService
                         log.ReportTrackingId,
                         cancellationToken);
 
-                    if (nonReferenceLogsCnt > 0 && (log.RetryAttempts ?? 0) < 10)
+                    if (nonReferenceLogsCnt > 0 && (log.RetryAttempts ?? 0) < DataAcquisitionLog.MaxRetryAttempts)
                     {
                         log.Status = RequestStatus.Pending;
                         log.RetryAttempts = (log.RetryAttempts ?? 0) + 1;
@@ -417,11 +411,11 @@ public class PatientDataService : IPatientDataService
                         }, cancellationToken);
                         return;
                     }
-                    else if ((log.RetryAttempts ?? 0) >= 10)
+                    else if ((log.RetryAttempts ?? 0) >= DataAcquisitionLog.MaxRetryAttempts)
                     {
                         log.Notes ??= new List<string>();
                         log.Status = RequestStatus.Failed;
-                        log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has exceeded the maximum retry attempts of 10. Not all Non-reference resource queries are completed. Marking as Failed.");
+                        log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has exceeded the maximum retry attempts. Not all Non-reference resource queries are completed. Marking as Failed.");
                         await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                         {
                             Id = log.Id,
@@ -484,7 +478,7 @@ public class PatientDataService : IPatientDataService
                     }
 
                     //check if log is search and not census, if true,
-                    if (fhirQuery.QueryType == FhirQueryType.Search && !log.IsCensus)
+                    if ((fhirQuery.QueryType == FhirQueryType.Search || fhirQuery.QueryType == FhirQueryType.SearchPost)&& !log.IsCensus)
                     {
                         var idParams = fhirQuery.QueryParameters.Where(x => x.StartsWith("_id=", StringComparison.InvariantCultureIgnoreCase)).ToList();
                         if(idParams.Any())
@@ -502,7 +496,7 @@ public class PatientDataService : IPatientDataService
                             if (!ids.Any())
                             {
                                 log.Notes ??= [];
-                                log.Notes.Add($"[{DateTime.UtcNow}] No IDs found in _id query parameter for Search FHIR query. Marking log as Completed.");
+                                log.Notes.Add($"[{DateTime.UtcNow}] No IDs found in _id query parameter for {fhirQuery.QueryType} FHIR query. Marking log as Completed.");
                                 skipFetch = true;
                             }
                         }
