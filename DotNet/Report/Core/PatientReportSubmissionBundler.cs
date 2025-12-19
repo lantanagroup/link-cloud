@@ -1,6 +1,7 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Domain.Queries;
+using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 
@@ -46,8 +47,7 @@ namespace LantanaGroup.Link.Report.Core
         {
             var schedule = patientReportData.Schedule;
 
-            //The 'resourcesAdded' Dictionary will keep track of FHIR resource id's that have been added to the bundle to avoid adding duplicates across entries. The value of each dictionary entry will contain the associated FHIR types. It's a string List type in case there are different FHIR resources that share the same id. This is probably unlikely to happen, but is possible. 
-            Dictionary<string, List<string>> resourcesAdded = new Dictionary<string, List<string>>();
+            Dictionary<string, string> resourcesAddedv2 = new Dictionary<string, string>();
 
             Bundle bundle = CreateNewBundle();
             foreach (var reportType in patientReportData.ReportData)
@@ -64,7 +64,9 @@ namespace LantanaGroup.Link.Report.Core
 
                 foreach (var fhirResource in resources)
                 {
-                    if (resourcesAdded.ContainsKey(fhirResource.ResourceId) && resourcesAdded[fhirResource.ResourceId].Contains(fhirResource.ResourceType))
+                    var resourceRef = $"{fhirResource.ResourceType}/{fhirResource.ResourceId}";
+
+                    if (!resourcesAddedv2.TryAdd(resourceRef, fhirResource.Id))
                     {
                         continue;
                     }
@@ -72,19 +74,10 @@ namespace LantanaGroup.Link.Report.Core
                     var fullUrl = GetFullUrl(fhirResource.Resource);
                     bundle.AddResourceEntry(fhirResource.Resource, fullUrl);
 
-                    if (resourcesAdded.ContainsKey(fhirResource.ResourceId))
-                    {
-                        resourcesAdded[fhirResource.ResourceId].Add(fhirResource.ResourceType);
-                    }
-                    else
-                    {
-                        resourcesAdded.Add(fhirResource.ResourceId, new List<string>() { fhirResource.ResourceType });
-                    }
+                    entry.MeasureReport.EvaluatedResource.Add(new ResourceReference(resourceRef));
                 }
 
                 MeasureReport mr = entry.MeasureReport;
-
-                mr.EvaluatedResource.AddRange(data.Resources.Select(r => new ResourceReference($"{r.ResourceType}/{r.ResourceId}")));
 
                 // ensure we have an id to reference
                 if (string.IsNullOrEmpty(mr.Id))
