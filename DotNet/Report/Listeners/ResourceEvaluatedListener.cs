@@ -295,7 +295,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     {
                         // Set up the ResourceMerger with the UseLatestStrategy
                         var merger = new ResourceMerger();
-                        var strategyLogger = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ILogger<UseLatestStrategy>>();
+                        var strategyLogger = scope.ServiceProvider.GetRequiredService<ILogger<UseLatestStrategy>>();
                         merger.SetStrategy(new UseLatestStrategy(strategyLogger));
 
                         existingReportResource.Resource = merger.Merge(existingReportResource.Resource, resource);
