@@ -200,6 +200,12 @@ public class PatientDataService : IPatientDataService
         Patient patient = null;
         var patientId = TEMPORARYPatientIdPart(dataAcqRequested.PatientId);
 
+        var traceId = Activity.Current?.TraceId.ToHexString();
+        var spanId = Activity.Current?.SpanId.ToHexString();
+        var traceAndSpanDelimited = (traceId != null && spanId != null)
+            ? $"{traceId}|{spanId}"
+            : null;
+
         if (queryPlan != null)
         {
             var initialQueries = queryPlan.InitialQueries.OrderBy(x => x.Key);
@@ -237,7 +243,7 @@ public class PatientDataService : IPatientDataService
                                 QueryType = FhirQueryType.Read,
                                 QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),
                                 ScheduledReport = schedReport,
-                                TraceId = Activity.Current?.TraceId.ToHexString(),
+                                TraceId = traceAndSpanDelimited,
                                 FhirQuery = new List<CreateFhirQueryModel>
                                 {
                                         new CreateFhirQueryModel
@@ -349,18 +355,32 @@ public class PatientDataService : IPatientDataService
 
                 ActivityContext parentContext = default;
 
-                if (!string.IsNullOrWhiteSpace(log.TraceId) && log.TraceId.Length == 32 && IsValidHex(log.TraceId))
+                if (!string.IsNullOrWhiteSpace(log.TraceId))
                 {
-                    try
+                    var parts = log.TraceId.Split('|');  // Or whatever delimiter you choose
+                    if (parts.Length == 2 &&
+                        parts[0].Length == 32 && IsValidHex(parts[0]) &&
+                        parts[1].Length == 16 && IsValidHex(parts[1]))
                     {
-                        var traceId = ActivityTraceId.CreateFromString(log.TraceId.AsSpan());
-                        parentContext = new ActivityContext(traceId, default, ActivityTraceFlags.None);
+                        try
+                        {
+                            var traceId = ActivityTraceId.CreateFromString(parts[0].AsSpan());
+                            var spanId = ActivitySpanId.CreateFromString(parts[1].AsSpan());
+                            var traceFlags = ActivityTraceFlags.Recorded;
+
+                            parentContext = new ActivityContext(traceId, spanId, traceFlags);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to parse combined TraceId/SpanId {TraceId} for log {LogId}", log.TraceId.Sanitize(), log.Id);
+                        }
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        _logger.LogWarning(ex, "Failed to create ActivityTraceId from TraceId {TraceId} for log {LogId}", log.TraceId.Sanitize(), log.Id);
+                        _logger.LogWarning("Invalid combined TraceId format (expected 32-16 hex chars) for log {LogId}", log.Id);
                     }
                 }
+
 
                 using var activity = ServiceActivitySource.Instance.StartActivity(
                     "PatientDataService.ExecuteLogRequest",
