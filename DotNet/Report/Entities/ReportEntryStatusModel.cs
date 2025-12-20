@@ -5,7 +5,7 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace LantanaGroup.Link.Report.Entities
 {
-    //TODO: Rename to patientReportingStatus?
+    //TODO: Rename to reportEntry?
     [BsonCollection("reportEntryStatus")]
     [BsonIgnoreExtraElements]
     public class ReportEntryStatusModel : BaseEntityExtended

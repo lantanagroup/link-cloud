@@ -21,10 +21,6 @@ using System.Text;
 using System.Threading;
 using static System.Net.Mime.MediaTypeNames;
 
-//TODO: Add story for extension removal Normalization
-//TODO: Add story for MeasureEval post eval extension removal (set in app config)
-//TODO: Add story for MeasureEval to add Meta.Profile to each measure report: "http://hl7.org/fhir/us/davinci-deqm/StructureDefinition/indv-measurereport-deqm";
-
 namespace LantanaGroup.Link.Report.Core
 {
     /// <summary>
@@ -98,8 +94,7 @@ namespace LantanaGroup.Link.Report.Core
                                     continue;
                                 }
 
-                                //TODO: ADD '/'
-                                string resourceType = resource_and_id.Split('_')[0];
+                                string resourceType = resource_and_id.Split('/')[0];
 
                                 if (aggregateMeasureReport.ResourceCount.ContainsKey(resourceType))
                                 {
