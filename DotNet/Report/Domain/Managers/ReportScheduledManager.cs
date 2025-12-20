@@ -1,4 +1,7 @@
-﻿using System.Linq.Expressions;
+﻿using System.Diagnostics.Metrics;
+using System.Linq.Expressions;
+using AngleSharp.Common;
+using AutoMapper;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Domain.Enums;
@@ -107,7 +110,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 //TODO: Eventually may need to check validation results
                 var population = await _reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == summary.Id);
 
-                summary.InitialPopulationCount = population == null ? 0 : population.ReportPopulations.Count;
+                summary.InitialPopulationCount = population == null ? 0 : population.GroupPopulationList.Count;
 
                         //reportEntries.Count(
                         //    x => x.ReportScheduleId == summary.Id &&
@@ -144,7 +147,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
 
                 // Get the initial population count for each report
-                summary.InitialPopulationCount = (await _reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == summary.Id)).ReportPopulations.Count;
+                //TODO: I don't think this is right. Need to look into adding all measures for the scheduled report
+                summary.InitialPopulationCount = (await _reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == summary.Id)).GroupPopulationList.Count;
                 //measureReportEntries.Count(
                 //    x => x.ReportScheduleId == summary.Id &&
                 //         x.Status != PatientSubmissionStatus.PendingEvaluation &&
@@ -156,16 +160,11 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     .DistinctBy(x => x.PatientId).Count();
 
                 // Get the metrics for the scheduled report
-                //TODO: Implement
                 //var metrics = new ScheduledReportMetrics
                 //{
-                //    MeasureIpCounts = measureReportEntries
-                //        .Where(x =>
-                //            x.ReportScheduleId == summary.Id &&
-                //            x.Status != PatientSubmissionStatus.PendingEvaluation &&
-                //            x.Status != PatientSubmissionStatus.NotReportable)
-                //        .GroupBy(x => x.ReportType)
-                //        .ToDictionary(x => MeasureNameShortener.ShortenMeasureName(x.Key), x => x.Count()),
+                //    MeasureIpCounts = measureReportEntries.Where(x => x.ReportScheduleId == summary.Id && x.Status != PatientSubmissionStatus.PendingEvaluation && x.Status != PatientSubmissionStatus.NotReportable)
+                //                                            .GroupBy(x => x.ReportType)
+                //                                            .ToDictionary(x => MeasureNameShortener.ShortenMeasureName(x.Key), x => x.Count()),
                 //    ReportStatusCounts = measureReportEntries
                 //        .GroupBy(x => x.Status)
                 //        .ToDictionary(x => x.Key.ToString(), x => x.Count()),
@@ -174,11 +173,36 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 //        .ToDictionary(x => x.Key.ToString(), x => x.Count())
                 //};
 
-                //summary.ReportMetrics = metrics;
+
+                //TODO: Change to group by report type and use name shortner after updating test data to have reportType in population document
+                var pop = (await _reportPopulationManager.FindAsync(x => x.ReportScheduleId == reportId)).GroupBy(x => MeasureNameShortener.ShortenMeasureName(x.ReportType)).ToDictionary(x => x.Key, x => x.Count());
+
+                var valid = new Dictionary<string, int>();
+
+                foreach (var entry in measureReportEntries) {
+                    if (valid.ContainsKey(entry.ReportingStatus.ToString())) {
+                        valid[entry.ReportingStatus.ToString()]++;
+                        continue;
+                    }
+
+                    valid.Add(entry.ReportingStatus.ToString(), 1);
+                }
+
+                var metrics = new ScheduledReportMetrics
+                {
+                    MeasureIpCounts = pop,
+                    ReportStatusCounts = measureReportEntries
+                        .GroupBy(x => x.ReportingStatus)
+                        .ToDictionary(x => x.Key.ToString(), x => x.Count()),
+                    ValidationStatusCounts = valid
+                };
+
+                summary.ReportMetrics = metrics;
 
                 return summary;
             }
             catch (Exception ex) {
+                //TODO: TEST OR THROW WITHOUT AND SEE WHAT HAPPENS
                 throw ex;
             }
         }

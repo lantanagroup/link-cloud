@@ -7,6 +7,8 @@ using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Enums;
 using System.Linq.Expressions;
+using System.Threading;
+using LantanaGroup.Link.Report.Application.Models;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
 {
@@ -26,6 +28,10 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         Task<ReportEntryStatusModel?> SingleOrDefaultAsync(
             Expression<Func<ReportEntryStatusModel, bool>> predicate,
             CancellationToken cancellationToken = default);
+
+        Task<ReportEntryStatusModel> UpdateAsyncWithConsumerResult(MeasureReportGeneratedValue consumerValue, CancellationToken cancellationToken = default);
+
+        Task<ReportEntryStatusModel> UpdateAsyncWithAggregateResult(ReportEntryStatusModel entry, AggregateResult aggregateResult, CancellationToken cancellationToken = default);
 
         Task<PatientReportSummary> GetPatients(string facilityId, string reportId, int page, int count, CancellationToken cancellationToken = default);
 
@@ -66,6 +72,41 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task<ReportEntryStatusModel> UpdateAsync(ReportEntryStatusModel entry, CancellationToken cancellationToken)
         {
+            return await _database.ReportEntryStatusRepository.UpdateAsync(entry, cancellationToken);
+        }
+
+        public async Task<ReportEntryStatusModel> UpdateAsyncWithConsumerResult(MeasureReportGeneratedValue consumerValue, CancellationToken cancellationToken = default)
+        {
+            var reportEntry = await this.GetEntry(consumerValue.ReportTrackingId, consumerValue.PatientId);
+
+            MeasureReportEntry measureReportEntry =  reportEntry.MeasureReportEntryList.First(x => x.ReportType == consumerValue.ReportType);
+
+            measureReportEntry.MeasureReportId = consumerValue.MeasureReportId;
+            measureReportEntry.MeasureReportFileName = consumerValue.MeasureReportFileName;
+            measureReportEntry.MeasureReportUri = consumerValue.MeasureReportURI;
+
+            if (consumerValue.IsReportable)
+            {
+                measureReportEntry.Status = MeasureReportStatus.ReadyForValidation;
+            }
+            else
+            {
+                measureReportEntry.Status = MeasureReportStatus.NotReportable;
+            }
+
+            return await _database.ReportEntryStatusRepository.UpdateAsync(reportEntry, cancellationToken);
+        }
+
+        public async Task<ReportEntryStatusModel> UpdateAsyncWithAggregateResult(ReportEntryStatusModel entry, AggregateResult aggregateResult, CancellationToken cancellationToken = default)
+        {
+            entry.AggregateReportUri = aggregateResult.Uri.AbsoluteUri;
+            entry.AggregateReportFileName = aggregateResult.Uri.Segments.Last();
+            entry.ModifyDate = DateTime.UtcNow;
+
+            foreach (var measureReportResult in aggregateResult.MeasureReportResults) {
+                entry.MeasureReportEntryList.First(x => x.ReportType == measureReportResult.ReportType).ResourceCount = measureReportResult.ResourceCount;
+            }
+
             return await _database.ReportEntryStatusRepository.UpdateAsync(entry, cancellationToken);
         }
 

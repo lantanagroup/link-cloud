@@ -110,7 +110,6 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    //TODO: Populate
                     string facilityId = string.Empty;
 
                     try
@@ -119,45 +118,21 @@ namespace LantanaGroup.Link.Report.Listeners
                         {
                             try
                             {
+                                facilityId = result.Value.FacilityId;
+
                                 if (!result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
                                 {
                                     throw new DeadLetterException("Correlation Id missing");
                                 }
 
                                 var correlationId = Encoding.UTF8.GetString(headerValue);
-
-                                var reportEntry = await _reportEntryManager.GetEntry(result.Value.ReportTrackingId, result.Value.PatientId, cancellationToken);
-
-                                if (reportEntry == null)
-                                {
-                                    //TODO: Throw error? Create an entry?
-                                    throw new NotImplementedException();
-                                }
-
-                                MeasureReportEntry measureReportEntry = reportEntry.MeasureReportEntryList.First(x => x.ReportType == result.Value.ReportType);
-
-                                measureReportEntry.MeasureReportId = result.Value.MeasureReportId;
-                                measureReportEntry.MeasureReportFileName = result.Value.MeasureReportFileName;
-                                measureReportEntry.MeasureReportUri = result.Value.MeasureReportURI;
-
-                                if (result.Value.IsReportable)
-                                {
-                                    measureReportEntry.Status = MeasureReportStatus.ReadyForValidation;
-                                }
-                                else
-                                {
-                                    measureReportEntry.Status = MeasureReportStatus.NotReportable;
-                                }
-
-                                await _reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
-
+                                var reportEntry = await _reportEntryManager.UpdateAsyncWithConsumerResult(result.Value);
                                 var schedule = await _reportScheduledManager.GetReportSchedule(result.Value.FacilityId, result.Value.ReportTrackingId, cancellationToken);
-
-                                //TODO: Follow up on this logic
                                 var readyForValidation = reportEntry.MeasureReportEntryList.All(x => x.Status == MeasureReportStatus.NotReportable || x.Status == MeasureReportStatus.ReadyForValidation);
 
                                 if (!readyForValidation)
                                 {
+                                    //TODO: Follow up on this logic
                                     await _reportManifestProducer.Produce(schedule, correlationId);
                                     return;
                                 }
@@ -169,52 +144,19 @@ namespace LantanaGroup.Link.Report.Listeners
                                     throw new DeadLetterException($"No aggregated results were found for patient '{result.Value.PatientId}' for report id '{result.Value.ReportTrackingId}'");
                                 }
 
-                                reportEntry.AggregateReportUri = aggregateResult.Uri.AbsoluteUri;
-                                reportEntry.AggregateReportFileName = aggregateResult.Uri.Segments.Last();
-                                reportEntry.ModifyDate = DateTime.UtcNow;
+                                _reportEntryManager.UpdateAsyncWithAggregateResult(reportEntry, aggregateResult);
 
-                                await _reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
-
-                                foreach (var measureReportResult in aggregateResult.MeasureReportResults)
+                                foreach (var aggregateMeasureReport in aggregateResult.MeasureReportResults)
                                 {
-                                    var reportPopulationModel = await _reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == result.Value.ReportTrackingId && x.Measure == measureReportEntry.ReportType);
+                                    var populationModel = await _reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == result.Value.ReportTrackingId && x.Measure == result.Value.ReportType);
 
-                                    if (reportPopulationModel == null)
+                                    if (populationModel == null)
                                     {
-                                        reportPopulationModel = new ReportPopulationModel()
-                                        {
-                                            Measure = measureReportResult.Measure,
-                                            CreateDate = DateTime.UtcNow,
-                                            FacilityId = result.Value.FacilityId,
-                                            ReportScheduleId = result.Value.ReportTrackingId
-                                        };
-
-                                        var serializer = new FhirJsonSerializer();
-
-                                        foreach (var measureReportpopulation in measureReportResult.PopulationList)
-                                        {
-                                            ReportPopulation population = new ReportPopulation()
-                                            {
-                                                PopulationId = measureReportpopulation.PopulationId,
-                                                PopulationCode = measureReportpopulation.PopulationCode,
-                                                TotalPopulationCount = measureReportpopulation.PopulationCount,
-                                                MeasureReportIds = new List<MeasureReportPopulation>() {
-                                                new MeasureReportPopulation() {
-                                                    MeasureReportId = measureReportResult.MeasureReportId,
-                                                    PopulationCount = measureReportpopulation.PopulationCount
-                                                }
-                                            }
-                                            };
-
-                                            reportPopulationModel.ReportPopulations.Add(population);
-                                        }
-
-                                        await _reportPopulationManager.AddAsync(reportPopulationModel, cancellationToken);
+                                        _reportPopulationManager.AddAsyncWithAggregateResult(result.Value.FacilityId, result.Value.ReportTrackingId, aggregateMeasureReport, cancellationToken);
+                                        continue;
                                     }
-                                    else
-                                    {
-                                        //TODO: Add
-                                    }
+                                    
+                                    _reportPopulationManager.UpdateAsyncWithAggregateResult(populationModel, aggregateMeasureReport, cancellationToken);    
                                 }
 
                                 try
@@ -225,7 +167,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 {
                                     //TODO: Add logic
                                     //TODO: Test 
-                                    _logger.LogError(ex, "An error was encountered generating a Ready For Validation event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
+                                    _logger.LogError(ex, "An error was encountered generating a MeasureReportGenerated event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
                                 }
                             }
                             catch (DeadLetterException ex)
@@ -238,7 +180,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (Exception ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - PatientListsAcquired Exception thrown: " + ex.Message), facilityId);
+                                _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - MeasureReportGenerated Exception thrown: " + ex.Message), facilityId);
                             }
                             finally
                             {

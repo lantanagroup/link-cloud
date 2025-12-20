@@ -80,6 +80,7 @@ namespace LantanaGroup.Link.Report.Core
                 foreach (var measureReportEntry in entry.MeasureReportEntryList)
                 {
                     BlockBlobClient blockReadBlobClient = _containerClient.GetBlockBlobClient(measureReportEntry.MeasureReportFileName);
+                    var aggregateMeasureReport = new AggregateMeasureReportResult() { ReportType = measureReportEntry.ReportType };
 
                     try
                     {
@@ -97,32 +98,46 @@ namespace LantanaGroup.Link.Report.Core
                                     continue;
                                 }
 
-                                if (resource_and_id.Split('/')[0] == "MeasureReport")
+                                //TODO: ADD '/'
+                                string resourceType = resource_and_id.Split('_')[0];
+
+                                if (aggregateMeasureReport.ResourceCount.ContainsKey(resourceType))
                                 {
-                                    string measureReportString = reader.ReadLine();
-                                    MeasureReport measureReport = parser.Parse<MeasureReport>(measureReportString);
-
-                                    var aggregateMeasureReport = new AggregateMeasureReportResult() { Measure = measureReport.Measure, MeasureReportId = measureReport.Id, ReportType = measureReportEntry.ReportType };
-
-                                    foreach (var group in measureReport.Group) {
-                                        foreach (var population in group.Population) {
-                                            aggregateMeasureReport.PopulationList.Add(new AggregateMeasureReportPopulation()
-                                            {
-                                                PopulationCode = population.Code,
-                                                PopulationCount = population.Count ?? 0,
-                                                PopulationId = population.ElementId
-                                            });
-                                        }
-                                    }
-
-                                    aggregateResult.MeasureReportResults.Add(aggregateMeasureReport);
-                                    resourcesAdded.Add(resource_and_id, 1);
-                                    writer.WriteLine(measureReportString);
+                                    aggregateMeasureReport.ResourceCount[resourceType]++;
                                 }
                                 else {
+                                    aggregateMeasureReport.ResourceCount.Add(resourceType, 1);
+                                }
+
+                                if (resourceType != "MeasureReport") {
                                     resourcesAdded.Add(resource_and_id, 1);
                                     writer.WriteLine(reader.ReadLine());
+                                    continue;
                                 }
+
+                                string measureReportString = reader.ReadLine();
+                                MeasureReport measureReport = parser.Parse<MeasureReport>(measureReportString);
+
+                                aggregateMeasureReport.Measure = measureReport.Measure;
+                                aggregateMeasureReport.MeasureReportId = measureReport.Id;
+
+                                foreach (var group in measureReport.Group)
+                                {
+                                    foreach (var population in group.Population)
+                                    {
+                                        aggregateMeasureReport.PopulationList.Add(new AggregateMeasureReportPopulation()
+                                        {
+                                            PopulationCode = population.Code,
+                                            PopulationCount = population.Count ?? 0,
+                                            PopulationId = population.ElementId
+                                        });
+                                    }
+                                }
+
+                                aggregateResult.MeasureReportResults.Add(aggregateMeasureReport);
+                                resourcesAdded.Add(resource_and_id, 1);
+                                writer.WriteLine(measureReportString);
+                               
                             }
                         }
 

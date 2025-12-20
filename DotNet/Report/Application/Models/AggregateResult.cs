@@ -5,7 +5,6 @@ namespace LantanaGroup.Link.Report.Application.Models
     public class AggregateResult
     {
         public Uri Uri;
-        //public List<string> MeasureReportReferences = new List<string>();
         public List<AggregateMeasureReportResult> MeasureReportResults = new List<AggregateMeasureReportResult>();
     }
 
@@ -14,6 +13,7 @@ namespace LantanaGroup.Link.Report.Application.Models
         public string ReportType;
         public string MeasureReportId;
         public List<AggregateMeasureReportPopulation> PopulationList = new List<AggregateMeasureReportPopulation>();
+        public Dictionary<string, int> ResourceCount = new Dictionary<string, int>();
     }
 
     public class AggregateMeasureReportPopulation

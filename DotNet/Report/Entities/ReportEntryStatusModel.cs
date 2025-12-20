@@ -13,11 +13,6 @@ namespace LantanaGroup.Link.Report.Entities
         public string FacilityId { get; set; } = string.Empty;
         public string ReportScheduleId { get; set; } = string.Empty;
         public string PatientId { get; set; } = string.Empty;
-        //public string ReportType { get; set; } = string.Empty;
-        //public PatientSubmissionStatus Status { get; set; } = PatientSubmissionStatus.PendingEvaluation;
-        //public ValidationStatus ValidationStatus { get; set; } = ValidationStatus.Pending;
-        //public string MeasureReportUri { get; set; } = string.Empty;
-        //public string MeasureReportFileName { get; set; } = string.Empty;
         [BsonRepresentation(MongoDB.Bson.BsonType.String)]
         public ReportingStatus ReportingStatus = ReportingStatus.PatientIdentified;
         [BsonRepresentation(MongoDB.Bson.BsonType.String)]
@@ -35,5 +30,7 @@ namespace LantanaGroup.Link.Report.Entities
         public string ReportType { get; set; } = string.Empty;
         public string MeasureReportUri { get; set; } = string.Empty;
         public string MeasureReportFileName { get; set; } = string.Empty;
+        //Key = ResourceType
+        public Dictionary<string, int> ResourceCount = new Dictionary<string, int>();
     }
 }
