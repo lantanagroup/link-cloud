@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryL
 public record SftpAcquisitionLogModel(
     Guid? ExternalId, 
     string FacilityId, 
-    string FacilityName, 
+    string FileName, 
     int PatientCount, 
     int EncounterCount, 
     DateTime ProcessDate);
@@ -18,9 +18,9 @@ public record PagedSftpAcquisitionLogModel : IPagedModel<SftpAcquisitionLogModel
     public PaginationMetadata Metadata { get; set; }
 }
 
-public record CreateSftpLogRequest(string FacilityId, string FacilityName, DateTime ProcessDate);
+public record CreateSftpLogRequest(string FacilityId, string FileName, DateTime ProcessDate);
 
-public record UpdateSftpLogRequest(Guid ExternalId, DateTime ProcessDate);
+public record UpdateSftpLogRequest(Guid ExternalId, string FileName, DateTime ProcessDate);
 
 public static class SftpAcquisitionLogModelExtensions
 {
@@ -28,7 +28,7 @@ public static class SftpAcquisitionLogModelExtensions
     public static SftpAcquisitionLogModel ToModel(this SftpAcquisitionLog entity) => new(
         entity.ExternalId,
         entity.FacilityId,
-        entity.FacilityName,
+        entity.FileName,
         entity.PatientCount,
         entity.EncounterCount,
         entity.ProcessDate
@@ -38,7 +38,7 @@ public static class SftpAcquisitionLogModelExtensions
     {
         ExternalId = model.ExternalId ?? Guid.NewGuid(),
         FacilityId = model.FacilityId,
-        FacilityName = model.FacilityName,
+        FileName = model.FileName,
         PatientCount = model.PatientCount,
         EncounterCount = model.EncounterCount,
         ProcessDate = model.ProcessDate
@@ -47,7 +47,7 @@ public static class SftpAcquisitionLogModelExtensions
     public static SftpAcquisitionLogModel ToModel(this CreateSftpLogRequest req) => new(
         ExternalId: Guid.NewGuid(),
         FacilityId: req.FacilityId,
-        FacilityName: req.FacilityName,
+        FileName: req.FileName,
         PatientCount: 0,
         EncounterCount: 0,
         ProcessDate: req.ProcessDate
@@ -56,7 +56,7 @@ public static class SftpAcquisitionLogModelExtensions
     public static SftpAcquisitionLogModel ToModel(this UpdateSftpLogRequest req) => new(
         ExternalId: req.ExternalId,
         FacilityId: string.Empty,
-        FacilityName: string.Empty,
+        FileName: req.FileName,
         PatientCount: 0,
         EncounterCount: 0,
         ProcessDate: req.ProcessDate

@@ -184,7 +184,7 @@ public class SftpLogController : ControllerBase
 
         try
         {
-            var updatedLog = await _manager.UpdateProcessDateAsync(req.ToModel(), cancellationToken);
+            var updatedLog = await _manager.UserUpdateAsync(req.ToModel(), cancellationToken);
 
             return Accepted(updatedLog);
         }

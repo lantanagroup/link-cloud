@@ -13,7 +13,7 @@ public class SftpAcquisitionLog
     
     public string FacilityId { get; set; } = string.Empty;
     
-    public string FacilityName { get; set; } = string.Empty;
+    public string FileName { get; set; } = string.Empty;
     
     public int PatientCount { get; set; }
     

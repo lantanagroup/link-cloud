@@ -15,7 +15,7 @@ public interface ISftpAcquisitionLogManager
     Task<SftpAcquisitionLogModel> CreateAsync(SftpAcquisitionLogModel model, CancellationToken cancellationToken);
     Task<SftpAcquisitionLogModel> UpdateAsync(SftpAcquisitionLogModel model, CancellationToken cancellationToken);
 
-    Task<SftpAcquisitionLogModel> UpdateProcessDateAsync(SftpAcquisitionLogModel model,
+    Task<SftpAcquisitionLogModel> UserUpdateAsync(SftpAcquisitionLogModel model,
         CancellationToken cancellationToken);
     Task DeleteAsync(long id, CancellationToken cancellationToken);
 }
@@ -47,7 +47,7 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
             await database.SftpAcquisitionLogRepository.AddAsync(entity, cancellationToken);
             await database.SaveChangesAsync();
             
-            logger.LogInformation("Created SFTP Acquisition Log for FacilityId: {FacilityId}, FacilityName: {FacilityName}", model.FacilityId, model.FacilityName);
+            logger.LogInformation("Created SFTP Acquisition Log for FacilityId: {FacilityId}, FileName: {FileName}", model.FacilityId, model.FileName);
         
             return entity.ToModel();
         }
@@ -55,7 +55,7 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
         {
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             activity?.AddTag(DiagnosticNames.StackTrace, ex.StackTrace);
-            logger.LogError(ex, "Error creating SFTP Acquisition Log for FacilityId: {FacilityId}, FacilityName: {FacilityName}", model.FacilityId, model.FacilityName);
+            logger.LogError(ex, "Error creating SFTP Acquisition Log for FacilityId: {FacilityId}, FileName: {FileName}", model.FacilityId, model.FileName);
             throw;
         }
     }
@@ -103,12 +103,12 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             activity?.SetTag("SftpAcquisitionLog", JsonSerializer.Serialize(model, LinkFhirSerializerOptions.ActivityTagging));
             activity?.AddTag(DiagnosticNames.StackTrace, ex.StackTrace);
-            logger.LogError(ex, "Error updating SFTP Acquisition Log for FacilityId: {FacilityId}, FacilityName: {FacilityName}", model.FacilityId, model.FacilityName);
+            logger.LogError(ex, "Error updating SFTP Acquisition Log for FacilityId: {FacilityId}, FileName: {FileName}", model.FacilityId, model.FileName);
             throw;
         }
     }
     
-    public async Task<SftpAcquisitionLogModel> UpdateProcessDateAsync(SftpAcquisitionLogModel model, CancellationToken cancellationToken = default)
+    public async Task<SftpAcquisitionLogModel> UserUpdateAsync(SftpAcquisitionLogModel model, CancellationToken cancellationToken = default)
     {
         using var activity = Activity.Current?.Source.StartActivity();
         activity?.SetTag(DiagnosticNames.FacilityId, model.ExternalId);
@@ -126,6 +126,13 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
             throw new ArgumentNullException(nameof(model.ExternalId));
         }
 
+        // TODO: Consider adding file type restrictions
+        if (string.IsNullOrEmpty(model.FileName))
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "FileName cannot be null or empty");
+            throw new ArgumentNullException(nameof(model.FileName));
+        }
+
         var existingLog = await database.SftpAcquisitionLogRepository.FirstOrDefaultAsync(x => x.ExternalId == model.ExternalId, cancellationToken);
         
         if (existingLog is null)
@@ -137,6 +144,7 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
         try
         {
             // Update existing log entry
+            existingLog.FileName = model.FileName;
             existingLog.ProcessDate = model.ProcessDate;
         
             await database.SaveChangesAsync();
@@ -148,7 +156,7 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             activity?.SetTag("SftpAcquisitionLog", JsonSerializer.Serialize(model, LinkFhirSerializerOptions.ActivityTagging));
             activity?.AddTag(DiagnosticNames.StackTrace, ex.StackTrace);
-            logger.LogError(ex, "Error updating SFTP Acquisition Log for FacilityId: {FacilityId}, FacilityName: {FacilityName}", model.FacilityId, model.FacilityName);
+            logger.LogError(ex, "Error updating SFTP Acquisition Log for FacilityId: {FacilityId}, FileName: {FileName}", model.FacilityId, model.FileName);
             throw;
         }
     }

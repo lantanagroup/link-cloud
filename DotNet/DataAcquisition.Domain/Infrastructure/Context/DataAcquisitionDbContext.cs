@@ -191,7 +191,7 @@ public class DataAcquisitionDbContext : DbContext
                 .IsRequired()
                 .HasMaxLength(DataAcquisitionConstants.DatabaseSettings.MaxFacilityIdLength);
             
-            entity.Property(e => e.FacilityName)
+            entity.Property(e => e.FileName)
                 .HasMaxLength(DataAcquisitionConstants.DatabaseSettings.MaxFacilityNameLength);
 
             entity.HasIndex(i => i.FacilityId)
