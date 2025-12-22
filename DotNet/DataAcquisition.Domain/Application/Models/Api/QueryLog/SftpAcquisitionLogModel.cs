@@ -1,4 +1,6 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.Shared.Application.Interfaces.Models;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 
@@ -11,6 +13,11 @@ public record SftpAcquisitionLogModel(
     int EncounterCount, 
     DateTime ProcessDate);
 
+public record PagedSftpAcquisitionLogModel : IPagedModel<SftpAcquisitionLogModel>
+{
+    public List<SftpAcquisitionLogModel> Records { get; set; }
+    public PaginationMetadata Metadata { get; set; }
+}
 
 public static class SftpAcquisitionLogModelExtensions
 {

@@ -45,6 +45,7 @@
 
         //Diagnostic tags Searching
         public const string SearchText = "search.text";
+        public const string SearchParameters = "search.parameters";
         public const string FacilityFilter = "facility.filter";
         public const string CorrelationFilter = "correlation.filter";
         public const string ServiceFilter = "service.filter";
