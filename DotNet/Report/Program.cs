@@ -124,6 +124,8 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.UseMongoDB(client, mongoSettings.DatabaseName);
     });
 
+    builder.Services.AddHostedService<MongoIndexCreationService>();
+
     // Add services to the container
     builder.Services.AddHttpClient();
 
