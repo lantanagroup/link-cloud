@@ -19,6 +19,10 @@ public record PagedSftpAcquisitionLogModel : IPagedModel<SftpAcquisitionLogModel
     public PaginationMetadata Metadata { get; set; }
 }
 
+public record CreateSftpLogRequest(string FacilityId, string FacilityName, DateTime ProcessDate);
+
+public record UpdateSftpLogRequest(Guid ExternalId, DateTime ProcessDate);
+
 public static class SftpAcquisitionLogModelExtensions
 {
 
@@ -41,5 +45,25 @@ public static class SftpAcquisitionLogModelExtensions
         EncounterCount = model.EncounterCount,
         ProcessDate = model.ProcessDate
     };
+    
+    public static SftpAcquisitionLogModel ToModel(this CreateSftpLogRequest req) => new(
+    
+        Id: 0,
+        ExternalId: Guid.NewGuid(),
+        FacilityId: req.FacilityId,
+        FacilityName: req.FacilityName,
+        PatientCount: 0,
+        EncounterCount: 0,
+        ProcessDate: req.ProcessDate
+    );
 
+    public static SftpAcquisitionLogModel ToModel(this UpdateSftpLogRequest req) => new(
+        Id: 0,
+        ExternalId: req.ExternalId,
+        FacilityId: string.Empty,
+        FacilityName: string.Empty,
+        PatientCount: 0,
+        EncounterCount: 0,
+        ProcessDate: req.ProcessDate
+    );
 }

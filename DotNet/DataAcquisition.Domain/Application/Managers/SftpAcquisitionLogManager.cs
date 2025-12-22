@@ -3,6 +3,7 @@ using System.Text.Json;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.Logging;
@@ -13,6 +14,9 @@ public interface ISftpAcquisitionLogManager
 {
     Task<SftpAcquisitionLogModel> CreateAsync(SftpAcquisitionLogModel model, CancellationToken cancellationToken);
     Task<SftpAcquisitionLogModel> UpdateAsync(SftpAcquisitionLogModel model, CancellationToken cancellationToken);
+
+    Task<SftpAcquisitionLogModel> UpdateProcessDateAsync(SftpAcquisitionLogModel model,
+        CancellationToken cancellationToken);
     Task DeleteAsync(long id, CancellationToken cancellationToken);
 }
 
@@ -24,9 +28,21 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
         using var activity = Activity.Current?.Source.StartActivity();
         activity?.AddTag(DiagnosticNames.FacilityId, model.FacilityId);
 
+        // Ensure the process date is set sometime in the future
+        if (model.ProcessDate <= DateTime.Now)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "ProcessDate cannot be in the past.");
+            activity?.AddTag("sftp.acquisition.log", JsonSerializer.Serialize(model, LinkFhirSerializerOptions.ActivityTagging));
+            throw new ArgumentException("ProcessDate cannot be in the past.");
+        }
+
         try
         {
             var entity = model.ToDomain();
+            
+            // There should not be any counts yet as it has not been run
+            entity.EncounterCount = 0;
+            entity.PatientCount = 0;
         
             await database.SftpAcquisitionLogRepository.AddAsync(entity, cancellationToken);
             await database.SaveChangesAsync();
@@ -69,7 +85,7 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
         if (existingLog is null)
         {
             activity?.SetStatus(ActivityStatusCode.Error, "SFTP Acquisition log not found");
-            throw new NotFoundException($"SFTP Acquisition log with ID {model.Id} not found.");
+            throw new DomainEntityNotFoundException($"SFTP Acquisition log with ID {model.Id} not found.");
         }
 
         try
@@ -91,8 +107,51 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
             logger.LogError(ex, "Error updating SFTP Acquisition Log for FacilityId: {FacilityId}, FacilityName: {FacilityName}", model.FacilityId, model.FacilityName);
             throw;
         }
+    }
+    
+    public async Task<SftpAcquisitionLogModel> UpdateProcessDateAsync(SftpAcquisitionLogModel model, CancellationToken cancellationToken = default)
+    {
+        using var activity = Activity.Current?.Source.StartActivity();
+        activity?.SetTag(DiagnosticNames.FacilityId, model.ExternalId);
 
+        if (model.ProcessDate <= DateTime.Now)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "ProcessDate cannot be in the past.");
+            activity?.AddTag("sftp.log.process.date", model.ProcessDate);
+            throw new ArgumentException("ProcessDate cannot be in the past.");
+        }
+
+        if (model.ExternalId is null || model.ExternalId == Guid.Empty)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "ExternalId cannot be null");
+            throw new ArgumentNullException(nameof(model.ExternalId));
+        }
+
+        var existingLog = await database.SftpAcquisitionLogRepository.FirstOrDefaultAsync(x => x.ExternalId == model.ExternalId, cancellationToken);
         
+        if (existingLog is null)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "SFTP Acquisition log not found");
+            throw new DomainEntityNotFoundException($"SFTP Acquisition log with ID {model.Id} not found.");
+        }
+        
+        try
+        {
+            // Update existing log entry
+            existingLog.ProcessDate = model.ProcessDate;
+        
+            await database.SaveChangesAsync();
+        
+            return existingLog.ToModel();
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.SetTag("SftpAcquisitionLog", JsonSerializer.Serialize(model, LinkFhirSerializerOptions.ActivityTagging));
+            activity?.AddTag(DiagnosticNames.StackTrace, ex.StackTrace);
+            logger.LogError(ex, "Error updating SFTP Acquisition Log for FacilityId: {FacilityId}, FacilityName: {FacilityName}", model.FacilityId, model.FacilityName);
+            throw;
+        }
     }
 
     public async Task DeleteAsync(long id, CancellationToken cancellationToken = default)

@@ -1,7 +1,9 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
@@ -75,7 +77,7 @@ public class SftpLogController : ControllerBase
     /// <param name="queryParameters"></param>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
-    [HttpGet()]
+    [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(IPagedModel<SftpAcquisitionLogModel>))]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -106,8 +108,95 @@ public class SftpLogController : ControllerBase
                 detail: $"An unexpected error occurred while processing your request, please see the logs for more details. TraceId: {httpContext.TraceIdentifier}",
                 statusCode: StatusCodes.Status500InternalServerError);
         }
+    }
+    
+    /// <summary>
+    /// Create SFTP log
+    /// </summary>
+    /// <param name="req"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    [HttpPost]
+    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(SftpAcquisitionLogModel))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult> CreateSftpLog(CreateSftpLogRequest req, CancellationToken cancellationToken = default)
+    {
+        // Store httpContext so that it is not lost during processing
+        var httpContext = HttpContext;
 
+        try
+        {
+            var createdLog = await _manager.CreateAsync(req.ToModel(), cancellationToken);
 
-        return Ok();
+            return Created($"/api/data/sftp-logs/{createdLog.Id}", createdLog);
+
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception)
+        {
+            return Problem(
+                title: "An error occurred while processing your request.",
+                detail:
+                $"An unexpected error occurred while processing your request, please see the logs for more details. TraceId: {httpContext.TraceIdentifier}",
+                statusCode: StatusCodes.Status500InternalServerError
+            );
+        }
+    }
+
+    /// <summary>
+    /// Update Process Date of SFTP log
+    /// </summary>
+    /// <param name="externalId"></param>
+    /// <param name="req"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    [HttpPut("{id}")]
+    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(SftpAcquisitionLogModel))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult> UpdateSftpLogProcessDate(Guid? externalId, UpdateSftpLogRequest req, CancellationToken cancellationToken = default)
+    {
+        // Validate the request model id matches the id in the url
+        if (req.ExternalId != externalId)
+        {
+            _logger.LogWarning("Sftp Log id in the request body ({RequestExternalId}) does not match the id in the url ({ExternalId}).", req.ExternalId, externalId);
+            return BadRequest("The ids in the request body and url do not match.");
+        }
+        
+        // Store httpContext so that it is not lost during processing
+        var httpContext = HttpContext;
+
+        try
+        {
+            var updatedLog = await _manager.UpdateProcessDateAsync(req.ToModel(), cancellationToken);
+
+            return Accepted(updatedLog);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (DomainEntityNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (Exception)
+        {
+            return Problem(
+                title: "An error occurred while processing your request.",
+                detail:
+                $"An unexpected error occurred while processing your request, please see the logs for more details. TraceId: {httpContext.TraceIdentifier}",
+                statusCode: StatusCodes.Status500InternalServerError
+            );
+        }
     }
 }
