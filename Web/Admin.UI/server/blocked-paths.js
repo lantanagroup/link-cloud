@@ -19,7 +19,6 @@
   "/templates/",
 
   // ---- CMS: Drupal ----
-  "/user/login",
   "/core/",
   "/sites/default/",
   "/sites/all/",
@@ -64,8 +63,7 @@
   /^\/.+\.(?:bak|old|save|swp|swo|tmp|~)$/i,
   /^\/.+\.(?:php|asp|aspx|jsp)\.(?:bak|old|save|swp|swo|tmp|~)$/i,
 
-  // ---- Admin/auth guessing ----
-  /^\/(?:admin|administrator|login|signin|auth|dashboard|webadmin|console)\/?$/i,
+  // ---- Admin guessing ----
   "/cpanel/",
 
   // ---- Server/hosting artifacts ----

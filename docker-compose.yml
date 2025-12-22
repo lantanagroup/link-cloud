@@ -675,8 +675,8 @@ services:
     depends_on:
       kafka_init:
         condition: service_completed_successfully
-      mongo:
-        condition: service_healthy
+      mssql_init:
+        condition: service_completed_successfully
       otel-collector:
         condition: service_started
       loki:
