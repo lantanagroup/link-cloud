@@ -138,7 +138,11 @@
                         >{{ report.submitted ? 'Submitted' : 'Pending' }}</span>
                         @if (report.submitted) {
                           <span style="display: block; margin-top: 1em;"
-                          >{{ report.submitDate | date }}</span>
+                          >{{ report.submitDate }}</span>
+                        }
+                        @if (report.createdDate) {
+                          <span style="display: block; margin-top: 1em;"
+                          >{{ report.createdDate }}</span>
                         }
                       </td>
                       <td>
