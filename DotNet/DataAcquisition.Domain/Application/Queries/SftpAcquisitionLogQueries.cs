@@ -18,6 +18,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 public interface ISftpAcquisitionLogQueries
 {
     Task<SftpAcquisitionLog?> GetByIdAsync(long id, CancellationToken cancellationToken);
+    Task<SftpAcquisitionLog?> GetByExternalIdAsync(Guid id, CancellationToken cancellationToken);
     Task<PagedSftpAcquisitionLogModel> SearchAsync(SftpLogSearchParameters queryParameters,
         CancellationToken cancellationToken);
 }
@@ -34,6 +35,25 @@ public class SftpAcquisitionLogQueries(
         try
         {
             var sftpLog = await dbContext.SftpAcquisitionLogs.FirstOrDefaultAsync(x => x.Id == id, cancellationToken: cancellationToken);
+            return sftpLog;
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            logger.LogError(ex, "Error retrieving SFTP Acquisition Log with Id: {Id}", id);
+            throw;
+        }
+        
+    }
+    
+    public async Task<SftpAcquisitionLog?> GetByExternalIdAsync(Guid id, CancellationToken cancellationToken)
+    {
+        using var activity = Activity.Current?.Source.StartActivity();
+        activity?.SetTag(DiagnosticNames.EntityId, id);
+        
+        try
+        {
+            var sftpLog = await dbContext.SftpAcquisitionLogs.FirstOrDefaultAsync(x => x.ExternalId == id, cancellationToken: cancellationToken);
             return sftpLog;
         }
         catch (Exception ex)

@@ -65,11 +65,11 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
         using var activity = Activity.Current?.Source.StartActivity();
         activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
         
-        if(model.Id <= 0)
+        if(model.ExternalId is not null && model.ExternalId != Guid.Empty)
         {
-            activity?.SetStatus(ActivityStatusCode.Error, "Log ID cannot be zero or null");
-            logger.LogError("Sftp Acquisition Log Id cannot be zero or null");
-            throw new ArgumentException("SftpAcquisitionLog Id must be greater than zero for update operation.");
+            activity?.SetStatus(ActivityStatusCode.Error, "Invalid log id");
+            logger.LogError("Sftp Acquisition Log Id cannot be null or empty for update operation.");
+            throw new ArgumentException("SftpAcquisitionLog Id cannot be null or empty for update operation.");
         }
 
         if (string.IsNullOrEmpty(model.FacilityId))
@@ -79,13 +79,12 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
             throw new MissingFacilityIdException(nameof(model.FacilityId));
         }
 
-        var existingLog = await database.SftpAcquisitionLogRepository.GetAsync(model.Id, cancellationToken);
+        var existingLog = await database.SftpAcquisitionLogRepository.FirstOrDefaultAsync(x => x.ExternalId == model.ExternalId, cancellationToken);
         
-        //TODO: should update the interface to allow a nullable return from GetAsync
         if (existingLog is null)
         {
             activity?.SetStatus(ActivityStatusCode.Error, "SFTP Acquisition log not found");
-            throw new DomainEntityNotFoundException($"SFTP Acquisition log with ID {model.Id} not found.");
+            throw new DomainEntityNotFoundException($"SFTP Acquisition log with ID {model.ExternalId} not found.");
         }
 
         try
@@ -132,7 +131,7 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
         if (existingLog is null)
         {
             activity?.SetStatus(ActivityStatusCode.Error, "SFTP Acquisition log not found");
-            throw new DomainEntityNotFoundException($"SFTP Acquisition log with ID {model.Id} not found.");
+            throw new DomainEntityNotFoundException($"SFTP Acquisition log with ID {model.ExternalId} not found.");
         }
         
         try

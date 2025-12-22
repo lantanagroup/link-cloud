@@ -1,6 +1,5 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Exceptions;
@@ -12,7 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
 
-[Microsoft.AspNetCore.Components.Route("api/data/sftp-logs")]
+[Route("api/data/sftp-logs")]
 [Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [ApiController]
 public class SftpLogController : ControllerBase
@@ -32,46 +31,6 @@ public class SftpLogController : ControllerBase
     }
     
     /// <summary>
-    /// Get SFTP log by ID
-    /// </summary>
-    /// <param name="id"></param>
-    /// <param name="cancellationToken"></param>
-    /// <returns></returns>
-    [HttpGet("{id}")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(SftpAcquisitionLogModel))]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<SftpAcquisitionLogModel>> GetSftpLogById(long id, CancellationToken cancellationToken = default)
-    {
-        // Validate log ID
-        if (id <= 0)
-            return BadRequest("Invalid log ID.");
-        
-        // Store httpContext so that it is not lost during processing
-        var httpContext = HttpContext;
-
-        try
-        {
-            var log = await _queries.GetByIdAsync(id, cancellationToken);
-        
-            if (log is null)
-                return NotFound();
-        
-            return Ok(log.ToModel());
-        }
-        catch (Exception)
-        {
-            return Problem(
-                title: "An error occurred while processing your request.",
-                detail: $"An unexpected error occurred while processing your request, please see the logs for more details. TraceId: {httpContext.TraceIdentifier}",
-                statusCode: StatusCodes.Status500InternalServerError);
-        }
-    }
-
-    /// <summary>
     /// Search SFTP logs
     /// </summary>
     /// <param name="queryParameters"></param>
@@ -83,7 +42,7 @@ public class SftpLogController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<IPagedModel<SftpAcquisitionLogModel>>> Search(
-        SftpLogSearchParameters? queryParameters, CancellationToken cancellationToken = default)
+        [FromQuery] SftpLogSearchParameters? queryParameters, CancellationToken cancellationToken = default)
     {
         // If no query parameters are specified, use default values
         queryParameters ??= new SftpLogSearchParameters
@@ -100,6 +59,48 @@ public class SftpLogController : ControllerBase
             var searchResults = await _queries.SearchAsync(queryParameters, cancellationToken);
             
             return Ok(searchResults);
+        }
+        catch (Exception)
+        {
+            return Problem(
+                title: "An error occurred while processing your request.",
+                detail: $"An unexpected error occurred while processing your request, please see the logs for more details. TraceId: {httpContext.TraceIdentifier}",
+                statusCode: StatusCodes.Status500InternalServerError);
+        }
+    }
+    
+    /// <summary>
+    /// Get SFTP log by external ID
+    /// </summary>
+    /// <param name="logId"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    [HttpGet("{logId}")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(SftpAcquisitionLogModel))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<SftpAcquisitionLogModel>> GetSftpLogByExternalId(string logId, CancellationToken cancellationToken = default)
+    {
+        // Validate log ID
+        if (string.IsNullOrWhiteSpace(logId) || !Guid.TryParse(logId, out var id))
+        {
+            return BadRequest("Invalid log ID.");
+        }
+        
+        // Store httpContext so that it is not lost during processing
+        var httpContext = HttpContext;
+
+        try
+        {
+            var log = await _queries.GetByExternalIdAsync(id, cancellationToken);
+        
+            if (log is null)
+                return NotFound();
+        
+            return Ok(log.ToModel());
         }
         catch (Exception)
         {
@@ -131,7 +132,7 @@ public class SftpLogController : ControllerBase
         {
             var createdLog = await _manager.CreateAsync(req.ToModel(), cancellationToken);
 
-            return Created($"/api/data/sftp-logs/{createdLog.Id}", createdLog);
+            return Created($"/api/data/sftp-logs/{createdLog.ExternalId}", createdLog);
 
         }
         catch (ArgumentException ex)
@@ -152,23 +153,29 @@ public class SftpLogController : ControllerBase
     /// <summary>
     /// Update Process Date of SFTP log
     /// </summary>
-    /// <param name="externalId"></param>
+    /// <param name="logId"></param>
     /// <param name="req"></param>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
-    [HttpPut("{id}")]
+    [HttpPut("{logId}")]
     [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(SftpAcquisitionLogModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult> UpdateSftpLogProcessDate(Guid? externalId, UpdateSftpLogRequest req, CancellationToken cancellationToken = default)
+    public async Task<ActionResult> UpdateSftpLogProcessDate(string logId, UpdateSftpLogRequest req, CancellationToken cancellationToken = default)
     {
-        // Validate the request model id matches the id in the url
-        if (req.ExternalId != externalId)
+        // Validate log ID
+        if (string.IsNullOrWhiteSpace(logId) || !Guid.TryParse(logId, out var id))
         {
-            _logger.LogWarning("Sftp Log id in the request body ({RequestExternalId}) does not match the id in the url ({ExternalId}).", req.ExternalId, externalId);
+            return BadRequest("Invalid log ID.");
+        }
+        
+        // Validate the request model id matches the id in the url
+        if (req.ExternalId != id)
+        {
+            _logger.LogWarning("Sftp Log id in the request body ({RequestExternalId}) does not match the id in the url ({ExternalId}).", req.ExternalId, logId);
             return BadRequest("The ids in the request body and url do not match.");
         }
         

@@ -5,7 +5,6 @@ using LantanaGroup.Link.Shared.Application.Models.Responses;
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 
 public record SftpAcquisitionLogModel(
-    long Id, 
     Guid? ExternalId, 
     string FacilityId, 
     string FacilityName, 
@@ -27,7 +26,6 @@ public static class SftpAcquisitionLogModelExtensions
 {
 
     public static SftpAcquisitionLogModel ToModel(this SftpAcquisitionLog entity) => new(
-        entity.Id,
         entity.ExternalId,
         entity.FacilityId,
         entity.FacilityName,
@@ -47,8 +45,6 @@ public static class SftpAcquisitionLogModelExtensions
     };
     
     public static SftpAcquisitionLogModel ToModel(this CreateSftpLogRequest req) => new(
-    
-        Id: 0,
         ExternalId: Guid.NewGuid(),
         FacilityId: req.FacilityId,
         FacilityName: req.FacilityName,
@@ -58,7 +54,6 @@ public static class SftpAcquisitionLogModelExtensions
     );
 
     public static SftpAcquisitionLogModel ToModel(this UpdateSftpLogRequest req) => new(
-        Id: 0,
         ExternalId: req.ExternalId,
         FacilityId: string.Empty,
         FacilityName: string.Empty,
