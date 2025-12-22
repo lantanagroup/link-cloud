@@ -140,7 +140,7 @@
                           <span style="display: block; margin-top: 1em;"
                           >{{ report.submitDate }}</span>
                         }
-                        @if (report.createdDate) {
+                        @else if (report.createdDate) {
                           <span style="display: block; margin-top: 1em;"
                           >{{ report.createdDate }}</span>
                         }
