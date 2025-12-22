@@ -71,7 +71,9 @@
                       'status-submitted': report.submitted == true
                   }">{{ report.submitted ? 'Submitted' : 'Pending' }}</span>
                 <span style="display: block; margin-top: 1em;"
-                      *ngIf="report.submitted">{{ report.submitDate | date }}</span>
+                      *ngIf="report.submitted">{{ report.submitDate }}</span>
+                <span style="display: block; margin-top: 1em;"
+                      *ngIf="report.createdDate">{{ report.createdDate }}</span>
               </td>
               <td>
                 <button type="button"
