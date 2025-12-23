@@ -4,8 +4,6 @@ using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.EntityFrameworkCore;
-using System.Threading.Tasks;
-using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Domain.Queries;
 
@@ -28,7 +26,7 @@ public interface ISubmissionEntryQueries
         string? patientEntryId = null,
         CancellationToken cancellationToken = default);
 
-    Task<(PatientSubmissionEntry?, FhirResource?)> GetPatientResourceData(
+    Task<(PatientSubmissionEntry, FhirResource?)> GetPatientResourceData(
         string facilityId, 
         string reportScheduleId, 
         string patientId, 
@@ -59,11 +57,14 @@ public interface ISubmissionEntryQueries
         string reportScheduleId, 
         string entryId, 
         CancellationToken cancellationToken);
+    Task<PatientSubmissionEntry> GetPatientSubmissionEntry(string facilityId,
+        string reportScheduleId,
+        string reportType,
+        string patientId);
 }
 
 /// <summary>
-/// Query class for MeasureReportSubmissionEntry entities using EF Core with MongoDB.
-/// Provides read-only query methods, including a performant fetch for ResourceEvaluatedListener data.
+/// Query class for PatientSubmissionEntry entities using EF Core with MongoDB.
 /// </summary>
 public class SubmissionEntryQueries : ISubmissionEntryQueries
 {
@@ -77,6 +78,9 @@ public class SubmissionEntryQueries : ISubmissionEntryQueries
     /// <summary>
     /// Gets a single MeasureReportSubmissionEntry by its ID.
     /// </summary>
+    /// <param name="id"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     public async Task<PatientSubmissionEntry?> GetByIdAsync(string id, CancellationToken cancellationToken = default)
     {
         return await _context.PatientSubmissionEntries
@@ -86,6 +90,13 @@ public class SubmissionEntryQueries : ISubmissionEntryQueries
     /// <summary>
     /// Searches for MeasureReportSubmissionEntry based on optional filters.
     /// </summary>
+    /// <param name="id"></param>
+    /// <param name="patientId"></param>
+    /// <param name="facilityId"></param>
+    /// <param name="reportScheduleId"></param>
+    /// <param name="reportType"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     public async Task<List<PatientSubmissionEntry>> SearchAsync(
         string? id = null,
         string? patientId = null,
@@ -125,15 +136,18 @@ public class SubmissionEntryQueries : ISubmissionEntryQueries
     }
 
     /// <summary>
-    /// Performant query to fetch all data needed for ResourceEvaluatedListener processing.
-    /// Fetches the ReportSchedule, all relevant SubmissionEntries for the patient, and pre-fetches all referenced resources.
-    /// To optimize for MongoDB with EF Core, the query is broken into separate server-executable steps:
-    /// 1. Fetch the ReportSchedule.
-    /// 2. Fetch and group the filtered SubmissionEntries client-side (assuming limited entries per patient).
-    /// 3. Fetch distinct FhirResourceIds from ReportScheduleResourceMaps.
-    /// 4. Fetch the corresponding FhirResources.
-    /// This avoids complex correlated subqueries or joins that may lead to client-side evaluation.
+    /// Gets all patient submission data for the provided parameters. Multiple submision entries will be returned
+    /// if the patient is present on more than one report type for the schedule. If a patientEntryId is provided,
+    /// the query scope will be limited to that submission entry, regardless of whether the patient has multiple entries
+    /// for the report. 
     /// </summary>
+    /// <param name="facilityId"></param>
+    /// <param name="reportScheduleId"></param>
+    /// <param name="patientId"></param>
+    /// <param name="patientEntryId"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    /// <exception cref="InvalidOperationException"></exception>
     public async Task<PatientReportData> GetPatientReportData(
     string facilityId,
     string reportScheduleId,
@@ -174,21 +188,22 @@ public class SubmissionEntryQueries : ISubmissionEntryQueries
         // Batch fetching of resources
         const int batchSize = 1000;
         var resourceBatches = resourceIds.Chunk(batchSize).ToList();
-        var resourceTasks = resourceBatches.Select(batch =>
-            _context.FhirResources
+
+        var resources = new List<FhirResource>();
+        foreach(var batch in resourceBatches)
+        {
+            var results = await _context.FhirResources
                 .AsNoTracking()
                 .Where(r => batch.Contains(r.Id))
-                .ToListAsync(cancellationToken)
-        );
-
-        var batchedResources = await Task.WhenAll(resourceTasks);
-        var resources = batchedResources.SelectMany(r => r).ToList();
+                .ToListAsync(cancellationToken);
+            resources.AddRange(results);
+        }
 
         var reportData = groupedEntries.ToDictionary(
             kv => kv.Key,
             kv => new ReportData
             {
-                Entries = kv.Value,
+                Entry = kv.Value.Single(),
                 Resources = resources
             });
         return new PatientReportData
@@ -198,7 +213,18 @@ public class SubmissionEntryQueries : ISubmissionEntryQueries
         };
     }
 
-    public async Task<(PatientSubmissionEntry?, FhirResource?)> GetPatientResourceData(string facilityId, string reportScheduleId, string patientId, string reportType, string resourceType, string resourceId, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Returns a single Submission Entry and Fhir Resource if one is found, based on the provided parameters.
+    /// </summary>
+    /// <param name="facilityId"></param>
+    /// <param name="reportScheduleId"></param>
+    /// <param name="patientId"></param>
+    /// <param name="reportType"></param>
+    /// <param name="resourceType"></param>
+    /// <param name="resourceId"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    public async Task<(PatientSubmissionEntry, FhirResource?)> GetPatientResourceData(string facilityId, string reportScheduleId, string patientId, string reportType, string resourceType, string resourceId, CancellationToken cancellationToken = default)
     {
         var entry = await _context.PatientSubmissionEntries.SingleAsync(e => e.FacilityId == facilityId && e.ReportScheduleId == reportScheduleId && e.PatientId == patientId && e.ReportType == reportType);
 
@@ -304,6 +330,16 @@ public class SubmissionEntryQueries : ISubmissionEntryQueries
                       where map.SubmissionEntryId == entryId && map.ReportScheduleId == reportScheduleId
                       select map).AllAsync(e => e.FhirResourceId != null);
     }
+
+    public async Task<PatientSubmissionEntry> GetPatientSubmissionEntry(string facilityId, string reportScheduleId, string reportType, string patientId)
+    {
+        return await (from e in _context.PatientSubmissionEntries
+                      where e.FacilityId == facilityId
+                      && e.ReportScheduleId == reportScheduleId 
+                      && e.ReportType == reportType
+                      && e.PatientId == patientId
+                      select e).SingleAsync();
+    }
 }
 
 /// <summary>
@@ -318,6 +354,6 @@ public class PatientReportData
 
 public class ReportData
 {
-    public List<PatientSubmissionEntry> Entries { get; set; } = new();
+    public PatientSubmissionEntry Entry { get; set; } = new();
     public List<FhirResource> Resources { get; set; } = new();
 }

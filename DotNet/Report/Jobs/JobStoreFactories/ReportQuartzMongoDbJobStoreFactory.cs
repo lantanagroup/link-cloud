@@ -13,7 +13,7 @@ public class ReportQuartzMongoDbJobStoreFactory : IQuartzMongoDbJobStoreFactory
         _mongoDbContext = context;
     }
 
-    public IMongoDatabase GetDatabase()  // Make it public, not explicit interface implementation
+    public IMongoDatabase GetDatabase()
     {
         return _mongoDbContext.MongoDatabase;
     }
