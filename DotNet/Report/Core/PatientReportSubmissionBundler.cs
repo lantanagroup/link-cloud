@@ -1,10 +1,10 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Interfaces;
-using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Queries;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
+using System.Collections.Generic;
 
 namespace LantanaGroup.Link.Report.Core
 {
@@ -38,30 +38,36 @@ namespace LantanaGroup.Link.Report.Core
         }
         public async Task<PatientSubmissionModel> GenerateBundle(string facilityId, string patientId, string reportScheduleId)
         {
-            var queries = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
+            using var scope = _serviceScopeFactory.CreateScope();
+            var queries = scope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
             var patientReportData = await queries.GetPatientReportData(facilityId, reportScheduleId, patientId, cancellationToken: CancellationToken.None);
-            return await GenerateBundle(patientReportData, facilityId, patientId, reportScheduleId);
+            return GenerateBundle(patientReportData, facilityId, patientId, reportScheduleId);
         }
 
-        public async Task<PatientSubmissionModel> GenerateBundle(PatientReportData patientReportData, string facilityId, string patientId, string reportScheduleId)
+        public PatientSubmissionModel GenerateBundle(PatientReportData patientReportData, string facilityId, string patientId, string reportScheduleId)
         {
             var schedule = patientReportData.Schedule;
 
-            //The 'resourcesAdded' Dictionary will keep track of FHIR resource id's that have been added to the bundle to avoid adding duplicates across entries. The value of each dictionary entry will contain the associated FHIR types. It's a string List type in case there are different FHIR resources that share the same id. This is probably unlikely to happen, but is possible. 
-            Dictionary<string, List<string>> resourcesAdded = new Dictionary<string, List<string>>();
+            HashSet<string> resourcesAdded = new HashSet<string>();
 
             Bundle bundle = CreateNewBundle();
             foreach (var reportType in patientReportData.ReportData)
             {
                 var report = reportType.Key;
                 var data = reportType.Value;
+                var entry = data.Entry;
+                var resources = data.Resources;
 
-                foreach (var fhirResource in data.Resources)
+                if (entry.MeasureReport == null)
                 {
-                    if (fhirResource.Id == null)
-                        continue;
+                    continue;
+                }
 
-                    if (resourcesAdded.ContainsKey(fhirResource.ResourceId) && resourcesAdded[fhirResource.ResourceId].Contains(fhirResource.ResourceType))
+                foreach (var fhirResource in resources)
+                {
+                    var resourceRef = $"{fhirResource.ResourceType}/{fhirResource.ResourceId}";
+
+                    if (!resourcesAdded.Add(resourceRef))
                     {
                         continue;
                     }
@@ -69,48 +75,35 @@ namespace LantanaGroup.Link.Report.Core
                     var fullUrl = GetFullUrl(fhirResource.Resource);
                     bundle.AddResourceEntry(fhirResource.Resource, fullUrl);
 
-                    if (resourcesAdded.ContainsKey(fhirResource.ResourceId))
-                    {
-                        resourcesAdded[fhirResource.ResourceId].Add(fhirResource.ResourceType);
-                    }
-                    else
-                    {
-                        resourcesAdded.Add(fhirResource.ResourceId, new List<string>() { fhirResource.ResourceType });
-                    }
+                    entry.MeasureReport.EvaluatedResource.Add(new ResourceReference(resourceRef));
                 }
 
-                foreach (var entry in data.Entries)
+                MeasureReport mr = entry.MeasureReport;
+
+                // ensure we have an id to reference
+                if (string.IsNullOrEmpty(mr.Id))
+                    mr.Id = Guid.NewGuid().ToString();
+
+                // ensure we have a meta object
+                // set individual measure report profile
+                mr.Meta = new Meta
                 {
-                    if (entry.MeasureReport == null)
-                    {
-                        continue;
-                    }
+                    Profile = new List<string> { ReportConstants.BundleSettings.IndividualMeasureReportProfileUrl }
+                };
 
-                    MeasureReport mr = entry.MeasureReport;
+                // clean up resource
+                cleanupResource(mr);
 
-                    // ensure we have an id to reference
-                    if (string.IsNullOrEmpty(mr.Id))
-                        mr.Id = Guid.NewGuid().ToString();
+                var mrUrl = GetFullUrl(mr);
+                bundle.AddResourceEntry(mr, mrUrl);
 
-                    // ensure we have a meta object
-                    // set individual measure report profile
-                    mr.Meta = new Meta
-                    {
-                        Profile = new List<string> { ReportConstants.BundleSettings.IndividualMeasureReportProfileUrl }
-                    };
-
-                    // clean up resource
-                    cleanupResource(mr);
-
-                    var fullUrl = GetFullUrl(mr);
-                    bundle.AddResourceEntry(mr, fullUrl);
-
-                    _metrics.IncrementReportGeneratedCounter(new List<KeyValuePair<string, object?>>() {
+                _metrics.IncrementReportGeneratedCounter(new List<KeyValuePair<string, object?>>() 
+                {
                     new KeyValuePair<string, object?>("facilityId", schedule.FacilityId),
                     new KeyValuePair<string, object?>("measure.schedule.id", reportScheduleId),
                     new KeyValuePair<string, object?>("measure", mr.Measure)
                 });
-                }
+                
             }
 
             PatientSubmissionModel patientSubmissionModel = new PatientSubmissionModel()

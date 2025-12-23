@@ -245,7 +245,7 @@ namespace IntegrationTests.Report
             var _subEntryQueries = scope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
 
             var updatedData = await _subEntryQueries.GetPatientReportData(facilityId, schedule.Id, patientId, cancellationToken: CancellationToken.None);
-            var updatedEntry = updatedData.ReportData[schedule.ReportTypes[0]].Entries.First();
+            var updatedEntry = updatedData.ReportData[schedule.ReportTypes[0]].Entry;
 
             AssertEntryStatusAndMeasureReport(updatedEntry, PatientSubmissionStatus.PendingEvaluation);
 
@@ -288,8 +288,8 @@ namespace IntegrationTests.Report
 
             // Create reportable MeasureReport resource
             var measureReport = new MeasureReport { Id = "mr-1", Type = MeasureReport.MeasureReportType.Individual };
-            var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
-            var mrStr = JsonSerializer.Serialize(measureReport, options);
+
+            var mrStr = JsonSerializer.Serialize(measureReport, SerializerOptions.ForFhirWithModelInspector);
 
             var consumeResult = CreateConsumeResult(facilityId, schedule.Id, patientId, reportType,
                 JsonDocument.Parse(mrStr).RootElement, isReportable: true);
@@ -344,7 +344,7 @@ namespace IntegrationTests.Report
             var queries = scope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
 
             var data = await queries.GetPatientReportData(facilityId, schedule.Id, patientId, entry.Id);
-            var updatedEntry = data.ReportData[entry.ReportType].Entries.Single();
+            var updatedEntry = data.ReportData[entry.ReportType].Entry;
 
             AssertEntryStatusAndMeasureReport(updatedEntry, PatientSubmissionStatus.NotReportable, "MeasureReport1");
 
@@ -378,7 +378,7 @@ namespace IntegrationTests.Report
             var _subEntryQueries = scope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
 
             var updatedData = await _subEntryQueries.GetPatientReportData(facilityId, schedule.Id, patientId, cancellationToken: CancellationToken.None);
-            var updatedEntry = updatedData.ReportData[schedule.ReportTypes[0]].Entries.First();
+            var updatedEntry = updatedData.ReportData[schedule.ReportTypes[0]].Entry;
 
             AssertEntryStatusAndMeasureReport(updatedEntry, PatientSubmissionStatus.PendingEvaluation);
 
@@ -406,8 +406,8 @@ namespace IntegrationTests.Report
 
             var patient = new Patient();
             patient.Id = patientId;
-            var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
-            var patientStr = JsonSerializer.Serialize(patient, options);
+
+            var patientStr = JsonSerializer.Serialize(patient, SerializerOptions.ForFhirWithModelInspector);
 
             var consumeResult = CreateConsumeResult(facilityId, "nonexistent", patientId, "TestReport", JsonDocument.Parse(patientStr).RootElement, true);
 
@@ -448,8 +448,8 @@ namespace IntegrationTests.Report
 
             var patient = new Patient();
             patient.Id = patientId;
-            var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
-            var patientStr = JsonSerializer.Serialize(patient, options);
+
+            var patientStr = JsonSerializer.Serialize(patient, SerializerOptions.ForFhirWithModelInspector);
 
             var consumeResult = CreateConsumeResult(facilityId, "testid", patientId, "TestReport", JsonDocument.Parse(patientStr).RootElement, true);
 
@@ -497,8 +497,8 @@ namespace IntegrationTests.Report
 
             var patient = new Patient();
             patient.Id = patientId;
-            var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
-            var patientStr = JsonSerializer.Serialize(patient, options);
+
+            var patientStr = JsonSerializer.Serialize(patient, SerializerOptions.ForFhirWithModelInspector);
 
             var consumeResult = CreateConsumeResult(facilityId, "testid", patientId, "TestReport", JsonDocument.Parse(patientStr).RootElement, true);
 
