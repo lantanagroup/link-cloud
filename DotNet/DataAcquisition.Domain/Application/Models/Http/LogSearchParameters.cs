@@ -15,6 +15,11 @@ public class LogSearchParameters : GenericLogSearchParameters
     public AcquisitionPriority? Priority { get; set; }
 }
 
+public class SftpLogSearchParameters : GenericLogSearchParameters
+{
+    public string? FacilityId { get; set; }
+}
+
 public class GenericLogSearchParameters
 {
     [Range(1, int.MaxValue, ErrorMessage = "PageNumber must be greater than 0")]
