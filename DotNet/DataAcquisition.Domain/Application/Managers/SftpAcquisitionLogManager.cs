@@ -6,6 +6,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
@@ -47,7 +48,7 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
             await database.SftpAcquisitionLogRepository.AddAsync(entity, cancellationToken);
             await database.SaveChangesAsync();
             
-            logger.LogInformation("Created SFTP Acquisition Log for FacilityId: {FacilityId}, FileName: {FileName}", model.FacilityId, model.FileName);
+            logger.LogInformation("Created SFTP Acquisition Log for FacilityId: {FacilityId}, FileName: {FileName}", model.FacilityId.Sanitize(), model.FileName.Sanitize());
         
             return entity.ToModel();
         }
@@ -55,7 +56,7 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
         {
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             activity?.AddTag(DiagnosticNames.StackTrace, ex.StackTrace);
-            logger.LogError(ex, "Error creating SFTP Acquisition Log for FacilityId: {FacilityId}, FileName: {FileName}", model.FacilityId, model.FileName);
+            logger.LogError(ex, "Error creating SFTP Acquisition Log for FacilityId: {FacilityId}, FileName: {FileName}", model.FacilityId.Sanitize(), model.FileName.Sanitize());
             throw;
         }
     }
@@ -156,7 +157,7 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             activity?.SetTag("SftpAcquisitionLog", JsonSerializer.Serialize(model, LinkFhirSerializerOptions.ActivityTagging));
             activity?.AddTag(DiagnosticNames.StackTrace, ex.StackTrace);
-            logger.LogError(ex, "Error updating SFTP Acquisition Log for FacilityId: {FacilityId}, FileName: {FileName}", model.FacilityId, model.FileName);
+            logger.LogError(ex, "Error updating SFTP Acquisition Log for FacilityId: {FacilityId}, FileName: {FileName}", model.FacilityId.Sanitize(), model.FileName.Sanitize());
             throw;
         }
     }

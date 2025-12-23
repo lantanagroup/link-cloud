@@ -4,6 +4,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -175,7 +176,7 @@ public class SftpLogController : ControllerBase
         // Validate the request model id matches the id in the url
         if (req.ExternalId != id)
         {
-            _logger.LogWarning("Sftp Log id in the request body ({RequestExternalId}) does not match the id in the url ({ExternalId}).", req.ExternalId, logId);
+            _logger.LogWarning("Sftp Log id in the request body ({RequestExternalId}) does not match the id in the url ({ExternalId}).", req.ExternalId, logId.Sanitize());
             return BadRequest("The ids in the request body and url do not match.");
         }
         
