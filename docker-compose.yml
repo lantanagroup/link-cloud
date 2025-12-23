@@ -600,7 +600,6 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       spring.kafka.properties.sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";
-      spring.security.oauth2.resourceserver.jwt.issuer-uri: ${ISSUER_URI}
     ports:
       - "8067:8067"
     build:
@@ -796,7 +795,6 @@ services:
     container_name: link-validation
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      spring.security.oauth2.resourceserver.jwt.issuer-uri: ${ISSUER_URI}
       spring.datasource.password: ${LINK_DB_PASS}
       spring.kafka.properties.sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";
       internal-blob-storage.connection-string: ${AZURITE_CONNECTION_STRING}
