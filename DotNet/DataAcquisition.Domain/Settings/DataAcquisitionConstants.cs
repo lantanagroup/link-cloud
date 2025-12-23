@@ -43,4 +43,10 @@ public static class DataAcquisitionConstants
         //public const string Basic = "basic";
         //public const string FormUrlEncoded = "application/x-www-form-urlencoded";
     }
+
+    public static class DatabaseSettings
+    {
+        public const int MaxFacilityIdLength = 250;
+        public const int MaxFacilityNameLength = 1000;
+    }
 }

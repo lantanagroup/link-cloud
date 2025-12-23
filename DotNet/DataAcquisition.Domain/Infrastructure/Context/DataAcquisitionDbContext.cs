@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.Configuration;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ScheduledReport = LantanaGroup.Link.Shared.Application.Models.ScheduledReport;
 
@@ -30,6 +31,7 @@ public class DataAcquisitionDbContext : DbContext
     public DbSet<FhirQuery> FhirQueries { get; set; }
     public virtual DbSet<FhirQueryResourceType> FhirQueryResourceTypes { get; set; }
     public DbSet<DataAcquisitionLog> DataAcquisitionLogs { get; set; }
+    public DbSet<SftpAcquisitionLog> SftpAcquisitionLogs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -152,7 +154,6 @@ public class DataAcquisitionDbContext : DbContext
 
             entity.HasIndex(e => new { e.ExecutionDate, e.Id })
                 .IsDescending()
-                .IsDescending()
                 .HasDatabaseName("IX_DataAcquisitionLogs_Paging_Default")
                 .IncludeProperties(
                     nameof(DataAcquisitionLog.Priority),
@@ -180,6 +181,22 @@ public class DataAcquisitionDbContext : DbContext
         modelBuilder.Entity<ResourceReferenceType>()
             .Property(b => b.QueryPhase)
             .HasConversion(new EnumToStringConverter<QueryPhase>());
+        
+        //-------------------SftpAcquisitionLog-------------------
+        modelBuilder.Entity<SftpAcquisitionLog>(entity =>
+        {
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
+
+            entity.Property(e => e.FacilityId)
+                .IsRequired()
+                .HasMaxLength(DataAcquisitionConstants.DatabaseSettings.MaxFacilityIdLength);
+            
+            entity.Property(e => e.FileName)
+                .HasMaxLength(DataAcquisitionConstants.DatabaseSettings.MaxFacilityNameLength);
+
+            entity.HasIndex(i => i.FacilityId)
+                .HasDatabaseName("IX_SftpAcquisitionLog_FacilityId");
+        });
 
         // Prefix and schema can be passed as parameters
         // Adds Quartz.NET SqlServer schema to EntityFrameworkCore
