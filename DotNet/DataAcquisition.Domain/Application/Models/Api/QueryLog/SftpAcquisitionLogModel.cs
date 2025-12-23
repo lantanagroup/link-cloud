@@ -31,7 +31,7 @@ public static class SftpAcquisitionLogModelExtensions
         entity.FileName,
         entity.PatientCount,
         entity.EncounterCount,
-        entity.ProcessDate
+        DateTime.SpecifyKind(entity.ProcessDate, DateTimeKind.Utc)
     );
     
     public static SftpAcquisitionLog ToDomain(this SftpAcquisitionLogModel model) => new()

@@ -30,7 +30,7 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
         activity?.AddTag(DiagnosticNames.FacilityId, model.FacilityId);
 
         // Ensure the process date is set sometime in the future
-        if (model.ProcessDate <= DateTime.Now)
+        if (model.ProcessDate.ToUniversalTime() <= DateTime.UtcNow)
         {
             activity?.SetStatus(ActivityStatusCode.Error, "ProcessDate cannot be in the past.");
             activity?.AddTag("sftp.acquisition.log", JsonSerializer.Serialize(model, LinkFhirSerializerOptions.ActivityTagging));
@@ -40,6 +40,8 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
         try
         {
             var entity = model.ToDomain();
+            
+            entity.ProcessDate = model.ProcessDate.ToUniversalTime();
             
             // There should not be any counts yet as it has not been run
             entity.EncounterCount = 0;
@@ -87,13 +89,21 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
             activity?.SetStatus(ActivityStatusCode.Error, "SFTP Acquisition log not found");
             throw new DomainEntityNotFoundException($"SFTP Acquisition log with ID {model.ExternalId} not found.");
         }
+        
+        // Ensure the process date is set sometime in the future
+        if (model.ProcessDate.ToUniversalTime() <= DateTime.UtcNow)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "ProcessDate cannot be in the past.");
+            activity?.AddTag("sftp.acquisition.log", JsonSerializer.Serialize(model, LinkFhirSerializerOptions.ActivityTagging));
+            throw new ArgumentException("ProcessDate cannot be in the past.");
+        }
 
         try
         {
             // Update existing log entry
             existingLog.EncounterCount = model.EncounterCount;
             existingLog.PatientCount = model.PatientCount;
-            existingLog.ProcessDate = model.ProcessDate;
+            existingLog.ProcessDate = model.ProcessDate.ToUniversalTime();
         
             await database.SaveChangesAsync();
         
@@ -114,7 +124,7 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
         using var activity = Activity.Current?.Source.StartActivity();
         activity?.SetTag(DiagnosticNames.FacilityId, model.ExternalId);
 
-        if (model.ProcessDate <= DateTime.Now)
+        if (model.ProcessDate.ToUniversalTime() <= DateTime.UtcNow)
         {
             activity?.SetStatus(ActivityStatusCode.Error, "ProcessDate cannot be in the past.");
             activity?.AddTag("sftp.log.process.date", model.ProcessDate);
@@ -146,7 +156,7 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
         {
             // Update existing log entry
             existingLog.FileName = model.FileName;
-            existingLog.ProcessDate = model.ProcessDate;
+            existingLog.ProcessDate = model.ProcessDate.ToUniversalTime();
         
             await database.SaveChangesAsync();
         
