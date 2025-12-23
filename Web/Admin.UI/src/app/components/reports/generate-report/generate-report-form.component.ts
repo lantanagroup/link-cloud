@@ -27,7 +27,7 @@ import {
 import {TenantService} from "../../../services/gateway/tenant/tenant.service";
 import {MeasureDefinitionService} from "../../../services/gateway/measure-definition/measure.service";
 import {IMeasureDefinitionConfigModel} from "../../../interfaces/measure-definition/measure-definition-config-model.interface";
-import {IEntityCreatedResponse, IReportGenerationResponse} from "../../../interfaces/entity-created-response.model";
+import {IReportGenerationResponse} from "../../../interfaces/entity-created-response.model";
 import {debounceTime, distinctUntilChanged, firstValueFrom, forkJoin, map, Observable, of, startWith, tap} from "rxjs";
 import {MatCheckboxModule} from "@angular/material/checkbox";
 import {MatRadioModule} from "@angular/material/radio";
@@ -39,7 +39,7 @@ import {switchMap} from "rxjs/operators";
 import {FaIconComponent} from "@fortawesome/angular-fontawesome";
 import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocomplete";
 import {faSearch} from "@fortawesome/free-solid-svg-icons";
-import {toZonedTime, format, fromZonedTime} from 'date-fns-tz';
+import {fromZonedTime} from 'date-fns-tz';
 
 
 @Component({
