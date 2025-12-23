@@ -121,7 +121,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         var client = sp.GetRequiredService<IMongoClient>();
         var mongoSettings = sp.GetRequiredService<IOptions<MongoConnection>>().Value;
-        options.UseMongoDB(client, mongoSettings.DatabaseName);
+
+        options.UseMongoDB(client, mongoSettings.DatabaseName);      
     });
 
     builder.Services.AddHostedService<MongoIndexCreationService>();
@@ -244,7 +245,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddQuartz(q =>
     {
         q.UseJobFactory<QuartzJobFactory>();
-        q.UseMicrosoftDependencyInjectionJobFactory();
     });
 
     builder.Services.AddKeyedSingleton<ISchedulerFactory>("MongoScheduler", (provider, key) =>

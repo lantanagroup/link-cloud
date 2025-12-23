@@ -473,7 +473,7 @@ services:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8062/health"]
-  
+
   census:
     image: link-census
     container_name: link-census
