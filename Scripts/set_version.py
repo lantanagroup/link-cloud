@@ -58,7 +58,8 @@ def update_csproj(file_path, version):
     else:
         print(f"No version tags found or added to {file_path}")
 
-def update_pom(file_path, version):
+
+def update_pom(file_path, version, update_parent=True):
     if not os.path.exists(file_path):
         print(f"Warning: File not found: {file_path}")
         return
@@ -67,9 +68,11 @@ def update_pom(file_path, version):
         content = f.read()
 
     new_content = content
-    # Update parent version if present
-    new_content = re.sub(r'(<parent>[\s\S]*?<version>).*?(</version>)', rf'\g<1>{version}\g<2>', new_content, count=1)
     
+    # Update parent version if present
+    if update_parent:
+        new_content = re.sub(r'(<parent>[\s\S]*?<version>).*?(</version>)', rf'\g<1>{version}\g<2>', new_content, count=1)
+
     # Also update project version if it's there (some might have it explicitly)
     # Match <version> that is a direct child of <project>
     # We look for <version> after <artifactId> but NOT inside <parent> or <dependency>
@@ -86,10 +89,23 @@ def update_pom(file_path, version):
     if len(parts) > 1:
         before_deps = parts[0]
         after_deps = parts[1:]
-        
-        if re.search(project_version_pattern, before_deps):
-            before_deps = re.sub(project_version_pattern, rf'\g<1>{version}\g<2>', before_deps, count=1)
-            new_content = before_deps + "".join(after_deps)
+
+        # Split to separate parent block from the rest
+        parent_split = re.split(r'(</parent>)', before_deps, maxsplit=1)
+        if len(parent_split) > 1:
+            # parent block exists, only search after it
+            before_parent = parent_split[0] + parent_split[1]
+            after_parent = "".join(parent_split[2:]) if len(parent_split) > 2 else ""
+
+            if re.search(project_version_pattern, after_parent):
+                after_parent = re.sub(project_version_pattern, rf'\g<1>{version}\g<2>', after_parent, count=1)
+                before_deps = before_parent + after_parent
+        else:
+            # no parent block, update as before
+            if re.search(project_version_pattern, before_deps):
+                before_deps = re.sub(project_version_pattern, rf'\g<1>{version}\g<2>', before_deps, count=1)
+
+        new_content = before_deps + "".join(after_deps)
     else:
         # No dependencies block, just try to update
         new_content = re.sub(project_version_pattern, rf'\g<1>{version}\g<2>', new_content, count=1)
@@ -120,9 +136,17 @@ def main():
         update_csproj(csproj_path, version)
 
     java_root = "Java"
+    
+    shared_pom_path = os.path.join(java_root, "shared", "pom.xml")
+    update_pom(shared_pom_path, version)
+    
+    parent_pom_path = os.path.join(java_root, "pom.xml")
+    update_pom(parent_pom_path, version, False)
+
     for project in java_projects:
         pom_path = os.path.join(java_root, project, "pom.xml")
         update_pom(pom_path, version)
+
 
 if __name__ == "__main__":
     main()
