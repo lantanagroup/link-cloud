@@ -248,21 +248,22 @@ static void RegisterServices(WebApplicationBuilder builder)
     if (monitorBackend)
     {
         healthCheckBuilder
-            .AddCheck<AccountServiceHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<AuditServiceHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<CensusServiceHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<DataAcquisitionHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<MeasureEvaluationServiceHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<NormalizationServiceHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<NotificationServiceHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<ReportServiceHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<SubmissionServiceHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<TenantServiceHealthCheck>(HealthCheckType.Service.ToString());
+            .AddCheck<AccountServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<AuditServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<CensusServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<DataAcquisitionHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<MeasureEvaluationServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<NormalizationServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<NotificationServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<ReportServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<SubmissionServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<TenantServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<TerminologyServiceHealthCheck>(nameof(HealthCheckType.Service));
     }
 
     if (builder.Configuration.GetValue<string>("Cache:Type") == "Redis")
     {
-        healthCheckBuilder.AddCheck<CacheHealthCheck>(HealthCheckType.Cache.ToString());
+        healthCheckBuilder.AddCheck<CacheHealthCheck>(nameof(HealthCheckType.Cache));
     }
 
 
@@ -454,46 +455,70 @@ static void SetupMiddleware(WebApplication app)
         var tasks = new List<Task<ServiceInformation?>>();
 
         if (!string.IsNullOrEmpty(serviceRegistry.AccountServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.AccountServiceApiUrl + "/account/info", logger));
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.AccountServiceApiUrl, 
+                serviceRegistry.PublicAccountServiceUrl, 
+                "/account/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.AuditServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.AuditServiceApiUrl + "/audit/info", logger));
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.AuditServiceApiUrl, 
+                serviceRegistry.PublicAuditServiceUrl,  
+                "/audit/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.CensusServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.CensusServiceApiUrl + "/census/info", logger));
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.CensusServiceApiUrl, 
+                serviceRegistry.PublicCensusServiceUrl,  
+                "/census/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.DataAcquisitionServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.DataAcquisitionServiceApiUrl + "/data/info", logger));
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.DataAcquisitionServiceApiUrl, 
+                serviceRegistry.PublicDataAcquisitionServiceUrl,  
+                "/data/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.MeasureServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.MeasureServiceApiUrl + "/measure-definition/info", logger));
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.MeasureServiceApiUrl, 
+                serviceRegistry.PublicMeasureServiceUrl,  
+                "/measureeval/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.NormalizationServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.NormalizationServiceApiUrl + "/normalization/info", logger));
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.NormalizationServiceApiUrl, 
+                serviceRegistry.PublicNormalizationServiceUrl, 
+                "/normalization/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.QueryDispatchServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.QueryDispatchServiceApiUrl + "/querydispatch/info", logger));
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.QueryDispatchServiceApiUrl, 
+                serviceRegistry.PublicQueryDispatchServiceUrl,  
+                "/querydispatch/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.ReportServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.ReportServiceApiUrl + "/report/info", logger));
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.ReportServiceApiUrl, 
+                serviceRegistry.PublicReportServiceUrl,  
+                "/report/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.SubmissionServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.SubmissionServiceApiUrl + "/submission/info", logger));
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.SubmissionServiceApiUrl, 
+                serviceRegistry.PublicSubmissionServiceUrl, 
+                "/submission/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.TenantServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.TenantServiceApiUrl + "/facility/info", logger));
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.TenantServiceApiUrl, 
+                serviceRegistry.TenantService.PublicTenantServiceUrl, 
+                "/facility/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.ValidationServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.ValidationServiceApiUrl + "/validation/info", logger));
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.ValidationServiceApiUrl, 
+                serviceRegistry.PublicValidationServiceUrl, 
+                "/validation/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.TerminologyServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.TerminologyServiceApiUrl + "/terminology/info", logger));
+            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.TerminologyServiceApiUrl, 
+                serviceRegistry.PublicTerminologyServiceUrl, 
+                "/terminology/info", logger));
 
         var results = await Task.WhenAll(tasks);
         serviceInfos.AddRange(results.Where(info => info != null)!);
 
         return serviceInfos;
-    });
+    }).RequireCors("ApiInfoPolicy");
 }
 
 #endregion

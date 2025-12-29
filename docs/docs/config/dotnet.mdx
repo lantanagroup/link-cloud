@@ -131,39 +131,59 @@ Not all services use every URL. The configuration is provided for completeness a
 
 ## Service URLs
 
-| Property                                   | Description                               |
-|--------------------------------------------|-------------------------------------------|
-| ServiceRegistry__AccountServiceUrl         | Base URL for the Account service          |
-| ServiceRegistry__AuditServiceUrl           | Base URL for the Audit service            |
-| ServiceRegistry__CensusServiceUrl          | Base URL for the Census service           |
-| ServiceRegistry__DataAcquisitionServiceUrl | Base URL for the Data Acquisition service |
-| ServiceRegistry__MeasureServiceUrl         | Base URL for the Measure service          |
-| ServiceRegistry__NormalizationServiceUrl   | Base URL for the Normalization service    |
-| ServiceRegistry__NotificationServiceUrl    | Base URL for the Notification service     |
-| ServiceRegistry__QueryDispatchServiceUrl   | Base URL for the Query Dispatch service   |
-| ServiceRegistry__ReportServiceUrl          | Base URL for the Report service           |
-| ServiceRegistry__SubmissionServiceUrl      | Base URL for the Submission service       |
+| Property                                                  | Required | Description                                                                                              |
+|-----------------------------------------------------------|:---------|----------------------------------------------------------------------------------------------------------|
+| ServiceRegistry__AccountServiceUrl                        | Yes      | Base URL for the Account service                                                                         |
+| ServiceRegistry__PublicAccountServiceUrl                  | No       | Public base URL for the Account service                                                                  |
+| ServiceRegistry__AuditServiceUrl                          | Yes      | Base URL for the Audit service                                                                           |
+| ServiceRegistry__PublicAuditServiceUrl                    | No       | Public base URL for the Audit service                                                                    |
+| ServiceRegistry__CensusServiceUrl                         | Yes      | Base URL for the Census service                                                                          |
+| ServiceRegistry__PublicCensusServiceUrl                   | No       | Public base URL for the Census service                                                                   |
+| ServiceRegistry__DataAcquisitionServiceUrl                | Yes      | Base URL for the Data Acquisition service                                                                |
+| ServiceRegistry__PublicDataAcquisitionServiceUrl          | No       | Public base URL for the Data Acquisition service                                                         |
+| ServiceRegistry__MeasureServiceUrl                        | Yes      | Base URL for the Measure service                                                                         |
+| ServiceRegistry__PublicMeasureServiceUrl                  | No       | Public base URL for the Measure service                                                                  |
+| ServiceRegistry__NormalizationServiceUrl                  | Yes      | Base URL for the Normalization service                                                                   |
+| ServiceRegistry__PublicNormalizationServiceUrl            | No       | Public base URL for the Normalization service                                                            |
+| ServiceRegistry__NotificationServiceUrl                   | Yes      | Base URL for the Notification service                                                                    |
+| ServiceRegistry__PublicNotificationServiceUrl             | No       | Public base URL for the Notification service                                                             |
+| ServiceRegistry__QueryDispatchServiceUrl                  | Yes      | Base URL for the Query Dispatch service                                                                  |
+| ServiceRegistry__PublicQueryDispatchServiceUrl            | No       | Public base URL for the Query Dispatch service                                                           |
+| ServiceRegistry__ReportServiceUrl                         | Yes      | Base URL for the Report service                                                                          |
+| ServiceRegistry__PublicReportServiceUrl                   | No       | Public base URL for the Report service                                                                   |
+| ServiceRegistry__SubmissionServiceUrl                     | Yes      | Base URL for the Submission service                                                                      |
+| ServiceRegistry__PublicSubmissionServiceUrl               | No       | Public base URL for the Submission service                                                               |
+| ServiceRegistry__ValidationServiceUrl                     | Yes      | Base URL for the Validation service                                                                      |
+| ServiceRegistry__PublicValidationServiceUrl               | No       | Public base URL for the Validation service                                                               |
+| ServiceRegistry__TerminologyServiceUrl                    | Yes      | Base URL for the Terminology service                                                                     |
+| ServiceRegistry__PublicTerminologyServiceUrl              | No       | Public base URL for the Terminology service                                                              |
+| ServiceRegistry__TenantService__TenantServiceUrl          | Yes      | Base URL for the Tenant service                                                                          |
+| ServiceRegistry__TenantService__PublicTenantServiceUrl    | No       | Public base URL for the Tenant service                                                                   |
+| ServiceRegistry__TenantService__CheckIfTenantExists       | No       | Whether to validate tenant's existence in other services such as Data Acquisition                        |
+| ServiceRegistry__TenantService__GetTenantRelativeEndpoint | No       | Relative endpoint path for tenant retrieval in other services such as Data Acquisition; excluding "/api" |
 
 ### Example Configuration in JSON
 
 ```json
 {
   "ServiceRegistry": {
-    "AccountServiceUrl": "https://localhost:7001",
-    "AuditServiceUrl": "https://localhost:7334",
-    "CensusServiceUrl": "https://localhost:7234",
-    "DataAcquisitionServiceUrl": "https://localhost:7194",
-    "MeasureServiceUrl": "https://localhost:7135",
-    "NormalizationServiceUrl": "https://localhost:7038",
-    "NotificationServiceUrl": "https://localhost:7434",
-    "QueryDispatchServiceUrl": "https://localhost:7534",
-    "ReportServiceUrl": "https://localhost:7110",
-    "SubmissionServiceUrl": "https://localhost:7046",
+    "AccountServiceUrl": "http://localhost:8060",
+    "AuditServiceUrl": "http://localhost:8062",
+    "CensusServiceUrl": "http://localhost:8064",
+    "DataAcquisitionServiceUrl": "http://localhost:8065",
+    "MeasureServiceUrl": "http://localhost:8067",
+    "NormalizationServiceUrl": "http://localhost:8068",
+    "NotificationServiceUrl": "http://localhost:7434",
+    "QueryDispatchServiceUrl": "http://localhost:8071",
+    "ReportServiceUrl": "http://localhost:8072",
+    "SubmissionServiceUrl": "http://localhost:8073",
     "TenantService": {
-      "TenantServiceUrl": "https://localhost:7332",
+      "TenantServiceUrl": "http://localhost:8074",
       "CheckIfTenantExists": true,
       "GetTenantRelativeEndpoint": "facility/"
-    }
+    },
+    "ValidationServiceUrl": "http://localhost:8075",
+    "TerminologyServiceUrl": "http://localhost:8076"
   }
 }
 ```
