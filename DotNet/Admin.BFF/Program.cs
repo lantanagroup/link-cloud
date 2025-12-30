@@ -25,7 +25,6 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Telemetry;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Extensions.ExternalServices;
@@ -41,6 +40,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddStandardEnvironmentConfiguration();
 
 RegisterServices(builder);
 
@@ -244,6 +244,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add health checks
     var monitorBackend = builder.Configuration.GetValue<bool>("MonitorBackendHealthChecks");
     var healthCheckBuilder = builder.Services.AddHealthChecks();
+    
+    var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, LinkAdminConstants.ServiceName).GetHealthCheckOptions();
+    healthCheckBuilder.AddKafka(kafkaHealthOptions, nameof(HealthCheckType.Kafka));
     
     if (monitorBackend)
     {
@@ -455,62 +458,62 @@ static void SetupMiddleware(WebApplication app)
         var tasks = new List<Task<ServiceInformation?>>();
 
         if (!string.IsNullOrEmpty(serviceRegistry.AccountServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.AccountServiceApiUrl, 
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Account", serviceRegistry.AccountServiceApiUrl, 
                 serviceRegistry.PublicAccountServiceUrl, 
                 "/account/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.AuditServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.AuditServiceApiUrl, 
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Audit", serviceRegistry.AuditServiceApiUrl, 
                 serviceRegistry.PublicAuditServiceUrl,  
                 "/audit/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.CensusServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.CensusServiceApiUrl, 
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Census", serviceRegistry.CensusServiceApiUrl, 
                 serviceRegistry.PublicCensusServiceUrl,  
                 "/census/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.DataAcquisitionServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.DataAcquisitionServiceApiUrl, 
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Data Acquisition", serviceRegistry.DataAcquisitionServiceApiUrl, 
                 serviceRegistry.PublicDataAcquisitionServiceUrl,  
                 "/data/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.MeasureServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.MeasureServiceApiUrl, 
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Measure Evaluation", serviceRegistry.MeasureServiceApiUrl, 
                 serviceRegistry.PublicMeasureServiceUrl,  
                 "/measureeval/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.NormalizationServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.NormalizationServiceApiUrl, 
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Normalization", serviceRegistry.NormalizationServiceApiUrl, 
                 serviceRegistry.PublicNormalizationServiceUrl, 
                 "/normalization/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.QueryDispatchServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.QueryDispatchServiceApiUrl, 
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Query Dispatch", serviceRegistry.QueryDispatchServiceApiUrl, 
                 serviceRegistry.PublicQueryDispatchServiceUrl,  
                 "/querydispatch/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.ReportServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.ReportServiceApiUrl, 
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Report", serviceRegistry.ReportServiceApiUrl, 
                 serviceRegistry.PublicReportServiceUrl,  
                 "/report/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.SubmissionServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.SubmissionServiceApiUrl, 
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Submission", serviceRegistry.SubmissionServiceApiUrl, 
                 serviceRegistry.PublicSubmissionServiceUrl, 
                 "/submission/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.TenantServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.TenantServiceApiUrl, 
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Tenant", serviceRegistry.TenantServiceApiUrl, 
                 serviceRegistry.TenantService.PublicTenantServiceUrl, 
                 "/facility/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.ValidationServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.ValidationServiceApiUrl, 
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Validation", serviceRegistry.ValidationServiceApiUrl, 
                 serviceRegistry.PublicValidationServiceUrl, 
                 "/validation/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.TerminologyServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.TerminologyServiceApiUrl, 
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Terminology", serviceRegistry.TerminologyServiceApiUrl, 
                 serviceRegistry.PublicTerminologyServiceUrl, 
                 "/terminology/info", logger));
 

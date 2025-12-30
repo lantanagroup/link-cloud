@@ -1,4 +1,6 @@
-using Azure.Identity;
+using System.Collections.Specialized;
+using System.Reflection;
+using System.Text;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Services;
@@ -33,18 +35,15 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Compliance.Classification;
 using Microsoft.Extensions.Compliance.Redaction;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Quartz;
 using Quartz.Impl;
 using Quartz.Spi;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Settings.Configuration;
-using System.Collections.Specialized;
-using System.Reflection;
-using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddStandardEnvironmentConfiguration();
 
 RegisterServices(builder);
 var app = builder.Build();

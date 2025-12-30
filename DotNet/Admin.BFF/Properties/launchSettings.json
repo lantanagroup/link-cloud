@@ -28,6 +28,51 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
+    "http-docker": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "launchUrl": "api/swagger",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Docker",
+        
+        "KafkaConnection__SaslUsername": "user",
+        "KafkaConnection__SaslPassword": "password",
+        "Redis__Password": "suT1ChwYtkwWfbV1bUfRvQZO1YNhNRMj",
+
+        "Serilog__WriteTo__0__Args__uri": "http://localhost:3100",
+        "KafkaConnection__BootstrapServers__0": "localhost:9094",
+        "ConnectionStrings__Redis": "localhost:6379",
+        "Telemetry__OtelCollectorEndpoint": "http://localhost:4317",
+
+        "ServiceRegistry__AccountServiceUrl": "http://localhost:8060",
+        "ServiceRegistry__AuditServiceUrl": "http://localhost:8062",
+        "ServiceRegistry__CensusServiceUrl": "http://localhost:8064",
+        "ServiceRegistry__DataAcquisitionServiceUrl": "http://localhost:8065",
+        "ServiceRegistry__MeasureServiceUrl": "http://localhost:8067",
+        "ServiceRegistry__NormalizationServiceUrl": "http://localhost:8068",
+        "ServiceRegistry__ReportServiceUrl": "http://localhost:8072",
+        "ServiceRegistry__SubmissionServiceUrl": "http://localhost:8073",
+        "ServiceRegistry__QueryDispatchServiceUrl": "http://localhost:8071",
+        "ServiceRegistry__TerminologyServiceUrl": "http://localhost:8076",
+        "ServiceRegistry__ValidationServiceUrl": "http://localhost:8075",
+        "ServiceRegistry__TenantService__TenantServiceURL": "http://localhost:8074",
+
+        "ReverseProxy__Clusters__AccountService__Destinations__destination1__Address": "http://localhost:8060",
+        "ReverseProxy__Clusters__AuditService__Destinations__destination1__Address": "http://localhost:8062",
+        "ReverseProxy__Clusters__CensusService__Destinations__destination1__Address": "http://localhost:8064",
+        "ReverseProxy__Clusters__DataAcquisitionService__Destinations__destination1__Address": "http://localhost:8065",
+        "ReverseProxy__Clusters__MeasureEvaluationService__Destinations__destination1__Address": "http://localhost:8067",
+        "ReverseProxy__Clusters__NormalizationService__Destinations__destination1__Address": "http://localhost:8068",
+        "ReverseProxy__Clusters__NotificationService__Destinations__destination1__Address": "http://localhost:8069",
+        "ReverseProxy__Clusters__ReportService__Destinations__destination1__Address": "http://localhost:8072",
+        "ReverseProxy__Clusters__TenantService__Destinations__destination1__Address": "http://localhost:8074",
+        "ReverseProxy__Clusters__QueryDispatchService__Destinations__destination1__Address": "http://localhost:8071",
+        "ReverseProxy__Clusters__ValidationService__Destinations__destination1__Address": "http://localhost:8075",
+        "ReverseProxy__Clusters__TerminologyService__Destinations__destination1__Address": "http://localhost:8076"
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": "http://localhost:8063"
+    },
     "Docker": {
       "commandName": "Docker",
       "launchBrowser": true,

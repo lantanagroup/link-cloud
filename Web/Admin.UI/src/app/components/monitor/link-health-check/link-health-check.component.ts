@@ -40,7 +40,9 @@ export class LinkHealthCheckComponent implements OnInit {
   getHealthSummary(): void {
     this.monitorService.getLinkHealthCheck().subscribe({
       next: (response: ILinkServiceHealthSummary[]) => {
-        this.healthSummary = response;
+        this.healthSummary = response.sort((a, b) =>
+          a.service.localeCompare(b.service)
+        );
         this.healthDataSource.data = this.healthSummary;
       },
       error: (error) => {
@@ -55,7 +57,9 @@ export class LinkHealthCheckComponent implements OnInit {
   getServiceInfos(): void {
     this.serviceInfoService.getServiceInfos().subscribe({
       next: (response: IServiceInfoModel[]) => {
-        this.serviceInfos = response;
+        this.serviceInfos = response.sort((a, b) =>
+          a.serviceName.localeCompare(b.serviceName)
+        );
         this.serviceInfosDataSource.data = this.serviceInfos;
       },
       error: (error) => {

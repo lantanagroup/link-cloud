@@ -12,7 +12,7 @@ spring:
       database: link-measureeval
 
   kafka:
-    bootstrap-servers: kafka_b:9094
+    bootstrap-servers: kafka_b:9092
 
     consumer:
       group-id: measureeval-events

@@ -274,7 +274,7 @@ services:
       KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "1@127.0.0.1:9093"
       KAFKA_CFG_LISTENERS: "SASL_PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094"
       KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:SASL_PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT,EXTERNAL:SASL_PLAINTEXT"
-      KAFKA_CFG_ADVERTISED_LISTENERS: "SASL_PLAINTEXT://127.0.0.1:9092,EXTERNAL://kafka-broker:9094"
+      KAFKA_CFG_ADVERTISED_LISTENERS: "SASL_PLAINTEXT://kafka_b:9092,EXTERNAL://localhost:9094"
       KAFKA_CLIENT_USERS: "${KAFKA_SASL_CLIENT_USER}"
       KAFKA_CLIENT_PASSWORDS: "${KAFKA_SASL_CLIENT_PASSWORD}"
       KAFKA_CFG_INTER_BROKER_LISTENER_NAME: "SASL_PLAINTEXT"
@@ -320,7 +320,7 @@ services:
       - kafka_b
     environment:
       KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka_b:9094
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka_b:9092
       KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL: SASL_PLAINTEXT
       KAFKA_CLUSTERS_0_PROPERTIES_SASL_MECHANISM: PLAIN
       KAFKA_CLUSTERS_0_PROPERTIES_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";'
@@ -338,7 +338,7 @@ services:
     container_name: kafka-rest-proxy
     environment:
       KAFKA_REST_HOST_NAME: rest-proxy
-      KAFKA_REST_BOOTSTRAP_SERVERS: 'kafka_b:9094'
+      KAFKA_REST_BOOTSTRAP_SERVERS: 'kafka_b:9092'
       KAFKA_REST_LISTENERS: "http://0.0.0.0:8082"
       KAFKA_REST_KAFKA_CLUSTER_ID: "link-cluster"
       KAFKA_REST_CLIENT_SECURITY_PROTOCOL: SASL_PLAINTEXT
@@ -362,7 +362,7 @@ services:
     container_name: kafka-schema-registry
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: SASL_PLAINTEXT://kafka_b:9094,PLAINTEXT_INTERNAL://localhost:29092
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: SASL_PLAINTEXT://kafka_b:9092,PLAINTEXT_INTERNAL://localhost:29092
       SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL: SASL_PLAINTEXT
       SCHEMA_REGISTRY_KAFKASTORE_SASL_MECHANISM: PLAIN 
       SCHEMA_REGISTRY_KAFKASTORE_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";'
@@ -410,64 +410,6 @@ services:
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       Redis__Password: ${REDIS_PASS}
-      ConnectionStrings__Redis: redis_cache:6379
-      Cache__Type: Redis
-      EnableIntegrationFeature: true
-      ProblemDetails__IncludeExceptionDetails: false
-      LinkTokenService__EnableTokenGenerationEndpoint: false
-      LinkTokenService__Authority: placeholder
-      LinkTokenService__LinkAdminEmail:      
-      LinkTokenService__TokenLifeSpan: 10    
-      Authentication__EnableAnonymousAccess: true
-      CORS__AllowAllOrigins: false  # Change from true to false
-      CORS__AllowedOrigins__0: http://localhost:8066  # Add the frontend origin
-      CORS__AllowCredentials: true  # Ensure this is set
-      CORS__AllowedMethods__0: GET
-      CORS__AllowedMethods__1: POST
-      CORS__AllowedMethods__2: PUT
-      CORS__AllowedMethods__3: DELETE
-      CORS__AllowedMethods__4: OPTIONS
-      CORS__AllowedHeaders__0: "*"
-      ServiceRegistry__TenantService__TenantServiceURL: http://tenant:8074
-      ServiceRegistry__TenantService__PublicTenantServiceUrl: http://localhost:8074
-      ServiceRegistry__AccountServiceUrl: http://account:8060
-      ServiceRegistry__PublicAccountServiceUrl: http://localhost:8060
-      ServiceRegistry__AuditServiceUrl: http://audit:8062
-      ServiceRegistry__PublicAuditServiceUrl: http://localhost:8062
-      ServiceRegistry__CensusServiceUrl: http://census:8064
-      ServiceRegistry__PublicCensusServiceUrl: http://localhost:8064
-      ServiceRegistry__DataAcquisitionServiceUrl: http://dataacquisition:8065
-      ServiceRegistry__PublicDataAcquisitionServiceUrl: http://localhost:8065
-      ServiceRegistry__MeasureServiceUrl: http://measureeval:8067
-      ServiceRegistry__PublicMeasureServiceUrl: http://localhost:8067
-      ServiceRegistry__NormalizationServiceUrl: http://normalization:8068
-      ServiceRegistry__PublicNormalizationServiceUrl: http://localhost:8068
-      ServiceRegistry__ReportServiceUrl: http://report:8072
-      ServiceRegistry__PublicReportServiceUrl: http://localhost:8072
-      ServiceRegistry__SubmissionServiceUrl: http://submission:8073
-      ServiceRegistry__PublicSubmissionServiceUrl: http://localhost:8073
-      ServiceRegistry__QueryDispatchServiceUrl: http://querydispatch:8071
-      ServiceRegistry__PublicQueryDispatchServiceUrl: http://localhost:8071
-      ServiceRegistry__ValidationServiceUrl: http://validation:8075
-      ServiceRegistry__PublicValidationServiceUrl: http://localhost:8075
-      ServiceRegistry__TerminologyServiceUrl: http://terminology:8076
-      ServiceRegistry__PublicTerminologyServiceUrl: http://localhost:8076
-      ReverseProxy__Clusters__AccountService__Destinations__destination1__Address: http://account:8060
-      ReverseProxy__Clusters__AuditService__Destinations__destination1__Address: http://audit:8062
-      ReverseProxy__Clusters__CensusService__Destinations__destination1__Address: http://census:8064
-      ReverseProxy__Clusters__DataAcquisitionService__Destinations__destination1__Address: http://dataacquisition:8065
-      ReverseProxy__Clusters__MeasureEvaluationService__Destinations__destination1__Address: http://measureeval:8067
-      ReverseProxy__Clusters__NormalizationService__Destinations__destination1__Address: http://normalization:8068
-      ReverseProxy__Clusters__NotificationService__Destinations__destination1__Address: http://notification:8069
-      ReverseProxy__Clusters__ReportService__Destinations__destination1__Address: http://report:8072
-      ReverseProxy__Clusters__TenantService__Destinations__destination1__Address: http://tenant:8074
-      ReverseProxy__Clusters__QueryDispatchService__Destinations__destination1__Address: http://querydispatch:8071
-      ReverseProxy__Clusters__ValidationService__Destinations__destination1__Address: http://validation:8075
-      ReverseProxy__Clusters__TerminologyService__Destinations__destination1__Address: http://terminology:8076
-      Telemetry__EnableTelemetry: true
-      Telemetry__EnableTracing: true
-      Telemetry__EnableOtelCollector: true
-      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
     ports:
       - "8063:8063"
     build:
