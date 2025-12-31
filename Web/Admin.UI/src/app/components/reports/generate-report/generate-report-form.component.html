@@ -76,7 +76,8 @@
   <div class="row">
     <mat-radio-group formControlName="selectedForm">
       <mat-radio-button value="fileUpload">File Upload</mat-radio-button>
-      <mat-radio-button value="censusPatients">Census Patients</mat-radio-button>
+      <mat-radio-button value="manualPatients">Enter Patients</mat-radio-button>
+      <mat-radio-button value="censusPatients">Use Census (Automatic) </mat-radio-button>
     </mat-radio-group>
   </div>
   <!-- File Upload Form -->
@@ -94,7 +95,7 @@
     }
 
     <!-- Census Patients Form -->
-    @if (selectedFormControl.value === 'censusPatients') {
+    @if (selectedFormControl.value === 'manualPatients') {
       <div>
         <h3>Census Patients</h3>
         <div>
