@@ -638,7 +638,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
                 $"evaluatedResource OK (total={totalEval}) [{evalSummary}]");
         }
     }
-
     private static Dictionary<string, int> CountResourceTypes(IEnumerable<JsonElement> lines)
     {
         var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -883,7 +882,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
             $"🔴 ZIP did not reach a stable state with all expected files within {timeoutInSeconds}s " +
             $"after {attempt} poll(s). Missing: {missingList}. Found: {foundList}");
     }
-
     private static void ValidateResourceTypeCounts(
         Dictionary<string, int> actualCounts,
         Dictionary<string, int> expectedCounts)
@@ -1060,20 +1058,19 @@ public class SubmissionZipReader(ITestOutputHelper output)
         }
     }
 
-
     private static readonly Dictionary<ValidationIssueType, ValidationSeverity> SeverityConfig
     = new Dictionary<ValidationIssueType, ValidationSeverity>
     {
 
-        [ValidationIssueType.MissingResourceTypeInBundle] = ValidationSeverity.Warning,
-        [ValidationIssueType.BundleCountMismatch] = ValidationSeverity.Warning,
-        [ValidationIssueType.EvaluatedCountMismatch] = ValidationSeverity.Warning,
-        [ValidationIssueType.UnexpectedEvaluatedType] = ValidationSeverity.Warning,
-        [ValidationIssueType.ExcludedTypeMissingFromBundle] = ValidationSeverity.Warning,
-        [ValidationIssueType.ExcludedTypePresentInEvaluated] = ValidationSeverity.Warning,
-        [ValidationIssueType.BundleVsEvaluatedCountMismatch] = ValidationSeverity.Warning,
-        [ValidationIssueType.BundleVsEvaluatedIdMismatch] = ValidationSeverity.Warning,
-        [ValidationIssueType.CrossTypeReference] = ValidationSeverity.Warning
+        [ValidationIssueType.MissingResourceTypeInBundle] = ValidationSeverity.Error,
+        [ValidationIssueType.BundleCountMismatch] = ValidationSeverity.Error,
+        [ValidationIssueType.EvaluatedCountMismatch] = ValidationSeverity.Error,
+        [ValidationIssueType.UnexpectedEvaluatedType] = ValidationSeverity.Error,
+        [ValidationIssueType.ExcludedTypeMissingFromBundle] = ValidationSeverity.Error,
+        [ValidationIssueType.ExcludedTypePresentInEvaluated] = ValidationSeverity.Error,
+        [ValidationIssueType.BundleVsEvaluatedCountMismatch] = ValidationSeverity.Error,
+        [ValidationIssueType.BundleVsEvaluatedIdMismatch] = ValidationSeverity.Error,
+        [ValidationIssueType.CrossTypeReference] = ValidationSeverity.Error
     };
 
     private static string Truncate(string? value, int maxLength)

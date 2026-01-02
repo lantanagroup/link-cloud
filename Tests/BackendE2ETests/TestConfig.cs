@@ -188,6 +188,5 @@ public static class TestConfig
                 Message = message;
             }
         }
-
     }
 }
