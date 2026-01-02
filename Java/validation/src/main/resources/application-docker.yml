@@ -1,0 +1,51 @@
+service-information:
+  service-name: "Link Validation Service"
+  product-version: dev
+
+server:
+  port: 8075
+
+spring:
+  datasource:
+    url: jdbc:sqlserver://;serverName=mssql;databaseName=link-validation;encrypt=true;trustServerCertificate=true
+    username: sa
+
+  kafka:
+    bootstrap-servers: kafka_b:9094
+    properties:
+      security:
+        protocol: SASL_PLAINTEXT
+      sasl:
+        mechanism: PLAIN
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+  data:
+    redis:
+      host: redis_cache
+      port: 6379
+
+authentication:
+  anonymous: true
+
+secret-management:
+  managerUri: https://link-vault.vault.azure.net/
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+loki:
+  enabled: true
+  url: http://loki:3100
+
+link:
+  report:
+    base-url: http://report:8072
+
+telemetry:
+  exporter-endpoint: http://otel-collector:4317
