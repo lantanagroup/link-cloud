@@ -41,30 +41,21 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                         string traceId = string.Empty;
                         string errorMessage = null;
 
-                        if (consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id",
-                                out var correlationHeader))
+                        if (consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var correlationHeader))
                         {
                             correlationId = System.Text.Encoding.UTF8.GetString(correlationHeader);
 
                             // read the exceptions
-                            if (consumeResult.Message.Headers.TryGetLastBytes("X-Exception-Message",
-                                    out var exceptionMessage))
+                            
+                            if (TryReadHeader(consumeResult.Message.Headers, out var errorBytes,
+                                    "X-Exception-Message",
+                                    "X-Retry-Exception-Message",
+                                    "kafka_exception-message",
+                                    "kafka_dlt-exception-message"))
                             {
-                                errorMessage = System.Text.Encoding.UTF8.GetString(exceptionMessage);
+                                errorMessage =  System.Text.Encoding.UTF8.GetString(errorBytes);
                             }
-
-                            else if (consumeResult.Message.Headers.TryGetLastBytes("X-Retry-Exception-Message",
-                                         out var retryExceptionMessage))
-                            {
-                                errorMessage = System.Text.Encoding.UTF8.GetString(retryExceptionMessage);
-                            }
-
-                            else if (consumeResult.Message.Headers.TryGetLastBytes("kafka_exception-message",
-                                         out var kafkaErrorBytes))
-                            {
-                                errorMessage = System.Text.Encoding.UTF8.GetString(kafkaErrorBytes);
-                            }
-
+                            
                             // Extract traceId from traceparent header
                             if (consumeResult.Message.Headers.TryGetLastBytes("traceparent", out var traceParentBytes))
                             {
@@ -155,6 +146,23 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             }
         }
 
+        private static bool TryReadHeader(
+            Headers headers,
+            out byte[] value,
+            params string[] keys)
+        {
+            foreach (var key in keys)
+            {
+                if (headers.TryGetLastBytes(key, out value))
+                {
+                    return true;
+                }
+            }
+
+            value = null!;
+            return false;
+        }
+        
         private bool checkReportTrackingId(string input, string reportTrackingId)
         {
             if (string.IsNullOrEmpty(input)) return false;
