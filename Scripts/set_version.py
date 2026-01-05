@@ -126,7 +126,7 @@ def main():
     dotnet_projects = [
         "Admin.BFF", "Account", "Audit", "Census", "DataAcquisition", 
         "Normalization", "QueryDispatch", "Report", "Submission", 
-        "Tenant", "Terminology"
+        "Tenant", "Terminology", "DataAcquisition.AcquisitionWorker"
     ]
     java_projects = ["measureeval", "validation"]
 
