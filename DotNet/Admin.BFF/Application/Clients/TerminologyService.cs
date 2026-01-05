@@ -37,8 +37,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             {
                 var response = await _client.GetAsync($"health", cancellationToken);
                 var healthResult = await response.Content.ReadFromJsonAsync<LinkServiceHealthReport>(cancellationToken: cancellationToken);
-                if (healthResult is not null) healthResult.Service = "Terminology";
 
+                if (healthResult is null)
+                {
+                    _logger.LogWarning("Terminology service health check returned null or invalid response");
+                    return new LinkServiceHealthReport() { Service = "Terminology", Status = HealthStatus.Unhealthy };
+                }
+
+                healthResult.Service = "Terminology";
                 return healthResult;
             }
             catch (Exception ex)
