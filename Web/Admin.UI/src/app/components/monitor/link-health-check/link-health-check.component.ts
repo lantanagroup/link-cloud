@@ -33,6 +33,7 @@ export class LinkHealthCheckComponent implements OnInit {
 
   ngOnInit(): void {
     this.healthDataSource = new MatTableDataSource<ILinkServiceHealthSummary>();
+    this.serviceInfosDataSource = new MatTableDataSource<IServiceInfoModel>();
     this.getHealthSummary();
     this.getServiceInfos();
   }
