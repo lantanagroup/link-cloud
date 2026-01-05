@@ -445,7 +445,9 @@ public class SubmissionZipReader(ITestOutputHelper output)
         var bundleIdsByType = BundleIdsByType(lines);
 
         var (evalCounts, evalIdsByType, crossTypeRefs) =
-            ParseEvaluatedResource(lines, bundleIdsByType);
+            ParseEvaluatedResource(lines, bundleIdsByType, excludedTypes);
+        var rawEvalTypes = GetEvaluatedTypesRaw(lines);
+
 
         foreach (var kv in expectedBundleCounts)
         {
@@ -510,8 +512,12 @@ public class SubmissionZipReader(ITestOutputHelper output)
         }
 
         var expectedEvalKeys = new HashSet<string>(expectedEvalCounts.Keys, StringComparer.OrdinalIgnoreCase);
+
         foreach (var extraKey in evalCounts.Keys.Where(k => !expectedEvalKeys.Contains(k)))
         {
+            if (excludedTypes.Contains(extraKey))
+                continue;
+
             ReportIssue(
                 fileName,
                 resourceType: extraKey,
@@ -523,7 +529,7 @@ public class SubmissionZipReader(ITestOutputHelper output)
         foreach (var exType in excludedTypes)
         {
             var bundleHas = bundleCounts.TryGetValue(exType, out var c) && c > 0;
-            var evalHas = evalCounts.TryGetValue(exType, out var c2) && c2 > 0;
+            var evalHas = rawEvalTypes.Contains(exType);
 
             if (!bundleHas)
             {
@@ -690,17 +696,19 @@ public class SubmissionZipReader(ITestOutputHelper output)
     }
 
     private static (Dictionary<string, int> counts,
-                    Dictionary<string, HashSet<string>> idsByType,
-                    List<(string EvaluatedType, string Id, string ActualType)> crossType)
-        ParseEvaluatedResource(
-            IEnumerable<JsonElement> lines,
-            Dictionary<string, HashSet<string>> bundleIdsByType)
+                Dictionary<string, HashSet<string>> idsByType,
+                List<(string EvaluatedType, string Id, string ActualType)> crossType)
+    ParseEvaluatedResource(
+        IEnumerable<JsonElement> lines,
+        Dictionary<string, HashSet<string>> bundleIdsByType,
+        ISet<string> excludedTypes)
     {
         var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var idsByType = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
         var crossType = new List<(string EvaluatedType, string Id, string ActualType)>();
         var total = 0;
 
+        // Build id -> type index from bundle so we can detect cross-type refs
         var idToType = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var kv in bundleIdsByType)
         {
@@ -737,6 +745,11 @@ public class SubmissionZipReader(ITestOutputHelper output)
                 if (type.Length == 0 || id.Length == 0)
                     continue;
 
+                // ✅ Option A: exclude types do NOT contribute to counts/ids/total
+                if (excludedTypes != null && excludedTypes.Contains(type))
+                    continue;
+
+                // Only non-excluded types count toward totals
                 total++;
                 counts[type] = counts.TryGetValue(type, out var n) ? n + 1 : 1;
 
@@ -758,7 +771,8 @@ public class SubmissionZipReader(ITestOutputHelper output)
         counts["__TOTAL__"] = total;
         return (counts, idsByType, crossType);
     }
-    
+
+
     public void ValidateSingleMeasureAdHocAggregateACHMFile()
     {
         string fileName = "manifest.ndjson";
@@ -1080,6 +1094,39 @@ public class SubmissionZipReader(ITestOutputHelper output)
 
         // leave space for "..."
         return value.Substring(0, maxLength - 3) + "...";
+    }
+    private static HashSet<string> GetEvaluatedTypesRaw(IEnumerable<JsonElement> lines)
+    {
+        var types = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var el in lines)
+        {
+            if (!el.TryGetProperty("resourceType", out var rt) || rt.ValueKind != JsonValueKind.String)
+                continue;
+
+            if (!string.Equals(rt.GetString(), "MeasureReport", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (!el.TryGetProperty("evaluatedResource", out var eval) || eval.ValueKind != JsonValueKind.Array)
+                continue;
+
+            foreach (var item in eval.EnumerateArray())
+            {
+                if (!item.TryGetProperty("reference", out var r) || r.ValueKind != JsonValueKind.String)
+                    continue;
+
+                var reference = r.GetString() ?? string.Empty;
+                var slash = reference.IndexOf('/');
+                if (slash <= 0)
+                    continue;
+
+                var type = reference.Substring(0, slash).Trim();
+                if (!string.IsNullOrWhiteSpace(type))
+                    types.Add(type);
+            }
+        }
+
+        return types;
     }
 
     private void ReportIssue(
