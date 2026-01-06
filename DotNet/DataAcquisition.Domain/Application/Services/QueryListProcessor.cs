@@ -122,6 +122,10 @@ public class QueryListProcessor : IQueryListProcessor
         CancellationToken cancellationToken = default
         )
     {
+        var traceId = Activity.Current?.TraceId.ToHexString();
+        var spanId = Activity.Current?.SpanId.ToHexString();
+        var traceAndSpanDelimited = traceId + "|" + spanId;
+
         foreach (var query in queryList)
         {
             var queryConfig = query.Value;
@@ -204,7 +208,7 @@ public class QueryListProcessor : IQueryListProcessor
                 ScheduledReport = scheduledReport,
                 ExecutionDate = DateTime.UtcNow,
                 FhirQuery = new List<CreateFhirQueryModel>() { fhirQuery },
-                TraceId = Activity.Current?.ParentId
+                TraceId = traceAndSpanDelimited ?? string.Empty,
             }, cancellationToken);
         }
     }

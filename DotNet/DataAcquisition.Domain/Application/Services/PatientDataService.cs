@@ -2,6 +2,7 @@
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
+using Hl7.Fhir.Utility;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
@@ -199,6 +200,12 @@ public class PatientDataService : IPatientDataService
         Patient patient = null;
         var patientId = TEMPORARYPatientIdPart(dataAcqRequested.PatientId);
 
+        var traceId = Activity.Current?.TraceId.ToHexString();
+        var spanId = Activity.Current?.SpanId.ToHexString();
+        var traceAndSpanDelimited = (traceId != null && spanId != null)
+            ? $"{traceId}|{spanId}"
+            : null;
+
         if (queryPlan != null)
         {
             var initialQueries = queryPlan.InitialQueries.OrderBy(x => x.Key);
@@ -236,7 +243,7 @@ public class PatientDataService : IPatientDataService
                                 QueryType = FhirQueryType.Read,
                                 QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),
                                 ScheduledReport = schedReport,
-                                TraceId = Activity.Current?.ParentId,
+                                TraceId = traceAndSpanDelimited,
                                 FhirQuery = new List<CreateFhirQueryModel>
                                 {
                                         new CreateFhirQueryModel
@@ -346,32 +353,45 @@ public class PatientDataService : IPatientDataService
                     return;
                 }
 
-                using var activity = new Activity("PatientDataService.ExecuteLogRequest");
+                ActivityContext parentContext = default;
 
-                //set trace parent id based on log trace id
                 if (!string.IsNullOrWhiteSpace(log.TraceId))
                 {
-                    try
+                    var parts = log.TraceId.Split('|');  // Or whatever delimiter you choose
+                    if (parts.Length == 2 &&
+                        parts[0].Length == 32 && IsValidHex(parts[0]) &&
+                        parts[1].Length == 16 && IsValidHex(parts[1]))
                     {
-                        activity.SetParentId(log.TraceId);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error setting Activity.Current for log ID {LogId} with TraceId {TraceId}", log.Id, log.TraceId.Sanitize());
-                        if (!string.IsNullOrWhiteSpace(Activity.Current?.Id))
+                        try
                         {
-                            activity.SetParentId(Activity.Current.Id);
+                            var traceId = ActivityTraceId.CreateFromString(parts[0].AsSpan());
+                            var spanId = ActivitySpanId.CreateFromString(parts[1].AsSpan());
+                            var traceFlags = ActivityTraceFlags.Recorded;
+
+                            parentContext = new ActivityContext(traceId, spanId, traceFlags);
                         }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to parse combined TraceId/SpanId {TraceId} for log {LogId}", log.TraceId.Sanitize(), log.Id);
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Invalid combined TraceId format (expected 32-16 hex chars) for log {LogId}", log.Id);
                     }
                 }
 
-                // helpful attributes for correlation
-                activity.AddTag("link.log_id", log.Id.ToString());
-                activity.AddTag("link.facility_id", log.FacilityId);
-                activity.AddTag("link.correlation_id", log.CorrelationId ?? string.Empty);
-                activity.AddTag("link.report_tracking_id", log.ReportTrackingId ?? string.Empty);
 
-                activity.Start();
+                using var activity = ServiceActivitySource.Instance.StartActivity(
+                    "PatientDataService.ExecuteLogRequest",
+                    ActivityKind.Internal,
+                    parentContext);
+
+                activity?.SetTag("link.log_id", log.Id.ToString());
+                activity?.SetTag("link.facility_id", log.FacilityId);
+                activity?.SetTag("link.correlation_id", log.CorrelationId ?? string.Empty);
+                activity?.SetTag("link.report_tracking_id", log.ReportTrackingId ?? string.Empty);
+                activity?.SetTag("link.patient_id", log.PatientId?.Sanitize());
 
                 //check if log is flagged as a reference, if yes, check if all non-reference logs for a facility, correlationId, and reportTrackingId are marked as 'Completed'
                 if (log.FhirQuery is not null && log.FhirQuery.Any(x => x.IsReference.HasValue && x.IsReference.Value))
@@ -382,7 +402,7 @@ public class PatientDataService : IPatientDataService
                         log.ReportTrackingId,
                         cancellationToken);
 
-                    if (nonReferenceLogsCnt > 0 && (log.RetryAttempts ?? 0) < 10)
+                    if (nonReferenceLogsCnt > 0 && (log.RetryAttempts ?? 0) < DataAcquisitionLog.MaxRetryAttempts)
                     {
                         log.Status = RequestStatus.Pending;
                         log.RetryAttempts = (log.RetryAttempts ?? 0) + 1;
@@ -399,11 +419,11 @@ public class PatientDataService : IPatientDataService
                         }, cancellationToken);
                         return;
                     }
-                    else if ((log.RetryAttempts ?? 0) >= 10)
+                    else if ((log.RetryAttempts ?? 0) >= DataAcquisitionLog.MaxRetryAttempts)
                     {
                         log.Notes ??= new List<string>();
                         log.Status = RequestStatus.Failed;
-                        log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has exceeded the maximum retry attempts of 10. Not all Non-reference resource queries are completed. Marking as Failed.");
+                        log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has exceeded the maximum retry attempts. Not all Non-reference resource queries are completed. Marking as Failed.");
                         await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                         {
                             Id = log.Id,
@@ -466,7 +486,7 @@ public class PatientDataService : IPatientDataService
                     }
 
                     //check if log is search and not census, if true,
-                    if (fhirQuery.QueryType == FhirQueryType.Search && !log.IsCensus)
+                    if ((fhirQuery.QueryType == FhirQueryType.Search || fhirQuery.QueryType == FhirQueryType.SearchPost)&& !log.IsCensus)
                     {
                         var idParams = fhirQuery.QueryParameters.Where(x => x.StartsWith("_id=", StringComparison.InvariantCultureIgnoreCase)).ToList();
                         if(idParams.Any())
@@ -484,7 +504,7 @@ public class PatientDataService : IPatientDataService
                             if (!ids.Any())
                             {
                                 log.Notes ??= [];
-                                log.Notes.Add($"[{DateTime.UtcNow}] No IDs found in _id query parameter for Search FHIR query. Marking log as Completed.");
+                                log.Notes.Add($"[{DateTime.UtcNow}] No IDs found in _id query parameter for {fhirQuery.QueryType} FHIR query. Marking log as Completed.");
                                 skipFetch = true;
                             }
                         }
@@ -566,6 +586,16 @@ public class PatientDataService : IPatientDataService
         var separatedPatientUrl = fullPatientUrl.Split('/');
         var patientIdPart = string.Join("/", separatedPatientUrl.Skip(Math.Max(0, separatedPatientUrl.Length - 2)));
         return patientIdPart;
+    }
+
+    private static bool IsValidHex(string s)
+    {
+        foreach (char c in s)
+        {
+            if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')))
+                return false;
+        }
+        return true;
     }
 }
 

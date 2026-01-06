@@ -1,15 +1,16 @@
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Report.Domain.Queries;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Entities.Enums;
 using LantanaGroup.Link.Report.KafkaProducers;
+using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
-using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
@@ -31,21 +32,23 @@ namespace LantanaGroup.Link.Report.Controllers
     [ApiController]
     public class ReportController : ControllerBase
     {
-        private static readonly JsonSerializerOptions lenientJsonOptions =
-            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector).UsingMode(DeserializerModes.Ostrich);
-
         private readonly ILogger<ReportController> _logger;
         private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
         private readonly IDatabase _database;
         private readonly ISubmissionEntryManager _submissionEntryManager;
+        private readonly ISubmissionEntryQueries _submissionEntryQueries;
         private readonly IReportScheduledManager _reportingScheduledManager;
         private readonly ReportManifestProducer _reportManifestProducer;
-        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler, IDatabase database, ISubmissionEntryManager submissionEntryManager, IReportScheduledManager reportingScheduledManager, ReportManifestProducer reportManifestProducer)
+        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler, IDatabase database, 
+            ISubmissionEntryManager submissionEntryManager, 
+            ISubmissionEntryQueries submissionEntryQueries,
+            IReportScheduledManager reportingScheduledManager, ReportManifestProducer reportManifestProducer)
         {
             _logger = logger;
             _patientReportSubmissionBundler = patientReportSubmissionBundler;
             _database = database;
             _submissionEntryManager = submissionEntryManager;
+            _submissionEntryQueries = submissionEntryQueries;
             _reportingScheduledManager = reportingScheduledManager;
             _reportManifestProducer = reportManifestProducer;
         }
@@ -113,7 +116,7 @@ namespace LantanaGroup.Link.Report.Controllers
                     return BadRequest("Parameter reportScheduleId is null or whitespace");
                 }
 
-                ReportScheduleModel? model = await _reportingScheduledManager.GetReportSchedule(facilityId, reportScheduleId);
+                ReportSchedule? model = await _reportingScheduledManager.GetReportSchedule(facilityId, reportScheduleId);
                 if (model == null)
                 {
                     return Problem(detail: "No Report Schedule found for the provided FacilityId and ReportId", statusCode: (int)HttpStatusCode.NotFound);
@@ -190,7 +193,7 @@ namespace LantanaGroup.Link.Report.Controllers
                     ReadOnlyMemory<byte> lineFeed = new([0x0a]);
                     foreach (var bundleEntry in bundle.Value.Entry)
                     {
-                        await JsonSerializer.SerializeAsync(zipEntryStream, bundleEntry.Resource, lenientJsonOptions);
+                        await JsonSerializer.SerializeAsync(zipEntryStream, bundleEntry.Resource, SerializerOptions.ForFhirLenientDeserialization);
                         await zipEntryStream.WriteAsync(lineFeed);
                     }
                 }
@@ -279,7 +282,7 @@ namespace LantanaGroup.Link.Report.Controllers
             {
                 // Create search predicates
                 //TODO: design way to dynamically build predicates or change search to use custom method
-                Expression<Func<ReportScheduleModel, bool>> predicate;
+                Expression<Func<ReportSchedule, bool>> predicate;
                 if (facilityId is null)
                 {
                     predicate = r => true;
@@ -388,7 +391,7 @@ namespace LantanaGroup.Link.Report.Controllers
             {
                 // Create search predicates
                 //TODO: design way to dynamically build predicates or change search to use custom method
-                Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate = r => r.FacilityId == facilityId;
+                Expression<Func<PatientSubmissionEntry, bool>> predicate = r => r.FacilityId == facilityId;
 
                 if (!string.IsNullOrEmpty(parameters.ReportId))
                 {
@@ -486,12 +489,8 @@ namespace LantanaGroup.Link.Report.Controllers
 
             try
             {
-                // Create search predicates
-                //TODO: design way to dynamically build predicates or change search to use custom method
-                Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate = r => r.FacilityId == facilityId && r.ReportScheduleId == reportId;
-              
                 var resources =
-                    await _submissionEntryManager.GetMeasureReportResourceSummary(facilityId, reportId, resourceType, pageSize, pageNumber, HttpContext.RequestAborted);
+                    await _submissionEntryQueries.GetResourceSummary(facilityId, reportId, resourceType, pageSize, pageNumber, HttpContext.RequestAborted);
 
                 return Ok(resources);
 
@@ -531,7 +530,7 @@ namespace LantanaGroup.Link.Report.Controllers
             try
             {
                 var resourceTypes = await
-                    _submissionEntryManager.GetMeasureReportResourceTypeList(facilityId, reportId,
+                    _submissionEntryQueries.GetMeasureReportResourceTypeList(facilityId, reportId,
                         HttpContext.RequestAborted);
 
                 return Ok(resourceTypes);

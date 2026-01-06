@@ -13,6 +13,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using Task = System.Threading.Tasks.Task;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
 namespace LantanaGroup.Link.DataAcquisition.Jobs;
 
@@ -24,7 +25,6 @@ public class AcquisitionProcessingJob : IJob
     private readonly IProducer<long, ReadyToAcquire> _readyToAcquireProducer;
     private readonly IProducer<string, ResourceAcquired> _resourceAcquiredProducer;
     private const int BatchSize = 25;
-    private const int MaxRetryAttempts = 10;
     private const int MaxConcurrency = 8;
 
     public AcquisitionProcessingJob(
@@ -139,11 +139,11 @@ public class AcquisitionProcessingJob : IJob
                     log.Notes ??= new();
                     if (log.Status == RequestStatus.Failed)
                     {
-                        if (log.RetryAttempts >= MaxRetryAttempts)
+                        if (log.RetryAttempts >= DataAcquisitionLog.MaxRetryAttempts)
                         {
                             log.Status = RequestStatus.MaxRetriesReached;
                             log.Notes ??= new List<string>();
-                            log.Notes.Add($"[{DateTime.UtcNow}] Maximum retry attempts ({MaxRetryAttempts}) reached for request.");
+                            log.Notes.Add($"[{DateTime.UtcNow}] Maximum retry attempts ({DataAcquisitionLog.MaxRetryAttempts}) reached for request.");
                             await dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                             {
                                 Id = log.Id,

@@ -199,7 +199,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 );
 
                                 // Create ReportSchedule for AdHoc Report
-                                var reportSchedule = new ReportScheduleModel
+                                var reportSchedule = new ReportSchedule
                                 {
                                     Id = value.AdhocReportId,
                                     FacilityId = facilityId,
@@ -228,11 +228,11 @@ namespace LantanaGroup.Link.Report.Listeners
                                     
                                     _logger.LogDebug("Found {PatientCount} patients to re-generate for facility {FacilityId} from {StartDate} to {EndDate} with ID {ReportId}", patientMeasureReports.Count(), facilityId, startDate, endDate, reportId);
 
-                                    patientMeasureReports.AsParallel().ForAll(async p =>
+                                    foreach (var p in patientMeasureReports)
                                     {
                                         foreach (var reportType in reportTypes)
                                         {
-                                            await submissionEntryManager.AddAsync(new MeasureReportSubmissionEntryModel()
+                                            await submissionEntryManager.AddAsync(new PatientSubmissionEntry()
                                             {
                                                 PatientId = p,
                                                 Status = PatientSubmissionStatus.PendingEvaluation,
@@ -263,13 +263,13 @@ namespace LantanaGroup.Link.Report.Listeners
                                         catch (ProduceException<string, EvaluationRequestedValue> ex)
                                         {
                                             _logger.LogError(ex, "An error was encountered generating an Evaluation Requested event.\n\tFacilityId: {facilityId}\n\tPatientId: {patientId}\n\tReportTrackingId: {reportTrackingId}",
-                                                facilityId, p, reportSchedule.Id);
+                                                facilityId.SanitizeAndRemove(), p.SanitizeAndRemove(), reportSchedule.Id.SanitizeAndRemove());
                                         }
-                                    });
+                                    }
                                 }
                                 else
                                 {
-                                    _logger.LogInformation("Generating new Adhoc report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, value.ReportId, DateTime.UtcNow);
+                                    _logger.LogInformation("Generating new Adhoc report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, reportSchedule.Id, DateTime.UtcNow);
                                     
                                     // Get Patient List if none was provided
                                     if (value.PatientIds == null || value.PatientIds.Count == 0)
@@ -281,12 +281,12 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     _logger.LogDebug("Found {PatientCount} patients to re-generate for facility {FacilityId} from {StartDate} to {EndDate}", value.PatientIds.Count, facilityId, startDate, endDate);
 
-                                    value.PatientIds.AsParallel().ForAll(async patient =>
+                                    foreach (var patient in value.PatientIds)
                                     {
                                         //For each patient and report type, Create Submission Entries for each Patient and Report Type
                                         foreach (var reportType in reportTypes)
                                         {
-                                            await submissionEntryManager.AddAsync(new MeasureReportSubmissionEntryModel()
+                                            await submissionEntryManager.AddAsync(new PatientSubmissionEntry()
                                             {
                                                 PatientId = patient,
                                                 Status = PatientSubmissionStatus.PendingEvaluation,
@@ -296,7 +296,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                                 CreateDate = DateTime.UtcNow
                                             }, cancellationToken);
                                         }
-                                    });
+                                    }
 
                                     try
                                     {
@@ -393,9 +393,9 @@ namespace LantanaGroup.Link.Report.Listeners
             try
             {
                 admittedPatients =
-                    System.Text.Json.JsonSerializer.Deserialize<List>(
+                    JsonSerializer.Deserialize<List>(
                         censusContent,
-                        new JsonSerializerOptions().ForFhir());
+                        SerializerOptions.ForFhirLenientDeserialization);
             }
             catch (Exception ex)
             {
