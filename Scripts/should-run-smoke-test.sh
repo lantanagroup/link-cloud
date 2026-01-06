@@ -20,13 +20,14 @@ if [[ -z "${DIFF_RANGE}" ]]; then
   fi
 fi
 
+echo "Checking changes in range: ${DIFF_RANGE}" >&2
+
 # Folders where changes ALONE should NOT trigger the job
 ALLOWED_PREFIXES=(
   "Azure_Pipelines/"
   "docs/"
   "Scripts/"
   ".github/"
-  "Web/"
 )
 
 # Collect changed files (added/changed/renamed)
@@ -37,6 +38,7 @@ run_job="false"
 
 if ((${#FILES[@]} == 0)); then
   # no changes → skip
+  echo "No changes detected in range ${DIFF_RANGE}." >&2
   echo "run_job=${run_job}"
   exit 0
 fi
@@ -47,14 +49,20 @@ for file in "${FILES[@]}"; do
   for prefix in "${ALLOWED_PREFIXES[@]}"; do
     if [[ "${file}" == ${prefix}* ]]; then
       allowed="true"
+      echo "File '${file}' is in allowed prefix '${prefix}'. It does not trigger the job." >&2
       break
     fi
   done
 
   if [[ "${allowed}" == "false" ]]; then
+    echo "File '${file}' is NOT in any allowed prefix. Job must run." >&2
     run_job="true"
     break
   fi
 done
+
+if [[ "${run_job}" == "false" ]]; then
+  echo "All changed files are in allowed prefixes. Skipping job." >&2
+fi
 
 echo "run_job=${run_job}"

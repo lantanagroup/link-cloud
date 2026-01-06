@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.Report.Domain
     {
         private readonly ILogger<MongoIndexCreationService> _logger;
         private readonly IServiceScopeFactory _serviceScopeFactory;
-        public MongoIndexCreationService(ILogger<MongoIndexCreationService> logger, IServiceScopeFactory factory) 
+        public MongoIndexCreationService(ILogger<MongoIndexCreationService> logger, IServiceScopeFactory factory)
         {
             _logger = logger;
             _serviceScopeFactory = factory;

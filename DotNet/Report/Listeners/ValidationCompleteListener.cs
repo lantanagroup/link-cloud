@@ -19,6 +19,7 @@ using LantanaGroup.Link.Shared.Settings;
 using System.Text;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Task = System.Threading.Tasks.Task;
+using Hl7.Fhir.Support;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -190,18 +191,12 @@ namespace LantanaGroup.Link.Report.Listeners
                 throw new DeadLetterException($"No Patient Submission Entries were found for schedule ID {schedule.Id}, patient ID {value.PatientId}, in status {PatientSubmissionStatus.ValidationRequested}");
             }
 
+            var operationOutcome = GetOperationOutcome();
+
             foreach (var entry in submissionEntries)
             {
                 if (!value.IsValid)
                 {
-                    var operationOutcome = new OperationOutcome();
-                    var issue = new OperationOutcome.IssueComponent
-                    {
-                        Severity = OperationOutcome.IssueSeverity.Fatal,
-                        Code = OperationOutcome.IssueType.Invalid,
-                        Diagnostics = "Patient has failed Validation"
-                    };
-                    operationOutcome.Issue = new List<OperationOutcome.IssueComponent> { issue };
                     await submissionEntryManager.AddResourceAsync(entry, operationOutcome, ResourceCategoryType.Patient, cancellationToken);
                 }
 
@@ -267,6 +262,21 @@ namespace LantanaGroup.Link.Report.Listeners
             }
 
             await _reportManifestProducer.Produce(schedule, correlationIdStr);
+        }
+
+        private static OperationOutcome GetOperationOutcome()
+        {
+            OperationOutcome operationOutcome = new()
+            {
+                Id = Guid.NewGuid().ToString()
+            };
+            operationOutcome.AddIssue(new OperationOutcome.IssueComponent
+            {
+                Severity = OperationOutcome.IssueSeverity.Error,
+                Code = OperationOutcome.IssueType.Invalid,
+                Diagnostics = "Patient has failed Validation"
+            });
+            return operationOutcome;
         }
 
         private static string GetFacilityIdFromHeader(Headers headers)
