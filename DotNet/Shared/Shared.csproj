@@ -13,7 +13,7 @@
 		<Company>Lantana Consulting Group</Company>
 		<Description>Shared library for Lantana Link</Description>
 		<Product>NHSN Link Shared Library</Product>
-		<VersionPrefix>0.1.1-dev</VersionPrefix>
+		<VersionPrefix>0.4.0</VersionPrefix>
 		<PackageId>com.lantanagroup.link.Shared</PackageId>
 	</PropertyGroup>
 
@@ -28,6 +28,7 @@
     <PackageReference Include="Confluent.Kafka.Extensions.Diagnostics" Version="0.*" />
     <PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.*" />
     <PackageReference Include="DistributedLock.Redis" Version="1.*" />
+    <PackageReference Include="DotNetEnv" Version="3.1.1" />
     <PackageReference Include="FluentValidation.AspNetCore" Version="11.*" />
     <PackageReference Include="Google.Protobuf" Version="3.*" />
     <PackageReference Include="Hl7.Fhir.R4" Version="5.*" />
@@ -68,6 +69,7 @@
 	</PackageReference>
 	<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.*" />
 	<PackageReference Include="System.Text.Json" Version="8.*" />
+	<PackageReference Include="Workleap.Extensions.Configuration.Substitution" Version="1.2.25" />
   </ItemGroup>
 	
 	<ItemGroup>
