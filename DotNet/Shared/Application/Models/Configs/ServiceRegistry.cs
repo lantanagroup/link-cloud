@@ -5,32 +5,103 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
     public class ServiceRegistry
     {
         public static string ConfigSectionName = "ServiceRegistry";
-
         public string AccountServiceUrl { get; set; } = null!;
-        public string? PublicAccountServiceUrl { get; set; }
+        private string? _publicAccountServiceUrl;
+        public string? PublicAccountServiceUrl 
+        { 
+            get => string.IsNullOrEmpty(_publicAccountServiceUrl) ? AccountServiceUrl : _publicAccountServiceUrl;
+            set => _publicAccountServiceUrl = value;
+        }
+        
         public string AuditServiceUrl { get; set; } = null!;
-        public string? PublicAuditServiceUrl { get; set; }
+        private string? _publicAuditServiceUrl;
+        public string? PublicAuditServiceUrl 
+        { 
+            get => string.IsNullOrEmpty(_publicAuditServiceUrl) ? AuditServiceUrl : _publicAuditServiceUrl;
+            set => _publicAuditServiceUrl = value;
+        }
+        
         public string CensusServiceUrl { get; set; } = null!;
-        public string? PublicCensusServiceUrl { get; set; }
+        private string? _publicCensusServiceUrl;
+        public string? PublicCensusServiceUrl 
+        { 
+            get => string.IsNullOrEmpty(_publicCensusServiceUrl) ? CensusServiceUrl : _publicCensusServiceUrl;
+            set => _publicCensusServiceUrl = value;
+        }
+        
         public string DataAcquisitionServiceUrl { get; set; } = null!;
-        public string? PublicDataAcquisitionServiceUrl { get; set; }
+        private string? _publicDataAcquisitionServiceUrl;
+        public string? PublicDataAcquisitionServiceUrl 
+        { 
+            get => string.IsNullOrEmpty(_publicDataAcquisitionServiceUrl) ? DataAcquisitionServiceUrl : _publicDataAcquisitionServiceUrl;
+            set => _publicDataAcquisitionServiceUrl = value;
+        }
+        
         public string MeasureServiceUrl { get; set; } = null!;
-        public string? PublicMeasureServiceUrl { get; set; }
+        private string? _publicMeasureServiceUrl;
+        public string? PublicMeasureServiceUrl 
+        { 
+            get => string.IsNullOrEmpty(_publicMeasureServiceUrl) ? MeasureServiceUrl : _publicMeasureServiceUrl;
+            set => _publicMeasureServiceUrl = value;
+        }
+        
         public string NormalizationServiceUrl { get; set; } = null!;
-        public string? PublicNormalizationServiceUrl { get; set; }
+        private string? _publicNormalizationServiceUrl;
+        public string? PublicNormalizationServiceUrl 
+        { 
+            get => string.IsNullOrEmpty(_publicNormalizationServiceUrl) ? NormalizationServiceUrl : _publicNormalizationServiceUrl;
+            set => _publicNormalizationServiceUrl = value;
+        }
+        
         public string NotificationServiceUrl { get; set; } = null!;
-        public string? PublicNotificationServiceUrl { get; set; }
+        private string? _publicNotificationServiceUrl;
+        public string? PublicNotificationServiceUrl 
+        { 
+            get => string.IsNullOrEmpty(_publicNotificationServiceUrl) ? NotificationServiceUrl : _publicNotificationServiceUrl;
+            set => _publicNotificationServiceUrl = value;
+        }
+        
         public string QueryDispatchServiceUrl { get; set; } = null!;
-        public string? PublicQueryDispatchServiceUrl { get; set; }
+        private string? _publicQueryDispatchServiceUrl;
+        public string? PublicQueryDispatchServiceUrl 
+        { 
+            get => string.IsNullOrEmpty(_publicQueryDispatchServiceUrl) ? QueryDispatchServiceUrl : _publicQueryDispatchServiceUrl;
+            set => _publicQueryDispatchServiceUrl = value;
+        }
+        
         public string ReportServiceUrl { get; set; } = null!;
-        public string? PublicReportServiceUrl { get; set; }
+        private string? _publicReportServiceUrl;
+        public string? PublicReportServiceUrl 
+        { 
+            get => string.IsNullOrEmpty(_publicReportServiceUrl) ? ReportServiceUrl : _publicReportServiceUrl;
+            set => _publicReportServiceUrl = value;
+        }
+        
         public string SubmissionServiceUrl { get; set; } = null!;
-        public string? PublicSubmissionServiceUrl { get; set; }
+        private string? _publicSubmissionServiceUrl;
+        public string? PublicSubmissionServiceUrl 
+        { 
+            get => string.IsNullOrEmpty(_publicSubmissionServiceUrl) ? SubmissionServiceUrl : _publicSubmissionServiceUrl;
+            set => _publicSubmissionServiceUrl = value;
+        }
+        
         public string ValidationServiceUrl { get; set; } = null!;
-        public string? PublicValidationServiceUrl { get; set; }
+        private string? _publicValidationServiceUrl;
+        public string? PublicValidationServiceUrl 
+        { 
+            get => string.IsNullOrEmpty(_publicValidationServiceUrl) ? ValidationServiceUrl : _publicValidationServiceUrl;
+            set => _publicValidationServiceUrl = value;
+        }
+        
         public TenantServiceRegistration TenantService { get; set; } = null!;
+        
         public string TerminologyServiceUrl { get; set; } = null!;
-        public string? PublicTerminologyServiceUrl { get; set; }
+        private string? _publicTerminologyServiceUrl;
+        public string? PublicTerminologyServiceUrl 
+        { 
+            get => string.IsNullOrEmpty(_publicTerminologyServiceUrl) ? TerminologyServiceUrl : _publicTerminologyServiceUrl;
+            set => _publicTerminologyServiceUrl = value;
+        }
 
         public string? TerminologyServiceApiUrl
         {
