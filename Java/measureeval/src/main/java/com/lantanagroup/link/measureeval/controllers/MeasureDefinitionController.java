@@ -31,7 +31,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/measureeval/measure-definition")
-@PreAuthorize("hasRole('LinkUser')")
+@PreAuthorize("hasAnyRole('LinkUser', 'LinkAdministrator')")
 public class MeasureDefinitionController {
 
     private final Logger _logger = LoggerFactory.getLogger(MeasureDefinitionController.class);
