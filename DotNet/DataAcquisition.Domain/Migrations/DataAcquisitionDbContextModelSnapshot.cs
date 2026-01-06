@@ -632,9 +632,6 @@ namespace DataAcquisition.Domain.Migrations
                     b.Property<string>("ResourceAcquiredIds")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("ResourceId")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<int?>("RetryAttempts")
                         .HasColumnType("int");
 
@@ -657,7 +654,7 @@ namespace DataAcquisition.Domain.Migrations
                         .IsDescending()
                         .HasDatabaseName("IX_DataAcquisitionLogs_Paging_Default");
 
-                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("ExecutionDate", "Id"), new[] { "Priority", "FacilityId", "IsCensus", "PatientId", "ReportableEvent", "ReportTrackingId", "CorrelationId", "TraceId", "FhirVersion", "QueryType", "QueryPhase", "Status", "RetryAttempts", "CompletionDate", "CompletionTimeMilliseconds", "ResourceId" });
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("ExecutionDate", "Id"), new[] { "Priority", "FacilityId", "IsCensus", "PatientId", "ReportableEvent", "ReportTrackingId", "CorrelationId", "TraceId", "FhirVersion", "QueryType", "QueryPhase", "Status", "RetryAttempts", "CompletionDate", "CompletionTimeMilliseconds" });
 
                     b.ToTable("DataAcquisitionLog");
                 });

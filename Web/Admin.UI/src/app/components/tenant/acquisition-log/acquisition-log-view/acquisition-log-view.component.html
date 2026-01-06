@@ -191,7 +191,7 @@
           @for (log of acquisitionLogs; track log) {
             <tr @fadeInSlideUp [ngClass]="{'priority-critical': log.priority === 'Critical', 'priority-high': log.priority === 'High'}">
               <td class="table-cell" style="position: relative;">
-                @if (log.status !== 'Processing' && log.status !== 'Failed' && log.status !== 'Completed') {
+                @if (log.status !== 'Processing' && log.status !== 'Failed' && log.status !== 'Completed' && log.status !== 'Skipped' && log.status !== 'MaxRetriesReached') {
                   <input type="checkbox" class="absolute left-4 top-1/2 -mt-2 h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-600">
                 }
                 @if (log.status === 'Processing') {
@@ -224,16 +224,15 @@
                 <td class="data-col table-cell">{{log.queryType}}</td>
                 <td class="data-col table-cell">{{log.executionDate | date:'shortDate'}}</td>
                 <td class="table-cell">
-                  <span
-                                  [ngClass]="{
+                  <span [ngClass]="{
                                       'status-pending': log.status === 'Pending',
                                       'status-ready': log.status === 'Ready',
                                       'status-processing': log.status === 'Processing',
                                       'status-completed': log.status === 'Completed',
                                       'status-failed': log.status === 'Failed',
-                                      'status-maxRetryReached': log.status === 'MaxRetriesReached'
-                                  }"
-                  >{{log.status}}</span>
+                                      'status-maxRetryReached': log.status === 'MaxRetriesReached',
+                                      'status-skipped': log.status === 'Skipped'
+                                  }">{{log.status}}</span>
                 </td>
                 <td class="table-cell">
                   <app-table-command

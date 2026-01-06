@@ -118,7 +118,9 @@ public class PatientListsAcquiredListener : BackgroundService
                                     {
                                         if (resp is PatientEventResponse per && per.PatientEvent != null)
                                         {
-                                            per.PatientEvent.ReportTrackingId = rawmessage.Message.Value.ReportTrackingId;
+                                            if (rawmessage.Message.Value.PatientLists.Any(list => list.PatientIds.Contains(per.PatientEvent.PatientId))) { 
+                                                per.PatientEvent.ReportTrackingId = rawmessage.Message.Value.ReportTrackingId;
+                                            }
                                         }
                                         return resp;
                                     }).ToList();
@@ -135,15 +137,16 @@ public class PatientListsAcquiredListener : BackgroundService
                                 {
                                     throw new TransientException("DB Error processing message: " + ex.Message, ex);
                                 }
-                                //add produce exeption catch
                                 catch (ProduceException<string, List<PatientListItem>> ex)
                                 {
                                     throw new TransientException("Error producing message: " + ex.Message, ex);
                                 }
                                 catch (Exception ex)
                                 {
-
-                                    throw new DeadLetterException("Error processing message: " + ex.Message, ex);
+                                    if (ex is DeadLetterException || ex is TransientException)
+                                        throw;
+                                   
+                                    throw new TransientException("Error processing message: " + ex.Message, ex);
                                 }
                             }
                         }
@@ -160,7 +163,7 @@ public class PatientListsAcquiredListener : BackgroundService
                         catch (Exception ex)
                         {
                             _logger.LogError(ex, $"Failed to process Patient Event.");
-                            _nonTransientExceptionHandler.HandleException(rawmessage, ex, rawmessage.Message.Key);
+                            _transientExceptionHandler.HandleException(rawmessage, ex, rawmessage.Message.Key);
                         }
                         finally
                         {

@@ -9,6 +9,8 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 [Table("DataAcquisitionLog")]
 public class DataAcquisitionLog
 {
+    public const int MaxRetryAttempts = 1;
+
     [Required]
     public string FacilityId { get; set; }
 
@@ -44,8 +46,6 @@ public class DataAcquisitionLog
     public bool IsCensus { get; set; } = false;
 
     public ReportableEvent? ReportableEvent { get; set; }
-
-    public string? ResourceId { get; set; }
 
     public bool TailSent { get; set; } = false;
 

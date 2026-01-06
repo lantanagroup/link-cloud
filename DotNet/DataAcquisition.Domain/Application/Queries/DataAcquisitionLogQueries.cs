@@ -174,7 +174,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
     public async Task<IEnumerable<TailingMessageModel>> GetTailingMessages(CancellationToken cancellationToken = default)
     {
-        var completedOrFailedStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached };
+        var completedOrFailedStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped };
 
         try
         {
@@ -265,11 +265,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         if (!string.IsNullOrEmpty(model.ReportTrackingId))
         {
             query = query.Where(log => log.ReportTrackingId == model.ReportTrackingId);
-        }
-
-        if (!string.IsNullOrEmpty(model.ResourceId))
-        {
-            query = query.Where(log => log.ResourceId != null && log.ResourceId == model.ResourceId);
         }
 
         if (model.QueryPhase.HasValue)

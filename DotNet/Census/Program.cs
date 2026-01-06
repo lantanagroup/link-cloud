@@ -49,6 +49,7 @@ using System.Reflection;
 using PatientEvent = LantanaGroup.Link.Census.Domain.Entities.POI.PatientEvent;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddStandardEnvironmentConfiguration();
 
 RegisterServices(builder);
 var app = builder.Build();

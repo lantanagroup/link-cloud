@@ -94,7 +94,7 @@ public class QueryListController : Controller
             }
             catch (EntityAlreadyExistsException ex)
             {
-                return BadRequest(ex.Message);
+                return Conflict(ex.Message);
             }
             catch (MissingFacilityConfigurationException ex)
             {
@@ -184,7 +184,7 @@ public class QueryListController : Controller
 
             if (entity == null)
             {
-                return BadRequest("No Fhir List Configuration Found for FacilityId: " + facilityId.SanitizeAndRemove());
+                return NotFound("No Fhir List Configuration Found for FacilityId: " + facilityId.SanitizeAndRemove());
             }
             var deleted = await _fhirQueryListConfigurationManager.DeleteAsync(sanitizedFacilityId, cancellationToken);
 

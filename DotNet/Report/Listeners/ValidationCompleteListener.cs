@@ -1,12 +1,11 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
-using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Entities.Enums;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
@@ -18,7 +17,9 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Task = System.Threading.Tasks.Task;
+using Hl7.Fhir.Support;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -190,24 +191,25 @@ namespace LantanaGroup.Link.Report.Listeners
                 throw new DeadLetterException($"No Patient Submission Entries were found for schedule ID {schedule.Id}, patient ID {value.PatientId}, in status {PatientSubmissionStatus.ValidationRequested}");
             }
 
+            var operationOutcome = GetOperationOutcome();
+
             foreach (var entry in submissionEntries)
             {
                 if (!value.IsValid)
                 {
-                    var operationOutcome = new OperationOutcome();
-                    var issue = new OperationOutcome.IssueComponent
-                    {
-                        Severity = OperationOutcome.IssueSeverity.Fatal,
-                        Code = OperationOutcome.IssueType.Invalid,
-                        Diagnostics = "Patient has failed Validation"
-                    };
-                    operationOutcome.Issue = new List<OperationOutcome.IssueComponent> { issue };
                     await submissionEntryManager.AddResourceAsync(entry, operationOutcome, ResourceCategoryType.Patient, cancellationToken);
                 }
 
                 entry.ValidationStatus = value.IsValid ? ValidationStatus.Passed : ValidationStatus.Failed;
                 entry.Status = PatientSubmissionStatus.ValidationComplete;
-                await submissionEntryManager.UpdateAsync(entry, cancellationToken);
+                await submissionEntryManager.UpdateAsync(new PatientSubmissionEntryUpdateModel
+                {
+                    Id = entry.Id,
+                    MeasureReport = entry.MeasureReport,
+                    PayloadUri = entry.PayloadUri,
+                    Status = entry.Status,
+                    ValidationStatus = entry.ValidationStatus,
+                }, cancellationToken);
             }
 
             if (!value.IsValid)
@@ -237,7 +239,14 @@ namespace LantanaGroup.Link.Report.Listeners
                     foreach (var entry in submissionEntries)
                     {
                         entry.PayloadUri = uri;
-                        await submissionEntryManager.UpdateAsync(entry, cancellationToken);
+                        await submissionEntryManager.UpdateAsync(new PatientSubmissionEntryUpdateModel
+                        {
+                            Id = entry.Id,
+                            MeasureReport = entry.MeasureReport,
+                            PayloadUri = entry.PayloadUri,
+                            Status = entry.Status,
+                            ValidationStatus = entry.ValidationStatus,
+                        }, cancellationToken);
                     }
                 }
             }
@@ -248,12 +257,26 @@ namespace LantanaGroup.Link.Report.Listeners
             }
             catch (ProduceException<SubmitPayloadKey, SubmitPayloadValue> ex)
             {
-                _logger.LogError(ex, "An error was encountered generating a Submit Payload event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
+                _logger.LogError(ex, "An error was encountered generating a Submit Payload event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId.SanitizeAndRemove());
                 throw new TransientException($"An error was encountered generating a Submit Payload event.\n\tFacilityId: {facilityId}\n\t", ex);
             }
 
-
             await _reportManifestProducer.Produce(schedule, correlationIdStr);
+        }
+
+        private static OperationOutcome GetOperationOutcome()
+        {
+            OperationOutcome operationOutcome = new()
+            {
+                Id = Guid.NewGuid().ToString()
+            };
+            operationOutcome.AddIssue(new OperationOutcome.IssueComponent
+            {
+                Severity = OperationOutcome.IssueSeverity.Error,
+                Code = OperationOutcome.IssueType.Invalid,
+                Diagnostics = "Patient has failed Validation"
+            });
+            return operationOutcome;
         }
 
         private static string GetFacilityIdFromHeader(Headers headers)

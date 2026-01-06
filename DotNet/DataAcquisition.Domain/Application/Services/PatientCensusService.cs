@@ -19,6 +19,7 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
@@ -61,24 +62,26 @@ public class PatientCensusService : IPatientCensusService
 
     public async Task CreateLog(string facilityId, CancellationToken cancellationToken)
     {
-        List<PatientListModel> results = new List<PatientListModel>();
+        using var activity = Activity.Current?.Source.StartActivity();
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+    
         var facilityConfig = await _fhirQueryListConfigurationQueries.GetByFacilityIdAsync(facilityId, cancellationToken);
 
         if (facilityConfig == null)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, "Missing FHIR list configuration");
             throw new Exception(
                 $"Missing census configuration for facility {facilityId}. Unable to proceed with request.");
         }
 
-        var fhirQueryConfig = await _fhirQueryConfigurationQueries.GetByFacilityIdAsync(facilityConfig.FacilityId);
+        var fhirQueryConfig = await _fhirQueryConfigurationQueries.GetByFacilityIdAsync(facilityConfig.FacilityId, cancellationToken);
 
         if (fhirQueryConfig == null)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, "Missing FHIR query configuration");
             throw new Exception(
                 $"Missing FHIR query configuration for facility {facilityId}. Unable to proceed with request.");
         }
-
-        List<List> resultLists = new List<List>();
 
         try
         {
@@ -90,20 +93,36 @@ public class PatientCensusService : IPatientCensusService
                 ExecutionDate = DateTime.UtcNow,
                 Priority = AcquisitionPriority.Normal,
                 IsCensus = true,
-                ScheduledReport = new()
+                ScheduledReport = new ScheduledReport()
             };
 
             facilityConfig.EHRPatientLists.ForEach(x =>
             {
+                if (x.TimeFrame is null)
+                {
+                    activity?.SetStatus(ActivityStatusCode.Error, "Timeframe is null for list");
+                    activity?.AddTag("fhir.list.id", x.FhirId);
+                    activity?.AddTag("fhir.list.internal.id", x.InternalId );
+                    _logger.LogError("TimeFrame is null for list {listId} for facility {facilityId}.", x.FhirId, facilityId);
+                }
+
+                if (x.Status is null)
+                {
+                    activity?.SetStatus(ActivityStatusCode.Error, "Status is null for list");
+                    activity?.AddTag("fhir.list.id", x.FhirId);
+                    activity?.AddTag("fhir.list.internal.id", x.InternalId );
+                    _logger.LogError("Status is null for list {listId} for facility {facilityId}.", x.FhirId, facilityId);
+                }
+
                 log.FhirQuery.Add(
                     new CreateFhirQueryModel
                     {
                         FacilityId = facilityId,
                         QueryType = FhirQueryType.Read,
-                        ResourceTypes = new List<ResourceType> { ResourceType.List },
+                        ResourceTypes = [ResourceType.List],
                         IsReference = false,
-                        CensusTimeFrame = x.TimeFrame,
-                        CensusPatientStatus = x.Status,
+                        CensusTimeFrame = x.TimeFrame ?? throw new ArgumentNullException(nameof(x.TimeFrame)),
+                        CensusPatientStatus = x.Status ?? throw new ArgumentNullException(nameof(x.Status)),
                         CensusListId = x.FhirId
                     });
             });
@@ -112,6 +131,8 @@ public class PatientCensusService : IPatientCensusService
         }
         catch (Exception ex)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.AddTag(DiagnosticNames.StackTrace, ex.StackTrace);
             _logger.LogError(ex, "An error occurred while attempting to create the log entry. FacilityId: {facilityId}", facilityId);
             throw;
         }
@@ -142,35 +163,30 @@ public class PatientCensusService : IPatientCensusService
             if (query.QueryType != FhirQueryType.Read)
             {
                 notes.Add($"Query type {query.QueryType} is not supported. Only Read queries are allowed.");
-                _logger.LogWarning("Query type {queryType} is not supported. Only Read queries are allowed.", query.QueryType);
                 continue;
             }
 
             if (query.ResourceTypes == null || !query.ResourceTypes.Contains(ResourceType.List))
             {
                 notes.Add($"Resource type {query.ResourceTypes} is not supported. Only List resource type is allowed.");
-                _logger.LogWarning("Resource type {ResourceTypes} is not supported. Only List resource type is allowed.", query.ResourceTypes);
                 continue;
             }
 
             if (query.CensusPatientStatus == null)
             {
                 notes.Add($"CensusPatientStatus is null for query with id {query.Id}. Unable to proceed with request.");
-                _logger.LogWarning("CensusPatientStatus is null for query with id {id}.", query.Id);
                 continue;
             }
 
             if (string.IsNullOrWhiteSpace(query.CensusListId))
             {
                 notes.Add($"CensusListId is null or empty for query with id {query.Id}. Unable to proceed with request.");
-                _logger.LogWarning("CensusListId is null or empty for query with id {id}.", query.Id);
                 continue;
             }
 
             if (query.CensusTimeFrame == null)
             {
                 notes.Add($"CensusTimeFrame is null for query with id {query.Id}. Unable to proceed with request.");
-                _logger.LogWarning("CensusTimeFrame is null for query with id {id}.", query.Id);
                 continue;
             }
 
@@ -208,7 +224,6 @@ public class PatientCensusService : IPatientCensusService
                 //check if the resultList is null or OperationOutcome
                 if (resultList == null || resultList is OperationOutcome)
                 {
-                    _logger.LogWarning("Error retrieving patient list id {ListId} for facility {FacilityId} with base url of {BaseUrl}.", query.CensusListId.Sanitize(), facilityConfig.FacilityId.Sanitize(), facilityConfig.FhirBaseServerUrl.Sanitize());
                     throw new FhirApiFetchFailureException($"Error retrieving patient list id {query.CensusListId} for facility {facilityConfig.FacilityId}.");
                 }
 
@@ -225,15 +240,11 @@ public class PatientCensusService : IPatientCensusService
             {
                 isFailed = true;
                 notes.Add($"Timeout while retrieving patient list for facility {query.FacilityId} with list id {query.CensusListId}.");
-                _logger.LogError(timeoutEx, "Timeout while retrieving patient list id {listId} for facility {facilityId}",
-                    query.CensusListId, query.FacilityId);
             }
             catch (Exception ex)
             {
                 isFailed = true;
                 notes.Add($"Error retrieving patient list for facility {query.FacilityId} with list id {query.CensusListId}: {ex.Message}");
-                _logger.LogError(ex, "Error retrieving patient list id {listId} for facility {facilityId}",
-                    query.CensusListId, query.FacilityId);
             }
         }
 
@@ -262,6 +273,7 @@ public class PatientCensusService : IPatientCensusService
         var updatedLog = await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
         {
             Id = log.Id,
+            ResourceAcquiredIds = log.ResourceAcquiredIds,
             RetryAttempts = log.RetryAttempts,
             CompletionDate = log.CompletionDate,
             CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,

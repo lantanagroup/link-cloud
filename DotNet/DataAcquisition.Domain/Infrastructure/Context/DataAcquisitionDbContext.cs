@@ -169,8 +169,7 @@ public class DataAcquisitionDbContext : DbContext
                     nameof(DataAcquisitionLog.Status),
                     nameof(DataAcquisitionLog.RetryAttempts),
                     nameof(DataAcquisitionLog.CompletionDate),
-                    nameof(DataAcquisitionLog.CompletionTimeMilliseconds),
-                    nameof(DataAcquisitionLog.ResourceId)
+                    nameof(DataAcquisitionLog.CompletionTimeMilliseconds)
                 );
         });
 

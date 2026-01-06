@@ -2,8 +2,12 @@
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
+using Hl7.Fhir.Utility;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -18,13 +22,10 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using StringComparison = System.StringComparison;
 using Task = System.Threading.Tasks.Task;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 
@@ -49,9 +50,7 @@ public class PatientDataService : IPatientDataService
     private readonly IDatabase _database;
 
     private readonly ILogger<PatientDataService> _logger;
-    private readonly IFhirQueryConfigurationManager _fhirQueryManager;
     private readonly IFhirQueryConfigurationQueries _fhirQueryQueries;
-    private readonly IQueryPlanManager _queryPlanManager;
     private readonly IQueryPlanQueries _queryPlanQueries;
     private readonly IQueryListProcessor _queryListProcessor;
     private readonly ProducerConfig _producerConfig;
@@ -65,9 +64,7 @@ public class PatientDataService : IPatientDataService
     public PatientDataService(
         IDatabase database,
         ILogger<PatientDataService> logger,
-        IFhirQueryConfigurationManager fhirQueryManager,
         IFhirQueryConfigurationQueries fhirQueryQueries,
-        IQueryPlanManager queryPlanManager,
         IQueryPlanQueries queryPlanQueries,
         IQueryListProcessor queryListProcessor,
         IReadFhirCommand readFhirCommand,
@@ -80,9 +77,7 @@ public class PatientDataService : IPatientDataService
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _fhirQueryManager = fhirQueryManager;
         _fhirQueryQueries = fhirQueryQueries;
-        _queryPlanManager = queryPlanManager;
         _queryPlanQueries = queryPlanQueries;
 
         _producerConfig = new ProducerConfig();
@@ -205,6 +200,12 @@ public class PatientDataService : IPatientDataService
         Patient patient = null;
         var patientId = TEMPORARYPatientIdPart(dataAcqRequested.PatientId);
 
+        var traceId = Activity.Current?.TraceId.ToHexString();
+        var spanId = Activity.Current?.SpanId.ToHexString();
+        var traceAndSpanDelimited = (traceId != null && spanId != null)
+            ? $"{traceId}|{spanId}"
+            : null;
+
         if (queryPlan != null)
         {
             var initialQueries = queryPlan.InitialQueries.OrderBy(x => x.Key);
@@ -242,7 +243,7 @@ public class PatientDataService : IPatientDataService
                                 QueryType = FhirQueryType.Read,
                                 QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),
                                 ScheduledReport = schedReport,
-                                TraceId = Activity.Current?.ParentId,
+                                TraceId = traceAndSpanDelimited,
                                 FhirQuery = new List<CreateFhirQueryModel>
                                 {
                                         new CreateFhirQueryModel
@@ -327,90 +328,6 @@ public class PatientDataService : IPatientDataService
                     throw new ArgumentException($"Facility ID {request.facilityId} does not match log's facility ID {log.FacilityId}.");
                 }
 
-                //check if isCensus, if true, create scope for PatientCensusService and execute RetrieveListData
-                if (log.IsCensus)
-                {
-                    await _patientCensusService.RetrieveListData(log, true, cancellationToken);
-                    return;
-                }
-
-                using var activity = new Activity("PatientDataService.ExecuteLogRequest");
-
-                //set trace parent id based on log trace id
-                if (!string.IsNullOrWhiteSpace(log.TraceId))
-                {
-                    try
-                    {
-                        activity.SetParentId(log.TraceId);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error setting Activity.Current for log ID {LogId} with TraceId {TraceId}", log.Id, log.TraceId.Sanitize());
-                        if (!string.IsNullOrWhiteSpace(Activity.Current?.Id))
-                        {
-                            activity.SetParentId(Activity.Current.Id);
-                        }
-                    }
-                }
-
-                // helpful attributes for correlation
-                activity.AddTag("link.log_id", log.Id.ToString());
-                activity.AddTag("link.facility_id", log.FacilityId);
-                activity.AddTag("link.correlation_id", log.CorrelationId ?? string.Empty);
-                activity.AddTag("link.report_tracking_id", log.ReportTrackingId ?? string.Empty);
-
-                activity.Start();
-
-                //check if log is flagged as a reference, if yes, check if all non-reference logs for a facility, correlationId, and reportTrackingId are marked as 'Completed'
-                if (log.FhirQuery.Any(x => x.IsReference.HasValue && x.IsReference.Value))
-                {
-                    var nonReferenceLogsCnt = await _dataAcquisitionLogQueries.GetCountOfNonRefLogsIncompleteAsync(
-                        log.FacilityId,
-                        log.CorrelationId,
-                        log.ReportTrackingId,
-                        cancellationToken);
-
-                    if (nonReferenceLogsCnt > 0 && (log.RetryAttempts ?? 0) < 10)
-                    {
-                        log.Status = RequestStatus.Pending;
-                        log.RetryAttempts = (log.RetryAttempts ?? 0) + 1;
-                        await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
-                        {
-                            Id = log.Id,
-                            RetryAttempts = log.RetryAttempts,
-                            CompletionDate = log.CompletionDate,
-                            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
-                            ExecutionDate = log.ExecutionDate,
-                            Notes = log.Notes,
-                            Status = log.Status,
-                        }, cancellationToken);
-                        return;
-                    }
-                    else if ((log.RetryAttempts ?? 0) >= 10)
-                    {
-                        log.Notes ??= new List<string>();
-                        log.Status = RequestStatus.Failed;
-                        log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has exceeded the maximum retry attempts of 10. Not all Non-reference resource queries are completed. Marking as Failed.");
-                        await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
-                        {
-                            Id = log.Id,
-                            RetryAttempts = log.RetryAttempts,
-                            CompletionDate = log.CompletionDate,
-                            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
-                            ExecutionDate = log.ExecutionDate,
-                            Notes = log.Notes,
-                            Status = log.Status,
-                        }, cancellationToken);
-                        return;
-                    }
-                }
-
-                //check if log is not in ready state
-                if (!request.ignoreStatusConstraint && log.Status != RequestStatus.Ready)
-                {
-                    throw new ArgumentException($"Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
-                }
-
                 //check if log has any FhirQuery objects
                 if (log.FhirQuery == null || !log.FhirQuery.Any())
                 {
@@ -429,11 +346,111 @@ public class PatientDataService : IPatientDataService
                     throw new ArgumentException($"Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
                 }
 
+                //check if isCensus, if true, create scope for PatientCensusService and execute RetrieveListData
+                if (log.IsCensus)
+                {
+                    await _patientCensusService.RetrieveListData(log, true, cancellationToken);
+                    return;
+                }
+
+                ActivityContext parentContext = default;
+
+                if (!string.IsNullOrWhiteSpace(log.TraceId))
+                {
+                    var parts = log.TraceId.Split('|');  // Or whatever delimiter you choose
+                    if (parts.Length == 2 &&
+                        parts[0].Length == 32 && IsValidHex(parts[0]) &&
+                        parts[1].Length == 16 && IsValidHex(parts[1]))
+                    {
+                        try
+                        {
+                            var traceId = ActivityTraceId.CreateFromString(parts[0].AsSpan());
+                            var spanId = ActivitySpanId.CreateFromString(parts[1].AsSpan());
+                            var traceFlags = ActivityTraceFlags.Recorded;
+
+                            parentContext = new ActivityContext(traceId, spanId, traceFlags);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to parse combined TraceId/SpanId {TraceId} for log {LogId}", log.TraceId.Sanitize(), log.Id);
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Invalid combined TraceId format (expected 32-16 hex chars) for log {LogId}", log.Id);
+                    }
+                }
+
+
+                using var activity = ServiceActivitySource.Instance.StartActivity(
+                    "PatientDataService.ExecuteLogRequest",
+                    ActivityKind.Internal,
+                    parentContext);
+
+                activity?.SetTag("link.log_id", log.Id.ToString());
+                activity?.SetTag("link.facility_id", log.FacilityId);
+                activity?.SetTag("link.correlation_id", log.CorrelationId ?? string.Empty);
+                activity?.SetTag("link.report_tracking_id", log.ReportTrackingId ?? string.Empty);
+                activity?.SetTag("link.patient_id", log.PatientId?.Sanitize());
+
+                //check if log is flagged as a reference, if yes, check if all non-reference logs for a facility, correlationId, and reportTrackingId are marked as 'Completed'
+                if (log.FhirQuery is not null && log.FhirQuery.Any(x => x.IsReference.HasValue && x.IsReference.Value))
+                {
+                    var nonReferenceLogsCnt = await _dataAcquisitionLogQueries.GetCountOfNonRefLogsIncompleteAsync(
+                        log.FacilityId,
+                        log.CorrelationId,
+                        log.ReportTrackingId,
+                        cancellationToken);
+
+                    if (nonReferenceLogsCnt > 0 && (log.RetryAttempts ?? 0) < DataAcquisitionLog.MaxRetryAttempts)
+                    {
+                        log.Status = RequestStatus.Pending;
+                        log.RetryAttempts = (log.RetryAttempts ?? 0) + 1;
+                        await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                        {
+                            Id = log.Id,
+                            ResourceAcquiredIds = log.ResourceAcquiredIds,
+                            RetryAttempts = log.RetryAttempts,
+                            CompletionDate = log.CompletionDate,
+                            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
+                            ExecutionDate = log.ExecutionDate,
+                            Notes = log.Notes,
+                            Status = log.Status,
+                        }, cancellationToken);
+                        return;
+                    }
+                    else if ((log.RetryAttempts ?? 0) >= DataAcquisitionLog.MaxRetryAttempts)
+                    {
+                        log.Notes ??= new List<string>();
+                        log.Status = RequestStatus.Failed;
+                        log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has exceeded the maximum retry attempts. Not all Non-reference resource queries are completed. Marking as Failed.");
+                        await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                        {
+                            Id = log.Id,
+                            ResourceAcquiredIds = log.ResourceAcquiredIds,
+                            RetryAttempts = log.RetryAttempts,
+                            CompletionDate = log.CompletionDate,
+                            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
+                            ExecutionDate = log.ExecutionDate,
+                            Notes = log.Notes,
+                            Status = log.Status,
+                        }, cancellationToken);
+                        return;
+                    }
+                }
+
+                //check if log is not in ready state
+                if (!request.ignoreStatusConstraint && log.Status != RequestStatus.Ready)
+                {
+                    throw new ArgumentException($"Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
+                }
+
                 //2. set to "Processing"
                 log.Status = RequestStatus.Processing;
                 await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {
                     Id = log.Id,
+                    ResourceAcquiredIds = log.ResourceAcquiredIds,
                     RetryAttempts = log.RetryAttempts,
                     CompletionDate = log.CompletionDate,
                     CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
@@ -455,31 +472,67 @@ public class PatientDataService : IPatientDataService
                         $"No configuration for {log.FacilityId} exists.");
                 }
 
-                List<string> resourceIds = new List<string>();
+                //hashset to hold unique resource ids
+                var resourceIds = new HashSet<string>();
 
-
+                bool skipFetch = false;
+                
                 //4. call api
                 foreach (var fhirQuery in log.FhirQuery.ToList())
                 {
-                    foreach (var resourceType in fhirQuery.ResourceTypes)
+                    if(skipFetch)
                     {
+                        break;
+                    }
 
-                        if (fhirQuery.QueryType == FhirQueryType.Read)
+                    //check if log is search and not census, if true,
+                    if ((fhirQuery.QueryType == FhirQueryType.Search || fhirQuery.QueryType == FhirQueryType.SearchPost)&& !log.IsCensus)
+                    {
+                        var idParams = fhirQuery.QueryParameters.Where(x => x.StartsWith("_id=", StringComparison.InvariantCultureIgnoreCase)).ToList();
+                        if(idParams.Any())
                         {
-                            resourceIds = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType, fhirQueryConfiguration, resourceIds, cancellationToken);
+                            var ids = new List<string>();
+                            foreach(var idParam in idParams)
+                            {
+                                var splitIds = idParam.Substring(4).Trim().Split(',');
+                                ids.AddRange(splitIds);
+                            }
+
+                            //cleanse ids for empty strings in ids
+                            ids = ids.Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
+
+                            if (!ids.Any())
+                            {
+                                log.Notes ??= [];
+                                log.Notes.Add($"[{DateTime.UtcNow}] No IDs found in _id query parameter for {fhirQuery.QueryType} FHIR query. Marking log as Completed.");
+                                skipFetch = true;
+                            }
                         }
-                        else if (fhirQuery.QueryType == FhirQueryType.Search)
+                    }
+
+                    if (!skipFetch)
+                    {
+                        foreach (var resourceType in fhirQuery.ResourceTypes)
                         {
-                            resourceIds = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, resourceIds, resourceType, cancellationToken);
-                        }
-                        else if (fhirQuery.QueryType == FhirQueryType.BulkDataRequest)
-                        {
-                            throw new NotSupportedException("Bulk Data is currently not supported.");
-                        }
-                        else if (fhirQuery.QueryType == FhirQueryType.BulkDataPoll)
-                        {
-                            throw new NotSupportedException("Bulk Data is currently not supported.");
-                        }
+                            if (fhirQuery.QueryType == FhirQueryType.Read)
+                            {
+                                var ids = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType, fhirQueryConfiguration, cancellationToken);
+                                if (ids != null) foreach (var id in ids) resourceIds.Add(id);
+                            }
+                            else if (fhirQuery.QueryType == FhirQueryType.Search || fhirQuery.QueryType == FhirQueryType.SearchPost)
+                            {
+                                var ids = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, resourceType, cancellationToken);
+                                if (ids != null) foreach (var id in ids) resourceIds.Add(id);
+                            }
+                            else if (fhirQuery.QueryType == FhirQueryType.BulkDataRequest)
+                            {
+                                throw new NotSupportedException("Bulk Data is currently not supported.");
+                            }
+                            else if (fhirQuery.QueryType == FhirQueryType.BulkDataPoll)
+                            {
+                                throw new NotSupportedException("Bulk Data is currently not supported.");
+                            }
+                        } 
                     }
                 }
 
@@ -488,12 +541,14 @@ public class PatientDataService : IPatientDataService
 
                 log.CompletionTimeMilliseconds = stopwatch.ElapsedMilliseconds;
                 log.CompletionDate = System.DateTime.UtcNow;
-                log.Status = RequestStatus.Completed;
-                log.ResourceAcquiredIds = resourceIds;
+                log.Status = skipFetch ? RequestStatus.Skipped : RequestStatus.Completed;
+                log.ResourceAcquiredIds = resourceIds.ToList();
+
                 await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {
                     Id = log.Id,
                     RetryAttempts = log.RetryAttempts,
+                    ResourceAcquiredIds = log.ResourceAcquiredIds,
                     CompletionDate = log.CompletionDate,
                     CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
                     ExecutionDate = log.ExecutionDate,
@@ -512,6 +567,7 @@ public class PatientDataService : IPatientDataService
                 await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {
                     Id = log.Id,
+                    ResourceAcquiredIds = log.ResourceAcquiredIds,
                     RetryAttempts = log.RetryAttempts,
                     CompletionDate = log.CompletionDate,
                     CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
@@ -530,6 +586,16 @@ public class PatientDataService : IPatientDataService
         var separatedPatientUrl = fullPatientUrl.Split('/');
         var patientIdPart = string.Join("/", separatedPatientUrl.Skip(Math.Max(0, separatedPatientUrl.Length - 2)));
         return patientIdPart;
+    }
+
+    private static bool IsValidHex(string s)
+    {
+        foreach (char c in s)
+        {
+            if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')))
+                return false;
+        }
+        return true;
     }
 }
 
