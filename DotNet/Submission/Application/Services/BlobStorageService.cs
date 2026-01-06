@@ -1,11 +1,14 @@
 ﻿using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
+using Hl7.Fhir.Model;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Submission.Application.Config;
 using Microsoft.Extensions.Options;
+using System.Text;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Submission.Application.Services
 {
@@ -16,6 +19,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
         private readonly ExternalBlobStorageSettings _externalSettings;
         private readonly BlobContainerClient? _internalContainerClient;
         private readonly BlobContainerClient? _externalContainerClient;
+        private readonly bool _useNdJson;
 
         private static BlobContainerClient? GetContainerClient(BlobStorageSettings settings)
         {
@@ -39,13 +43,15 @@ namespace LantanaGroup.Link.Submission.Application.Services
         public BlobStorageService(
             ILogger<BlobStorageService> logger,
             IOptions<InternalBlobStorageSettings> internalSettings,
-            IOptions<ExternalBlobStorageSettings> externalSettings)
+            IOptions<ExternalBlobStorageSettings> externalSettings,
+            IConfiguration configuration)
         {
             _logger = logger;
             _internalSettings = internalSettings.Value;
             _externalSettings = externalSettings.Value;
             _internalContainerClient = GetContainerClient(_internalSettings);
             _externalContainerClient = GetContainerClient(_externalSettings);
+            _useNdJson = configuration.GetValue<bool>("useNdJson");
         }
 
         private string ChangeBlobRoot(string blobName)
@@ -100,16 +106,58 @@ namespace LantanaGroup.Link.Submission.Application.Services
             {
                 throw new InvalidOperationException("Not configured for external blob storage.");
             }
+
             string blobName;
             if (string.IsNullOrEmpty(value.PayloadUri))
             {
                 string reportName = ReportHelpers.GetReportName(key.ReportScheduleId, key.FacilityId, value.ReportTypes, value.StartDate);
-                string bundleName = value.PayloadType switch
+                string bundleName;
+
+                if (_useNdJson)
                 {
-                    PayloadType.MeasureReportSubmissionEntry => $"patient-{value.PatientId}.ndjson",
-                    PayloadType.ReportSchedule => "manifest.ndjson",
-                    _ => $"{Guid.NewGuid()}.ndjson"
-                };
+                    bundleName = value.PayloadType switch
+                    {
+                        PayloadType.MeasureReportSubmissionEntry => $"patient-{value.PatientId}.ndjson",
+                        PayloadType.ReportSchedule => "manifest.ndjson",
+                        _ => $"{Guid.NewGuid()}.ndjson"
+                    }; 
+                }
+                else
+                {
+                    // For the incoming ndjson file, take each fhir resource and wrap it in a bundle collection and save as json with same naming convention
+
+                    // Convert byte array to string
+                    var ndjsonContent = Encoding.UTF8.GetString(content);
+
+                    // Parse the ndjson and wrap each resource in a Bundle
+                    var bundle = new Bundle
+                    {
+                        Type = Bundle.BundleType.Collection,
+                        Entry = new List<Bundle.EntryComponent>()
+                    };
+
+                    // Split by newlines and parse each FHIR resource
+                    var lines = ndjsonContent.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var line in lines)
+                    {
+                        if (!string.IsNullOrWhiteSpace(line))
+                        {
+                            var resource = JsonConvert.DeserializeObject<Resource>(line);
+                            bundle.Entry.Add(new Bundle.EntryComponent { Resource = resource });
+                        }
+                    }
+
+                    // Serialize the bundle to JSON and convert back to byte array
+                    var bundleJson = JsonConvert.SerializeObject(bundle, Formatting.Indented);
+                    content = Encoding.UTF8.GetBytes(bundleJson);
+
+                    bundleName = value.PayloadType switch
+                    {
+                        PayloadType.MeasureReportSubmissionEntry => $"patient-{value.PatientId}.json",
+                        PayloadType.ReportSchedule => "manifest.json",
+                        _ => $"{Guid.NewGuid()}.json"
+                    };
+                }
                 blobName = GetBlobName(_externalSettings.BlobRoot, reportName, bundleName);
             }
             else
