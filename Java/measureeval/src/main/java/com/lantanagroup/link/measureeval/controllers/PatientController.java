@@ -13,7 +13,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/measureeval/patient")
-@PreAuthorize("hasRole('LinkUser')")
+@PreAuthorize("hasAnyRole('LinkUser','LinkAdministrator')")
 public class PatientController {
     private final PatientReportingEvaluationStatusRepository patientReportingEvaluationStatusRepository;
     private final PatientStatusBundler patientStatusBundler;
