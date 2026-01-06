@@ -16,6 +16,14 @@ using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
 
+var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddStandardEnvironmentConfiguration();
+
+RegisterServices(builder);
+var app = builder.Build();
+SetupMiddleware(app);
+app.Run();
+
 static void RegisterServices(WebApplicationBuilder builder)
 {
     // load external configuration source (if specified)
@@ -161,10 +169,3 @@ static void SetupMiddleware(WebApplication app)
     
     app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "terminology");
 }
-
-var builder = WebApplication.CreateBuilder(args);
-
-RegisterServices(builder);
-var app = builder.Build();
-SetupMiddleware(app);
-app.Run();
