@@ -342,7 +342,6 @@ stages:
 - stage: Apply_TEST_Update_SQL_DBs
   trigger: manual
   displayName: Apply_TEST_Update_SQL_DBs
-  # dependsOn: Build
   condition: always()
 
   # Requires Windows runner for SQL
