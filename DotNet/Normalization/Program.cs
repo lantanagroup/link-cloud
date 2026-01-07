@@ -16,6 +16,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Factory;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
@@ -34,16 +35,15 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.OpenApi.Models;
 using Quartz;
-using Quartz.Impl;
 using Quartz.Spi;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
-using System.Text.Json;
 using AuditEventMessage = LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddStandardEnvironmentConfiguration();
 
 RegisterServices(builder);
 var app = builder.Build();
@@ -55,33 +55,8 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
-    //load external configuration source if specified
-    var externalConfigurationSource = builder.Configuration.GetSection(NormalizationConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
-
-    if (!string.IsNullOrEmpty(externalConfigurationSource))
-    {
-        switch (externalConfigurationSource)
-        {
-            case ("AzureAppConfiguration"):
-                builder.Configuration.AddAzureAppConfiguration(options =>
-                {
-                    options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
-                         // Load configuration values with no label
-                         .Select("*", LabelFilter.Null)
-                         // Load configuration values for service name
-                         .Select("*", NormalizationConstants.ServiceName)
-                         // Load configuration values for service name and environment
-                         .Select("*", NormalizationConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
-
-                    options.ConfigureKeyVault(kv =>
-                    {
-                        kv.SetCredential(new DefaultAzureCredential());
-                    });
-
-                });
-                break;
-        }
-    }
+    // load external configuration source (if specified)
+    builder.AddExternalConfiguration(NormalizationConstants.ServiceName);
 
     IConfigurationSection serviceInformationSection = builder.Configuration.GetRequiredSection(NormalizationConstants.AppSettingsSectionNames.ServiceInformation);
     builder.Services.Configure<ServiceInformation>(serviceInformationSection);
@@ -180,8 +155,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IEntityRepository<VendorVersion>, VendorVersionRepository>();
     builder.Services.AddScoped<IEntityRepository<VendorVersionOperationPreset>, VendorVersionOperationPresetRepository>();
 
-    builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
-    builder.Services.AddTransient<IBaseEntityRepository<RetryEntity>, NormalizationEntityRepository<RetryEntity>>();
+    builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();  
 
     // Logging using Serilog
     builder.Logging.AddSerilog();
@@ -213,8 +187,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
 
-    builder.Services.AddTransient<IJobFactory, JobFactory>();
-    builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
+    builder.Services.AddTransient<IJobFactory, QuartzJobFactory>();
+    builder.Services.AddSingleton<InMemorySchedulerFactory>();
+    builder.Services.AddKeyedSingleton<ISchedulerFactory>(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
+    builder.Services.AddSingleton<ISchedulerFactory>(provider => provider.GetRequiredService<InMemorySchedulerFactory>());
     builder.Services.AddTransient<RetryJob>();
 
     builder.Services.AddSingleton<CopyPropertyOperationService>();

@@ -165,7 +165,7 @@ namespace IntegrationTests.Tenant
             await _manager.CreateAsync(facility1, CancellationToken.None);
             await _manager.CreateAsync(facility2, CancellationToken.None);
 
-            var paged = await _queries.SearchAsync(new FacilitySearchModel(), null, null, 100, 1, CancellationToken.None);
+            var paged = await _queries.PagedSearchAsync(new FacilitySearchModel(), pageSize: 100,  pageNumber: 1,  cancellationToken: CancellationToken.None);
             var allFacilities = paged.Records;
 
             Assert.True(allFacilities.Count >= 2);

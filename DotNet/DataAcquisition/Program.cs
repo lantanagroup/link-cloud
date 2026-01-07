@@ -1,4 +1,3 @@
-using DataAcquisition.Domain.Application.Serializers;
 using HealthChecks.UI.Client;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
@@ -27,6 +26,7 @@ using System.Reflection;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddStandardEnvironmentConfiguration();
 
 RegisterServices(builder);
 var app = builder.Build();
@@ -42,7 +42,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.RegisterAll(DataAcquisitionConstants.ServiceName, true);
 
-    builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
+    builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
 
     builder.RegisterQuartzAcquisitionJob(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection));
 
@@ -56,9 +56,8 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-        options.JsonSerializerOptions.Converters.Add(new QueryPlanConverter());
-        options.JsonSerializerOptions.Converters.Add(new QueryPlanPostModelConverter());
-        options.JsonSerializerOptions.Converters.Add(new QueryPlanPutModelConverter());
+        options.JsonSerializerOptions.Converters.Add(new QueryConfigConverter());
+        options.JsonSerializerOptions.Converters.Add(new ParameterConverter());
         options.JsonSerializerOptions.Converters.Add(new TimeSpanConverter());
         options.JsonSerializerOptions.ForFhir(ModelInfo.ModelInspector);
     }); 

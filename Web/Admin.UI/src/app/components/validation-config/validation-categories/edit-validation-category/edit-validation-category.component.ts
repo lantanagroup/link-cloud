@@ -4,7 +4,6 @@ import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } 
 import { IValidationIssueCategory, IValidationRule, IValidationRuleSet } from 'src/app/components/tenant/facility-view/report-view.interface';
 
 import { CommonModule } from '@angular/common';
-import { LinkAdminSubnavBarComponent } from 'src/app/components/core/link-admin-subnav-bar/link-admin-subnav-bar.component';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -27,7 +26,6 @@ import { VdIconComponent } from "../../../core/vd-icon/vd-icon.component";
   standalone: true,
   imports: [
     CommonModule,
-    LinkAdminSubnavBarComponent,
     FormsModule,
     ReactiveFormsModule,
     MatCardModule,

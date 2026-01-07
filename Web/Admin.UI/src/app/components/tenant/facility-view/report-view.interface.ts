@@ -12,6 +12,7 @@ export interface IReportListSummary {
   censusCount: number;
   initialPopulationCount: number;
   reportMetrics: IScheduledReportMetrics;
+  createdDate: Date;
 }
 
 export interface ICensusCount {
@@ -38,6 +39,7 @@ export interface IMeasureReportSummary {
   validationStatus: string;
   resourceCount: number;
   resourceCountSummary: Record<string, number>;
+  reportScheduleId : string
 }
 
 export class IPagedMeasureReportSummary {

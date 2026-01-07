@@ -11,5 +11,7 @@
         public List<string> UserClaims { get; set; } = [];
         public List<string> RoleClaims { get; set; } = [];
         public List<string> Roles { get; set; } = [];
+        public bool IsDeleted { get; set; } = false;
+        public bool IsActive { get; set; } = false;
     }
 }

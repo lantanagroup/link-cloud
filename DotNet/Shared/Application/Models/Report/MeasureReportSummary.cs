@@ -12,6 +12,7 @@ public class MeasureReportSummary
     public string Status { get; set; } = string.Empty;
     public string ValidationStatus { get; set; } = string.Empty;
     public int ResourceCount { get; set; }
+    public required string ReportScheduleId { get; set; }
     public Dictionary<string, int> ResourceCountSummary { get; set; } = new();
 }
 

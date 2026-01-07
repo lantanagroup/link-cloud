@@ -1,151 +1,358 @@
-﻿using Hl7.Fhir.Model;
+﻿using Confluent.Kafka;
+using DataAcquisition.Domain.Application.Models;
+using Hl7.Fhir.Model;
+using Hl7.Fhir.Utility;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
-using Microsoft.Extensions.Logging;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
-using LantanaGroup.Link.DataAcquisition.Domain.Services.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.DataAcq;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Utilities;
+using Microsoft.Extensions.Logging;
+using System.Diagnostics;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Services.Security;
+using Task = System.Threading.Tasks.Task;
 
-namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
+namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+public interface IPatientCensusService
 {
-    public interface IPatientCensusService
+    Task CreateLog(string facilityId, CancellationToken cancellationToken);
+    Task<List<PatientListItem>> RetrieveListData(DataAcquisitionLogModel log, bool triggerMessage, CancellationToken cancellationToken);
+}
+
+public class PatientCensusService : IPatientCensusService
+{
+    private readonly ILogger<PatientCensusService> _logger;
+    private readonly IAuthenticationRetrievalService _authRetrievalService;
+    private readonly IFhirQueryListConfigurationQueries _fhirQueryListConfigurationQueries;
+    private readonly IReadFhirCommand _readFhirCommand;
+    private readonly IFhirQueryConfigurationQueries _fhirQueryConfigurationQueries;
+    private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
+    private readonly IProducer<string, PatientListMessage> _kafkaProducer;
+
+    public PatientCensusService(
+        ILogger<PatientCensusService> logger,
+        IAuthenticationRetrievalService authRetrievalService,
+        IFhirQueryListConfigurationQueries fhirQueryListConfigurationQueries,
+        IFhirQueryConfigurationQueries fhirQueryConfigurationQueries,
+        IReadFhirCommand readFhirCommand,
+        IDataAcquisitionLogManager dataAcquisitionLogManager,
+        IProducer<string, PatientListMessage> kafkaProducer)
     {
-        Task<PatientIDsAcquired> Get(string facilityId, CancellationToken cancellationToken);
+        _logger = logger;
+        _authRetrievalService = authRetrievalService;
+        _readFhirCommand = readFhirCommand;
+        _dataAcquisitionLogManager = dataAcquisitionLogManager;
+
+        _fhirQueryListConfigurationQueries = fhirQueryListConfigurationQueries;
+        _fhirQueryConfigurationQueries = fhirQueryConfigurationQueries;
+        _kafkaProducer = kafkaProducer;
     }
 
-    public class PatientCensusService : IPatientCensusService
+    public async Task CreateLog(string facilityId, CancellationToken cancellationToken)
     {
-        private readonly ILogger<PatientCensusService> _logger;
-        private readonly IAuthenticationRetrievalService _authRetrievalService;
-        private readonly IFhirQueryListConfigurationManager _fhirQueryListConfigurationManager;
-        private readonly IFhirApiService _fhirApiManager;
-        private readonly IReadFhirCommand _readFhirCommand;
-        private readonly IFhirQueryConfigurationManager _fhirQueryConfigurationManager;
-        private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
+        using var activity = Activity.Current?.Source.StartActivity();
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+    
+        var facilityConfig = await _fhirQueryListConfigurationQueries.GetByFacilityIdAsync(facilityId, cancellationToken);
 
-        public PatientCensusService(
-            ILogger<PatientCensusService> logger,
-            IAuthenticationRetrievalService authRetrievalService,
-            IFhirQueryListConfigurationManager fhirQueryListConfigurationManager,
-            IFhirApiService fhirApiManager
-,
-            IReadFhirCommand readFhirCommand,
-            IFhirQueryConfigurationManager fhirQueryConfigurationManager,
-            IDataAcquisitionLogManager dataAcquisitionLogManager)
+        if (facilityConfig == null)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _authRetrievalService = authRetrievalService ?? throw new ArgumentNullException(nameof(authRetrievalService));
-            _fhirQueryListConfigurationManager = fhirQueryListConfigurationManager ??
-                                                 throw new ArgumentNullException(nameof(fhirQueryListConfigurationManager));
-            _fhirApiManager = fhirApiManager ?? throw new ArgumentNullException(nameof(fhirApiManager));
-            _readFhirCommand = readFhirCommand ?? throw new ArgumentNullException(nameof(readFhirCommand));
-            _fhirQueryConfigurationManager = fhirQueryConfigurationManager ??
-                                                 throw new ArgumentNullException(nameof(fhirQueryConfigurationManager));
-            _dataAcquisitionLogManager = dataAcquisitionLogManager ??
-                                                 throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
+            activity?.SetStatus(ActivityStatusCode.Error, "Missing FHIR list configuration");
+            throw new Exception(
+                $"Missing census configuration for facility {facilityId}. Unable to proceed with request.");
         }
 
-        public async Task<PatientIDsAcquired> Get(string facilityId, CancellationToken cancellationToken)
-        {
-            PatientIDsAcquired result = new PatientIDsAcquired();
-            var facilityConfig = await _fhirQueryListConfigurationManager.GetAsync(facilityId, cancellationToken);
+        var fhirQueryConfig = await _fhirQueryConfigurationQueries.GetByFacilityIdAsync(facilityConfig.FacilityId, cancellationToken);
 
+        if (fhirQueryConfig == null)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "Missing FHIR query configuration");
+            throw new Exception(
+                $"Missing FHIR query configuration for facility {facilityId}. Unable to proceed with request.");
+        }
+
+        try
+        {
+            var log = new CreateDataAcquisitionLogModel
+            {
+                FacilityId = facilityId,
+                Status = RequestStatus.Pending,
+                QueryType = FhirQueryType.Read,
+                ExecutionDate = DateTime.UtcNow,
+                Priority = AcquisitionPriority.Normal,
+                IsCensus = true,
+                ScheduledReport = new ScheduledReport()
+            };
+
+            facilityConfig.EHRPatientLists.ForEach(x =>
+            {
+                if (x.TimeFrame is null)
+                {
+                    activity?.SetStatus(ActivityStatusCode.Error, "Timeframe is null for list");
+                    activity?.AddTag("fhir.list.id", x.FhirId);
+                    activity?.AddTag("fhir.list.internal.id", x.InternalId );
+                    _logger.LogError("TimeFrame is null for list {listId} for facility {facilityId}.", x.FhirId, facilityId);
+                }
+
+                if (x.Status is null)
+                {
+                    activity?.SetStatus(ActivityStatusCode.Error, "Status is null for list");
+                    activity?.AddTag("fhir.list.id", x.FhirId);
+                    activity?.AddTag("fhir.list.internal.id", x.InternalId );
+                    _logger.LogError("Status is null for list {listId} for facility {facilityId}.", x.FhirId, facilityId);
+                }
+
+                log.FhirQuery.Add(
+                    new CreateFhirQueryModel
+                    {
+                        FacilityId = facilityId,
+                        QueryType = FhirQueryType.Read,
+                        ResourceTypes = [ResourceType.List],
+                        IsReference = false,
+                        CensusTimeFrame = x.TimeFrame ?? throw new ArgumentNullException(nameof(x.TimeFrame)),
+                        CensusPatientStatus = x.Status ?? throw new ArgumentNullException(nameof(x.Status)),
+                        CensusListId = x.FhirId
+                    });
+            });
+
+            await _dataAcquisitionLogManager.CreateAsync(log, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.AddTag(DiagnosticNames.StackTrace, ex.StackTrace);
+            _logger.LogError(ex, "An error occurred while attempting to create the log entry. FacilityId: {facilityId}", facilityId);
+            throw;
+        }
+    }
+
+    public async Task<List<PatientListItem>> RetrieveListData(DataAcquisitionLogModel log, bool triggerMessage, CancellationToken cancellationToken)
+    {
+        List<PatientListItem> results = new List<PatientListItem>();
+
+        if (log == null)
+        {
+            throw new ArgumentNullException(nameof(log), "Data acquisition log cannot be null.");
+        }
+
+        if (log.FhirQuery == null || log.FhirQuery.Count != 6)
+        {
+            throw new ArgumentException("Data acquisition log must contain exactly 6 FHIR query.", nameof(log));
+        }
+
+        List<string> notes = new List<string>();
+        bool isFailed = false;
+
+        Stopwatch stopwatch = new Stopwatch();
+        stopwatch.Start();
+
+        foreach (var query in log.FhirQuery)
+        {
+            if (query.QueryType != FhirQueryType.Read)
+            {
+                notes.Add($"Query type {query.QueryType} is not supported. Only Read queries are allowed.");
+                continue;
+            }
+
+            if (query.ResourceTypes == null || !query.ResourceTypes.Contains(ResourceType.List))
+            {
+                notes.Add($"Resource type {query.ResourceTypes} is not supported. Only List resource type is allowed.");
+                continue;
+            }
+
+            if (query.CensusPatientStatus == null)
+            {
+                notes.Add($"CensusPatientStatus is null for query with id {query.Id}. Unable to proceed with request.");
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(query.CensusListId))
+            {
+                notes.Add($"CensusListId is null or empty for query with id {query.Id}. Unable to proceed with request.");
+                continue;
+            }
+
+            if (query.CensusTimeFrame == null)
+            {
+                notes.Add($"CensusTimeFrame is null for query with id {query.Id}. Unable to proceed with request.");
+                continue;
+            }
+
+            var facilityConfig = await _fhirQueryListConfigurationQueries.GetByFacilityIdAsync(query.FacilityId, cancellationToken);
             if (facilityConfig == null)
             {
                 throw new Exception(
-                    $"Missing census configuration for facility {facilityId}. Unable to proceed with request.");
+                    $"Missing census configuration for facility {query.FacilityId}. Unable to proceed with request.");
             }
-
 
             (bool? isQueryParam, object? authHeader) authHeader = (false, null);
-
             if (facilityConfig.Authentication != null)
             {
-                authHeader = await BuildeAuthHeader(facilityId, facilityConfig.Authentication);
+                authHeader = await BuildeAuthHeader(query.FacilityId, facilityConfig.Authentication);
             }
 
-            var fhirQueryConfig = await _fhirQueryConfigurationManager.GetAsync(facilityConfig.FacilityId);
-
+            var fhirQueryConfig = await _fhirQueryConfigurationQueries.GetByFacilityIdAsync(facilityConfig.FacilityId);
             if (fhirQueryConfig == null)
             {
                 throw new Exception(
-                    $"Missing FHIR query configuration for facility {facilityId}. Unable to proceed with request.");
+                    $"Missing FHIR query configuration for facility {query.FacilityId}. Unable to proceed with request.");
             }
 
-            List<List> resultLists = new List<List>();
-            foreach (var list in facilityConfig.EHRPatientLists)
+            try
             {
-                foreach (var listId in list.ListIds)
+                var resultList = await _readFhirCommand.ExecuteAsync(
+                    new ReadFhirCommandRequest(
+                        query.FacilityId,
+                        ResourceType.List,
+                        query.CensusListId,
+                        facilityConfig.FhirBaseServerUrl,
+                        fhirQueryConfig),
+                    cancellationToken);
+
+                //check if the resultList is null or OperationOutcome
+                if (resultList == null || resultList is OperationOutcome)
                 {
-                    try
-                    {
-                        var log = new DataAcquisitionLog
-                        {
-                            FacilityId = facilityId,
-                            Status = RequestStatus.Pending,
-                            QueryType = FhirQueryType.Read,
-                            TimeZone = fhirQueryConfig.TimeZone,
-                            ExecutionDate = DateTime.UtcNow,
-                            Priority = AcquisitionPriority.Normal,
-                            ResourceId = listId,
-                            FhirQuery = new List<FhirQuery> {
-                                new FhirQuery
-                                {
-                                    FacilityId = facilityId,
-                                    QueryType = FhirQueryType.Read,
-                                    ResourceTypes = new List<ResourceType> { ResourceType.List },
-                                }
-                            },
-                            IsCensus = true,
-
-                        };
-                        resultLists.Add((List)await _readFhirCommand.ExecuteAsync(
-                            new ReadFhirCommandRequest(
-                                facilityId,
-                                ResourceType.List,
-                                listId,
-                                facilityConfig.FhirBaseServerUrl,
-                                fhirQueryConfig), cancellationToken));
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error retrieving patient list id {ListId} for facility {FacilityId} with base url of {BaseUrl}.", listId.Sanitize(), facilityConfig.FacilityId.Sanitize(), facilityConfig.FhirBaseServerUrl.Sanitize());
-                        throw new FhirApiFetchFailureException($"Error retrieving patient list id {listId} for facility {facilityConfig.FacilityId}.", ex);
-                    }
+                    throw new FhirApiFetchFailureException($"Error retrieving patient list id {query.CensusListId} for facility {facilityConfig.FacilityId}.");
                 }
+
+                var fhirList = resultList as List;
+                results.Add(new PatientListItem
+                {
+                    ListType = ConvertToListType(query.CensusPatientStatus.Value),
+                    TimeFrame = ConvertToTimeFrame(query.CensusTimeFrame.Value),
+                    PatientIds = fhirList.Entry.Select(x => x.Item?.ReferenceElement.Value.SplitReference().Trim()).ToList() ?? [],
+                });
+                
             }
-
-            var finalList = new List();
-            resultLists.ForEach(x =>
+            catch (TimeoutException timeoutEx)
             {
-                finalList.Entry.AddRange(x.Entry);
-            });
-
-            result.PatientIds = finalList;
-
-            return result;
+                isFailed = true;
+                notes.Add($"Timeout while retrieving patient list for facility {query.FacilityId} with list id {query.CensusListId}.");
+            }
+            catch (Exception ex)
+            {
+                isFailed = true;
+                notes.Add($"Error retrieving patient list for facility {query.FacilityId} with list id {query.CensusListId}: {ex.Message}");
+            }
         }
 
-        private async Task<(bool isQueryParam, object? authHeader)> BuildeAuthHeader(string facilityId, AuthenticationConfiguration auth)
+        if (isFailed)
         {
-            (bool isQueryParam, object authHeader) authHeader = (false, null);
-            IAuth authService = _authRetrievalService.GetAuthenticationService(auth);
-
-            if (authService == null)
+            if (log.Notes == null)
             {
-                return (false, null);
+                log.Notes = new List<string>();
+            }
+            log.Notes.Add($"Failed to retrieve patient list for facility {log.FacilityId}. \n" + string.Join(", ", notes));
+            log.Status = RequestStatus.Failed;
+            log.Notes.AddRange(notes);
+        }
+        else
+        {
+            log.Status = RequestStatus.Completed;
+        }
+
+        stopwatch.Stop();
+
+        log.CompletionTimeMilliseconds = stopwatch.ElapsedMilliseconds;
+        log.CompletionDate = System.DateTime.UtcNow;
+        log.ResourceAcquiredIds = results.SelectMany(x => x.PatientIds).ToList();
+
+        // Ensure that the result of UpdateAsync is not null before assigning it to the log variable
+        var updatedLog = await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+        {
+            Id = log.Id,
+            ResourceAcquiredIds = log.ResourceAcquiredIds,
+            RetryAttempts = log.RetryAttempts,
+            CompletionDate = log.CompletionDate,
+            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+            ExecutionDate = log.ExecutionDate,
+            Notes = log.Notes,
+            Status = log.Status,
+            TraceId = log.TraceId,  
+        }, cancellationToken);
+
+        if (updatedLog == null)
+        {
+            throw new InvalidOperationException("Failed to update the DataAcquisitionLog. The returned value is null.");
+        }
+
+        log = updatedLog;
+
+        if (triggerMessage)
+        {
+            if (isFailed)
+            {
+                throw new Exception($"Failed to retrieve patient list for facility {log.FacilityId}. " + string.Join(", ", notes));
             }
 
-            authHeader = await authService.SetAuthentication(facilityId, auth);
-            return authHeader;
+            var produceMessage = new Message<string, PatientListMessage>
+            {
+                Key = log.FacilityId,
+                Value = new PatientListMessage
+                {
+                    PatientLists = results,
+                    ReportTrackingId = log.ReportTrackingId
+                },
+            };
+
+            try
+            {
+                await _kafkaProducer.ProduceAsync(KafkaTopic.PatientListsAcquired.ToString(), produceMessage, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while producing the message to Kafka for facility {facilityId} and log id {logid}.", log.FacilityId, log.Id);
+                throw;
+            }
         }
+
+        return results;
+    }
+
+    private async Task<(bool isQueryParam, object? authHeader)> BuildeAuthHeader(string facilityId, AuthenticationConfigurationModel auth)
+    {
+        (bool isQueryParam, object authHeader) authHeader = (false, null);
+        IAuth authService = _authRetrievalService.GetAuthenticationService(auth);
+
+        if (authService == null)
+        {
+            return (false, null);
+        }
+
+        authHeader = await authService.SetAuthentication(facilityId, auth);
+        return authHeader;
+    }
+
+    private Shared.Application.Models.DataAcq.ListType ConvertToListType(Infrastructure.Models.Enums.ListType listType)
+    {
+        return listType switch
+        {
+            Infrastructure.Models.Enums.ListType.Admit => Shared.Application.Models.DataAcq.ListType.Admit,
+            Infrastructure.Models.Enums.ListType.Discharge => Shared.Application.Models.DataAcq.ListType.Discharge,
+            _ => throw new ArgumentOutOfRangeException(nameof(listType), $"Unsupported ListType value: {listType}"),
+        };
+    }
+
+    private Shared.Application.Models.DataAcq.TimeFrame ConvertToTimeFrame(Infrastructure.Models.Enums.TimeFrame timeFrame)
+    {
+        return timeFrame switch
+        {
+            Infrastructure.Models.Enums.TimeFrame.LessThan24Hours => Shared.Application.Models.DataAcq.TimeFrame.LessThan24Hours,
+            Infrastructure.Models.Enums.TimeFrame.Between24To48Hours => Shared.Application.Models.DataAcq.TimeFrame.Between24To48Hours,
+            Infrastructure.Models.Enums.TimeFrame.MoreThan48Hours => Shared.Application.Models.DataAcq.TimeFrame.MoreThan48Hours,
+            _ => throw new ArgumentOutOfRangeException(nameof(timeFrame), $"Unsupported TimeFrame value: {timeFrame}"),
+        };
     }
 }

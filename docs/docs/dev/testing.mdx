@@ -104,7 +104,7 @@ Automated report scheduling can be configured through the Tenant API. However, a
 
 Because the report generation process runs immediately after the set `EndDate`, allocate enough time (a few minutes) to perform the subsequent steps.
 
-To manually admit patients, produce the following into the `PatientIDsAcquired` topic in Kafka UI:
+To manually admit patients, produce the following into the `PatientListsAcquired` topic in Kafka UI:
 > [!NOTE]
 > The patients included in the event below are examples only. Add patient identifiers that exist in your EHR endpoint.
 
@@ -116,29 +116,50 @@ Test-Hospital
 **Value:**
 ```
 {
-  "PatientIds": {
-  "resourceType": "List",
-  "entry": [
-    {
-      "item": {
-      "reference": "Patient/hJOGSZyFOTIiwEBWUU6p9NKxflMTOLCRRpLbAkfPrfqee"
-      }
-    },
-    {
-      "item": {
-      "reference": "Patient/0VmZaB90pc5yRSefoK6sW9C9WVOvPARAgquBFNtGr6LXk"
-      }
-    },
-    {
-      "item": {
-      "reference": "Patient/9mDh8TdqYuZP4JZkjbyDkw1SRwOG6TOhCY8GfClh5QG2m"
-      }
-    }]
-  }
+	"ReportTrackingId": null,
+	"PatientLists": [
+		{
+			"ListType": "Discharge",
+			"TimeFrame": "Between24To48Hours",
+			"PatientIds": []
+		},
+		{
+			"ListType": "Admit",
+			"TimeFrame": "LessThan24Hours",
+			"PatientIds": [
+				"hJOGSZyFOTIiwEBWUU6p9NKxflMTOLCRRpLbAkfPrfqee",
+				"0VmZaB90pc5yRSefoK6sW9C9WVOvPARAgquBFNtGr6LXk"
+			]
+		},
+		{
+			"ListType": "Discharge",
+			"TimeFrame": "MoreThan48Hours",
+			"PatientIds": []
+		},
+		{
+			"ListType": "Admit",
+			"TimeFrame": "Between24To48Hours",
+			"PatientIds": [
+				"9mDh8TdqYuZP4JZkjbyDkw1SRwOG6TOhCY8GfClh5QG2m"
+			]
+		},
+		{
+			"ListType": "Admit",
+			"TimeFrame": "MoreThan48Hours",
+			"PatientIds": [
+			]
+		},
+		{
+			"ListType": "Discharge",
+			"TimeFrame": "LessThan24Hours",
+			"PatientIds": [
+			]
+		}
+	]
 }
 ```
 
-To discharge a patient and begin their reporting workflow, produce the same `PatientIDsAcquired` event without the discharged patient in the list. The example below will discharge `Patient/0VmZaB90pc5yRSefoK6sW9C9WVOvPARAgquBFNtGr6LXk`:
+To discharge a patient and begin their reporting workflow, produce the same `PatientListsAcquired` event without the discharged patient in the list. The example below will discharge `Patient/0VmZaB90pc5yRSefoK6sW9C9WVOvPARAgquBFNtGr6LXk`:
 
 **Key:**
 ```
@@ -148,20 +169,46 @@ Test-Hospital
 **Value:**
 ```
 {
-  "PatientIds": {
-  "resourceType": "List",
-    "entry": [
-      {
-        "item": {
-        "reference": "Patient/hJOGSZyFOTIiwEBWUU6p9NKxflMTOLCRRpLbAkfPrfqee"
-        }
-      },
-      {
-        "item": {
-        "reference": "Patient/9mDh8TdqYuZP4JZkjbyDkw1SRwOG6TOhCY8GfClh5QG2m"
-        }
-      }]
-  }
+	"ReportTrackingId": null,
+	"PatientLists": [
+		{
+			"ListType": "Discharge",
+			"TimeFrame": "Between24To48Hours",
+			"PatientIds": []
+		},
+		{
+			"ListType": "Admit",
+			"TimeFrame": "LessThan24Hours",
+			"PatientIds": [
+				"hJOGSZyFOTIiwEBWUU6p9NKxflMTOLCRRpLbAkfPrfqee"
+			]
+		},
+		{
+			"ListType": "Discharge",
+			"TimeFrame": "MoreThan48Hours",
+			"PatientIds": []
+		},
+		{
+			"ListType": "Admit",
+			"TimeFrame": "Between24To48Hours",
+			"PatientIds": [
+				"9mDh8TdqYuZP4JZkjbyDkw1SRwOG6TOhCY8GfClh5QG2m"
+			]
+		},
+		{
+			"ListType": "Admit",
+			"TimeFrame": "MoreThan48Hours",
+			"PatientIds": [
+			]
+		},
+		{
+			"ListType": "Discharge",
+			"TimeFrame": "LessThan24Hours",
+			"PatientIds": [
+				"0VmZaB90pc5yRSefoK6sW9C9WVOvPARAgquBFNtGr6LXk"
+			]
+		}
+	]
 }
 ```
 
@@ -207,8 +254,8 @@ sequenceDiagram
     Census->>Kafka: Produce - CensusAcquisitionScheduled()
     Kafka->>Acquisition: Consume - CensusAcquisitionScheduled()
     Acquisition->>EHR: Query STU3 Patient List()
-    Acquisition-->>Kafka: Produce - PatientIDsAcquired()
-    Kafka->>Census: Consume - PatientIDsAcquired()
+    Acquisition-->>Kafka: Produce - PatientListsAcquired()
+    Kafka->>Census: Consume - PatientListsAcquired()
     Census->>Census: Persist and admit patient ID’s from the consumed list()
     Census->>Census: Discharge patients who were admitted and are no longer on the consumed list()
     Census-->>Kafka: Produce - PatientEvent(discharge)
@@ -218,11 +265,11 @@ sequenceDiagram
     Acquisition->>Acquisition: Schedules a lag time before querying for patient resources()
 ```
 
-During the reporting period, the Census service is configured to continually request a new list of patients admitted in a facility by producing the `CensusAcquisitionScheduled` event. The Data Acquisition service consumed this event and queries the facility's List endpoint. After receiving a response back from the EHR endpoints, the Data Acquisition service then produces a `PatientIDsAcquired` event that contains a list of all patients that are currently admitted in the facility.
+During the reporting period, the Census service is configured to continually request a new list of patients admitted in a facility by producing the `CensusAcquisitionScheduled` event. The Data Acquisition service consumed this event and queries the facility's List endpoint. After receiving a response back from the EHR endpoints, the Data Acquisition service then produces a `PatientListsAcquired` event that contains a list of all patients that are currently admitted in the facility.
 
-The Census service consumes the `PatientIDsAcquired` event and applies updates in the database for patients have been admitted or discharged.
+The Census service consumes the `PatientListsAcquired` event and applies updates in the database for patients have been admitted or discharged.
 
-> Note: The Census service treats any patient in the PatientIDsAcquired list as an admitted patient. If the Census service has a patient marked as admitted in the database, but the patient is no longer present on the consumed list, it treats the patient as a discharge.
+> Note: The Census service treats any patient in the PatientListsAcquired list as an admitted patient. If the Census service has a patient marked as admitted in the database, but the patient is no longer present on the consumed list, it treats the patient as a discharge.
 
 A `PatientEvent` Kafka message is produced for each patient that has been discharged.
 

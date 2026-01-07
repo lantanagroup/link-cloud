@@ -1,5 +1,5 @@
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import {
     AbstractControl,
   FormControl,
@@ -49,7 +49,6 @@ export function facilityIdConditionalValidator(allowAlphaNumeric: boolean): Vali
   selector: 'app-facility-config-form',
   standalone: true,
   imports: [
-    CommonModule,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -63,7 +62,6 @@ export function facilityIdConditionalValidator(allowAlphaNumeric: boolean): Vali
     FormsModule,
     ReactiveFormsModule,
     MatFormFieldModule,
-    CommonModule,
     MatSnackBarModule,
     FormsModule,
     ReactiveFormsModule,
@@ -76,8 +74,8 @@ export function facilityIdConditionalValidator(allowAlphaNumeric: boolean): Vali
     MatButtonModule,
     MatIconModule,
     MatExpansionModule,
-    MatProgressSpinnerModule,
-  ],
+    MatProgressSpinnerModule
+],
   templateUrl: './facility-config-form.component.html',
   styleUrls: ['./facility-config-form.component.scss']
 })
@@ -116,7 +114,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
   }
 
   async ngOnInit(): Promise<void> {
-    
+
 
     this.appConfig = await this.appConfigService.loadConfig();
 
@@ -169,8 +167,10 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
       this.formMode = FormMode.Create;
     }
 
+    // toggle view
+    this.toggleViewOnly(this.viewOnly);
+
     this.facilityConfigForm.valueChanges.subscribe(() => {
-      this.facilityConfigForm.updateValueAndValidity();
       this.formValueChanged.emit(this.facilityConfigForm.invalid);
     });
   }
@@ -195,6 +195,28 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
 
       this.dailyReportsControl.setValue(this.item.scheduledReports.daily);
       this.dailyReportsControl.updateValueAndValidity();
+
+      // toggle view
+      this.toggleViewOnly(this.viewOnly);
+    }
+  }
+
+  toggleViewOnly(viewOnly: boolean) {
+
+    if (viewOnly) {
+      this.facilityIdControl.disable();
+      this.facilityNameControl.disable();
+      this.timeZoneControl.disable();
+      this.monthlyReportsControl.disable();
+      this.weeklyReportsControl.disable();
+      this.dailyReportsControl.disable();
+    } else {
+      this.facilityIdControl.enable();
+      this.facilityNameControl.enable();
+      this.timeZoneControl.enable();
+      this.monthlyReportsControl.enable();
+      this.weeklyReportsControl.enable();
+      this.dailyReportsControl.enable();
     }
   }
 

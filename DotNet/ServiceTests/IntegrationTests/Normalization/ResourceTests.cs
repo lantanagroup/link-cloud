@@ -63,12 +63,16 @@ namespace IntegrationTests.Normalization
         [Fact]
         public async Task InitializeResources_AlreadyInitialized_ReturnsEmptyList()
         {
+            //Setup
             using var scope = _fixture.ServiceProvider.CreateScope();
             var manager = scope.ServiceProvider.GetRequiredService<IResourceManager>();
+            await manager.InitializeResources();
 
+            //Act
             var result = await manager.InitializeResources();
 
-            Assert.Empty(result);
+            //Assert
+            Assert.Empty(result); //Second call should not create any new resources.
         }
 
         [Fact]

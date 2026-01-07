@@ -14,7 +14,7 @@ export class MeasureDefinitionService {
   constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
 
   updateMeasureDefinitionConfiguration(measureConfiguration: IMeasureDefinitionConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/measure-definition`, measureConfiguration.bundle, { headers: { 'Content-Type': 'application/fhir+json' } })
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/measureeval/measure-definition`, measureConfiguration.bundle, { headers: { 'Content-Type': 'application/fhir+json' } })
       .pipe(
         tap(_ => console.log(`Request for configuration update was sent.`)),
         catchError((error) => this.errorHandler.handleError(error))
@@ -22,7 +22,7 @@ export class MeasureDefinitionService {
   }
 
    getMeasureDefinitionConfigurations(): Observable<IMeasureDefinitionConfigModel[]> {
-     return this.http.get<IMeasureDefinitionConfigModel[]>(`${this.appConfigService.config?.baseApiUrl}/measure-definition`)
+     return this.http.get<IMeasureDefinitionConfigModel[]>(`${this.appConfigService.config?.baseApiUrl}/measureeval/measure-definition`)
        .pipe(
          tap(_ => console.log(`Fetched measure definitions.`)),
          map((response: IMeasureDefinitionConfigModel[]) => {

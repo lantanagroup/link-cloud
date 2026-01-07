@@ -1,35 +1,18 @@
 {
   "profiles": {
-    "Normalization": {
+    "http-docker": {
       "commandName": "Project",
       "launchBrowser": false,
-      "launchUrl": "swagger",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Docker",
+        "KafkaConnection__BootstrapServers__0": "localhost:9094",
+        "ConnectionStrings__DatabaseConnection": "Server=tcp:localhost,1433;Initial Catalog=link-normalization;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;",
+        "Serilog__WriteTo__0__Args__uri": "http://localhost:3100",
+        "Telemetry__OtelCollectorEndpoint": "http://localhost:4317",
+        "ServiceRegistry__TenantService__TenantServiceURL": "http://localhost:8074"
       },
-      "applicationUrl": "http://localhost:5038;https://localhost:7038",
-      "dotnetRunMessages": true
-    },
-    "Docker": {
-      "commandName": "Docker",
-      "launchUrl": "{Scheme}://{ServiceHost}:{ServicePort}",
-      "publishAllPorts": true,
-      "useSSL": true
-    },
-    "IISExpress": {
-      "commandName": "IISExpress",
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      },
-      "ancmHostingModel": "OutOfProcess"
-    }
-  },
-  "iisSettings": {
-    "windowsAuthentication": false,
-    "anonymousAuthentication": true,
-    "iisExpress": {
-      "applicationUrl": "http://localhost:5038",
-      "sslPort": 0
+      "dotnetRunMessages": true,
+      "applicationUrl": "http://localhost:8068"
     }
   }
 }

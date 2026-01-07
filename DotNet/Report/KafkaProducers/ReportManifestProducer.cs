@@ -1,54 +1,53 @@
 ﻿using Hl7.Fhir.Model;
+using Hl7.Fhir.Rest;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
-using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Entities.Enums;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
-using System.Threading;
 
 namespace LantanaGroup.Link.Report.KafkaProducers
 {
     public class ReportManifestProducer
     {
-        private readonly IDatabase _database;
+        private readonly ILogger<ReportManifestProducer> _logger;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly MeasureReportAggregator _aggregator;
         private readonly ITenantApiService _tenantApiService;
         private readonly BlobStorageService _blobStorageService;
         private readonly SubmitPayloadProducer _payloadSubmittedProducer;
+        private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
+
 
         public ReportManifestProducer(
-            IDatabase database,
+            ILogger<ReportManifestProducer> logger,
+            IServiceScopeFactory serviceScopeFactory,
             MeasureReportAggregator aggregator,
             ITenantApiService tenantApiService,
             BlobStorageService blobStorageService,
-            SubmitPayloadProducer payloadSubmittedProducer)
+            SubmitPayloadProducer payloadSubmittedProducer,
+            AuditableEventOccurredProducer auditableEventOccurredProducer)
         {
-            _database = database;
+            _logger = logger;
+            _serviceScopeFactory = serviceScopeFactory;
             _aggregator = aggregator;
             _tenantApiService = tenantApiService;
             _blobStorageService = blobStorageService;
             _payloadSubmittedProducer = payloadSubmittedProducer;
+            _auditableEventOccurredProducer = auditableEventOccurredProducer;
         }
 
-        public async Task<bool> Produce(ReportScheduleModel schedule)
+        public async Task<List<Resource>> Generate(ReportSchedule schedule)
         {
-            var allReady = !await _database.SubmissionEntryRepository.AnyAsync(e => e.FacilityId == schedule.FacilityId
-                && e.ReportScheduleId == schedule.Id
-                && e.Status != PatientSubmissionStatus.NotReportable
-                && e.Status != PatientSubmissionStatus.ValidationComplete
-                && e.Status != PatientSubmissionStatus.Submitted, CancellationToken.None);
+            var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
 
-            if (!allReady)
-            {
-                return false;
-            }
-
-            var allSubmissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
+            var allSubmissionEntries = await database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
 
             var submissionEntries = allSubmissionEntries.Where(x => x.Status != PatientSubmissionStatus.NotReportable).ToList();
 
@@ -99,7 +98,63 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 resource.Id ??= Guid.NewGuid().ToString();
             }
 
-            Uri? payloadUri = await _blobStorageService.UploadManifestAsync(schedule, manifestResources);
+            return manifestResources;
+        }
+
+        public async Task<Bundle> GenerateAsBundle(ReportSchedule schedule)
+        {
+            List<Resource> resources = await Generate(schedule);
+            Bundle bundle = new()
+            {
+                Type = Bundle.BundleType.Collection
+            };
+            Uri baseUrl = new(ReportConstants.BundleSettings.BundlingUrlBase);
+            foreach (var resource in resources)
+            {
+                ResourceIdentity identity = ResourceIdentity.Build(baseUrl, resource.TypeName, resource.Id);
+                bundle.AddResourceEntry(resource, identity.AbsoluteUri);
+            }
+            return bundle;
+        }
+
+        public async Task<bool> Produce(ReportSchedule schedule, string correlationId = null)
+        {
+            var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
+
+            var allReady = !await database.SubmissionEntryRepository.AnyAsync(e => e.FacilityId == schedule.FacilityId
+                && e.ReportScheduleId == schedule.Id
+                && e.Status != PatientSubmissionStatus.NotReportable
+                && e.Status != PatientSubmissionStatus.ValidationComplete
+                && e.Status != PatientSubmissionStatus.Submitted, CancellationToken.None);
+
+            if (!allReady)
+            {
+                return false;
+            }
+
+            List<Resource> manifestResources = await Generate(schedule);
+
+            Uri? payloadUri;
+            try
+            {
+                payloadUri = await _blobStorageService.UploadManifestAsync(schedule, manifestResources);
+            }
+            catch (Exception ex)
+            {
+                payloadUri = null;
+                _logger.LogError(ex, "Failed to upload to blob storage.");
+                AuditEventMessage auditEvent = new()
+                {
+                    FacilityId = schedule.FacilityId,
+                    CorrelationId = correlationId,
+                    EventDate = DateTime.UtcNow,
+                    Notes = $"Failed to upload to blob storage: {ex}"
+                };
+                await _auditableEventOccurredProducer.ProduceAsync(auditEvent);
+
+                // Return false to indicate failure
+                return false;
+            }
 
             await _payloadSubmittedProducer.Produce(schedule, PayloadType.ReportSchedule, payloadUri: payloadUri?.ToString());
 
@@ -172,7 +227,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             }
         }
 
-        private OperationOutcome CreateOperationOutcome(List<MeasureReportSubmissionEntryModel> failedEntries)
+        private OperationOutcome CreateOperationOutcome(List<PatientSubmissionEntry> failedEntries)
         {
             var operationOutcome = new OperationOutcome();
             foreach (var entry in failedEntries)
@@ -180,7 +235,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 // Assuming PatientSubmissionEntry has a ValidationMessage property; adjust as per actual model
                 operationOutcome.Issue.Add(new OperationOutcome.IssueComponent
                 {
-                    Severity = OperationOutcome.IssueSeverity.Fatal,
+                    Severity = OperationOutcome.IssueSeverity.Error,
                     Code = OperationOutcome.IssueType.Invalid,
                     Diagnostics = $"Validation failed for patient {entry.PatientId}"
                 });

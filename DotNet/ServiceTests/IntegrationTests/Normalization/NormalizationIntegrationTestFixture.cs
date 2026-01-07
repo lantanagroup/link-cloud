@@ -33,7 +33,7 @@ namespace IntegrationTests.Normalization
                     // Add in-memory with warning suppression
                     services.AddDbContext<NormalizationDbContext>(options =>
                     {
-                        options.UseInMemoryDatabase("TestDatabase");
+                        options.UseInMemoryDatabase("NormalizationDatabase");
                         options.ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning));
                     });
 

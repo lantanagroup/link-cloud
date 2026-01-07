@@ -1,5 +1,5 @@
 import {Component, EventEmitter, Input, Output} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {MatInputModule} from '@angular/material/input';
 import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
 import {
@@ -26,7 +26,6 @@ import { MatTableModule } from '@angular/material/table';
   selector: 'app-patient-acquired-form',
   standalone: true,
   imports: [
-    CommonModule,
     MatSnackBarModule,
     FormsModule,
     ReactiveFormsModule,
@@ -41,7 +40,7 @@ import { MatTableModule } from '@angular/material/table';
     MatExpansionModule,
     MatCheckboxModule,
     MatTableModule
-  ],
+],
   templateUrl: './patient-acquired-form.component.html',
   styleUrls: ['./patient-acquired-form.component.scss']
 })

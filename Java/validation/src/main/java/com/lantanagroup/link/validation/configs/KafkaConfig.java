@@ -1,24 +1,28 @@
 package com.lantanagroup.link.validation.configs;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lantanagroup.link.shared.kafka.ErrorHandler;
+import com.lantanagroup.link.shared.kafka.AsyncListener;
 import com.lantanagroup.link.shared.kafka.Properties;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.validation.records.ReadyForValidation;
 import com.lantanagroup.link.validation.records.ValidationComplete;
+import com.lantanagroup.link.validation.services.ReadyForValidationConsumer;
 import io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingConsumerInterceptor;
 import io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingProducerInterceptor;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.*;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.*;
-import org.springframework.kafka.listener.CommonErrorHandler;
+import org.springframework.kafka.listener.*;
 import org.springframework.kafka.support.serializer.*;
+import org.springframework.util.backoff.FixedBackOff;
 
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -33,8 +37,18 @@ public class KafkaConfig {
     }
 
     @Bean
-    public CommonErrorHandler errorHandler() {
-        return new ErrorHandler();
+    public DeadLetterPublishingRecoverer deadLetterPublishingRecoverer(KafkaTemplate<?, ?> defaultKafkaTemplate) {
+        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(defaultKafkaTemplate, (record, exception) ->
+                new TopicPartition(record.topic() + "-Error", record.partition()));
+        recoverer.setLogRecoveryRecord(true);
+        return recoverer;
+    }
+
+    @Bean
+    public DefaultErrorHandler defaultErrorHandler(ConsumerRecordRecoverer recoverer) {
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, new FixedBackOff(0L, 0L));
+        errorHandler.setSeekAfterError(false);
+        return errorHandler;
     }
 
     @Bean
@@ -123,5 +137,24 @@ public class KafkaConfig {
         return new KafkaTemplate<>(getProducerFactory(properties, sslBundles, keySerializer, valueSerializer, Map.of(
                 ProducerConfig.MAX_BLOCK_MS_CONFIG, Properties.MAX_BLOCK_MS_CONFIG,
                 ProducerConfig.RETRIES_CONFIG, 0)));
+    }
+
+    @Bean
+    public ConcurrentMessageListenerContainer<ReadyForValidation.Key, ReadyForValidation> readyForValidationContainer(
+            ConcurrentKafkaListenerContainerFactory<ReadyForValidation.Key, ReadyForValidation> factory,
+            ReadyForValidationConsumer consumer) {
+        return getAsyncListenerContainer(factory, consumer, Topics.READY_FOR_VALIDATION);
+    }
+
+    private <K, V> ConcurrentMessageListenerContainer<K, V> getAsyncListenerContainer(
+            ConcurrentKafkaListenerContainerFactory<K, V> factory,
+            AsyncListener<?, ?> listener,
+            String... topics) {
+        ConcurrentMessageListenerContainer<K, V> container = factory.createContainer(topics);
+        ContainerProperties containerProperties = container.getContainerProperties();
+        containerProperties.setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
+        containerProperties.setAsyncAcks(true);
+        containerProperties.setMessageListener(listener);
+        return container;
     }
 }

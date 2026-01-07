@@ -1,12 +1,8 @@
 import { ChartConfiguration, ChartData } from 'chart.js';
-import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { Component, ViewChild, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { IValidationIssue, IValidationIssueCategorySummary, IValidationIssuesSummary } from '../../tenant/facility-view/report-view.interface';
 
-import { ActivatedRoute } from '@angular/router';
 import { BaseChartDirective } from 'ng2-charts';
-import { FacilityViewService } from '../../tenant/facility-view/facility-view.service';
-import { IApiResponse } from 'src/app/interfaces/api-response.interface';
-import { Subscription } from 'rxjs';
 import { VdButtonComponent } from "../../core/vd-button/vd-button.component";
 import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
 
@@ -22,16 +18,9 @@ import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
   styleUrls: ['./sub-pre-qual-report-summary.component.scss'],
   standalone: true
 })
-export class SubPreQualReportSummaryComponent implements OnInit, OnDestroy {
-  private subscription: Subscription | undefined;
-
-  facilityId: string = '';
-  submissionId: string = ''
-  reportIssues: IValidationIssue[] = [];
-  reportIssuesSummary: IValidationIssueCategorySummary[] = [];
-
-  issuesResponse: IValidationIssue[] | undefined;
-  issuesSummaryResponse: IValidationIssueCategorySummary[] | undefined;
+export class SubPreQualReportSummaryComponent implements OnChanges {
+  @Input() reportIssues: IValidationIssue[] | undefined;
+  @Input() reportIssuesSummary: IValidationIssueCategorySummary[] | undefined;
 
   @ViewChild(BaseChartDirective) chart: BaseChartDirective<'bar'> | undefined;
 
@@ -118,77 +107,45 @@ export class SubPreQualReportSummaryComponent implements OnInit, OnDestroy {
   };
 
   constructor(
-    private route: ActivatedRoute,
-    private facilityViewService: FacilityViewService
+    
   ) { }
 
-  ngOnInit(): void {
-    // Subscribe to route parameters to get facilityId and submissionId
-    this.subscription = this.route.params.subscribe(params => {
-      this.facilityId = params['facilityId'];
-      this.submissionId = params['submissionId'];
-
-      // Load data when params change
+  ngOnChanges(changes: SimpleChanges): void {
+    // Only reload if reportIssues or reportIssuesSummary inputs have changed
+    if (changes['reportIssues'] || changes['reportIssuesSummary']) {
       this.loadReportData();
-    });
+    }
   }
 
   /**
-   * Loads report data from the API
-   * First gets all issues, then gets their summary
    * Updates the chart with the summary data
    */
   private loadReportData(): void {
-    this.facilityViewService.getReportIssues(this.facilityId, this.submissionId).subscribe({
-      next: (response) => {
-        this.issuesResponse = response;
-        this.reportIssues = this.issuesResponse;
+    if (this.reportIssuesSummary && this.reportIssuesSummary.length > 0) {
+      // Update chart data with the summary
+      this.barChartData = {
+        datasets: [{
+          barThickness: 64,
+          data: this.reportIssuesSummary ?? []
+        }]
+      };
 
-        if (this.reportIssues.length > 0) {
-          this.facilityViewService.getReportIssuesSummary(this.reportIssues).subscribe({
-            next: (response) => {
-              this.issuesSummaryResponse = response;
-              this.reportIssuesSummary = this.issuesSummaryResponse;
-
-              // Update chart data with the summary
-              this.barChartData = {
-                datasets: [{
-                  barThickness: 64,
-                  data: this.reportIssuesSummary
-                }]
-              };
-
-              // Force chart update to reflect new data
-              if (this.chart) {
-                this.chart.update();
-              }
-            },
-            error: (error) => {
-              console.error('Error getting report issues summary:', error);
-            }
-          });
-        } else {
-          // No issues found, clear the chart
-          this.barChartData = {
-            datasets: [{
-              barThickness: 64,
-              data: []
-            }]
-          };
-          if (this.chart) {
-            this.chart.update();
-          }
-        }
-      },
-      error: (error) => {
-        console.error('Error getting report issues:', error);
+      // Force chart update to reflect new data
+      if (this.chart) {
+        this.chart.update();
       }
-    });
-  }
-
-  ngOnDestroy(): void {
-    if (this.subscription) {
-      this.subscription.unsubscribe();
+    }
+    else {
+      // No issues found, clear the chart
+      this.barChartData = {
+        datasets: [{
+          barThickness: 64,
+          data: []
+        }]
+      };
+      if (this.chart) {
+        this.chart.update();
+      }
     }
   }
 }

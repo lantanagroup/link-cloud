@@ -14,5 +14,7 @@ public enum RequestStatus
     [StringValue("Failed")]
     Failed,
     [StringValue("Max Retries Reached")]
-    MaxRetriesReached
+    MaxRetriesReached,
+    [StringValue("Skipped")]
+    Skipped
 }

@@ -1,10 +1,9 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
 {

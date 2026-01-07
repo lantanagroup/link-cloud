@@ -1,5 +1,5 @@
 import {Component} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {PaginationMetadata} from "../../../models/pagination-metadata.model";
 import {MatTableDataSource, MatTableModule} from "@angular/material/table";
 import {MatPaginatorModule, PageEvent} from "@angular/material/paginator";
@@ -26,7 +26,6 @@ import {IVendorConfigModel} from "../../../interfaces/vendor/vendor-config-model
   selector: 'app-vendor-dashboard',
   standalone: true,
   imports: [
-    CommonModule,
     MatTableModule,
     MatPaginatorModule,
     MatExpansionModule,
@@ -39,7 +38,7 @@ import {IVendorConfigModel} from "../../../interfaces/vendor/vendor-config-model
     MatTooltipModule,
     MatToolbarModule,
     MatChipsModule
-  ],
+],
   templateUrl: './vendor-dashboard.component.html',
   styleUrls: ['./vendor-dashboard.component.scss']
 })

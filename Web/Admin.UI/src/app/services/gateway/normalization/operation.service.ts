@@ -71,6 +71,16 @@ export class OperationService {
             );
     }
 
+    deleteAllOperationsByFacility(facilityId: string): Observable<any> {
+      return this.http.delete(`${this.appConfigService.config?.baseApiUrl}/normalization/operations/facility/${facilityId}`)
+        .pipe(
+          tap(() => console.log('All operations for facility deleted')),
+          catchError((error) => {
+            throw error;
+          })
+        );
+    }
+
     deleteOperationByVendor(vendorName: string, operationId: string): Observable<any> {
         return this.http.delete<IResource[]>(`${this.appConfigService.config?.baseApiUrl}/normalization/operations/vendor/${vendorName}?operationId=${operationId}`)
             .pipe(

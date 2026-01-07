@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
+﻿using Hl7.Fhir.Utility;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Security;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
@@ -74,7 +75,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
                     account = await _getLinkAccount.ExecuteAsync(principal, CancellationToken.None);
                 }
 
-                if (account is null) //if no account found, return an empty principal
+                if (account is null || account.IsDeleted) //if no account found or account was deleted, return an empty principal
                 {
                     _logger.LogLinkServiceRequestWarning("Account not found for {accountId}", accountId);
 

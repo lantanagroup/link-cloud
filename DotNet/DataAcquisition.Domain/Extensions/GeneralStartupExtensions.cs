@@ -1,9 +1,12 @@
 ﻿using Azure.Identity;
+using DataAcquisition.Domain.Application.Queries;
 using FluentValidation;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
@@ -12,8 +15,6 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Services;
-using LantanaGroup.Link.DataAcquisition.Domain.Services.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -52,7 +53,9 @@ public static class GeneralStartupExtensions
         string serviceName,
         bool? configureRedis = false)
     {
-        builder.Configuration.RegisterAzureConfigService(builder.Environment, serviceName);
+        // load external configuration source (if specified)
+        builder.AddExternalConfiguration(serviceName);
+        
         builder.Configuration.RegisterMonitoring(builder.Logging, builder.Services);
         builder.Services.RegisterConfigs(builder.Configuration);
         builder.RegisterEntityFramework();
@@ -74,50 +77,38 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterProblemDetails((Microsoft.Extensions.Hosting.IHostingEnvironment)builder.Environment);
     }
 
-    public static void RegisterAzureConfigService(this IConfigurationManager configuration, IWebHostEnvironment environment, string serviceName)
-    {
-        //load external configuration source if specified
-        var externalConfigurationSource = configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
-
-        if (!string.IsNullOrEmpty(externalConfigurationSource))
-        {
-            switch (externalConfigurationSource)
-            {
-                case ("AzureAppConfiguration"):
-                    configuration.AddAzureAppConfiguration(options =>
-                    {
-                        options.Connect(configuration.GetConnectionString("AzureAppConfiguration"))
-                                // Load configuration values with no label
-                                .Select("*", LabelFilter.Null)
-                                // Load configuration values for service name
-                                .Select("*", serviceName)
-                                // Load configuration values for service name and environment
-                                .Select("*", serviceName + ":" + environment.EnvironmentName);
-
-                        options.ConfigureKeyVault(kv =>
-                        {
-                            kv.SetCredential(new DefaultAzureCredential());
-                        });
-
-                    });
-                    break;
-            }
-        }
-    }
-
     public static void RegisterMonitoring(this IConfigurationManager configuration, ILoggingBuilder logging, IServiceCollection services)
     {
+        var env = configuration.GetValue<string>("ASPNETCORE_ENVIRONMENT") ?? "Production"; // Or inject IHostEnvironment if available
+
         // Logging using Serilog
         logging.AddSerilog();
         var loggerOptions = new ConfigurationReaderOptions { SectionName = DataAcquisitionConstants.AppSettingsSectionNames.Serilog };
-        Log.Logger = new LoggerConfiguration()
-                        .ReadFrom.Configuration(configuration, loggerOptions)
-                        .Filter.ByExcluding("RequestPath like '/health%'")
-                        //.Enrich.WithExceptionDetails()
-                        .Enrich.FromLogContext()
-                        .Enrich.WithSpan()
-                        .Enrich.With<ActivityEnricher>()
-                        .CreateLogger();
+        var serilogConfig = new LoggerConfiguration()
+            .ReadFrom.Configuration(configuration, loggerOptions)
+            .Filter.ByExcluding("RequestPath like '/health%'")
+            .Enrich.FromLogContext()
+            .Enrich.WithSpan()
+            .Enrich.With<ActivityEnricher>();
+
+        // Add rich console only in Development (for local debugging)
+        if (env == "Development")
+        {
+            serilogConfig.WriteTo.Console(
+                outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}",
+                theme: Serilog.Sinks.SystemConsole.Themes.AnsiConsoleTheme.Code  // Colorful output like default console
+            );
+        }
+        else
+        {
+            // In non-Development (e.g., Docker, Prod), no console or minimal
+        }
+
+        Log.Logger = serilogConfig.CreateLogger();
+
+        // Clear defaults and use Serilog everywhere
+        logging.ClearProviders();
+        logging.AddSerilog(Log.Logger, dispose: true);
 
         var serviceInformation = configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
         services.Configure<ServiceInformation>(configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation));
@@ -125,6 +116,9 @@ public static class GeneralStartupExtensions
         if (serviceInformation != null)
         {
             ServiceActivitySource.Initialize(serviceInformation);
+            Log.Information("ServiceActivitySource initialized with name: {ServiceName}, version: {Version}",
+            ServiceActivitySource.ServiceName,
+            serviceInformation.Version);
         }
         else
         {
@@ -140,6 +134,7 @@ public static class GeneralStartupExtensions
         services.Configure<ConsumerSettings>(configuration.GetRequiredSection(nameof(ConsumerSettings)));
         services.Configure<CorsSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
         services.Configure<LinkTokenServiceSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
+        services.Configure<ApiSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.ApiSettings));
 
         IConfigurationSection consumerSettingsSection = configuration.GetRequiredSection(nameof(ConsumerSettings));
         services.Configure<ConsumerSettings>(consumerSettingsSection);
@@ -223,10 +218,11 @@ public static class GeneralStartupExtensions
         services.AddTransient<IEntityRepository<FhirListConfiguration>, EntityRepository<FhirListConfiguration, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<FhirQueryConfiguration>, EntityRepository<FhirQueryConfiguration, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<QueryPlan>, EntityRepository<QueryPlan, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<ResourceReferenceType>, EntityRepository<ResourceReferenceType, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<ReferenceResources>, EntityRepository<ReferenceResources, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<FhirQuery>, EntityRepository<FhirQuery, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<DataAcquisitionLog>, EntityRepository<DataAcquisitionLog, DataAcquisitionDbContext>>();
-        services.AddScoped<IBaseEntityRepository<RetryEntity>, BaseEntityRepository<RetryEntity, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
 
         //Database
         services.AddTransient<IDatabase, Database>();
@@ -236,10 +232,15 @@ public static class GeneralStartupExtensions
     {
         //Queries
         services.AddTransient<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();
+        services.AddTransient<IFhirQueryConfigurationQueries, FhirQueryConfigurationQueries>();
+        services.AddTransient<IFhirQueryListConfigurationQueries, FhirQueryListConfigurationQueries>();
+        services.AddTransient<IFhirQueryQueries, FhirQueryQueries>();
+        services.AddTransient<IQueryPlanQueries, QueryPlanQueries>();
+        services.AddTransient<IReferenceResourcesQueries, ReferenceResourcesQueries>();
 
         //Managers
         services.AddTransient<IFhirQueryConfigurationManager, FhirQueryConfigurationManager>();
-        services.AddTransient<IFhirQueryListConfigurationManager, FhirQueryListConfigurationManager>();
+        services.AddTransient<IFhirListQueryConfigurationManager, FhirListQueryConfigurationManager>();
         services.AddTransient<IQueryPlanManager, QueryPlanManager>();
         services.AddTransient<IReferenceResourcesManager, ReferenceResourcesManager>();
         services.AddTransient<IFhirQueryManager, FhirQueryManager>();
@@ -277,13 +278,14 @@ public static class GeneralStartupExtensions
 
         //Factories - Producer
         var kafkaConnection = configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>() ?? throw new Exception("Missing Kafka Connection Settings");
-        var producerConfig = new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd }; 
+        var producerConfig = new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd };
+        
         services.RegisterKafkaProducer<string, object>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, string>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, DataAcquisitionRequested>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, PatientCensusScheduled>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, ResourceAcquired>(kafkaConnection, producerConfig);
-        services.RegisterKafkaProducer<string, PatientIDsAcquired>(kafkaConnection, producerConfig);
+        services.RegisterKafkaProducer<string, PatientListMessage>(kafkaConnection, producerConfig, null, new IndentedJsonSerializer<PatientListMessage>());
         services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<long, ReadyToAcquire>(kafkaConnection, producerConfig);
 
@@ -293,7 +295,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IKafkaProducerFactory<string, DataAcquisitionRequested>, KafkaProducerFactory<string, DataAcquisitionRequested>>();
         services.AddTransient<IKafkaProducerFactory<string, PatientCensusScheduled>, KafkaProducerFactory<string, PatientCensusScheduled>>();
         services.AddTransient<IKafkaProducerFactory<string, ResourceAcquired>, KafkaProducerFactory<string, ResourceAcquired>>();
-        services.AddTransient<IKafkaProducerFactory<string, PatientIDsAcquired>, KafkaProducerFactory<string, PatientIDsAcquired>>();
+        services.AddTransient<IKafkaProducerFactory<string, PatientListMessage>, KafkaProducerFactory<string, PatientListMessage>>();
         services.AddTransient<IKafkaProducerFactory<long, ReadyToAcquire>, KafkaProducerFactory<long, ReadyToAcquire>>();
     }
 
@@ -305,7 +307,7 @@ public static class GeneralStartupExtensions
         {
             options.Environment = environment;
             options.ServiceName = serviceName;
-            options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+            options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?
         });
     }
 

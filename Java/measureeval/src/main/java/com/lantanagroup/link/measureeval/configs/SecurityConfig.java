@@ -3,6 +3,8 @@ import com.lantanagroup.link.shared.config.AuthenticationConfig;
 import com.lantanagroup.link.shared.auth.JwtAuthenticationEntryPoint;
 import com.lantanagroup.link.shared.auth.JwtAuthenticationFilter;
 import com.lantanagroup.link.shared.security.SecurityHelper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
@@ -39,10 +41,20 @@ public class SecurityConfig {
     }
   }
 
+    /**
+     * This class is necessary to support @PreAuthorize and @PostAuthorize when
+     * anonymous mode is enabled. The condition causes the Dummy class to get registered
+     * and for the @EnableMethodSecurity to be applied, which affects all classes, enabling @PreAuthorize/@PostAuthorize
+     */
   @ConditionalOnProperty(prefix = "authentication",
-          name = "enableAnonymousAccess",
+          name = "anonymous",
           havingValue = "false")
   @EnableMethodSecurity(prePostEnabled = true)
   static class Dummy {
+      private static final Logger logger = LoggerFactory.getLogger(Dummy.class);
+
+      public Dummy() {
+          logger.info("Anonymous authentication disabled - @EnableMethodSecurity is being applied (authentication.anonymous=false)");
+      }
   }
 }

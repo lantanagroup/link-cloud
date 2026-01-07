@@ -30,10 +30,14 @@ public class SubmissionController(
      * Downloads the specified report's data as a ZIP archive
      * <param name="facilityId">The ID of the facility</param>
      * <param name="reportId">The ID of the report to download</param>
+     * <param name="external">Whether to download from external or internal (default) storage</param>
      * <remarks>Gets information about the report from the report service in order to construct the directory/path for the report.</remarks>
      */
     [HttpGet("{facilityId}/{reportId}")]
-    public async Task<IActionResult> DownloadReport([FromRoute] string facilityId, [FromRoute] string reportId)
+    public async Task<IActionResult> DownloadReport(
+        [FromRoute] string facilityId,
+        [FromRoute] string reportId,
+        [FromQuery] bool external = false)
     {
         string sanitizedFacilityId = facilityId.SanitizeAndRemove();
 
@@ -86,9 +90,10 @@ public class SubmissionController(
             throw new Exception("Missing 'payloadRootUri' in the response.");
         }
 
-        IDictionary<string, byte[]> files = await blobStorageService.DownloadFromExternalAsync(payloadRootUri.GetString());
+        IDictionary<string, byte[]> files = external
+            ? await blobStorageService.DownloadFromExternalAsync(payloadRootUri.GetString())
+            : await blobStorageService.DownloadFromInternalAsync(payloadRootUri.GetString());
 
-        // TODO: Consider changing this to store the ZIP on disk, instead, and check if the ZIP already exists
         var compressedData = this.CompressFiles(files);
         
         return File(compressedData, "application/zip", $"{sanitizedReportId}.zip");

@@ -25,7 +25,6 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Telemetry;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Extensions.ExternalServices;
@@ -38,8 +37,10 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions.Caching;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddStandardEnvironmentConfiguration();
 
 RegisterServices(builder);
 
@@ -51,17 +52,8 @@ app.Run();
 #region Register Services
 static void RegisterServices(WebApplicationBuilder builder)
 {
-    // load external configuration source if specified
-    var externalConfigurationSource = builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
-    if (!string.IsNullOrEmpty(externalConfigurationSource))
-    {
-        builder.AddExternalConfiguration(options =>
-        {
-            options.ExternalConfigurationSource = externalConfigurationSource;
-            options.ExternalConfigurationConnectionString = builder.Configuration.GetConnectionString("AzureAppConfiguration");
-            options.Environment = builder.Environment;
-        });
-    }
+    // load external configuration source (if specified)
+    builder.AddExternalConfiguration(LinkAdminConstants.ServiceName);
 
     // Logging using Serilog    
     builder.Logging.AddSerilog();
@@ -108,6 +100,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add Kafka Producer Factories
     builder.Services.RegisterKafkaProducer<string, object>(kafkaConnection, new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
 
+    builder.Services.RegisterKafkaProducer<string, PatientListMessage>(kafkaConnection, new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
+
     // Add fluent validation
     builder.Services.AddValidatorsFromAssemblyContaining(typeof(PatientEventValidator));
 
@@ -120,8 +114,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     //TODO: https://learn.microsoft.com/en-us/aspnet/core/security/data-protection/configuration/overview?view=aspnetcore-8.0
 
     // Add commands
-    builder.Services.AddTransient<ICreatePatientEvent, CreatePatientEvent>();
+    builder.Services.AddTransient<ICreatePatientListAcquired, CreatePatientListAcquired>();
     builder.Services.AddTransient<ICreatePatientAcquired, CreatePatientAcquired>();
+    builder.Services.AddTransient<ICreatePatientEvent, CreatePatientEvent>();
     builder.Services.AddTransient<ICreateReportScheduled, CreateReportScheduled>();
     builder.Services.AddTransient<ICreateDataAcquisitionRequested, CreateDataAcquisitionRequested>();
     builder.Services.AddTransient<IGetLinkAccount, GetLinkAccount>();
@@ -250,24 +245,28 @@ static void RegisterServices(WebApplicationBuilder builder)
     var monitorBackend = builder.Configuration.GetValue<bool>("MonitorBackendHealthChecks");
     var healthCheckBuilder = builder.Services.AddHealthChecks();
     
+    var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, LinkAdminConstants.ServiceName).GetHealthCheckOptions();
+    healthCheckBuilder.AddKafka(kafkaHealthOptions, nameof(HealthCheckType.Kafka));
+    
     if (monitorBackend)
     {
         healthCheckBuilder
-            .AddCheck<AccountServiceHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<AuditServiceHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<CensusServiceHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<DataAcquisitionHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<MeasureEvaluationServiceHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<NormalizationServiceHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<NotificationServiceHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<ReportServiceHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<SubmissionServiceHealthCheck>(HealthCheckType.Service.ToString())
-            .AddCheck<TenantServiceHealthCheck>(HealthCheckType.Service.ToString());
+            .AddCheck<AccountServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<AuditServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<CensusServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<DataAcquisitionHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<MeasureEvaluationServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<NormalizationServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<NotificationServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<ReportServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<SubmissionServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<TenantServiceHealthCheck>(nameof(HealthCheckType.Service))
+            .AddCheck<TerminologyServiceHealthCheck>(nameof(HealthCheckType.Service));
     }
 
     if (builder.Configuration.GetValue<string>("Cache:Type") == "Redis")
     {
-        healthCheckBuilder.AddCheck<CacheHealthCheck>(HealthCheckType.Cache.ToString());
+        healthCheckBuilder.AddCheck<CacheHealthCheck>(nameof(HealthCheckType.Cache));
     }
 
 
@@ -459,43 +458,70 @@ static void SetupMiddleware(WebApplication app)
         var tasks = new List<Task<ServiceInformation?>>();
 
         if (!string.IsNullOrEmpty(serviceRegistry.AccountServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.AccountServiceApiUrl + "/account/info", logger));
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Account", serviceRegistry.AccountServiceApiUrl, 
+                serviceRegistry.PublicAccountServiceUrl, 
+                "/account/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.AuditServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.AuditServiceApiUrl + "/audit/info", logger));
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Audit", serviceRegistry.AuditServiceApiUrl, 
+                serviceRegistry.PublicAuditServiceUrl,  
+                "/audit/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.CensusServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.CensusServiceApiUrl + "/census/info", logger));
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Census", serviceRegistry.CensusServiceApiUrl, 
+                serviceRegistry.PublicCensusServiceUrl,  
+                "/census/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.DataAcquisitionServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.DataAcquisitionServiceApiUrl + "/data/info", logger));
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Data Acquisition", serviceRegistry.DataAcquisitionServiceApiUrl, 
+                serviceRegistry.PublicDataAcquisitionServiceUrl,  
+                "/data/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.MeasureServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.MeasureServiceApiUrl + "/measure-definition/info", logger));
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Measure Evaluation", serviceRegistry.MeasureServiceApiUrl, 
+                serviceRegistry.PublicMeasureServiceUrl,  
+                "/measureeval/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.NormalizationServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.NormalizationServiceApiUrl + "/normalization/info", logger));
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Normalization", serviceRegistry.NormalizationServiceApiUrl, 
+                serviceRegistry.PublicNormalizationServiceUrl, 
+                "/normalization/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.QueryDispatchServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.QueryDispatchServiceApiUrl + "/querydispatch/info", logger));
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Query Dispatch", serviceRegistry.QueryDispatchServiceApiUrl, 
+                serviceRegistry.PublicQueryDispatchServiceUrl,  
+                "/querydispatch/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.ReportServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.ReportServiceApiUrl + "/report/info", logger));
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Report", serviceRegistry.ReportServiceApiUrl, 
+                serviceRegistry.PublicReportServiceUrl,  
+                "/report/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.SubmissionServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.SubmissionServiceApiUrl + "/submission/info", logger));
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Submission", serviceRegistry.SubmissionServiceApiUrl, 
+                serviceRegistry.PublicSubmissionServiceUrl, 
+                "/submission/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.TenantServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.TenantServiceApiUrl + "/facility/info", logger));
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Tenant", serviceRegistry.TenantServiceApiUrl, 
+                serviceRegistry.TenantService.PublicTenantServiceUrl, 
+                "/facility/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.ValidationServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, serviceRegistry.ValidationServiceApiUrl + "/validation/info", logger));
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Validation", serviceRegistry.ValidationServiceApiUrl, 
+                serviceRegistry.PublicValidationServiceUrl, 
+                "/validation/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.TerminologyServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "Terminology", serviceRegistry.TerminologyServiceApiUrl, 
+                serviceRegistry.PublicTerminologyServiceUrl, 
+                "/terminology/info", logger));
 
         var results = await Task.WhenAll(tasks);
         serviceInfos.AddRange(results.Where(info => info != null)!);
 
         return serviceInfos;
-    });
+    }).RequireCors("ApiInfoPolicy");
 }
 
 #endregion

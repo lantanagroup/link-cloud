@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
@@ -57,7 +58,7 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
             throw new DeadLetterException("FacilityId is missing from the message key.", ex);
         }
 
-        var scope = _serviceScopeFactory.CreateScope();
+        using var scope = _serviceScopeFactory.CreateScope();
         var patientDataService =
             scope.ServiceProvider.GetRequiredService<IPatientDataService>();
 

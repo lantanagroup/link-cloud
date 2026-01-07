@@ -1,9 +1,4 @@
 ﻿using LantanaGroup.Link.Shared.Application.Utilities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 public enum FhirQueryType
@@ -12,6 +7,8 @@ public enum FhirQueryType
     Read,
     [StringValue("Search")]
     Search,
+    [StringValue("SearchPost")]
+    SearchPost,
     [StringValue("BulkDataRequest")]
     BulkDataRequest,
     [StringValue("BulkDataPoll")]
@@ -26,6 +23,7 @@ public static class FhirQueryTypeUtilities
         {
             "Read" => FhirQueryType.Read,
             "Search" => FhirQueryType.Search,
+            "SearchPost" => FhirQueryType.SearchPost,
             "BulkDataRequest" => FhirQueryType.BulkDataRequest,
             "BulkDataPoll" => FhirQueryType.BulkDataPoll,
             _ => throw new ArgumentOutOfRangeException(nameof(fhirQueryType), fhirQueryType, null)

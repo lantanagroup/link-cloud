@@ -67,7 +67,7 @@ public static class DataAcquisitionQuartzExtension
         });
 
         //Factories - Retry
-        builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
+        builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
 
         builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
     }

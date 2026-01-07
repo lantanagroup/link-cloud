@@ -1,14 +1,24 @@
 <h1 mat-dialog-title class="dialog-form-header">{{dialogTitle}}</h1>
 <div mat-dialog-content>
-  <app-conditional-transformation  #conditionalTransformForm *ngIf="operationType === OperationType.ConditionalTransform" [operation]="operation" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-conditional-transformation>
-  <app-copy-property  #copyPropertyForm *ngIf="operationType === OperationType.CopyProperty" [operation]="operation" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-copy-property>
-  <app-code-map  #codeMap *ngIf="operationType === OperationType.CodeMap" [operation]="operation" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-code-map>
-  <app-copy-location  #copylocation *ngIf="operationType === OperationType.CopyLocation" [operation]="operation" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-copy-location>
+  @if (operationType === OperationType.ConditionalTransform) {
+    <app-conditional-transformation  #conditionalTransformForm [operation]="operation" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-conditional-transformation>
+  }
+  @if (operationType === OperationType.CopyProperty) {
+    <app-copy-property  #copyPropertyForm [operation]="operation" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-copy-property>
+  }
+  @if (operationType === OperationType.CodeMap) {
+    <app-code-map  #codeMap [operation]="operation" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-code-map>
+  }
+  @if (operationType === OperationType.CopyLocation) {
+    <app-copy-location  #copylocation [operation]="operation" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-copy-location>
+  }
 </div>
 <div mat-dialog-actions align="end">
-  <button *ngIf="!viewOnly" mat-raised-button color="primary" [disabled]="formIsInvalid" (click)="submitConfiguration()">
-    <mat-icon>{{ formMode == FormMode.Create ? 'save' : 'save_as' }}</mat-icon>
-    {{ formMode == FormMode.Create ? 'Create' : 'Update' }}
-  </button>
+  @if (!viewOnly) {
+    <button mat-raised-button color="primary" [disabled]="formIsInvalid" (click)="submitConfiguration()">
+      <mat-icon>{{ formMode == FormMode.Create ? 'save' : 'save_as' }}</mat-icon>
+      {{ formMode == FormMode.Create ? 'Create' : 'Update' }}
+    </button>
+  }
   <button mat-raised-button mat-dialog-close>Close</button>
 </div>

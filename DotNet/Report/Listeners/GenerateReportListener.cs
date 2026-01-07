@@ -11,6 +11,7 @@ using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -38,6 +39,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
+        private readonly IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> _linkBearerServiceOptions;
         private readonly ICreateSystemToken _createSystemToken;
 
         private readonly DataAcquisitionRequestedProducer _dataAcqProducer;
@@ -57,7 +59,8 @@ namespace LantanaGroup.Link.Report.Listeners
             IOptions<ServiceRegistry> serviceRegistry,
             DataAcquisitionRequestedProducer dataAcqProducer,
             IProducer<string, EvaluationRequestedValue> evaluationProducer,
-            BlobStorageService blobStorageService)
+            BlobStorageService blobStorageService,
+            IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -81,6 +84,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _dataAcqProducer = dataAcqProducer;
             _evaluationProducer = evaluationProducer;
             _blobStorageService = blobStorageService;
+            _linkBearerServiceOptions = linkBearerServiceOptions;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -195,9 +199,9 @@ namespace LantanaGroup.Link.Report.Listeners
                                 );
 
                                 // Create ReportSchedule for AdHoc Report
-                                var reportSchedule = new ReportScheduleModel
+                                var reportSchedule = new ReportSchedule
                                 {
-                                    Id = value.Regenerate? Guid.NewGuid().ToString() : value.ReportId,
+                                    Id = value.AdhocReportId,
                                     FacilityId = facilityId,
                                     ReportStartDate = startDate.Value,
                                     ReportEndDate = endDate.Value,
@@ -220,15 +224,15 @@ namespace LantanaGroup.Link.Report.Listeners
                                     
                                     var scheduledReports = await submissionEntryManager.FindAsync(
                                             p => p.ReportScheduleId == reportId, cancellationToken);
-                                    var patientMeasureReports = scheduledReports.Select(p => p.PatientId);
+                                    var patientMeasureReports = scheduledReports.Select(p => p.PatientId).Distinct();
                                     
                                     _logger.LogDebug("Found {PatientCount} patients to re-generate for facility {FacilityId} from {StartDate} to {EndDate} with ID {ReportId}", patientMeasureReports.Count(), facilityId, startDate, endDate, reportId);
 
-                                    patientMeasureReports.AsParallel().ForAll(async p =>
+                                    foreach (var p in patientMeasureReports)
                                     {
                                         foreach (var reportType in reportTypes)
                                         {
-                                            await submissionEntryManager.AddAsync(new MeasureReportSubmissionEntryModel()
+                                            await submissionEntryManager.AddAsync(new PatientSubmissionEntry()
                                             {
                                                 PatientId = p,
                                                 Status = PatientSubmissionStatus.PendingEvaluation,
@@ -259,13 +263,13 @@ namespace LantanaGroup.Link.Report.Listeners
                                         catch (ProduceException<string, EvaluationRequestedValue> ex)
                                         {
                                             _logger.LogError(ex, "An error was encountered generating an Evaluation Requested event.\n\tFacilityId: {facilityId}\n\tPatientId: {patientId}\n\tReportTrackingId: {reportTrackingId}",
-                                                facilityId, p, reportSchedule.Id);
+                                                facilityId.SanitizeAndRemove(), p.SanitizeAndRemove(), reportSchedule.Id.SanitizeAndRemove());
                                         }
-                                    });
+                                    }
                                 }
                                 else
                                 {
-                                    _logger.LogInformation("Generating new Adhoc report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, value.ReportId, DateTime.UtcNow);
+                                    _logger.LogInformation("Generating new Adhoc report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, reportSchedule.Id, DateTime.UtcNow);
                                     
                                     // Get Patient List if none was provided
                                     if (value.PatientIds == null || value.PatientIds.Count == 0)
@@ -277,12 +281,12 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     _logger.LogDebug("Found {PatientCount} patients to re-generate for facility {FacilityId} from {StartDate} to {EndDate}", value.PatientIds.Count, facilityId, startDate, endDate);
 
-                                    value.PatientIds.AsParallel().ForAll(async patient =>
+                                    foreach (var patient in value.PatientIds)
                                     {
                                         //For each patient and report type, Create Submission Entries for each Patient and Report Type
                                         foreach (var reportType in reportTypes)
                                         {
-                                            await submissionEntryManager.AddAsync(new MeasureReportSubmissionEntryModel()
+                                            await submissionEntryManager.AddAsync(new PatientSubmissionEntry()
                                             {
                                                 PatientId = patient,
                                                 Status = PatientSubmissionStatus.PendingEvaluation,
@@ -292,7 +296,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                                 CreateDate = DateTime.UtcNow
                                             }, cancellationToken);
                                         }
-                                    });
+                                    }
 
                                     try
                                     {
@@ -371,9 +375,12 @@ namespace LantanaGroup.Link.Report.Listeners
             if (_linkTokenServiceConfig.Value.SigningKey is null)
                 throw new Exception("Link Token Service Signing Key is missing.");
 
-            //Add link token
-            var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 5);
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            if (!_linkBearerServiceOptions.Value.AllowAnonymous)
+            {
+                //Add link token
+                var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 5);
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
 
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
             var censusResponse = await httpClient.GetAsync(censusRequestUrl, cts.Token);
@@ -386,9 +393,9 @@ namespace LantanaGroup.Link.Report.Listeners
             try
             {
                 admittedPatients =
-                    System.Text.Json.JsonSerializer.Deserialize<List>(
+                    JsonSerializer.Deserialize<List>(
                         censusContent,
-                        new JsonSerializerOptions().ForFhir());
+                        SerializerOptions.ForFhirLenientDeserialization);
             }
             catch (Exception ex)
             {

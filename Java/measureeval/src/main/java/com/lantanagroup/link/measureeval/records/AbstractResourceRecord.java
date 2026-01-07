@@ -9,24 +9,24 @@ import com.lantanagroup.link.measureeval.entities.ReportableEvent;
 import com.lantanagroup.link.shared.serdes.FhirIdDeserializer;
 import lombok.Getter;
 import lombok.Setter;
-import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.ResourceType;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Getter
 @Setter
 public abstract class AbstractResourceRecord {
-
-    private boolean AcquisitionComplete;
+    private static final Map<String, ResourceType> RESOURCE_TYPES_BY_CODE = Arrays.stream(ResourceType.values())
+            .collect(Collectors.toMap(Enum::name, Function.identity()));
 
     @JsonDeserialize(using = FhirIdDeserializer.class)
     private String patientId;
 
     private QueryType queryType;
+
     private IBaseResource resource;
 
     private ReportableEvent reportableEvent;
@@ -34,19 +34,30 @@ public abstract class AbstractResourceRecord {
     @JsonSetter(nulls = Nulls.AS_EMPTY)
     private List<ScheduledReport> scheduledReports = new ArrayList<>();
 
-    @JsonIgnore
-    public boolean isPatientResource() {
-        return StringUtils.isNotEmpty(patientId);
-    }
+    private boolean acquisitionComplete;
 
     @JsonIgnore
     public ResourceType getResourceType() {
-        return ResourceType.fromCode(resource!= null?resource.fhirType():"");
+        if (resource == null) {
+            return null;
+        }
+        return RESOURCE_TYPES_BY_CODE.get(resource.fhirType());
     }
 
     @JsonIgnore
     public String getResourceId() {
-        return resource!=null?resource.getIdElement().getIdPart():"";
+        if (resource == null) {
+            return null;
+        }
+        return resource.getIdElement().getIdPart();
+    }
+
+    @JsonIgnore
+    public String getResourceTypeAndId() {
+        if (resource == null) {
+            return null;
+        }
+        return resource.getIdElement().toUnqualifiedVersionless().getValue();
     }
 
     @Getter

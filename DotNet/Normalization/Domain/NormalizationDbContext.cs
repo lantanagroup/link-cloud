@@ -12,7 +12,6 @@ public partial class NormalizationDbContext : DbContext
     {
     }
 
-    public virtual DbSet<RetryEntity> EventRetries { get; set; }
     public virtual DbSet<Operation> Operations { get; set; }
     public virtual DbSet<OperationResourceType> OperationResourceTypes { get; set; }
     public virtual DbSet<ResourceType> ResourceTypes { get; set; }
@@ -23,13 +22,6 @@ public partial class NormalizationDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        //Retry Repository
-        modelBuilder.Entity<RetryEntity>()
-            .Property(x => x.Headers)
-            .HasConversion(
-                           v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                                          v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions())
-                                                 );
 
         modelBuilder.Entity<Operation>(entity =>
         {

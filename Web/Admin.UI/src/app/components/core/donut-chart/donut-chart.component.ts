@@ -1,12 +1,10 @@
-import { CommonModule } from '@angular/common';
+
 import { AfterViewInit, Component, ElementRef, Input, OnChanges, OnDestroy, SimpleChanges, ViewChild } from '@angular/core';
 import * as d3 from 'd3';
 
 @Component({
   selector: 'app-donut-chart',
-  imports: [
-    CommonModule
-  ],
+  imports: [],
   templateUrl: './donut-chart.component.html',
   styleUrl: './donut-chart.component.scss'
 })

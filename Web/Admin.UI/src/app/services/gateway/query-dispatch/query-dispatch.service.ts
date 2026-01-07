@@ -60,7 +60,9 @@ export class QueryDispatchService {
     return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/querydispatch/configuration/facility/${facilityId}`)
       .pipe(
         tap(_ => console.log(`Request for configuration deletion was sent.`)),
-        catchError((error) => this.errorHandler.handleError(error))
+        catchError((error) => {
+          throw error;
+        })
       )
   }
 

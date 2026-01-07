@@ -197,6 +197,28 @@ jobs:
           path: ./TestResults/dotnet-unit-test-results.trx
           reporter: dotnet-trx
 
+  docs-build:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ./docs
+
+      - name: Build documentation
+        run: npm run build
+        working-directory: ./docs
+
   java-unit-tests:
     name: Unit Tests for Java
     runs-on: ['ubuntu-latest']
