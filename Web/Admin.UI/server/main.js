@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
+const { blockPathMatchers } = require('./blocked-paths');
 
 const app = express();
 
@@ -38,6 +39,15 @@ app.get('/assets/app.config.local.json', (req, res) => {
 });
 
 app.get('/*any', apiLimiter, (req, res) => {
+  const p = req.path; // pathname only (no querystring)
+
+  const isExcluded = blockPathMatchers.some((rule) => {
+    if (typeof rule === 'string') return p.toLowerCase() === rule.toLowerCase();
+    return rule.test(p);
+  });
+
+  if (isExcluded) return res.status(404).send('Not Found');
+
   res.sendFile(path.join(distFolder, 'index.html'));
 });
 

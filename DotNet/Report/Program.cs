@@ -53,6 +53,7 @@ using StackExchange.Redis.Extensions.System.Text.Json;
 using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddStandardEnvironmentConfiguration();
 
 RegisterServices(builder);
 var app = builder.Build();
