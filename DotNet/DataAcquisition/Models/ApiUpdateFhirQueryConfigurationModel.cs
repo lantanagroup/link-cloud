@@ -27,7 +27,7 @@ namespace LantanaGroup.Link.DataAcquisition.Models
 
         [DataMember]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public int? MaxConcurrentRequests { get; set; } = 8;
+        public int? MaxConcurrentRequests { get; set; } = 1;
 
         [DataMember]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
