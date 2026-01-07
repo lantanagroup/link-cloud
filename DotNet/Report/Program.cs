@@ -134,12 +134,14 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IBaseEntityRepository<ReportModel>, MongoEntityRepository<ReportModel>>();
     builder.Services.AddTransient<IBaseEntityRepository<ReportEntryStatusModel>, MongoEntityRepository<ReportEntryStatusModel>>();
     builder.Services.AddTransient<IBaseEntityRepository<ReportPopulationModel>, MongoEntityRepository<ReportPopulationModel>>();
+    builder.Services.AddTransient<IBaseEntityRepository<ReportResourceModel>, MongoEntityRepository<ReportResourceModel>>();
     builder.Services.AddTransient<IDatabase, Database>();
 
     // Add Managers
     builder.Services.AddTransient<IReportScheduledManager, ReportScheduledManager>();
     builder.Services.AddTransient<IReportEntryStatusManager, ReportEntryStatusManager>();
     builder.Services.AddTransient<IReportPopulationManager, ReportPopulationManager>();
+    builder.Services.AddTransient<IReportResourceManager, ReportResourceManager>();
 
     // Add Link Security
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");

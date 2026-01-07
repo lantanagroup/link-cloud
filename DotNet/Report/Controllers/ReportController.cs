@@ -79,8 +79,9 @@ namespace LantanaGroup.Link.Report.Controllers
                 {
                     return BadRequest("Parameter reportScheduleId is null or whitespace");
                 }
-
-                await _patientReportSubmissionBundler.GenerateBundleToABS(patientId, reportScheduleId);
+                
+                //TODO: Reimplement 
+                //await _patientReportSubmissionBundler.GenerateBundleToABS(patientId, reportScheduleId);
                 return Ok();
 
             }

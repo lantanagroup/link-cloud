@@ -52,11 +52,11 @@ namespace LantanaGroup.Link.Report.Core
             }
         }
 
-        public async Task<AggregateResult> GenerateBundleToABS(string patientId, string reportScheduleId)
+        public async Task<AggregateResult> GenerateBundleToABS(string patientId, ReportScheduleModel reportSchedule)
         {
             AggregateResult aggregateResult = new AggregateResult();
 
-            var entry = (await _database.ReportEntryStatusRepository.SingleOrDefaultAsync(x => x.ReportScheduleId == reportScheduleId && x.PatientId == patientId));
+            var entry = (await _database.ReportEntryStatusRepository.SingleOrDefaultAsync(x => x.ReportScheduleId == reportSchedule.Id && x.PatientId == patientId));
 
             if (entry == null) {
                 return null;
@@ -67,7 +67,7 @@ namespace LantanaGroup.Link.Report.Core
             var parser = new FhirJsonParser();
 
             //TODO: Need to get the actual source file
-            AppendBlobClient blockWriteBlobClient = _containerClient.GetAppendBlobClient("Patient_" + patientId + ".ndjson");
+            AppendBlobClient blockWriteBlobClient = _containerClient.GetAppendBlobClient(reportSchedule.PayloadRootUri + "/patient-" + patientId + ".ndjson");
             aggregateResult.Uri = blockWriteBlobClient.Uri;
 
             using (Stream write_stream = await blockWriteBlobClient.OpenWriteAsync(true))
@@ -94,17 +94,20 @@ namespace LantanaGroup.Link.Report.Core
                                     continue;
                                 }
 
-                                string resourceType = resource_and_id.Split('/')[0];
+                                string[] resource = resource_and_id.Split('/');
 
-                                if (aggregateMeasureReport.ResourceCount.ContainsKey(resourceType))
+                                if (aggregateMeasureReport.ResourceCount.ContainsKey(resource[0]))
                                 {
-                                    aggregateMeasureReport.ResourceCount[resourceType]++;
+                                    aggregateMeasureReport.ResourceCount[resource[0]]++;
                                 }
-                                else {
-                                    aggregateMeasureReport.ResourceCount.Add(resourceType, 1);
+                                else 
+                                {
+                                    aggregateMeasureReport.ResourceCount.Add(resource[0], 1);
                                 }
 
-                                if (resourceType != "MeasureReport") {
+                                aggregateMeasureReport.Resources.Add(resource);
+
+                                if (resource[0] != "MeasureReport") {
                                     resourcesAdded.Add(resource_and_id, 1);
                                     writer.WriteLine(reader.ReadLine());
                                     continue;
@@ -139,7 +142,7 @@ namespace LantanaGroup.Link.Report.Core
                         //TODO: Is this a helpful metric to capture as is?
                         _metrics.IncrementReportGeneratedCounter(new List<KeyValuePair<string, object?>>() {
                             new KeyValuePair<string, object?>("facilityId", entry.FacilityId),
-                            new KeyValuePair<string, object?>("measure.schedule.id", reportScheduleId),
+                            new KeyValuePair<string, object?>("measure.schedule.id", reportSchedule.Id),
                             //new KeyValuePair<string, object?>("measure", mr.Measure)
                         });
                     }
