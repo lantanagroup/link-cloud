@@ -47,6 +47,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IReportEntryStatusManager _reportEntryManager;
         private readonly IReportScheduledManager _reportScheduledManager;
         private readonly IReportPopulationManager _reportPopulationManager;
+        private readonly IReportResourceManager _reportResourceManager;
 
         private string Name => this.GetType().Name;
 
@@ -63,7 +64,8 @@ namespace LantanaGroup.Link.Report.Listeners
             AuditableEventOccurredProducer auditableEventOccurredProducer, 
             IReportEntryStatusManager reportEntryManager,
             IReportScheduledManager reportScheduledManager,
-            IReportPopulationManager reportPopulationManager)
+            IReportPopulationManager reportPopulationManager,
+            IReportResourceManager reportResourceManager)
         {
 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -87,6 +89,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _reportEntryManager = reportEntryManager;
             _reportScheduledManager = reportScheduledManager;
             _reportPopulationManager = reportPopulationManager;
+            _reportResourceManager = reportResourceManager;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -137,7 +140,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     return;
                                 }
 
-                                AggregateResult aggregateResult = await _patientReportSubmissionBundler.GenerateBundleToABS(result.Value.PatientId, result.Value.ReportTrackingId);
+                                AggregateResult aggregateResult = await _patientReportSubmissionBundler.GenerateBundleToABS(result.Value.PatientId, schedule);
 
                                 if (aggregateResult == null)
                                 {
@@ -145,6 +148,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
 
                                 _reportEntryManager.UpdateAsyncWithAggregateResult(reportEntry, aggregateResult);
+                                _reportResourceManager.AddAsyncWithAggregateResult(facilityId, result.Value.ReportTrackingId, result.Value.PatientId, aggregateResult, cancellationToken);
 
                                 foreach (var aggregateMeasureReport in aggregateResult.MeasureReportResults)
                                 {

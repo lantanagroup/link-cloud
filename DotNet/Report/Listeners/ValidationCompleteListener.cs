@@ -197,7 +197,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     Id = Guid.NewGuid().ToString(),
                     Issue = new List<OperationOutcome.IssueComponent>() { 
                         new OperationOutcome.IssueComponent() {
-                            Severity = OperationOutcome.IssueSeverity.Fatal,
+                            Severity = OperationOutcome.IssueSeverity.Error,
                             Code = OperationOutcome.IssueType.Invalid,
                             Diagnostics = "Patient has failed Validation"
                         }
