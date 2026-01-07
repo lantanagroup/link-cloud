@@ -1,17 +1,16 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FacilityViewService } from '../tenant/facility-view/facility-view.service';
-import { IValidationIssue } from '../tenant/facility-view/report-view.interface';
-import { LinkAdminSubnavBarComponent } from "../core/link-admin-subnav-bar/link-admin-subnav-bar.component";
-import { SubPreQualReportBannerComponent } from "./sub-pre-qual-report-banner/sub-pre-qual-report-banner.component";
+import { IValidationIssue, IValidationIssueCategorySummary, IReportListSummary } from '../tenant/facility-view/report-view.interface';
 import { SubPreQualReportCategoriesTableComponent } from './sub-pre-qual-report-categories-table/sub-pre-qual-report-categories-table.component';
 import { SubPreQualReportIssuesTableComponent } from './sub-pre-qual-report-issues-table/sub-pre-qual-report-issues-table.component';
 import { SubPreQualReportMetaComponent } from './sub-pre-qual-report-meta/sub-pre-qual-report-meta.component';
-import { SubPreQualReportSubnavComponent } from './sub-pre-qual-report-subnav/sub-pre-qual-report-subnav.component';
 import { SubPreQualReportSummaryComponent } from './sub-pre-qual-report-summary/sub-pre-qual-report-summary.component';
 import { Subscription } from 'rxjs';
+import { MatTabsModule } from '@angular/material/tabs';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 /**
  * Main component for the sub-pre-qual report view
@@ -21,13 +20,14 @@ import { Subscription } from 'rxjs';
   selector: 'app-sub-pre-qual-report',
   imports: [
     CommonModule,
-    LinkAdminSubnavBarComponent,
-    SubPreQualReportBannerComponent,
-    SubPreQualReportSubnavComponent,
     SubPreQualReportMetaComponent,
     SubPreQualReportSummaryComponent,
     SubPreQualReportCategoriesTableComponent,
-    SubPreQualReportIssuesTableComponent
+    SubPreQualReportIssuesTableComponent,
+    MatTabsModule,
+    RouterLink,
+    RouterLinkActive,
+    MatProgressSpinnerModule
   ],
   templateUrl: './sub-pre-qual-report.component.html',
   styleUrls: ['./sub-pre-qual-report.component.scss'],
@@ -37,11 +37,10 @@ export class SubPreQualReportComponent implements OnInit, OnDestroy {
   private subscription: Subscription | undefined;
   facilityId: string = '';
   submissionId: string = '';
-
-  // Counts for each type of issue
-  unacceptableCount: number = 0;
-  acceptableCount: number = 0;
-  uncategorizedCount: number = 0;
+  reportIssues: IValidationIssue[] | undefined;
+  reportIssuesSummary: IValidationIssueCategorySummary[] | undefined;
+  reportSummary: IReportListSummary | undefined;
+  isLoading: boolean = true;
 
   constructor(
     private route: ActivatedRoute,
@@ -56,32 +55,45 @@ export class SubPreQualReportComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Loads report data and calculates issue counts
-   * Updates the counts for each type of issue
-   */
-  private loadReportData(): void {
-    this.facilityViewService.getReportIssues(this.facilityId, this.submissionId).subscribe({
-      next: (issues: IValidationIssue[]) => {
-        // Reset counts
-        this.unacceptableCount = 0;
-        this.acceptableCount = 0;
-        this.uncategorizedCount = 0;
+  updateIsLoading() {
+    if (this.reportIssues != undefined && this.reportIssuesSummary != undefined && this.reportSummary != undefined) {
+      this.isLoading = false;
+    }
+    else {
+      this.isLoading = true;
+    }
+  }
 
-        // Calculate counts
-        issues.forEach(issue => {
-          if (issue.categories.length === 0) {
-            this.uncategorizedCount++;
-          } else {
-            // Check if all categories are acceptable
-            const allAcceptable = issue.categories.every(cat => cat.acceptable);
-            if (allAcceptable) {
-              this.acceptableCount++;
-            } else {
-              this.unacceptableCount++;
+  private loadReportData(): void {
+    this.facilityViewService.getReportSummary(this.facilityId, this.submissionId).subscribe({
+      next: (response) => {
+        this.reportSummary = response;
+        this.updateIsLoading();
+      },
+      error: (error) => {
+        console.error('Error getting report summary:', error);
+      }
+    });
+
+    this.facilityViewService.getReportIssues(this.facilityId, this.submissionId).subscribe({
+      next: (response) => {
+        this.reportIssues = response;
+        this.updateIsLoading();
+        if (this.reportIssues && this.reportIssues.length > 0) {
+          this.facilityViewService.getReportIssuesSummary(this.reportIssues).subscribe({
+            next: (response) => {
+              this.reportIssuesSummary = response;
+              this.updateIsLoading();
+            },
+            error: (error) => {
+              console.error('Error getting report issues summary:', error);
             }
-          }
-        });
+          });
+        } else {
+          // No issues found
+          this.reportIssuesSummary = [];
+          this.updateIsLoading();
+        }
       },
       error: (error) => {
         console.error('Error getting report issues:', error);

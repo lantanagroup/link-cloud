@@ -15,7 +15,6 @@ import java.util.function.Predicate;
 @ConfigurationProperties("link")
 public class LinkConfig {
     private String reportabilityPredicate;
-
     private boolean cqlDebug = false;
 
     @Bean

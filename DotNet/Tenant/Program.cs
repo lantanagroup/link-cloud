@@ -1,4 +1,6 @@
-using Azure.Identity;
+using System.Collections.Specialized;
+using System.Diagnostics;
+using System.Reflection;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Extensions;
@@ -26,18 +28,15 @@ using LantanaGroup.Link.Tenant.Repository.Context;
 using LantanaGroup.Link.Tenant.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.Extensions.Options;
 using Quartz;
 using Quartz.Impl;
 using Quartz.Spi;
 using Serilog;
+using Serilog.Debugging;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
-using System.Collections.Specialized;
-using System.Diagnostics;
-using System.Reflection;
 
 namespace Tenant
 {
@@ -46,6 +45,7 @@ namespace Tenant
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
+            builder.Configuration.AddStandardEnvironmentConfiguration();
 
             RegisterServices(builder);
 
@@ -60,32 +60,8 @@ namespace Tenant
 
         static void RegisterServices(WebApplicationBuilder builder)
         {
-            //load external configuration source if specified
-            var externalConfigurationSource = builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
-
-            if (!string.IsNullOrEmpty(externalConfigurationSource))
-            {
-                switch (externalConfigurationSource)
-                {
-                    case ("AzureAppConfiguration"):
-                        builder.Configuration.AddAzureAppConfiguration(options =>
-                        {
-                            options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
-                                    // Load configuration values with no label
-                                    .Select("*", LabelFilter.Null)
-                                    // Load configuration values for service name
-                                    .Select("*", TenantConstants.ServiceName)
-                                    // Load configuration values for service name and environment
-                                    .Select("*", TenantConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
-
-                            options.ConfigureKeyVault(kv =>
-                            {
-                                kv.SetCredential(new DefaultAzureCredential());
-                            });
-                        });
-                        break;
-                }
-            }
+            // load external configuration source (if specified)
+            builder.AddExternalConfiguration(TenantConstants.ServiceName);
 
             // Add Link Security
             bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
@@ -220,9 +196,9 @@ namespace Tenant
                 .Enrich.FromLogContext()
                 .CreateLogger();
 
-            Serilog.Debugging.SelfLog.Enable(Console.Error);
+            SelfLog.Enable(Console.Error);
 
-            builder.Services.AddSingleton<IJobFactory, JobFactory>();
+            builder.Services.AddSingleton<IJobFactory, QuartzJobFactory>();
 
             var quartzProps = new NameValueCollection
             {

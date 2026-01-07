@@ -22,6 +22,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
         private readonly IDatabase _database;
         private readonly IVendorQueries _vendorQueries;
         private readonly IOperationManager _operationManager;
+
         public VendorManager(IDatabase database, IVendorQueries vendorQueries, IOperationManager operationManager)
         {
             _database = database;

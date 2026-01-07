@@ -56,7 +56,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     Headers = headers
                 };
 
-                await _producer.ProduceAsync(nameof(KafkaTopic.PatientIDsAcquired), message);
+                await _producer.ProduceAsync(nameof(KafkaTopic.PatientListsAcquired), message);
 
                 return correlationId;
 
@@ -65,7 +65,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.RecordException(ex);
-                _logger.LogKafkaProducerException(nameof(KafkaTopic.PatientIDsAcquired), ex.Message);
+                _logger.LogKafkaProducerException(nameof(KafkaTopic.PatientListsAcquired), ex.Message);
                 throw;
             }
 

@@ -30,8 +30,8 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/measure-definition")
-@PreAuthorize("hasRole('LinkUser')")
+@RequestMapping("/api/measureeval/measure-definition")
+@PreAuthorize("hasAnyRole('LinkUser', 'LinkAdministrator')")
 public class MeasureDefinitionController {
 
     private final Logger _logger = LoggerFactory.getLogger(MeasureDefinitionController.class);

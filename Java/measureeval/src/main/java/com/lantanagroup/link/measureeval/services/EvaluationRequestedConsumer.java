@@ -5,11 +5,10 @@ import com.lantanagroup.link.measureeval.entities.ReportableEvent;
 import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.records.EvaluationRequested;
 import com.lantanagroup.link.measureeval.records.ResourceEvaluated;
-import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
-import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusTemplateRepository;
+import com.lantanagroup.link.measureeval.repositories.ResourceRepository;
+import com.lantanagroup.link.shared.kafka.AsyncListener;
 import com.lantanagroup.link.shared.kafka.Headers;
-import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
@@ -20,9 +19,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.messaging.handler.annotation.Header;
+import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
@@ -31,7 +29,7 @@ import java.util.function.Predicate;
 import static io.opentelemetry.api.common.AttributeKey.stringKey;
 
 @Service
-public class EvaluationRequestedConsumer {
+public class EvaluationRequestedConsumer extends AsyncListener<String, EvaluationRequested> {
 
     private static final Logger logger = LoggerFactory.getLogger(EvaluationRequestedConsumer.class);
     private final PatientReportingEvaluationStatusRepository patientStatusRepository;
@@ -39,9 +37,8 @@ public class EvaluationRequestedConsumer {
     private final PatientStatusBundler patientStatusBundler;
     private final ResourceEvaluatedProducer resourceEvaluatedProducer;
     private final EvaluateMeasureService evaluateMeasureService;
-    private final PatientReportingEvaluationStatusTemplateRepository patientReportingEvaluationStatusTemplateRepository;
 
-    EvaluationRequestedConsumer(AbstractResourceRepository resourceRepository,
+    EvaluationRequestedConsumer(ResourceRepository resourceRepository,
                                 PatientReportingEvaluationStatusRepository patientStatusRepository,
                                 MeasureReportNormalizer measureReportNormalizer,
                                 Predicate<MeasureReport> reportabilityPredicate,
@@ -52,18 +49,18 @@ public class EvaluationRequestedConsumer {
                                 PatientStatusBundler patientStatusBundler,
                                 ResourceEvaluatedProducer resourceEvaluatedProducer,
                                 EvaluateMeasureService evaluateMeasureService,
-                                PatientReportingEvaluationStatusTemplateRepository patientReportingEvaluationStatusTemplateRepository) {
+                                ConsumerRecordRecoverer recoverer) {
+        super(recoverer);
         this.patientStatusRepository = patientStatusRepository;
         this.measureEvalMetrics = measureEvalMetrics;
         this.patientStatusBundler = patientStatusBundler;
         this.resourceEvaluatedProducer = resourceEvaluatedProducer;
         this.evaluateMeasureService = evaluateMeasureService;
-        this.patientReportingEvaluationStatusTemplateRepository = patientReportingEvaluationStatusTemplateRepository;
     }
 
-    @KafkaListener(topics = Topics.EVALUATION_REQUESTED)
-    public void consume(@Header(Headers.CORRELATION_ID) String correlationId,
-                        ConsumerRecord<String, EvaluationRequested> record) {
+    @Override
+    protected void process(ConsumerRecord<String, EvaluationRequested> record) {
+        String correlationId = Headers.getCorrelationId(record.headers());
 
         Span currentSpan = Span.current();
         MDC.put("traceId", currentSpan.getSpanContext().getTraceId());
@@ -74,10 +71,10 @@ public class EvaluationRequestedConsumer {
         measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
 
         String facilityId = record.key();
-        var patientReportStatus = patientReportingEvaluationStatusTemplateRepository.getFirstByFacilityIdAndPatientIdAndReports_ReportTrackingId(facilityId, record.value().getPatientId(), record.value().getPreviousReportId());
+        var patientReportStatus = patientStatusRepository.findByFacilityIdAndPatientIdAndReportsReportTrackingId(facilityId, record.value().getPatientId(), record.value().getPreviousReportId()).orElse(null);
 
         if (patientReportStatus != null) {
-            var bundle = patientStatusBundler.createBundle(patientReportStatus);
+            var bundle = patientStatusBundler.createBundle(facilityId, patientReportStatus.getCorrelationId());
             evaluateMeasures(reportTrackingId, correlationId, record.value(), patientReportStatus, bundle);
         } else {
             logger.warn("Patient status not found for facilityId: {}, patientId: {}, reportTrackingId: {}. EvaluationRequested event not fully processed.", facilityId, record.value().getPatientId(), record.value().getPreviousReportId());
@@ -100,7 +97,6 @@ public class EvaluationRequestedConsumer {
         newPatientStatus.setCorrelationId(correlationId);
         newPatientStatus.setReportableEvent(ReportableEvent.ADHOC.name());
         newPatientStatus.setReports(reports);
-        newPatientStatus.setResources(patientStatus.getResources());
         patientStatusRepository.insert(newPatientStatus);
 
         reports.forEach(r -> {

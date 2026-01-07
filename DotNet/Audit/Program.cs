@@ -1,50 +1,49 @@
-using LantanaGroup.Link.Audit.Settings;
+using System.Collections.Specialized;
+using System.Reflection;
+using System.Text;
+using HealthChecks.UI.Client;
 using LantanaGroup.Link.Audit.Application.Interfaces;
+using LantanaGroup.Link.Audit.Application.Services;
+using LantanaGroup.Link.Audit.Domain.Managers;
+using LantanaGroup.Link.Audit.Infrastructure;
+using LantanaGroup.Link.Audit.Infrastructure.Health;
+using LantanaGroup.Link.Audit.Infrastructure.Logging;
+using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
+using LantanaGroup.Link.Audit.Listeners;
+using LantanaGroup.Link.Audit.Persistance;
+using LantanaGroup.Link.Audit.Persistance.Interceptors;
+using LantanaGroup.Link.Audit.Persistance.Repositories;
+using LantanaGroup.Link.Audit.Settings;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Factory;
+using LantanaGroup.Link.Shared.Application.Health;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
-using LantanaGroup.Link.Audit.Application.Factory;
+using LantanaGroup.Link.Shared.Application.Middleware;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Shared.Jobs;
+using LantanaGroup.Link.Shared.Settings;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Compliance.Classification;
+using Microsoft.Extensions.Compliance.Redaction;
+using Quartz;
+using Quartz.Impl;
+using Quartz.Spi;
 using Serilog;
 using Serilog.Enrichers.Span;
-using LantanaGroup.Link.Audit.Infrastructure;
-using System.Reflection;
-using LantanaGroup.Link.Audit.Infrastructure.Health;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using HealthChecks.UI.Client;
-using LantanaGroup.Link.Shared.Application.Middleware;
 using Serilog.Settings.Configuration;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
-using Azure.Identity;
-using Microsoft.Extensions.Compliance.Redaction;
-using LantanaGroup.Link.Audit.Infrastructure.Logging;
-using Microsoft.Extensions.Compliance.Classification;
-using System.Text;
-using LantanaGroup.Link.Audit.Persistance.Repositories;
-using LantanaGroup.Link.Audit.Persistance;
-using Microsoft.EntityFrameworkCore;
-using LantanaGroup.Link.Audit.Persistance.Interceptors;
-using LantanaGroup.Link.Shared.Application.Extensions;
-using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Settings;
-using LantanaGroup.Link.Shared.Application.Extensions.Security;
-using LantanaGroup.Link.Shared.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Factories;
-using LantanaGroup.Link.Shared.Application.Error.Interfaces;
-using LantanaGroup.Link.Shared.Application.Services;
-using Quartz.Impl;
-using Quartz;
-using LantanaGroup.Link.Shared.Application.Models;
-using Quartz.Spi;
-using LantanaGroup.Link.Shared.Jobs;
-using LantanaGroup.Link.Shared.Application.Utilities;
-using LantanaGroup.Link.Audit.Listeners;
-using LantanaGroup.Link.Audit.Domain.Managers;
-using LantanaGroup.Link.Shared.Application.Error.Handlers;
-using LantanaGroup.Link.Audit.Application.Services;
-using LantanaGroup.Link.Shared.Application.Health;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddStandardEnvironmentConfiguration();
 
 RegisterServices(builder);
 var app = builder.Build();
@@ -56,32 +55,8 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
-    //load external configuration source if specified
-    var externalConfigurationSource = builder.Configuration.GetSection(AuditConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
-    if(!string.IsNullOrEmpty(externalConfigurationSource))
-    {
-        switch (externalConfigurationSource)
-        { 
-            case("AzureAppConfiguration"):
-                builder.Configuration.AddAzureAppConfiguration(options =>
-                {
-                    options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
-                        // Load configuration values with no label
-                        .Select("*", LabelFilter.Null)
-                        // Load configuration values for service name
-                        .Select("*", AuditConstants.ServiceName)
-                        // Load configuration values for service name and environment
-                        .Select("*", AuditConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
-
-                    options.ConfigureKeyVault(kv =>
-                    {
-                        kv.SetCredential(new DefaultAzureCredential());
-                    });
-
-                });
-                break;
-        }
-    }   
+    // load external configuration source (if specified)
+    builder.AddExternalConfiguration(AuditConstants.ServiceName);
 
     var serviceInformation = builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
     if (serviceInformation != null)
@@ -121,6 +96,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IAuditEventProcessor, AuditEventProcessor>();
 
     //Add factories
+    builder.Services.AddSingleton<InMemorySchedulerFactory>();
+    builder.Services.AddKeyedSingleton<ISchedulerFactory>(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
+    
     builder.Services.AddTransient<IKafkaConsumerFactory<string, AuditEventMessage>, KafkaConsumerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
@@ -163,17 +141,37 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add repositories
     builder.Services.AddScoped<IAuditRepository, AuditLogRepository>();
     builder.Services.AddScoped<ISearchRepository, AuditLogSearchRepository>();
-    builder.Services.AddScoped<IBaseEntityRepository<RetryEntity>, AuditEntityRepository<RetryEntity>>();
 
     //Add Hosted Services
     builder.Services.AddHostedService<AuditEventListener>();
 
     var consumerSettings = builder.Configuration.GetSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
+
+    var quartzProps = new NameValueCollection
+    {
+        ["quartz.scheduler.instanceName"] = "AuditScheduler",
+        ["quartz.scheduler.instanceId"] = "AUTO",
+        ["quartz.jobStore.clustered"] = "true",
+        ["quartz.jobStore.type"] = "Quartz.Impl.AdoJobStore.JobStoreTX, Quartz",
+        ["quartz.jobStore.driverDelegateType"] = "Quartz.Impl.AdoJobStore.SqlServerDelegate, Quartz",
+        ["quartz.jobStore.tablePrefix"] = "quartz.QRTZ_",
+        ["quartz.jobStore.dataSource"] = "default",
+        ["quartz.dataSource.default.connectionString"] = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection),
+        ["quartz.dataSource.default.provider"] = "SqlServer",
+        ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
+        ["quartz.threadPool.threadCount"] = "5",
+        ["quartz.jobStore.useProperties"] = "false",
+        ["quartz.serializer.type"] = "json"
+    };
+
+    // Register main persistent scheduler factory
+    builder.Services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
+    builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
+
     if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
     {
-        builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
-        builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
-        builder.Services.AddTransient<IJobFactory, JobFactory>();
+        builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
+        builder.Services.AddTransient<IJobFactory, QuartzJobFactory>();
         builder.Services.AddTransient<RetryJob>();
 
         builder.Services.AddSingleton(new RetryListenerSettings(AuditConstants.ServiceName, [KafkaTopic.AuditableEventOccurredRetry.GetStringValue()]));

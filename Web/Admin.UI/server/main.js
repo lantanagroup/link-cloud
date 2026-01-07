@@ -3,8 +3,16 @@ const fs = require('fs');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
+const { blockPathMatchers } = require('./blocked-paths');
 
 const app = express();
+
+const trustProxyEnv = process.env.TRUST_PROXY || '1';
+const trustProxyValue = !isNaN(trustProxyEnv) ? Number(trustProxyEnv) : trustProxyEnv;
+app.set('trust proxy', trustProxyValue);
+console.log(`Express trust proxy is set to: ${trustProxyValue}`);
+
+
 const port = process.env.PORT || 80;
 
 // Basic rate limiting middleware
@@ -31,6 +39,15 @@ app.get('/assets/app.config.local.json', (req, res) => {
 });
 
 app.get('/*any', apiLimiter, (req, res) => {
+  const p = req.path; // pathname only (no querystring)
+
+  const isExcluded = blockPathMatchers.some((rule) => {
+    if (typeof rule === 'string') return p.toLowerCase() === rule.toLowerCase();
+    return rule.test(p);
+  });
+
+  if (isExcluded) return res.status(404).send('Not Found');
+
   res.sendFile(path.join(distFolder, 'index.html'));
 });
 
@@ -126,6 +143,16 @@ function getConfig() {
       config.oauth2.responseType = process.env.LINK_OAUTH2_RESPONSE_TYPE;
       console.log('Found LINK_OAUTH2_RESPONSE_TYPE:', config.oauth2.responseType);
     }
+  }
+
+  if (process.env.GRAFANA_URL !== undefined) {
+    config.grafanaUrl = process.env.GRAFANA_URL;
+    console.log('Found GRAFANA_URL:', config.grafanaUrl);
+  }
+
+  if (process.env.KAFKA_URL !== undefined) {
+    config.kafkaUrl = process.env.KAFKA_URL;
+    console.log('Found KAFKA_URL:', config.kafkaUrl);
   }
 
   return config;

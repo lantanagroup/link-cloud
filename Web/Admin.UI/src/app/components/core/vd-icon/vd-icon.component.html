@@ -1,9 +1,10 @@
 <i class="vd-icon" [ngClass]="class">
-  <ng-container *ngIf="isSvg; else imgTemplate">
+  @if (isSvg) {
     <div [innerHTML]="svgContent">
     </div>
-  </ng-container>
-  <ng-template #imgTemplate>
-    <img *ngIf="filePath" [src]="filePath" [alt]="altText" />
-  </ng-template>
+  } @else {
+    @if (filePath) {
+      <img [src]="filePath" [alt]="altText" />
+    }
+  }
 </i>

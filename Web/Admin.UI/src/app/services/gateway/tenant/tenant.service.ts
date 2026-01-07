@@ -10,6 +10,7 @@ import {
 import {Observable, catchError, map, tap, of} from 'rxjs';
 import {IEntityCreatedResponse} from 'src/app/interfaces/entity-created-response.model';
 import {AppConfigService} from '../../app-config.service';
+import {IEntityDeletedResponse} from "../../../interfaces/entity-deleted-response.interface";
 
 @Injectable({
   providedIn: 'root'
@@ -46,13 +47,23 @@ export class TenantService {
       scheduledReports: scheduledReports
     };
 
-    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/facility/${id}`, facility)
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/facility/${facilityId}`, facility)
       .pipe(
         tap(_ => console.log(`Request for facility update was sent.`)),
         map((response: IEntityCreatedResponse) => {
           return response;
         }),
         catchError((error) => this.errorHandler.handleError(error))
+      )
+  }
+
+  deleteFacilityConfiguration(facilityId: string): Observable<IEntityDeletedResponse> {
+    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/facility/${facilityId}`)
+      .pipe(
+        tap(_ => console.log(`Delete Facility configuration.`)),
+        catchError((error) => {
+          return this.errorHandler.handleError(error);
+        })
       )
   }
 
@@ -110,7 +121,9 @@ export class TenantService {
         tap(_ => console.log(`Fetched facilities.`)),
         map((response: PagedFacilityConfigModel) => {
           //revert back to zero based paging
-          response.metadata.pageNumber--;
+          if (response) {
+            response.metadata.pageNumber--;
+          }
           return response;
         }),
         catchError((err) => this.handleError(err))

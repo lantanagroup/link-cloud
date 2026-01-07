@@ -11,7 +11,7 @@ import {
 import {IQueryPlanModel} from "../../../interfaces/data-acquisition/query-plan-model.interface";
 import {FormMode} from "../../../models/FormMode.enum";
 import {IEntityCreatedResponse} from "../../../interfaces/entity-created-response.model";
-import {CommonModule} from "@angular/common";
+
 import {MatButtonModule} from "@angular/material/button";
 import {MatFormFieldModule} from "@angular/material/form-field";
 import {MatInputModule} from "@angular/material/input";
@@ -31,7 +31,6 @@ import {DataAcquisitionService} from "../../../services/gateway/data-acquisition
   selector: 'app-query-plan-config-form',
   standalone: true,
   imports: [
-    CommonModule,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -45,7 +44,6 @@ import {DataAcquisitionService} from "../../../services/gateway/data-acquisition
     FormsModule,
     ReactiveFormsModule,
     MatFormFieldModule,
-    CommonModule,
     MatSnackBarModule,
     FormsModule,
     ReactiveFormsModule,
@@ -58,8 +56,8 @@ import {DataAcquisitionService} from "../../../services/gateway/data-acquisition
     MatButtonModule,
     MatIconModule,
     MatExpansionModule,
-    MatProgressSpinnerModule,
-  ],
+    MatProgressSpinnerModule
+],
   templateUrl: './query-plan-config.component.html',
   styleUrl: './query-plan-config.component.scss'
 })
@@ -90,10 +88,10 @@ export class QueryPlanConfigFormComponent {
   isInvalidJson = false;
 
   types = [
-    { value: '0', label: 'Discharge' },
-    { value: '2', label: 'Weekly' },
-    { value: '1', label: 'Daily' },
-    { value: '3', label: 'Monthly' }
+    { value: 'Discharge', label: 'Discharge' },
+    { value: 'Weekly', label: 'Weekly' },
+    { value: 'Daily', label: 'Daily' },
+    { value: 'Monthly', label: 'Monthly' }
   ];
 
   constructor(private snackBar: MatSnackBar, private dataAcquisitionService: DataAcquisitionService, private fb: FormBuilder) {
@@ -115,26 +113,26 @@ export class QueryPlanConfigFormComponent {
 
     if (this.item) {
       //set form values
-      this.planNameControl.setValue(this.item.PlanName);
+      this.planNameControl.setValue(this.item.planName);
       this.planNameControl.updateValueAndValidity();
 
-      this.facilityIdControl.setValue(this.item.FacilityId);
+      this.facilityIdControl.setValue(this.item.facilityId);
       this.facilityIdControl.updateValueAndValidity();
 
-      this.typeControl.setValue(this.item.Type.toString());
+      this.typeControl.setValue(this.item.type);
       this.typeControl.updateValueAndValidity();
 
-      this.ehrDescriptionControl.setValue(this.item.EHRDescription);
+      this.ehrDescriptionControl.setValue(this.item.ehrDescription);
       this.ehrDescriptionControl.updateValueAndValidity();
 
-      this.lookBackControl.setValue(this.item.LookBack);
+      this.lookBackControl.setValue(this.item.lookBack);
       this.lookBackControl.updateValueAndValidity();
 
 
-      this.initialQueriesControl.setValue(this.item?.InitialQueries ? JSON.stringify(this.item.InitialQueries, null, 2) : '');
+      this.initialQueriesControl.setValue(this.item?.initialQueries ? JSON.stringify(this.item.initialQueries, null, 2) : '');
       this.initialQueriesControl.updateValueAndValidity();
 
-      this.supplementalQueriesControl.setValue(this.item?.SupplementalQueries ? JSON.stringify(this.item.SupplementalQueries, null, 2) : '')
+      this.supplementalQueriesControl.setValue(this.item?.supplementalQueries ? JSON.stringify(this.item.supplementalQueries, null, 2) : '')
       this.supplementalQueriesControl.updateValueAndValidity();
 
     } else {
@@ -150,26 +148,26 @@ export class QueryPlanConfigFormComponent {
 
     if (changes['item'] && changes['item'].currentValue) {
 
-      this.planNameControl.setValue(this.item.PlanName);
+      this.planNameControl.setValue(this.item.planName);
       this.planNameControl.updateValueAndValidity();
 
-      this.facilityIdControl.setValue(this.item.FacilityId);
+      this.facilityIdControl.setValue(this.item.facilityId);
       this.facilityIdControl.updateValueAndValidity();
 
-      this.typeControl.setValue(this.item.Type.toString());
+      this.typeControl.setValue(this.item.type);
       this.typeControl.updateValueAndValidity();
 
-      this.ehrDescriptionControl.setValue(this.item.EHRDescription);
+      this.ehrDescriptionControl.setValue(this.item.ehrDescription);
       this.ehrDescriptionControl.updateValueAndValidity();
 
-      this.lookBackControl.setValue(this.item.LookBack);
+      this.lookBackControl.setValue(this.item.lookBack);
       this.lookBackControl.updateValueAndValidity();
 
 
-      this.initialQueriesControl.setValue(this.item?.InitialQueries ? JSON.stringify(this.item.InitialQueries, null, 2) : '');
+      this.initialQueriesControl.setValue(this.item?.initialQueries ? JSON.stringify(this.item.initialQueries, null, 2) : '');
       this.initialQueriesControl.updateValueAndValidity();
 
-      this.supplementalQueriesControl.setValue(this.item?.SupplementalQueries ? JSON.stringify(this.item.SupplementalQueries, null, 2) : '')
+      this.supplementalQueriesControl.setValue(this.item?.supplementalQueries ? JSON.stringify(this.item.supplementalQueries, null, 2) : '')
       this.supplementalQueriesControl.updateValueAndValidity();
     }
     // toggle view
@@ -200,13 +198,13 @@ export class QueryPlanConfigFormComponent {
             verticalPosition: 'top'
           });
           this.item = {
-            FacilityId: this.facilityIdControl.value,
-            PlanName: '',
-            EHRDescription: '',
-            LookBack: '',
-            InitialQueries: '',
-            SupplementalQueries: '',
-            Type: '0'
+            facilityId: this.facilityIdControl.value,
+            planName: '',
+            ehrDescription: '',
+            lookBack: '',
+            initialQueries: '',
+            supplementalQueries: '',
+            type: this.typeControl.value ?? "Discharge"
           } as IQueryPlanModel;
           this.planSelected.emit({"type" : this.typeControl.value, "label": this.getLabelFromValue(this.typeControl.value), "exists" : false});
         } else {
@@ -320,7 +318,7 @@ export class QueryPlanConfigFormComponent {
             InitialQueries: JSON.parse(this.initialQueriesControl.value),
             SupplementalQueries: JSON.parse(this.supplementalQueriesControl.value),
             Type: this.typeControl.value
-          } as IQueryPlanModel).subscribe({
+          } as any).subscribe({
             next: (response) => {
               this.submittedConfiguration.emit({id: '', message: `Created query plan`});
             },
@@ -331,6 +329,7 @@ export class QueryPlanConfigFormComponent {
         } else if (this.formMode == FormMode.Edit) {
           this.dataAcquisitionService.updateQueryPlanConfiguration(this.facilityIdControl.value,
             {
+              Id: this.item.id,
               PlanName: this.planNameControl.value,
               FacilityId: this.facilityIdControl.value,
               EHRDescription: this.ehrDescriptionControl.value,
@@ -338,7 +337,7 @@ export class QueryPlanConfigFormComponent {
               InitialQueries: JSON.parse(this.initialQueriesControl.value),
               SupplementalQueries: JSON.parse(this.supplementalQueriesControl.value),
               Type: this.typeControl.value
-            } as IQueryPlanModel).subscribe({
+            } as any).subscribe({
             next: (response) => {
               this.submittedConfiguration.emit({id: '', message: `Updated query plan`});
             },

@@ -1,33 +1,37 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs/internal/firstValueFrom';
-import { UserProfileService } from '../../../services/user-profile.service';
-import { UserProfile } from '../../../models/user-pofile.model';
-import {AppConfigService} from "../../../services/app-config.service";
+import {Component, OnInit} from '@angular/core';
+import {UserProfileService} from '../../../services/user-profile.service';
+import {Router} from "@angular/router";
 
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './admin-dashboard.component.html',
   styleUrls: ['./admin-dashboard.component.css']
 })
-export class AdminDashboardComponent {
+export class AdminDashboardComponent implements OnInit {
 
-  private name: string = "";
-  constructor(private http: HttpClient, private userProfileService: UserProfileService, private appConfigService: AppConfigService) {
+  private name: string | undefined;
+
+  constructor(private userProfileService: UserProfileService, private router: Router) {
   }
 
   async ngOnInit(): Promise<void> {
-    const baseApiUrl = this.appConfigService.config?.baseApiUrl || '/api';
-    let result: UserProfile = await firstValueFrom(this.http.get<UserProfile>(`${baseApiUrl}/user`));
-    console.log('got result:', result);
+    const returnUrl = sessionStorage.getItem('returnUrl');
+    if (returnUrl) {
+      sessionStorage.removeItem('returnUrl'); // prevent loops
+      await this.router.navigateByUrl(returnUrl);
+      return;
+    }
 
-    let profile = new UserProfile(result.email, result.firstName, result.lastName, result.roles, result.permissions);
-    this.name = profile.firstName + ' ' + profile.lastName;
-    this.userProfileService.setProfile(profile);
+    try {
+      const profile = await this.userProfileService.getProfile();
+      this.name = profile?.firstName || profile?.lastName ? `${profile.firstName ?? ''} ${profile.lastName ?? ''}`.trim() : '';
+    } catch (error) {
+      console.error('Failed to fetch user profile:', error);
+    }
   }
+
 
   get myName() {
     return this.name;
