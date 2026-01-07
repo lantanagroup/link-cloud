@@ -76,15 +76,12 @@ public class MeasureReportAggregator
                     });
                 }
 
-                measureReport.Contained.Add(measureReportList);
-
-                CodeableConcept codeableConcept = reportPopulation.PopulationCode; 
-                
+                measureReport.Contained.Add(measureReportList); 
                 measureReport.Group.Add(new MeasureReport.GroupComponent()
                 {
                     Population = new List<MeasureReport.PopulationComponent>() { 
                         new MeasureReport.PopulationComponent() { 
-                            Code = codeableConcept,
+                            Code = reportPopulation.PopulationCode,
                             Count = reportPopulation.TotalPopulationCount,
                             SubjectResults = new ResourceReference("#" + reportPopulation.PopulationId + "-list")
                         }

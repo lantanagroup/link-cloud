@@ -12,7 +12,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         Task<ReportResourceModel> AddAsync(ReportResourceModel entry,
             CancellationToken cancellationToken);
 
-        void AddAsyncWithAggregateResult(string facilityId, string reportId, string patientId, AggregateResult aggregateResult, CancellationToken cancellationToken);
+        Task AddAsyncWithAggregateResult(string facilityId, string reportId, string patientId, AggregateResult aggregateResult, CancellationToken cancellationToken);
 
         Task<List<ReportResourceModel>> FindAsync(Expression<Func<ReportResourceModel, bool>> predicate,
             CancellationToken cancellationToken = default);
@@ -36,7 +36,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return await _database.ReportResourceRepository.AddAsync(entry, cancellationToken);
         }
 
-        public async void AddAsyncWithAggregateResult(string facilityId, string reportId, string patientId, AggregateResult aggregateResult, CancellationToken cancellationToken) {
+        public async Task AddAsyncWithAggregateResult(string facilityId, string reportId, string patientId, AggregateResult aggregateResult, CancellationToken cancellationToken) {
             foreach (var measureReport in aggregateResult.MeasureReportResults)
             {
                 foreach (var resource in measureReport.Resources)

@@ -111,7 +111,7 @@ namespace IntegrationTests.Report
                     services.AddTransient<ReportManifestProducer>();
 
                     services.AddTransient<EndOfReportPeriodJob>();
-                    services.AddTransient<PatientReportSubmissionBundler>();
+                    services.AddTransient<PatientAggregator>();
                     services.AddTransient<ValidationCompleteListener>();
                     services.AddTransient<ResourceEvaluatedListener>();
                     services.AddTransient<AuditableEventOccurredProducer>();
@@ -233,7 +233,7 @@ namespace IntegrationTests.Report
         public IBaseEntityRepository<SharedResourceModel> SharedResourceRepository { get; set; } = new InMemoryEntityRepository<SharedResourceModel>();
         public IBaseEntityRepository<ReportScheduleModel> ReportScheduledRepository { get; set; } = new InMemoryEntityRepository<ReportScheduleModel>();
         public IBaseEntityRepository<MeasureReportSubmissionEntryModel> SubmissionEntryRepository { get; set; } = new InMemoryEntityRepository<MeasureReportSubmissionEntryModel>();
-        public IBaseEntityRepository<ReportEntryStatusModel> ReportEntryStatusRepository { get; set; } = new InMemoryEntityRepository<ReportEntryStatusModel>();
+        public IBaseEntityRepository<ReportEntryModel> ReportEntryRepository { get; set; } = new InMemoryEntityRepository<ReportEntryModel>();
     }
 
     public class InMemoryEntityRepository<T> : IBaseEntityRepository<T> where T : class, new()

@@ -22,6 +22,7 @@ using System.IO.Compression;
 using System.Linq.Expressions;
 using System.Net;
 using System.Text.Json;
+using System.Threading;
 using SortOrder = LantanaGroup.Link.Shared.Application.Enums.SortOrder;
 
 namespace LantanaGroup.Link.Report.Controllers
@@ -35,15 +36,15 @@ namespace LantanaGroup.Link.Report.Controllers
             new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector).UsingMode(DeserializerModes.Ostrich);
 
         private readonly ILogger<ReportController> _logger;
-        private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
+        private readonly PatientAggregator _patientAggregator;
         private readonly IDatabase _database;
         private readonly IReportEntryStatusManager _reportEntryStatusManager;
         private readonly IReportScheduledManager _reportingScheduledManager;
         private readonly ReportManifestProducer _reportManifestProducer;
-        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler, IDatabase database, IReportEntryStatusManager reportEntryStatusManager, IReportScheduledManager reportingScheduledManager, ReportManifestProducer reportManifestProducer)
+        public ReportController(ILogger<ReportController> logger, PatientAggregator patientAggregator, IDatabase database, IReportEntryStatusManager reportEntryStatusManager, IReportScheduledManager reportingScheduledManager, ReportManifestProducer reportManifestProducer)
         {
             _logger = logger;
-            _patientReportSubmissionBundler = patientReportSubmissionBundler;
+            _patientAggregator = patientAggregator;
             _database = database;
             _reportEntryStatusManager = reportEntryStatusManager;
             _reportingScheduledManager = reportingScheduledManager;
@@ -79,9 +80,15 @@ namespace LantanaGroup.Link.Report.Controllers
                 {
                     return BadRequest("Parameter reportScheduleId is null or whitespace");
                 }
-                
-                //TODO: Reimplement 
-                //await _patientReportSubmissionBundler.GenerateBundleToABS(patientId, reportScheduleId);
+
+                var schedule = await _reportingScheduledManager.GetReportSchedule(facilityId, reportScheduleId);
+
+                if (schedule == null)
+                {
+                    return BadRequest("No scheduled report found for " + reportScheduleId);
+                }
+
+                await _patientAggregator.AggregateToABS(patientId, schedule);
                 return Ok();
 
             }
@@ -389,7 +396,7 @@ namespace LantanaGroup.Link.Report.Controllers
             {
                 // Create search predicates
                 //TODO: design way to dynamically build predicates or change search to use custom method
-                Expression<Func<ReportEntryStatusModel, bool>> predicate = r => r.FacilityId == facilityId;
+                Expression<Func<ReportEntryModel, bool>> predicate = r => r.FacilityId == facilityId;
 
                 if (!string.IsNullOrEmpty(parameters.ReportId))
                 {
@@ -406,12 +413,12 @@ namespace LantanaGroup.Link.Report.Controllers
                     predicate = predicate.And(r => r.Id == parameters.MeasureReportId);
                 }
 
-                //TODO: Look into re-implementing commented section
+                if (!string.IsNullOrEmpty(parameters.Measure))
+                {
+                    predicate = predicate.And(r => r.MeasureReportList.Any(x => x.ReportType == parameters.Measure));
+                }
 
-                //if (!string.IsNullOrEmpty(parameters.Measure))
-                //{
-                //    predicate = predicate.And(r => r.ReportType == parameters.Measure);
-                //}
+                //TODO: Look into re-implementing commented section
 
                 //if (parameters.ReportStatus is not null)
                 //{

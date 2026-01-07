@@ -25,7 +25,7 @@ public class ScheduledReportFactory
 
 public class MeasureReportSummaryFactory
 {
-    public MeasureReportSummary FromDomain(ReportEntryStatusModel measureReport)
+    public MeasureReportSummary FromDomain(ReportEntryModel measureReport)
     {
         var summary = new MeasureReportSummary()
         {

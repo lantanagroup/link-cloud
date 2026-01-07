@@ -14,29 +14,28 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 {
     public interface IReportEntryStatusManager 
     {
-        Task<ReportEntryStatusModel?> GetEntry(string reportScheduleId, string patientId, CancellationToken cancellationToken = default);
+        Task<ReportEntryModel?> GetEntry(string reportScheduleId, string patientId, CancellationToken cancellationToken = default);
 
-        Task<ReportEntryStatusModel> UpdateAsync(ReportEntryStatusModel entry,
+        Task<ReportEntryModel> UpdateAsync(ReportEntryModel entry,
             CancellationToken cancellationToken);
 
-        Task<ReportEntryStatusModel> AddAsync(ReportEntryStatusModel entry,
+        Task<ReportEntryModel> AddAsync(ReportEntryModel entry,
             CancellationToken cancellationToken);
 
-        Task<List<ReportEntryStatusModel>> FindAsync(Expression<Func<ReportEntryStatusModel, bool>> predicate,
+        Task<List<ReportEntryModel>> FindAsync(Expression<Func<ReportEntryModel, bool>> predicate,
             CancellationToken cancellationToken = default);
 
-        Task<ReportEntryStatusModel?> SingleOrDefaultAsync(
-            Expression<Func<ReportEntryStatusModel, bool>> predicate,
+        Task<ReportEntryModel?> SingleOrDefaultAsync(
+            Expression<Func<ReportEntryModel, bool>> predicate,
             CancellationToken cancellationToken = default);
 
-        Task<ReportEntryStatusModel> UpdateAsyncWithConsumerResult(MeasureReportGeneratedValue consumerValue, CancellationToken cancellationToken = default);
+        Task<ReportEntryModel> UpdateAsyncWithConsumerResult(MeasureReportGeneratedValue consumerValue, CancellationToken cancellationToken = default);
 
-        Task<ReportEntryStatusModel> UpdateAsyncWithAggregateResult(ReportEntryStatusModel entry, AggregateResult aggregateResult, CancellationToken cancellationToken = default);
+        Task<ReportEntryModel> UpdateAsyncWithAggregateResult(ReportEntryModel entry, AggregateResult aggregateResult, CancellationToken cancellationToken = default);
 
         Task<PatientReportSummary> GetPatients(string facilityId, string reportId, int page, int count, CancellationToken cancellationToken = default);
 
-        Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(Expression<Func<ReportEntryStatusModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default);
-        //Task UpdateStatusToValidationRequested(string reportScheduleId, string patientId, CancellationToken cancellationToken = default);
+        Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(Expression<Func<ReportEntryModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default);
     }
 
     public class ReportEntryStatusManager : IReportEntryStatusManager
@@ -50,36 +49,36 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             _measureReportSummaryFactory = measureReportSummaryFactory;
         }
 
-        public async Task<ReportEntryStatusModel> AddAsync(ReportEntryStatusModel entry, CancellationToken cancellationToken)
+        public async Task<ReportEntryModel> AddAsync(ReportEntryModel entry, CancellationToken cancellationToken)
         {
-            return await _database.ReportEntryStatusRepository.AddAsync(entry, cancellationToken);
+            return await _database.ReportEntryRepository.AddAsync(entry, cancellationToken);
         }
 
-        public async Task<List<ReportEntryStatusModel>> FindAsync(Expression<Func<ReportEntryStatusModel, bool>> predicate, CancellationToken cancellationToken = default)
+        public async Task<List<ReportEntryModel>> FindAsync(Expression<Func<ReportEntryModel, bool>> predicate, CancellationToken cancellationToken = default)
         {
-            return await _database.ReportEntryStatusRepository.FindAsync(predicate, cancellationToken);
+            return await _database.ReportEntryRepository.FindAsync(predicate, cancellationToken);
         }
 
-        public async Task<ReportEntryStatusModel?> GetEntry(string reportScheduleId, string patientId, CancellationToken cancellationToken = default)
+        public async Task<ReportEntryModel?> GetEntry(string reportScheduleId, string patientId, CancellationToken cancellationToken = default)
         {
-            return (await _database.ReportEntryStatusRepository.FindAsync(r => r.ReportScheduleId == reportScheduleId && r.PatientId == patientId, cancellationToken)).SingleOrDefault();
+            return (await _database.ReportEntryRepository.FindAsync(r => r.ReportScheduleId == reportScheduleId && r.PatientId == patientId, cancellationToken)).SingleOrDefault();
         }
 
-        public async Task<ReportEntryStatusModel?> SingleOrDefaultAsync(Expression<Func<ReportEntryStatusModel, bool>> predicate, CancellationToken cancellationToken = default)
+        public async Task<ReportEntryModel?> SingleOrDefaultAsync(Expression<Func<ReportEntryModel, bool>> predicate, CancellationToken cancellationToken = default)
         {
-            return await _database.ReportEntryStatusRepository.SingleOrDefaultAsync(predicate, cancellationToken);
+            return await _database.ReportEntryRepository.SingleOrDefaultAsync(predicate, cancellationToken);
         }
 
-        public async Task<ReportEntryStatusModel> UpdateAsync(ReportEntryStatusModel entry, CancellationToken cancellationToken)
+        public async Task<ReportEntryModel> UpdateAsync(ReportEntryModel entry, CancellationToken cancellationToken)
         {
-            return await _database.ReportEntryStatusRepository.UpdateAsync(entry, cancellationToken);
+            return await _database.ReportEntryRepository.UpdateAsync(entry, cancellationToken);
         }
 
-        public async Task<ReportEntryStatusModel> UpdateAsyncWithConsumerResult(MeasureReportGeneratedValue consumerValue, CancellationToken cancellationToken = default)
+        public async Task<ReportEntryModel> UpdateAsyncWithConsumerResult(MeasureReportGeneratedValue consumerValue, CancellationToken cancellationToken = default)
         {
             var reportEntry = await this.GetEntry(consumerValue.ReportTrackingId, consumerValue.PatientId);
 
-            MeasureReportEntry measureReportEntry =  reportEntry.MeasureReportEntryList.First(x => x.ReportType == consumerValue.ReportType);
+            EvaluatedMeasureReport measureReportEntry =  reportEntry.MeasureReportList.First(x => x.ReportType == consumerValue.ReportType);
 
             measureReportEntry.MeasureReportId = consumerValue.MeasureReportId;
             measureReportEntry.MeasureReportFileName = consumerValue.MeasureReportFileName;
@@ -94,20 +93,20 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 measureReportEntry.Status = MeasureReportStatus.NotReportable;
             }
 
-            return await _database.ReportEntryStatusRepository.UpdateAsync(reportEntry, cancellationToken);
+            return await _database.ReportEntryRepository.UpdateAsync(reportEntry, cancellationToken);
         }
 
-        public async Task<ReportEntryStatusModel> UpdateAsyncWithAggregateResult(ReportEntryStatusModel entry, AggregateResult aggregateResult, CancellationToken cancellationToken = default)
+        public async Task<ReportEntryModel> UpdateAsyncWithAggregateResult(ReportEntryModel entry, AggregateResult aggregateResult, CancellationToken cancellationToken = default)
         {
             entry.AggregateReportUri = aggregateResult.Uri.AbsoluteUri;
             entry.AggregateReportFileName = aggregateResult.Uri.Segments.Last();
             entry.ModifyDate = DateTime.UtcNow;
 
             foreach (var measureReportResult in aggregateResult.MeasureReportResults) {
-                entry.MeasureReportEntryList.First(x => x.ReportType == measureReportResult.ReportType).ResourceCount = measureReportResult.ResourceCount;
+                entry.MeasureReportList.First(x => x.ReportType == measureReportResult.ReportType).ResourceCount = measureReportResult.ResourceCount;
             }
 
-            return await _database.ReportEntryStatusRepository.UpdateAsync(entry, cancellationToken);
+            return await _database.ReportEntryRepository.UpdateAsync(entry, cancellationToken);
         }
 
         public async Task<PatientReportSummary> GetPatients(string facilityId, string reportId, int page, int count, CancellationToken cancellationToken = default)
@@ -116,7 +115,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
             if (scheduledReport is null) throw new ArgumentNullException($"Scheduled report with ID {reportId} not found.");
 
-            var measureReportEntries = await _database.ReportEntryStatusRepository.FindAsync(x => x.ReportScheduleId == reportId, cancellationToken);
+            var measureReportEntries = await _database.ReportEntryRepository.FindAsync(x => x.ReportScheduleId == reportId, cancellationToken);
 
             var patientIds = measureReportEntries.Select(x => x.PatientId).Distinct().ToList();
 
@@ -164,11 +163,11 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return patientReportSummary;
         }
 
-        public async Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(Expression<Func<ReportEntryStatusModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
+        public async Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(Expression<Func<ReportEntryModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
         {
             //TODO: Refactors are probably needed here to support the new report entry model
             // Get individual measure report entries for this report
-            var searchResults = await _database.ReportEntryStatusRepository
+            var searchResults = await _database.ReportEntryRepository
                 .SearchAsync(
                     predicate,
                     sortBy: sortBy,

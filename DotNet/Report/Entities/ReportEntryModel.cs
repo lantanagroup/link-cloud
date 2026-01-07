@@ -5,10 +5,9 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace LantanaGroup.Link.Report.Entities
 {
-    //TODO: Rename to reportEntry?
-    [BsonCollection("reportEntryStatus")]
+    [BsonCollection("reportEntry")]
     [BsonIgnoreExtraElements]
-    public class ReportEntryStatusModel : BaseEntityExtended
+    public class ReportEntryModel : BaseEntityExtended
     {
         public string FacilityId { get; set; } = string.Empty;
         public string ReportScheduleId { get; set; } = string.Empty;
@@ -19,10 +18,10 @@ namespace LantanaGroup.Link.Report.Entities
         public SubmissionStatus? SubmissionStatus = null;
         public string AggregateReportUri { get; set; } = string.Empty;
         public string AggregateReportFileName { get; set; } = string.Empty;
-        public List<MeasureReportEntry> MeasureReportEntryList { get; set; } = new List<MeasureReportEntry>();
+        public List<EvaluatedMeasureReport> MeasureReportList { get; set; } = new List<EvaluatedMeasureReport>();
     }
 
-    public class MeasureReportEntry 
+    public class EvaluatedMeasureReport 
     {
         public string MeasureReportId { get; set; } = string.Empty;
         [BsonRepresentation(MongoDB.Bson.BsonType.String)]

@@ -77,7 +77,7 @@ namespace LantanaGroup.Link.Report.Jobs
 
                 if (!manifestProduced)
                 {
-                    var patientsToEvaluate = await _database.ReportEntryStatusRepository.AnyAsync(x => x.ReportScheduleId == schedule.Id && x.ReportingStatus == ReportingStatus.PatientIdentified, CancellationToken.None);
+                    var patientsToEvaluate = await _database.ReportEntryRepository.AnyAsync(x => x.ReportScheduleId == schedule.Id && x.ReportingStatus == ReportingStatus.PatientIdentified, CancellationToken.None);
 
                     if (patientsToEvaluate)
                     {

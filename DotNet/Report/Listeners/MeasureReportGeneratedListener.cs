@@ -39,7 +39,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ITransientExceptionHandler<Null, MeasureReportGeneratedValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<Null, MeasureReportGeneratedValue> _deadLetterExceptionHandler;
 
-        private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
+        private readonly PatientAggregator _patientAggregator;
         private readonly BlobStorageService _blobStorageService;
         private readonly ReadyForValidationProducer _readyForValidationProducer;
         private readonly ReportManifestProducer _reportManifestProducer;
@@ -57,7 +57,7 @@ namespace LantanaGroup.Link.Report.Listeners
             ITransientExceptionHandler<Null, MeasureReportGeneratedValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<Null, MeasureReportGeneratedValue> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory,
-            PatientReportSubmissionBundler patientReportSubmissionBundler,
+            PatientAggregator patientAggregator,
             BlobStorageService blobStorageService,
             ReadyForValidationProducer readyForValidationProducer,
             ReportManifestProducer reportManifestProducer,
@@ -81,7 +81,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.MeasureReportGenerated) + "-Error";
-            _patientReportSubmissionBundler = patientReportSubmissionBundler;
+            _patientAggregator = patientAggregator;
             _blobStorageService = blobStorageService;
             _readyForValidationProducer = readyForValidationProducer;
             _reportManifestProducer = reportManifestProducer;
@@ -121,7 +121,12 @@ namespace LantanaGroup.Link.Report.Listeners
                         {
                             try
                             {
-                                facilityId = result.Value.FacilityId;
+                                if (result.Message.Value == null) 
+                                {
+                                    throw new DeadLetterException($"MeasureReportGenerated Partition: { result.Partition.Value }, Offset: {result.Offset.Value} event value missing");
+                                }
+
+                                facilityId = result.Message.Value.FacilityId;
 
                                 if (!result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
                                 {
@@ -129,9 +134,9 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
 
                                 var correlationId = Encoding.UTF8.GetString(headerValue);
-                                var reportEntry = await _reportEntryManager.UpdateAsyncWithConsumerResult(result.Value);
-                                var schedule = await _reportScheduledManager.GetReportSchedule(result.Value.FacilityId, result.Value.ReportTrackingId, cancellationToken);
-                                var readyForValidation = reportEntry.MeasureReportEntryList.All(x => x.Status == MeasureReportStatus.NotReportable || x.Status == MeasureReportStatus.ReadyForValidation);
+                                var reportEntry = await _reportEntryManager.UpdateAsyncWithConsumerResult(result.Message.Value);
+                                var schedule = await _reportScheduledManager.GetReportSchedule(result.Message.Value.FacilityId, result.Message.Value.ReportTrackingId, cancellationToken);
+                                var readyForValidation = reportEntry.MeasureReportList.All(x => x.Status == MeasureReportStatus.NotReportable || x.Status == MeasureReportStatus.ReadyForValidation);
 
                                 if (!readyForValidation)
                                 {
@@ -140,32 +145,32 @@ namespace LantanaGroup.Link.Report.Listeners
                                     return;
                                 }
 
-                                AggregateResult aggregateResult = await _patientReportSubmissionBundler.GenerateBundleToABS(result.Value.PatientId, schedule);
+                                AggregateResult aggregateResult = await _patientAggregator.AggregateToABS(result.Value.PatientId, schedule);
 
                                 if (aggregateResult == null)
                                 {
-                                    throw new DeadLetterException($"No aggregated results were found for patient '{result.Value.PatientId}' for report id '{result.Value.ReportTrackingId}'");
+                                    throw new DeadLetterException($"No aggregated results were generated for patient '{result.Message.Value.PatientId}' for report id '{result.Message.Value.ReportTrackingId}'");
                                 }
 
-                                _reportEntryManager.UpdateAsyncWithAggregateResult(reportEntry, aggregateResult);
-                                _reportResourceManager.AddAsyncWithAggregateResult(facilityId, result.Value.ReportTrackingId, result.Value.PatientId, aggregateResult, cancellationToken);
+                                await _reportEntryManager.UpdateAsyncWithAggregateResult(reportEntry, aggregateResult);
+                                await _reportResourceManager.AddAsyncWithAggregateResult(facilityId, result.Message.Value.ReportTrackingId, result.Message.Value.PatientId, aggregateResult, cancellationToken);
 
                                 foreach (var aggregateMeasureReport in aggregateResult.MeasureReportResults)
                                 {
-                                    var populationModel = await _reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == result.Value.ReportTrackingId && x.Measure == result.Value.ReportType);
+                                    var populationModel = await _reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == result.Message.Value.ReportTrackingId && x.Measure == result.Message.Value.ReportType);
 
                                     if (populationModel == null)
                                     {
-                                        _reportPopulationManager.AddAsyncWithAggregateResult(result.Value.FacilityId, result.Value.ReportTrackingId, aggregateMeasureReport, cancellationToken);
+                                        await _reportPopulationManager.AddAsyncWithAggregateResult(result.Message.Value.FacilityId, result.Message.Value.ReportTrackingId, aggregateMeasureReport, cancellationToken);
                                         continue;
                                     }
                                     
-                                    _reportPopulationManager.UpdateAsyncWithAggregateResult(populationModel, aggregateMeasureReport, cancellationToken);    
+                                    await _reportPopulationManager.UpdateAsyncWithAggregateResult(populationModel, aggregateMeasureReport, cancellationToken);    
                                 }
 
                                 try
                                 {
-                                    await _readyForValidationProducer.Produce(schedule.Id, schedule.ReportTypes, schedule.FacilityId, result.Value.PatientId, aggregateResult.Uri.AbsolutePath, correlationId);
+                                    await _readyForValidationProducer.Produce(schedule.Id, schedule.ReportTypes, schedule.FacilityId, result.Message.Value.PatientId, aggregateResult.Uri.AbsolutePath, correlationId);
                                 }
                                 catch (ProduceException<ReadyForValidationKey, ReadyForValidationValue> ex)
                                 {

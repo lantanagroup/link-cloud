@@ -132,7 +132,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add repositories
     builder.Services.AddTransient<IBaseEntityRepository<ReportScheduleModel>, MongoEntityRepository<ReportScheduleModel>>();
     builder.Services.AddTransient<IBaseEntityRepository<ReportModel>, MongoEntityRepository<ReportModel>>();
-    builder.Services.AddTransient<IBaseEntityRepository<ReportEntryStatusModel>, MongoEntityRepository<ReportEntryStatusModel>>();
+    builder.Services.AddTransient<IBaseEntityRepository<ReportEntryModel>, MongoEntityRepository<ReportEntryModel>>();
     builder.Services.AddTransient<IBaseEntityRepository<ReportPopulationModel>, MongoEntityRepository<ReportPopulationModel>>();
     builder.Services.AddTransient<IBaseEntityRepository<ReportResourceModel>, MongoEntityRepository<ReportResourceModel>>();
     builder.Services.AddTransient<IDatabase, Database>();
@@ -259,7 +259,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<RetryScheduleService>();
     builder.Services.AddHostedService<MeasureReportScheduleService>();
 
-    builder.Services.AddTransient<PatientReportSubmissionBundler>();
+    builder.Services.AddTransient<PatientAggregator>();
     builder.Services.AddTransient<MeasureReportAggregator>();
     builder.Services.AddTransient<ReportManifestProducer>();
     builder.Services.AddTransient<SubmitPayloadProducer>();

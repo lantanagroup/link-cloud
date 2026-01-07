@@ -45,7 +45,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public async Task<List<Resource>> Generate(ReportScheduleModel schedule)
         {
-            var reportEntries = await _database.ReportEntryStatusRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
+            var reportEntries = await _database.ReportEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
 
             //TODO: ADD ERROR
 
@@ -112,7 +112,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             //    && e.Status != PatientSubmissionStatus.ValidationComplete
             //    && e.Status != PatientSubmissionStatus.Submitted, CancellationToken.None);
 
-            var reportEntries = await _database.ReportEntryStatusRepository.FindAsync(x => x.FacilityId == schedule.FacilityId && x.ReportScheduleId == schedule.Id);
+            var reportEntries = await _database.ReportEntryRepository.FindAsync(x => x.FacilityId == schedule.FacilityId && x.ReportScheduleId == schedule.Id);
 
             foreach (var entry in reportEntries) {
                 if ((entry.ReportingStatus == ReportingStatus.NoReportableReports || entry.ReportingStatus == ReportingStatus.PassedValidation || entry.ReportingStatus == ReportingStatus.FailedValidation) && entry.SubmissionStatus == SubmissionStatus.Submitted) {
@@ -199,7 +199,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             return admittedPatients;
         }
 
-        private OperationOutcome CreateOperationOutcome(List<ReportEntryStatusModel> failedEntries)
+        private OperationOutcome CreateOperationOutcome(List<ReportEntryModel> failedEntries)
         {
             var operationOutcome = new OperationOutcome();
             foreach (var entry in failedEntries)

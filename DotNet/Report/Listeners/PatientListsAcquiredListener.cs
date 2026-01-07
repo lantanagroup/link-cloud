@@ -121,7 +121,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                                         && e.PatientId == patientId, consumeCancellationToken);
 
                                             if (entry == null) {
-                                                entry = new ReportEntryStatusModel() { 
+                                                entry = new ReportEntryModel() { 
                                                     PatientId = patientId,
                                                     FacilityId = scheduledReport.FacilityId,
                                                     CreateDate = DateTime.Now,
@@ -133,11 +133,11 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                             foreach (var reportType in scheduledReport.ReportTypes)
                                             {
-                                                var measureReportEntry = entry.MeasureReportEntryList.Where(x => x.ReportType == reportType).FirstOrDefault();
+                                                var measureReportEntry = entry.MeasureReportList.Where(x => x.ReportType == reportType).FirstOrDefault();
 
                                                 if (measureReportEntry == null)
                                                 {
-                                                    entry.MeasureReportEntryList.Add(new MeasureReportEntry()
+                                                    entry.MeasureReportList.Add(new EvaluatedMeasureReport()
                                                     {
                                                         ReportType = reportType,
                                                         Status = MeasureReportStatus.EntryCreated,
