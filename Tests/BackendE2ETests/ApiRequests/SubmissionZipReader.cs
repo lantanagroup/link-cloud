@@ -104,16 +104,13 @@ public class SubmissionZipReader(ITestOutputHelper output)
         {
             ["ServiceRequest"] = 20,
             ["Observation"] = 11,
-            ["MedicationAdministration"] = 8,
-            ["Specimen"] = 7,
-            ["Location"] = 3,
+            ["Location"] = 1,
             ["Condition"] = 2,
             ["Medication"] = 2,
             ["MedicationRequest"] = 2,
             ["Patient"] = 1,
             ["Encounter"] = 1,
             ["Coverage"] = 1,
-            ["Device"] = 1,
             ["Procedure"] = 1,
             ["DiagnosticReport"] = 1,
             ["OperationOutcome"] = 1,
@@ -122,20 +119,17 @@ public class SubmissionZipReader(ITestOutputHelper output)
 
         var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
-            ["__TOTAL__"] = 61,  
+            ["__TOTAL__"] = 43,  
 
             ["ServiceRequest"] = 20,
             ["Observation"] = 11,
-            ["MedicationAdministration"] = 8,
-            ["Specimen"] = 7,
-            ["Location"] = 3,
+            ["Location"] = 1,
             ["Condition"] = 2,
             ["Medication"] = 2,
             ["MedicationRequest"] = 2,
             ["Patient"] = 1,
             ["Encounter"] = 1,
             ["Coverage"] = 1,
-            ["Device"] = 1,
             ["Procedure"] = 1,
             ["DiagnosticReport"] = 1
         };
@@ -153,12 +147,10 @@ public class SubmissionZipReader(ITestOutputHelper output)
         {
             ["ServiceRequest"] = 126,
             ["Observation"] = 126,
-            ["Specimen"] = 126,
-            ["MedicationAdministration"] = 4,
             ["MedicationRequest"] = 4,
             ["Medication"] = 4,
             ["Condition"] = 4,
-            ["Location"] = 4,
+            ["Location"] = 2,
             ["Encounter"] = 2,
             ["Coverage"] = 2,
             ["Patient"] = 1,
@@ -168,16 +160,14 @@ public class SubmissionZipReader(ITestOutputHelper output)
 
         var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
-            ["__TOTAL__"] = 403,
+            ["__TOTAL__"] = 271,
 
             ["ServiceRequest"] = 126,
             ["Observation"] = 126,
-            ["Specimen"] = 126,
-            ["MedicationAdministration"] = 4,
             ["MedicationRequest"] = 4,
             ["Medication"] = 4,
             ["Condition"] = 4,
-            ["Location"] = 4,
+            ["Location"] = 2,
             ["Encounter"] = 2,
             ["Coverage"] = 2,
             ["Patient"] = 1
@@ -192,12 +182,10 @@ public class SubmissionZipReader(ITestOutputHelper output)
         {
             ["ServiceRequest"] = 16,
             ["Observation"] = 5,
-            ["MedicationAdministration"] = 4,
-            ["Specimen"] = 4,
-            ["Location"] = 3,
+            ["Location"] = 1,
             ["Condition"] = 2,
-            ["Medication"] = 2,
-            ["MedicationRequest"] = 2,
+            ["Medication"] = 1,
+            ["MedicationRequest"] = 1,
             ["Procedure"] = 2,
             ["Patient"] = 1,
             ["Encounter"] = 1,
@@ -210,16 +198,14 @@ public class SubmissionZipReader(ITestOutputHelper output)
 
         var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
-            ["__TOTAL__"] = 45,
+            ["__TOTAL__"] = 33,
 
             ["ServiceRequest"] = 16,
             ["Observation"] = 5,
-            ["MedicationAdministration"] = 4,
-            ["Specimen"] = 4,
-            ["Location"] = 3,
+            ["Location"] = 1,
             ["Condition"] = 2,
-            ["Medication"] = 2,
-            ["MedicationRequest"] = 2,
+            ["Medication"] = 1,
+            ["MedicationRequest"] = 1,
             ["Procedure"] = 2,
             ["Patient"] = 1,
             ["Encounter"] = 1,
@@ -240,13 +226,11 @@ public class SubmissionZipReader(ITestOutputHelper output)
         var expectedBundleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
             ["ServiceRequest"] = 27,
-            ["MedicationAdministration"] = 13,
             ["Observation"] = 9,
-            ["Location"] = 6,
-            ["Condition"] = 4,
-            ["Medication"] = 4,
-            ["MedicationRequest"] = 4,
-            ["Specimen"] = 4,
+            ["Location"] = 1,
+            ["Condition"] = 2,
+            ["Medication"] = 2,
+            ["MedicationRequest"] = 2,
             ["Procedure"] = 4,
             ["Encounter"] = 2,
             ["Coverage"] = 2,
@@ -259,16 +243,14 @@ public class SubmissionZipReader(ITestOutputHelper output)
 
         var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
-            ["__TOTAL__"] = 84, 
+            ["__TOTAL__"] = 56, 
 
             ["ServiceRequest"] = 27,
-            ["MedicationAdministration"] = 13,
             ["Observation"] = 9,
-            ["Location"] = 6,
-            ["Condition"] = 4,
-            ["Medication"] = 4,
-            ["MedicationRequest"] = 4,
-            ["Specimen"] = 4,
+            ["Location"] = 1,
+            ["Condition"] = 2,
+            ["Medication"] = 2,
+            ["MedicationRequest"] = 2,
             ["Procedure"] = 4,
             ["Encounter"] = 2,
             ["Coverage"] = 2,
@@ -290,16 +272,13 @@ public class SubmissionZipReader(ITestOutputHelper output)
         {
             ["ServiceRequest"] = 31,
             ["Observation"] = 11,
-            ["Specimen"] = 8,
-            ["MedicationAdministration"] = 3,
-            ["Location"] = 3,
+            ["Location"] = 1,
             ["Condition"] = 2,
             ["Medication"] = 2,
             ["MedicationRequest"] = 2,
             ["Patient"] = 1,
             ["Encounter"] = 1,
             ["Coverage"] = 1,
-            ["Device"] = 1,
             ["Procedure"] = 1,
             ["DiagnosticReport"] = 1,
             ["OperationOutcome"] = 1,
@@ -308,20 +287,17 @@ public class SubmissionZipReader(ITestOutputHelper output)
 
         var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
-            ["__TOTAL__"] = 68, 
+            ["__TOTAL__"] = 54, 
 
             ["ServiceRequest"] = 31,
             ["Observation"] = 11,
-            ["Specimen"] = 8,
-            ["MedicationAdministration"] = 3,
-            ["Location"] = 3,
+            ["Location"] = 1,
             ["Condition"] = 2,
             ["Medication"] = 2,
             ["MedicationRequest"] = 2,
             ["Patient"] = 1,
             ["Encounter"] = 1,
             ["Coverage"] = 1,
-            ["Device"] = 1,
             ["Procedure"] = 1,
             ["DiagnosticReport"] = 1
         };
@@ -339,8 +315,6 @@ public class SubmissionZipReader(ITestOutputHelper output)
         {
             ["ServiceRequest"] = 116,
             ["Observation"] = 23,
-            ["MedicationAdministration"] = 19,
-            ["Specimen"] = 19,
             ["Procedure"] = 3,
             ["Condition"] = 4,
             ["MedicationRequest"] = 4,
@@ -348,8 +322,8 @@ public class SubmissionZipReader(ITestOutputHelper output)
             ["DiagnosticReport"] = 2,
             ["Encounter"] = 2,
             ["Coverage"] = 2,
-            ["Device"] = 2,
-            ["Location"] = 4,
+            ["Device"] = 1,
+            ["Location"] = 2,
             ["Patient"] = 1,
             ["OperationOutcome"] = 1,
             ["MeasureReport"] = 1
@@ -357,12 +331,10 @@ public class SubmissionZipReader(ITestOutputHelper output)
 
         var expectedEvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
-            ["__TOTAL__"] = 205,
+            ["__TOTAL__"] = 164,
 
             ["ServiceRequest"] = 116,
             ["Observation"] = 23,
-            ["MedicationAdministration"] = 19,
-            ["Specimen"] = 19,
             ["Procedure"] = 3,
             ["Condition"] = 4,
             ["MedicationRequest"] = 4,
@@ -370,8 +342,8 @@ public class SubmissionZipReader(ITestOutputHelper output)
             ["DiagnosticReport"] = 2,
             ["Encounter"] = 2,
             ["Coverage"] = 2,
-            ["Device"] = 2,
-            ["Location"] = 4,
+            ["Device"] = 1,
+            ["Location"] = 2,
             ["Patient"] = 1
         };
 
@@ -515,13 +487,15 @@ public class SubmissionZipReader(ITestOutputHelper output)
 
         foreach (var extraKey in evalCounts.Keys.Where(k => !expectedEvalKeys.Contains(k)))
         {
-            if (excludedTypes.Contains(extraKey))
-                continue;
+            var issueType =
+                string.Equals(extraKey, "OperationOutcome", StringComparison.OrdinalIgnoreCase)
+                    ? ValidationIssueType.ObservedResourceTypeCount
+                    : ValidationIssueType.UnexpectedEvaluatedType;
 
             ReportIssue(
                 fileName,
                 resourceType: extraKey,
-                issueType: ValidationIssueType.UnexpectedEvaluatedType,
+                issueType: issueType,
                 message: $"evaluatedResource contains unexpected type '{extraKey}'.",
                 issues: issues);
         }
@@ -543,11 +517,15 @@ public class SubmissionZipReader(ITestOutputHelper output)
 
             if (evalHas)
             {
+                var issueType = exType.Equals("OperationOutcome", StringComparison.OrdinalIgnoreCase)
+                    ? ValidationIssueType.OperationOutcomePresentInEvaluated
+                    : ValidationIssueType.ExcludedTypePresentInEvaluated;
+
                 ReportIssue(
                     fileName,
                     resourceType: exType,
-                    issueType: ValidationIssueType.ExcludedTypePresentInEvaluated,
-                    message: $"Excluded type '{exType}' found in evaluatedResource (should be omitted).",
+                    issueType: issueType,
+                    message: $"Excluded type '{exType}' found in evaluatedResource.",
                     issues: issues);
             }
         }
@@ -1084,7 +1062,9 @@ public class SubmissionZipReader(ITestOutputHelper output)
         [ValidationIssueType.ExcludedTypePresentInEvaluated] = ValidationSeverity.Error,
         [ValidationIssueType.BundleVsEvaluatedCountMismatch] = ValidationSeverity.Error,
         [ValidationIssueType.BundleVsEvaluatedIdMismatch] = ValidationSeverity.Error,
-        [ValidationIssueType.CrossTypeReference] = ValidationSeverity.Error
+        [ValidationIssueType.CrossTypeReference] = ValidationSeverity.Error,
+        [ValidationIssueType.OperationOutcomePresentInEvaluated] = ValidationSeverity.Info,
+        [ValidationIssueType.ObservedResourceTypeCount] = ValidationSeverity.Info,
     };
 
     private static string Truncate(string? value, int maxLength)

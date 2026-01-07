@@ -161,9 +161,11 @@ public static class TestConfig
             UnexpectedEvaluatedType,
             ExcludedTypeMissingFromBundle,
             ExcludedTypePresentInEvaluated,
+            OperationOutcomePresentInEvaluated,
             BundleVsEvaluatedCountMismatch,
             BundleVsEvaluatedIdMismatch,
-            CrossTypeReference
+            CrossTypeReference,
+            ObservedResourceTypeCount
         }
 
         public sealed class ValidationIssue
