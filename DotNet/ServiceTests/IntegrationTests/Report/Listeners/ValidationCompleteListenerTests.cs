@@ -48,7 +48,7 @@ namespace IntegrationTests.Report
                 scope.ServiceProvider.GetRequiredService<SubmitPayloadProducer>(),
                 mockScopeFactory?.Object ?? scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>(),
                 scope.ServiceProvider.GetRequiredService<BlobStorageService>(),
-                scope.ServiceProvider.GetRequiredService<PatientReportSubmissionBundler>(),
+                scope.ServiceProvider.GetRequiredService<PatientAggregator>(),
                 scope.ServiceProvider.GetRequiredService<ReportManifestProducer>(),
                 scope.ServiceProvider.GetRequiredService<AuditableEventOccurredProducer>());
         }

@@ -4,6 +4,7 @@
     {
         PendingValidation,
         Submitting,
-        Submitted
+        Submitted,
+        NotEligable //TODO: Implement setting this flag for invalid patients when we decide to not submit every measure report
     }
 }

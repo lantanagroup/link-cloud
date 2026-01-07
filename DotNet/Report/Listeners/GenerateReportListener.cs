@@ -230,7 +230,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     patientEntries.AsParallel().ForAll(async p =>
                                     {
-                                        var newEntry = new ReportEntryStatusModel()
+                                        var newEntry = new ReportEntryModel()
                                         {
                                             PatientId = p,
                                             ReportingStatus = ReportingStatus.PatientIdentified,
@@ -241,7 +241,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                         foreach (var reportType in reportTypes)
                                         {
-                                            newEntry.MeasureReportEntryList.Add(new MeasureReportEntry()
+                                            newEntry.MeasureReportList.Add(new EvaluatedMeasureReport()
                                             {
                                                 Status = MeasureReportStatus.EntryCreated,
                                                 ReportType = reportType
@@ -290,7 +290,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     value.PatientIds.AsParallel().ForAll(async patientId =>
                                     {
-                                        var newEntry = new ReportEntryStatusModel()
+                                        var newEntry = new ReportEntryModel()
                                         {
                                             PatientId = patientId,
                                             ReportingStatus = ReportingStatus.PatientIdentified,
@@ -302,7 +302,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         //For each patient and report type, Create Submission Entries for each Patient and Report Type
                                         foreach (var reportType in reportTypes)
                                         {
-                                            newEntry.MeasureReportEntryList.Add(new MeasureReportEntry()
+                                            newEntry.MeasureReportList.Add(new EvaluatedMeasureReport()
                                             {
                                                 Status = MeasureReportStatus.EntryCreated,
                                                 ReportType = reportType

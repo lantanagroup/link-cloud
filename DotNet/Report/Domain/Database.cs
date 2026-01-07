@@ -10,7 +10,7 @@ namespace LantanaGroup.Link.Report.Domain
     public interface IDatabase
     {
         IBaseEntityRepository<ReportScheduleModel> ReportScheduledRepository { get; set; }
-        IBaseEntityRepository<ReportEntryStatusModel> ReportEntryStatusRepository { get; set; }
+        IBaseEntityRepository<ReportEntryModel> ReportEntryRepository { get; set; }
         IBaseEntityRepository<ReportPopulationModel> ReportPopulationRepository { get; set; }
         IBaseEntityRepository<ReportResourceModel> ReportResourceRepository { get; set; }
     }
@@ -20,20 +20,20 @@ namespace LantanaGroup.Link.Report.Domain
         protected IMongoDatabase DbContext { get; set; }
 
         public IBaseEntityRepository<ReportScheduleModel> ReportScheduledRepository { get; set; }
-        public IBaseEntityRepository<ReportEntryStatusModel> ReportEntryStatusRepository { get; set; }
+        public IBaseEntityRepository<ReportEntryModel> ReportEntryRepository { get; set; }
         public IBaseEntityRepository<ReportPopulationModel> ReportPopulationRepository { get; set; }
         public IBaseEntityRepository<ReportResourceModel> ReportResourceRepository { get; set; }
 
         public Database(IOptions<MongoConnection> mongoSettings,
             IBaseEntityRepository<ReportScheduleModel> reportScheduledRepository,
-            IBaseEntityRepository<ReportEntryStatusModel> reportEntryStatusRepository,
+            IBaseEntityRepository<ReportEntryModel> reportEntryRepository,
             IBaseEntityRepository<ReportPopulationModel> reportPopulationRepository,
             IBaseEntityRepository<ReportResourceModel> reportResourceRepository)
         {
             var client = new MongoClient(mongoSettings.Value.ConnectionString);
             DbContext = client.GetDatabase(mongoSettings.Value.DatabaseName);
             ReportScheduledRepository = reportScheduledRepository;
-            ReportEntryStatusRepository = reportEntryStatusRepository;
+            ReportEntryRepository = reportEntryRepository;
             ReportPopulationRepository = reportPopulationRepository;
             ReportResourceRepository = reportResourceRepository;
         }

@@ -102,7 +102,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
             // Get Census and IP information from individual measure report entries
             var uniqueReportIds = summaries.Select(x => x.Id).Distinct().ToList();
-            var reportEntries = await _database.ReportEntryStatusRepository.FindAsync(x => uniqueReportIds.Contains(x.ReportScheduleId), cancellationToken);
+            var reportEntries = await _database.ReportEntryRepository.FindAsync(x => uniqueReportIds.Contains(x.ReportScheduleId), cancellationToken);
 
             foreach (var summary in summaries)
             {

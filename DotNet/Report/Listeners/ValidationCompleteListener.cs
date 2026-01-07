@@ -33,7 +33,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly SubmitPayloadProducer _submitPayloadProducer;
         private readonly ReportManifestProducer _reportManifestProducer;
         private readonly BlobStorageService _blobStorageService;
-        private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
+        private readonly PatientAggregator _patientReportSubmissionBundler;
         private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
         private readonly IReportEntryStatusManager _reportEntryManager;
         private readonly IReportScheduledManager _reportScheduledManager;
@@ -48,7 +48,7 @@ namespace LantanaGroup.Link.Report.Listeners
             SubmitPayloadProducer submitPayloadProducer,
             IServiceScopeFactory serviceScopeFactory,
             BlobStorageService blobStorageService,
-            PatientReportSubmissionBundler patientReportSubmissionBundler,
+            PatientAggregator patientReportSubmissionBundler,
             ReportManifestProducer reportManifestProducer,
             AuditableEventOccurredProducer auditableEventOccurredProducer,
             IReportEntryStatusManager reportEntryManager,

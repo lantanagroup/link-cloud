@@ -62,7 +62,7 @@ public class PayloadSubmittedListener(
                         {
                             if (result.Message.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry)
                             {
-                                var reportEntry = await database.ReportEntryStatusRepository.FirstAsync(e => e.PatientId == result.Message.Value.PatientId && e.ReportScheduleId == result.Message.Key.ReportScheduleId);
+                                var reportEntry = await database.ReportEntryRepository.FirstAsync(e => e.PatientId == result.Message.Value.PatientId && e.ReportScheduleId == result.Message.Key.ReportScheduleId);
 
                                 //foreach (var item in submissionEntries)
                                 //{
@@ -73,7 +73,7 @@ public class PayloadSubmittedListener(
 
                                 reportEntry.SubmissionStatus = SubmissionStatus.Submitted;
                                 reportEntry.ModifyDate = DateTime.UtcNow;
-                                await database.ReportEntryStatusRepository.UpdateAsync(reportEntry);
+                                await database.ReportEntryRepository.UpdateAsync(reportEntry);
 
                                 //TODO: START - TEST CODE ONLY! REMOVE AFTER TESTING
                                 var reportSchedule = await database.ReportScheduledRepository
