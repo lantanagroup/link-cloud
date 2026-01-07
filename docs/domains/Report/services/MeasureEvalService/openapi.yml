@@ -138,7 +138,7 @@ paths:
             '*/*':
               schema:
                 type: string
-  /api/measureeval/measure-definition/info:
+  /api/measureeval/info:
     get:
       tags:
       - api-info-controller

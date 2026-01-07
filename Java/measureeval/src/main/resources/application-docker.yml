@@ -1,0 +1,50 @@
+service-information:
+  service-name: "Link Measure Evaluation Service"
+  product-version: dev
+
+server:
+  port: 8067
+
+spring:
+  data:
+    mongodb:
+      uri: mongodb://mongo:27017
+      database: link-measureeval
+
+  kafka:
+    bootstrap-servers: kafka_b:9092
+
+    consumer:
+      group-id: measureeval-events
+      client-id: measureeval-client
+
+    producer:
+      properties:
+        max:
+          request:
+            size: 10485760
+    properties:
+      security:
+        protocol: SASL_PLAINTEXT
+      sasl:
+        mechanism: PLAIN
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+authentication:
+  anonymous: true
+
+link:
+  data-acquisition:
+    base-url: http://dataacquisition:8065
+
+telemetry:
+  exporter_endpoint: http://otel-collector:4317
+
+loki:
+  enabled: true
+  url: http://loki:3100

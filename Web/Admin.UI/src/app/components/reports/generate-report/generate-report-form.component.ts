@@ -27,8 +27,8 @@ import {
 import {TenantService} from "../../../services/gateway/tenant/tenant.service";
 import {MeasureDefinitionService} from "../../../services/gateway/measure-definition/measure.service";
 import {IMeasureDefinitionConfigModel} from "../../../interfaces/measure-definition/measure-definition-config-model.interface";
-import {IEntityCreatedResponse, IReportGenerationResponse} from "../../../interfaces/entity-created-response.model";
-import {debounceTime, distinctUntilChanged, forkJoin, map, Observable, of, startWith, tap} from "rxjs";
+import {IReportGenerationResponse} from "../../../interfaces/entity-created-response.model";
+import {debounceTime, distinctUntilChanged, firstValueFrom, forkJoin, map, Observable, of, startWith, tap} from "rxjs";
 import {MatCheckboxModule} from "@angular/material/checkbox";
 import {MatRadioModule} from "@angular/material/radio";
 import * as Papa from 'papaparse';
@@ -39,6 +39,8 @@ import {switchMap} from "rxjs/operators";
 import {FaIconComponent} from "@fortawesome/angular-fontawesome";
 import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocomplete";
 import {faSearch} from "@fortawesome/free-solid-svg-icons";
+import {fromZonedTime} from 'date-fns-tz';
+
 
 @Component({
   selector: 'generate-report-form',
@@ -194,14 +196,34 @@ export class GenerateReportFormComponent implements OnInit{
     this.patients.splice(index, 1);
   }
 
-  generateReport() {
+  toNoTimeZoneDateString(date: Date): string {
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  }
+
+  async generateReport() {
     this.formSubmitted = true; // Set flag when form is submitted
     if (this.generateReportForm.valid) {
-      console.log('Report Data:', this.generateReportForm.value);
+
+      // Wait for the facility configuration
+      const config = await firstValueFrom(this.tenantService.getFacilityConfiguration(this.facilityIdControl.value));
+      const facilityTimeZone = config.timeZone || 'UTC'; // fallback if not set
+
+      const noTimeZoneStart = this.toNoTimeZoneDateString(this.startDateControl.value);
+      // fromZonedTime treats noTimeZoneStart as if it is in the facility timezone
+      const startUtc = fromZonedTime(new Date(noTimeZoneStart), facilityTimeZone);
+
+      // End of day
+      const noTimeZoneEnd = this.toNoTimeZoneDateString(this.endDateControl.value);
+      const endDate = new Date(noTimeZoneEnd);
+      endDate.setHours(23, 59, 59, 999);
+      // fromZonedTime treats noTimeZoneEnd as if it is in the facility timezone
+      const endUtc = fromZonedTime(endDate, facilityTimeZone);
+
       let adHocReportRequest: IAdHocReportRequest = {
         'bypassSubmission': this.bypassSubmissionControl.value,
-        'startDate': this.startDateControl.value,
-        'endDate': this.endDateControl.value,
+        'startDate': startUtc ,
+        'endDate': endUtc,
         'reportTypes': this.reportTypesControl.value,
         'patientIds': this.patients
       };
