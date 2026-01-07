@@ -3,12 +3,7 @@
 public class TenantServiceRegistration
 {
     public string? TenantServiceUrl { get; set; }
-    private string? _publicTenantServiceUrl;
-    public string? PublicTenantServiceUrl
-    {
-        get => string.IsNullOrEmpty(_publicTenantServiceUrl) ? TenantServiceUrl : _publicTenantServiceUrl;
-        set => _publicTenantServiceUrl = value;
-    }
+    public string? PublicTenantServiceUrl { get; set; }
     public bool CheckIfTenantExists { get; set; }
     public string? GetTenantRelativeEndpoint { get; set; }
     
