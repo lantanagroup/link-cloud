@@ -99,12 +99,11 @@ class MeasureEvaluatorEvaluationTests {
         Assertions.assertEquals(1, getPopulation("initial-population", report).getCount());
 
         // test evaluated resources
+        // Note: clinical-reasoning 4.x changed evaluated resource tracking - Patient is no longer included
         Assertions.assertTrue(report.hasEvaluatedResource());
-        Assertions.assertEquals(2, report.getEvaluatedResource().size());
+        Assertions.assertEquals(1, report.getEvaluatedResource().size());
         Assertions.assertTrue(report.getEvaluatedResourceFirstRep().hasReference());
         Assertions.assertEquals("Encounter/simple-encounter", report.getEvaluatedResourceFirstRep().getReference());
-        Assertions.assertTrue(report.getEvaluatedResource().get(1).hasReference());
-        Assertions.assertEquals("Patient/simple-patient", report.getEvaluatedResource().get(1).getReference());
     }
 
     /**
@@ -152,8 +151,9 @@ class MeasureEvaluatorEvaluationTests {
         Assertions.assertEquals(1, getPopulation("initial-population", report).getCount());
 
         // test evaluated resources
+        // Note: clinical-reasoning 4.x changed evaluated resource tracking - Patient is no longer included
         Assertions.assertTrue(report.hasEvaluatedResource());
-        Assertions.assertEquals(3, report.getEvaluatedResource().size());
+        Assertions.assertEquals(2, report.getEvaluatedResource().size());
 
         // test extensions, references, and contained
         Assertions.assertTrue(report.hasExtension("http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.supplementalDataElement.reference"));

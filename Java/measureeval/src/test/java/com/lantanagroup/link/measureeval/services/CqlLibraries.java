@@ -128,24 +128,24 @@ public class CqlLibraries {
               false""";
 
     public static final String SIMPLE_PROPORTION_ALL_FALSE = """
-            library ProportionLibraryFalse version '1.0.0'
-                            
+            library ProportionLibraryAllFalse version '1.0.0'
+
             using FHIR version '4.0.1'
-                            
+
             context Patient
 
             define "Initial Population":
               false
-              
+
             define "Numerator":
               false
-              
+
             define "Numerator Exclusion":
               false
-                            
+
             define "Denominator":
               false
-              
+
             define "Denominator Exclusion":
               false""";
 

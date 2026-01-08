@@ -109,7 +109,7 @@ public class MeasureEvaluator {
             StringType subject,
             Bundle additionalData) {
         var repository = new LinkInMemoryFhirRepository(fhirContext, bundle);
-        R4MeasureService measureService = new R4MeasureService(repository, options, new MeasurePeriodValidator(), new R4MeasureServiceUtils(repository));
+        R4MeasureService measureService = new R4MeasureService(repository, options, new MeasurePeriodValidator());
 
         return measureService.evaluate(
                 Eithers.forRight3(measure),
