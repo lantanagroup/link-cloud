@@ -134,9 +134,16 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
 
                                 var correlationId = Encoding.UTF8.GetString(headerValue);
+
                                 var reportEntry = await _reportEntryManager.UpdateAsyncWithConsumerResult(result.Message.Value);
-                                var schedule = await _reportScheduledManager.GetReportSchedule(result.Message.Value.FacilityId, result.Message.Value.ReportTrackingId, cancellationToken);
                                 var readyForValidation = reportEntry.MeasureReportList.All(x => x.Status == MeasureReportStatus.NotReportable || x.Status == MeasureReportStatus.ReadyForValidation);
+
+                                var schedule = await _reportScheduledManager.GetReportSchedule(result.Message.Value.FacilityId, result.Message.Value.ReportTrackingId, cancellationToken);
+
+                                if (schedule == null) 
+                                {
+                                    throw new DeadLetterException($"No scheduled report record was found for report id '{result.Message.Value.ReportTrackingId}'");
+                                }
 
                                 if (!readyForValidation)
                                 {
