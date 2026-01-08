@@ -12,7 +12,7 @@ namespace LantanaGroup.Link.Report.Domain
         IBaseEntityRepository<ReportScheduleModel> ReportScheduledRepository { get; set; }
         IBaseEntityRepository<ReportEntryModel> ReportEntryRepository { get; set; }
         IBaseEntityRepository<ReportPopulationModel> ReportPopulationRepository { get; set; }
-        IBaseEntityRepository<ReportResourceModel> ReportResourceRepository { get; set; }
+        MongoEntityRepository<ReportResourceModel> ReportResourceRepository { get; set; }
     }
 
     public class Database : IDatabase
@@ -22,13 +22,13 @@ namespace LantanaGroup.Link.Report.Domain
         public IBaseEntityRepository<ReportScheduleModel> ReportScheduledRepository { get; set; }
         public IBaseEntityRepository<ReportEntryModel> ReportEntryRepository { get; set; }
         public IBaseEntityRepository<ReportPopulationModel> ReportPopulationRepository { get; set; }
-        public IBaseEntityRepository<ReportResourceModel> ReportResourceRepository { get; set; }
+        public MongoEntityRepository<ReportResourceModel> ReportResourceRepository { get; set; }
 
         public Database(IOptions<MongoConnection> mongoSettings,
             IBaseEntityRepository<ReportScheduleModel> reportScheduledRepository,
             IBaseEntityRepository<ReportEntryModel> reportEntryRepository,
             IBaseEntityRepository<ReportPopulationModel> reportPopulationRepository,
-            IBaseEntityRepository<ReportResourceModel> reportResourceRepository)
+            MongoEntityRepository<ReportResourceModel> reportResourceRepository)
         {
             var client = new MongoClient(mongoSettings.Value.ConnectionString);
             DbContext = client.GetDatabase(mongoSettings.Value.DatabaseName);

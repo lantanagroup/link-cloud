@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Shared.Application.Enums;
+﻿using AngleSharp.Dom;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Domain.Attributes;
@@ -77,6 +78,27 @@ public class MongoEntityRepository<T> : IBaseEntityRepository<T> where T : BaseE
         }
 
         return entity;
+    }
+
+    public async Task<List<T>> AddManyAsync(List<T> entities, CancellationToken cancellationToken = default) 
+    {
+        if (cancellationToken.IsCancellationRequested) return null;
+
+        foreach (var entity in entities) 
+        {
+            entity.Id ??= Guid.NewGuid().ToString();
+        }
+
+        try
+        {
+            await _collection.InsertManyAsync(entities, cancellationToken: cancellationToken);
+        }
+        catch (Exception)
+        {
+            throw;
+        }
+
+        return entities;
     }
 
     public virtual void Delete(object id)

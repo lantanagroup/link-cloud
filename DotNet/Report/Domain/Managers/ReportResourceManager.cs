@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Entities;
+using System.Diagnostics;
 using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
@@ -36,23 +37,27 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return await _database.ReportResourceRepository.AddAsync(entry, cancellationToken);
         }
 
-        public async Task AddAsyncWithAggregateResult(string facilityId, string reportId, string patientId, AggregateResult aggregateResult, CancellationToken cancellationToken) {
+        public async Task AddAsyncWithAggregateResult(string facilityId, string reportId, string patientId, AggregateResult aggregateResult, CancellationToken cancellationToken)
+        {
             foreach (var measureReport in aggregateResult.MeasureReportResults)
             {
+                List<ReportResourceModel> resources = new List<ReportResourceModel>();
+
                 foreach (var resource in measureReport.Resources)
                 {
-                    var resourceModel = new ReportResourceModel()
+                    resources.Add(new ReportResourceModel()
                     {
                         ReportScheduledId = reportId,
                         FacilityId = facilityId,
                         PatientId = patientId,
+                        MeasureReportId = measureReport.MeasureReportId,
                         ResourceType = resource[0],
                         ResourceId = resource[1],
                         CreateDate = DateTime.UtcNow
-                    };
-
-                    await _database.ReportResourceRepository.AddAsync(resourceModel, cancellationToken);
+                    });
                 }
+
+                await _database.ReportResourceRepository.AddManyAsync(resources, cancellationToken);
             }
         }
 
