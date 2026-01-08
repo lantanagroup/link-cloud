@@ -5,6 +5,7 @@ namespace LantanaGroup.Link.Report.Application.Models
     public class AggregateResult
     {
         public Uri Uri;
+        public string BlobName; 
         public List<AggregateMeasureReportResult> MeasureReportResults = new List<AggregateMeasureReportResult>();
     }
 

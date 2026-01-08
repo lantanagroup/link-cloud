@@ -101,7 +101,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHttpClient();
 
     // Add factories
-    builder.Services.AddTransient<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>, KafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
     builder.Services.AddTransient<ScheduledReportFactory>();
     builder.Services.AddTransient<MeasureReportSummaryFactory>();
 
@@ -121,7 +120,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Producers for Retry/Deadletter
     builder.Services.AddTransient<IKafkaProducerFactory<string, ReportScheduledValue>, KafkaProducerFactory<string, ReportScheduledValue>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>, KafkaProducerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, PatientListMessage>, KafkaProducerFactory<string, PatientListMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, KafkaProducerFactory<string, GenerateReportValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, ValidationCompleteValue>, KafkaProducerFactory<string, ValidationCompleteValue>>();
@@ -284,9 +282,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IDeadLetterExceptionHandler<Null, MeasureReportGeneratedValue>, DeadLetterExceptionHandler<Null, MeasureReportGeneratedValue>>();
 
     builder.Services.AddTransient<ITransientExceptionHandler<Null, MeasureReportGeneratedValue>, TransientExceptionHandler<Null, MeasureReportGeneratedValue>>();
-
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>, DeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>, TransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
 
     
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();

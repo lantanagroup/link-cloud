@@ -106,12 +106,6 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public async Task<bool> Produce(ReportScheduleModel schedule, string correlationId = null)
         {
-            //var allReady = !await _database.ReportEntryStatusRepository.AnyAsync(e => e.FacilityId == schedule.FacilityId
-            //    && e.ReportScheduleId == schedule.Id
-            //    && e.Status != PatientSubmissionStatus.NotReportable
-            //    && e.Status != PatientSubmissionStatus.ValidationComplete
-            //    && e.Status != PatientSubmissionStatus.Submitted, CancellationToken.None);
-
             var reportEntries = await _database.ReportEntryRepository.FindAsync(x => x.FacilityId == schedule.FacilityId && x.ReportScheduleId == schedule.Id);
 
             foreach (var entry in reportEntries) {

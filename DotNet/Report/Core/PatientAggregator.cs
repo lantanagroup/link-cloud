@@ -7,7 +7,6 @@ using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Application.Options;
-using LantanaGroup.Link.Report.Application.ResourceCategories;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
@@ -68,7 +67,9 @@ namespace LantanaGroup.Link.Report.Core
             string blobName = _blobStorageService.GetBlobName(reportName, bundleName);
 
             AppendBlobClient blockWriteBlobClient = _containerClient.GetAppendBlobClient(blobName);
+
             aggregateResult.Uri = blockWriteBlobClient.Uri;
+            aggregateResult.BlobName = blobName;
 
             using (Stream write_stream = await blockWriteBlobClient.OpenWriteAsync(true))
             using (StreamWriter writer = new StreamWriter(write_stream))
