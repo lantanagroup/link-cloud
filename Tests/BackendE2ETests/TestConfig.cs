@@ -33,7 +33,7 @@ public static class TestConfig
 
     public static class FhirQueryConfig
     {
-        public const int MaxConcurrentRequests = 5;
+        public const int MaxConcurrentRequests = 8;
         public static readonly TimeSpan MinAcquisitionPullTime = TimeSpan.FromHours(1);
         public static readonly TimeSpan MaxAcquisitionPullTime = TimeSpan.FromHours(24);
         public static readonly string TimeZone = "America/New_York";
