@@ -82,7 +82,8 @@ public class KafkaConfig {
     public Serializer<?> keySerializer(ObjectMapper objectMapper) {
         Map<String, Serializer<?>> serializers = Map.of(
                 Topics.SERVICE_HEALTH_CHECK, new StringSerializer(),
-                Topics.VALIDATION_COMPLETE, new StringSerializer());
+                Topics.VALIDATION_COMPLETE, new StringSerializer(),
+                Topics.READY_FOR_VALIDATION, getJsonSerializer(objectMapper, ReadyForValidation.Key.class));
         return new DelegatingByTopicSerializer(byPattern(serializers), new VoidSerializer());
     }
 
