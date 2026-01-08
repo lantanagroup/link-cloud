@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
+using MongoDB.Driver.Encryption;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Interfaces
 {
@@ -19,6 +20,6 @@ namespace LantanaGroup.Link.Shared.Application.Error.Interfaces
         void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, string facilityId);
         void HandleException(ConsumeResult<K, V> consumeResult, DeadLetterException ex, string facilityId);
         void HandleConsumeException(ConsumeException ex, string facilityId);
-        void ProduceDeadLetter(K key, V value, Headers headers, string exceptionMessage);
+        void ProduceDeadLetter(ConsumeResult<K, V> consumeResult, string exceptionMessage);
     }
 }
