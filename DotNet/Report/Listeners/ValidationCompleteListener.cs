@@ -35,7 +35,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly BlobStorageService _blobStorageService;
         private readonly PatientAggregator _patientReportSubmissionBundler;
         private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
-        private readonly IReportEntryStatusManager _reportEntryManager;
+        private readonly IReportEntryManager _reportEntryManager;
         private readonly IReportScheduledManager _reportScheduledManager;
 
         private string Name => this.GetType().Name;
@@ -51,7 +51,7 @@ namespace LantanaGroup.Link.Report.Listeners
             PatientAggregator patientReportSubmissionBundler,
             ReportManifestProducer reportManifestProducer,
             AuditableEventOccurredProducer auditableEventOccurredProducer,
-            IReportEntryStatusManager reportEntryManager,
+            IReportEntryManager reportEntryManager,
             IReportScheduledManager reportScheduledManager)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));

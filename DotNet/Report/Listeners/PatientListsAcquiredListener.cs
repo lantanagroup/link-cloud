@@ -23,13 +23,13 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ITransientExceptionHandler<string, PatientListMessage> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, PatientListMessage> _deadLetterExceptionHandler;
         private readonly IServiceScopeFactory _serviceScopeFactory;
-        private readonly IReportEntryStatusManager _reportEntryStatusManager;
+        private readonly IReportEntryManager _reportEntryStatusManager;
         private string Name => this.GetType().Name;
 
         public PatientListsAcquiredListener(
             ILogger<PatientListsAcquiredListener> logger, 
             IKafkaConsumerFactory<string, PatientListMessage> kafkaConsumerFactory,
-            IReportEntryStatusManager reportEntryStatusManager,
+            IReportEntryManager reportEntryStatusManager,
             ITransientExceptionHandler<string, PatientListMessage> transientExceptionHandler,
             IDeadLetterExceptionHandler<string, PatientListMessage> deadLetterExceptionHandler, 
             IServiceScopeFactory serviceScopeFactory)

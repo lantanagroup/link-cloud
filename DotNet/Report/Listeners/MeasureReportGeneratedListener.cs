@@ -44,7 +44,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ReadyForValidationProducer _readyForValidationProducer;
         private readonly ReportManifestProducer _reportManifestProducer;
         private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
-        private readonly IReportEntryStatusManager _reportEntryManager;
+        private readonly IReportEntryManager _reportEntryManager;
         private readonly IReportScheduledManager _reportScheduledManager;
         private readonly IReportPopulationManager _reportPopulationManager;
         private readonly IReportResourceManager _reportResourceManager;
@@ -62,7 +62,7 @@ namespace LantanaGroup.Link.Report.Listeners
             ReadyForValidationProducer readyForValidationProducer,
             ReportManifestProducer reportManifestProducer,
             AuditableEventOccurredProducer auditableEventOccurredProducer, 
-            IReportEntryStatusManager reportEntryManager,
+            IReportEntryManager reportEntryManager,
             IReportScheduledManager reportScheduledManager,
             IReportPopulationManager reportPopulationManager,
             IReportResourceManager reportResourceManager)

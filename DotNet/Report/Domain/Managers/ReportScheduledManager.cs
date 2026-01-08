@@ -46,9 +46,9 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         private readonly IDatabase _database;
         private readonly ScheduledReportFactory _scheduledReportFactory;
         private readonly IReportPopulationManager _reportPopulationManager;
-        private readonly IReportEntryStatusManager _reportEntryManager;
+        private readonly IReportEntryManager _reportEntryManager;
 
-        public ReportScheduledManager(IDatabase database, ScheduledReportFactory scheduledReportFactory, IReportPopulationManager reportPopulationManager, IReportEntryStatusManager reportEntryManager)
+        public ReportScheduledManager(IDatabase database, ScheduledReportFactory scheduledReportFactory, IReportPopulationManager reportPopulationManager, IReportEntryManager reportEntryManager)
         {
             _database = database;
             _scheduledReportFactory = scheduledReportFactory;

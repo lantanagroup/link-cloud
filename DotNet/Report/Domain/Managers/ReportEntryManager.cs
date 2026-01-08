@@ -12,7 +12,7 @@ using LantanaGroup.Link.Report.Application.Models;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
 {
-    public interface IReportEntryStatusManager 
+    public interface IReportEntryManager 
     {
         Task<ReportEntryModel?> GetEntry(string reportScheduleId, string patientId, CancellationToken cancellationToken = default);
 
@@ -38,12 +38,12 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(Expression<Func<ReportEntryModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default);
     }
 
-    public class ReportEntryStatusManager : IReportEntryStatusManager
+    public class ReportEntryManager : IReportEntryManager
     {
         private readonly IDatabase _database;
         private readonly MeasureReportSummaryFactory _measureReportSummaryFactory;
 
-        public ReportEntryStatusManager(IDatabase database, MeasureReportSummaryFactory measureReportSummaryFactory)
+        public ReportEntryManager(IDatabase database, MeasureReportSummaryFactory measureReportSummaryFactory)
         {
             _database = database;
             _measureReportSummaryFactory = measureReportSummaryFactory;
