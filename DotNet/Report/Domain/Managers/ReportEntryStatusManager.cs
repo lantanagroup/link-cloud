@@ -99,7 +99,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         public async Task<ReportEntryModel> UpdateAsyncWithAggregateResult(ReportEntryModel entry, AggregateResult aggregateResult, CancellationToken cancellationToken = default)
         {
             entry.AggregateReportUri = aggregateResult.Uri.AbsoluteUri;
-            entry.AggregateReportFileName = aggregateResult.Uri.Segments.Last();
+            entry.AggregateReportBlobName = aggregateResult.BlobName;
             entry.ModifyDate = DateTime.UtcNow;
 
             foreach (var measureReportResult in aggregateResult.MeasureReportResults) {

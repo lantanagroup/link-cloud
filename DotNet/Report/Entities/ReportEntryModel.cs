@@ -16,8 +16,9 @@ namespace LantanaGroup.Link.Report.Entities
         public ReportingStatus ReportingStatus = ReportingStatus.PatientIdentified;
         [BsonRepresentation(MongoDB.Bson.BsonType.String)]
         public SubmissionStatus? SubmissionStatus = null;
+        //TODO: Don't think we need uri anymore
         public string AggregateReportUri { get; set; } = string.Empty;
-        public string AggregateReportFileName { get; set; } = string.Empty;
+        public string AggregateReportBlobName { get; set; } = string.Empty;
         public List<EvaluatedMeasureReport> MeasureReportList { get; set; } = new List<EvaluatedMeasureReport>();
     }
 

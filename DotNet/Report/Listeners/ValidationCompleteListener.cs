@@ -207,7 +207,15 @@ namespace LantanaGroup.Link.Report.Listeners
                 var serializer = new FhirJsonSerializer();
                 string json = serializer.SerializeToString(operationOutcome);
 
-                _patientReportSubmissionBundler.AppendToBlob(reportEntry.AggregateReportFileName, operationOutcome);
+                try
+                {
+                    _patientReportSubmissionBundler.AppendToBlob(reportEntry.AggregateReportBlobName, operationOutcome);
+                }
+                catch (Exception ex) 
+                {
+                    //TODO: Do something with this
+                    throw ex;
+                }
             }
 
             try
