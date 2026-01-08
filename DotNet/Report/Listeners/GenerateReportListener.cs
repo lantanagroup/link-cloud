@@ -45,7 +45,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly DataAcquisitionRequestedProducer _dataAcqProducer;
         private readonly IProducer<string, EvaluationRequestedValue> _evaluationProducer;
         private readonly BlobStorageService _blobStorageService;
-        private readonly IReportEntryStatusManager _reportEntryManager;
+        private readonly IReportEntryManager _reportEntryManager;
         private readonly IReportScheduledManager _reportScheduledManager;
 
         private string Name => this.GetType().Name;
@@ -63,7 +63,7 @@ namespace LantanaGroup.Link.Report.Listeners
             IProducer<string, EvaluationRequestedValue> evaluationProducer,
             BlobStorageService blobStorageService,
             IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions,
-            IReportEntryStatusManager reportEntryStatusManager,
+            IReportEntryManager reportEntryStatusManager,
             IReportScheduledManager reportScheduledManager)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));

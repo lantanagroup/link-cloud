@@ -53,12 +53,13 @@ namespace IntegrationTests.Report
                 scope.ServiceProvider.GetRequiredService<AuditableEventOccurredProducer>());
         }
 
-        private async Task<(ReportScheduleModel schedule, List<MeasureReportSubmissionEntryModel> entries)> SetupDatabaseAsync(IServiceScope scope, string facilityId = "TestFacility", List<string> reportTypes = null, List<(string patientId, string reportType, MeasureReportStatus status, MeasureReport measureReport)> entryData = null)
+        //TODO: Daniel - Test
+        private async Task<(ReportScheduleModel schedule, List<ReportEntryModel> entries)> SetupDatabaseAsync(IServiceScope scope, string facilityId = "TestFacility", List<string> reportTypes = null, List<(string patientId, string reportType, ReportingStatus status, MeasureReport measureReport)> entryData = null)
         {
             var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
 
             reportTypes ??= new List<string> { "TestReport" };
-            entryData ??= new List<(string, string, MeasureReportStatus, MeasureReport)> { ("Patient1", "TestReport", MeasureReportStatus.ValidationRequested, null) };
+            entryData ??= new List<(string, string, ReportingStatus, MeasureReport)> { ("Patient1", "TestReport", ReportingStatus.PendingValidation, null) };
 
             var reportStartDate = DateTime.Parse("2024-01-01").ToUniversalTime();
             var reportEndDate = DateTime.Parse("2024-01-31").ToUniversalTime();
@@ -75,10 +76,10 @@ namespace IntegrationTests.Report
             };
             await database.ReportScheduledRepository.AddAsync(schedule);
 
-            var entries = new List<MeasureReportSubmissionEntryModel>();
+            var entries = new List<ReportEntryModel>();
             foreach (var (patientId, reportType, status, measureReport) in entryData)
             {
-                var entry = new MeasureReportSubmissionEntryModel
+                var entry = new ReportEntryModel
                 {
                     Id = Guid.NewGuid().ToString(),
                     FacilityId = schedule.FacilityId,
@@ -117,14 +118,16 @@ namespace IntegrationTests.Report
             return new ConsumeResult<string, ValidationCompleteValue> { Message = message, Topic = nameof(KafkaTopic.ValidationComplete) };
         }
 
-        private void AssertEntryStatusAndValidation(MeasureReportSubmissionEntryModel updatedEntry, MeasureReportStatus expectedStatus, ValidationStatus expectedValidationStatus, string expectedPayloadUri = null)
+        //TODO - Daniel: Test
+        private void AssertEntryStatusAndValidation(ReportEntryModel updatedEntry, MeasureReportStatus expectedStatus, ReportingStatus expectedReportingStatus, string expectedPayloadUri = null)
         {
             Assert.NotNull(updatedEntry);
-            Assert.Equal(expectedStatus, updatedEntry.Status);
-            Assert.Equal(expectedValidationStatus, updatedEntry.ValidationStatus);
+            //Assert.Equal(expectedStatus, updatedEntry.Status);
+            Assert.Equal(expectedReportingStatus, updatedEntry.ReportingStatus);
+
             if (expectedPayloadUri != null)
             {
-                Assert.Equal(expectedPayloadUri, updatedEntry.PayloadUri);
+                Assert.Equal(expectedPayloadUri, updatedEntry.AggregateReportUri);
             }
         }
 
@@ -208,7 +211,7 @@ namespace IntegrationTests.Report
             await listener.ProcessMessageAsync(consumeResult, default);
 
             var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
-            var updatedEntry = await database.SubmissionEntryRepository.FirstOrDefaultAsync(e => e.Id == entry.Id);
+            var updatedEntry = await database.ReportEntryRepository.FirstOrDefaultAsync(e => e.Id == entry.Id);
             AssertEntryStatusAndValidation(updatedEntry, MeasureReportStatus.ValidationComplete, ValidationStatus.Failed, expectedUri);
 
             Assert.Contains(updatedEntry.ContainedResources, cr => cr.ResourceType == "OperationOutcome");

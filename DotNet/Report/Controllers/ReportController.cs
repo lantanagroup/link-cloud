@@ -38,10 +38,10 @@ namespace LantanaGroup.Link.Report.Controllers
         private readonly ILogger<ReportController> _logger;
         private readonly PatientAggregator _patientAggregator;
         private readonly IDatabase _database;
-        private readonly IReportEntryStatusManager _reportEntryStatusManager;
+        private readonly IReportEntryManager _reportEntryStatusManager;
         private readonly IReportScheduledManager _reportingScheduledManager;
         private readonly ReportManifestProducer _reportManifestProducer;
-        public ReportController(ILogger<ReportController> logger, PatientAggregator patientAggregator, IDatabase database, IReportEntryStatusManager reportEntryStatusManager, IReportScheduledManager reportingScheduledManager, ReportManifestProducer reportManifestProducer)
+        public ReportController(ILogger<ReportController> logger, PatientAggregator patientAggregator, IDatabase database, IReportEntryManager reportEntryStatusManager, IReportScheduledManager reportingScheduledManager, ReportManifestProducer reportManifestProducer)
         {
             _logger = logger;
             _patientAggregator = patientAggregator;

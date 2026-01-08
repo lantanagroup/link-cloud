@@ -137,7 +137,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add Managers
     builder.Services.AddTransient<IReportScheduledManager, ReportScheduledManager>();
-    builder.Services.AddTransient<IReportEntryStatusManager, ReportEntryStatusManager>();
+    builder.Services.AddTransient<IReportEntryManager, ReportEntryManager>();
     builder.Services.AddTransient<IReportPopulationManager, ReportPopulationManager>();
     builder.Services.AddTransient<IReportResourceManager, ReportResourceManager>();
 
@@ -239,7 +239,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Register listeners
     builder.Services.AddSingleton(new RetryListenerSettings(ReportConstants.ServiceName, [
         KafkaTopic.ReportScheduledRetry.GetStringValue(),
-        KafkaTopic.ResourceEvaluatedRetry.GetStringValue(),
         KafkaTopic.PatientListsAcquiredRetry.GetStringValue(),
         KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()
     ]));
@@ -251,7 +250,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<PayloadSubmittedListener>();
     builder.Services.AddHostedService<MeasureReportGeneratedListener>();
 
-    builder.Services.AddSingleton(new RetryListenerSettings(ReportConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.ResourceEvaluatedRetry.GetStringValue(), KafkaTopic.PatientListsAcquiredRetry.GetStringValue(), KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()]));
+    builder.Services.AddSingleton(new RetryListenerSettings(ReportConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.PatientListsAcquiredRetry.GetStringValue(), KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()]));
     builder.Services.AddHostedService<RetryListener>();
 
     builder.Services.AddHostedService<RetryScheduleService>();

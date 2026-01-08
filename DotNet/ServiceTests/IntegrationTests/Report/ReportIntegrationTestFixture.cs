@@ -20,6 +20,7 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -88,7 +89,7 @@ namespace IntegrationTests.Report
                     // Register logging for real ILogger instances, but mock listener loggers
                     services.AddLogging();
                     services.AddTransient<ILogger<ValidationCompleteListener>>(sp => Mock.Of<ILogger<ValidationCompleteListener>>());
-                    services.AddTransient<ILogger<ResourceEvaluatedListener>>(sp => Mock.Of<ILogger<ResourceEvaluatedListener>>());
+                    services.AddTransient<ILogger<MeasureReportGeneratedListener>>(sp => Mock.Of<ILogger<MeasureReportGeneratedListener>>());
                     services.AddTransient<ILogger<ReportManifestProducer>>(sp => Mock.Of<ILogger<ReportManifestProducer>>());
                     services.AddTransient<ILogger<UseLatestStrategy>>(sp => Mock.Of<ILogger<UseLatestStrategy>>());
 
@@ -113,17 +114,17 @@ namespace IntegrationTests.Report
                     services.AddTransient<EndOfReportPeriodJob>();
                     services.AddTransient<PatientAggregator>();
                     services.AddTransient<ValidationCompleteListener>();
-                    services.AddTransient<ResourceEvaluatedListener>();
+                    services.AddTransient<MeasureReportGeneratedListener>();
                     services.AddTransient<AuditableEventOccurredProducer>();
 
                     // Managers
-                    services.AddTransient<IResourceManager, ResourceManager>();
-                    services.AddTransient<ISubmissionEntryManager, SubmissionEntryManager>();
                     services.AddTransient<IReportScheduledManager, ReportScheduledManager>();
+                    services.AddTransient<IReportEntryManager, ReportEntryManager>();
+                    services.AddTransient<IReportPopulationManager, ReportPopulationManager>();
+                    services.AddTransient<IReportResourceManager, ReportResourceManager>();
 
                     // Factories
                     services.AddTransient<MeasureReportSummaryFactory>();
-                    services.AddTransient<ResourceSummaryFactory>();
                     services.AddTransient<ScheduledReportFactory>();
 
                     // BlobStorageService dependencies (emulator)
@@ -156,17 +157,17 @@ namespace IntegrationTests.Report
                     mockFactoryValidation.Setup(f => f.CreateConsumer(It.IsAny<ConsumerConfig>(), null, null)).Returns(mockConsumerValidation.Object);
                     services.AddTransient(sp => mockFactoryValidation.Object);
 
-                    var mockFactoryResource = new Mock<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
-                    var mockConsumerResource = new Mock<IConsumer<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
-                    mockConsumerResource.Setup(c => c.Commit(It.IsAny<ConsumeResult<ResourceEvaluatedKey, ResourceEvaluatedValue>>())).Verifiable();
+                    var mockFactoryResource = new Mock<IKafkaConsumerFactory<Null, MeasureReportGeneratedValue>>();
+                    var mockConsumerResource = new Mock<IConsumer<Null, MeasureReportGeneratedValue>>();
+                    mockConsumerResource.Setup(c => c.Commit(It.IsAny<ConsumeResult<Null, MeasureReportGeneratedValue>>())).Verifiable();
                     mockFactoryResource.Setup(f => f.CreateConsumer(It.IsAny<ConsumerConfig>(), null, null)).Returns(mockConsumerResource.Object);
                     services.AddTransient(sp => mockFactoryResource.Object);
 
                     // Exception handler mocks
                     services.AddScoped(sp => Mock.Of<ITransientExceptionHandler<string, ValidationCompleteValue>>());
                     services.AddScoped(sp => Mock.Of<IDeadLetterExceptionHandler<string, ValidationCompleteValue>>());
-                    services.AddScoped(sp => Mock.Of<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>());
-                    services.AddScoped(sp => Mock.Of<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>());
+                    services.AddScoped(sp => Mock.Of<ITransientExceptionHandler<Null, MeasureReportGeneratedValue>>());
+                    services.AddScoped(sp => Mock.Of<IDeadLetterExceptionHandler<Null, MeasureReportGeneratedValue>>());
 
                     // Kafka producer mocks
                     services.AddTransient<IProducer<string, DataAcquisitionRequestedValue>>(sp => DataAcquisitionRequestedProducerMock.Object);
@@ -180,10 +181,10 @@ namespace IntegrationTests.Report
                     services.AddKeyedTransient<ISchedulerFactory>("InMemoryScheduler", (sp, key) => SchedulerFactoryMock.Object);
 
                     // Register repositories as Scoped delegates
-                    services.AddScoped<IBaseEntityRepository<PatientResourceModel>>(sp => sp.GetRequiredService<IDatabase>().PatientResourceRepository);
-                    services.AddScoped<IBaseEntityRepository<SharedResourceModel>>(sp => sp.GetRequiredService<IDatabase>().SharedResourceRepository);
+                    services.AddScoped<IBaseEntityRepository<ReportPopulationModel>>(sp => sp.GetRequiredService<IDatabase>().ReportPopulationRepository);
+                    services.AddScoped<IBaseEntityRepository<ReportResourceModel>>(sp => sp.GetRequiredService<IDatabase>().ReportResourceRepository);
                     services.AddScoped<IBaseEntityRepository<ReportScheduleModel>>(sp => sp.GetRequiredService<IDatabase>().ReportScheduledRepository);
-                    services.AddScoped<IBaseEntityRepository<MeasureReportSubmissionEntryModel>>(sp => sp.GetRequiredService<IDatabase>().SubmissionEntryRepository);
+                    services.AddScoped<IBaseEntityRepository<ReportEntryModel>>(sp => sp.GetRequiredService<IDatabase>().ReportEntryRepository);
                 })
                 .Build();
 
@@ -229,11 +230,11 @@ namespace IntegrationTests.Report
 
     public class InMemoryDatabase : IDatabase
     {
-        public IBaseEntityRepository<PatientResourceModel> PatientResourceRepository { get; set; } = new InMemoryEntityRepository<PatientResourceModel>();
-        public IBaseEntityRepository<SharedResourceModel> SharedResourceRepository { get; set; } = new InMemoryEntityRepository<SharedResourceModel>();
         public IBaseEntityRepository<ReportScheduleModel> ReportScheduledRepository { get; set; } = new InMemoryEntityRepository<ReportScheduleModel>();
-        public IBaseEntityRepository<MeasureReportSubmissionEntryModel> SubmissionEntryRepository { get; set; } = new InMemoryEntityRepository<MeasureReportSubmissionEntryModel>();
         public IBaseEntityRepository<ReportEntryModel> ReportEntryRepository { get; set; } = new InMemoryEntityRepository<ReportEntryModel>();
+        public IBaseEntityRepository<ReportPopulationModel> ReportPopulationRepository { get; set; } = new InMemoryEntityRepository<ReportPopulationModel>();
+        //TODO: Missing instantiation
+        public MongoEntityRepository<ReportResourceModel> ReportResourceRepository { get; set; }
     }
 
     public class InMemoryEntityRepository<T> : IBaseEntityRepository<T> where T : class, new()

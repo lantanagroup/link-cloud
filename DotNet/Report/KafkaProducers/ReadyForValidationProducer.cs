@@ -10,9 +10,9 @@ namespace LantanaGroup.Link.Report.KafkaProducers
     {
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly IProducer<ReadyForValidationKey, ReadyForValidationValue> _readyForValidationProducer;
-        private readonly IReportEntryStatusManager _reportEntryStatusManager;
+        private readonly IReportEntryManager _reportEntryStatusManager;
 
-        public ReadyForValidationProducer(IProducer<ReadyForValidationKey, ReadyForValidationValue> readyForValidationProducer, IServiceScopeFactory serviceScopeFactory, IReportEntryStatusManager reportEntryStatusManager)
+        public ReadyForValidationProducer(IProducer<ReadyForValidationKey, ReadyForValidationValue> readyForValidationProducer, IServiceScopeFactory serviceScopeFactory, IReportEntryManager reportEntryStatusManager)
         {
             _readyForValidationProducer = readyForValidationProducer;
             _serviceScopeFactory = serviceScopeFactory;
