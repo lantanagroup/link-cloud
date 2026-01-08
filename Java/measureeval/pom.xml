@@ -96,21 +96,13 @@
         </dependency>
 
         <dependency>
-            <groupId>info.cqframework</groupId>
-            <artifactId>engine</artifactId>
-            <version>3.15.0</version>
+            <groupId>org.opencds.cqf.fhir</groupId>
+            <artifactId>cqf-fhir-cql</artifactId>
         </dependency>
 
         <dependency>
             <groupId>org.opencds.cqf.fhir</groupId>
             <artifactId>cqf-fhir-cr</artifactId>
-        </dependency>
-
-
-        <dependency>
-            <groupId>org.opencds.cqf.fhir</groupId>
-            <artifactId>cqf-fhir-jackson</artifactId>
-            <type>pom</type>
         </dependency>
 
         <!-- for logback to use conditional expressions -->

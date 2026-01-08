@@ -20,9 +20,10 @@
     <description>Project/folder of Java modules/services for Link</description>
 
     <properties>
-        <cqf-fhir.version>3.23.0</cqf-fhir.version>
-        <hapi-fhir.version>8.4.0</hapi-fhir.version>
+        <cqf-fhir.version>4.1.0</cqf-fhir.version>
+        <hapi-fhir.version>8.6.0</hapi-fhir.version>
         <janino.version>2.6.1</janino.version>
+        <kotlin.version>2.2.10</kotlin.version>
     </properties>
 
     <modules>
@@ -64,6 +65,12 @@
                 <groupId>org.codehaus.janino</groupId>
                 <artifactId>janino</artifactId>
                 <version>${janino.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-stdlib</artifactId>
+                <version>${kotlin.version}</version>
             </dependency>
 
             <dependency>

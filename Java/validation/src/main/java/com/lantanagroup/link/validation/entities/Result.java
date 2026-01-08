@@ -251,10 +251,6 @@ public class Result {
             case I18nConstants.SD_TYPE_NOT_MATCH_NS:
             case I18nConstants.SECURITY_STRING_CONTENT_ERROR:
             case I18nConstants.SECURITY_STRING_CONTENT_WARNING:
-            case I18nConstants.STATUS_CODE_HINT:
-            case I18nConstants.STATUS_CODE_HINT_CODE:
-            case I18nConstants.STATUS_CODE_WARNING:
-            case I18nConstants.STATUS_CODE_WARNING_CODE:
             case I18nConstants.TYPE_SPECIFIC_CHECKS_CANONICAL_ABSOLUTE:
             case I18nConstants.TYPE_SPECIFIC_CHECKS_CANONICAL_CONTAINED:
             case I18nConstants.TYPE_SPECIFIC_CHECKS_DT_BASE64_NO_WS_ERROR:
