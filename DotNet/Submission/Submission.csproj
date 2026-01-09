@@ -28,7 +28,7 @@
 	<ItemGroup>
 		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.*" />
 		<PackageReference Include="Azure.Identity" Version="1.*" />
-		<PackageReference Include="Azure.Storage.Blobs" Version="12.*" />
+		<PackageReference Include="Azure.Storage.Blobs" Version="12.26.0" />
 		<PackageReference Include="Confluent.Kafka" Version="2.*" />
 		<PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.*" />
 		<PackageReference Include="MediatR" Version="12.*" />
@@ -55,10 +55,6 @@
 	<ItemGroup>
 		<ProjectReference Include="..\Shared\Shared.csproj" />
 		<ProjectReference Include="..\Submission.Data\Submission.Data.csproj" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <Folder Include="Application\Factories\" />
 	</ItemGroup>
 
 
