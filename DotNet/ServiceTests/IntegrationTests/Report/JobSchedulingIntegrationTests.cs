@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using Hl7.Fhir.Model;
 using IntegrationTests.Census;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
@@ -52,15 +53,17 @@ namespace IntegrationTests.Report
             await db.ReportScheduledRepository.AddAsync(schedule);
 
             // Add a submission entry with PendingEvaluation to trigger DataAcquisitionRequestedProducer
-            var entry = new MeasureReportSubmissionEntryModel
+            var entry = new ReportEntryModel
             {
                 Id = Guid.NewGuid().ToString(),
                 FacilityId = schedule.FacilityId,
                 ReportScheduleId = schedule.Id,
                 PatientId = "Patient2",
-                Status = MeasureReportStatus.PendingEvaluation
+                ReportingStatus = ReportingStatus.PatientIdentified, 
+                AggregateReportUri = $"test://payload/Patient2",
+                AggregateReportBlobName = $"payload/Patient2",
             };
-            await db.SubmissionEntryRepository.AddAsync(entry);
+            await db.ReportEntryRepository.AddAsync(entry);
 
             // Act
             var job = _serviceProvider.GetRequiredService<EndOfReportPeriodJob>();
