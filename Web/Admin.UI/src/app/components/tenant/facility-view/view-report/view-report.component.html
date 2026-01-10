@@ -38,14 +38,17 @@
     <div class="link-card-row" style="justify-content: space-between;">
       <div>
         <div class="data-label">
-          Scheduled Report
+          Report Id
           <span class="data-value selectable-value">{{reportSummary?.id}}</span>
         </div>
       </div>
       <div>
         <div class="data-label">
           Facility
-          <span class="data-value selectable-value">{{reportSummary?.facilityId}}</span>
+          <span class="data-value selectable-value">
+            <a [routerLink]="['/tenant/facility', facilityId]">{{reportSummary?.facilityId}}</a>&nbsp;
+            <a [routerLink]="['/tenant/facility', facilityId, 'edit']"><fa-icon [icon]="faGears"></fa-icon></a>
+          </span>
         </div>
       </div>
       <div>
