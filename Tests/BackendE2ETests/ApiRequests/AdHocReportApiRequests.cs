@@ -174,7 +174,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             ""QueryPlanIds"": [
             """ + TestConfig.MeasureAch + @"""
                 ],
-            ""MaxConcurrentRequests"": 2,
+            ""MaxConcurrentRequests"": """ + TestConfig.FhirQueryConfig.MaxConcurrentRequests + @""",
             ""TimeZone"": ""America/Chicago""
             }";
             request.AddStringBody(body, DataFormat.Json);

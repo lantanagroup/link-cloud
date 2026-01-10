@@ -37,6 +37,7 @@ using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
 using Submission.Data;
 using System.Reflection;
+using LantanaGroup.Link.Submission.Application.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
@@ -187,6 +188,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, SubmissionConstants.ServiceName).GetHealthCheckOptions();
 
     builder.Services.AddHealthChecks()
+        .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
     
     // Producers
