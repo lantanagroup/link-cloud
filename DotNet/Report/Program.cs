@@ -129,7 +129,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add repositories
     builder.Services.AddTransient<IBaseEntityRepository<ReportScheduleModel>, MongoEntityRepository<ReportScheduleModel>>();
-    builder.Services.AddTransient<IBaseEntityRepository<ReportModel>, MongoEntityRepository<ReportModel>>();
     builder.Services.AddTransient<IBaseEntityRepository<ReportEntryModel>, MongoEntityRepository<ReportEntryModel>>();
     builder.Services.AddTransient<IBaseEntityRepository<ReportPopulationModel>, MongoEntityRepository<ReportPopulationModel>>();
     builder.Services.AddTransient<MongoEntityRepository<ReportResourceModel>, MongoEntityRepository<ReportResourceModel>>();
