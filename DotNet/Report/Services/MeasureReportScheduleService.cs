@@ -67,7 +67,7 @@ public class MeasureReportScheduleService : BackgroundService
         _logger.LogInformation("MeasureReportScheduleService stopped.");
     }
 
-    public static async Task CreateJobAndTrigger(ReportScheduleModel reportSchedule, IScheduler scheduler, ILogger? logger = null)
+    public static async Task CreateJobAndTrigger(ReportSchedule reportSchedule, IScheduler scheduler, ILogger? logger = null)
     {
         var job = CreateJob(reportSchedule);
         var trigger = CreateTrigger(reportSchedule, job.Key);
@@ -79,7 +79,7 @@ public class MeasureReportScheduleService : BackgroundService
             await scheduler.ScheduleJob(trigger);
     }
 
-    public static IJobDetail CreateJob(ReportScheduleModel reportSchedule)
+    public static IJobDetail CreateJob(ReportSchedule reportSchedule)
     {
         JobDataMap jobDataMap = new JobDataMap();
         jobDataMap.Put("ReportScheduleId", reportSchedule.Id);
@@ -95,7 +95,7 @@ public class MeasureReportScheduleService : BackgroundService
             .Build();
     }
 
-    private static ITrigger CreateTrigger(ReportScheduleModel reportSchedule, JobKey jobKey)
+    private static ITrigger CreateTrigger(ReportSchedule reportSchedule, JobKey jobKey)
     {
         JobDataMap jobDataMap = new JobDataMap();
         string reportScheduleJson = JsonSerializer.Serialize(reportSchedule);
@@ -121,13 +121,13 @@ public class MeasureReportScheduleService : BackgroundService
             .Build();
     }
 
-    public static async Task DeleteJob(ReportScheduleModel reportSchedule, IScheduler scheduler)
+    public static async Task DeleteJob(ReportSchedule reportSchedule, IScheduler scheduler)
     {
         JobKey jobKey = new JobKey(reportSchedule.Id, ReportConstants.MeasureReportSubmissionScheduler.Group);
         await scheduler.DeleteJob(jobKey);
     }
 
-    public static async Task RescheduleJob(ReportScheduleModel reportSchedule, IScheduler scheduler)
+    public static async Task RescheduleJob(ReportSchedule reportSchedule, IScheduler scheduler)
     {
         await DeleteJob(reportSchedule, scheduler);
         await CreateJobAndTrigger(reportSchedule, scheduler);

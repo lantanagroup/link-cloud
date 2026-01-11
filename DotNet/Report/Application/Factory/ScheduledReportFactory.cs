@@ -6,7 +6,7 @@ namespace LantanaGroup.Link.Report.Application.Factory;
 
 public class ScheduledReportFactory
 {
-    public ScheduledReportListSummary FromDomain(ReportScheduleModel reportScheduleModel)
+    public ScheduledReportListSummary FromDomain(ReportSchedule reportScheduleModel)
     {
         return new ScheduledReportListSummary()
         {
@@ -25,7 +25,7 @@ public class ScheduledReportFactory
 
 public class MeasureReportSummaryFactory
 {
-    public MeasureReportSummary FromDomain(ReportEntryModel measureReport)
+    public MeasureReportSummary FromDomain(ReportEntry measureReport)
     {
         var summary = new MeasureReportSummary()
         {

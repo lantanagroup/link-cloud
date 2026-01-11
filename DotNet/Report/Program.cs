@@ -128,10 +128,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<Null, MeasureReportGeneratedValue>, KafkaProducerFactory<Null, MeasureReportGeneratedValue>>();
 
     // Add repositories
-    builder.Services.AddTransient<IBaseEntityRepository<ReportScheduleModel>, MongoEntityRepository<ReportScheduleModel>>();
-    builder.Services.AddTransient<IBaseEntityRepository<ReportEntryModel>, MongoEntityRepository<ReportEntryModel>>();
-    builder.Services.AddTransient<IBaseEntityRepository<ReportPopulationModel>, MongoEntityRepository<ReportPopulationModel>>();
-    builder.Services.AddTransient<MongoEntityRepository<ReportResourceModel>, MongoEntityRepository<ReportResourceModel>>();
+    builder.Services.AddTransient<IBaseEntityRepository<ReportSchedule>, MongoEntityRepository<ReportSchedule>>();
+    builder.Services.AddTransient<IBaseEntityRepository<ReportEntry>, MongoEntityRepository<ReportEntry>>();
+    builder.Services.AddTransient<IBaseEntityRepository<ReportPopulation>, MongoEntityRepository<ReportPopulation>>();
+    builder.Services.AddTransient<MongoEntityRepository<ReportResource>, MongoEntityRepository<ReportResource>>();
     builder.Services.AddTransient<IDatabase, Database>();
 
     // Add Managers

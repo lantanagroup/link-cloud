@@ -39,7 +39,7 @@ namespace IntegrationTests.Report
             // Arrange
             var db = _serviceProvider.GetRequiredService<IDatabase>();
 
-            var schedule = new ReportScheduleModel
+            var schedule = new ReportSchedule
             {
                 Id = Guid.NewGuid().ToString(),
                 FacilityId = "TestFacility2",
@@ -53,7 +53,7 @@ namespace IntegrationTests.Report
             await db.ReportScheduledRepository.AddAsync(schedule);
 
             // Add a submission entry with PendingEvaluation to trigger DataAcquisitionRequestedProducer
-            var entry = new ReportEntryModel
+            var entry = new ReportEntry
             {
                 Id = Guid.NewGuid().ToString(),
                 FacilityId = schedule.FacilityId,
@@ -103,7 +103,7 @@ namespace IntegrationTests.Report
             // Arrange
             var db = _serviceProvider.GetRequiredService<IDatabase>();
 
-            var schedule = new ReportScheduleModel
+            var schedule = new ReportSchedule
             {
                 Id = Guid.NewGuid().ToString(),
                 FacilityId = "TestFacility3",
@@ -179,7 +179,7 @@ namespace IntegrationTests.Report
             var dataAcqKafkaProducer = scope.ServiceProvider.GetRequiredService<IProducer<string, DataAcquisitionRequestedValue>>();
 
             // Setup schedule
-            var schedule = new ReportScheduleModel
+            var schedule = new ReportSchedule
             {
                 Id = Guid.NewGuid().ToString(),
                 FacilityId = "TestFacility",

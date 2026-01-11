@@ -54,7 +54,7 @@ namespace IntegrationTests.Report
         }
 
         //TODO: Daniel - Test
-        private async Task<(ReportScheduleModel schedule, List<ReportEntryModel> entries)> SetupDatabaseAsync(IServiceScope scope, string facilityId = "TestFacility", List<string> reportTypes = null, List<(string patientId, string reportType, ReportingStatus status, MeasureReport measureReport)> entryData = null)
+        private async Task<(ReportSchedule schedule, List<ReportEntry> entries)> SetupDatabaseAsync(IServiceScope scope, string facilityId = "TestFacility", List<string> reportTypes = null, List<(string patientId, string reportType, ReportingStatus status, MeasureReport measureReport)> entryData = null)
         {
             var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
 
@@ -64,7 +64,7 @@ namespace IntegrationTests.Report
             var reportStartDate = DateTime.Parse("2024-01-01").ToUniversalTime();
             var reportEndDate = DateTime.Parse("2024-01-31").ToUniversalTime();
 
-            var schedule = new ReportScheduleModel
+            var schedule = new ReportSchedule
             {
                 Id = Guid.NewGuid().ToString(),
                 FacilityId = facilityId,
@@ -76,10 +76,10 @@ namespace IntegrationTests.Report
             };
             await database.ReportScheduledRepository.AddAsync(schedule);
 
-            var entries = new List<ReportEntryModel>();
+            var entries = new List<ReportEntry>();
             foreach (var (patientId, reportType, status, measureReport) in entryData)
             {
-                var entry = new ReportEntryModel
+                var entry = new ReportEntry
                 {
                     Id = Guid.NewGuid().ToString(),
                     FacilityId = schedule.FacilityId,
@@ -119,7 +119,7 @@ namespace IntegrationTests.Report
         }
 
         //TODO - Daniel: Test
-        private void AssertEntryStatusAndValidation(ReportEntryModel updatedEntry, MeasureReportStatus expectedStatus, ReportingStatus expectedReportingStatus, string expectedPayloadUri = null)
+        private void AssertEntryStatusAndValidation(ReportEntry updatedEntry, MeasureReportStatus expectedStatus, ReportingStatus expectedReportingStatus, string expectedPayloadUri = null)
         {
             Assert.NotNull(updatedEntry);
             //Assert.Equal(expectedStatus, updatedEntry.Status);
@@ -131,7 +131,7 @@ namespace IntegrationTests.Report
             }
         }
 
-        private void AssertProducerMocks(Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> submitMock, Times timesEntry, Times timesSchedule, ReportScheduleModel schedule, string patientId, string payloadUri)
+        private void AssertProducerMocks(Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> submitMock, Times timesEntry, Times timesSchedule, ReportSchedule schedule, string patientId, string payloadUri)
         {
             submitMock.Verify(p => p.Produce(
                 nameof(KafkaTopic.SubmitPayload),
@@ -238,7 +238,7 @@ namespace IntegrationTests.Report
             mockServiceProvider.Setup(sp => sp.GetService(It.Is<Type>(t => t != typeof(IReportScheduledManager)))).Returns<Type>(t => scope.ServiceProvider.GetService(t));
             mockScopeFactory.Setup(f => f.CreateScope()).Returns(mockScope.Object);
             var reportScheduledManagerMock = mockServiceProvider.Object.GetService<IReportScheduledManager>();
-            Mock.Get(reportScheduledManagerMock).Setup(m => m.SingleOrDefaultAsync(It.IsAny<Expression<Func<ReportScheduleModel, bool>>>(), It.IsAny<CancellationToken>())).ReturnsAsync((ReportScheduleModel)null);
+            Mock.Get(reportScheduledManagerMock).Setup(m => m.SingleOrDefaultAsync(It.IsAny<Expression<Func<ReportSchedule, bool>>>(), It.IsAny<CancellationToken>())).ReturnsAsync((ReportSchedule)null);
 
             var listener = CreateListener(scope, mockScopeFactory);
 
@@ -261,7 +261,7 @@ namespace IntegrationTests.Report
             mockServiceProvider.Setup(sp => sp.GetService(It.Is<Type>(t => t != typeof(IReportScheduledManager)))).Returns<Type>(t => scope.ServiceProvider.GetService(t));
             mockScopeFactory.Setup(f => f.CreateScope()).Returns(mockScope.Object);
             var reportScheduledManagerMock = mockServiceProvider.Object.GetService<IReportScheduledManager>();
-            Mock.Get(reportScheduledManagerMock).Setup(m => m.SingleOrDefaultAsync(It.IsAny<Expression<Func<ReportScheduleModel, bool>>>(), It.IsAny<CancellationToken>())).ThrowsAsync(new TimeoutException());
+            Mock.Get(reportScheduledManagerMock).Setup(m => m.SingleOrDefaultAsync(It.IsAny<Expression<Func<ReportSchedule, bool>>>(), It.IsAny<CancellationToken>())).ThrowsAsync(new TimeoutException());
 
             var listener = CreateListener(scope, mockScopeFactory);
 
@@ -283,7 +283,7 @@ namespace IntegrationTests.Report
             mockServiceProvider.Setup(sp => sp.GetService(It.Is<Type>(t => t != typeof(IReportScheduledManager)))).Returns<Type>(t => scope.ServiceProvider.GetService(t));
             mockScopeFactory.Setup(f => f.CreateScope()).Returns(mockScope.Object);
             var reportScheduledManagerMock = mockServiceProvider.Object.GetService<IReportScheduledManager>();
-            Mock.Get(reportScheduledManagerMock).Setup(m => m.SingleOrDefaultAsync(It.IsAny<Expression<Func<ReportScheduleModel, bool>>>(), It.IsAny<CancellationToken>())).ThrowsAsync(new Exception("Test error"));
+            Mock.Get(reportScheduledManagerMock).Setup(m => m.SingleOrDefaultAsync(It.IsAny<Expression<Func<ReportSchedule, bool>>>(), It.IsAny<CancellationToken>())).ThrowsAsync(new Exception("Test error"));
 
             var listener = CreateListener(scope, mockScopeFactory);
 

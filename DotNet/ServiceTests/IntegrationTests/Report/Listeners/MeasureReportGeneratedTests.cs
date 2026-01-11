@@ -61,13 +61,13 @@ namespace IntegrationTests.Report
                 scope.ServiceProvider.GetRequiredService<IReportResourceManager>());
         }
 
-        private async Task<(ReportScheduleModel schedule, List<ReportEntryModel> entries)> SetupDatabaseAsync(IServiceScope scope, string facilityId, List<string> reportTypes = null, List<(string patientId, string reportType, MeasureReportStatus status)> entryData = null, List<(string resourceType, string resourceId, DomainResource resource)> existingResources = null)
+        private async Task<(ReportSchedule schedule, List<ReportEntry> entries)> SetupDatabaseAsync(IServiceScope scope, string facilityId, List<string> reportTypes = null, List<(string patientId, string reportType, MeasureReportStatus status)> entryData = null, List<(string resourceType, string resourceId, DomainResource resource)> existingResources = null)
         {
             var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
 
             reportTypes ??= new List<string> { "TestReport" };
 
-            var schedule = new ReportScheduleModel
+            var schedule = new ReportSchedule
             {
                 Id = Guid.NewGuid().ToString(),
                 FacilityId = facilityId,
@@ -78,10 +78,10 @@ namespace IntegrationTests.Report
             };
             await database.ReportScheduledRepository.AddAsync(schedule);
 
-            var entries = new List<ReportEntryModel>();
+            var entries = new List<ReportEntry>();
             foreach (var (patientId, reportType, status) in entryData)
             {
-                var entry = new ReportEntryModel()
+                var entry = new ReportEntry()
                 {
                     Id = Guid.NewGuid().ToString(),
                     FacilityId = schedule.FacilityId,
@@ -126,7 +126,7 @@ namespace IntegrationTests.Report
             return new ConsumeResult<Null, MeasureReportGeneratedValue> { Message = message, Topic = nameof(KafkaTopic.MeasureReportGenerated) };
         }
 
-        private void AssertEntryStatusAndMeasureReport(ReportEntryModel updatedEntry, ReportingStatus expectedStatus, string expectedMeasureReportId = null)
+        private void AssertEntryStatusAndMeasureReport(ReportEntry updatedEntry, ReportingStatus expectedStatus, string expectedMeasureReportId = null)
         {
             Assert.NotNull(updatedEntry);
             Assert.Equal(expectedStatus, updatedEntry.ReportingStatus);
@@ -138,7 +138,7 @@ namespace IntegrationTests.Report
             }
         }
 
-        private void AssertProducerMocks(Mock<IProducer<ReadyForValidationKey, ReadyForValidationValue>> readyMock, Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> submitMock, Times readyTimes, Times submitTimes, ReportScheduleModel schedule, ReportEntryModel entry)
+        private void AssertProducerMocks(Mock<IProducer<ReadyForValidationKey, ReadyForValidationValue>> readyMock, Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> submitMock, Times readyTimes, Times submitTimes, ReportSchedule schedule, ReportEntry entry)
         {
             readyMock.Verify(p => p.Produce(
                 nameof(KafkaTopic.ReadyForValidation),
@@ -158,7 +158,7 @@ namespace IntegrationTests.Report
                 It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()), submitTimes);
         }
 
-        private async Task AssertNoBlobUploaded(IServiceScope scope, ReportScheduleModel schedule, ReportEntryModel entry)
+        private async Task AssertNoBlobUploaded(IServiceScope scope, ReportSchedule schedule, ReportEntry entry)
         {
             var settings = scope.ServiceProvider.GetRequiredService<IOptions<BlobStorageSettings>>().Value;
             var containerClient = new BlobContainerClient(settings.ConnectionString, settings.BlobContainerName);
@@ -173,7 +173,7 @@ namespace IntegrationTests.Report
             Assert.False(exists);
         }
 
-        private async Task AssertBlobUploaded(IServiceScope scope, ReportScheduleModel schedule, ReportEntryModel entry)
+        private async Task AssertBlobUploaded(IServiceScope scope, ReportSchedule schedule, ReportEntry entry)
         {
             var settings = scope.ServiceProvider.GetRequiredService<IOptions<BlobStorageSettings>>().Value;
             var containerClient = new BlobContainerClient(settings.ConnectionString, settings.BlobContainerName);

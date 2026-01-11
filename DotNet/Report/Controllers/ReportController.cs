@@ -120,7 +120,7 @@ namespace LantanaGroup.Link.Report.Controllers
                     return BadRequest("Parameter reportScheduleId is null or whitespace");
                 }
 
-                ReportScheduleModel? model = await _reportingScheduledManager.GetReportSchedule(facilityId, reportScheduleId);
+                ReportSchedule? model = await _reportingScheduledManager.GetReportSchedule(facilityId, reportScheduleId);
                 if (model == null)
                 {
                     return Problem(detail: "No Report Schedule found for the provided FacilityId and ReportId", statusCode: (int)HttpStatusCode.NotFound);
@@ -287,7 +287,7 @@ namespace LantanaGroup.Link.Report.Controllers
             {
                 // Create search predicates
                 //TODO: design way to dynamically build predicates or change search to use custom method
-                Expression<Func<ReportScheduleModel, bool>> predicate;
+                Expression<Func<ReportSchedule, bool>> predicate;
                 if (facilityId is null)
                 {
                     predicate = r => true;
@@ -396,7 +396,7 @@ namespace LantanaGroup.Link.Report.Controllers
             {
                 // Create search predicates
                 //TODO: design way to dynamically build predicates or change search to use custom method
-                Expression<Func<ReportEntryModel, bool>> predicate = r => r.FacilityId == facilityId;
+                Expression<Func<ReportEntry, bool>> predicate = r => r.FacilityId == facilityId;
 
                 if (!string.IsNullOrEmpty(parameters.ReportId))
                 {

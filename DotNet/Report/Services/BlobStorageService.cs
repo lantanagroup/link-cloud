@@ -29,7 +29,7 @@ namespace LantanaGroup.Link.Report.Services
             }
         }
 
-        public string GetReportName(ReportScheduleModel reportSchedule)
+        public string GetReportName(ReportSchedule reportSchedule)
         {
             return ReportHelpers.GetReportName(
                 reportSchedule.Id,
@@ -62,7 +62,7 @@ namespace LantanaGroup.Link.Report.Services
         }
 
         public virtual async Task<Uri?> UploadAsync(
-            ReportScheduleModel reportSchedule,
+            ReportSchedule reportSchedule,
             PatientSubmissionModel patientSubmission,
             CancellationToken cancellationToken = default)
         {
@@ -91,7 +91,7 @@ namespace LantanaGroup.Link.Report.Services
             return blobClient.Uri;
         }
 
-        public virtual async Task<Uri?> UploadManifestAsync(ReportScheduleModel reportSchedule, IEnumerable<Resource> resources, CancellationToken cancellationToken = default)
+        public virtual async Task<Uri?> UploadManifestAsync(ReportSchedule reportSchedule, IEnumerable<Resource> resources, CancellationToken cancellationToken = default)
         {
             if (_containerClient == null)
             {

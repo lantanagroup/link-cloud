@@ -10,7 +10,7 @@ namespace LantanaGroup.Link.Report.Entities
 
     [BsonCollection("reportSchedule")]
     [BsonIgnoreExtraElements]
-    public class ReportScheduleModel : BaseEntityExtended
+    public class ReportSchedule : BaseEntityExtended
     {
         public string FacilityId { get; set; } = string.Empty;
         public DateTime ReportStartDate { get; set; }

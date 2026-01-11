@@ -44,7 +44,7 @@ namespace LantanaGroup.Link.Report.Jobs
 
         public async Task Execute(IJobExecutionContext context)
         {
-            ReportScheduleModel? schedule = null;
+            ReportSchedule? schedule = null;
             try
             {
                 // Get the schedule ID from the job data map

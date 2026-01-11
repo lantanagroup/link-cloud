@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.Report.Entities
 {
     [BsonCollection("reportResources")]
     [BsonIgnoreExtraElements]
-    public class ReportResourceModel : BaseEntityExtended
+    public class ReportResource : BaseEntityExtended
     {
         public string FacilityId { get; set; }
         public string ReportScheduledId { get; set; }
