@@ -201,7 +201,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 );
 
                                 // Create ReportSchedule for AdHoc Report
-                                var reportSchedule = new ReportScheduleModel
+                                var reportSchedule = new ReportSchedule
                                 {
                                     Id = value.AdhocReportId,
                                     FacilityId = facilityId,
@@ -230,7 +230,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     patientEntries.AsParallel().ForAll(async p =>
                                     {
-                                        var newEntry = new ReportEntryModel()
+                                        var newEntry = new ReportEntry()
                                         {
                                             PatientId = p,
                                             ReportingStatus = ReportingStatus.PatientIdentified,
@@ -290,7 +290,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     value.PatientIds.AsParallel().ForAll(async patientId =>
                                     {
-                                        var newEntry = new ReportEntryModel()
+                                        var newEntry = new ReportEntry()
                                         {
                                             PatientId = patientId,
                                             ReportingStatus = ReportingStatus.PatientIdentified,

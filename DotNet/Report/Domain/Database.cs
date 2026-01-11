@@ -9,26 +9,26 @@ namespace LantanaGroup.Link.Report.Domain
 {
     public interface IDatabase
     {
-        IBaseEntityRepository<ReportScheduleModel> ReportScheduledRepository { get; set; }
-        IBaseEntityRepository<ReportEntryModel> ReportEntryRepository { get; set; }
-        IBaseEntityRepository<ReportPopulationModel> ReportPopulationRepository { get; set; }
-        MongoEntityRepository<ReportResourceModel> ReportResourceRepository { get; set; }
+        IBaseEntityRepository<ReportSchedule> ReportScheduledRepository { get; set; }
+        IBaseEntityRepository<ReportEntry> ReportEntryRepository { get; set; }
+        IBaseEntityRepository<ReportPopulation> ReportPopulationRepository { get; set; }
+        MongoEntityRepository<ReportResource> ReportResourceRepository { get; set; }
     }
 
     public class Database : IDatabase
     {
         protected IMongoDatabase DbContext { get; set; }
 
-        public IBaseEntityRepository<ReportScheduleModel> ReportScheduledRepository { get; set; }
-        public IBaseEntityRepository<ReportEntryModel> ReportEntryRepository { get; set; }
-        public IBaseEntityRepository<ReportPopulationModel> ReportPopulationRepository { get; set; }
-        public MongoEntityRepository<ReportResourceModel> ReportResourceRepository { get; set; }
+        public IBaseEntityRepository<ReportSchedule> ReportScheduledRepository { get; set; }
+        public IBaseEntityRepository<ReportEntry> ReportEntryRepository { get; set; }
+        public IBaseEntityRepository<ReportPopulation> ReportPopulationRepository { get; set; }
+        public MongoEntityRepository<ReportResource> ReportResourceRepository { get; set; }
 
         public Database(IOptions<MongoConnection> mongoSettings,
-            IBaseEntityRepository<ReportScheduleModel> reportScheduledRepository,
-            IBaseEntityRepository<ReportEntryModel> reportEntryRepository,
-            IBaseEntityRepository<ReportPopulationModel> reportPopulationRepository,
-            MongoEntityRepository<ReportResourceModel> reportResourceRepository)
+            IBaseEntityRepository<ReportSchedule> reportScheduledRepository,
+            IBaseEntityRepository<ReportEntry> reportEntryRepository,
+            IBaseEntityRepository<ReportPopulation> reportPopulationRepository,
+            MongoEntityRepository<ReportResource> reportResourceRepository)
         {
             var client = new MongoClient(mongoSettings.Value.ConnectionString);
             DbContext = client.GetDatabase(mongoSettings.Value.DatabaseName);

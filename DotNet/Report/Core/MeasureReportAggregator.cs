@@ -41,7 +41,7 @@ public class MeasureReportAggregator
         }
     }
 
-    public async Task<List<MeasureReport>> CreateMeasureReportAggregate(ReportScheduleModel reportSchedule, string organizationId) 
+    public async Task<List<MeasureReport>> CreateMeasureReportAggregate(ReportSchedule reportSchedule, string organizationId) 
     {
         var parser = new FhirJsonParser();
         var populationModels = (await _database.ReportPopulationRepository.FindAsync(x => x.ReportScheduleId == reportSchedule.Id));

@@ -8,20 +8,20 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 {
     public interface IReportPopulationManager
     {
-        Task<ReportPopulationModel> UpdateAsync(ReportPopulationModel entry,
+        Task<ReportPopulation> UpdateAsync(ReportPopulation entry,
             CancellationToken cancellationToken);
 
-        Task<ReportPopulationModel> AddAsync(ReportPopulationModel entry,
+        Task<ReportPopulation> AddAsync(ReportPopulation entry,
             CancellationToken cancellationToken);
-        Task<ReportPopulationModel> UpdateAsyncWithAggregateResult(ReportPopulationModel populationModel, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken);
+        Task<ReportPopulation> UpdateAsyncWithAggregateResult(ReportPopulation populationModel, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken);
 
-        Task<ReportPopulationModel> AddAsyncWithAggregateResult(string facilityId, string reportId, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken);
+        Task<ReportPopulation> AddAsyncWithAggregateResult(string facilityId, string reportId, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken);
 
-        Task<List<ReportPopulationModel>> FindAsync(Expression<Func<ReportPopulationModel, bool>> predicate,
+        Task<List<ReportPopulation>> FindAsync(Expression<Func<ReportPopulation, bool>> predicate,
             CancellationToken cancellationToken = default);
 
-        Task<ReportPopulationModel?> SingleOrDefaultAsync(
-            Expression<Func<ReportPopulationModel, bool>> predicate,
+        Task<ReportPopulation?> SingleOrDefaultAsync(
+            Expression<Func<ReportPopulation, bool>> predicate,
             CancellationToken cancellationToken = default);
     }
 
@@ -34,14 +34,14 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             _database = database;
         }
 
-        public async Task<ReportPopulationModel> AddAsync(ReportPopulationModel entry, CancellationToken cancellationToken)
+        public async Task<ReportPopulation> AddAsync(ReportPopulation entry, CancellationToken cancellationToken)
         {
             return await _database.ReportPopulationRepository.AddAsync(entry, cancellationToken);
         }
 
-        public async Task<ReportPopulationModel> AddAsyncWithAggregateResult(string facilityId, string reportId, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken)
+        public async Task<ReportPopulation> AddAsyncWithAggregateResult(string facilityId, string reportId, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken)
         {
-            var populationModel = new ReportPopulationModel()
+            var populationModel = new ReportPopulation()
             {
                 Measure = aggregateResult.Measure,
                 ReportType = aggregateResult.ReportType,
@@ -71,7 +71,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return await _database.ReportPopulationRepository.AddAsync(populationModel, cancellationToken);
         }
 
-        public async Task<ReportPopulationModel> UpdateAsyncWithAggregateResult(ReportPopulationModel populationModel, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken)
+        public async Task<ReportPopulation> UpdateAsyncWithAggregateResult(ReportPopulation populationModel, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken)
         {
             foreach (var measureReportpopulation in aggregateResult.PopulationList)
             {
@@ -108,17 +108,17 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return await _database.ReportPopulationRepository.UpdateAsync(populationModel, cancellationToken);
         }
 
-        public async Task<List<ReportPopulationModel>> FindAsync(Expression<Func<ReportPopulationModel, bool>> predicate, CancellationToken cancellationToken = default)
+        public async Task<List<ReportPopulation>> FindAsync(Expression<Func<ReportPopulation, bool>> predicate, CancellationToken cancellationToken = default)
         {
             return await _database.ReportPopulationRepository.FindAsync(predicate, cancellationToken);
         }
 
-        public async Task<ReportPopulationModel?> SingleOrDefaultAsync(Expression<Func<ReportPopulationModel, bool>> predicate, CancellationToken cancellationToken = default)
+        public async Task<ReportPopulation?> SingleOrDefaultAsync(Expression<Func<ReportPopulation, bool>> predicate, CancellationToken cancellationToken = default)
         {
             return await _database.ReportPopulationRepository.SingleOrDefaultAsync(predicate, cancellationToken);
         }
 
-        public async Task<ReportPopulationModel> UpdateAsync(ReportPopulationModel entry, CancellationToken cancellationToken)
+        public async Task<ReportPopulation> UpdateAsync(ReportPopulation entry, CancellationToken cancellationToken)
         {
             return await _database.ReportPopulationRepository.UpdateAsync(entry, cancellationToken);
         }

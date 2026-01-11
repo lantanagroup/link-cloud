@@ -48,7 +48,7 @@ namespace LantanaGroup.Link.Report.Core
             }
         }
 
-        public async Task<AggregateResult> AggregateToABS(string patientId, ReportScheduleModel reportSchedule)
+        public async Task<AggregateResult> AggregateToABS(string patientId, ReportSchedule reportSchedule)
         {
             AggregateResult aggregateResult = new AggregateResult();
 

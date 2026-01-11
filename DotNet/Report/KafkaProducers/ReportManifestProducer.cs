@@ -43,7 +43,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _auditableEventOccurredProducer = auditableEventOccurredProducer;
         }
 
-        public async Task<List<Resource>> Generate(ReportScheduleModel schedule)
+        public async Task<List<Resource>> Generate(ReportSchedule schedule)
         {
             var reportEntries = await _database.ReportEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
 
@@ -88,7 +88,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             return manifestResources;
         }
 
-        public async Task<Bundle> GenerateAsBundle(ReportScheduleModel schedule)
+        public async Task<Bundle> GenerateAsBundle(ReportSchedule schedule)
         {
             List<Resource> resources = await Generate(schedule);
             Bundle bundle = new()
@@ -104,7 +104,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             return bundle;
         }
 
-        public async Task<bool> Produce(ReportScheduleModel schedule, string correlationId = null)
+        public async Task<bool> Produce(ReportSchedule schedule, string correlationId = null)
         {
             var reportEntries = await _database.ReportEntryRepository.FindAsync(x => x.FacilityId == schedule.FacilityId && x.ReportScheduleId == schedule.Id);
 
@@ -193,7 +193,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             return admittedPatients;
         }
 
-        private OperationOutcome CreateOperationOutcome(List<ReportEntryModel> failedEntries)
+        private OperationOutcome CreateOperationOutcome(List<ReportEntry> failedEntries)
         {
             var operationOutcome = new OperationOutcome();
             foreach (var entry in failedEntries)

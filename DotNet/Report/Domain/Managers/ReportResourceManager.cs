@@ -7,19 +7,19 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 {
     public interface IReportResourceManager 
     {
-        Task<ReportResourceModel> UpdateAsync(ReportResourceModel entry,
+        Task<ReportResource> UpdateAsync(ReportResource entry,
             CancellationToken cancellationToken);
 
-        Task<ReportResourceModel> AddAsync(ReportResourceModel entry,
+        Task<ReportResource> AddAsync(ReportResource entry,
             CancellationToken cancellationToken);
 
         Task AddAsyncWithAggregateResult(string facilityId, string reportId, string patientId, AggregateResult aggregateResult, CancellationToken cancellationToken);
 
-        Task<List<ReportResourceModel>> FindAsync(Expression<Func<ReportResourceModel, bool>> predicate,
+        Task<List<ReportResource>> FindAsync(Expression<Func<ReportResource, bool>> predicate,
             CancellationToken cancellationToken = default);
 
-        Task<ReportResourceModel?> SingleOrDefaultAsync(
-            Expression<Func<ReportResourceModel, bool>> predicate,
+        Task<ReportResource?> SingleOrDefaultAsync(
+            Expression<Func<ReportResource, bool>> predicate,
             CancellationToken cancellationToken = default);
     }
 
@@ -32,7 +32,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             _database = database;
         }
 
-        public async Task<ReportResourceModel> AddAsync(ReportResourceModel entry, CancellationToken cancellationToken)
+        public async Task<ReportResource> AddAsync(ReportResource entry, CancellationToken cancellationToken)
         {
             return await _database.ReportResourceRepository.AddAsync(entry, cancellationToken);
         }
@@ -41,11 +41,11 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         {
             foreach (var measureReport in aggregateResult.MeasureReportResults)
             {
-                List<ReportResourceModel> resources = new List<ReportResourceModel>();
+                List<ReportResource> resources = new List<ReportResource>();
 
                 foreach (var resource in measureReport.Resources)
                 {
-                    resources.Add(new ReportResourceModel()
+                    resources.Add(new ReportResource()
                     {
                         ReportScheduledId = reportId,
                         FacilityId = facilityId,
@@ -61,17 +61,17 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             }
         }
 
-        public async Task<List<ReportResourceModel>> FindAsync(Expression<Func<ReportResourceModel, bool>> predicate, CancellationToken cancellationToken = default)
+        public async Task<List<ReportResource>> FindAsync(Expression<Func<ReportResource, bool>> predicate, CancellationToken cancellationToken = default)
         {
             return await _database.ReportResourceRepository.FindAsync(predicate, cancellationToken);
         }
 
-        public async Task<ReportResourceModel?> SingleOrDefaultAsync(Expression<Func<ReportResourceModel, bool>> predicate, CancellationToken cancellationToken = default)
+        public async Task<ReportResource?> SingleOrDefaultAsync(Expression<Func<ReportResource, bool>> predicate, CancellationToken cancellationToken = default)
         {
             return await _database.ReportResourceRepository.SingleOrDefaultAsync(predicate, cancellationToken);
         }
 
-        public async Task<ReportResourceModel> UpdateAsync(ReportResourceModel entry, CancellationToken cancellationToken)
+        public async Task<ReportResource> UpdateAsync(ReportResource entry, CancellationToken cancellationToken)
         {
             return await _database.ReportResourceRepository.UpdateAsync(entry, cancellationToken);
         }

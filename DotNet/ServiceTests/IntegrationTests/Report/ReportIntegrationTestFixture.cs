@@ -181,10 +181,10 @@ namespace IntegrationTests.Report
                     services.AddKeyedTransient<ISchedulerFactory>("InMemoryScheduler", (sp, key) => SchedulerFactoryMock.Object);
 
                     // Register repositories as Scoped delegates
-                    services.AddScoped<IBaseEntityRepository<ReportPopulationModel>>(sp => sp.GetRequiredService<IDatabase>().ReportPopulationRepository);
-                    services.AddScoped<IBaseEntityRepository<ReportResourceModel>>(sp => sp.GetRequiredService<IDatabase>().ReportResourceRepository);
-                    services.AddScoped<IBaseEntityRepository<ReportScheduleModel>>(sp => sp.GetRequiredService<IDatabase>().ReportScheduledRepository);
-                    services.AddScoped<IBaseEntityRepository<ReportEntryModel>>(sp => sp.GetRequiredService<IDatabase>().ReportEntryRepository);
+                    services.AddScoped<IBaseEntityRepository<ReportPopulation>>(sp => sp.GetRequiredService<IDatabase>().ReportPopulationRepository);
+                    services.AddScoped<IBaseEntityRepository<ReportResource>>(sp => sp.GetRequiredService<IDatabase>().ReportResourceRepository);
+                    services.AddScoped<IBaseEntityRepository<ReportSchedule>>(sp => sp.GetRequiredService<IDatabase>().ReportScheduledRepository);
+                    services.AddScoped<IBaseEntityRepository<ReportEntry>>(sp => sp.GetRequiredService<IDatabase>().ReportEntryRepository);
                 })
                 .Build();
 
@@ -230,11 +230,11 @@ namespace IntegrationTests.Report
 
     public class InMemoryDatabase : IDatabase
     {
-        public IBaseEntityRepository<ReportScheduleModel> ReportScheduledRepository { get; set; } = new InMemoryEntityRepository<ReportScheduleModel>();
-        public IBaseEntityRepository<ReportEntryModel> ReportEntryRepository { get; set; } = new InMemoryEntityRepository<ReportEntryModel>();
-        public IBaseEntityRepository<ReportPopulationModel> ReportPopulationRepository { get; set; } = new InMemoryEntityRepository<ReportPopulationModel>();
+        public IBaseEntityRepository<ReportSchedule> ReportScheduledRepository { get; set; } = new InMemoryEntityRepository<ReportSchedule>();
+        public IBaseEntityRepository<ReportEntry> ReportEntryRepository { get; set; } = new InMemoryEntityRepository<ReportEntry>();
+        public IBaseEntityRepository<ReportPopulation> ReportPopulationRepository { get; set; } = new InMemoryEntityRepository<ReportPopulation>();
         //TODO: Missing instantiation
-        public MongoEntityRepository<ReportResourceModel> ReportResourceRepository { get; set; }
+        public MongoEntityRepository<ReportResource> ReportResourceRepository { get; set; }
     }
 
     public class InMemoryEntityRepository<T> : IBaseEntityRepository<T> where T : class, new()

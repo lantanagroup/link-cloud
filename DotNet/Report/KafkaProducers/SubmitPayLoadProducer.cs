@@ -21,7 +21,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _database = database;
         }
 
-        public async Task<bool> Produce(ReportScheduleModel schedule, PayloadType payloadType, string? patientId = null, string correlationId = null, string? payloadUri = null)
+        public async Task<bool> Produce(ReportSchedule schedule, PayloadType payloadType, string? patientId = null, string correlationId = null, string? payloadUri = null)
         {
 
             var corrId = string.IsNullOrWhiteSpace(correlationId)

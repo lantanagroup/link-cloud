@@ -49,7 +49,7 @@ namespace IntegrationTests.Report
             var tenantApiService = scope.ServiceProvider.GetRequiredService<ITenantApiService>();
 
             // Setup schedule
-            var schedule = new ReportScheduleModel
+            var schedule = new ReportSchedule
             {
                 Id = Guid.NewGuid().ToString(),
                 FacilityId = "TestFacility",
@@ -98,7 +98,7 @@ namespace IntegrationTests.Report
             optionsMock.Setup(o => o.Value).Returns(new BlobStorageSettings());
 
             var blobStorageMock = new Mock<BlobStorageService>(optionsMock.Object);
-            blobStorageMock.Setup(b => b.UploadManifestAsync(It.IsAny<ReportScheduleModel>(), It.IsAny<IEnumerable<Resource>>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Uri("test://payload/root/uri/blob"));
+            blobStorageMock.Setup(b => b.UploadManifestAsync(It.IsAny<ReportSchedule>(), It.IsAny<IEnumerable<Resource>>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Uri("test://payload/root/uri/blob"));
 
             var submitKafkaMock = new Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>>();
             var submitPayloadProducer = new SubmitPayloadProducer(database, submitKafkaMock.Object);
@@ -140,7 +140,7 @@ namespace IntegrationTests.Report
             Assert.Equal(ScheduleStatus.EndOfPeriod, updatedSchedule.Status);
             Assert.True(updatedSchedule.EndOfReportPeriodJobHasRun);
 
-            blobStorageMock.Verify(b => b.UploadManifestAsync(It.Is<ReportScheduleModel>(s => s.Id == schedule.Id), It.IsAny<IEnumerable<Resource>>(), It.IsAny<CancellationToken>()), Times.Once());
+            blobStorageMock.Verify(b => b.UploadManifestAsync(It.Is<ReportSchedule>(s => s.Id == schedule.Id), It.IsAny<IEnumerable<Resource>>(), It.IsAny<CancellationToken>()), Times.Once());
             submitKafkaMock.Verify(p => p.Produce(It.Is<string>(topic => topic == nameof(KafkaTopic.SubmitPayload)),
                 It.Is<Message<SubmitPayloadKey, SubmitPayloadValue>>(m => m.Key.FacilityId == schedule.FacilityId && m.Key.ReportScheduleId == schedule.Id && m.Value.PayloadType == PayloadType.ReportSchedule && m.Value.PayloadUri == "test://payload/root/uri/blob" && m.Value.ReportTypes.Contains("TestReport")), It.Is<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>(h => h == null)), Times.Once());
         }
@@ -159,7 +159,7 @@ namespace IntegrationTests.Report
             var dataAcqKafkaProducer = scope.ServiceProvider.GetRequiredService<IProducer<string, DataAcquisitionRequestedValue>>();
 
             // Setup schedule
-            var schedule = new ReportScheduleModel
+            var schedule = new ReportSchedule
             {
                 Id = Guid.NewGuid().ToString(),
                 FacilityId = "TestFacility",
@@ -247,7 +247,7 @@ namespace IntegrationTests.Report
             var tenantApiService = scope.ServiceProvider.GetRequiredService<ITenantApiService>();
 
             // Setup schedule
-            var schedule = new ReportScheduleModel
+            var schedule = new ReportSchedule
             {
                 Id = Guid.NewGuid().ToString(),
                 FacilityId = "TestFacility",
@@ -343,7 +343,7 @@ namespace IntegrationTests.Report
             var dataAcqKafkaProducer = scope.ServiceProvider.GetRequiredService<IProducer<string, DataAcquisitionRequestedValue>>();
 
             // Setup schedule
-            var schedule = new ReportScheduleModel
+            var schedule = new ReportSchedule
             {
                 Id = Guid.NewGuid().ToString(),
                 FacilityId = "TestFacility",

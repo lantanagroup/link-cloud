@@ -121,7 +121,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                                         && e.PatientId == patientId, consumeCancellationToken);
 
                                             if (entry == null) {
-                                                entry = new ReportEntryModel() { 
+                                                entry = new ReportEntry() { 
                                                     PatientId = patientId,
                                                     FacilityId = scheduledReport.FacilityId,
                                                     CreateDate = DateTime.Now,
