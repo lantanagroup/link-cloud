@@ -11,7 +11,7 @@ spring:
     username: sa
 
   kafka:
-    bootstrap-servers: kafka_b:9094
+    bootstrap-servers: kafka_b:9092
     properties:
       security:
         protocol: SASL_PLAINTEXT
