@@ -7,6 +7,11 @@ namespace LantanaGroup.Link.Report.Application.Factory;
 
 public class ScheduledReportFactory
 {
+    /// <summary>
+    /// Create a ScheduledReportListSummary populated from the provided ReportSchedule domain model.
+    /// </summary>
+    /// <param name="reportScheduleModel">The domain ReportSchedule to map into a summary object.</param>
+    /// <returns>A ScheduledReportListSummary with fields copied from <paramref name="reportScheduleModel"/>; `Id` is the empty string if the source Id is null, and `Submitted` is `true` when `SubmitReportDateTime` has a value.</returns>
     public ScheduledReportListSummary FromDomain(ReportSchedule reportScheduleModel)
     {
         return new ScheduledReportListSummary()
