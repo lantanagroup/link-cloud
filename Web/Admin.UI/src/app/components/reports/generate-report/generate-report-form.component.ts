@@ -30,7 +30,18 @@ import {
   IMeasureDefinitionConfigModel
 } from "../../../interfaces/measure-definition/measure-definition-config-model.interface";
 import {IReportGenerationResponse} from "../../../interfaces/entity-created-response.model";
-import {debounceTime, distinctUntilChanged, firstValueFrom, forkJoin, map, Observable, of, startWith, tap} from "rxjs";
+import {
+  debounceTime,
+  distinctUntilChanged,
+  firstValueFrom,
+  forkJoin,
+  map,
+  Observable,
+  of,
+  startWith,
+  Subject, takeUntil,
+  tap
+} from "rxjs";
 import {MatCheckboxModule} from "@angular/material/checkbox";
 import {MatRadioModule} from "@angular/material/radio";
 import * as Papa from 'papaparse';
@@ -73,7 +84,7 @@ import {fromZonedTime} from 'date-fns-tz';
   templateUrl: './generate-report-form.component.html',
   styleUrls: ['./generate-report-form.component.scss']
 })
-export class GenerateReportFormComponent implements OnInit {
+export class GenerateReportFormComponent implements OnInit, OnDestroy {
 
   generateReportForm: FormGroup;
   facilities: Array<{ facilityId: string, facilityName: string }> = [];
@@ -82,6 +93,8 @@ export class GenerateReportFormComponent implements OnInit {
   formSubmitted = false; // Flag to track form submission
   errorMessage: string = '';
   lastGeneratedReport: { facilityId: string, reportId: string } | null = null;
+
+  private destroy$ = new Subject<void>();
 
   @Output() formValueChanged = new EventEmitter<boolean>();
 
@@ -124,17 +137,20 @@ export class GenerateReportFormComponent implements OnInit {
       tap(facilities => (this.facilities = facilities))
     );
 
-    this.generateReportForm.valueChanges.subscribe(() => {
+    this.generateReportForm.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => {
       this.formValueChanged.emit(this.generateReportForm.invalid);
     });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   onFacilityInputBlur() {
     setTimeout(() => {
       const inputVal = this.facilityInputControl.value?.trim();
       const facilityIdControl = this.facilityIdControl;
-
-      const match = this.facilities.find(f => f.facilityId === inputVal);
 
       if (!inputVal) {
         facilityIdControl.setValue('');
@@ -174,12 +190,12 @@ export class GenerateReportFormComponent implements OnInit {
     return this.generateReportForm.get('facilityInput') as FormControl;
   }
 
-  get startDateControl(): FormArray {
-    return this.generateReportForm.get('startDate') as FormArray;
+  get startDateControl(): FormControl {
+    return this.generateReportForm.get('startDate') as FormControl;
   }
 
-  get endDateControl(): FormArray {
-    return this.generateReportForm.get('endDate') as FormArray;
+  get endDateControl(): FormControl {
+    return this.generateReportForm.get('endDate') as FormControl;
   }
 
   get bypassSubmissionControl(): FormControl {

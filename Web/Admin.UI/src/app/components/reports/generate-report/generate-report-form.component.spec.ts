@@ -1,15 +1,15 @@
 import {ComponentFixture, TestBed, fakeAsync, tick, waitForAsync, flushMicrotasks} from '@angular/core/testing';
-import { GenerateReportFormComponent } from './generate-report-form.component';
-import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import {GenerateReportFormComponent} from './generate-report-form.component';
+import {FormBuilder, ReactiveFormsModule} from '@angular/forms';
 import {async, of, throwError} from 'rxjs';
-import { MatSnackBar } from '@angular/material/snack-bar';
-import { TenantService } from '../../../services/gateway/tenant/tenant.service';
-import { MeasureDefinitionService } from '../../../services/gateway/measure-definition/measure.service';
-import { Router } from '@angular/router';
+import {MatSnackBar} from '@angular/material/snack-bar';
+import {TenantService} from '../../../services/gateway/tenant/tenant.service';
+import {MeasureDefinitionService} from '../../../services/gateway/measure-definition/measure.service';
+import {Router} from '@angular/router';
 
 
-import { MatDatepickerModule } from '@angular/material/datepicker';
-import { MatNativeDateModule } from '@angular/material/core';
+import {MatDatepickerModule} from '@angular/material/datepicker';
+import {MatNativeDateModule} from '@angular/material/core';
 
 
 describe('GenerateReportFormComponent', () => {
@@ -28,9 +28,9 @@ describe('GenerateReportFormComponent', () => {
     router = jasmine.createSpyObj('Router', ['navigate']);
 
     // Mock service responses
-    tenantService.autocompleteFacilities.and.returnValue(of({ facility1: 'Facility 1', facility2: 'Facility 2' }));
+    tenantService.autocompleteFacilities.and.returnValue(of({facility1: 'Facility 1', facility2: 'Facility 2'}));
 
-    tenantService.generateAdHocReport.and.returnValue(of({ reportId: 'mockReportId' }));
+    tenantService.generateAdHocReport.and.returnValue(of({reportId: 'mockReportId'}));
     tenantService.checkFacility.and.returnValue(of(true));
 
 
@@ -48,22 +48,21 @@ describe('GenerateReportFormComponent', () => {
     );
 
 
-
     measureDefinitionService.getMeasureDefinitionConfigurations.and.returnValue(
-      of([{ id: 'reportType1' }, { id: 'reportType2' }])
+      of([{id: 'reportType1'}, {id: 'reportType2'}])
     );
 
     TestBed.configureTestingModule({
-      imports: [ReactiveFormsModule,GenerateReportFormComponent, MatDatepickerModule,  // Import for the datepicker
+      imports: [ReactiveFormsModule, GenerateReportFormComponent, MatDatepickerModule,  // Import for the datepicker
         MatNativeDateModule   // Import for the Native adapter
       ],
       declarations: [],
       providers: [
         FormBuilder,
-        { provide: TenantService, useValue: tenantService },
-        { provide: MeasureDefinitionService, useValue: measureDefinitionService },
-        { provide: MatSnackBar, useValue: snackBar },
-        { provide: Router, useValue: router }
+        {provide: TenantService, useValue: tenantService},
+        {provide: MeasureDefinitionService, useValue: measureDefinitionService},
+        {provide: MatSnackBar, useValue: snackBar},
+        {provide: Router, useValue: router}
       ]
     }).compileComponents();
   }));
@@ -74,7 +73,7 @@ describe('GenerateReportFormComponent', () => {
     fixture.detectChanges();
   });
 
-  fdescribe('Component Initialization', () => {
+  describe('Component Initialization', () => {
     it('should create the component', () => {
       expect(component).toBeTruthy();
     });
@@ -98,46 +97,46 @@ describe('GenerateReportFormComponent', () => {
 
       component.filteredFacilities.subscribe(filtered => {
         expect(filtered).toEqual([
-          { facilityId: 'facility1', facilityName: 'Facility 1' },
-          { facilityId: 'facility2', facilityName: 'Facility 2' }
+          {facilityId: 'facility1', facilityName: 'Facility 1'},
+          {facilityId: 'facility2', facilityName: 'Facility 2'}
         ]);
       });
     }));
   });
 
-  fdescribe('Form Validation', () => {
+  describe('Form Validation', () => {
     it('should mark facilityId as required', () => {
       const facilityIdControl = component.facilityIdControl;
       facilityIdControl.setValue('');
       expect(facilityIdControl.valid).toBeFalse();
-      expect(facilityIdControl.errors).toEqual({ required: true });
+      expect(facilityIdControl.errors).toEqual({required: true});
 
       facilityIdControl.setValue('validFacility');
       expect(facilityIdControl.valid).toBeTrue();
     });
 
-    fit('should validate startDate and endDate', () => {
+    it('should validate startDate and endDate', () => {
       const startDateControl = component.startDateControl;
       const endDateControl = component.endDateControl;
 
-      startDateControl.setValue(['']);
+      startDateControl.setValue('');
       expect(startDateControl.valid).toBeFalse();
 
-      endDateControl.setValue(['']);
+      endDateControl.setValue('');
       expect(endDateControl.valid).toBeFalse();
 
-      startDateControl.setValue([new Date()]);
-      endDateControl.setValue([new Date()]);
-      expect(startDateControl.valid).toBeFalse();
-      expect(endDateControl.valid).toBeFalse();
+      startDateControl.setValue(new Date());
+      endDateControl.setValue(new Date());
+      expect(startDateControl.valid).toBeTrue();
+      expect(endDateControl.valid).toBeTrue();
     });
   });
 
-  fdescribe('Facility Input Handling', () => {
+  describe('Facility Input Handling', () => {
     it('should handle facility input blur and validate facility', fakeAsync(() => {
       component.facilities = [
-        { facilityId: 'facility1', facilityName: 'Facility 1' },
-        { facilityId: 'facility2', facilityName: 'Facility 2' }
+        {facilityId: 'facility1', facilityName: 'Facility 1'},
+        {facilityId: 'facility2', facilityName: 'Facility 2'}
       ];
 
       tenantService.checkFacility.and.returnValue(of(false));
@@ -147,12 +146,12 @@ describe('GenerateReportFormComponent', () => {
       component.onFacilityInputBlur();
       tick(200); // Allow time for the blur timeout
 
-      expect(component.facilityIdControl.errors).toEqual({ notFound: true });
+      expect(component.facilityIdControl.errors).toEqual({notFound: true});
       expect(component.facilityIdControl.value).toEqual('Invalid Facility');
     }));
 
     it('should handle facility selection', () => {
-      const facility = { facilityId: 'facility1', facilityName: 'Facility 1' };
+      const facility = {facilityId: 'facility1', facilityName: 'Facility 1'};
       component.facilities = [facility]; // Mock the facilities
 
       component.onFacilitySelected(facility);
@@ -163,7 +162,7 @@ describe('GenerateReportFormComponent', () => {
     });
   });
 
-  fdescribe('Form Submission', () => {
+  describe('Form Submission', () => {
     beforeEach(() => {
       component.generateReportForm.patchValue({
         facilityId: 'facility1',
@@ -177,14 +176,14 @@ describe('GenerateReportFormComponent', () => {
       });
     });
 
-    it('should submit the form successfully when valid', async() => {
+    it('should submit the form successfully when valid', async () => {
 
       const mockReportId = 'mockReportId';
 
-      tenantService.generateAdHocReport.and.returnValue(of({ reportId: 'mockReportId' }));
+      tenantService.generateAdHocReport.and.returnValue(of({reportId: 'mockReportId'}));
 
       await component.generateReport();
-     // tick();
+      // tick();
 
       expect(component.lastGeneratedReport).toEqual({
         facilityId: 'facility1',
@@ -199,17 +198,6 @@ describe('GenerateReportFormComponent', () => {
           bypassSubmission: false
         })
       );
-    /*  expect(snackBar.open).toHaveBeenCalledWith(
-        'Successfully generated report with ID: mockReportId.',
-        '',
-        jasmine.objectContaining({
-          duration: 3500,
-          panelClass: 'success-snackbar',
-          horizontalPosition: 'end',
-          verticalPosition: 'top'
-        })
-      );*/
-
     });
 
     it('should display an error when submission fails', fakeAsync(() => {
@@ -226,16 +214,7 @@ describe('GenerateReportFormComponent', () => {
       expect(component.formSubmitted).toBeTrue();
 
       expect(tenantService.generateAdHocReport).toHaveBeenCalled();
-     /* expect(snackBar.open).toHaveBeenCalledWith(
-        'Failed to generate report. Please try again.',
-        '',
-        jasmine.objectContaining({
-          duration: 3500,
-          panelClass: 'error-snackbar',
-          horizontalPosition: 'end',
-          verticalPosition: 'top'
-        })
-      );*/
+
     }));
   });
 
@@ -249,9 +228,10 @@ describe('GenerateReportFormComponent', () => {
       });
       (component as any).resetForm();
 
-      expect(component.generateReportForm.get('facilityId')?.value).toBe('');
-      expect(component.generateReportForm.get('startDate')?.value).toBe('');
-      expect(component.generateReportForm.get('endDate')?.value).toBe('');
+      expect(component.generateReportForm.get('facilityId')?.value).toBeNull();
+      expect(component.generateReportForm.get('startDate')?.value).toBeNull();
+      expect(component.generateReportForm.get('endDate')?.value).toBeNull();
+      expect(component.generateReportForm.get('reportTypes')?.value).toBeNull();
     });
   });
 });
