@@ -1,8 +1,10 @@
 using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
@@ -20,7 +22,10 @@ public class PayloadSubmittedListener(
     ITransientExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue> transientExceptionHandler,
     IDeadLetterExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue> deadLetterExceptionHandler,
     ILogger<PayloadSubmittedListener> logger,
-    IServiceScopeFactory serviceScopeFactory)
+    IServiceScopeFactory serviceScopeFactory, 
+    IDatabase database,
+    //TODO: TEST CODE ONLY! REMOVE AFTER TESTING
+    ReportManifestProducer reportManifestProducer)
     : BackgroundService
 {
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -55,7 +60,6 @@ public class PayloadSubmittedListener(
                             return;
                         }
                         var scope = serviceScopeFactory.CreateScope();
-                        var submissionEntryManager = scope.ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
                         var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
 
                         var facilityId = result.Message.Key.FacilityId;
@@ -64,24 +68,24 @@ public class PayloadSubmittedListener(
                         {
                             if (result.Message.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry)
                             {
-                                var submissionEntries = await submissionEntryManager.FindAsync(e => e.FacilityId == facilityId 
-                                                                                                                && e.Status != MeasureReportStatus.NotReportable
-                                                                                                                && e.PatientId == result.Message.Value.PatientId 
-                                                                                                                && e.ReportScheduleId == result.Message.Key.ReportScheduleId);
+                                var reportEntry = await database.ReportEntryRepository.FirstAsync(e => e.PatientId == result.Message.Value.PatientId && e.ReportScheduleId == result.Message.Key.ReportScheduleId);
 
-                                foreach (var entry in submissionEntries)
-                                {
-                                    entry.Status = MeasureReportStatus.Submitted;
-                                    entry.ModifyDate = DateTime.UtcNow;
-                                    await submissionEntryManager.UpdateAsync(new PatientSubmissionEntryUpdateModel
-                                    {
-                                        Id = entry.Id,
-                                        MeasureReport = entry.MeasureReport,
-                                        PayloadUri = entry.PayloadUri,
-                                        Status = entry.Status,
-                                        ValidationStatus = entry.ValidationStatus,
-                                    }, consumeCancellationToken);
-                                }
+                                //foreach (var item in submissionEntries)
+                                //{
+                                //    item.Status = PatientSubmissionStatus.Submitted;
+                                //    item.ModifyDate = DateTime.UtcNow;
+                                //    await database.ReportEntryStatusRepository.UpdateAsync(item);
+                                //}
+
+                                reportEntry.SubmissionStatus = SubmissionStatus.Submitted;
+                                reportEntry.ModifyDate = DateTime.UtcNow;
+                                await database.ReportEntryRepository.UpdateAsync(reportEntry);
+
+                                //TODO: START - TEST CODE ONLY! REMOVE AFTER TESTING
+                                var reportSchedule = await database.ReportScheduledRepository
+                                    .FirstAsync(x => x.Id == result.Message.Key.ReportScheduleId, consumeCancellationToken);
+                                reportManifestProducer.Produce(reportSchedule);
+                                //TODO: END - TEST CODE ONLY! REMOVE AFTER TESTING
                             }
                             else if (result.Message.Value.PayloadType == PayloadType.ReportSchedule)
                             {

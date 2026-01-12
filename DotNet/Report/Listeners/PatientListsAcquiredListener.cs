@@ -24,6 +24,8 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ITransientExceptionHandler<string, PatientListMessage> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, PatientListMessage> _deadLetterExceptionHandler;
         private readonly IServiceScopeFactory _serviceScopeFactory;
+        private readonly IReportEntryManager _reportEntryStatusManager;
+
         private string Name => this.GetType().Name;
 
         public PatientListsAcquiredListener(
@@ -31,11 +33,12 @@ namespace LantanaGroup.Link.Report.Listeners
             IKafkaConsumerFactory<string, PatientListMessage> kafkaConsumerFactory,
             ITransientExceptionHandler<string, PatientListMessage> transientExceptionHandler,
             IDeadLetterExceptionHandler<string, PatientListMessage> deadLetterExceptionHandler, 
-            IServiceScopeFactory serviceScopeFactory)
+            IServiceScopeFactory serviceScopeFactory, IReportEntryManager reportEntryStatusManager)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _serviceScopeFactory = serviceScopeFactory;
+            _reportEntryStatusManager = reportEntryStatusManager;
 
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
@@ -109,43 +112,47 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 foreach (var scheduledReport in scheduledReports)
                                 {
-                                    foreach (var reportType in scheduledReport.ReportTypes)
+                                    foreach (var patientListItem in value)
                                     {
-                                        foreach (var patientListItem in value)
+                                        foreach (var pId in patientListItem.PatientIds)
                                         {
-                                            foreach (var pId in patientListItem.PatientIds)
+                                            var patientId = pId.Split('/').Last();
+
+                                            var entry = await _reportEntryStatusManager.SingleOrDefaultAsync(e =>
+                                                        e.ReportScheduleId == scheduledReport.Id
+                                                        && e.PatientId == patientId, consumeCancellationToken);
+
+                                            if (entry == null)
                                             {
-                                                var patientId = pId.Split('/').Last();
-
-                                                var entry = await submissionEntryManager.SingleOrDefaultAsync(e =>
-                                                           e.ReportScheduleId == scheduledReport.Id
-                                                           && e.PatientId == patientId
-                                                           && e.ReportType == reportType, consumeCancellationToken);
-
-                                                if (entry == null)
+                                                entry = new ReportEntry()
                                                 {
-                                                    await submissionEntryManager.AddAsync(new PatientSubmissionEntry()
+                                                    PatientId = patientId,
+                                                    FacilityId = scheduledReport.FacilityId,
+                                                    CreateDate = DateTime.Now,
+                                                    ReportingStatus = ReportingStatus.PatientIdentified,
+                                                    ReportScheduleId = scheduledReport.Id
+                                                };
+                                                await _reportEntryStatusManager.AddAsync(entry, cancellationToken);
+                                            }
+
+                                            foreach (var reportType in scheduledReport.ReportTypes)
+                                            {
+                                                var measureReportEntry = entry.MeasureReportList.Where(x => x.ReportType == reportType).FirstOrDefault();
+
+                                                if (measureReportEntry == null)
+                                                {
+                                                    entry.MeasureReportList.Add(new EvaluatedMeasureReport()
                                                     {
-                                                        PatientId = patientId,
-                                                        Status = MeasureReportStatus.PendingEvaluation,
-                                                        ReportScheduleId = scheduledReport.Id,
-                                                        FacilityId = scheduledReport.FacilityId,
                                                         ReportType = reportType,
-                                                        CreateDate = DateTime.UtcNow,
+                                                        Status = MeasureReportStatus.EntryCreated,
                                                     });
                                                 }
                                                 else
                                                 {
-                                                    entry.Status = MeasureReportStatus.PendingEvaluation;
-                                                    await submissionEntryManager.UpdateAsync(new PatientSubmissionEntryUpdateModel
-                                                    {
-                                                        Id = entry.Id,
-                                                        MeasureReport = entry.MeasureReport,
-                                                        PayloadUri = entry.PayloadUri,
-                                                        Status = entry.Status,
-                                                        ValidationStatus = entry.ValidationStatus,
-                                                    }, cancellationToken);
-                                                } 
+                                                    measureReportEntry.Status = MeasureReportStatus.EntryCreated;
+                                                }
+
+                                                await _reportEntryStatusManager.UpdateAsync(entry, cancellationToken);
                                             }
                                         }
                                     }

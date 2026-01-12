@@ -45,6 +45,8 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly DataAcquisitionRequestedProducer _dataAcqProducer;
         private readonly IProducer<string, EvaluationRequestedValue> _evaluationProducer;
         private readonly BlobStorageService _blobStorageService;
+        private readonly IReportEntryManager _reportEntryManager;
+        private readonly IReportScheduledManager _reportScheduledManager;
 
         private string Name => this.GetType().Name;
 
@@ -60,7 +62,9 @@ namespace LantanaGroup.Link.Report.Listeners
             DataAcquisitionRequestedProducer dataAcqProducer,
             IProducer<string, EvaluationRequestedValue> evaluationProducer,
             BlobStorageService blobStorageService,
-            IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions)
+            IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions,
+            IReportEntryManager reportEntryManager,
+            IReportScheduledManager reportScheduledManager)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -85,6 +89,8 @@ namespace LantanaGroup.Link.Report.Listeners
             _evaluationProducer = evaluationProducer;
             _blobStorageService = blobStorageService;
             _linkBearerServiceOptions = linkBearerServiceOptions;
+            _reportEntryManager = reportEntryManager;
+            _reportScheduledManager = reportScheduledManager;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -125,10 +131,6 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             try
                             {
-                              using var scope = _serviceScopeFactory.CreateScope();
-                                var measureReportScheduledManager =
-                                    scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
-
                                 var key = result.Message.Key;
                                 var value = result.Message.Value;
                                 var startDate = value.StartDate;
@@ -149,7 +151,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 {
                                     _logger.LogDebug(
                                         "Finding existing report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, value.ReportId, DateTime.UtcNow);
-                                    var existing = await measureReportScheduledManager.SingleOrDefaultAsync(x => x.Id == value.ReportId, consumeCancellationToken);
+                                    var existing = await _reportScheduledManager.SingleOrDefaultAsync(x => x.Id == value.ReportId, consumeCancellationToken);
 
                                     if (existing == null)
                                     {
@@ -214,34 +216,38 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var reportName = _blobStorageService.GetReportName(reportSchedule);
                                 reportSchedule.PayloadRootUri = _blobStorageService.GetUri(reportName)?.ToString();
 
-                                await measureReportScheduledManager.AddAsync(reportSchedule, cancellationToken);
-
-                                var submissionEntryManager = scope.ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
+                                await _reportScheduledManager.AddAsync(reportSchedule, cancellationToken);
                                 
                                 if (value.Regenerate)
                                 {
                                     _logger.LogInformation("Re-generating report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, reportId, DateTime.UtcNow);
-                                    
-                                    var scheduledReports = await submissionEntryManager.FindAsync(
-                                            p => p.ReportScheduleId == reportId, cancellationToken);
-                                    var patientMeasureReports = scheduledReports.Select(p => p.PatientId).Distinct();
-                                    
-                                    _logger.LogDebug("Found {PatientCount} patients to re-generate for facility {FacilityId} from {StartDate} to {EndDate} with ID {ReportId}", patientMeasureReports.Count(), facilityId, startDate, endDate, reportId);
 
-                                    foreach (var p in patientMeasureReports)
+                                    var scheduledReports = await _reportEntryManager.FindAsync(p => p.ReportScheduleId == reportId, cancellationToken);
+                                    var patientEntries = scheduledReports.Select(p => p.PatientId).Distinct();
+
+                                    _logger.LogDebug("Found {PatientCount} patients to re-generate for facility {FacilityId} from {StartDate} to {EndDate} with ID {ReportId}", patientEntries.Count(), facilityId, startDate, endDate, reportId);
+
+                                    foreach (var p in patientEntries)
                                     {
+                                        var newEntry = new ReportEntry()
+                                        {
+                                            PatientId = p,
+                                            ReportingStatus = ReportingStatus.PatientIdentified,
+                                            ReportScheduleId = reportSchedule.Id,
+                                            FacilityId = facilityId,
+                                            CreateDate = DateTime.UtcNow
+                                        };
+
                                         foreach (var reportType in reportTypes)
                                         {
-                                            await submissionEntryManager.AddAsync(new PatientSubmissionEntry()
+                                            newEntry.MeasureReportList.Add(new EvaluatedMeasureReport()
                                             {
-                                                PatientId = p,
-                                                Status = MeasureReportStatus.PendingEvaluation,
-                                                ReportScheduleId = reportSchedule.Id,
-                                                FacilityId = facilityId,
-                                                ReportType = reportType,
-                                                CreateDate = DateTime.UtcNow
-                                            }, cancellationToken);
+                                                Status = MeasureReportStatus.EntryCreated,
+                                                ReportType = reportType
+                                            });
                                         }
+
+                                        await _reportEntryManager.AddAsync(newEntry, cancellationToken);
 
                                         try
                                         {
@@ -263,7 +269,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         catch (ProduceException<string, EvaluationRequestedValue> ex)
                                         {
                                             _logger.LogError(ex, "An error was encountered generating an Evaluation Requested event.\n\tFacilityId: {facilityId}\n\tPatientId: {patientId}\n\tReportTrackingId: {reportTrackingId}",
-                                                facilityId.SanitizeAndRemove(), p.SanitizeAndRemove(), reportSchedule.Id.SanitizeAndRemove());
+                                                facilityId, p, reportSchedule.Id);
                                         }
                                     }
                                 }
@@ -283,19 +289,26 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     foreach (var patient in value.PatientIds)
                                     {
+                                        var newEntry = new ReportEntry()
+                                        {
+                                            PatientId = patient,
+                                            ReportingStatus = ReportingStatus.PatientIdentified,
+                                            ReportScheduleId = reportSchedule.Id,
+                                            FacilityId = facilityId,
+                                            CreateDate = DateTime.UtcNow
+                                        };
+
                                         //For each patient and report type, Create Submission Entries for each Patient and Report Type
                                         foreach (var reportType in reportTypes)
                                         {
-                                            await submissionEntryManager.AddAsync(new PatientSubmissionEntry()
+                                            newEntry.MeasureReportList.Add(new EvaluatedMeasureReport()
                                             {
-                                                PatientId = patient,
-                                                Status = MeasureReportStatus.PendingEvaluation,
-                                                ReportScheduleId = reportSchedule.Id,
-                                                FacilityId = facilityId,
-                                                ReportType = reportType,
-                                                CreateDate = DateTime.UtcNow
-                                            }, cancellationToken);
+                                                Status = MeasureReportStatus.EntryCreated,
+                                                ReportType = reportType
+                                            });
                                         }
+
+                                        await _reportEntryManager.AddAsync(newEntry, cancellationToken);
                                     }
 
                                     try
