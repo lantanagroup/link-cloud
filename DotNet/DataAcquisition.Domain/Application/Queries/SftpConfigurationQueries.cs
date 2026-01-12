@@ -29,6 +29,7 @@ public interface ISftpConfigurationQueries
 
 public class SftpConfigurationQueries(DataAcquisitionDbContext database) : ISftpConfigurationQueries
 {
+    /// <inheritdoc/>
     public async Task<SftpConfigurationModel?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var result = await (from config in database.SftpConfigurations
@@ -38,6 +39,7 @@ public class SftpConfigurationQueries(DataAcquisitionDbContext database) : ISftp
         return result;
     }
 
+    /// <inheritdoc/>
     public async Task<SftpConfigurationModel?> GetByOrganizationIdAsync(string organizationId, CancellationToken cancellationToken = default)
     {
         var result = await (from config in database.SftpConfigurations
