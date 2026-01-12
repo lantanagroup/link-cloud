@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
@@ -93,6 +93,10 @@ namespace LantanaGroup.Link.Report.Listeners
         }
 
 
+        /// <summary>
+        /// Runs the Kafka consumer loop that processes GenerateReportRequested messages to schedule or regenerate reports, create patient submission entries, and emit downstream events (evaluation requests or data-acquisition requests).
+        /// </summary>
+        /// <param name="cancellationToken">Token used to stop the consumer loop and cancel in-flight operations.</param>
         private async Task StartConsumerLoop(CancellationToken cancellationToken)
         {
             var config = new ConsumerConfig()
