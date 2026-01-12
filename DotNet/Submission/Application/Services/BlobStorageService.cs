@@ -124,8 +124,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
                 }
                 else if (value.PayloadType == PayloadType.ReportSchedule)
                 {
-                    // This is the manifest - process and upload all expanded patient bundles
-                    await ProcessAndUploadExpandedBundlesAsync(key, value, cancellationToken);
+                    await ProcessAndUploadExpandedBundlesAsync(key, value, content, cancellationToken);
                     return;
                 }
             }
@@ -155,822 +154,385 @@ namespace LantanaGroup.Link.Submission.Application.Services
             {
                 HttpHeaders = new()
                 {
-                    ContentType = "application/x-ndjson"
+                    ContentType = "application/fhir+ndjson"
                 }
             };
+
             using Stream stream = await blobClient.OpenWriteAsync(true, blobOptions, cancellationToken);
             await stream.WriteAsync(content, cancellationToken);
         }
 
-        //private async Task ProcessAndUploadExpandedBundlesAsync(
-        //    SubmitPayloadKey key,
-        //    SubmitPayloadValue value,
-        //    CancellationToken cancellationToken)
-        //{
-        //    _logger.LogInformation("Processing expanded bundles for report");
-
-        //    var jsonOptions = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector, new FhirJsonPocoDeserializerSettings { Validator = null });
-
-        //    // Get the root URI from the manifest's PayloadUri
-        //    var uriBuilder = new BlobUriBuilder(new Uri(value.PayloadUri));
-        //    var pathParts = uriBuilder.BlobName.Split('/');
-        //    var rootPath = string.Join('/', pathParts.Take(pathParts.Length - 1));
-        //    var rootUri = $"{uriBuilder.Scheme}://{uriBuilder.Host}/{uriBuilder.BlobContainerName}/{rootPath}";
-
-        //    // Download all files from internal storage
-        //    _logger.LogDebug("Downloading all files from internal storage: {}", rootUri);
-        //    var files = await DownloadFromInternalAsync(rootUri, cancellationToken);
-
-        //    // Parse and categorize all resources
-        //    var patientResources = new Dictionary<string, List<Resource>>();
-        //    var sharedResources = new List<Resource>();
-        //    Organization submittingOrg = null;
-        //    Device submittingDevice = null;
-        //    var aggregateReports = new List<MeasureReport>();
-        //    string nhsnOrgId = null;
-
-        //    foreach (var file in files)
-        //    {
-        //        _logger.LogDebug("Processing file: {}", file.Key);
-        //        var ndjsonContent = Encoding.UTF8.GetString(file.Value);
-        //        var lines = ndjsonContent.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-
-        //        foreach (var line in lines)
-        //        {
-        //            if (string.IsNullOrWhiteSpace(line)) continue;
-
-        //            var resource = JsonSerializer.Deserialize<Resource>(line, jsonOptions);
-
-        //            // Categorize the resource
-        //            if (file.Key.StartsWith("patient-"))
-        //            {
-        //                // Extract patient ID from filename
-        //                var patientId = file.Key.Replace("patient-", "").Replace(".ndjson", "");
-        //                if (!patientResources.ContainsKey(patientId))
-        //                {
-        //                    patientResources[patientId] = new List<Resource>();
-        //                }
-        //                patientResources[patientId].Add(resource);
-        //            }
-        //            else if (resource is Organization org)
-        //            {
-        //                submittingOrg = org;
-
-        //                // Extract NHSN org ID
-        //                var nhsnIdentifier = org.Identifier?.FirstOrDefault(
-        //                    i => i.System == "https://www.cdc.gov/nhsn/OrgID");
-        //                if (nhsnIdentifier != null)
-        //                {
-        //                    nhsnOrgId = nhsnIdentifier.Value;
-        //                }
-        //            }
-        //            else if (resource is Device device)
-        //            {
-        //                submittingDevice = device;
-        //            }
-        //            else if (resource is MeasureReport mr && IsAggregateMeasureReport(mr))
-        //            {
-        //                aggregateReports.Add(mr);
-        //            }
-        //            else
-        //            {
-        //                // Everything else goes into shared resources
-        //                sharedResources.Add(resource);
-        //            }
-        //        }
-        //    }
-
-        //    _logger.LogInformation("Found {} patient bundles, {} shared resources, {} aggregate reports",
-        //        patientResources.Count, sharedResources.Count, aggregateReports.Count);
-
-        //    // Build a lookup for shared resources
-        //    var sharedResourceLookup = new Dictionary<(string ResourceType, string ResourceId), Resource>();
-        //    foreach (var resource in sharedResources)
-        //    {
-        //        sharedResourceLookup[(resource.TypeName, resource.Id)] = resource;
-        //    }
-
-        //    // Process each patient and create expanded bundles
-        //    string timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
-        //    string measureFolder = GetMeasureFolderPath(value.ReportTypes);
-        //    string reportName = ReportHelpers.GetReportName(key.ReportScheduleId, key.FacilityId, value.ReportTypes, value.StartDate);
-
-        //    foreach (var patientEntry in patientResources)
-        //    {
-        //        string patientId = patientEntry.Key;
-        //        var resources = patientEntry.Value;
-
-        //        _logger.LogDebug("Creating expanded bundle for patient: {}", patientId);
-
-        //        // Create the expanded bundle
-        //        var expandedBundle = new Bundle
-        //        {
-        //            Type = Bundle.BundleType.Collection,
-        //            Entry = new List<Bundle.EntryComponent>()
-        //        };
-
-        //        // Add original patient resources
-        //        foreach (var resource in resources)
-        //        {
-        //            expandedBundle.Entry.Add(new Bundle.EntryComponent
-        //            {
-        //                FullUrl = resource.Id,
-        //                Resource = resource
-        //            });
-        //        }
-
-        //        // Find all references in the patient's resources
-        //        var references = FindReferencesInResources(resources);
-
-        //        // Add referenced shared resources
-        //        foreach (var reference in references)
-        //        {
-        //            if (sharedResourceLookup.TryGetValue(reference, out var sharedResource))
-        //            {
-        //                expandedBundle.Entry.Add(new Bundle.EntryComponent
-        //                {
-        //                    FullUrl = sharedResource.Id,
-        //                    Resource = sharedResource
-        //                });
-        //            }
-        //        }
-
-        //        // Add submitting org and device
-        //        if (submittingOrg != null)
-        //        {
-        //            expandedBundle.Entry.Add(new Bundle.EntryComponent
-        //            {
-        //                FullUrl = submittingOrg.Id,
-        //                Resource = submittingOrg
-        //            });
-        //        }
-
-        //        if (submittingDevice != null)
-        //        {
-        //            expandedBundle.Entry.Add(new Bundle.EntryComponent
-        //            {
-        //                FullUrl = submittingDevice.Id,
-        //                Resource = submittingDevice
-        //            });
-        //        }
-
-        //        // Add all aggregate reports
-        //        foreach (var aggregate in aggregateReports)
-        //        {
-        //            expandedBundle.Entry.Add(new Bundle.EntryComponent
-        //            {
-        //                FullUrl = aggregate.Id,
-        //                Resource = aggregate
-        //            });
-        //        }
-
-        //        // Serialize the expanded bundle
-        //        var bundleJson = JsonSerializer.Serialize(expandedBundle, jsonOptions);
-        //        var bundleBytes = Encoding.UTF8.GetBytes(bundleJson);
-
-        //        // Create the filename with NHSN org ID and timestamp
-        //        string bundleName;
-        //        if (!string.IsNullOrEmpty(nhsnOrgId))
-        //        {
-        //            bundleName = $"patient-{nhsnOrgId}-{patientId}-{timestamp}.json";
-        //        }
-        //        else
-        //        {
-        //            bundleName = $"patient-{patientId}-{timestamp}.json";
-        //        }
-
-        //        // Upload to external storage
-        //        string blobName = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, bundleName);
-        //        _logger.LogDebug("Uploading expanded bundle: {}", blobName);
-
-        //        BlockBlobClient blobClient = _externalContainerClient.GetBlockBlobClient(blobName);
-        //        BlockBlobOpenWriteOptions blobOptions = new()
-        //        {
-        //            HttpHeaders = new()
-        //            {
-        //                ContentType = "application/json"
-        //            }
-        //        };
-
-        //        using Stream stream = await blobClient.OpenWriteAsync(true, blobOptions, cancellationToken);
-        //        await stream.WriteAsync(bundleBytes, cancellationToken);
-        //    }
-
-        //    _logger.LogInformation("Completed uploading {} expanded patient bundles", patientResources.Count);
-        //}
-
-        //private async Task ProcessAndUploadExpandedBundlesAsync(
-        //    SubmitPayloadKey key,
-        //    SubmitPayloadValue value,
-        //    CancellationToken cancellationToken)
-        //{
-        //    _logger.LogInformation("Processing expanded bundles for report");
-
-        //    var jsonOptions = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector, new FhirJsonPocoDeserializerSettings { Validator = null });
-
-        //    // Get the root URI from the manifest's PayloadUri
-        //    var uriBuilder = new BlobUriBuilder(new Uri(value.PayloadUri));
-        //    var pathParts = uriBuilder.BlobName.Split('/');
-        //    var rootPath = string.Join('/', pathParts.Take(pathParts.Length - 1));
-        //    var rootUri = $"{uriBuilder.Scheme}://{uriBuilder.Host}/{uriBuilder.BlobContainerName}/{rootPath}";
-
-        //    // Download all files from internal storage
-        //    _logger.LogDebug("Downloading all files from internal storage: {}", rootUri);
-        //    var files = await DownloadFromInternalAsync(rootUri, cancellationToken);
-
-        //    // Parse and categorize all resources
-        //    var patientResources = new Dictionary<string, List<Resource>>();
-        //    Organization submittingOrg = null;
-        //    Device submittingDevice = null;
-        //    var aggregateReports = new List<MeasureReport>();
-        //    List censusList = null;
-        //    byte[] queryPlanContent = null;
-        //    string nhsnOrgId = null;
-
-        //    foreach (var file in files)
-        //    {
-        //        _logger.LogDebug("Processing file: {}", file.Key);
-
-        //        // Handle query-plan.yml separately (it's not JSON)
-        //        if (file.Key == "query-plan.yml" || file.Key.EndsWith(".yml") || file.Key.EndsWith(".yaml"))
-        //        {
-        //            queryPlanContent = file.Value;
-        //            continue;
-        //        }
-
-        //        var ndjsonContent = Encoding.UTF8.GetString(file.Value);
-        //        var lines = ndjsonContent.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-
-        //        foreach (var line in lines)
-        //        {
-        //            if (string.IsNullOrWhiteSpace(line)) continue;
-
-        //            var resource = JsonSerializer.Deserialize<Resource>(line, jsonOptions);
-
-        //            // Categorize the resource
-        //            if (file.Key.StartsWith("patient-"))
-        //            {
-        //                // Extract patient ID from filename
-        //                var patientId = file.Key.Replace("patient-", "").Replace(".ndjson", "");
-        //                if (!patientResources.ContainsKey(patientId))
-        //                {
-        //                    patientResources[patientId] = new List<Resource>();
-        //                }
-        //                patientResources[patientId].Add(resource);
-        //            }
-        //            else if (resource is Organization org)
-        //            {
-        //                submittingOrg = org;
-
-        //                // Extract NHSN org ID
-        //                var nhsnIdentifier = org.Identifier?.FirstOrDefault(
-        //                    i => i.System == "https://www.cdc.gov/nhsn/OrgID");
-        //                if (nhsnIdentifier != null)
-        //                {
-        //                    nhsnOrgId = nhsnIdentifier.Value;
-        //                }
-        //            }
-        //            else if (resource is Device device)
-        //            {
-        //                submittingDevice = device;
-        //            }
-        //            else if (resource is MeasureReport mr && IsAggregateMeasureReport(mr))
-        //            {
-        //                aggregateReports.Add(mr);
-        //            }
-        //            else if (resource is List list)
-        //            {
-        //                censusList = list;
-        //            }
-        //        }
-        //    }
-
-        //    _logger.LogInformation("Found {} patient bundles, {} aggregate reports",
-        //        patientResources.Count, aggregateReports.Count);
-
-        //    string timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
-        //    string measureFolder = GetMeasureFolderPath(value.ReportTypes);
-        //    string reportName = ReportHelpers.GetReportName(key.ReportScheduleId, key.FacilityId, value.ReportTypes, value.StartDate);
-
-        //    // Upload supplemental files first
-
-        //    // 1. Upload empty shared-resources.json
-        //    var emptySharedResources = new Bundle
-        //    {
-        //        Type = Bundle.BundleType.Collection,
-        //        Timestamp = DateTimeOffset.UtcNow
-        //    };
-        //    await UploadSupplementalFile(
-        //        "shared-resources.json",
-        //        emptySharedResources,
-        //        measureFolder,
-        //        reportName,
-        //        timestamp,
-        //        jsonOptions,
-        //        cancellationToken);
-
-        //    // 2. Upload submitting-device.json
-        //    if (submittingDevice != null)
-        //    {
-        //        await UploadSupplementalFile(
-        //            "submitting-device.json",
-        //            submittingDevice,
-        //            measureFolder,
-        //            reportName,
-        //            timestamp,
-        //            jsonOptions,
-        //            cancellationToken);
-        //    }
-
-        //    // 3. Upload submitting-org.json
-        //    if (submittingOrg != null)
-        //    {
-        //        await UploadSupplementalFile(
-        //            "submitting-org.json",
-        //            submittingOrg,
-        //            measureFolder,
-        //            reportName,
-        //            timestamp,
-        //            jsonOptions,
-        //            cancellationToken);
-        //    }
-
-        //    // 4. Upload aggregate measure reports
-        //    foreach (var aggregate in aggregateReports)
-        //    {
-        //        // Extract measure name from the measure URL
-        //        var measureName = ExtractMeasureName(aggregate.Measure);
-        //        var fileName = $"aggregate-{measureName}.json";
-
-        //        await UploadSupplementalFile(
-        //            fileName,
-        //            aggregate,
-        //            measureFolder,
-        //            reportName,
-        //            timestamp,
-        //            jsonOptions,
-        //            cancellationToken);
-        //    }
-
-        //    // 5. Upload census.json
-        //    if (censusList != null)
-        //    {
-        //        await UploadSupplementalFile(
-        //            "census.json",
-        //            censusList,
-        //            measureFolder,
-        //            reportName,
-        //            timestamp,
-        //            jsonOptions,
-        //            cancellationToken);
-        //    }
-
-        //    // 6. Upload query-plan.yml
-        //    if (queryPlanContent != null)
-        //    {
-        //        string blobName = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, "query-plan");
-        //        _logger.LogDebug("Uploading query-plan");
-
-        //        BlockBlobClient blobClient = _externalContainerClient.GetBlockBlobClient(blobName);
-        //        BlockBlobOpenWriteOptions blobOptions = new()
-        //        {
-        //            HttpHeaders = new()
-        //            {
-        //                ContentType = "application/x-yaml"
-        //            }
-        //        };
-
-        //        using Stream stream = await blobClient.OpenWriteAsync(true, blobOptions, cancellationToken);
-        //        await stream.WriteAsync(queryPlanContent, cancellationToken);
-        //    }
-
-        //    // Now process each patient and create expanded bundles
-        //    foreach (var patientEntry in patientResources)
-        //    {
-        //        string patientId = patientEntry.Key;
-        //        var resources = patientEntry.Value;
-
-        //        _logger.LogDebug("Creating expanded bundle for patient: {}", patientId);
-
-        //        // Create the expanded bundle
-        //        var expandedBundle = new Bundle
-        //        {
-        //            Type = Bundle.BundleType.Collection,
-        //            Entry = new List<Bundle.EntryComponent>()
-        //        };
-
-        //        // Add original patient resources
-        //        foreach (var resource in resources)
-        //        {
-        //            expandedBundle.Entry.Add(new Bundle.EntryComponent
-        //            {
-        //                FullUrl = resource.Id,
-        //                Resource = resource
-        //            });
-        //        }
-
-        //        // Find all references in the patient's resources - but we're not adding shared resources anymore
-        //        // var references = FindReferencesInResources(resources);
-
-        //        // Add submitting org and device
-        //        if (submittingOrg != null)
-        //        {
-        //            expandedBundle.Entry.Add(new Bundle.EntryComponent
-        //            {
-        //                FullUrl = submittingOrg.Id,
-        //                Resource = submittingOrg
-        //            });
-        //        }
-
-        //        if (submittingDevice != null)
-        //        {
-        //            expandedBundle.Entry.Add(new Bundle.EntryComponent
-        //            {
-        //                FullUrl = submittingDevice.Id,
-        //                Resource = submittingDevice
-        //            });
-        //        }
-
-        //        // Add all aggregate reports
-        //        foreach (var aggregate in aggregateReports)
-        //        {
-        //            expandedBundle.Entry.Add(new Bundle.EntryComponent
-        //            {
-        //                FullUrl = aggregate.Id,
-        //                Resource = aggregate
-        //            });
-        //        }
-
-        //        // Serialize the expanded bundle
-        //        var bundleJson = JsonSerializer.Serialize(expandedBundle, jsonOptions);
-        //        var bundleBytes = Encoding.UTF8.GetBytes(bundleJson);
-
-        //        // Create the filename with NHSN org ID, report name, date, and timestamp
-        //        string orgId = "00000";
-        //        string startDate = value.StartDate?.ToString("yyyyMMdd") ?? DateTime.UtcNow.ToString("yyyyMMdd");
-        //        string reportTypesStr = string.Join('+', value.ReportTypes.Order());
-
-        //        string bundleName = $"{orgId}_{reportTypesStr}_{startDate}_{timestamp}_patient-{patientId}.json";
-
-        //        // Upload to external storage
-        //        string blobName = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, bundleName);
-        //        _logger.LogDebug("Uploading expanded bundle: {}", blobName);
-
-        //        BlockBlobClient blobClient = _externalContainerClient.GetBlockBlobClient(blobName);
-        //        BlockBlobOpenWriteOptions blobOptions = new()
-        //        {
-        //            HttpHeaders = new()
-        //            {
-        //                ContentType = "application/json"
-        //            }
-        //        };
-
-        //        using Stream stream = await blobClient.OpenWriteAsync(true, blobOptions, cancellationToken);
-        //        await stream.WriteAsync(bundleBytes, cancellationToken);
-        //    }
-
-        //    _logger.LogInformation("Completed uploading {} expanded patient bundles and supplemental files", patientResources.Count);
-        //}
-
         private async Task ProcessAndUploadExpandedBundlesAsync(
             SubmitPayloadKey key,
             SubmitPayloadValue value,
+            byte[] content,
             CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrEmpty(value.PayloadRootUri))
-            {
-                _logger.LogWarning("No PayloadRootUri provided for expanded bundle processing");
-                return;
-            }
+            _logger.LogInformation("Processing manifest for expanded bundles - ReportScheduleId: {ReportScheduleId}", key.ReportScheduleId);
 
-            _logger.LogInformation("Starting expanded bundle processing for report {ReportScheduleId}", key.ReportScheduleId);
+            // Parse manifest NDJSON
+            string manifestContent = Encoding.UTF8.GetString(content);
+            var jsonOptions = new JsonSerializerOptions().ForFhir(new FhirJsonPocoDeserializerSettings { Validator = null });
+            List<Resource> manifestResources = new();
 
-            // 1. Download the manifest NDJSON from internal storage
-            var manifestFiles = await DownloadFromInternalAsync(value.PayloadRootUri, cancellationToken);
-            if (!manifestFiles.Any())
-            {
-                _logger.LogWarning("No files found under manifest prefix: {PayloadRootUri}", value.PayloadRootUri);
-                return;
-            }
-
-            // Assume manifest is the file named manifest.ndjson or similar
-            var manifestFile = manifestFiles.FirstOrDefault(f => f.Key.Contains("manifest") || f.Key.EndsWith(".ndjson"));
-            if (manifestFile.Value == null || manifestFile.Value.Length == 0)
-            {
-                _logger.LogWarning("Manifest content not found or empty");
-                return;
-            }
-
-            string manifestContent = Encoding.UTF8.GetString(manifestFile.Value);
-            var jsonOptions = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
-            var manifestResources = new List<Resource>();
-
-            foreach (var line in manifestContent.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            var lines = manifestContent.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            foreach (var line in lines)
             {
                 try
                 {
                     var resource = JsonSerializer.Deserialize<Resource>(line, jsonOptions);
-                    if (resource != null) manifestResources.Add(resource);
+                    if (resource != null)
+                    {
+                        manifestResources.Add(resource);
+                    }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to parse manifest line");
+                    _logger.LogWarning(ex, "Failed to deserialize manifest line. Line preview: {LinePreview}",
+                        line.Length > 200 ? line.Substring(0, 200) + "..." : line);
                 }
             }
 
-            var patientMeasureReports = manifestResources
-                .OfType<MeasureReport>()
-                .Where(mr => !IsAggregateMeasureReport(mr))
-                .ToList();
+            _logger.LogInformation("Successfully parsed {Count} resources from manifest", manifestResources.Count);
 
-            var aggregateMeasureReports = manifestResources
-                .OfType<MeasureReport>()
-                .Where(IsAggregateMeasureReport)
-                .ToList();
+            var aggregateReports = manifestResources.OfType<MeasureReport>().Where(IsAggregateMeasureReport).ToList();
+            _logger.LogInformation("Found {Count} aggregate MeasureReports", aggregateReports.Count);
 
-            var sharedResources = manifestResources
-                .Where(r => r is not MeasureReport)
-                .ToList();
+            if (aggregateReports.Any())
+            {
+                foreach (var agg in aggregateReports)
+                {
+                    _logger.LogDebug("Aggregate report parsed: ID={Id}, Type={Type}, Measure={Measure}",
+                        agg.Id ?? "no-id", agg.Type?.ToString() ?? "null", agg.Measure ?? "no-measure");
+                }
+            }
+            else
+            {
+                _logger.LogWarning("No aggregate reports detected in manifest after parsing.");
+            }
 
-            string reportName = ReportHelpers.GetReportName(
-                key.ReportScheduleId,
-                key.FacilityId,
-                value.ReportTypes,
-                value.StartDate);
+            var allSharedResources = manifestResources.Where(r => r is not MeasureReport).ToList();
 
             string measureFolder = GetMeasureFolderPath(value.ReportTypes);
+            string reportName = ReportHelpers.GetReportName(key.ReportScheduleId, key.FacilityId, value.ReportTypes, value.StartDate);
 
-            string? nhsnOrgId = sharedResources
-                .OfType<Organization>()
-                .FirstOrDefault()
-                ?.Identifier
-                ?.FirstOrDefault(i => i.System?.Contains("nhsn/OrgID") == true)
-                ?.Value;
+            string? nhsnOrgId = allSharedResources.OfType<Organization>().FirstOrDefault()?.Identifier
+                .FirstOrDefault(i => i.System == "https://www.cdc.gov/nhsn/OrgID")?.Value;
+            nhsnOrgId ??= key.FacilityId;
 
-            nhsnOrgId ??= key.FacilityId ?? "unknown";
+            // Derive root prefix from value.PayloadUri
+            BlobUriBuilder uriBuilder = new(new Uri(value.PayloadUri!));
+            string manifestBlobName = uriBuilder.BlobName;
+            int lastSlash = manifestBlobName.LastIndexOf('/');
+            string rootPrefix = lastSlash >= 0 ? manifestBlobName.Substring(0, lastSlash + 1) : "";
 
-            string startDateYmd = DateTime.Parse(value.StartDate).ToString("yyyyMMdd");
-            string measureAcronym = value.ReportTypes.FirstOrDefault() ?? "unknown";
+            _logger.LogDebug("Downloading files under prefix: {Prefix}", rootPrefix);
 
-            // 2. Process each patient
-            foreach (var patientMR in patientMeasureReports)
+            // Download all files under the root prefix once
+            var allFiles = await DownloadAsync(_internalContainerClient!, rootPrefix, cancellationToken);
+
+            _logger.LogInformation("Downloaded {FileCount} files from internal storage", allFiles.Count);
+            if (allFiles.Count > 0)
             {
-                if (patientMR.Subject?.Reference == null) continue;
+                _logger.LogDebug("Available files: {Files}", string.Join(", ", allFiles.Keys));
+            }
 
-                string patientId = patientMR.Subject.Reference.Split('/').Last();
+            // Find patient IDs from the List resource in manifest
+            var patientList = manifestResources.OfType<Hl7.Fhir.Model.List>()
+                .FirstOrDefault(l => l.Entry?.Any(e => e.Item?.Reference?.StartsWith("Patient/") == true) == true);
 
-                // Download the patient's NDJSON from internal storage
-                string patientPrefix = $"patient-{patientId}";
-                var patientFiles = await DownloadFromInternalAsync(
-                    $"{value.PayloadRootUri.TrimEnd('/')}/{patientPrefix}",
-                    cancellationToken);
-
-                var patientNdjsonFile = patientFiles.FirstOrDefault(f => f.Key.EndsWith(".ndjson"));
-                if (patientNdjsonFile.Value == null || patientNdjsonFile.Value.Length == 0)
+            var patientIds = new List<string>();
+            if (patientList != null)
+            {
+                foreach (var entry in patientList.Entry ?? new List<Hl7.Fhir.Model.List.EntryComponent>())
                 {
-                    _logger.LogWarning("No patient NDJSON found for {PatientId}", patientId);
+                    var refId = entry.Item?.Reference?.Split('/').Last();
+                    if (!string.IsNullOrEmpty(refId))
+                    {
+                        patientIds.Add(refId);
+                    }
+                }
+            }
+            else
+            {
+                _logger.LogWarning("No patient List found in manifest. Falling back to file names.");
+            }
+
+            // Fallback: discover from file names
+            var idsFromFiles = allFiles.Keys
+                .Where(k => k.StartsWith("patient-") && k.EndsWith(".ndjson"))
+                .Select(k => k.Replace("patient-", "").Replace(".ndjson", ""))
+                .ToList();
+
+            patientIds.AddRange(idsFromFiles.Except(patientIds));  // add any missing
+            patientIds = patientIds.Distinct().ToList();
+
+            _logger.LogInformation("Discovered {Count} unique patient IDs for bundle creation: {Ids}", patientIds.Count, string.Join(", ", patientIds));
+
+            string startDateStr = value.StartDate?.ToString("yyyyMMdd") ?? "unknown";
+            string measureAcronym = string.Join("_", value.ReportTypes.Select(rt => rt.ToLowerInvariant()));
+
+            // Process each patient
+            foreach (var patientId in patientIds)
+            {
+                string patientFileName = $"patient-{patientId}.ndjson";
+                if (!allFiles.TryGetValue(patientFileName, out var patientBytes) || patientBytes == null)
+                {
+                    _logger.LogWarning("Missing NDJSON file for patient {PatientId}", patientId);
                     continue;
                 }
 
-                string patientNdjson = Encoding.UTF8.GetString(patientNdjsonFile.Value);
                 var patientResources = new List<Resource>();
-
-                foreach (var line in patientNdjson.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                string patientContent = Encoding.UTF8.GetString(patientBytes);
+                foreach (var line in patientContent.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                 {
                     try
                     {
                         var res = JsonSerializer.Deserialize<Resource>(line, jsonOptions);
                         if (res != null) patientResources.Add(res);
                     }
-                    catch { /* skip invalid lines */ }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to parse line in patient {PatientId} NDJSON", patientId);
+                    }
                 }
 
-                // Find referenced shared resources
-                var referencedIds = FindReferencesInResources(patientResources);
-                var neededShared = sharedResources
-                    .Where(r => referencedIds.Contains((r.TypeName, r.Id)))
-                    .ToList();
+                _logger.LogDebug("Parsed {Count} resources for patient {PatientId}", patientResources.Count, patientId);
 
-                // Build expanded patient bundle
+                // Find the individual MeasureReport in patient resources
+                var patientMR = patientResources.OfType<MeasureReport>()
+                    .FirstOrDefault(mr => !IsAggregateMeasureReport(mr) && mr.Subject?.Reference?.Contains(patientId) == true);
+
+                if (patientMR == null)
+                {
+                    _logger.LogWarning("No individual MeasureReport found in NDJSON for patient {PatientId} - skipping bundle", patientId);
+                    continue;
+                }
+
+                _logger.LogInformation("Found individual MeasureReport ID {MRId} for patient {PatientId}", patientMR.Id ?? "no-id", patientId);
+
+                var references = FindReferencesInResources(patientResources);
+                var selectedSharedResources = allSharedResources.Where(r => references.Contains((r.TypeName, r.Id))).ToList();
+
                 var expandedBundle = new Bundle
                 {
                     Type = Bundle.BundleType.Collection,
                     Timestamp = DateTimeOffset.UtcNow
                 };
 
-                // Add patient measure report
                 expandedBundle.Entry.Add(new Bundle.EntryComponent
                 {
-                    FullUrl = patientMR.FullUrl() ?? $"urn:uuid:{patientMR.Id}",
+                    FullUrl = $"http://www.cdc.gov/nhsn/fhirportal/dqm/ig/MeasureReport/{patientMR.Id}",
                     Resource = patientMR
                 });
 
-                // Add all patient-specific resources
-                foreach (var res in patientResources)
+                foreach (var resource in patientResources.Where(r => r != patientMR))
                 {
                     expandedBundle.Entry.Add(new Bundle.EntryComponent
                     {
-                        FullUrl = res.FullUrl() ?? $"urn:uuid:{res.Id}",
-                        Resource = res
+                        FullUrl = $"http://www.cdc.gov/nhsn/fhirportal/dqm/ig/{resource.TypeName}/{resource.Id}",
+                        Resource = resource
                     });
                 }
 
-                // Add referenced shared resources
-                foreach (var res in neededShared)
+                foreach (var resource in selectedSharedResources)
                 {
                     expandedBundle.Entry.Add(new Bundle.EntryComponent
                     {
-                        FullUrl = res.FullUrl() ?? $"urn:uuid:{res.Id}",
-                        Resource = res
+                        FullUrl = $"http://www.cdc.gov/nhsn/fhirportal/dqm/ig/{resource.TypeName}/{resource.Id}",
+                        Resource = resource
                     });
                 }
 
-                // Serialize and upload
-                string bundleJson = JsonSerializer.Serialize(expandedBundle, jsonOptions);
+                var bundleJson = JsonSerializer.Serialize(expandedBundle, jsonOptions);
                 byte[] bundleBytes = Encoding.UTF8.GetBytes(bundleJson);
 
-                string filename = $"{nhsnOrgId}_{measureAcronym}_{startDateYmd}_patient-{patientId}.json";
-                string blobPath = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, filename);
+                string bundleName = $"{nhsnOrgId}_{measureAcronym}_{startDateStr}_patient-{patientId}.json";
+                string blobName = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, bundleName);
+                _logger.LogDebug("Uploading expanded patient bundle: {BlobName}", blobName);
 
-                await UploadJsonBlobAsync(blobPath, bundleBytes, cancellationToken);
-                _logger.LogInformation("Uploaded patient bundle: {BlobPath}", blobPath);
-            }
-
-            // 3. Upload aggregate measure report(s)
-            foreach (var agg in aggregateMeasureReports)
-            {
-                string aggJson = JsonSerializer.Serialize(agg, jsonOptions);
-                byte[] aggBytes = Encoding.UTF8.GetBytes(aggJson);
-
-                string aggFilename = $"aggregate-{agg.Id}.json";  // or derive from measure URL if preferred
-                string aggBlobPath = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, aggFilename);
-
-                await UploadJsonBlobAsync(aggBlobPath, aggBytes, cancellationToken);
-                _logger.LogInformation("Uploaded aggregate: {BlobPath}", aggBlobPath);
-            }
-
-            // 4. Upload shared-resources.json (all shared resources in one bundle)
-            if (sharedResources.Any())
-            {
-                var sharedBundle = new Bundle
+                BlockBlobClient blobClient = _externalContainerClient!.GetBlockBlobClient(blobName);
+                BlockBlobOpenWriteOptions blobOptions = new()
                 {
-                    Type = Bundle.BundleType.Collection,
-                    Timestamp = DateTimeOffset.UtcNow
+                    HttpHeaders = new BlobHttpHeaders { ContentType = "application/json" }
                 };
 
-                foreach (var res in sharedResources)
+                await using var stream = await blobClient.OpenWriteAsync(true, blobOptions, cancellationToken);
+                await stream.WriteAsync(bundleBytes, cancellationToken);
+            }
+
+            // Upload aggregate reports
+            foreach (var aggregate in aggregateReports)
+            {
+                var aggregateJson = JsonSerializer.Serialize(aggregate, jsonOptions);
+                byte[] aggregateBytes = Encoding.UTF8.GetBytes(aggregateJson);
+
+                string measureName = new Uri(aggregate.Measure).Segments.Last().Split('|')[0];
+                string aggregateName = $"aggregate-{measureName}.json";
+
+                string blobName = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, aggregateName);
+                _logger.LogDebug("Uploading aggregate report: {BlobName}", blobName);
+
+                BlockBlobClient blobClient = _externalContainerClient!.GetBlockBlobClient(blobName);
+                BlockBlobOpenWriteOptions blobOptions = new()
                 {
-                    sharedBundle.Entry.Add(new Bundle.EntryComponent
-                    {
-                        FullUrl = res.FullUrl() ?? $"urn:uuid:{res.Id}",
-                        Resource = res
-                    });
-                }
+                    HttpHeaders = new BlobHttpHeaders { ContentType = "application/json" }
+                };
 
-                string sharedJson = JsonSerializer.Serialize(sharedBundle, jsonOptions);
-                byte[] sharedBytes = Encoding.UTF8.GetBytes(sharedJson);
-
-                string sharedPath = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, "shared-resources.json");
-                await UploadJsonBlobAsync(sharedPath, sharedBytes, cancellationToken);
-                _logger.LogInformation("Uploaded shared-resources: {BlobPath}", sharedPath);
+                await using var stream = await blobClient.OpenWriteAsync(true, blobOptions, cancellationToken);
+                await stream.WriteAsync(aggregateBytes, cancellationToken);
             }
 
-            // 5. Upload census.json
-            var census = BuildCensusList(patientMeasureReports, value);
-            if (census != null)
+            if (!aggregateReports.Any() && manifestResources.OfType<MeasureReport>().Any(m => m.Type?.ToString()?.ToLowerInvariant().Contains("subject-list") == true))
             {
-                string censusJson = JsonSerializer.Serialize(census, jsonOptions);
-                byte[] censusBytes = Encoding.UTF8.GetBytes(censusJson);
+                var fallbackAgg = manifestResources.OfType<MeasureReport>().First(m => m.Type?.ToString()?.ToLowerInvariant().Contains("subject-list") == true);
+                _logger.LogWarning("Fallback: Uploading aggregate report {Id} that was not classified as aggregate", fallbackAgg.Id);
 
-                string censusPath = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, "census.json");
-                await UploadJsonBlobAsync(censusPath, censusBytes, cancellationToken);
-                _logger.LogInformation("Uploaded census: {BlobPath}", censusPath);
+                var aggregateJson = JsonSerializer.Serialize(fallbackAgg, jsonOptions);
+                byte[] aggregateBytes = Encoding.UTF8.GetBytes(aggregateJson);
+                string measureName = new Uri(fallbackAgg.Measure).Segments.Last().Split('|')[0];
+                string aggregateName = $"aggregate-{measureName}.json";
+                string blobName = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, aggregateName);
+                _logger.LogDebug("Fallback uploading aggregate: {BlobName}", blobName);
+
+                // upload code same as loop
+                BlockBlobClient blobClient = _externalContainerClient!.GetBlockBlobClient(blobName);
+                BlockBlobOpenWriteOptions blobOptions = new() { HttpHeaders = new BlobHttpHeaders { ContentType = "application/json" } };
+                await using var stream = await blobClient.OpenWriteAsync(true, blobOptions, cancellationToken);
+                await stream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(fallbackAgg, jsonOptions)), cancellationToken);
             }
 
-            // 6. Upload submitting-org.json and submitting-device.json if present
-            var org = sharedResources.OfType<Organization>().FirstOrDefault(o => o.Meta?.Profile?.Any(p => p.Contains("submitting-organization")) == true);
-            if (org != null)
+            // shared-resources.json
+            var sharedBundle = new Bundle
             {
-                string orgJson = JsonSerializer.Serialize(org, jsonOptions);
-                byte[] orgBytes = Encoding.UTF8.GetBytes(orgJson);
-                string orgPath = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, "submitting-org.json");
-                await UploadJsonBlobAsync(orgPath, orgBytes, cancellationToken);
-            }
+                Type = Bundle.BundleType.Collection,
+                Timestamp = DateTimeOffset.UtcNow
+            };
 
-            var device = sharedResources.OfType<Device>().FirstOrDefault(d => d.Meta?.Profile?.Any(p => p.Contains("submitting-device")) == true);
-            if (device != null)
+            foreach (var shared in allSharedResources)
             {
-                string deviceJson = JsonSerializer.Serialize(device, jsonOptions);
-                byte[] deviceBytes = Encoding.UTF8.GetBytes(deviceJson);
-                string devicePath = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, "submitting-device.json");
-                await UploadJsonBlobAsync(devicePath, deviceBytes, cancellationToken);
+                sharedBundle.Entry.Add(new Bundle.EntryComponent
+                {
+                    FullUrl = $"http://www.cdc.gov/nhsn/fhirportal/dqm/ig/{shared.TypeName}/{shared.Id}",
+                    Resource = shared
+                });
             }
 
-            _logger.LogInformation("Completed expanded bundle processing for {PatientCount} patients", patientMeasureReports.Count);
-        }
+            var sharedJson = JsonSerializer.Serialize(sharedBundle, jsonOptions);
+            byte[] sharedBytes = Encoding.UTF8.GetBytes(sharedJson);
 
-        // Helper to upload JSON content
-        private async Task UploadJsonBlobAsync(string blobName, byte[] content, CancellationToken ct)
-        {
-            var blobClient = _externalContainerClient!.GetBlockBlobClient(blobName);
-            var options = new BlockBlobOpenWriteOptions
+            string sharedBlobName = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, "shared-resources.json");
+            _logger.LogDebug("Uploading shared resources bundle: {BlobName}", sharedBlobName);
+
+            BlockBlobClient sharedClient = _externalContainerClient!.GetBlockBlobClient(sharedBlobName);
+            BlockBlobOpenWriteOptions sharedOptions = new()
             {
                 HttpHeaders = new BlobHttpHeaders { ContentType = "application/json" }
             };
 
-            await using var stream = await blobClient.OpenWriteAsync(true, options, ct);
-            await stream.WriteAsync(content, ct);
-        }
+            await using var sharedStream = await sharedClient.OpenWriteAsync(true, sharedOptions, cancellationToken);
+            await sharedStream.WriteAsync(sharedBytes, cancellationToken);
 
-        // Helper to build census List resource (matching your example)
-        private Hl7.Fhir.Model.List? BuildCensusList(List<MeasureReport> patientMRs, SubmitPayloadValue value)
-        {
-            if (!patientMRs.Any()) return null;
-
-            var census = new Hl7.Fhir.Model.List
+            DateTime endDate;
+            if(value.EndDate.HasValue)
             {
-                Id = Guid.NewGuid().ToString("N"),
+                endDate = value.EndDate.Value;
+            }
+            else
+            {
+                endDate = value.StartDate.Value.AddDays(1).AddTicks(-1);
+            }
+
+            // census.json
+            var censusList = new Hl7.Fhir.Model.List
+            {
+                Id = Guid.NewGuid().ToString(),
                 Meta = new Meta { Profile = new[] { "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/poi-list" } },
-                Status = Hl7.Fhir.Model.List.ListStatus.Current,
-                Mode = Hl7.Fhir.Model.List.ListMode.Snapshot,
-                Identifier = new List<Identifier>
-        {
-            new Identifier { System = "https://nhsnlink.org", Value = "NHSNAcuteCareHospitalMonthlyInitialPopulation" }
-        },
                 Extension = new List<Extension>
-        {
-            new Extension
-            {
-                Url = "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-patient-list-applicable-period-extension",
-                Value = new Period { Start = value.StartDate, End = value.EndDate ?? value.StartDate }
-            }
-        }
-            };
-
-            foreach (var mr in patientMRs)
-            {
-                if (mr.Subject?.Reference != null)
                 {
-                    string patientId = mr.Subject.Reference.Split('/').Last();
-                    census.Entry.Add(new Hl7.Fhir.Model.List.EntryComponent
+                    new Extension
                     {
-                        Item = new ResourceReference($"Patient/{patientId}")
-                    });
-                }
-            }
-
-            return census;
-        }
-
-        private async Task UploadSupplementalFile(
-            string fileName,
-            Resource resource,
-            string measureFolder,
-            string reportName,
-            string timestamp,
-            JsonSerializerOptions jsonOptions,
-            CancellationToken cancellationToken)
-        {
-            var json = JsonSerializer.Serialize(resource, jsonOptions);
-            var bytes = Encoding.UTF8.GetBytes(json);
-
-            string blobName = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, fileName);
-            _logger.LogDebug("Uploading supplemental file: {}", blobName);
-
-            BlockBlobClient blobClient = _externalContainerClient.GetBlockBlobClient(blobName);
-            BlockBlobOpenWriteOptions blobOptions = new()
-            {
-                HttpHeaders = new()
+                        Url = "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-patient-list-applicable-period-extension",
+                        Value = new Period
+                        {
+                            StartElement = new FhirDateTime(value.StartDate.Value),
+                            EndElement = new FhirDateTime(endDate)
+                        }
+                    }
+                },
+                Identifier = new List<Identifier>
                 {
-                    ContentType = "application/json"
-                }
+                    new Identifier { System = "https://nhsnlink.org", Value = "NHSNAcuteCareHospitalMonthlyInitialPopulation" }
+                },
+                Status = List.ListStatus.Current,
+                Mode = ListMode.Snapshot
             };
 
-            using Stream stream = await blobClient.OpenWriteAsync(true, blobOptions, cancellationToken);
-            await stream.WriteAsync(bytes, cancellationToken);
-        }
+            foreach (var patientId in patientIds)
+            {
+                censusList.Entry.Add(new Hl7.Fhir.Model.List.EntryComponent
+                {
+                    Item = new ResourceReference($"Patient/{patientId}")
+                });
+            }
 
-        private string ExtractMeasureName(string measureUrl)
-        {
-            // Extract measure name from URL like:
-            // "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNAcuteCareHospitalMonthlyInitialPopulation|1.0.0-dev"
-            if (string.IsNullOrEmpty(measureUrl))
-                return "Unknown";
+            var censusJson = JsonSerializer.Serialize(censusList, jsonOptions);
+            byte[] censusBytes = Encoding.UTF8.GetBytes(censusJson);
 
-            // Remove version if present
-            var urlWithoutVersion = measureUrl.Split('|')[0];
+            string censusBlobName = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, "census.json");
+            _logger.LogDebug("Uploading census file: {BlobName}", censusBlobName);
 
-            // Get the last segment
-            var segments = urlWithoutVersion.Split('/');
-            return segments.LastOrDefault() ?? "Unknown";
+            BlockBlobClient censusClient = _externalContainerClient!.GetBlockBlobClient(censusBlobName);
+            await using var censusStream = await censusClient.OpenWriteAsync(true, sharedOptions, cancellationToken);
+            await censusStream.WriteAsync(censusBytes, cancellationToken);
+
+            // submitting-org.json
+            var submittingOrg = allSharedResources.OfType<Organization>()
+                .FirstOrDefault(o => o.Meta?.Profile?.Any(p => p.Contains("nhsn-submitting-organization")) == true);
+            if (submittingOrg != null)
+            {
+                var orgJson = JsonSerializer.Serialize(submittingOrg, jsonOptions);
+                byte[] orgBytes = Encoding.UTF8.GetBytes(orgJson);
+                string orgBlobName = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, "submitting-org.json");
+                _logger.LogDebug("Uploading submitting organization: {BlobName}", orgBlobName);
+
+                BlockBlobClient orgClient = _externalContainerClient!.GetBlockBlobClient(orgBlobName);
+                await using var orgStream = await orgClient.OpenWriteAsync(true, sharedOptions, cancellationToken);
+                await orgStream.WriteAsync(orgBytes, cancellationToken);
+            }
+
+            // submitting-device.json
+            var submittingDevice = allSharedResources.OfType<Device>()
+                .FirstOrDefault(d => d.Meta?.Profile?.Any(p => p.Contains("nhsn-submitting-device")) == true);
+            if (submittingDevice != null)
+            {
+                var deviceJson = JsonSerializer.Serialize(submittingDevice, jsonOptions);
+                byte[] deviceBytes = Encoding.UTF8.GetBytes(deviceJson);
+                string deviceBlobName = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, "submitting-device.json");
+                _logger.LogDebug("Uploading submitting device: {BlobName}", deviceBlobName);
+
+                BlockBlobClient deviceClient = _externalContainerClient!.GetBlockBlobClient(deviceBlobName);
+                await using var deviceStream = await deviceClient.OpenWriteAsync(true, sharedOptions, cancellationToken);
+                await deviceStream.WriteAsync(deviceBytes, cancellationToken);
+            }
+
+            _logger.LogInformation("Completed processing and uploading {PatientCount} expanded patient bundles", patientIds.Count);
         }
 
         private bool IsAggregateMeasureReport(MeasureReport measureReport)
         {
-            // Aggregate measure reports have type = "subject-list" and contain a reporter reference
-            // They also don't have a subject (individual patient)
-            return measureReport.Type == MeasureReport.MeasureReportType.SubjectList &&
-                   measureReport.Subject == null;
+            var typeCode = measureReport.Type?.ToString()?.ToLowerInvariant() ?? "null";
+            var hasSubject = measureReport.Subject != null;
+            var hasSubjectListRef = measureReport.Contained?.Any(c => c is Hl7.Fhir.Model.List) == true;
+
+            _logger.LogDebug("Aggregate check for MeasureReport {Id}: type={Type}, hasSubject={HasSubject}, hasContainedList={HasList}",
+                measureReport.Id ?? "no-id", typeCode, hasSubject, hasSubjectListRef);
+
+            bool isSummaryType = typeCode == "summary" ||
+                                 typeCode == "subject-list" ||
+                                 typeCode == "subjectlist";
+
+            return isSummaryType && !hasSubject;
         }
 
         private string GetMeasureFolderPath(List<string> reportTypes)
@@ -994,77 +556,28 @@ namespace LantanaGroup.Link.Submission.Application.Services
             return reportTypes.FirstOrDefault() ?? string.Empty;
         }
 
-        //private HashSet<(string ResourceType, string ResourceId)> FindReferencesInResources(List<Resource> resources)
-        //{
-        //    var references = new HashSet<(string, string)>();
+        private HashSet<(string ResourceType, string ResourceId)> FindReferencesInResources(List<Resource> resources)
+        {
+            var references = new HashSet<(string, string)>();
+            var jsonOptions = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
 
-        //    foreach (var resource in resources)
-        //    {
-        //        FindReferencesInResource(resource, references);
-        //    }
+            foreach (var resource in resources)
+            {
+                try
+                {
+                    var json = JsonSerializer.Serialize(resource, jsonOptions);
+                    var doc = JsonDocument.Parse(json);
 
-        //    return references;
-        //}
+                    FindReferencesInJson(doc.RootElement, references);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to find references in resource {}", resource.TypeName);
+                }
+            }
 
-        //private void FindReferencesInResource(object obj, HashSet<(string, string)> references)
-        //{
-        //    if (obj == null) return;
-
-        //    var properties = obj.GetType().GetProperties();
-
-        //    foreach (var prop in properties)
-        //    {
-        //        var value = prop.GetValue(obj);
-        //        if (value == null) continue;
-
-        //        // Check if it's a ResourceReference
-        //        if (value is ResourceReference reference && !string.IsNullOrEmpty(reference.Reference))
-        //        {
-        //            var parts = reference.Reference.Split('/');
-        //            if (parts.Length == 2)
-        //            {
-        //                references.Add((parts[0], parts[1]));
-        //            }
-        //        }
-        //        // Recursively check collections
-        //        else if (value is System.Collections.IEnumerable enumerable && !(value is string))
-        //        {
-        //            foreach (var item in enumerable)
-        //            {
-        //                FindReferencesInResource(item, references);
-        //            }
-        //        }
-        //        // Recursively check complex objects
-        //        else if (prop.PropertyType.IsClass && prop.PropertyType != typeof(string))
-        //        {
-        //            FindReferencesInResource(value, references);
-        //        }
-        //    }
-        //}
-
-        //private HashSet<(string ResourceType, string ResourceId)> FindReferencesInResources(List<Resource> resources)
-        //{
-        //    var references = new HashSet<(string, string)>();
-        //    var jsonOptions = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
-
-        //    foreach (var resource in resources)
-        //    {
-        //        try
-        //        {
-        //            // Serialize to JSON and parse to find reference patterns
-        //            var json = JsonSerializer.Serialize(resource, jsonOptions);
-        //            var doc = JsonDocument.Parse(json);
-
-        //            FindReferencesInJson(doc.RootElement, references);
-        //        }
-        //        catch (Exception ex)
-        //        {
-        //            _logger.LogWarning(ex, "Failed to find references in resource {}", resource.TypeName);
-        //        }
-        //    }
-
-        //    return references;
-        //}
+            return references;
+        }
 
         private void FindReferencesInJson(JsonElement element, HashSet<(string, string)> references)
         {
@@ -1103,8 +616,6 @@ namespace LantanaGroup.Link.Submission.Application.Services
                     break;
             }
         }
-
-        //========================================================================
 
         private async Task<IDictionary<string, byte[]>> DownloadAsync(BlobContainerClient containerClient, string prefix, CancellationToken cancellationToken = default)
         {
