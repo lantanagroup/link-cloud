@@ -235,7 +235,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 // Assuming PatientSubmissionEntry has a ValidationMessage property; adjust as per actual model
                 operationOutcome.Issue.Add(new OperationOutcome.IssueComponent
                 {
-                    Severity = OperationOutcome.IssueSeverity.Fatal,
+                    Severity = OperationOutcome.IssueSeverity.Error,
                     Code = OperationOutcome.IssueType.Invalid,
                     Diagnostics = $"Validation failed for patient {entry.PatientId}"
                 });

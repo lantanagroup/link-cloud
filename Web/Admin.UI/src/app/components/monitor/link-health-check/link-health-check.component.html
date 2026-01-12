@@ -1,9 +1,76 @@
+
+@if (!initializeServiceInfos) {
+  <div class="content">
+    <p>
+      <mat-toolbar class="page-header-bar" color="primary">
+        <span>Service Meta Data</span>
+        <button mat-mini-fab aria-label="Refresh" matTooltip="Refresh service meta data" (click)="getServiceInfos()">
+          <mat-icon>refresh</mat-icon>
+        </button>
+      </mat-toolbar>
+    </p>
+    @if (serviceInfos.length > 0) {
+      <div class="table-container">
+        <table mat-table [dataSource]="serviceInfos">
+          <ng-container matColumnDef="serviceName" class="service-name-column">
+            <th mat-header-cell [ngStyle]="{'border-right': '1px solid lightgray'}" *matHeaderCellDef> Service</th>
+            <td mat-cell [ngStyle]="{'border-right': '1px solid lightgray'}" *matCellDef="let info">
+              @if (info.swaggerUrl) {
+                <a [href]="info.swaggerUrl" target="_blank">{{ info.serviceName }}</a>
+              } @else {
+                {{ info.serviceName }}
+              }
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="version">
+            <th mat-header-cell [ngStyle]="{'border-right': '1px solid lightgray'}" *matHeaderCellDef> Version</th>
+            <td mat-cell [ngStyle]="{'border-right': '1px solid lightgray'}"
+                *matCellDef="let info"> {{ info.version || 'N/A' }}
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="productVersion">
+            <th mat-header-cell [ngStyle]="{'border-right': '1px solid lightgray'}" *matHeaderCellDef> Product Version
+            </th>
+            <td mat-cell [ngStyle]="{'border-right': '1px solid lightgray'}"
+                *matCellDef="let info"> {{ info.productVersion || 'N/A' }}
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="commit">
+            <th mat-header-cell [ngStyle]="{'border-right': '1px solid lightgray'}" *matHeaderCellDef> Commit</th>
+            <td mat-cell [ngStyle]="{'border-right': '1px solid lightgray'}"
+                *matCellDef="let info"> {{ info.commit || 'N/A' }}
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="build">
+            <th mat-header-cell [ngStyle]="{'border-right': '1px solid lightgray'}" *matHeaderCellDef> Build</th>
+            <td mat-cell [ngStyle]="{'border-right': '1px solid lightgray'}"
+                *matCellDef="let info"> {{ info.build || 'N/A' }}
+            </td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="serviceInfosDisplayColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: serviceInfosDisplayColumns;"></tr>
+        </table>
+      </div>
+    } @else {
+      <div class="no-results-found-container">
+        <span>No service information found.</span>
+      </div>
+    }
+  </div>
+} @else {
+  <div class="content">
+    <div class="no-results-found-container">
+      <span>Loading link services information.</span>
+    </div>
+  </div>
+}
+
 @if (!initializeSummaries) {
   <div class="content">
     <p>
       <mat-toolbar class="page-header-bar" color="primary">
-        <span>Link Health Status</span>
-        <button mat-mini-fab aria-label="Refresh" matTooltip="Refresh health summary" (click)="onRefresh()">
+        <span>Service Health Status</span>
+        <button mat-mini-fab aria-label="Refresh" matTooltip="Refresh service health summary" (click)="getHealthSummary()">
           <mat-icon>refresh</mat-icon>
         </button>
       </mat-toolbar>
@@ -62,8 +129,8 @@
               </mat-chip>
             </td>
           </ng-container>
-          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+          <tr mat-header-row *matHeaderRowDef="healthDisplayColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: healthDisplayColumns;"></tr>
         </table>
       </div>
     } @else {

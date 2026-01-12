@@ -10,6 +10,7 @@
     <DockerComposeProjectPath>..\docker-compose.dcproj</DockerComposeProjectPath>
     <Configurations>Debug;Release;Debug IIS</Configurations>
 	<PredefinedCulturesOnly>false</PredefinedCulturesOnly>
+	<Version>0.4.1</Version>
   </PropertyGroup>
 
 	<PropertyGroup>
