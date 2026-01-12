@@ -27,9 +27,10 @@ namespace LantanaGroup.Link.Report.KafkaProducers
         {
             var _database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
 
+            //TODO: Ensure that ReportEntry statuses are updated for each entry
             if (patientsToEvaluate == null || patientsToEvaluate.Count == 0)
             {
-                patientsToEvaluate = (await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status == MeasureReportStatus.PendingEvaluation)).Select(x => x.PatientId).Distinct().ToList();
+                patientsToEvaluate = (await _database.ReportEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.ReportingStatus == ReportingStatus.PatientIdentified)).Select(x => x.PatientId).Distinct().ToList();
             }
 
             string reportableEvent = string.Empty;
