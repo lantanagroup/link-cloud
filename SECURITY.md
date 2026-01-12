@@ -10,7 +10,7 @@ All changes to the `main` branch go through a code review process. This helps en
 
 ## Dependency Management
 
-We use Dependabot to monitor and update dependencies. Regular updates are crucial for maintaining the security of the project.
+We use Snyk.io to monitor and update dependencies. Regular updates are crucial for maintaining the security of the project.
 
 ## Branch Protection Rules
 

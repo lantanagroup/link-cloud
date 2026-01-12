@@ -1,4 +1,6 @@
-using Azure.Identity;
+using System.Collections.Specialized;
+using System.Diagnostics;
+using System.Reflection;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Extensions;
@@ -26,18 +28,15 @@ using LantanaGroup.Link.Tenant.Repository.Context;
 using LantanaGroup.Link.Tenant.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.Extensions.Options;
 using Quartz;
 using Quartz.Impl;
 using Quartz.Spi;
 using Serilog;
+using Serilog.Debugging;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
-using System.Collections.Specialized;
-using System.Diagnostics;
-using System.Reflection;
 
 namespace Tenant
 {
@@ -46,6 +45,7 @@ namespace Tenant
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
+            builder.Configuration.AddStandardEnvironmentConfiguration();
 
             RegisterServices(builder);
 
@@ -196,7 +196,7 @@ namespace Tenant
                 .Enrich.FromLogContext()
                 .CreateLogger();
 
-            Serilog.Debugging.SelfLog.Enable(Console.Error);
+            SelfLog.Enable(Console.Error);
 
             builder.Services.AddSingleton<IJobFactory, QuartzJobFactory>();
 

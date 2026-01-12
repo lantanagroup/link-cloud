@@ -13,7 +13,7 @@
 
     <groupId>com.lantanagroup.link</groupId>
     <artifactId>main</artifactId>
-    <version>0.1.1-dev</version>
+    <version>0.4.1</version>
     <packaging>pom</packaging>
 
     <name>Link Java Modules</name>
@@ -21,7 +21,7 @@
 
     <properties>
         <cqf-fhir.version>3.12.0</cqf-fhir.version>
-        <hapi-fhir.version>7.4.0</hapi-fhir.version>
+        <hapi-fhir.version>7.6.1</hapi-fhir.version>
         <janino.version>2.6.1</janino.version>
     </properties>
 
@@ -148,7 +148,7 @@
             <dependency>
                 <groupId>com.azure</groupId>
                 <artifactId>azure-storage-blob</artifactId>
-                <version>12.30.0</version>
+                <version>12.32.0</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
