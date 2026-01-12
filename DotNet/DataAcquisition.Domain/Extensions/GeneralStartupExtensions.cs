@@ -205,6 +205,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IEntityRepository<DataAcquisitionLog>, EntityRepository<DataAcquisitionLog, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<SftpAcquisitionLog>, EntityRepository<SftpAcquisitionLog, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<SftpConfiguration>, EntityRepository<SftpConfiguration, DataAcquisitionDbContext>>();
 
         //Database
         services.AddTransient<IDatabase, Database>();
@@ -220,6 +221,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IFhirQueryQueries, FhirQueryQueries>();
         services.AddTransient<IQueryPlanQueries, QueryPlanQueries>();
         services.AddTransient<IReferenceResourcesQueries, ReferenceResourcesQueries>();
+        services.AddTransient<ISftpConfigurationQueries, SftpConfigurationQueries>();
 
         //Managers
         services.AddTransient<IFhirQueryConfigurationManager, FhirQueryConfigurationManager>();
@@ -229,6 +231,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IFhirQueryManager, FhirQueryManager>();
         services.AddTransient<IDataAcquisitionLogManager, DataAcquisitionLogManager>();
         services.AddTransient<ISftpAcquisitionLogManager, SftpAcquisitionLogManager>();
+        services.AddTransient<ISftpConfigurationManager, SftpConfigurationManager>();
     }
 
     public static void RegisterServices(this IServiceCollection services)

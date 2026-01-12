@@ -15,6 +15,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
         IEntityRepository<FhirQueryResourceType> FhirQueryResourceTypeRepository { get; set; }
         IEntityRepository<DataAcquisitionLog> DataAcquisitionLogRepository { get; set; }
         IEntityRepository<SftpAcquisitionLog> SftpAcquisitionLogRepository { get; set; }
+        IEntityRepository<SftpConfiguration> SftpConfigurationRepository { get; set; }
         Task SaveChangesAsync();
     }
     public class Database : IDatabase
@@ -29,6 +30,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
         public IEntityRepository<FhirQueryResourceType> FhirQueryResourceTypeRepository { get; set; }
         public IEntityRepository<DataAcquisitionLog> DataAcquisitionLogRepository { get; set; }
         public IEntityRepository<SftpAcquisitionLog> SftpAcquisitionLogRepository { get; set; }
+        public IEntityRepository<SftpConfiguration> SftpConfigurationRepository { get; set; }
 
         public Database(
             DataAcquisitionDbContext context,
@@ -40,7 +42,8 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
             IEntityRepository<DataAcquisitionLog> dataAcquisitionLogRepository,
             IEntityRepository<ResourceReferenceType> resourceReferenceTypeRepository,
             IEntityRepository<FhirQueryResourceType> fhirQueryResourceTypeRepository,
-            IEntityRepository<SftpAcquisitionLog> sftpAcquisitionLogRepository)
+            IEntityRepository<SftpAcquisitionLog> sftpAcquisitionLogRepository,
+            IEntityRepository<SftpConfiguration> sftpConfigurationRepository)
         {
             _context = context;
             QueryPlanRepository = queryPlans;
@@ -52,6 +55,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
             ResourceReferenceTypeRepository = resourceReferenceTypeRepository;
             FhirQueryResourceTypeRepository = fhirQueryResourceTypeRepository;
             SftpAcquisitionLogRepository = sftpAcquisitionLogRepository;
+            SftpConfigurationRepository = sftpConfigurationRepository;
         }
 
         public async Task SaveChangesAsync()
