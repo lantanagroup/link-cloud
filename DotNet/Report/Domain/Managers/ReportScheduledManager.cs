@@ -39,11 +39,15 @@ namespace LantanaGroup.Link.Report.Domain.Managers
     {
         private readonly IDatabase _database;
         private readonly ScheduledReportFactory _scheduledReportFactory;
+        private readonly IReportPopulationManager _reportPopulationManager;
+        private readonly IReportEntryManager _reportEntryManager;
 
-        public ReportScheduledManager(IDatabase database, ScheduledReportFactory scheduledReportFactory)
+        public ReportScheduledManager(IDatabase database, ScheduledReportFactory scheduledReportFactory, IReportPopulationManager reportPopulationManager, IReportEntryManager reportEntryManager)
         {
             _database = database;
             _scheduledReportFactory = scheduledReportFactory;
+            _reportPopulationManager = reportPopulationManager;
+            _reportEntryManager = reportEntryManager;
         }
 
         public async Task<ReportSchedule?> GetReportSchedule(string facilityid, string reportId, CancellationToken cancellationToken = default)
@@ -88,20 +92,21 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
             // Get Census and IP information from individual measure report entries
             var uniqueReportIds = summaries.Select(x => x.Id).Distinct().ToList();
-            var reportEntries = await _database.SubmissionEntryRepository
-                .FindAsync(x => uniqueReportIds.Contains(x.ReportScheduleId), cancellationToken);
+            var reportEntries = await _database.ReportEntryRepository.FindAsync(x => uniqueReportIds.Contains(x.ReportScheduleId), cancellationToken);
 
             foreach (var summary in summaries)
             {
                 // Get the initial population count for each report
                 //TODO: Eventually may need to check validation results
-                if (!string.IsNullOrWhiteSpace(summary.Id))
-                    summary.InitialPopulationCount =
-                        reportEntries.Count(
-                            x => x.ReportScheduleId == summary.Id &&
-                                 x.Status != MeasureReportStatus.PendingEvaluation &&
-                                 x.Status != MeasureReportStatus.NotReportable
-                        );
+                var population = await _reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == summary.Id);
+
+                summary.InitialPopulationCount = population == null ? 0 : population.GroupPopulationList.Count;
+
+                //reportEntries.Count(
+                //    x => x.ReportScheduleId == summary.Id &&
+                //         x.Status != PatientSubmissionStatus.PendingEvaluation &&
+                //         x.Status != PatientSubmissionStatus.NotReportable
+                //);
 
                 // Get census information for each report
                 summary.CensusCount = reportEntries.Where(x => x.ReportScheduleId == summary.Id)
@@ -113,53 +118,86 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task<ScheduledReportListSummary> GetScheduledReportSummary(string facilityId, string reportId, CancellationToken cancellationToken = default)
         {
-            var scheduledReport = await _database.ReportScheduledRepository.SingleOrDefaultAsync(x => x.FacilityId == facilityId && x.Id == reportId, cancellationToken);
-
-            if (scheduledReport is null)
-                throw new InvalidOperationException($"Scheduled report with ID '{reportId}' not found.");
-
-            var summary = _scheduledReportFactory.FromDomain(scheduledReport);
-            if (string.IsNullOrWhiteSpace(summary?.Id)) return summary;
-
-            //TODO: Eventually may need to check validation results
-            // Get individual measure report entries for this report
-            var measureReportEntries = await _database.SubmissionEntryRepository
-                .FindAsync(x => x.ReportScheduleId == reportId, cancellationToken);
-
-            // Get the initial population count for each report
-            summary.InitialPopulationCount =
-                measureReportEntries.Count(
-                    x => x.ReportScheduleId == summary.Id &&
-                         x.Status != MeasureReportStatus.PendingEvaluation &&
-                         x.Status != MeasureReportStatus.NotReportable
-                );
-
-            // Get census information for each report
-            summary.CensusCount = measureReportEntries.Where(x => x.ReportScheduleId == summary.Id)
-                .DistinctBy(x => x.PatientId).Count();
-
-            // Get the metrics for the scheduled report
-            var metrics = new ScheduledReportMetrics
+            try
             {
-                MeasureIpCounts = measureReportEntries
-                    .Where(x =>
-                        x.ReportScheduleId == summary.Id &&
-                        x.Status != MeasureReportStatus.PendingEvaluation &&
-                        x.Status != MeasureReportStatus.NotReportable)
-                    .GroupBy(x => x.ReportType)
-                    .ToDictionary(x => MeasureNameShortener.ShortenMeasureName(x.Key), x => x.Count()),
-                ReportStatusCounts = measureReportEntries
-                    .GroupBy(x => x.Status)
-                    .ToDictionary(x => x.Key.ToString(), x => x.Count()),
-                ValidationStatusCounts = measureReportEntries
-                    .GroupBy(x => x.ValidationStatus)
-                    .ToDictionary(x => x.Key.ToString(), x => x.Count())
-            };
 
-            summary.ReportMetrics = metrics;
+                var scheduledReport = await this.GetReportSchedule(facilityId, reportId);
 
-            return summary;
+                if (scheduledReport is null)
+                    throw new InvalidOperationException($"Scheduled report with ID '{reportId}' not found.");
+
+                var summary = _scheduledReportFactory.FromDomain(scheduledReport);
+                if (string.IsNullOrWhiteSpace(summary?.Id)) return summary;
+
+                //TODO: Eventually may need to check validation results
+                // Get individual measure report entries for this report
+                //var measureReportEntries = await _database.ReportEntryStatusRepository
+                //    .FindAsync(x => x.ReportScheduleId == reportId, cancellationToken);
+                var measureReportEntries = await _reportEntryManager.FindAsync(x => x.ReportScheduleId == reportId);
+
+
+                // Get the initial population count for each report
+                //TODO: I don't think this is right. Need to look into adding all measures for the scheduled report
+                summary.InitialPopulationCount = (await _reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == summary.Id)).GroupPopulationList.Count;
+                //measureReportEntries.Count(
+                //    x => x.ReportScheduleId == summary.Id &&
+                //         x.Status != PatientSubmissionStatus.PendingEvaluation &&
+                //         x.Status != PatientSubmissionStatus.NotReportable
+                //);
+
+                // Get census information for each report
+                summary.CensusCount = measureReportEntries.Where(x => x.ReportScheduleId == summary.Id)
+                    .DistinctBy(x => x.PatientId).Count();
+
+                // Get the metrics for the scheduled report
+                //var metrics = new ScheduledReportMetrics
+                //{
+                //    MeasureIpCounts = measureReportEntries.Where(x => x.ReportScheduleId == summary.Id && x.Status != PatientSubmissionStatus.PendingEvaluation && x.Status != PatientSubmissionStatus.NotReportable)
+                //                                            .GroupBy(x => x.ReportType)
+                //                                            .ToDictionary(x => MeasureNameShortener.ShortenMeasureName(x.Key), x => x.Count()),
+                //    ReportStatusCounts = measureReportEntries
+                //        .GroupBy(x => x.Status)
+                //        .ToDictionary(x => x.Key.ToString(), x => x.Count()),
+                //    ValidationStatusCounts = measureReportEntries
+                //        .GroupBy(x => x.ValidationStatus)
+                //        .ToDictionary(x => x.Key.ToString(), x => x.Count())
+                //};
+
+
+                //TODO: Change to group by report type and use name shortner after updating test data to have reportType in population document
+                var pop = (await _reportPopulationManager.FindAsync(x => x.ReportScheduleId == reportId)).GroupBy(x => MeasureNameShortener.ShortenMeasureName(x.ReportType)).ToDictionary(x => x.Key, x => x.Count());
+
+                var valid = new Dictionary<string, int>();
+
+                foreach (var entry in measureReportEntries)
+                {
+                    if (valid.ContainsKey(entry.ReportingStatus.ToString()))
+                    {
+                        valid[entry.ReportingStatus.ToString()]++;
+                        continue;
+                    }
+
+                    valid.Add(entry.ReportingStatus.ToString(), 1);
+                }
+
+                var metrics = new ScheduledReportMetrics
+                {
+                    MeasureIpCounts = pop,
+                    ReportStatusCounts = measureReportEntries
+                        .GroupBy(x => x.ReportingStatus)
+                        .ToDictionary(x => x.Key.ToString(), x => x.Count()),
+                    ValidationStatusCounts = valid
+                };
+
+                summary.ReportMetrics = metrics;
+
+                return summary;
+            }
+            catch (Exception ex)
+            {
+                //TODO: TEST OR THROW WITHOUT AND SEE WHAT HAPPENS
+                throw ex;
+            }
         }
-
     }
 }

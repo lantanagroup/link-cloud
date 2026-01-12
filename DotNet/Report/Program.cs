@@ -170,7 +170,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add Managers
     builder.Services.AddTransient<IReportScheduledManager, ReportScheduledManager>();
-    builder.Services.AddTransient<ISubmissionEntryManager, SubmissionEntryManager>();
     builder.Services.AddTransient<ISubmissionEntryQueries, SubmissionEntryQueries>();
 
     // Add Link Security

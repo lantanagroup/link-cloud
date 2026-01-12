@@ -45,51 +45,38 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public async Task<List<Resource>> Generate(ReportSchedule schedule)
         {
-            var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
+            var reportEntries = await _database.ReportEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
 
-            var allSubmissionEntries = await database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
-
-            var submissionEntries = allSubmissionEntries.Where(x => x.Status != MeasureReportStatus.NotReportable).ToList();
-
-            var measureReports = submissionEntries
-                        .Select(e => e.MeasureReport)
-                        .Where(report => report != null).ToList();
-
-            var allPatientIds = allSubmissionEntries.Select(s => s.PatientId).Distinct().ToList();
-
-            var patientIds = submissionEntries.Where(s => s.Status == MeasureReportStatus.ValidationComplete || s.Status == MeasureReportStatus.Submitted).Select(s => s.PatientId).Distinct().ToList();
-
-            var failedEntries = submissionEntries.Where(s => s.ValidationStatus == ValidationStatus.Failed).ToList();
+            //TODO: ADD ERROR
 
             var facilityConfig = await _tenantApiService.GetFacilityConfig(schedule.FacilityId, CancellationToken.None);
 
-            var organization = FhirHelperMethods.CreateOrganization(facilityConfig.FacilityName, schedule.FacilityId, ReportConstants.BundleSettings.SubmittingOrganizationProfile, ReportConstants.BundleSettings.OrganizationTypeSystem,
-                                                                            ReportConstants.BundleSettings.CdcOrgIdSystem, ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);
+            //TODO: ADD ERROR
 
-            var aggregates = _aggregator.Aggregate(measureReports, organization.Id, schedule.ReportStartDate, schedule.ReportEndDate);
-
-            var measureIds = measureReports.Select(mr => mr.Measure).Distinct().ToList();
-
-            var reportName = _blobStorageService.GetReportName(schedule);
-
-            var patientFileDict = patientIds.ToDictionary(pid => pid, pid => $"{reportName}_{pid}.ndjson");
+            var organization = FhirHelperMethods.CreateOrganization(facilityConfig.FacilityName, schedule.FacilityId, ReportConstants.BundleSettings.SubmittingOrganizationProfile, ReportConstants.BundleSettings.OrganizationTypeSystem, ReportConstants.BundleSettings.CdcOrgIdSystem, ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);
 
             List<Resource> manifestResources =
             [
                 organization,
                 CreateDevice(),
-                CreatePatientList(allPatientIds, schedule.ReportStartDate, schedule.ReportEndDate),
+                CreatePatientList(reportEntries.Select(x => x.PatientId).ToList(), schedule.ReportStartDate, schedule.ReportEndDate),
             ];
+
+            var reportName = _blobStorageService.GetReportName(schedule);
+            var submittedPatientIds = reportEntries.Where(x => x.SubmissionStatus == SubmissionStatus.Submitted).Select(x => x.PatientId).ToList();
+            var patientFileDict = submittedPatientIds.ToDictionary(pid => pid, pid => $"{reportName}_{pid}.ndjson");
+            var aggregates = await _aggregator.CreateMeasureReportAggregate(schedule, organization.Id);
 
             foreach (var aggregate in aggregates)
             {
-                AddExtensionsToAggregate(aggregate, patientFileDict);
                 manifestResources.Add(aggregate);
             }
 
-            var operationOutcome = CreateOperationOutcome(failedEntries);
-            if (operationOutcome.Issue.Any())
+            var failedEntries = reportEntries.Where(x => x.ReportingStatus == ReportingStatus.FailedValidation).ToList();
+
+            if (failedEntries.Count > 0)
             {
+                var operationOutcome = CreateOperationOutcome(failedEntries);
                 manifestResources.Add(operationOutcome);
             }
 
@@ -119,18 +106,32 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public async Task<bool> Produce(ReportSchedule schedule, string correlationId = null)
         {
-            var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
+            //var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
 
-            var allReady = !await database.SubmissionEntryRepository.AnyAsync(e => e.FacilityId == schedule.FacilityId
-                && e.ReportScheduleId == schedule.Id
-                && e.Status != MeasureReportStatus.NotReportable
-                && e.Status != MeasureReportStatus.ValidationComplete
-                && e.Status != MeasureReportStatus.Submitted, CancellationToken.None);
+            //var allReady = !await database.SubmissionEntryRepository.AnyAsync(e => e.FacilityId == schedule.FacilityId
+            //    && e.ReportScheduleId == schedule.Id
+            //    && e.Status != MeasureReportStatus.NotReportable
+            //    && e.Status != MeasureReportStatus.ValidationComplete
+            //    && e.Status != MeasureReportStatus.Submitted, CancellationToken.None);
 
-            if (!allReady)
+            //if (!allReady)
+            //{
+            //    return false;
+            //}
+
+            var reportEntries = await _database.ReportEntryRepository.FindAsync(x => x.FacilityId == schedule.FacilityId && x.ReportScheduleId == schedule.Id);
+
+            foreach (var entry in reportEntries)
             {
+                if ((entry.ReportingStatus == ReportingStatus.NoReportableReports || entry.ReportingStatus == ReportingStatus.PassedValidation || entry.ReportingStatus == ReportingStatus.FailedValidation) && entry.SubmissionStatus == SubmissionStatus.Submitted)
+                {
+                    continue;
+                }
+
                 return false;
             }
+
+
 
             List<Resource> manifestResources = await Generate(schedule);
 
