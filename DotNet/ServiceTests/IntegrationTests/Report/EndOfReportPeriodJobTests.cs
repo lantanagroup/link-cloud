@@ -72,7 +72,7 @@ namespace IntegrationTests.Report
                 FacilityId = schedule.FacilityId,
                 ReportScheduleId = schedule.Id,
                 PatientId = "Patient1",
-                Status = PatientSubmissionStatus.ValidationComplete,
+                Status = MeasureReportStatus.ValidationComplete,
                 MeasureReport = new MeasureReport { Id = Guid.NewGuid().ToString(), Measure = "TestMeasure" }
             };
             var entry2 = new PatientSubmissionEntry
@@ -81,7 +81,7 @@ namespace IntegrationTests.Report
                 FacilityId = schedule.FacilityId,
                 ReportScheduleId = schedule.Id,
                 PatientId = "Patient2",
-                Status = PatientSubmissionStatus.NotReportable
+                Status = MeasureReportStatus.NotReportable
             };
             await database.SubmissionEntryRepository.AddAsync(entry1);
             await database.SubmissionEntryRepository.AddAsync(entry2);
@@ -187,7 +187,7 @@ namespace IntegrationTests.Report
                     ReportScheduleId = schedule.Id,
                     PatientId = patientId,
                     ReportType = "TestReport",
-                    Status = PatientSubmissionStatus.PendingEvaluation
+                    Status = MeasureReportStatus.PendingEvaluation
                 };
                 await database.SubmissionEntryRepository.AddAsync(entry);
             }
@@ -279,7 +279,7 @@ namespace IntegrationTests.Report
                 FacilityId = schedule.FacilityId,
                 ReportScheduleId = schedule.Id,
                 PatientId = "Patient1",
-                Status = PatientSubmissionStatus.ReadyForValidation,
+                Status = MeasureReportStatus.ReadyForValidation,
                 ValidationStatus = ValidationStatus.Pending,
                 PayloadUri = "test://payload/patient1"
             };
@@ -377,7 +377,7 @@ namespace IntegrationTests.Report
                 FacilityId = schedule.FacilityId,
                 ReportScheduleId = schedule.Id,
                 PatientId = "Patient1",
-                Status = PatientSubmissionStatus.PendingEvaluation
+                Status = MeasureReportStatus.PendingEvaluation
             };
             await database.SubmissionEntryRepository.AddAsync(entry);
             await database.SaveChangesAsync();

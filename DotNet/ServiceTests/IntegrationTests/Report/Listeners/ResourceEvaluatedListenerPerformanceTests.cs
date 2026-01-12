@@ -89,7 +89,7 @@ namespace IntegrationTests.Report
                     ReportScheduleId = schedule.Id,
                     PatientId = patients[i],
                     ReportType = reportTypes[i],
-                    Status = PatientSubmissionStatus.PendingEvaluation,
+                    Status = MeasureReportStatus.PendingEvaluation,
                     ValidationStatus = ValidationStatus.Pending,
                     CreateDate = DateTime.UtcNow
                 };

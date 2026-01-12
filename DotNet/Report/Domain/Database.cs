@@ -5,10 +5,10 @@ namespace LantanaGroup.Link.Report.Domain
 {
     public interface IDatabase
     {
-        IEntityRepository<FhirResource> ResourceRepository { get; set; }
         IEntityRepository<ReportSchedule> ReportScheduledRepository { get; set; }
-        IEntityRepository<PatientSubmissionEntry> SubmissionEntryRepository { get; set; }
-        IEntityRepository<PatientSubmissionEntryResourceMap> PatientSubmissionEntryResourceMapRepository { get; set; }
+        IEntityRepository<ReportEntry> ReportEntryRepository { get; set; }
+        IEntityRepository<ReportPopulation> ReportPopulationRepository { get; set; }
+        MongoEntityRepository<ReportResource> ReportResourceRepository { get; set; }
 
         Task SaveChangesAsync();
     }
@@ -17,23 +17,23 @@ namespace LantanaGroup.Link.Report.Domain
     {
         protected MongoDbContext DbContext { get; set; }
 
-        public IEntityRepository<FhirResource> ResourceRepository { get; set; }
         public IEntityRepository<ReportSchedule> ReportScheduledRepository { get; set; }
-        public IEntityRepository<PatientSubmissionEntry> SubmissionEntryRepository { get; set; }
-        public IEntityRepository<PatientSubmissionEntryResourceMap> PatientSubmissionEntryResourceMapRepository { get; set; }
+        public IEntityRepository<ReportEntry> ReportEntryRepository { get; set; }
+        public IEntityRepository<ReportPopulation> ReportPopulationRepository { get; set; }
+        public MongoEntityRepository<ReportResource> ReportResourceRepository { get; set; }
 
         public Database(MongoDbContext context,
-            IEntityRepository<FhirResource> resourceRepository,
             IEntityRepository<ReportSchedule> reportScheduledRepository,
-            IEntityRepository<PatientSubmissionEntry> submissionEntryRepository,
-            IEntityRepository<PatientSubmissionEntryResourceMap> reportScheduleResourceMapRepository)
+            IEntityRepository<ReportEntry> reportEntryRepository,
+            IEntityRepository<ReportPopulation> reportPopulationRepository,
+            MongoEntityRepository<ReportResource> reportResourceRepository)
         {
             DbContext = context;
 
-            ResourceRepository = resourceRepository;
             ReportScheduledRepository = reportScheduledRepository;
-            SubmissionEntryRepository = submissionEntryRepository;
-            PatientSubmissionEntryResourceMapRepository = reportScheduleResourceMapRepository;
+            ReportEntryRepository = reportEntryRepository;
+            ReportPopulationRepository = reportPopulationRepository;
+            ReportResourceRepository = reportResourceRepository;
         }
 
         public async Task SaveChangesAsync()

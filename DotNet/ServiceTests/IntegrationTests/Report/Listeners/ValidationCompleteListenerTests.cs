@@ -56,12 +56,12 @@ namespace IntegrationTests.Report
                 scope.ServiceProvider.GetRequiredService<AuditableEventOccurredProducer>());
         }
 
-        private async Task<(ReportSchedule schedule, List<PatientSubmissionEntry> entries)> SetupDatabaseAsync(IServiceScope scope, string facilityId = "TestFacility", List<string> reportTypes = null, List<(string patientId, string reportType, PatientSubmissionStatus status, MeasureReport measureReport)> entryData = null)
+        private async Task<(ReportSchedule schedule, List<PatientSubmissionEntry> entries)> SetupDatabaseAsync(IServiceScope scope, string facilityId = "TestFacility", List<string> reportTypes = null, List<(string patientId, string reportType, MeasureReportStatus status, MeasureReport measureReport)> entryData = null)
         {
             var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
 
             reportTypes ??= new List<string> { "TestReport" };
-            entryData ??= new List<(string, string, PatientSubmissionStatus, MeasureReport)> { ("Patient1", "TestReport", PatientSubmissionStatus.ValidationRequested, null) };
+            entryData ??= new List<(string, string, MeasureReportStatus, MeasureReport)> { ("Patient1", "TestReport", MeasureReportStatus.ValidationRequested, null) };
 
             var reportStartDate = DateTime.Parse("2024-01-01").ToUniversalTime();
             var reportEndDate = DateTime.Parse("2024-01-31").ToUniversalTime();
@@ -121,7 +121,7 @@ namespace IntegrationTests.Report
             return new ConsumeResult<string, ValidationCompleteValue> { Message = message, Topic = nameof(KafkaTopic.ValidationComplete) };
         }
 
-        private void AssertEntryStatusAndValidation(PatientSubmissionEntry updatedEntry, PatientSubmissionStatus expectedStatus, ValidationStatus expectedValidationStatus, string expectedPayloadUri = null)
+        private void AssertEntryStatusAndValidation(PatientSubmissionEntry updatedEntry, MeasureReportStatus expectedStatus, ValidationStatus expectedValidationStatus, string expectedPayloadUri = null)
         {
             Assert.NotNull(updatedEntry);
             Assert.Equal(expectedStatus, updatedEntry.Status);
@@ -183,7 +183,7 @@ namespace IntegrationTests.Report
             var assertDatabase = assertScope.ServiceProvider.GetRequiredService<IDatabase>();
 
             var updatedEntry = await assertDatabase.SubmissionEntryRepository.FirstOrDefaultAsync(e => e.Id == entry.Id);
-            AssertEntryStatusAndValidation(updatedEntry, PatientSubmissionStatus.ValidationComplete, ValidationStatus.Passed);
+            AssertEntryStatusAndValidation(updatedEntry, MeasureReportStatus.ValidationComplete, ValidationStatus.Passed);
 
             AssertProducerMocks(ReportIntegrationTestFixture.SubmitPayloadProducerMock, Times.Once(), Times.Once(), schedule, entry.PatientId, updatedEntry.PayloadUri);
         }
@@ -210,9 +210,9 @@ namespace IntegrationTests.Report
                 Period = new Period { Start = "2024-01-01", End = "2024-01-31" }  // Added to fix null period error
             };
 
-            var entryData = new List<(string, string, PatientSubmissionStatus, MeasureReport)>
+            var entryData = new List<(string, string, MeasureReportStatus, MeasureReport)>
             {
-                ("Patient1", "TestReport", PatientSubmissionStatus.ValidationRequested, measureReport)
+                ("Patient1", "TestReport", MeasureReportStatus.ValidationRequested, measureReport)
             };
 
             var (schedule, entries) = await SetupDatabaseAsync(scope, entryData: entryData);
@@ -250,7 +250,7 @@ namespace IntegrationTests.Report
             var updatedData = await assertQueries.GetPatientReportData(schedule.FacilityId, schedule.Id, entry.PatientId, cancellationToken: CancellationToken.None);
             var updatedEntry = updatedData.ReportData[schedule.ReportTypes[0]].Entry;
 
-            AssertEntryStatusAndValidation(updatedEntry, PatientSubmissionStatus.ValidationComplete, ValidationStatus.Failed, expectedUri);
+            AssertEntryStatusAndValidation(updatedEntry, MeasureReportStatus.ValidationComplete, ValidationStatus.Failed, expectedUri);
 
             Assert.Contains(updatedData.ReportData[schedule.ReportTypes[0]].Resources, cr => cr.ResourceType == "OperationOutcome");
 

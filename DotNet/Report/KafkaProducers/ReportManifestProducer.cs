@@ -49,7 +49,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             var allSubmissionEntries = await database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
 
-            var submissionEntries = allSubmissionEntries.Where(x => x.Status != PatientSubmissionStatus.NotReportable).ToList();
+            var submissionEntries = allSubmissionEntries.Where(x => x.Status != MeasureReportStatus.NotReportable).ToList();
 
             var measureReports = submissionEntries
                         .Select(e => e.MeasureReport)
@@ -57,7 +57,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             var allPatientIds = allSubmissionEntries.Select(s => s.PatientId).Distinct().ToList();
 
-            var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ValidationComplete || s.Status == PatientSubmissionStatus.Submitted).Select(s => s.PatientId).Distinct().ToList();
+            var patientIds = submissionEntries.Where(s => s.Status == MeasureReportStatus.ValidationComplete || s.Status == MeasureReportStatus.Submitted).Select(s => s.PatientId).Distinct().ToList();
 
             var failedEntries = submissionEntries.Where(s => s.ValidationStatus == ValidationStatus.Failed).ToList();
 
@@ -123,9 +123,9 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             var allReady = !await database.SubmissionEntryRepository.AnyAsync(e => e.FacilityId == schedule.FacilityId
                 && e.ReportScheduleId == schedule.Id
-                && e.Status != PatientSubmissionStatus.NotReportable
-                && e.Status != PatientSubmissionStatus.ValidationComplete
-                && e.Status != PatientSubmissionStatus.Submitted, CancellationToken.None);
+                && e.Status != MeasureReportStatus.NotReportable
+                && e.Status != MeasureReportStatus.ValidationComplete
+                && e.Status != MeasureReportStatus.Submitted, CancellationToken.None);
 
             if (!allReady)
             {

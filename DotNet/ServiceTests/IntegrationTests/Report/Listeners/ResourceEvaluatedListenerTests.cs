@@ -62,7 +62,7 @@ namespace IntegrationTests.Report
                 scope.ServiceProvider.GetRequiredService<AuditableEventOccurredProducer>());
         }
 
-        private async Task<(ReportSchedule schedule, List<PatientSubmissionEntry> entries)> SetupDatabaseAsync(string facilityId, List<string> reportTypes = null, List<(string patientId, string reportType, PatientSubmissionStatus status)> entryData = null, List<(string resourceType, string resourceId, DomainResource resource)> existingResources = null)
+        private async Task<(ReportSchedule schedule, List<PatientSubmissionEntry> entries)> SetupDatabaseAsync(string facilityId, List<string> reportTypes = null, List<(string patientId, string reportType, MeasureReportStatus status)> entryData = null, List<(string resourceType, string resourceId, DomainResource resource)> existingResources = null)
         {
             var scope = _scopeFactory.CreateScope();
             var _database = scope.ServiceProvider.GetRequiredService<IDatabase>();
@@ -165,7 +165,7 @@ namespace IntegrationTests.Report
             return JsonDocument.Parse(json).RootElement;
         }
 
-        private void AssertEntryStatusAndMeasureReport(PatientSubmissionEntry updatedEntry, PatientSubmissionStatus expectedStatus, string expectedMeasureReportId = null)
+        private void AssertEntryStatusAndMeasureReport(PatientSubmissionEntry updatedEntry, MeasureReportStatus expectedStatus, string expectedMeasureReportId = null)
         {
             Assert.NotNull(updatedEntry);
             Assert.Equal(expectedStatus, updatedEntry.Status);
@@ -230,7 +230,7 @@ namespace IntegrationTests.Report
             var facilityId = Guid.NewGuid().ToString();
             var patientId = Guid.NewGuid().ToString();
 
-            var (schedule, entries) = await SetupDatabaseAsync(facilityId, entryData: new List<(string patientId, string reportType, PatientSubmissionStatus status)> { (patientId, "TestReport", PatientSubmissionStatus.PendingEvaluation) });
+            var (schedule, entries) = await SetupDatabaseAsync(facilityId, entryData: new List<(string patientId, string reportType, MeasureReportStatus status)> { (patientId, "TestReport", MeasureReportStatus.PendingEvaluation) });
             var entry = entries.First();
             var scope = _scopeFactory.CreateScope();
             var listener = CreateListener(scope);
@@ -247,7 +247,7 @@ namespace IntegrationTests.Report
             var updatedData = await _subEntryQueries.GetPatientReportData(facilityId, schedule.Id, patientId, cancellationToken: CancellationToken.None);
             var updatedEntry = updatedData.ReportData[schedule.ReportTypes[0]].Entry;
 
-            AssertEntryStatusAndMeasureReport(updatedEntry, PatientSubmissionStatus.PendingEvaluation);
+            AssertEntryStatusAndMeasureReport(updatedEntry, MeasureReportStatus.PendingEvaluation);
 
             var createdResource = await _database.ResourceRepository.FirstOrDefaultAsync(r => r.FacilityId == facilityId && r.PatientId == patientId && r.ResourceType == "Patient");
 
@@ -275,7 +275,7 @@ namespace IntegrationTests.Report
 
             var (schedule, entries) = await SetupDatabaseAsync(facilityId,
                 reportTypes: new List<string> { reportType },
-                entryData: new List<(string, string, PatientSubmissionStatus)> { (patientId, reportType, PatientSubmissionStatus.PendingEvaluation) });
+                entryData: new List<(string, string, MeasureReportStatus)> { (patientId, reportType, MeasureReportStatus.PendingEvaluation) });
 
             var entry = entries.First();
 
@@ -301,7 +301,7 @@ namespace IntegrationTests.Report
             var updatedEntry = await assertQueries.GetByIdAsync(entry.Id); 
 
             Assert.NotNull(updatedEntry);
-            Assert.Equal(PatientSubmissionStatus.ValidationRequested, updatedEntry.Status); 
+            Assert.Equal(MeasureReportStatus.ValidationRequested, updatedEntry.Status); 
             Assert.Equal(mockPayloadUri.ToString(), updatedEntry.PayloadUri);
 
             // Update AssertProducerMocks to use updatedEntry
@@ -318,10 +318,10 @@ namespace IntegrationTests.Report
             var facilityId = Guid.NewGuid().ToString();
             var patientId = Guid.NewGuid().ToString();
 
-            var entryData = new List<(string, string, PatientSubmissionStatus)>
+            var entryData = new List<(string, string, MeasureReportStatus)>
             {
-                (patientId, "TestReport", PatientSubmissionStatus.PendingEvaluation),
-                (patientId, "OtherReport", PatientSubmissionStatus.PendingEvaluation)
+                (patientId, "TestReport", MeasureReportStatus.PendingEvaluation),
+                (patientId, "OtherReport", MeasureReportStatus.PendingEvaluation)
             };
             var (schedule, entries) = await SetupDatabaseAsync(facilityId, reportTypes: new List<string> { "TestReport", "OtherReport" }, entryData: entryData);
             var entry = entries.First(e => e.ReportType == "TestReport");
@@ -346,7 +346,7 @@ namespace IntegrationTests.Report
             var data = await queries.GetPatientReportData(facilityId, schedule.Id, patientId, entry.Id);
             var updatedEntry = data.ReportData[entry.ReportType].Entry;
 
-            AssertEntryStatusAndMeasureReport(updatedEntry, PatientSubmissionStatus.NotReportable, "MeasureReport1");
+            AssertEntryStatusAndMeasureReport(updatedEntry, MeasureReportStatus.NotReportable, "MeasureReport1");
 
             AssertProducerMocks(ReportIntegrationTestFixture.ReadyForValidationProducerMock, ReportIntegrationTestFixture.SubmitPayloadProducerMock, Times.Never(), Times.Never(), schedule, updatedEntry);
 
@@ -363,7 +363,7 @@ namespace IntegrationTests.Report
             {
                 ("Patient", patientId, new Patient { Id = patientId, Meta = new Meta{ ElementId =  "ElementId" }, Name = { new HumanName { Family = "Old" } } })
             };
-            var (schedule, entries) = await SetupDatabaseAsync(facilityId, entryData: new List<(string patientId, string reportType, PatientSubmissionStatus status)> { (patientId, "TestReport", PatientSubmissionStatus.PendingEvaluation) }, existingResources: existingResources);
+            var (schedule, entries) = await SetupDatabaseAsync(facilityId, entryData: new List<(string patientId, string reportType, MeasureReportStatus status)> { (patientId, "TestReport", MeasureReportStatus.PendingEvaluation) }, existingResources: existingResources);
             var entry = entries.First();
 
             var scope = _scopeFactory.CreateScope();
@@ -380,7 +380,7 @@ namespace IntegrationTests.Report
             var updatedData = await _subEntryQueries.GetPatientReportData(facilityId, schedule.Id, patientId, cancellationToken: CancellationToken.None);
             var updatedEntry = updatedData.ReportData[schedule.ReportTypes[0]].Entry;
 
-            AssertEntryStatusAndMeasureReport(updatedEntry, PatientSubmissionStatus.PendingEvaluation);
+            AssertEntryStatusAndMeasureReport(updatedEntry, MeasureReportStatus.PendingEvaluation);
 
             var updatedResource = updatedData.ReportData[schedule.ReportTypes[0]].Resources.First();
 
@@ -520,7 +520,7 @@ namespace IntegrationTests.Report
             var facilityId = Guid.NewGuid().ToString();
             var patientId = Guid.NewGuid().ToString();
 
-            var (schedule, _) = await SetupDatabaseAsync(facilityId, entryData: new List<(string patientId, string reportType, PatientSubmissionStatus status)> { (patientId, "TestReport", PatientSubmissionStatus.PendingEvaluation) });
+            var (schedule, _) = await SetupDatabaseAsync(facilityId, entryData: new List<(string patientId, string reportType, MeasureReportStatus status)> { (patientId, "TestReport", MeasureReportStatus.PendingEvaluation) });
 
             var scope = _scopeFactory.CreateScope();
             var listener = CreateListener(scope);

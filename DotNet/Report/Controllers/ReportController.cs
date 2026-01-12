@@ -173,8 +173,8 @@ namespace LantanaGroup.Link.Report.Controllers
             {
                 return Problem(detail: "No Report Schedule found for the provided FacilityId and ReportId", statusCode: (int)HttpStatusCode.NotFound);
             }
-            var submissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.FacilityId == facilityId && x.ReportScheduleId == reportScheduleId && x.Status != PatientSubmissionStatus.NotReportable);
-            var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ValidationComplete || s.Status == PatientSubmissionStatus.Submitted).Select(s => s.PatientId).Distinct().ToList();
+            var submissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.FacilityId == facilityId && x.ReportScheduleId == reportScheduleId && x.Status != MeasureReportStatus.NotReportable);
+            var patientIds = submissionEntries.Where(s => s.Status == MeasureReportStatus.ValidationComplete || s.Status == MeasureReportStatus.Submitted).Select(s => s.PatientId).Distinct().ToList();
             foreach (var patientId in patientIds)
             {
                 var model = await _patientReportSubmissionBundler.GenerateBundle(facilityId, patientId, reportScheduleId);
@@ -557,7 +557,7 @@ namespace LantanaGroup.Link.Report.Controllers
         {
             try
             {
-                var submissionStatuses = Enum.GetNames(typeof(PatientSubmissionStatus)).ToList();
+                var submissionStatuses = Enum.GetNames(typeof(MeasureReportStatus)).ToList();
 
                 return Ok(submissionStatuses);
 

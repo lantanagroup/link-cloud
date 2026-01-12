@@ -184,11 +184,11 @@ namespace LantanaGroup.Link.Report.Listeners
 
 
             var submissionEntries = await submissionEntryManager.FindAsync(
-                e => e.ReportScheduleId == schedule.Id && e.PatientId == value.PatientId && e.Status == PatientSubmissionStatus.ValidationRequested, cancellationToken);
+                e => e.ReportScheduleId == schedule.Id && e.PatientId == value.PatientId && e.Status == MeasureReportStatus.ValidationRequested, cancellationToken);
 
             if(!submissionEntries.Any() )
             {
-                throw new DeadLetterException($"No Patient Submission Entries were found for schedule ID {schedule.Id}, patient ID {value.PatientId}, in status {PatientSubmissionStatus.ValidationRequested}");
+                throw new DeadLetterException($"No Patient Submission Entries were found for schedule ID {schedule.Id}, patient ID {value.PatientId}, in status {MeasureReportStatus.ValidationRequested}");
             }
 
             var operationOutcome = GetOperationOutcome();
@@ -201,7 +201,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 }
 
                 entry.ValidationStatus = value.IsValid ? ValidationStatus.Passed : ValidationStatus.Failed;
-                entry.Status = PatientSubmissionStatus.ValidationComplete;
+                entry.Status = MeasureReportStatus.ValidationComplete;
                 await submissionEntryManager.UpdateAsync(new PatientSubmissionEntryUpdateModel
                 {
                     Id = entry.Id,

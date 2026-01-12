@@ -11,7 +11,7 @@ namespace LantanaGroup.Link.Report.Application.Models
         public required string Id { get; set; }
         public MeasureReport? MeasureReport { get; set; }
         public string? PayloadUri { get; set; }
-        public PatientSubmissionStatus Status { get; set; } = PatientSubmissionStatus.PendingEvaluation;
+        public MeasureReportStatus Status { get; set; } = MeasureReportStatus.PendingEvaluation;
         public ValidationStatus ValidationStatus { get; set; } = ValidationStatus.Pending;
     }
 }

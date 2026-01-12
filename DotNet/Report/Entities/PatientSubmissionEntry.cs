@@ -25,6 +25,6 @@ public class PatientSubmissionEntry
 
     public string? PayloadUri { get; set; }
 
-    public PatientSubmissionStatus Status { get; set; } = PatientSubmissionStatus.PendingEvaluation;
+    public MeasureReportStatus Status { get; set; } = MeasureReportStatus.PendingEvaluation;
     public ValidationStatus ValidationStatus { get; set; } = ValidationStatus.Pending;
 }

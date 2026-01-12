@@ -79,7 +79,7 @@ namespace LantanaGroup.Link.Report.Jobs
 
                 if (!manifestProduced)
                 {
-                    var patientsToEvaluate = await database.SubmissionEntryRepository.AnyAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.PendingEvaluation, CancellationToken.None);
+                    var patientsToEvaluate = await database.SubmissionEntryRepository.AnyAsync(x => x.ReportScheduleId == schedule.Id && x.Status == MeasureReportStatus.PendingEvaluation, CancellationToken.None);
 
                     if (patientsToEvaluate)
                     {
@@ -93,7 +93,7 @@ namespace LantanaGroup.Link.Report.Jobs
                         }
                     }
 
-                    var needsValidation = (await database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.ReadyForValidation && x.ValidationStatus != ValidationStatus.Requested)).ToList();
+                    var needsValidation = (await database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status == MeasureReportStatus.ReadyForValidation && x.ValidationStatus != ValidationStatus.Requested)).ToList();
 
                     if (needsValidation.Any())
                     {

@@ -233,7 +233,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
             foreach (var entry in entries)
             {
-                entry.Status = PatientSubmissionStatus.ValidationRequested;
+                entry.Status = MeasureReportStatus.ValidationRequested;
                 entry.ValidationStatus = ValidationStatus.Requested;
                 entry.ModifyDate = date;
                 _database.SubmissionEntryRepository.Update(entry);

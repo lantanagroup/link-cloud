@@ -99,8 +99,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     summary.InitialPopulationCount =
                         reportEntries.Count(
                             x => x.ReportScheduleId == summary.Id &&
-                                 x.Status != PatientSubmissionStatus.PendingEvaluation &&
-                                 x.Status != PatientSubmissionStatus.NotReportable
+                                 x.Status != MeasureReportStatus.PendingEvaluation &&
+                                 x.Status != MeasureReportStatus.NotReportable
                         );
 
                 // Get census information for each report
@@ -130,8 +130,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             summary.InitialPopulationCount =
                 measureReportEntries.Count(
                     x => x.ReportScheduleId == summary.Id &&
-                         x.Status != PatientSubmissionStatus.PendingEvaluation &&
-                         x.Status != PatientSubmissionStatus.NotReportable
+                         x.Status != MeasureReportStatus.PendingEvaluation &&
+                         x.Status != MeasureReportStatus.NotReportable
                 );
 
             // Get census information for each report
@@ -144,8 +144,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 MeasureIpCounts = measureReportEntries
                     .Where(x =>
                         x.ReportScheduleId == summary.Id &&
-                        x.Status != PatientSubmissionStatus.PendingEvaluation &&
-                        x.Status != PatientSubmissionStatus.NotReportable)
+                        x.Status != MeasureReportStatus.PendingEvaluation &&
+                        x.Status != MeasureReportStatus.NotReportable)
                     .GroupBy(x => x.ReportType)
                     .ToDictionary(x => MeasureNameShortener.ShortenMeasureName(x.Key), x => x.Count()),
                 ReportStatusCounts = measureReportEntries

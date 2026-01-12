@@ -246,11 +246,11 @@ public class SubmissionEntryQueries : ISubmissionEntryQueries
         string patientId,
         CancellationToken cancellationToken = default)
     {
-        List<PatientSubmissionStatus> statuses = await (from entry in _context.PatientSubmissionEntries
+        List<MeasureReportStatus> statuses = await (from entry in _context.PatientSubmissionEntries
                                                         where entry.ReportScheduleId == reportScheduleId && entry.FacilityId == facilityId && entry.PatientId == patientId
                                                         select entry.Status).ToListAsync(cancellationToken);
-        return statuses.All(s => s == PatientSubmissionStatus.ReadyForValidation || s == PatientSubmissionStatus.NotReportable) &&
-            statuses.Any(s => s == PatientSubmissionStatus.ReadyForValidation);
+        return statuses.All(s => s == MeasureReportStatus.ReadyForValidation || s == MeasureReportStatus.NotReportable) &&
+            statuses.Any(s => s == MeasureReportStatus.ReadyForValidation);
     }
 
     public async Task<PagedConfigModel<ResourceSummary>> GetResourceSummary(string facilityId, string reportScheduleId, ResourceType? resourceType, int pageSize, int pageNumber,

@@ -10,8 +10,7 @@ public class GetMeasureReportsQueryParameters
     public string? PatientId { get; set; }
     public string? MeasureReportId { get; set; }
     public string? Measure { get; set; }
-    public PatientSubmissionStatus? ReportStatus { get; set; }
-    public ValidationStatus? ValidationStatus { get; set; }
+    public MeasureReportStatus? ReportStatus { get; set; }
     public string? SortBy { get; set; }
     public SortOrder SortOrder { get; set; } = SortOrder.Descending;
     public int PageNumber { get; set; } = 1;
