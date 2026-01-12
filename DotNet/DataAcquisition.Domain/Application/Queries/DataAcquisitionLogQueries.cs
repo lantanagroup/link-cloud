@@ -1,3 +1,6 @@
+using System.Linq.Expressions;
+using System.Reflection;
+using System.Text.Json;
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
@@ -15,12 +18,10 @@ using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using MongoDB.Driver;
-using System.Linq.Expressions;
-using System.Reflection;
 using Expression = System.Linq.Expressions.Expression;
 using IDatabase = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
+using ResourceType = Hl7.Fhir.Model.ResourceType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
@@ -68,6 +69,8 @@ public interface IDataAcquisitionLogQueries
     Task<List<string>> GetFacilitiesWithPendingAndRetryableFailedRequests(CancellationToken cancellationToken = default);
 
     Task<List<DataAcquisitionLogModel>> GetNextEligibleBatchForFacility(string facilityId, long? lastId, int batchSize, CancellationToken cancellationToken = default);
+
+    Task<List<string>> GetResourceIdsForReportPatient(string correlationId, string facilityId, string resourceType, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
@@ -81,6 +84,43 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    public async Task<List<string>> GetResourceIdsForReportPatient(string correlationId, string facilityId, string resourceType, CancellationToken cancellationToken = default)
+    {
+        var parsedResourceType = (ResourceType)Enum.Parse(typeof(ResourceType), resourceType);
+        var logsWithResources = await (from log in _dbContext.DataAcquisitionLogs
+                                     join query in _dbContext.FhirQueries on log.Id equals query.DataAcquisitionLogId
+                                     join resourceTypeEntry in _dbContext.FhirQueryResourceTypes on query.Id equals resourceTypeEntry.FhirQueryId
+                                     where query.FacilityId == facilityId
+                                           && log.CorrelationId == correlationId
+                                           && resourceTypeEntry.ResourceType == parsedResourceType
+                                     select log.ResourceAcquiredIds).ToListAsync(cancellationToken);
+
+        var result = new List<string>();
+        var resourceTypePrefix = $"{resourceType}/";
+
+        foreach (var resourceReferences in logsWithResources)
+        {
+            try
+            {
+                if (resourceReferences != null)
+                {
+                    var filteredIds = resourceReferences
+                        .Where(r => r.StartsWith(resourceTypePrefix, StringComparison.OrdinalIgnoreCase))
+                        .Select(r => r.Substring(resourceTypePrefix.Length))
+                        .ToList();
+
+                    result.AddRange(filteredIds);
+                }
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogError(ex, "Failed to deserialize ResourceAcquiredIds JSON: {Json}", resourceReferences);
+            }
+        }
+
+        return result;
     }
 
     public async Task<DataAcquisitionLogModel?> GetAsync(long id, CancellationToken cancellationToken = default)
@@ -296,7 +336,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
         if (!string.IsNullOrEmpty(model.ResourceType))
         {
-            var resourceType = (Hl7.Fhir.Model.ResourceType)Enum.Parse(typeof(Hl7.Fhir.Model.ResourceType), model.ResourceType);    
+            var resourceType = (ResourceType)Enum.Parse(typeof(ResourceType), model.ResourceType);    
             query = (from l in query
                      join q in _dbContext.FhirQueries on l.Id equals q.DataAcquisitionLogId
                      where q.FhirQueryResourceTypes.Any(r => r.ResourceType == resourceType)
