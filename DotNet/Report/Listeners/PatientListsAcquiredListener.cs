@@ -24,7 +24,6 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ITransientExceptionHandler<string, PatientListMessage> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, PatientListMessage> _deadLetterExceptionHandler;
         private readonly IServiceScopeFactory _serviceScopeFactory;
-        private readonly IReportEntryManager _reportEntryStatusManager;
 
         private string Name => this.GetType().Name;
 
@@ -38,7 +37,6 @@ namespace LantanaGroup.Link.Report.Listeners
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _serviceScopeFactory = serviceScopeFactory;
-            _reportEntryStatusManager = reportEntryStatusManager;
 
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
@@ -85,7 +83,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 return;
                             }
 
-                            var submissionEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
+                            var reportEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportEntryManager>();
 
                             try
                             {
@@ -118,7 +116,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         {
                                             var patientId = pId.Split('/').Last();
 
-                                            var entry = await _reportEntryStatusManager.SingleOrDefaultAsync(e =>
+                                            var entry = await reportEntryManager.SingleOrDefaultAsync(e =>
                                                         e.ReportScheduleId == scheduledReport.Id
                                                         && e.PatientId == patientId, consumeCancellationToken);
 
@@ -132,7 +130,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                                     ReportingStatus = ReportingStatus.PatientIdentified,
                                                     ReportScheduleId = scheduledReport.Id
                                                 };
-                                                await _reportEntryStatusManager.AddAsync(entry, cancellationToken);
+                                                await reportEntryManager.AddAsync(entry, cancellationToken);
                                             }
 
                                             foreach (var reportType in scheduledReport.ReportTypes)
@@ -152,7 +150,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                                     measureReportEntry.Status = MeasureReportStatus.EntryCreated;
                                                 }
 
-                                                await _reportEntryStatusManager.UpdateAsync(entry, cancellationToken);
+                                                await reportEntryManager.UpdateAsync(entry);
                                             }
                                         }
                                     }

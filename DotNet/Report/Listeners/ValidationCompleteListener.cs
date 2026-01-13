@@ -36,8 +36,6 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly BlobStorageService _blobStorageService;
         private readonly PatientAggregator _patientAggregator;
         private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
-        private readonly IReportEntryManager _reportEntryManager;
-        private readonly IReportScheduledManager _reportScheduledManager;
 
         private string Name => this.GetType().Name;
 
@@ -51,9 +49,7 @@ namespace LantanaGroup.Link.Report.Listeners
             BlobStorageService blobStorageService,
             PatientAggregator patientAggregator,
             ReportManifestProducer reportManifestProducer,
-            AuditableEventOccurredProducer auditableEventOccurredProducer,
-            IReportEntryManager reportEntryManager,
-            IReportScheduledManager reportScheduledManager)
+            AuditableEventOccurredProducer auditableEventOccurredProducer)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -64,8 +60,6 @@ namespace LantanaGroup.Link.Report.Listeners
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
             _reportManifestProducer = reportManifestProducer;
-            _reportEntryManager = reportEntryManager;
-            _reportScheduledManager = reportScheduledManager;
 
             _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _transientExceptionHandler.Topic = nameof(KafkaTopic.ValidationComplete) + "-Retry";
@@ -168,11 +162,15 @@ namespace LantanaGroup.Link.Report.Listeners
 
         public async Task ProcessMessageAsync(ConsumeResult<string, ValidationCompleteValue> result, CancellationToken cancellationToken)
         {
+            using var scope = _serviceScopeFactory.CreateScope();
+            var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+            var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+
             var facilityId = result.Message.Key;
             var value = result.Message.Value;
             var reportId = value.ReportTrackingId;
 
-            var schedule = await _reportScheduledManager.SingleOrDefaultAsync(s => s.Id == reportId, cancellationToken);
+            var schedule = await reportScheduledManager.SingleOrDefaultAsync(s => s.Id == reportId, cancellationToken);
 
             if (schedule == null)
             {
@@ -185,7 +183,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
 
             var correlationIdStr = Encoding.UTF8.GetString(headerValue);
-            var reportEntry = await _reportEntryManager.GetEntry(schedule.Id, value.PatientId, cancellationToken);
+            var reportEntry = await reportEntryManager.GetEntry(schedule.Id, value.PatientId, cancellationToken);
 
             if (reportEntry == null)
             {
@@ -224,7 +222,7 @@ namespace LantanaGroup.Link.Report.Listeners
             {
                 reportEntry.ReportingStatus = value.IsValid ? ReportingStatus.PassedValidation : ReportingStatus.FailedValidation;
                 reportEntry.SubmissionStatus = SubmissionStatus.Submitting;
-                await _reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
+                await reportEntryManager.UpdateAsync(reportEntry);
 
                 await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, correlationIdStr, reportEntry.AggregateReportUri);
             }

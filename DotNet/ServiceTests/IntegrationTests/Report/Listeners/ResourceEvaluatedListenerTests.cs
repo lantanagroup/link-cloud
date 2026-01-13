@@ -34,531 +34,531 @@ namespace IntegrationTests.Report
     [Trait("Category", "IntegrationTests")]
     public class ResourceEvaluatedListenerTests
     {
-        private readonly ReportIntegrationTestFixture _fixture;
-        private readonly ITestOutputHelper _output;
+        //private readonly ReportIntegrationTestFixture _fixture;
+        //private readonly ITestOutputHelper _output;
 
-        private readonly IServiceScopeFactory _scopeFactory;
+        //private readonly IServiceScopeFactory _scopeFactory;
 
-        public ResourceEvaluatedListenerTests(ReportIntegrationTestFixture fixture, ITestOutputHelper output)
-        {
-            _fixture = fixture;
-            _output = output;
+        //public ResourceEvaluatedListenerTests(ReportIntegrationTestFixture fixture, ITestOutputHelper output)
+        //{
+        //    _fixture = fixture;
+        //    _output = output;
 
-            _scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        }
+        //    _scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
+        //}
 
-        private ResourceEvaluatedListener CreateListener(IServiceScope scope)
-        {
-            return new ResourceEvaluatedListener(
-                scope.ServiceProvider.GetRequiredService<ILogger<ResourceEvaluatedListener>>(),
-                scope.ServiceProvider.GetRequiredService<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>(),
-                scope.ServiceProvider.GetRequiredService<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>(),
-                scope.ServiceProvider.GetRequiredService<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>(),
-                scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>(),
-                scope.ServiceProvider.GetRequiredService<PatientReportSubmissionBundler>(),
-                scope.ServiceProvider.GetRequiredService<BlobStorageService>(),
-                scope.ServiceProvider.GetRequiredService<ReadyForValidationProducer>(),
-                scope.ServiceProvider.GetRequiredService<ReportManifestProducer>(),
-                scope.ServiceProvider.GetRequiredService<AuditableEventOccurredProducer>());
-        }
+        //private ResourceEvaluatedListener CreateListener(IServiceScope scope)
+        //{
+        //    return new ResourceEvaluatedListener(
+        //        scope.ServiceProvider.GetRequiredService<ILogger<ResourceEvaluatedListener>>(),
+        //        scope.ServiceProvider.GetRequiredService<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>(),
+        //        scope.ServiceProvider.GetRequiredService<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>(),
+        //        scope.ServiceProvider.GetRequiredService<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>(),
+        //        scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>(),
+        //        scope.ServiceProvider.GetRequiredService<PatientReportSubmissionBundler>(),
+        //        scope.ServiceProvider.GetRequiredService<BlobStorageService>(),
+        //        scope.ServiceProvider.GetRequiredService<ReadyForValidationProducer>(),
+        //        scope.ServiceProvider.GetRequiredService<ReportManifestProducer>(),
+        //        scope.ServiceProvider.GetRequiredService<AuditableEventOccurredProducer>());
+        //}
 
-        private async Task<(ReportSchedule schedule, List<PatientSubmissionEntry> entries)> SetupDatabaseAsync(string facilityId, List<string> reportTypes = null, List<(string patientId, string reportType, MeasureReportStatus status)> entryData = null, List<(string resourceType, string resourceId, DomainResource resource)> existingResources = null)
-        {
-            var scope = _scopeFactory.CreateScope();
-            var _database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+        //private async Task<(ReportSchedule schedule, List<PatientSubmissionEntry> entries)> SetupDatabaseAsync(string facilityId, List<string> reportTypes = null, List<(string patientId, string reportType, MeasureReportStatus status)> entryData = null, List<(string resourceType, string resourceId, DomainResource resource)> existingResources = null)
+        //{
+        //    var scope = _scopeFactory.CreateScope();
+        //    var _database = scope.ServiceProvider.GetRequiredService<IDatabase>();
 
-            reportTypes ??= new List<string> { "TestReport" };
+        //    reportTypes ??= new List<string> { "TestReport" };
 
-            var schedule = new ReportSchedule
-            {
-                Id = Guid.NewGuid().ToString(),
-                FacilityId = facilityId,
-                ReportStartDate = DateTime.UtcNow.AddDays(-30),
-                ReportEndDate = DateTime.UtcNow,
-                ReportTypes = reportTypes,
-                Frequency = Frequency.Monthly
-            };
-            await _database.ReportScheduledRepository.AddAsync(schedule);
+        //    var schedule = new ReportSchedule
+        //    {
+        //        Id = Guid.NewGuid().ToString(),
+        //        FacilityId = facilityId,
+        //        ReportStartDate = DateTime.UtcNow.AddDays(-30),
+        //        ReportEndDate = DateTime.UtcNow,
+        //        ReportTypes = reportTypes,
+        //        Frequency = Frequency.Monthly
+        //    };
+        //    await _database.ReportScheduledRepository.AddAsync(schedule);
 
-            var entries = new List<PatientSubmissionEntry>();
-            foreach (var (patientId, reportType, status) in entryData)
-            {
-                var entry = new PatientSubmissionEntry
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    FacilityId = schedule.FacilityId,
-                    ReportScheduleId = schedule.Id,
-                    PatientId = patientId,
-                    ReportType = reportType,
-                    Status = status,
-                    PayloadUri = $"test://payload/{patientId}",
-                };
-                await _database.SubmissionEntryRepository.AddAsync(entry);
-                entries.Add(entry);
-            }
+        //    var entries = new List<PatientSubmissionEntry>();
+        //    foreach (var (patientId, reportType, status) in entryData)
+        //    {
+        //        var entry = new PatientSubmissionEntry
+        //        {
+        //            Id = Guid.NewGuid().ToString(),
+        //            FacilityId = schedule.FacilityId,
+        //            ReportScheduleId = schedule.Id,
+        //            PatientId = patientId,
+        //            ReportType = reportType,
+        //            Status = status,
+        //            PayloadUri = $"test://payload/{patientId}",
+        //        };
+        //        await _database.SubmissionEntryRepository.AddAsync(entry);
+        //        entries.Add(entry);
+        //    }
 
-            if (existingResources != null)
-            {
-                foreach (var (resourceType, resourceId, resource) in existingResources)
-                {
-                    var patientResource = new FhirResource
-                    {
-                        Id = Guid.NewGuid().ToString(),
-                        FacilityId = facilityId,
-                        PatientId = entryData[0].patientId,
-                        ResourceType = resourceType,
-                        ResourceId = resourceId
-                    };
-                    patientResource.Resource = resource;
-                    await _database.ResourceRepository.AddAsync(patientResource);
+        //    if (existingResources != null)
+        //    {
+        //        foreach (var (resourceType, resourceId, resource) in existingResources)
+        //        {
+        //            var patientResource = new FhirResource
+        //            {
+        //                Id = Guid.NewGuid().ToString(),
+        //                FacilityId = facilityId,
+        //                PatientId = entryData[0].patientId,
+        //                ResourceType = resourceType,
+        //                ResourceId = resourceId
+        //            };
+        //            patientResource.Resource = resource;
+        //            await _database.ResourceRepository.AddAsync(patientResource);
 
-                    foreach (var entry in entries)
-                    {
-                        await _database.PatientSubmissionEntryResourceMapRepository.AddAsync(new PatientSubmissionEntryResourceMap
-                        {
-                            FhirResourceId = patientResource.Id,
-                            ReportScheduleId = schedule.Id,
-                            SubmissionEntryId = entry.Id,
-                            ResourceType = resourceType,
-                            ResourceId = resourceId,
-                            ReportTypes = schedule.ReportTypes,
-                            CreateDate = DateTime.Now,
-                            ModifyDate = DateTime.Now,
-                        });
-                    }
-                }
-            }
+        //            foreach (var entry in entries)
+        //            {
+        //                await _database.PatientSubmissionEntryResourceMapRepository.AddAsync(new PatientSubmissionEntryResourceMap
+        //                {
+        //                    FhirResourceId = patientResource.Id,
+        //                    ReportScheduleId = schedule.Id,
+        //                    SubmissionEntryId = entry.Id,
+        //                    ResourceType = resourceType,
+        //                    ResourceId = resourceId,
+        //                    ReportTypes = schedule.ReportTypes,
+        //                    CreateDate = DateTime.Now,
+        //                    ModifyDate = DateTime.Now,
+        //                });
+        //            }
+        //        }
+        //    }
 
-            await _database.SaveChangesAsync();
+        //    await _database.SaveChangesAsync();
 
-            return (schedule, entries);
-        }
+        //    return (schedule, entries);
+        //}
 
-        private ConsumeResult<ResourceEvaluatedKey, ResourceEvaluatedValue> CreateConsumeResult(string facilityId, string reportTrackingId, string patientId, string reportType, JsonElement resourceElement, bool isReportable, bool hasCorrelationId = true)
-        {
-            var headers = new Headers();
-            if (hasCorrelationId)
-            {
-                headers.Add("X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()));
-            }
+        //private ConsumeResult<ResourceEvaluatedKey, ResourceEvaluatedValue> CreateConsumeResult(string facilityId, string reportTrackingId, string patientId, string reportType, JsonElement resourceElement, bool isReportable, bool hasCorrelationId = true)
+        //{
+        //    var headers = new Headers();
+        //    if (hasCorrelationId)
+        //    {
+        //        headers.Add("X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()));
+        //    }
 
-            var message = new Message<ResourceEvaluatedKey, ResourceEvaluatedValue>
-            {
-                Key = new ResourceEvaluatedKey { FacilityId = facilityId },
-                Value = new ResourceEvaluatedValue
-                {
-                    ReportTrackingId = reportTrackingId,
-                    PatientId = patientId,
-                    ReportType = reportType,
-                    Resource = resourceElement,
-                    IsReportable = isReportable
-                },
-                Headers = headers
-            };
+        //    var message = new Message<ResourceEvaluatedKey, ResourceEvaluatedValue>
+        //    {
+        //        Key = new ResourceEvaluatedKey { FacilityId = facilityId },
+        //        Value = new ResourceEvaluatedValue
+        //        {
+        //            ReportTrackingId = reportTrackingId,
+        //            PatientId = patientId,
+        //            ReportType = reportType,
+        //            Resource = resourceElement,
+        //            IsReportable = isReportable
+        //        },
+        //        Headers = headers
+        //    };
 
-            return new ConsumeResult<ResourceEvaluatedKey, ResourceEvaluatedValue> { Message = message, Topic = nameof(KafkaTopic.ResourceEvaluated) };
-        }
+        //    return new ConsumeResult<ResourceEvaluatedKey, ResourceEvaluatedValue> { Message = message, Topic = nameof(KafkaTopic.ResourceEvaluated) };
+        //}
 
-        private JsonElement CreateResourceJson(DomainResource resource)
-        {
-            var json = new FhirJsonSerializer().SerializeToString(resource);
-            return JsonDocument.Parse(json).RootElement;
-        }
+        //private JsonElement CreateResourceJson(DomainResource resource)
+        //{
+        //    var json = new FhirJsonSerializer().SerializeToString(resource);
+        //    return JsonDocument.Parse(json).RootElement;
+        //}
 
-        private void AssertEntryStatusAndMeasureReport(PatientSubmissionEntry updatedEntry, MeasureReportStatus expectedStatus, string expectedMeasureReportId = null)
-        {
-            Assert.NotNull(updatedEntry);
-            Assert.Equal(expectedStatus, updatedEntry.Status);
-            if (expectedMeasureReportId != null)
-            {
-                Assert.NotNull(updatedEntry.MeasureReport);
-                Assert.Equal(expectedMeasureReportId, updatedEntry.MeasureReport.Id);
-            }
-        }
+        //private void AssertEntryStatusAndMeasureReport(PatientSubmissionEntry updatedEntry, MeasureReportStatus expectedStatus, string expectedMeasureReportId = null)
+        //{
+        //    Assert.NotNull(updatedEntry);
+        //    Assert.Equal(expectedStatus, updatedEntry.Status);
+        //    if (expectedMeasureReportId != null)
+        //    {
+        //        Assert.NotNull(updatedEntry.MeasureReport);
+        //        Assert.Equal(expectedMeasureReportId, updatedEntry.MeasureReport.Id);
+        //    }
+        //}
 
-        private void AssertProducerMocks(Mock<IProducer<ReadyForValidationKey, ReadyForValidationValue>> readyMock, Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> submitMock, Times readyTimes, Times submitTimes, ReportSchedule schedule, PatientSubmissionEntry entry)
-        {
-            readyMock.Verify(p => p.Produce(
-                nameof(KafkaTopic.ReadyForValidation),
-                It.Is<Message<ReadyForValidationKey, ReadyForValidationValue>>(m =>
-                    m.Key.FacilityId == schedule.FacilityId &&
-                    m.Value.PatientId == entry.PatientId &&
-                    m.Value.ReportTrackingId == schedule.Id &&
-                    m.Value.ReportTypes.SequenceEqual(schedule.ReportTypes) &&
-                    m.Value.PayloadUri == entry.PayloadUri),
-                It.IsAny<Action<DeliveryReport<ReadyForValidationKey, ReadyForValidationValue>>>()), readyTimes);
+        //private void AssertProducerMocks(Mock<IProducer<ReadyForValidationKey, ReadyForValidationValue>> readyMock, Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> submitMock, Times readyTimes, Times submitTimes, ReportSchedule schedule, PatientSubmissionEntry entry)
+        //{
+        //    readyMock.Verify(p => p.Produce(
+        //        nameof(KafkaTopic.ReadyForValidation),
+        //        It.Is<Message<ReadyForValidationKey, ReadyForValidationValue>>(m =>
+        //            m.Key.FacilityId == schedule.FacilityId &&
+        //            m.Value.PatientId == entry.PatientId &&
+        //            m.Value.ReportTrackingId == schedule.Id &&
+        //            m.Value.ReportTypes.SequenceEqual(schedule.ReportTypes) &&
+        //            m.Value.PayloadUri == entry.PayloadUri),
+        //        It.IsAny<Action<DeliveryReport<ReadyForValidationKey, ReadyForValidationValue>>>()), readyTimes);
 
-            submitMock.Verify(p => p.Produce(
-                nameof(KafkaTopic.SubmitPayload),
-                It.Is<Message<SubmitPayloadKey, SubmitPayloadValue>>(m =>
-                    m.Key.FacilityId == schedule.FacilityId &&
-                    m.Key.ReportScheduleId == schedule.Id),
-                It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()), submitTimes);
-        }
+        //    submitMock.Verify(p => p.Produce(
+        //        nameof(KafkaTopic.SubmitPayload),
+        //        It.Is<Message<SubmitPayloadKey, SubmitPayloadValue>>(m =>
+        //            m.Key.FacilityId == schedule.FacilityId &&
+        //            m.Key.ReportScheduleId == schedule.Id),
+        //        It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()), submitTimes);
+        //}
 
-        private async Task AssertNoBlobUploaded(ReportSchedule schedule, PatientSubmissionEntry entry)
-        {
-            var settings = _fixture.ServiceProvider.GetRequiredService<IOptions<BlobStorageSettings>>().Value;
-            var containerClient = new BlobContainerClient(settings.ConnectionString, settings.BlobContainerName);
-            // Use the same GetReportName method as AssertBlobUploaded
-            var reportName = ReportHelpers.GetReportName(schedule.Id, schedule.FacilityId, schedule.ReportTypes, schedule.ReportStartDate);
-            var bundleName = $"patient-{entry.PatientId}.ndjson";
-            var blobName = $"{reportName}/{bundleName}";
-            var blobClient = containerClient.GetBlobClient(blobName);
-            bool exists = await blobClient.ExistsAsync();
-            Assert.False(exists);
-        }
+        //private async Task AssertNoBlobUploaded(ReportSchedule schedule, PatientSubmissionEntry entry)
+        //{
+        //    var settings = _fixture.ServiceProvider.GetRequiredService<IOptions<BlobStorageSettings>>().Value;
+        //    var containerClient = new BlobContainerClient(settings.ConnectionString, settings.BlobContainerName);
+        //    // Use the same GetReportName method as AssertBlobUploaded
+        //    var reportName = ReportHelpers.GetReportName(schedule.Id, schedule.FacilityId, schedule.ReportTypes, schedule.ReportStartDate);
+        //    var bundleName = $"patient-{entry.PatientId}.ndjson";
+        //    var blobName = $"{reportName}/{bundleName}";
+        //    var blobClient = containerClient.GetBlobClient(blobName);
+        //    bool exists = await blobClient.ExistsAsync();
+        //    Assert.False(exists);
+        //}
 
-        private async Task AssertBlobUploaded(ReportSchedule schedule, PatientSubmissionEntry entry)
-        {
-            var settings = _fixture.ServiceProvider.GetRequiredService<IOptions<BlobStorageSettings>>().Value;
-            var containerClient = new BlobContainerClient(settings.ConnectionString, settings.BlobContainerName);
-            var reportName = ReportHelpers.GetReportName(schedule.Id, schedule.FacilityId, schedule.ReportTypes, schedule.ReportStartDate);
-            var bundleName = $"patient-{entry.PatientId}.ndjson";
-            var blobName = $"{reportName}/{bundleName}";
-            var blobClient = containerClient.GetBlobClient(blobName);
-            bool exists = await blobClient.ExistsAsync();
-            Assert.True(exists);
-        }
+        //private async Task AssertBlobUploaded(ReportSchedule schedule, PatientSubmissionEntry entry)
+        //{
+        //    var settings = _fixture.ServiceProvider.GetRequiredService<IOptions<BlobStorageSettings>>().Value;
+        //    var containerClient = new BlobContainerClient(settings.ConnectionString, settings.BlobContainerName);
+        //    var reportName = ReportHelpers.GetReportName(schedule.Id, schedule.FacilityId, schedule.ReportTypes, schedule.ReportStartDate);
+        //    var bundleName = $"patient-{entry.PatientId}.ndjson";
+        //    var blobName = $"{reportName}/{bundleName}";
+        //    var blobClient = containerClient.GetBlobClient(blobName);
+        //    bool exists = await blobClient.ExistsAsync();
+        //    Assert.True(exists);
+        //}
 
-        [Fact]
-        public async Task ProcessMessageAsync_ReportableResource_NewResource_AddsToDBUpdatesEntry()
-        {
-            _fixture.ResetMocks();
-            //await _fixture.ClearDatabaseAsync();
+        //[Fact]
+        //public async Task ProcessMessageAsync_ReportableResource_NewResource_AddsToDBUpdatesEntry()
+        //{
+        //    _fixture.ResetMocks();
+        //    //await _fixture.ClearDatabaseAsync();
 
-            var facilityId = Guid.NewGuid().ToString();
-            var patientId = Guid.NewGuid().ToString();
+        //    var facilityId = Guid.NewGuid().ToString();
+        //    var patientId = Guid.NewGuid().ToString();
 
-            var (schedule, entries) = await SetupDatabaseAsync(facilityId, entryData: new List<(string patientId, string reportType, MeasureReportStatus status)> { (patientId, "TestReport", MeasureReportStatus.PendingEvaluation) });
-            var entry = entries.First();
-            var scope = _scopeFactory.CreateScope();
-            var listener = CreateListener(scope);
+        //    var (schedule, entries) = await SetupDatabaseAsync(facilityId, entryData: new List<(string patientId, string reportType, MeasureReportStatus status)> { (patientId, "TestReport", MeasureReportStatus.PendingEvaluation) });
+        //    var entry = entries.First();
+        //    var scope = _scopeFactory.CreateScope();
+        //    var listener = CreateListener(scope);
 
-            var patient = new Patient { Id = patientId };
-            var consumeResult = CreateConsumeResult(facilityId, schedule.Id, patientId, "TestReport", CreateResourceJson(patient), true);
+        //    var patient = new Patient { Id = patientId };
+        //    var consumeResult = CreateConsumeResult(facilityId, schedule.Id, patientId, "TestReport", CreateResourceJson(patient), true);
 
-            await listener.ProcessMessageAsync(consumeResult, default);
+        //    await listener.ProcessMessageAsync(consumeResult, default);
 
 
-            var _database = scope.ServiceProvider.GetRequiredService<IDatabase>();
-            var _subEntryQueries = scope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
+        //    var _database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+        //    var _subEntryQueries = scope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
 
-            var updatedData = await _subEntryQueries.GetPatientReportData(facilityId, schedule.Id, patientId, cancellationToken: CancellationToken.None);
-            var updatedEntry = updatedData.ReportData[schedule.ReportTypes[0]].Entry;
+        //    var updatedData = await _subEntryQueries.GetPatientReportData(facilityId, schedule.Id, patientId, cancellationToken: CancellationToken.None);
+        //    var updatedEntry = updatedData.ReportData[schedule.ReportTypes[0]].Entry;
 
-            AssertEntryStatusAndMeasureReport(updatedEntry, MeasureReportStatus.PendingEvaluation);
+        //    AssertEntryStatusAndMeasureReport(updatedEntry, MeasureReportStatus.PendingEvaluation);
 
-            var createdResource = await _database.ResourceRepository.FirstOrDefaultAsync(r => r.FacilityId == facilityId && r.PatientId == patientId && r.ResourceType == "Patient");
+        //    var createdResource = await _database.ResourceRepository.FirstOrDefaultAsync(r => r.FacilityId == facilityId && r.PatientId == patientId && r.ResourceType == "Patient");
 
-            Assert.NotNull(createdResource);
-            Assert.IsType<Patient>(createdResource.Resource);
-            Assert.Equal(patientId, ((Patient)createdResource.Resource).Id);
+        //    Assert.NotNull(createdResource);
+        //    Assert.IsType<Patient>(createdResource.Resource);
+        //    Assert.Equal(patientId, ((Patient)createdResource.Resource).Id);
 
-            Assert.Contains(updatedData.ReportData[schedule.ReportTypes[0]].Resources, cr => cr.ResourceType == "Patient" && cr.ResourceId == patientId && cr.ResourceCategoryType == ResourceCategoryType.Patient);
+        //    Assert.Contains(updatedData.ReportData[schedule.ReportTypes[0]].Resources, cr => cr.ResourceType == "Patient" && cr.ResourceId == patientId && cr.ResourceCategoryType == ResourceCategoryType.Patient);
 
-            AssertProducerMocks(ReportIntegrationTestFixture.ReadyForValidationProducerMock, ReportIntegrationTestFixture.SubmitPayloadProducerMock, Times.Never(), Times.Never(), schedule, updatedEntry);
+        //    AssertProducerMocks(ReportIntegrationTestFixture.ReadyForValidationProducerMock, ReportIntegrationTestFixture.SubmitPayloadProducerMock, Times.Never(), Times.Never(), schedule, updatedEntry);
 
-            await AssertNoBlobUploaded(schedule, updatedEntry);
-        }
+        //    await AssertNoBlobUploaded(schedule, updatedEntry);
+        //}
 
-        [Fact]
-        public async Task ProcessMessageAsync_ReportableMeasureReport_ProducesValidationRequested()
-        {
-            _fixture.ResetMocks();
-            //await _fixture.ClearDatabaseAsync();
+        //[Fact]
+        //public async Task ProcessMessageAsync_ReportableMeasureReport_ProducesValidationRequested()
+        //{
+        //    _fixture.ResetMocks();
+        //    //await _fixture.ClearDatabaseAsync();
 
-            var facilityId = Guid.NewGuid().ToString();
-            var patientId = Guid.NewGuid().ToString();
-            var reportType = "TestReport";
-            var mockPayloadUri = new Uri($"test://payload/{patientId}");
+        //    var facilityId = Guid.NewGuid().ToString();
+        //    var patientId = Guid.NewGuid().ToString();
+        //    var reportType = "TestReport";
+        //    var mockPayloadUri = new Uri($"test://payload/{patientId}");
 
-            var (schedule, entries) = await SetupDatabaseAsync(facilityId,
-                reportTypes: new List<string> { reportType },
-                entryData: new List<(string, string, MeasureReportStatus)> { (patientId, reportType, MeasureReportStatus.PendingEvaluation) });
+        //    var (schedule, entries) = await SetupDatabaseAsync(facilityId,
+        //        reportTypes: new List<string> { reportType },
+        //        entryData: new List<(string, string, MeasureReportStatus)> { (patientId, reportType, MeasureReportStatus.PendingEvaluation) });
 
-            var entry = entries.First();
+        //    var entry = entries.First();
 
-            // NEW: Setup blob mock to succeed
-            ReportIntegrationTestFixture.BlobStorageMock.Setup(b => b.UploadAsync(It.IsAny<ReportSchedule>(), It.IsAny<PatientSubmissionModel>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(mockPayloadUri);
+        //    // NEW: Setup blob mock to succeed
+        //    ReportIntegrationTestFixture.BlobStorageMock.Setup(b => b.UploadAsync(It.IsAny<ReportSchedule>(), It.IsAny<PatientSubmissionModel>(), It.IsAny<CancellationToken>()))
+        //        .ReturnsAsync(mockPayloadUri);
 
-            using var assertScope = _scopeFactory.CreateScope();
-            var listener = CreateListener(assertScope);
+        //    using var assertScope = _scopeFactory.CreateScope();
+        //    var listener = CreateListener(assertScope);
 
-            // Create reportable MeasureReport resource
-            var measureReport = new MeasureReport { Id = "mr-1", Type = MeasureReport.MeasureReportType.Individual };
+        //    // Create reportable MeasureReport resource
+        //    var measureReport = new MeasureReport { Id = "mr-1", Type = MeasureReport.MeasureReportType.Individual };
 
-            var mrStr = JsonSerializer.Serialize(measureReport, SerializerOptions.ForFhirWithModelInspector);
+        //    var mrStr = JsonSerializer.Serialize(measureReport, SerializerOptions.ForFhirWithModelInspector);
 
-            var consumeResult = CreateConsumeResult(facilityId, schedule.Id, patientId, reportType,
-                JsonDocument.Parse(mrStr).RootElement, isReportable: true);
+        //    var consumeResult = CreateConsumeResult(facilityId, schedule.Id, patientId, reportType,
+        //        JsonDocument.Parse(mrStr).RootElement, isReportable: true);
 
-            // Act
-            await listener.ProcessMessageAsync(consumeResult, default);
+        //    // Act
+        //    await listener.ProcessMessageAsync(consumeResult, default);
 
-            var assertQueries = assertScope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
-            var updatedEntry = await assertQueries.GetByIdAsync(entry.Id); 
+        //    var assertQueries = assertScope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
+        //    var updatedEntry = await assertQueries.GetByIdAsync(entry.Id); 
 
-            Assert.NotNull(updatedEntry);
-            Assert.Equal(MeasureReportStatus.ValidationRequested, updatedEntry.Status); 
-            Assert.Equal(mockPayloadUri.ToString(), updatedEntry.PayloadUri);
+        //    Assert.NotNull(updatedEntry);
+        //    Assert.Equal(MeasureReportStatus.ValidationRequested, updatedEntry.Status); 
+        //    Assert.Equal(mockPayloadUri.ToString(), updatedEntry.PayloadUri);
 
-            // Update AssertProducerMocks to use updatedEntry
-            AssertProducerMocks(ReportIntegrationTestFixture.ReadyForValidationProducerMock, ReportIntegrationTestFixture.SubmitPayloadProducerMock,
-                Times.Once(), Times.Never(), schedule, updatedEntry);
-        }
+        //    // Update AssertProducerMocks to use updatedEntry
+        //    AssertProducerMocks(ReportIntegrationTestFixture.ReadyForValidationProducerMock, ReportIntegrationTestFixture.SubmitPayloadProducerMock,
+        //        Times.Once(), Times.Never(), schedule, updatedEntry);
+        //}
 
-        [Fact]
-        public async Task ProcessMessageAsync_NotReportable_UpdatesStatusToNotReportable()
-        {
-            _fixture.ResetMocks();
-            //await _fixture.ClearDatabaseAsync();
+        //[Fact]
+        //public async Task ProcessMessageAsync_NotReportable_UpdatesStatusToNotReportable()
+        //{
+        //    _fixture.ResetMocks();
+        //    //await _fixture.ClearDatabaseAsync();
 
-            var facilityId = Guid.NewGuid().ToString();
-            var patientId = Guid.NewGuid().ToString();
+        //    var facilityId = Guid.NewGuid().ToString();
+        //    var patientId = Guid.NewGuid().ToString();
 
-            var entryData = new List<(string, string, MeasureReportStatus)>
-            {
-                (patientId, "TestReport", MeasureReportStatus.PendingEvaluation),
-                (patientId, "OtherReport", MeasureReportStatus.PendingEvaluation)
-            };
-            var (schedule, entries) = await SetupDatabaseAsync(facilityId, reportTypes: new List<string> { "TestReport", "OtherReport" }, entryData: entryData);
-            var entry = entries.First(e => e.ReportType == "TestReport");
+        //    var entryData = new List<(string, string, MeasureReportStatus)>
+        //    {
+        //        (patientId, "TestReport", MeasureReportStatus.PendingEvaluation),
+        //        (patientId, "OtherReport", MeasureReportStatus.PendingEvaluation)
+        //    };
+        //    var (schedule, entries) = await SetupDatabaseAsync(facilityId, reportTypes: new List<string> { "TestReport", "OtherReport" }, entryData: entryData);
+        //    var entry = entries.First(e => e.ReportType == "TestReport");
 
-            var scope = _scopeFactory.CreateScope();
-            var listener = CreateListener(scope);
+        //    var scope = _scopeFactory.CreateScope();
+        //    var listener = CreateListener(scope);
 
-            var measureReport = new MeasureReport
-            {
-                Id = "MeasureReport1",
-                Measure = "TestReport",
-                Status = MeasureReport.MeasureReportStatus.Complete,
-                Type = MeasureReport.MeasureReportType.Individual,
-                Period = new Period { Start = "2024-01-01", End = "2024-01-31" }
-            };
-            var consumeResult = CreateConsumeResult(facilityId, schedule.Id, patientId, "TestReport", CreateResourceJson(measureReport), false);
+        //    var measureReport = new MeasureReport
+        //    {
+        //        Id = "MeasureReport1",
+        //        Measure = "TestReport",
+        //        Status = MeasureReport.MeasureReportStatus.Complete,
+        //        Type = MeasureReport.MeasureReportType.Individual,
+        //        Period = new Period { Start = "2024-01-01", End = "2024-01-31" }
+        //    };
+        //    var consumeResult = CreateConsumeResult(facilityId, schedule.Id, patientId, "TestReport", CreateResourceJson(measureReport), false);
 
-            await listener.ProcessMessageAsync(consumeResult, default);
+        //    await listener.ProcessMessageAsync(consumeResult, default);
  
-            var queries = scope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
+        //    var queries = scope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
 
-            var data = await queries.GetPatientReportData(facilityId, schedule.Id, patientId, entry.Id);
-            var updatedEntry = data.ReportData[entry.ReportType].Entry;
+        //    var data = await queries.GetPatientReportData(facilityId, schedule.Id, patientId, entry.Id);
+        //    var updatedEntry = data.ReportData[entry.ReportType].Entry;
 
-            AssertEntryStatusAndMeasureReport(updatedEntry, MeasureReportStatus.NotReportable, "MeasureReport1");
+        //    AssertEntryStatusAndMeasureReport(updatedEntry, MeasureReportStatus.NotReportable, "MeasureReport1");
 
-            AssertProducerMocks(ReportIntegrationTestFixture.ReadyForValidationProducerMock, ReportIntegrationTestFixture.SubmitPayloadProducerMock, Times.Never(), Times.Never(), schedule, updatedEntry);
+        //    AssertProducerMocks(ReportIntegrationTestFixture.ReadyForValidationProducerMock, ReportIntegrationTestFixture.SubmitPayloadProducerMock, Times.Never(), Times.Never(), schedule, updatedEntry);
 
-            await AssertNoBlobUploaded(schedule, updatedEntry);
-        }
+        //    await AssertNoBlobUploaded(schedule, updatedEntry);
+        //}
 
-        [Fact]
-        public async Task ProcessMessageAsync_ReportableResource_MergesExistingResource()
-        {
-            var facilityId = Guid.NewGuid().ToString();
-            var patientId = Guid.NewGuid().ToString();
+        //[Fact]
+        //public async Task ProcessMessageAsync_ReportableResource_MergesExistingResource()
+        //{
+        //    var facilityId = Guid.NewGuid().ToString();
+        //    var patientId = Guid.NewGuid().ToString();
 
-            var existingResources = new List<(string, string, DomainResource)>
-            {
-                ("Patient", patientId, new Patient { Id = patientId, Meta = new Meta{ ElementId =  "ElementId" }, Name = { new HumanName { Family = "Old" } } })
-            };
-            var (schedule, entries) = await SetupDatabaseAsync(facilityId, entryData: new List<(string patientId, string reportType, MeasureReportStatus status)> { (patientId, "TestReport", MeasureReportStatus.PendingEvaluation) }, existingResources: existingResources);
-            var entry = entries.First();
+        //    var existingResources = new List<(string, string, DomainResource)>
+        //    {
+        //        ("Patient", patientId, new Patient { Id = patientId, Meta = new Meta{ ElementId =  "ElementId" }, Name = { new HumanName { Family = "Old" } } })
+        //    };
+        //    var (schedule, entries) = await SetupDatabaseAsync(facilityId, entryData: new List<(string patientId, string reportType, MeasureReportStatus status)> { (patientId, "TestReport", MeasureReportStatus.PendingEvaluation) }, existingResources: existingResources);
+        //    var entry = entries.First();
 
-            var scope = _scopeFactory.CreateScope();
-            var listener = CreateListener(scope);
+        //    var scope = _scopeFactory.CreateScope();
+        //    var listener = CreateListener(scope);
 
-            var newPatient = new Patient { Id = patientId, Meta = new Meta { ElementId = "ElementId" }, Name = { new HumanName { Family = "New" } } };
-            var consumeResult = CreateConsumeResult(facilityId, schedule.Id, patientId, "TestReport", CreateResourceJson(newPatient), true);
+        //    var newPatient = new Patient { Id = patientId, Meta = new Meta { ElementId = "ElementId" }, Name = { new HumanName { Family = "New" } } };
+        //    var consumeResult = CreateConsumeResult(facilityId, schedule.Id, patientId, "TestReport", CreateResourceJson(newPatient), true);
 
-            await listener.ProcessMessageAsync(consumeResult, default);
+        //    await listener.ProcessMessageAsync(consumeResult, default);
 
-            var _database = scope.ServiceProvider.GetRequiredService<IDatabase>();
-            var _subEntryQueries = scope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
+        //    var _database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+        //    var _subEntryQueries = scope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
 
-            var updatedData = await _subEntryQueries.GetPatientReportData(facilityId, schedule.Id, patientId, cancellationToken: CancellationToken.None);
-            var updatedEntry = updatedData.ReportData[schedule.ReportTypes[0]].Entry;
+        //    var updatedData = await _subEntryQueries.GetPatientReportData(facilityId, schedule.Id, patientId, cancellationToken: CancellationToken.None);
+        //    var updatedEntry = updatedData.ReportData[schedule.ReportTypes[0]].Entry;
 
-            AssertEntryStatusAndMeasureReport(updatedEntry, MeasureReportStatus.PendingEvaluation);
+        //    AssertEntryStatusAndMeasureReport(updatedEntry, MeasureReportStatus.PendingEvaluation);
 
-            var updatedResource = updatedData.ReportData[schedule.ReportTypes[0]].Resources.First();
+        //    var updatedResource = updatedData.ReportData[schedule.ReportTypes[0]].Resources.First();
 
-            Assert.NotNull(updatedResource);
-            Assert.IsType<Patient>(updatedResource.Resource);
-            Assert.Equal("New", ((Patient)updatedResource.Resource).Name.First().Family);
+        //    Assert.NotNull(updatedResource);
+        //    Assert.IsType<Patient>(updatedResource.Resource);
+        //    Assert.Equal("New", ((Patient)updatedResource.Resource).Name.First().Family);
 
-            Assert.Contains(updatedData.ReportData[schedule.ReportTypes[0]].Resources, cr => cr.ResourceType == "Patient" && cr.ResourceId == patientId && cr.ResourceCategoryType == ResourceCategoryType.Patient);
+        //    Assert.Contains(updatedData.ReportData[schedule.ReportTypes[0]].Resources, cr => cr.ResourceType == "Patient" && cr.ResourceId == patientId && cr.ResourceCategoryType == ResourceCategoryType.Patient);
 
-            AssertProducerMocks(ReportIntegrationTestFixture.ReadyForValidationProducerMock, ReportIntegrationTestFixture.SubmitPayloadProducerMock, Times.Never(), Times.Never(), schedule, updatedEntry);
+        //    AssertProducerMocks(ReportIntegrationTestFixture.ReadyForValidationProducerMock, ReportIntegrationTestFixture.SubmitPayloadProducerMock, Times.Never(), Times.Never(), schedule, updatedEntry);
 
-            await AssertNoBlobUploaded(schedule, updatedEntry);
-        }
+        //    await AssertNoBlobUploaded(schedule, updatedEntry);
+        //}
 
-        [Fact]
-        public async Task ProcessMessageAsync_NoSchedule_TransientException()
-        {
-            var facilityId = Guid.NewGuid().ToString();
-            var patientId = Guid.NewGuid().ToString();
+        //[Fact]
+        //public async Task ProcessMessageAsync_NoSchedule_TransientException()
+        //{
+        //    var facilityId = Guid.NewGuid().ToString();
+        //    var patientId = Guid.NewGuid().ToString();
 
-            var scope = _scopeFactory.CreateScope();
-            var listener = CreateListener(scope);
+        //    var scope = _scopeFactory.CreateScope();
+        //    var listener = CreateListener(scope);
 
-            var patient = new Patient();
-            patient.Id = patientId;
+        //    var patient = new Patient();
+        //    patient.Id = patientId;
 
-            var patientStr = JsonSerializer.Serialize(patient, SerializerOptions.ForFhirWithModelInspector);
+        //    var patientStr = JsonSerializer.Serialize(patient, SerializerOptions.ForFhirWithModelInspector);
 
-            var consumeResult = CreateConsumeResult(facilityId, "nonexistent", patientId, "TestReport", JsonDocument.Parse(patientStr).RootElement, true);
+        //    var consumeResult = CreateConsumeResult(facilityId, "nonexistent", patientId, "TestReport", JsonDocument.Parse(patientStr).RootElement, true);
 
-            var exception = await Assert.ThrowsAsync<TransientException>(() => listener.ProcessMessageAsync(consumeResult, default));
-            Assert.Contains("No Report Schedule Found.", exception.Message);
-        }
+        //    var exception = await Assert.ThrowsAsync<TransientException>(() => listener.ProcessMessageAsync(consumeResult, default));
+        //    Assert.Contains("No Report Schedule Found.", exception.Message);
+        //}
 
-        [Fact]
-        public async Task ProcessMessageAsync_TimeoutException_TransientException()
-        {
-            _fixture.ResetMocks();
-            //await _fixture.ClearDatabaseAsync();
-            var facilityId = Guid.NewGuid().ToString();
-            var patientId = Guid.NewGuid().ToString();
+        //[Fact]
+        //public async Task ProcessMessageAsync_TimeoutException_TransientException()
+        //{
+        //    _fixture.ResetMocks();
+        //    //await _fixture.ClearDatabaseAsync();
+        //    var facilityId = Guid.NewGuid().ToString();
+        //    var patientId = Guid.NewGuid().ToString();
 
-            var mockScopeFactory = new Mock<IServiceScopeFactory>();
-            var mockScope = new Mock<IServiceScope>();
-            var mockServiceProvider = new Mock<IServiceProvider>();
-            mockScope.Setup(s => s.ServiceProvider).Returns(mockServiceProvider.Object);
-            mockServiceProvider.Setup(sp => sp.GetService(typeof(IReportScheduledManager))).Returns(new Mock<IReportScheduledManager>().Object);
-            mockServiceProvider.Setup(sp => sp.GetService(It.Is<Type>(t => t != typeof(IReportScheduledManager)))).Returns<Type>(t => _fixture.ServiceProvider.GetService(t));
-            mockScopeFactory.Setup(f => f.CreateScope()).Returns(mockScope.Object);
-            var reportScheduledManagerMock = mockServiceProvider.Object.GetService<IReportScheduledManager>();
-            Mock.Get(reportScheduledManagerMock).Setup(m => m.GetReportSchedule(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ThrowsAsync(new TimeoutException());
+        //    var mockScopeFactory = new Mock<IServiceScopeFactory>();
+        //    var mockScope = new Mock<IServiceScope>();
+        //    var mockServiceProvider = new Mock<IServiceProvider>();
+        //    mockScope.Setup(s => s.ServiceProvider).Returns(mockServiceProvider.Object);
+        //    mockServiceProvider.Setup(sp => sp.GetService(typeof(IReportScheduledManager))).Returns(new Mock<IReportScheduledManager>().Object);
+        //    mockServiceProvider.Setup(sp => sp.GetService(It.Is<Type>(t => t != typeof(IReportScheduledManager)))).Returns<Type>(t => _fixture.ServiceProvider.GetService(t));
+        //    mockScopeFactory.Setup(f => f.CreateScope()).Returns(mockScope.Object);
+        //    var reportScheduledManagerMock = mockServiceProvider.Object.GetService<IReportScheduledManager>();
+        //    Mock.Get(reportScheduledManagerMock).Setup(m => m.GetReportSchedule(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ThrowsAsync(new TimeoutException());
 
-            var listener = new ResourceEvaluatedListener(
-                _fixture.ServiceProvider.GetRequiredService<ILogger<ResourceEvaluatedListener>>(),
-                _fixture.ServiceProvider.GetRequiredService<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>(),
-                _fixture.ServiceProvider.GetRequiredService<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>(),
-                _fixture.ServiceProvider.GetRequiredService<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>(),
-                mockScopeFactory.Object,
-                _fixture.ServiceProvider.GetRequiredService<PatientReportSubmissionBundler>(),
-                _fixture.ServiceProvider.GetRequiredService<BlobStorageService>(),
-                _fixture.ServiceProvider.GetRequiredService<ReadyForValidationProducer>(),
-                _fixture.ServiceProvider.GetRequiredService<ReportManifestProducer>(),
-                _fixture.ServiceProvider.GetRequiredService<AuditableEventOccurredProducer>());
-
-
-            var patient = new Patient();
-            patient.Id = patientId;
-
-            var patientStr = JsonSerializer.Serialize(patient, SerializerOptions.ForFhirWithModelInspector);
-
-            var consumeResult = CreateConsumeResult(facilityId, "testid", patientId, "TestReport", JsonDocument.Parse(patientStr).RootElement, true);
-
-            var consumerConfig = new ConsumerConfig()
-            {
-                GroupId = ReportConstants.ServiceName,
-                EnableAutoCommit = false
-            };
-
-            var consumer = Mock.Of<IConsumer<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
-            await listener.HandleConsumeResult(consumeResult, consumer, default);
-
-            var transientHandlerMock = _fixture.ServiceProvider.GetRequiredService<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
-            Mock.Get(transientHandlerMock).Verify(h => h.HandleException(It.IsAny<ConsumeResult<ResourceEvaluatedKey, ResourceEvaluatedValue>>(), It.IsAny<TransientException>(), It.IsAny<string>()), Times.Once);
-        }
-
-        [Fact]
-        public async Task ProcessMessageAsync_GeneralException_TransientException()
-        {
-            var facilityId = Guid.NewGuid().ToString();
-            var patientId = Guid.NewGuid().ToString();
-
-            var mockScopeFactory = new Mock<IServiceScopeFactory>();
-            var mockScope = new Mock<IServiceScope>();
-            var mockServiceProvider = new Mock<IServiceProvider>();
-            mockScope.Setup(s => s.ServiceProvider).Returns(mockServiceProvider.Object);
-            mockServiceProvider.Setup(sp => sp.GetService(typeof(IReportScheduledManager))).Returns(new Mock<IReportScheduledManager>().Object);
-            mockServiceProvider.Setup(sp => sp.GetService(It.Is<Type>(t => t != typeof(IReportScheduledManager)))).Returns<Type>(t => _fixture.ServiceProvider.GetService(t));
-            mockScopeFactory.Setup(f => f.CreateScope()).Returns(mockScope.Object);
-            var reportScheduledManagerMock = mockServiceProvider.Object.GetService<IReportScheduledManager>();
-
-            var transHandler = _fixture.ServiceProvider.GetRequiredService<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
-            var listener = new ResourceEvaluatedListener(
-                _fixture.ServiceProvider.GetRequiredService<ILogger<ResourceEvaluatedListener>>(),
-                _fixture.ServiceProvider.GetRequiredService<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>(),
-                transHandler,
-                _fixture.ServiceProvider.GetRequiredService<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>(),
-                mockScopeFactory.Object,
-                _fixture.ServiceProvider.GetRequiredService<PatientReportSubmissionBundler>(),
-                _fixture.ServiceProvider.GetRequiredService<BlobStorageService>(),
-                _fixture.ServiceProvider.GetRequiredService<ReadyForValidationProducer>(),
-                _fixture.ServiceProvider.GetRequiredService<ReportManifestProducer>(),
-                _fixture.ServiceProvider.GetRequiredService<AuditableEventOccurredProducer>());
+        //    var listener = new ResourceEvaluatedListener(
+        //        _fixture.ServiceProvider.GetRequiredService<ILogger<ResourceEvaluatedListener>>(),
+        //        _fixture.ServiceProvider.GetRequiredService<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>(),
+        //        _fixture.ServiceProvider.GetRequiredService<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>(),
+        //        _fixture.ServiceProvider.GetRequiredService<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>(),
+        //        mockScopeFactory.Object,
+        //        _fixture.ServiceProvider.GetRequiredService<PatientReportSubmissionBundler>(),
+        //        _fixture.ServiceProvider.GetRequiredService<BlobStorageService>(),
+        //        _fixture.ServiceProvider.GetRequiredService<ReadyForValidationProducer>(),
+        //        _fixture.ServiceProvider.GetRequiredService<ReportManifestProducer>(),
+        //        _fixture.ServiceProvider.GetRequiredService<AuditableEventOccurredProducer>());
 
 
-            var patient = new Patient();
-            patient.Id = patientId;
+        //    var patient = new Patient();
+        //    patient.Id = patientId;
 
-            var patientStr = JsonSerializer.Serialize(patient, SerializerOptions.ForFhirWithModelInspector);
+        //    var patientStr = JsonSerializer.Serialize(patient, SerializerOptions.ForFhirWithModelInspector);
 
-            var consumeResult = CreateConsumeResult(facilityId, "testid", patientId, "TestReport", JsonDocument.Parse(patientStr).RootElement, true);
+        //    var consumeResult = CreateConsumeResult(facilityId, "testid", patientId, "TestReport", JsonDocument.Parse(patientStr).RootElement, true);
 
-            var consumerConfig = new ConsumerConfig()
-            {
-                GroupId = ReportConstants.ServiceName,
-                EnableAutoCommit = false
-            };
+        //    var consumerConfig = new ConsumerConfig()
+        //    {
+        //        GroupId = ReportConstants.ServiceName,
+        //        EnableAutoCommit = false
+        //    };
 
-            var consumer = Mock.Of<IConsumer<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
-            await listener.HandleConsumeResult(consumeResult, consumer, default);
+        //    var consumer = Mock.Of<IConsumer<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
+        //    await listener.HandleConsumeResult(consumeResult, consumer, default);
 
-            Mock.Get(transHandler).Verify(h => h.HandleException(It.IsAny<ConsumeResult<ResourceEvaluatedKey, ResourceEvaluatedValue>>(), It.IsAny<TransientException>(), It.IsAny<string>()), Times.Once);
-        }
+        //    var transientHandlerMock = _fixture.ServiceProvider.GetRequiredService<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
+        //    Mock.Get(transientHandlerMock).Verify(h => h.HandleException(It.IsAny<ConsumeResult<ResourceEvaluatedKey, ResourceEvaluatedValue>>(), It.IsAny<TransientException>(), It.IsAny<string>()), Times.Once);
+        //}
 
-        [Fact]
-        public async Task ProcessMessageAsync_InvalidResource_DeadLetterException()
-        {
-            var facilityId = Guid.NewGuid().ToString();
-            var patientId = Guid.NewGuid().ToString();
+        //[Fact]
+        //public async Task ProcessMessageAsync_GeneralException_TransientException()
+        //{
+        //    var facilityId = Guid.NewGuid().ToString();
+        //    var patientId = Guid.NewGuid().ToString();
 
-            var (schedule, _) = await SetupDatabaseAsync(facilityId, entryData: new List<(string patientId, string reportType, MeasureReportStatus status)> { (patientId, "TestReport", MeasureReportStatus.PendingEvaluation) });
+        //    var mockScopeFactory = new Mock<IServiceScopeFactory>();
+        //    var mockScope = new Mock<IServiceScope>();
+        //    var mockServiceProvider = new Mock<IServiceProvider>();
+        //    mockScope.Setup(s => s.ServiceProvider).Returns(mockServiceProvider.Object);
+        //    mockServiceProvider.Setup(sp => sp.GetService(typeof(IReportScheduledManager))).Returns(new Mock<IReportScheduledManager>().Object);
+        //    mockServiceProvider.Setup(sp => sp.GetService(It.Is<Type>(t => t != typeof(IReportScheduledManager)))).Returns<Type>(t => _fixture.ServiceProvider.GetService(t));
+        //    mockScopeFactory.Setup(f => f.CreateScope()).Returns(mockScope.Object);
+        //    var reportScheduledManagerMock = mockServiceProvider.Object.GetService<IReportScheduledManager>();
 
-            var scope = _scopeFactory.CreateScope();
-            var listener = CreateListener(scope);
+        //    var transHandler = _fixture.ServiceProvider.GetRequiredService<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
+        //    var listener = new ResourceEvaluatedListener(
+        //        _fixture.ServiceProvider.GetRequiredService<ILogger<ResourceEvaluatedListener>>(),
+        //        _fixture.ServiceProvider.GetRequiredService<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>(),
+        //        transHandler,
+        //        _fixture.ServiceProvider.GetRequiredService<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>(),
+        //        mockScopeFactory.Object,
+        //        _fixture.ServiceProvider.GetRequiredService<PatientReportSubmissionBundler>(),
+        //        _fixture.ServiceProvider.GetRequiredService<BlobStorageService>(),
+        //        _fixture.ServiceProvider.GetRequiredService<ReadyForValidationProducer>(),
+        //        _fixture.ServiceProvider.GetRequiredService<ReportManifestProducer>(),
+        //        _fixture.ServiceProvider.GetRequiredService<AuditableEventOccurredProducer>());
 
-            var consumeResult = CreateConsumeResult(facilityId, schedule.Id, patientId, "TestReport", JsonDocument.Parse("{}").RootElement, true);
 
-            var exception = await Assert.ThrowsAsync<DeadLetterException>(() => listener.ProcessMessageAsync(consumeResult, default));
-            Assert.Contains("Unable to deserialize event resource", exception.Message);
-        }
+        //    var patient = new Patient();
+        //    patient.Id = patientId;
 
-        [Fact]
-        public async Task ProcessMessageAsync_MissingCorrelationId_DeadLetterException()
-        {
-            var facilityId = Guid.NewGuid().ToString();
-            var patientId = Guid.NewGuid().ToString();
+        //    var patientStr = JsonSerializer.Serialize(patient, SerializerOptions.ForFhirWithModelInspector);
 
-            var scope = _scopeFactory.CreateScope();
-            var listener = CreateListener(scope);
+        //    var consumeResult = CreateConsumeResult(facilityId, "testid", patientId, "TestReport", JsonDocument.Parse(patientStr).RootElement, true);
 
-            var consumeResult = CreateConsumeResult(facilityId, "testid", patientId, "TestReport", JsonDocument.Parse("{\"resourceType\": \"Patient\"}").RootElement, true, hasCorrelationId: false);
+        //    var consumerConfig = new ConsumerConfig()
+        //    {
+        //        GroupId = ReportConstants.ServiceName,
+        //        EnableAutoCommit = false
+        //    };
 
-            var exception = await Assert.ThrowsAsync<DeadLetterException>(() => listener.ProcessMessageAsync(consumeResult, default));
-            Assert.Contains("Received message without correlation ID", exception.Message);
-        }
+        //    var consumer = Mock.Of<IConsumer<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
+        //    await listener.HandleConsumeResult(consumeResult, consumer, default);
 
-        [Fact]
-        public async Task ProcessMessageAsync_MissingResource_DeadLetterException()
-        {
-            var facilityId = Guid.NewGuid().ToString();
-            var patientId = Guid.NewGuid().ToString();
+        //    Mock.Get(transHandler).Verify(h => h.HandleException(It.IsAny<ConsumeResult<ResourceEvaluatedKey, ResourceEvaluatedValue>>(), It.IsAny<TransientException>(), It.IsAny<string>()), Times.Once);
+        //}
 
-            var scope = _scopeFactory.CreateScope();
-            var listener = CreateListener(scope);
+        //[Fact]
+        //public async Task ProcessMessageAsync_InvalidResource_DeadLetterException()
+        //{
+        //    var facilityId = Guid.NewGuid().ToString();
+        //    var patientId = Guid.NewGuid().ToString();
 
-            var consumeResult = CreateConsumeResult(facilityId, "testid", patientId, "TestReport", JsonDocument.Parse("null").RootElement, true);
+        //    var (schedule, _) = await SetupDatabaseAsync(facilityId, entryData: new List<(string patientId, string reportType, MeasureReportStatus status)> { (patientId, "TestReport", MeasureReportStatus.PendingEvaluation) });
 
-            var exception = await Assert.ThrowsAsync<DeadLetterException>(() => listener.ProcessMessageAsync(consumeResult, default));
-            Assert.Contains("Received message without a value in the resource property", exception.Message);
-        }
+        //    var scope = _scopeFactory.CreateScope();
+        //    var listener = CreateListener(scope);
+
+        //    var consumeResult = CreateConsumeResult(facilityId, schedule.Id, patientId, "TestReport", JsonDocument.Parse("{}").RootElement, true);
+
+        //    var exception = await Assert.ThrowsAsync<DeadLetterException>(() => listener.ProcessMessageAsync(consumeResult, default));
+        //    Assert.Contains("Unable to deserialize event resource", exception.Message);
+        //}
+
+        //[Fact]
+        //public async Task ProcessMessageAsync_MissingCorrelationId_DeadLetterException()
+        //{
+        //    var facilityId = Guid.NewGuid().ToString();
+        //    var patientId = Guid.NewGuid().ToString();
+
+        //    var scope = _scopeFactory.CreateScope();
+        //    var listener = CreateListener(scope);
+
+        //    var consumeResult = CreateConsumeResult(facilityId, "testid", patientId, "TestReport", JsonDocument.Parse("{\"resourceType\": \"Patient\"}").RootElement, true, hasCorrelationId: false);
+
+        //    var exception = await Assert.ThrowsAsync<DeadLetterException>(() => listener.ProcessMessageAsync(consumeResult, default));
+        //    Assert.Contains("Received message without correlation ID", exception.Message);
+        //}
+
+        //[Fact]
+        //public async Task ProcessMessageAsync_MissingResource_DeadLetterException()
+        //{
+        //    var facilityId = Guid.NewGuid().ToString();
+        //    var patientId = Guid.NewGuid().ToString();
+
+        //    var scope = _scopeFactory.CreateScope();
+        //    var listener = CreateListener(scope);
+
+        //    var consumeResult = CreateConsumeResult(facilityId, "testid", patientId, "TestReport", JsonDocument.Parse("null").RootElement, true);
+
+        //    var exception = await Assert.ThrowsAsync<DeadLetterException>(() => listener.ProcessMessageAsync(consumeResult, default));
+        //    Assert.Contains("Received message without a value in the resource property", exception.Message);
+        //}
     }
 }

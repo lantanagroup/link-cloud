@@ -22,8 +22,7 @@ public class PayloadSubmittedListener(
     ITransientExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue> transientExceptionHandler,
     IDeadLetterExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue> deadLetterExceptionHandler,
     ILogger<PayloadSubmittedListener> logger,
-    IServiceScopeFactory serviceScopeFactory, 
-    IDatabase database,
+    IServiceScopeFactory serviceScopeFactory,
     //TODO: TEST CODE ONLY! REMOVE AFTER TESTING
     ReportManifestProducer reportManifestProducer)
     : BackgroundService
@@ -61,6 +60,7 @@ public class PayloadSubmittedListener(
                         }
                         var scope = serviceScopeFactory.CreateScope();
                         var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+                        var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
 
                         var facilityId = result.Message.Key.FacilityId;
                         
@@ -79,7 +79,7 @@ public class PayloadSubmittedListener(
 
                                 reportEntry.SubmissionStatus = SubmissionStatus.Submitted;
                                 reportEntry.ModifyDate = DateTime.UtcNow;
-                                await database.ReportEntryRepository.UpdateAsync(reportEntry);
+                                database.ReportEntryRepository.Update(reportEntry);
 
                                 //TODO: START - TEST CODE ONLY! REMOVE AFTER TESTING
                                 var reportSchedule = await database.ReportScheduledRepository

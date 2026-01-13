@@ -57,7 +57,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     });
                 }
 
-                await _database.ReportResourceRepository.AddManyAsync(resources, cancellationToken);
+                await _database.ReportResourceRepository.AddRangeAsync(resources);
             }
         }
 
@@ -73,7 +73,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task<ReportResource> UpdateAsync(ReportResource entry, CancellationToken cancellationToken)
         {
-            return await _database.ReportResourceRepository.UpdateAsync(entry, cancellationToken);
+            _database.ReportResourceRepository.Update(entry);
+            return entry;
         }
     }
 }

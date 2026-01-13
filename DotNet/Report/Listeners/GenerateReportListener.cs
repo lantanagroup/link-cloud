@@ -45,8 +45,6 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly DataAcquisitionRequestedProducer _dataAcqProducer;
         private readonly IProducer<string, EvaluationRequestedValue> _evaluationProducer;
         private readonly BlobStorageService _blobStorageService;
-        private readonly IReportEntryManager _reportEntryManager;
-        private readonly IReportScheduledManager _reportScheduledManager;
 
         private string Name => this.GetType().Name;
 
@@ -62,9 +60,7 @@ namespace LantanaGroup.Link.Report.Listeners
             DataAcquisitionRequestedProducer dataAcqProducer,
             IProducer<string, EvaluationRequestedValue> evaluationProducer,
             BlobStorageService blobStorageService,
-            IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions,
-            IReportEntryManager reportEntryManager,
-            IReportScheduledManager reportScheduledManager)
+            IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -89,8 +85,6 @@ namespace LantanaGroup.Link.Report.Listeners
             _evaluationProducer = evaluationProducer;
             _blobStorageService = blobStorageService;
             _linkBearerServiceOptions = linkBearerServiceOptions;
-            _reportEntryManager = reportEntryManager;
-            _reportScheduledManager = reportScheduledManager;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -129,6 +123,9 @@ namespace LantanaGroup.Link.Report.Listeners
                                 return;
                             }
 
+                            var reportScheduledManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportScheduledManager>();
+                            var reportEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportEntryManager>();
+
                             try
                             {
                                 var key = result.Message.Key;
@@ -151,7 +148,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 {
                                     _logger.LogDebug(
                                         "Finding existing report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, value.ReportId, DateTime.UtcNow);
-                                    var existing = await _reportScheduledManager.SingleOrDefaultAsync(x => x.Id == value.ReportId, consumeCancellationToken);
+                                    var existing = await reportScheduledManager.SingleOrDefaultAsync(x => x.Id == value.ReportId, consumeCancellationToken);
 
                                     if (existing == null)
                                     {
@@ -216,13 +213,13 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var reportName = _blobStorageService.GetReportName(reportSchedule);
                                 reportSchedule.PayloadRootUri = _blobStorageService.GetUri(reportName)?.ToString();
 
-                                await _reportScheduledManager.AddAsync(reportSchedule, cancellationToken);
+                                await reportScheduledManager.AddAsync(reportSchedule, cancellationToken);
                                 
                                 if (value.Regenerate)
                                 {
                                     _logger.LogInformation("Re-generating report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, reportId, DateTime.UtcNow);
 
-                                    var scheduledReports = await _reportEntryManager.FindAsync(p => p.ReportScheduleId == reportId, cancellationToken);
+                                    var scheduledReports = await reportEntryManager.FindAsync(p => p.ReportScheduleId == reportId, cancellationToken);
                                     var patientEntries = scheduledReports.Select(p => p.PatientId).Distinct();
 
                                     _logger.LogDebug("Found {PatientCount} patients to re-generate for facility {FacilityId} from {StartDate} to {EndDate} with ID {ReportId}", patientEntries.Count(), facilityId, startDate, endDate, reportId);
@@ -247,7 +244,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                             });
                                         }
 
-                                        await _reportEntryManager.AddAsync(newEntry, cancellationToken);
+                                        await reportEntryManager.AddAsync(newEntry, cancellationToken);
 
                                         try
                                         {
@@ -308,7 +305,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                             });
                                         }
 
-                                        await _reportEntryManager.AddAsync(newEntry, cancellationToken);
+                                        await reportEntryManager.AddAsync(newEntry, cancellationToken);
                                     }
 
                                     try

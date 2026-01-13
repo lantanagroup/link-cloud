@@ -6,8 +6,10 @@ using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Report.Domain.Queries;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
@@ -45,10 +47,6 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ReadyForValidationProducer _readyForValidationProducer;
         private readonly ReportManifestProducer _reportManifestProducer;
         private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
-        private readonly IReportEntryManager _reportEntryManager;
-        private readonly IReportScheduledManager _reportScheduledManager;
-        private readonly IReportPopulationManager _reportPopulationManager;
-        private readonly IReportResourceManager _reportResourceManager;
 
         private string Name => this.GetType().Name;
 
@@ -62,11 +60,7 @@ namespace LantanaGroup.Link.Report.Listeners
             BlobStorageService blobStorageService,
             ReadyForValidationProducer readyForValidationProducer,
             ReportManifestProducer reportManifestProducer,
-            AuditableEventOccurredProducer auditableEventOccurredProducer,
-            IReportEntryManager reportEntryManager,
-            IReportScheduledManager reportScheduledManager,
-            IReportPopulationManager reportPopulationManager,
-            IReportResourceManager reportResourceManager)
+            AuditableEventOccurredProducer auditableEventOccurredProducer)
         {
 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -87,10 +81,6 @@ namespace LantanaGroup.Link.Report.Listeners
             _readyForValidationProducer = readyForValidationProducer;
             _reportManifestProducer = reportManifestProducer;
             _auditableEventOccurredProducer = auditableEventOccurredProducer;
-            _reportEntryManager = reportEntryManager;
-            _reportScheduledManager = reportScheduledManager;
-            _reportPopulationManager = reportPopulationManager;
-            _reportResourceManager = reportResourceManager;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -185,12 +175,20 @@ namespace LantanaGroup.Link.Report.Listeners
                 throw new DeadLetterException("Correlation Id missing");
             }
 
+            using var scope = _serviceScopeFactory.CreateScope();
+            var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+            var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+            var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+            var reportResourceManager = scope.ServiceProvider.GetRequiredService<IReportResourceManager>();
+            var reportPopulationManager = scope.ServiceProvider.GetRequiredService<IReportPopulationManager>();
+
             var correlationId = Encoding.UTF8.GetString(headerValue);
 
-            var reportEntry = await _reportEntryManager.UpdateAsyncWithConsumerResult(result.Message.Value);
-            var readyForValidation = reportEntry.MeasureReportList.All((object x) => x.Status == MeasureReport.MeasureReportStatus.NotReportable || x.Status == MeasureReport.MeasureReportStatus.ReadyForValidation);
+            var reportEntry = await reportEntryManager.UpdateAsyncWithConsumerResult(result.Message.Value);
+            var readyForValidation = reportEntry.MeasureReportList.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable || x.Status == Domain.Enums.MeasureReportStatus.ReadyForValidation);
 
-            var schedule = await _reportScheduledManager.GetReportSchedule(result.Message.Value.FacilityId, result.Message.Value.ReportTrackingId, cancellationToken);
+
+            var schedule = await reportScheduledManager.GetReportSchedule(result.Message.Value.FacilityId, result.Message.Value.ReportTrackingId, cancellationToken);
 
             if (schedule == null)
             {
@@ -204,27 +202,27 @@ namespace LantanaGroup.Link.Report.Listeners
                 return;
             }
 
-            AggregateResult aggregateResult = await _patientAggregator.AggregateToABS(result.Value.PatientId, schedule);
+            AggregateResult aggregateResult = await _patientAggregator.AggregateToABS(result.Message.Value.PatientId, schedule);
 
             if (aggregateResult == null)
             {
                 throw new DeadLetterException($"No aggregated results were generated for patient '{result.Message.Value.PatientId}' for report id '{result.Message.Value.ReportTrackingId}'");
             }
 
-            await _reportEntryManager.UpdateAsyncWithAggregateResult(reportEntry, aggregateResult);
-            await _reportResourceManager.AddAsyncWithAggregateResult(facilityId, result.Message.Value.ReportTrackingId, result.Message.Value.PatientId, aggregateResult, cancellationToken);
+            await reportEntryManager.UpdateAsyncWithAggregateResult(reportEntry, aggregateResult);
+            await reportResourceManager.AddAsyncWithAggregateResult(facilityId, result.Message.Value.ReportTrackingId, result.Message.Value.PatientId, aggregateResult, cancellationToken);
 
             foreach (var aggregateMeasureReport in aggregateResult.MeasureReportResults)
             {
-                var populationModel = await _reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == result.Message.Value.ReportTrackingId && x.Measure == result.Message.Value.ReportType);
+                var populationModel = await reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == result.Message.Value.ReportTrackingId && x.Measure == result.Message.Value.ReportType);
 
                 if (populationModel == null)
                 {
-                    await _reportPopulationManager.AddAsyncWithAggregateResult(result.Message.Value.FacilityId, result.Message.Value.ReportTrackingId, aggregateMeasureReport, cancellationToken);
+                    await reportPopulationManager.AddAsyncWithAggregateResult(result.Message.Value.FacilityId, result.Message.Value.ReportTrackingId, aggregateMeasureReport, cancellationToken);
                     continue;
                 }
 
-                await _reportPopulationManager.UpdateAsyncWithAggregateResult(populationModel, aggregateMeasureReport, cancellationToken);
+                await reportPopulationManager.UpdateAsyncWithAggregateResult(populationModel, aggregateMeasureReport, cancellationToken);
             }
 
             try

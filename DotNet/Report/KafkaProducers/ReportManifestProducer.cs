@@ -45,7 +45,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public async Task<List<Resource>> Generate(ReportSchedule schedule)
         {
-            var reportEntries = await _database.ReportEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
+            var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
+            var reportEntries = await database.ReportEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
 
             //TODO: ADD ERROR
 
@@ -106,7 +107,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public async Task<bool> Produce(ReportSchedule schedule, string correlationId = null)
         {
-            //var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
+            var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
 
             //var allReady = !await database.SubmissionEntryRepository.AnyAsync(e => e.FacilityId == schedule.FacilityId
             //    && e.ReportScheduleId == schedule.Id
@@ -119,7 +120,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             //    return false;
             //}
 
-            var reportEntries = await _database.ReportEntryRepository.FindAsync(x => x.FacilityId == schedule.FacilityId && x.ReportScheduleId == schedule.Id);
+            var reportEntries = await database.ReportEntryRepository.FindAsync(x => x.FacilityId == schedule.FacilityId && x.ReportScheduleId == schedule.Id);
 
             foreach (var entry in reportEntries)
             {

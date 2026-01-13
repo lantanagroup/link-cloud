@@ -16,8 +16,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
     {
         Task<ReportEntry?> GetEntry(string reportScheduleId, string patientId, CancellationToken cancellationToken = default);
 
-        Task<ReportEntry> UpdateAsync(ReportEntry entry,
-            CancellationToken cancellationToken);
+        Task<ReportEntry> UpdateAsync(ReportEntry entry);
 
         Task<ReportEntry> AddAsync(ReportEntry entry,
             CancellationToken cancellationToken);
@@ -29,7 +28,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             Expression<Func<ReportEntry, bool>> predicate,
             CancellationToken cancellationToken = default);
 
-        Task<ReportEntry> UpdateAsyncWithConsumerResult(MeasureReportGeneratedValue consumerValue, CancellationToken cancellationToken = default);
+        Task<ReportEntry> UpdateAsyncWithConsumerResult(MeasureReportGeneratedValue consumerValue);
 
         Task<ReportEntry> UpdateAsyncWithAggregateResult(ReportEntry entry, AggregateResult aggregateResult, CancellationToken cancellationToken = default);
 
@@ -69,12 +68,14 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return await _database.ReportEntryRepository.SingleOrDefaultAsync(predicate, cancellationToken);
         }
 
-        public async Task<ReportEntry> UpdateAsync(ReportEntry entry, CancellationToken cancellationToken)
+        public async Task<ReportEntry> UpdateAsync(ReportEntry entry)
         {
-            return await _database.ReportEntryRepository.UpdateAsync(entry, cancellationToken);
+            _database.ReportEntryRepository.Update(entry);
+            
+            return entry;
         }
 
-        public async Task<ReportEntry> UpdateAsyncWithConsumerResult(MeasureReportGeneratedValue consumerValue, CancellationToken cancellationToken = default)
+        public async Task<ReportEntry> UpdateAsyncWithConsumerResult(MeasureReportGeneratedValue consumerValue)
         {
             var reportEntry = await this.GetEntry(consumerValue.ReportTrackingId, consumerValue.PatientId);
 
@@ -93,7 +94,9 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 measureReportEntry.Status = MeasureReportStatus.NotReportable;
             }
 
-            return await _database.ReportEntryRepository.UpdateAsync(reportEntry, cancellationToken);
+            _database.ReportEntryRepository.Update(reportEntry);
+
+            return reportEntry;
         }
 
         public async Task<ReportEntry> UpdateAsyncWithAggregateResult(ReportEntry entry, AggregateResult aggregateResult, CancellationToken cancellationToken = default)
@@ -107,7 +110,9 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 entry.MeasureReportList.First(x => x.ReportType == measureReportResult.ReportType).ResourceCount = measureReportResult.ResourceCount;
             }
 
-            return await _database.ReportEntryRepository.UpdateAsync(entry, cancellationToken);
+            _database.ReportEntryRepository.Update(entry);
+
+            return entry;
         }
 
         public async Task<PatientReportSummary> GetPatients(string facilityId, string reportId, int page, int count, CancellationToken cancellationToken = default)

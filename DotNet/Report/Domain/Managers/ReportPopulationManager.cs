@@ -105,7 +105,9 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 }
             }
 
-            return await _database.ReportPopulationRepository.UpdateAsync(populationModel, cancellationToken);
+            _database.ReportPopulationRepository.Update(populationModel);
+            
+            return populationModel;
         }
 
         public async Task<List<ReportPopulation>> FindAsync(Expression<Func<ReportPopulation, bool>> predicate, CancellationToken cancellationToken = default)
@@ -120,7 +122,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task<ReportPopulation> UpdateAsync(ReportPopulation entry, CancellationToken cancellationToken)
         {
-            return await _database.ReportPopulationRepository.UpdateAsync(entry, cancellationToken);
+            _database.ReportPopulationRepository.Update(entry);
+            return entry;
         }
     }
 }
