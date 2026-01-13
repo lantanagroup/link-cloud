@@ -19,6 +19,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Settings;
 using OpenTelemetry.Trace;
@@ -238,7 +239,7 @@ namespace LantanaGroup.Link.Report.Listeners
             Resource? resource = null;
             try
             {
-                resource = JsonSerializer.Deserialize<Resource>(value.Resource.ToString(), SerializerOptions.ForFhirLenientDeserialization) ?? throw new Exception($"{Name}: Unable to deserialize event resource");
+                resource = JsonSerializer.Deserialize<Resource>(value.Resource.ToString(), LinkFhirSerializerOptions.ForFhirLenientDeserialization) ?? throw new Exception($"{Name}: Unable to deserialize event resource");
             }
             catch (Exception ex)
             {

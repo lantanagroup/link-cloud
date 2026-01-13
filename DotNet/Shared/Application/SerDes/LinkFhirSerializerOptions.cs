@@ -20,7 +20,15 @@ namespace LantanaGroup.Link.Shared.Application.SerDes
             _optionsWithoutValidation ??= InitializeForFhirJsonSerializerOptions(false, false);
             return _optionsWithoutValidation;        
         }
-     
+
+        public static readonly JsonSerializerOptions ForFhirLenientDeserialization =
+            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector).UsingMode(DeserializerModes.Ostrich);
+
+        public static readonly FhirJsonParser FhirJsonParserPermissive = new FhirJsonParser(new ParserSettings
+        {
+            PermissiveParsing = true,
+        });
+
         public static JsonSerializerOptions InitializeForFhirJsonSerializerOptions(bool validateFhir = false, bool pretty = false)
         {
             switch(validateFhir)
