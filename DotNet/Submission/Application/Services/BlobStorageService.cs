@@ -195,7 +195,13 @@ namespace LantanaGroup.Link.Submission.Application.Services
 
             _logger.LogInformation("Successfully parsed {Count} resources from manifest", manifestResources.Count);
 
+            // Extract specific resource types from manifest
+            var organization = manifestResources.OfType<Organization>().FirstOrDefault();
+            var device = manifestResources.OfType<Device>().FirstOrDefault();
+            var censusList = manifestResources.OfType<Hl7.Fhir.Model.List>().FirstOrDefault();
             var aggregateReports = manifestResources.OfType<MeasureReport>().Where(IsAggregateMeasureReport).ToList();
+            var operationOutcome = manifestResources.OfType<OperationOutcome>().FirstOrDefault();
+
             _logger.LogInformation("Found {Count} aggregate MeasureReports", aggregateReports.Count);
 
             if (aggregateReports.Any())
@@ -211,12 +217,10 @@ namespace LantanaGroup.Link.Submission.Application.Services
                 _logger.LogWarning("No aggregate reports detected in manifest after parsing.");
             }
 
-            var allSharedResources = manifestResources.Where(r => r is not MeasureReport).ToList();
-
             string measureFolder = GetMeasureFolderPath(value.ReportTypes);
             string reportName = ReportHelpers.GetReportName(key.ReportScheduleId, key.FacilityId, value.ReportTypes, value.StartDate);
 
-            string? nhsnOrgId = allSharedResources.OfType<Organization>().FirstOrDefault()?.Identifier
+            string? nhsnOrgId = organization?.Identifier
                 .FirstOrDefault(i => i.System == "https://www.cdc.gov/nhsn/OrgID")?.Value;
             nhsnOrgId ??= key.FacilityId;
 
@@ -238,13 +242,10 @@ namespace LantanaGroup.Link.Submission.Application.Services
             }
 
             // Find patient IDs from the List resource in manifest
-            var patientList = manifestResources.OfType<Hl7.Fhir.Model.List>()
-                .FirstOrDefault(l => l.Entry?.Any(e => e.Item?.Reference?.StartsWith("Patient/") == true) == true);
-
             var patientIds = new List<string>();
-            if (patientList != null)
+            if (censusList != null)
             {
-                foreach (var entry in patientList.Entry ?? new List<Hl7.Fhir.Model.List.EntryComponent>())
+                foreach (var entry in censusList.Entry ?? new List<Hl7.Fhir.Model.List.EntryComponent>())
                 {
                     var refId = entry.Item?.Reference?.Split('/').Last();
                     if (!string.IsNullOrEmpty(refId))
@@ -264,7 +265,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
                 .Select(k => k.Replace("patient-", "").Replace(".ndjson", ""))
                 .ToList();
 
-            patientIds.AddRange(idsFromFiles.Except(patientIds));  // add any missing
+            patientIds.AddRange(idsFromFiles.Except(patientIds));
             patientIds = patientIds.Distinct().ToList();
 
             _logger.LogInformation("Discovered {Count} unique patient IDs for bundle creation: {Ids}", patientIds.Count, string.Join(", ", patientIds));
@@ -311,9 +312,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
 
                 _logger.LogInformation("Found individual MeasureReport ID {MRId} for patient {PatientId}", patientMR.Id ?? "no-id", patientId);
 
-                var references = FindReferencesInResources(patientResources);
-                var selectedSharedResources = allSharedResources.Where(r => references.Contains((r.TypeName, r.Id))).ToList();
-
+                // Create expanded bundle with patient resources only (no shared resources from manifest)
                 var expandedBundle = new Bundle
                 {
                     Type = Bundle.BundleType.Collection,
@@ -327,15 +326,6 @@ namespace LantanaGroup.Link.Submission.Application.Services
                 });
 
                 foreach (var resource in patientResources.Where(r => r != patientMR))
-                {
-                    expandedBundle.Entry.Add(new Bundle.EntryComponent
-                    {
-                        FullUrl = $"http://www.cdc.gov/nhsn/fhirportal/dqm/ig/{resource.TypeName}/{resource.Id}",
-                        Resource = resource
-                    });
-                }
-
-                foreach (var resource in selectedSharedResources)
                 {
                     expandedBundle.Entry.Add(new Bundle.EntryComponent
                     {
@@ -367,7 +357,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
                 var aggregateJson = JsonSerializer.Serialize(aggregate, jsonOptions);
                 byte[] aggregateBytes = Encoding.UTF8.GetBytes(aggregateJson);
 
-                string measureName = new Uri(aggregate.Measure).Segments.Last().Split('|')[0];
+                string measureName = aggregate.Measure.Split('/').Last().Split('|')[0];
                 string aggregateName = $"aggregate-{measureName}.json";
 
                 string blobName = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, aggregateName);
@@ -390,39 +380,30 @@ namespace LantanaGroup.Link.Submission.Application.Services
 
                 var aggregateJson = JsonSerializer.Serialize(fallbackAgg, jsonOptions);
                 byte[] aggregateBytes = Encoding.UTF8.GetBytes(aggregateJson);
-                string measureName = new Uri(fallbackAgg.Measure).Segments.Last().Split('|')[0];
+                string measureName = fallbackAgg.Measure.Split('/').Last().Split('|')[0];
                 string aggregateName = $"aggregate-{measureName}.json";
                 string blobName = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, aggregateName);
                 _logger.LogDebug("Fallback uploading aggregate: {BlobName}", blobName);
 
-                // upload code same as loop
                 BlockBlobClient blobClient = _externalContainerClient!.GetBlockBlobClient(blobName);
                 BlockBlobOpenWriteOptions blobOptions = new() { HttpHeaders = new BlobHttpHeaders { ContentType = "application/json" } };
                 await using var stream = await blobClient.OpenWriteAsync(true, blobOptions, cancellationToken);
                 await stream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(fallbackAgg, jsonOptions)), cancellationToken);
             }
 
-            // shared-resources.json
+            // shared-resources.json - now an EMPTY Bundle
             var sharedBundle = new Bundle
             {
                 Type = Bundle.BundleType.Collection,
                 Timestamp = DateTimeOffset.UtcNow
             };
-
-            foreach (var shared in allSharedResources)
-            {
-                sharedBundle.Entry.Add(new Bundle.EntryComponent
-                {
-                    FullUrl = $"http://www.cdc.gov/nhsn/fhirportal/dqm/ig/{shared.TypeName}/{shared.Id}",
-                    Resource = shared
-                });
-            }
+            // No entries added - empty bundle
 
             var sharedJson = JsonSerializer.Serialize(sharedBundle, jsonOptions);
             byte[] sharedBytes = Encoding.UTF8.GetBytes(sharedJson);
 
             string sharedBlobName = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, "shared-resources.json");
-            _logger.LogDebug("Uploading shared resources bundle: {BlobName}", sharedBlobName);
+            _logger.LogDebug("Uploading empty shared resources bundle: {BlobName}", sharedBlobName);
 
             BlockBlobClient sharedClient = _externalContainerClient!.GetBlockBlobClient(sharedBlobName);
             BlockBlobOpenWriteOptions sharedOptions = new()
@@ -433,65 +414,28 @@ namespace LantanaGroup.Link.Submission.Application.Services
             await using var sharedStream = await sharedClient.OpenWriteAsync(true, sharedOptions, cancellationToken);
             await sharedStream.WriteAsync(sharedBytes, cancellationToken);
 
-            DateTime endDate;
-            if(value.EndDate.HasValue)
+            // census.json - use the List from manifest as-is
+            if (censusList != null)
             {
-                endDate = value.EndDate.Value;
+                var censusJson = JsonSerializer.Serialize(censusList, jsonOptions);
+                byte[] censusBytes = Encoding.UTF8.GetBytes(censusJson);
+
+                string censusBlobName = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, "census.json");
+                _logger.LogDebug("Uploading census file: {BlobName}", censusBlobName);
+
+                BlockBlobClient censusClient = _externalContainerClient!.GetBlockBlobClient(censusBlobName);
+                await using var censusStream = await censusClient.OpenWriteAsync(true, sharedOptions, cancellationToken);
+                await censusStream.WriteAsync(censusBytes, cancellationToken);
             }
             else
             {
-                endDate = value.StartDate.Value.AddDays(1).AddTicks(-1);
+                _logger.LogWarning("No census List found in manifest - skipping census.json upload");
             }
 
-            // census.json
-            var censusList = new Hl7.Fhir.Model.List
+            // submitting-org.json - use Organization from manifest
+            if (organization != null)
             {
-                Id = Guid.NewGuid().ToString(),
-                Meta = new Meta { Profile = new[] { "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/poi-list" } },
-                Extension = new List<Extension>
-                {
-                    new Extension
-                    {
-                        Url = "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-patient-list-applicable-period-extension",
-                        Value = new Period
-                        {
-                            StartElement = new FhirDateTime(value.StartDate.Value),
-                            EndElement = new FhirDateTime(endDate)
-                        }
-                    }
-                },
-                Identifier = new List<Identifier>
-                {
-                    new Identifier { System = "https://nhsnlink.org", Value = "NHSNAcuteCareHospitalMonthlyInitialPopulation" }
-                },
-                Status = List.ListStatus.Current,
-                Mode = ListMode.Snapshot
-            };
-
-            foreach (var patientId in patientIds)
-            {
-                censusList.Entry.Add(new Hl7.Fhir.Model.List.EntryComponent
-                {
-                    Item = new ResourceReference($"Patient/{patientId}")
-                });
-            }
-
-            var censusJson = JsonSerializer.Serialize(censusList, jsonOptions);
-            byte[] censusBytes = Encoding.UTF8.GetBytes(censusJson);
-
-            string censusBlobName = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, "census.json");
-            _logger.LogDebug("Uploading census file: {BlobName}", censusBlobName);
-
-            BlockBlobClient censusClient = _externalContainerClient!.GetBlockBlobClient(censusBlobName);
-            await using var censusStream = await censusClient.OpenWriteAsync(true, sharedOptions, cancellationToken);
-            await censusStream.WriteAsync(censusBytes, cancellationToken);
-
-            // submitting-org.json
-            var submittingOrg = allSharedResources.OfType<Organization>()
-                .FirstOrDefault(o => o.Meta?.Profile?.Any(p => p.Contains("nhsn-submitting-organization")) == true);
-            if (submittingOrg != null)
-            {
-                var orgJson = JsonSerializer.Serialize(submittingOrg, jsonOptions);
+                var orgJson = JsonSerializer.Serialize(organization, jsonOptions);
                 byte[] orgBytes = Encoding.UTF8.GetBytes(orgJson);
                 string orgBlobName = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, "submitting-org.json");
                 _logger.LogDebug("Uploading submitting organization: {BlobName}", orgBlobName);
@@ -500,13 +444,15 @@ namespace LantanaGroup.Link.Submission.Application.Services
                 await using var orgStream = await orgClient.OpenWriteAsync(true, sharedOptions, cancellationToken);
                 await orgStream.WriteAsync(orgBytes, cancellationToken);
             }
-
-            // submitting-device.json
-            var submittingDevice = allSharedResources.OfType<Device>()
-                .FirstOrDefault(d => d.Meta?.Profile?.Any(p => p.Contains("nhsn-submitting-device")) == true);
-            if (submittingDevice != null)
+            else
             {
-                var deviceJson = JsonSerializer.Serialize(submittingDevice, jsonOptions);
+                _logger.LogWarning("No Organization found in manifest - skipping submitting-org.json upload");
+            }
+
+            // submitting-device.json - use Device from manifest
+            if (device != null)
+            {
+                var deviceJson = JsonSerializer.Serialize(device, jsonOptions);
                 byte[] deviceBytes = Encoding.UTF8.GetBytes(deviceJson);
                 string deviceBlobName = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, "submitting-device.json");
                 _logger.LogDebug("Uploading submitting device: {BlobName}", deviceBlobName);
@@ -514,6 +460,27 @@ namespace LantanaGroup.Link.Submission.Application.Services
                 BlockBlobClient deviceClient = _externalContainerClient!.GetBlockBlobClient(deviceBlobName);
                 await using var deviceStream = await deviceClient.OpenWriteAsync(true, sharedOptions, cancellationToken);
                 await deviceStream.WriteAsync(deviceBytes, cancellationToken);
+            }
+            else
+            {
+                _logger.LogWarning("No Device found in manifest - skipping submitting-device.json upload");
+            }
+
+            // validation.json - use OperationOutcome from manifest
+            if (operationOutcome != null)
+            {
+                var validationJson = JsonSerializer.Serialize(operationOutcome, jsonOptions);
+                byte[] validationBytes = Encoding.UTF8.GetBytes(validationJson);
+                string validationBlobName = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, "validation.json");
+                _logger.LogDebug("Uploading validation file: {BlobName}", validationBlobName);
+
+                BlockBlobClient validationClient = _externalContainerClient!.GetBlockBlobClient(validationBlobName);
+                await using var validationStream = await validationClient.OpenWriteAsync(true, sharedOptions, cancellationToken);
+                await validationStream.WriteAsync(validationBytes, cancellationToken);
+            }
+            else
+            {
+                _logger.LogWarning("No OperationOutcome found in manifest - skipping validation.json upload");
             }
 
             _logger.LogInformation("Completed processing and uploading {PatientCount} expanded patient bundles", patientIds.Count);
