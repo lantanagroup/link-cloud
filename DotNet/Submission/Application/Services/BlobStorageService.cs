@@ -178,11 +178,19 @@ namespace LantanaGroup.Link.Submission.Application.Services
             var lines = manifestContent.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             foreach (var line in lines)
             {
+                var trimmed = line.Trim();
+                if (string.IsNullOrWhiteSpace(trimmed) || !trimmed.StartsWith("{")) continue;
+
+                // Quick skip for known non-essential / problematic types
+                if (trimmed.Contains("\"resourceType\":\"OperationOutcome\""))
+                {
+                    _logger.LogDebug("Skipping OperationOutcome line (validation.json not needed)");
+                    continue;
+                }
+
                 try
                 {
-                    // Clean the JSON by removing properties with empty string values
-                    var cleanedLine = CleanEmptyStringProperties(line);
-
+                    var cleanedLine = CleanEmptyStringProperties(trimmed);
                     var resource = JsonSerializer.Deserialize<Resource>(cleanedLine, jsonOptions);
                     if (resource != null)
                     {
@@ -191,8 +199,8 @@ namespace LantanaGroup.Link.Submission.Application.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to deserialize manifest line. Line preview: {LinePreview}",
-                        line.Length > 200 ? line.Substring(0, 200) + "..." : line);
+                    _logger.LogWarning(ex, "Failed to deserialize manifest line. Preview: {Preview}",
+                        trimmed.Length > 200 ? trimmed.Substring(0, 200) + "..." : trimmed);
                 }
             }
 
@@ -473,21 +481,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
             }
 
             // validation.json - use OperationOutcome from manifest
-            if (operationOutcome != null)
-            {
-                var validationJson = JsonSerializer.Serialize(operationOutcome, jsonOptions);
-                byte[] validationBytes = Encoding.UTF8.GetBytes(validationJson);
-                string validationBlobName = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, "validation.json");
-                _logger.LogDebug("Uploading validation file: {BlobName}", validationBlobName);
-
-                BlockBlobClient validationClient = _externalContainerClient!.GetBlockBlobClient(validationBlobName);
-                await using var validationStream = await validationClient.OpenWriteAsync(true, sharedOptions, cancellationToken);
-                await validationStream.WriteAsync(validationBytes, cancellationToken);
-            }
-            else
-            {
-                _logger.LogWarning("No OperationOutcome found in manifest - skipping validation.json upload");
-            }
+            _logger.LogInformation("Skipping validation.json upload as per current requirements");
 
             _logger.LogInformation("Completed processing and uploading {PatientCount} expanded patient bundles", patientIds.Count);
         }
@@ -527,29 +521,6 @@ namespace LantanaGroup.Link.Submission.Application.Services
 
             // Fallback: use the first report type or empty string
             return reportTypes.FirstOrDefault() ?? string.Empty;
-        }
-
-        private HashSet<(string ResourceType, string ResourceId)> FindReferencesInResources(List<Resource> resources)
-        {
-            var references = new HashSet<(string, string)>();
-            var jsonOptions = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
-
-            foreach (var resource in resources)
-            {
-                try
-                {
-                    var json = JsonSerializer.Serialize(resource, jsonOptions);
-                    var doc = JsonDocument.Parse(json);
-
-                    FindReferencesInJson(doc.RootElement, references);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to find references in resource {}", resource.TypeName);
-                }
-            }
-
-            return references;
         }
 
         private void FindReferencesInJson(JsonElement element, HashSet<(string, string)> references)
