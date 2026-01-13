@@ -1,9 +1,9 @@
-﻿using Azure.Identity;
-using DataAcquisition.Domain.Application.Queries;
+﻿using DataAcquisition.Domain.Application.Queries;
 using FluentValidation;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services;
+using LantanaGroup.Link.Shared.Application.Services.SecretManager;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
@@ -31,14 +31,13 @@ using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Settings.Configuration;
@@ -49,13 +48,14 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 public static class GeneralStartupExtensions
 {
     public static void RegisterAll(
-        this WebApplicationBuilder builder, 
+        this WebApplicationBuilder builder,
         string serviceName,
-        bool? configureRedis = false)
+        bool? configureRedis = false,
+        bool? configureSecretManager = false)
     {
         // load external configuration source (if specified)
         builder.AddExternalConfiguration(serviceName);
-        
+
         builder.Configuration.RegisterMonitoring(builder.Logging, builder.Services);
         builder.Services.RegisterConfigs(builder.Configuration);
         builder.RegisterEntityFramework();
@@ -63,6 +63,11 @@ public static class GeneralStartupExtensions
         if (configureRedis.GetValueOrDefault())
         {
             builder.RegisterRedis();
+        }
+
+        if (configureSecretManager.GetValueOrDefault())
+        {
+            builder.Services.RegisterSecretManager(builder.Configuration);
         }
 
         builder.Services.RegisterInMemoryCache();
@@ -116,6 +121,7 @@ public static class GeneralStartupExtensions
         services.Configure<CorsSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
         services.Configure<LinkTokenServiceSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
         services.Configure<ApiSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.ApiSettings));
+        services.Configure<SecretManagerSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.SecretManagement));
 
         IConfigurationSection consumerSettingsSection = configuration.GetRequiredSection(nameof(ConsumerSettings));
         services.Configure<ConsumerSettings>(consumerSettingsSection);
@@ -250,6 +256,29 @@ public static class GeneralStartupExtensions
         //Data Pull Commands
         services.AddTransient<IReadFhirCommand, ReadFhirCommand>();
         services.AddTransient<ISearchFhirCommand, SearchFhirCommand>();
+    }
+
+    private static void RegisterSecretManager(this IServiceCollection services, IConfiguration configuration)
+    {
+        var manager = configuration.GetValue<string>("SecretManagement:Manager");
+
+        if (string.Equals(manager, "AzureKeyVault", StringComparison.OrdinalIgnoreCase))
+        {
+            Log.Information("Registering Azure Key Vault Secret Manager");
+            services.AddSingleton<ISecretManager, AzureKeyVaultSecretManager>();
+        }
+        else
+        {
+            // LocalSecretManager requires Data Protection for encrypted file storage
+            services.AddDataProtection()
+                .SetApplicationName(configuration.GetValue<string>("DataProtection:KeyRing") ?? "Link");
+
+            Log.Information("Registering Local Secret Manager (file-based with encryption)");
+            services.AddSingleton<ISecretManager, LocalSecretManager>();
+        }
+
+        // Register credential service (depends on ISecretManager)
+        services.AddScoped<ISftpCredentialService, SftpCredentialService>();
     }
 
     public static void RegisterFactories(this IServiceCollection services, IConfigurationManager configuration)

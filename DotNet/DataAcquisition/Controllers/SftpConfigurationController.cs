@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
@@ -21,15 +22,18 @@ public class SftpConfigurationController : Controller
     private readonly ILogger<SftpConfigurationController> _logger;
     private readonly ISftpConfigurationManager _sftpConfigurationManager;
     private readonly ISftpConfigurationQueries _sftpConfigurationQueries;
+    private readonly ISftpCredentialService _sftpCredentialService;
 
     public SftpConfigurationController(
         ILogger<SftpConfigurationController> logger,
         ISftpConfigurationManager sftpConfigurationManager,
-        ISftpConfigurationQueries sftpConfigurationQueries)
+        ISftpConfigurationQueries sftpConfigurationQueries,
+        ISftpCredentialService sftpCredentialService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _sftpConfigurationManager = sftpConfigurationManager ?? throw new ArgumentNullException(nameof(sftpConfigurationManager));
         _sftpConfigurationQueries = sftpConfigurationQueries ?? throw new ArgumentNullException(nameof(sftpConfigurationQueries));
+        _sftpCredentialService = sftpCredentialService ?? throw new ArgumentNullException(nameof(sftpCredentialService));
     }
 
     /// <summary>
@@ -43,7 +47,7 @@ public class SftpConfigurationController : Controller
     ///     Bad Request: 400
     ///     Server Error: 500
     /// </returns>
-    [HttpGet("sftpConfiguration/{id}")]
+    [HttpGet("sftp-configurations/{id}")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(SftpConfigurationModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -87,7 +91,7 @@ public class SftpConfigurationController : Controller
     ///     Bad Request: 400
     ///     Server Error: 500
     /// </returns>
-    [HttpGet("{organizationId}/sftpConfiguration")]
+    [HttpGet("{organizationId}/sftp-configurations")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(SftpConfigurationModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -123,10 +127,11 @@ public class SftpConfigurationController : Controller
 
     /// <summary>
     /// Creates an SftpConfiguration record for an organization. Should only be used for initial configuration.
+    /// Optionally accepts credentials which will be stored securely in a configured secret manager.
     /// Supported Authentication Types: Basic (default)
     /// </summary>
     /// <param name="organizationId">The organization identifier.</param>
-    /// <param name="sftpConfiguration">The SFTP configuration model.</param>
+    /// <param name="sftpConfiguration">The SFTP configuration model with optional credentials.</param>
     /// <param name="cancellationToken"></param>
     /// <returns>
     ///     Success: 201
@@ -135,13 +140,13 @@ public class SftpConfigurationController : Controller
     ///     Organization Already Exists: 409
     ///     Server Error: 500
     /// </returns>
-    [HttpPost("{organizationId}/sftpConfiguration")]
+    [HttpPost("{organizationId}/sftp-configurations")]
     [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(SftpConfigurationModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<SftpConfigurationModel>> CreateSftpConfiguration(string organizationId, SftpConfigurationModel? sftpConfiguration, CancellationToken cancellationToken)
+    public async Task<ActionResult<SftpConfigurationModel>> CreateSftpConfiguration(string organizationId, CreateSftpConfigurationModel? sftpConfiguration, CancellationToken cancellationToken)
     {
         var httpContext = HttpContext;
 
@@ -161,8 +166,29 @@ public class SftpConfigurationController : Controller
             sftpConfiguration.AuthenticationProtocol = AuthType.Basic;
 
             organizationId = organizationId.SanitizeAndRemove();
+
+            // Create the configuration in the database
             var result =
                 await _sftpConfigurationManager.CreateAsync(sftpConfiguration, organizationId, cancellationToken);
+
+            // If credentials were provided, store them in the configured secret manager
+            if (sftpConfiguration.Credentials is not null &&
+                !string.IsNullOrWhiteSpace(sftpConfiguration.Credentials.Username) &&
+                !string.IsNullOrWhiteSpace(sftpConfiguration.Credentials.Password))
+            {
+                var credentialResult = await _sftpCredentialService.SetCredentialsAsync(
+                    organizationId,
+                    sftpConfiguration.Credentials,
+                    cancellationToken);
+
+                if (!credentialResult)
+                {
+                    _logger.LogWarning(
+                        new EventId(LoggingIds.InsertItem, "CreateSftpConfiguration"),
+                        "SFTP configuration created but credentials could not be stored for organizationId: {OrganizationId}",
+                        organizationId);
+                }
+            }
 
             return CreatedAtAction(nameof(GetOrgSftpConfiguration),
                 new { organizationId },
@@ -200,7 +226,7 @@ public class SftpConfigurationController : Controller
     ///     Not Found: 404
     ///     Server Error: 500
     /// </returns>
-    [HttpPut("sftpConfiguration")]
+    [HttpPut("sftp-configurations")]
     [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(SftpConfigurationModel))]
     [ProducesResponseType(StatusCodes.Status304NotModified)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -264,7 +290,7 @@ public class SftpConfigurationController : Controller
     ///     Not Found: 404
     ///     Server Error: 500
     /// </returns>
-    [HttpDelete("{organizationId}/sftpConfiguration")]
+    [HttpDelete("{organizationId}/sftp-configurations")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -281,7 +307,24 @@ public class SftpConfigurationController : Controller
             }
 
             organizationId = organizationId.SanitizeAndRemove();
+
+            // Delete the configuration from the database
             var result = await _sftpConfigurationManager.DeleteAsync(organizationId, cancellationToken);
+
+            // Also delete credentials from Key Vault (if they exist)
+            try
+            {
+                await _sftpCredentialService.DeleteCredentialsAsync(organizationId, cancellationToken);
+            }
+            catch (Exception credEx)
+            {
+                // Log but don't fail the request if credential deletion fails
+                _logger.LogWarning(
+                    new EventId(LoggingIds.DeleteItem, "DeleteSftpConfiguration"),
+                    credEx,
+                    "SFTP configuration deleted but credentials could not be removed for organizationId: {OrganizationId}",
+                    organizationId);
+            }
 
             return Accepted(result);
         }
@@ -292,4 +335,174 @@ public class SftpConfigurationController : Controller
             return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
+
+    #region Credential Endpoints
+
+    /// <summary>
+    /// Updates SFTP credentials for an organization's configuration.
+    /// Credentials are stored securely in a configured secret manager.
+    /// </summary>
+    /// <param name="organizationId">The organization identifier.</param>
+    /// <param name="credentials">The credentials to store.</param>
+    /// <param name="cancellationToken"></param>
+    /// <returns>
+    ///     Success: 202
+    ///     Bad Request: 400
+    ///     Not Found: 404
+    ///     Server Error: 500
+    /// </returns>
+    [HttpPut("{organizationId}/sftp-configurations/credentials")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult> UpdateSftpCredentials(string organizationId, SftpCredentialsModel? credentials, CancellationToken cancellationToken)
+    {
+        var httpContext = HttpContext;
+
+        try
+        {
+            if (string.IsNullOrWhiteSpace(organizationId))
+            {
+                return BadRequest("OrganizationId is null or empty.");
+            }
+
+            if (credentials is null)
+            {
+                return BadRequest("Credentials are required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(credentials.Username))
+            {
+                return BadRequest("Username is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(credentials.Password))
+            {
+                return BadRequest("Password is required.");
+            }
+
+            organizationId = organizationId.SanitizeAndRemove();
+
+            // Verify the SFTP configuration exists
+            var existingConfig = await _sftpConfigurationQueries.GetByOrganizationIdAsync(organizationId, cancellationToken);
+            if (existingConfig is null)
+            {
+                return NotFound($"No {nameof(SftpConfiguration)} found for organization: {organizationId}. Create a configuration first.");
+            }
+
+            var result = await _sftpCredentialService.SetCredentialsAsync(organizationId, credentials, cancellationToken);
+
+            if (!result)
+            {
+                return Problem("Failed to store credentials.", statusCode: (int)HttpStatusCode.InternalServerError);
+            }
+
+            return Accepted();
+        }
+        catch (Exception ex)
+        {
+            var message = $"An unexpected error occurred while attempting to update SFTP credentials for organizationId: {organizationId}. Trace Id: {httpContext.TraceIdentifier}";
+            _logger.LogError(new EventId(LoggingIds.UpdateItem, "UpdateSftpCredentials"), ex, "An exception occurred while attempting to update SFTP credentials for organizationId: {OrganizationId}", organizationId);
+            return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Gets the credential status for an organization's SFTP configuration.
+    /// Returns whether credentials exist, without exposing the actual values.
+    /// </summary>
+    /// <param name="organizationId">The organization identifier.</param>
+    /// <param name="cancellationToken"></param>
+    /// <returns>
+    ///     Success: 200
+    ///     Bad Request: 400
+    ///     Not Found: 404
+    ///     Server Error: 500
+    /// </returns>
+    [HttpGet("{organizationId}/sftp-configurations/credentials/status")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(SftpCredentialStatusModel))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<SftpCredentialStatusModel>> GetSftpCredentialStatus(string organizationId, CancellationToken cancellationToken)
+    {
+        var httpContext = HttpContext;
+
+        try
+        {
+            if (string.IsNullOrWhiteSpace(organizationId))
+            {
+                return BadRequest("OrganizationId is null or empty.");
+            }
+
+            organizationId = organizationId.SanitizeAndRemove();
+
+            // Verify the SFTP configuration exists
+            var existingConfig = await _sftpConfigurationQueries.GetByOrganizationIdAsync(organizationId, cancellationToken);
+            if (existingConfig is null)
+            {
+                return NotFound($"No {nameof(SftpConfiguration)} found for organization: {organizationId}");
+            }
+
+            var result = await _sftpCredentialService.GetCredentialStatusAsync(organizationId, cancellationToken);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            var message = $"An unexpected error occurred while attempting to get SFTP credential status for organizationId: {organizationId}. Trace Id: {httpContext.TraceIdentifier}";
+            _logger.LogError(new EventId(LoggingIds.GetItem, "GetSftpCredentialStatus"), ex, "An exception occurred while attempting to get SFTP credential status for organizationId: {OrganizationId}", organizationId);
+            return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Deletes SFTP credentials for an organization.
+    /// The SFTP configuration itself is not deleted.
+    /// </summary>
+    /// <param name="organizationId">The organization identifier.</param>
+    /// <param name="cancellationToken"></param>
+    /// <returns>
+    ///     Success: 202
+    ///     Bad Request: 400
+    ///     Not Found: 404
+    ///     Server Error: 500
+    /// </returns>
+    [HttpDelete("{organizationId}/sftp-configurations/credentials")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult> DeleteSftpCredentials(string organizationId, CancellationToken cancellationToken)
+    {
+        var httpContext = HttpContext;
+
+        try
+        {
+            if (string.IsNullOrWhiteSpace(organizationId))
+            {
+                return BadRequest("OrganizationId is null or empty.");
+            }
+
+            organizationId = organizationId.SanitizeAndRemove();
+
+            // Verify the SFTP configuration exists
+            var existingConfig = await _sftpConfigurationQueries.GetByOrganizationIdAsync(organizationId, cancellationToken);
+            if (existingConfig is null)
+            {
+                return NotFound($"No {nameof(SftpConfiguration)} found for organization: {organizationId}");
+            }
+
+            var result = await _sftpCredentialService.DeleteCredentialsAsync(organizationId, cancellationToken);
+            return Accepted(result);
+        }
+        catch (Exception ex)
+        {
+            var message = $"An unexpected error occurred while attempting to delete SFTP credentials for organizationId: {organizationId}. Trace Id: {httpContext.TraceIdentifier}";
+            _logger.LogError(new EventId(LoggingIds.DeleteItem, "DeleteSftpCredentials"), ex, "An exception occurred while attempting to delete SFTP credentials for organizationId: {OrganizationId}", organizationId);
+            return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    #endregion
 }

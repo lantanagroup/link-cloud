@@ -14,6 +14,19 @@ public class SftpConfigurationModel
     public AuthType AuthenticationProtocol { get; set; }
 }
 
+/// <summary>
+/// Model for creating SFTP configuration with optional credentials.
+/// Credentials are stored separately in Azure Key Vault, not in the database.
+/// </summary>
+public class CreateSftpConfigurationModel : SftpConfigurationModel
+{
+    /// <summary>
+    /// Optional credentials for basic authentication.
+    /// Will be stored in Azure Key Vault, not in the database.
+    /// </summary>
+    public SftpCredentialsModel? Credentials { get; set; }
+}
+
 public static class SftpConfigurationModelExtensions
 {
     public static SftpConfigurationModel ToModel(this Infrastructure.Entities.SftpConfiguration entity)

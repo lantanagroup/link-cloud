@@ -19,6 +19,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
@@ -38,7 +39,14 @@ static void RegisterServices(WebApplicationBuilder builder)
 {
     var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
 
-    builder.RegisterAll(DataAcquisitionConstants.ServiceName, true);
+    // Determine if secret manager should be enabled based on configuration
+    var secretManagerEnabled = builder.Configuration.GetValue<bool>("SecretManagement:Enabled");
+
+    builder.RegisterAll(DataAcquisitionConstants.ServiceName, configureRedis: true, configureSecretManager: secretManagerEnabled);
+
+    // Add Data Protection
+    builder.Services.AddDataProtection()
+        .SetApplicationName(builder.Configuration.GetValue<string>("DataProtection:KeyRing") ?? "Link");
 
     builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
 
