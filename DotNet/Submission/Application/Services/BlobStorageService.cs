@@ -180,7 +180,8 @@ namespace LantanaGroup.Link.Submission.Application.Services
             {
                 try
                 {
-                    var resource = JsonSerializer.Deserialize<Resource>(line, jsonOptions);
+                    var patchedLine = PatchEmptyDeviceVersionValue(line);
+                    var resource = JsonSerializer.Deserialize<Resource>(patchedLine, jsonOptions);
                     if (resource != null)
                     {
                         manifestResources.Add(resource);
@@ -289,7 +290,8 @@ namespace LantanaGroup.Link.Submission.Application.Services
                 {
                     try
                     {
-                        var res = JsonSerializer.Deserialize<Resource>(line, jsonOptions);
+                        var patchedLine = PatchEmptyDeviceVersionValue(line);
+                        var res = JsonSerializer.Deserialize<Resource>(patchedLine, jsonOptions);
                         if (res != null) patientResources.Add(res);
                     }
                     catch (Exception ex)
@@ -485,6 +487,69 @@ namespace LantanaGroup.Link.Submission.Application.Services
 
             _logger.LogInformation("Completed processing and uploading {PatientCount} expanded patient bundles", patientIds.Count);
         }
+
+        private static string PatchEmptyDeviceVersionValue(string json)
+        {
+            using var doc = JsonDocument.Parse(json);
+
+            if (!doc.RootElement.TryGetProperty("resourceType", out var rt) ||
+                rt.GetString() != "Device")
+            {
+                return json;
+            }
+
+            if (!doc.RootElement.TryGetProperty("version", out var versions) ||
+                versions.ValueKind != JsonValueKind.Array)
+            {
+                return json;
+            }
+
+            using var stream = new MemoryStream();
+            using var writer = new Utf8JsonWriter(stream);
+
+            writer.WriteStartObject();
+
+            foreach (var prop in doc.RootElement.EnumerateObject())
+            {
+                if (prop.NameEquals("version"))
+                {
+                    writer.WritePropertyName("version");
+                    writer.WriteStartArray();
+
+                    foreach (var v in prop.Value.EnumerateArray())
+                    {
+                        writer.WriteStartObject();
+
+                        if (v.TryGetProperty("value", out var val) &&
+                            val.ValueKind == JsonValueKind.String &&
+                            string.IsNullOrWhiteSpace(val.GetString()))
+                        {
+                            // 🔑 PLACEHOLDER
+                            writer.WriteString("value", "unknown");
+                        }
+                        else
+                        {
+                            foreach (var inner in v.EnumerateObject())
+                                inner.WriteTo(writer);
+                        }
+
+                        writer.WriteEndObject();
+                    }
+
+                    writer.WriteEndArray();
+                }
+                else
+                {
+                    prop.WriteTo(writer);
+                }
+            }
+
+            writer.WriteEndObject();
+            writer.Flush();
+
+            return Encoding.UTF8.GetString(stream.ToArray());
+        }
+
 
         private bool IsAggregateMeasureReport(MeasureReport measureReport)
         {
