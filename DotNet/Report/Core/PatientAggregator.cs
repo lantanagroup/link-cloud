@@ -50,6 +50,8 @@ namespace LantanaGroup.Link.Report.Core
 
         public async Task<AggregateResult> AggregateToABS(string patientId, ReportSchedule reportSchedule)
         {
+            //TODO: Add error check to see if _containerClient is null
+
             AggregateResult aggregateResult = new AggregateResult();
 
             var entry = (await _database.ReportEntryRepository.SingleOrDefaultAsync(x => x.ReportScheduleId == reportSchedule.Id && x.PatientId == patientId));

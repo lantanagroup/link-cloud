@@ -36,7 +36,10 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task<ReportPopulation> AddAsync(ReportPopulation entry, CancellationToken cancellationToken)
         {
-            return await _database.ReportPopulationRepository.AddAsync(entry, cancellationToken);
+            await _database.ReportPopulationRepository.AddAsync(entry, cancellationToken);
+            await _database.SaveChangesAsync();
+
+            return entry;
         }
 
         public async Task<ReportPopulation> AddAsyncWithAggregateResult(string facilityId, string reportId, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken)
@@ -68,7 +71,10 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 populationModel.GroupPopulationList.Add(group);
             }
 
-            return await _database.ReportPopulationRepository.AddAsync(populationModel, cancellationToken);
+            await _database.ReportPopulationRepository.AddAsync(populationModel, cancellationToken);
+            await _database.SaveChangesAsync();
+
+            return populationModel;
         }
 
         public async Task<ReportPopulation> UpdateAsyncWithAggregateResult(ReportPopulation populationModel, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken)
@@ -106,7 +112,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             }
 
             _database.ReportPopulationRepository.Update(populationModel);
-            
+            await _database.SaveChangesAsync();
+
             return populationModel;
         }
 
@@ -123,6 +130,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         public async Task<ReportPopulation> UpdateAsync(ReportPopulation entry, CancellationToken cancellationToken)
         {
             _database.ReportPopulationRepository.Update(entry);
+            await _database.SaveChangesAsync();
+
             return entry;
         }
     }

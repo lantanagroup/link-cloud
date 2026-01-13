@@ -161,7 +161,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add repositories
     builder.Services.AddTransient<IEntityRepository<ReportSchedule>, EntityRepository<ReportSchedule, MongoDbContext>>();
-    builder.Services.AddTransient<IEntityRepository<ReportSchedule>, EntityRepository<ReportSchedule, MongoDbContext>>();
     builder.Services.AddTransient<IEntityRepository<ReportEntry>, EntityRepository<ReportEntry, MongoDbContext>>();
     builder.Services.AddTransient<IEntityRepository<ReportPopulation>, EntityRepository<ReportPopulation, MongoDbContext>>();
     builder.Services.AddTransient<IEntityRepository<ReportResource>, EntityRepository<ReportResource, MongoDbContext>>();
@@ -169,6 +168,9 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add Managers
     builder.Services.AddTransient<IReportScheduledManager, ReportScheduledManager>();
+    builder.Services.AddTransient<IReportEntryManager, ReportEntryManager>();
+    builder.Services.AddTransient<IReportPopulationManager, ReportPopulationManager>();
+    builder.Services.AddTransient<IReportResourceManager, ReportResourceManager>();
     builder.Services.AddTransient<ISubmissionEntryQueries, SubmissionEntryQueries>();
 
     // Add Link Security

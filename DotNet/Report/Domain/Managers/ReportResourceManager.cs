@@ -34,7 +34,10 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task<ReportResource> AddAsync(ReportResource entry, CancellationToken cancellationToken)
         {
-            return await _database.ReportResourceRepository.AddAsync(entry, cancellationToken);
+            await _database.ReportResourceRepository.AddAsync(entry, cancellationToken);
+            await _database.SaveChangesAsync();
+
+            return entry;
         }
 
         public async Task AddAsyncWithAggregateResult(string facilityId, string reportId, string patientId, AggregateResult aggregateResult, CancellationToken cancellationToken)
@@ -59,6 +62,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
                 await _database.ReportResourceRepository.AddRangeAsync(resources);
             }
+
+            await _database.SaveChangesAsync();
         }
 
         public async Task<List<ReportResource>> FindAsync(Expression<Func<ReportResource, bool>> predicate, CancellationToken cancellationToken = default)
@@ -74,6 +79,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         public async Task<ReportResource> UpdateAsync(ReportResource entry, CancellationToken cancellationToken)
         {
             _database.ReportResourceRepository.Update(entry);
+            await _database.SaveChangesAsync();
+
             return entry;
         }
     }

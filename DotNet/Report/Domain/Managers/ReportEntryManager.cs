@@ -50,7 +50,10 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task<ReportEntry> AddAsync(ReportEntry entry, CancellationToken cancellationToken)
         {
-            return await _database.ReportEntryRepository.AddAsync(entry, cancellationToken);
+            await _database.ReportEntryRepository.AddAsync(entry, cancellationToken);
+            await _database.SaveChangesAsync();
+
+            return entry;
         }
 
         public async Task<List<ReportEntry>> FindAsync(Expression<Func<ReportEntry, bool>> predicate, CancellationToken cancellationToken = default)
@@ -71,7 +74,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         public async Task<ReportEntry> UpdateAsync(ReportEntry entry)
         {
             _database.ReportEntryRepository.Update(entry);
-            
+            await _database.SaveChangesAsync();
+
             return entry;
         }
 
@@ -95,6 +99,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             }
 
             _database.ReportEntryRepository.Update(reportEntry);
+            await _database.SaveChangesAsync();
 
             return reportEntry;
         }
@@ -111,6 +116,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             }
 
             _database.ReportEntryRepository.Update(entry);
+            await _database.SaveChangesAsync();
 
             return entry;
         }
