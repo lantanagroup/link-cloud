@@ -1,6 +1,5 @@
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Text.Json;
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
@@ -107,21 +106,14 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
         foreach (var resourceReferences in logsWithResources)
         {
-            try
+            if (resourceReferences != null)
             {
-                if (resourceReferences != null)
-                {
-                    var filteredIds = resourceReferences
-                        .Where(r => r.StartsWith(resourceTypePrefix, StringComparison.OrdinalIgnoreCase))
-                        .Select(r => r.Substring(resourceTypePrefix.Length))
-                        .ToList();
+                var filteredIds = resourceReferences
+                    .Where(r => r.StartsWith(resourceTypePrefix, StringComparison.OrdinalIgnoreCase))
+                    .Select(r => r.Substring(resourceTypePrefix.Length))
+                    .ToList();
 
-                    result.AddRange(filteredIds);
-                }
-            }
-            catch (JsonException ex)
-            {
-                _logger.LogError(ex, "Failed to deserialize ResourceAcquiredIds JSON: {Json}", resourceReferences);
+                result.AddRange(filteredIds);
             }
         }
 
