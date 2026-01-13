@@ -1,9 +1,12 @@
-﻿using Azure.Identity;
+﻿using System.Diagnostics;
+using System.Net;
+using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Queries;
 using FluentValidation;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.ParameterFactories;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.QueryFactories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
@@ -34,16 +37,14 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Settings.Configuration;
-using System.Diagnostics;
-using System.Net;
+using Serilog.Sinks.SystemConsole.Themes;
+using IHostingEnvironment = Microsoft.Extensions.Hosting.IHostingEnvironment;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 public static class GeneralStartupExtensions
@@ -74,7 +75,7 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterServices();
         builder.Services.RegisterFactories(builder.Configuration);
         builder.Services.RegisterTelemetry(builder.Configuration, builder.Environment, serviceName);
-        builder.Services.RegisterProblemDetails((Microsoft.Extensions.Hosting.IHostingEnvironment)builder.Environment);
+        builder.Services.RegisterProblemDetails((IHostingEnvironment)builder.Environment);
     }
 
     public static void RegisterMonitoring(this IConfigurationManager configuration, ILoggingBuilder logging, IServiceCollection services)
@@ -96,7 +97,7 @@ public static class GeneralStartupExtensions
         {
             serilogConfig.WriteTo.Console(
                 outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}",
-                theme: Serilog.Sinks.SystemConsole.Themes.AnsiConsoleTheme.Code  // Colorful output like default console
+                theme: AnsiConsoleTheme.Code  // Colorful output like default console
             );
         }
         else
@@ -278,7 +279,7 @@ public static class GeneralStartupExtensions
 
         //Factories - Producer
         var kafkaConnection = configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>() ?? throw new Exception("Missing Kafka Connection Settings");
-        var producerConfig = new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd };
+        var producerConfig = new ProducerConfig { CompressionType = CompressionType.Zstd };
         
         services.RegisterKafkaProducer<string, object>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, string>(kafkaConnection, producerConfig);
@@ -297,6 +298,12 @@ public static class GeneralStartupExtensions
         services.AddTransient<IKafkaProducerFactory<string, ResourceAcquired>, KafkaProducerFactory<string, ResourceAcquired>>();
         services.AddTransient<IKafkaProducerFactory<string, PatientListMessage>, KafkaProducerFactory<string, PatientListMessage>>();
         services.AddTransient<IKafkaProducerFactory<long, ReadyToAcquire>, KafkaProducerFactory<long, ReadyToAcquire>>();
+
+        //Factories - Application
+        services.AddTransient<IParameterQueryFactory, ParameterQueryFactory>();
+        services.AddTransient<ILiteralParameterFactory, LiteralParameterFactory>();
+        services.AddTransient<IVariableParameterFactory, VariableParameterFactory>();
+        services.AddTransient<IResourceIdParameterFactory, ResourceIdParameterFactory>();
     }
 
     public static void RegisterTelemetry(this IServiceCollection services, IConfigurationManager configuration, IWebHostEnvironment environment, string serviceName)
@@ -311,7 +318,7 @@ public static class GeneralStartupExtensions
         });
     }
 
-    public static void RegisterProblemDetails(this IServiceCollection services, Microsoft.Extensions.Hosting.IHostingEnvironment environment)
+    public static void RegisterProblemDetails(this IServiceCollection services, IHostingEnvironment environment)
     {
         services.AddProblemDetails(options => {
             options.CustomizeProblemDetails = ctx =>
