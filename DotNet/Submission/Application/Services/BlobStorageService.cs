@@ -24,6 +24,14 @@ namespace LantanaGroup.Link.Submission.Application.Services
         private readonly BlobContainerClient? _externalContainerClient;
         private readonly bool _useNdJson;
 
+        private static readonly FhirJsonParser _fhirParser = new FhirJsonParser(
+            new ParserSettings
+            {
+                AcceptUnknownMembers = true,
+                AllowUnrecognizedEnums = true,
+                PermissiveParsing = true
+            });
+
         private static BlobContainerClient? GetContainerClient(BlobStorageSettings settings)
         {
             if (settings.ConnectionString == null)
@@ -197,18 +205,22 @@ namespace LantanaGroup.Link.Submission.Application.Services
 
                 try
                 {
-                    var resource = JsonSerializer.Deserialize<Resource>(cleanedLine, jsonOptions);
+                    var resource = _fhirParser.Parse<Resource>(cleanedLine);
                     if (resource != null)
                     {
                         manifestResources.Add(resource);
                     }
                 }
+                catch (FormatException fex)  // FhirJsonParser throws FormatException on parse failures
+                {
+                    _logger.LogWarning(fex, "FhirJsonParser failed on manifest line. Raw preview (escaped): '{Escaped}'",
+                        line.Length > 200
+                        ? line.Substring(0, 200).Replace("\r", "\\r").Replace("\n", "\\n").Replace("\0", "\\0") + "..."
+                        : line.Replace("\r", "\\r").Replace("\n", "\\n").Replace("\0", "\\0"));
+                }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Deserialization still failed after cleaning. Raw line preview (escaped): '{Escaped}'",
-                        line.Length > 200
-                            ? line.Substring(0, 200).Replace("\r", "\\r").Replace("\n", "\\n").Replace("\0", "\\0") + "..."
-                            : line.Replace("\r", "\\r").Replace("\n", "\\n").Replace("\0", "\\0"));
+                    _logger.LogWarning(ex, "Unexpected error parsing manifest line...");
                 }
             }
 
@@ -217,7 +229,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
             // Extract specific resource types from manifest
             var organization = manifestResources.OfType<Organization>().FirstOrDefault();
             var device = manifestResources.OfType<Device>().FirstOrDefault();
-            var censusList = manifestResources.OfType<Hl7.Fhir.Model.List>().FirstOrDefault();
+            var censusList = manifestResources.OfType<List>().FirstOrDefault();
             var aggregateReports = manifestResources.OfType<MeasureReport>().Where(IsAggregateMeasureReport).ToList();
             var operationOutcome = manifestResources.OfType<OperationOutcome>().FirstOrDefault();
 
