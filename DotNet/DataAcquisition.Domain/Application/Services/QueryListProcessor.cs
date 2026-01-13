@@ -72,7 +72,7 @@ public class QueryListProcessor : IQueryListProcessor
         _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
         _referenceResourceService = referenceResourceService ?? throw new ArgumentNullException(nameof(referenceResourceService));
         _dataAcquisitionLogManager = dataAcquisitionLogManager ?? throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
-        _dataAcquisitionLogQueries = dataAcquisitionLogQueries;
+        _dataAcquisitionLogQueries = dataAcquisitionLogQueries ?? throw new ArgumentNullException(nameof(dataAcquisitionLogQueries));
         _parameterQueryFactory = parameterQueryFactory ?? throw new ArgumentNullException(nameof(parameterQueryFactory));
 
         _producerConfig = new ProducerConfig();
