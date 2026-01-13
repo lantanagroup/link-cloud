@@ -228,7 +228,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             }
         }
 
-        private OperationOutcome CreateOperationOutcome(List<PatientSubmissionEntry> failedEntries)
+        private OperationOutcome CreateOperationOutcome(List<ReportEntry> failedEntries)
         {
             var operationOutcome = new OperationOutcome();
             foreach (var entry in failedEntries)

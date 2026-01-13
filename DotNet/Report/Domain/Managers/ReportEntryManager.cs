@@ -35,7 +35,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         Task<PatientReportSummary> GetPatients(string facilityId, string reportId, int page, int count, CancellationToken cancellationToken = default);
 
-        Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(Expression<Func<ReportEntry, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default);
+        //Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(Expression<Func<ReportEntry, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default);
     }
 
     public class ReportEntryManager : IReportEntryManager
@@ -164,24 +164,24 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return patientReportSummary;
         }
 
-        public async Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(Expression<Func<ReportEntry, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
-        {
-            //TODO: Refactors are probably needed here to support the new report entry model
-            // Get individual measure report entries for this report
-            var searchResults = await _database.ReportEntryRepository
-                .SearchAsync(
-                    predicate,
-                    sortBy: sortBy,
-                    sortOrder: sortOrder,
-                    pageSize: pageSize, pageNumber: pageNumber,
-                    cancellationToken);
+        //public async Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(Expression<Func<ReportEntry, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
+        //{
+        //    //TODO: Refactors are probably needed here to support the new report entry model
+        //    // Get individual measure report entries for this report
+        //    var searchResults = await _database.ReportEntryRepository
+        //        .SearchAsync(
+        //            predicate,
+        //            sortBy: sortBy,
+        //            sortOrder: sortOrder,
+        //            pageSize: pageSize, pageNumber: pageNumber,
+        //            cancellationToken);
 
 
-            // Build patient report summaries
-            var measureReports = searchResults.Item1.Select(_measureReportSummaryFactory.FromDomain).ToList();
+        //    // Build patient report summaries
+        //    var measureReports = searchResults.Item1.Select(_measureReportSummaryFactory.FromDomain).ToList();
 
-            return new PagedConfigModel<MeasureReportSummary>(measureReports, searchResults.Item2);
-        }
+        //    return new PagedConfigModel<MeasureReportSummary>(measureReports, searchResults.Item2);
+        //}
 
     }
 }

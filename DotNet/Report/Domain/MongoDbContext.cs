@@ -24,9 +24,9 @@ public class MongoDbContext : DbContext
     }
 
     public DbSet<ReportSchedule> ReportSchedules { get; set; } = null!;
-    public DbSet<PatientSubmissionEntry> PatientSubmissionEntries { get; set; } = null!;
-    public DbSet<FhirResource> FhirResources { get; set; } = null!;
-    public DbSet<PatientSubmissionEntryResourceMap> PatientEntryResourceMaps { get; set; } = null!;
+    public DbSet<ReportEntry> ReportEntries { get; set; } = null!;
+    public DbSet<ReportResource> ReportResources { get; set; } = null!;
+    public DbSet<ReportPopulation> ReportPopulations { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -35,27 +35,14 @@ public class MongoDbContext : DbContext
         modelBuilder.Entity<ReportSchedule>()
             .ToCollection("reportSchedule");
 
-        modelBuilder.Entity<PatientSubmissionEntry>()
-            .ToCollection("patientSubmissionEntry");
+        modelBuilder.Entity<ReportEntry>()
+            .ToCollection("reportEntry");
 
-        modelBuilder.Entity<FhirResource>()
-            .ToCollection("fhirResource");
+        modelBuilder.Entity<ReportResource>()
+            .ToCollection("reportResource");
 
-        modelBuilder.Entity<PatientSubmissionEntryResourceMap>()
-            .ToCollection("patientSubmissionEntryResourceMap");
-
-
-        modelBuilder.Entity<FhirResource>()
-            .Property(p => p.Resource)
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, SerializerOptions.ForFhirWithModelInspectorNoValidator),
-                v => JsonSerializer.Deserialize<Resource>(v, SerializerOptions.ForFhirLenientDeserialization)!);
-
-        modelBuilder.Entity<PatientSubmissionEntry>()
-            .Property(e => e.MeasureReport)
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, SerializerOptions.ForFhirWithModelInspectorNoValidator),
-                v => JsonSerializer.Deserialize<MeasureReport>(v, SerializerOptions.ForFhirLenientDeserialization));
+        modelBuilder.Entity<ReportPopulation>()
+            .ToCollection("reportPopulation");
 
         // Indexes for ReportSchedule
         modelBuilder.Entity<ReportSchedule>()
@@ -74,51 +61,42 @@ public class MongoDbContext : DbContext
             .HasIndex(x => x.CreateDate)
             .IsDescending();
 
-        // Indexes for PatientSubmissionEntry
-        modelBuilder.Entity<PatientSubmissionEntry>()
-            .HasIndex(x => new { x.FacilityId, x.ReportScheduleId, x.PatientId, x.ReportType });
+        // Indexes for ReportEntry
+        modelBuilder.Entity<ReportEntry>()
+            .HasIndex(x => new { x.FacilityId, x.ReportScheduleId, x.PatientId });
 
-        modelBuilder.Entity<PatientSubmissionEntry>()
-            .HasIndex(x => new { x.ReportScheduleId, x.Status });
+        modelBuilder.Entity<ReportEntry>()
+            .HasIndex(x => new { x.ReportScheduleId, x.ReportingStatus });
 
-        modelBuilder.Entity<PatientSubmissionEntry>()
+        modelBuilder.Entity<ReportEntry>()
             .HasIndex(x => new { x.FacilityId, x.PatientId });
 
-        modelBuilder.Entity<PatientSubmissionEntry>()
-            .HasIndex(x => new { x.Status, x.ValidationStatus });
+        modelBuilder.Entity<ReportEntry>()
+            .HasIndex(x => new { x.ReportingStatus, x.SubmissionStatus });
 
-        modelBuilder.Entity<PatientSubmissionEntry>()
+        modelBuilder.Entity<ReportEntry>()
             .HasIndex(x => x.ReportScheduleId);
 
-        modelBuilder.Entity<PatientSubmissionEntry>()
+        modelBuilder.Entity<ReportEntry>()
             .HasIndex(x => x.CreateDate)
             .IsDescending();
 
-        // Indexes for FhirResource
-        modelBuilder.Entity<FhirResource>()
+        // Indexes for ReportResource
+        modelBuilder.Entity<ReportResource>()
             .HasIndex(x => new { x.FacilityId, x.ResourceType, x.ResourceId });
 
-        modelBuilder.Entity<FhirResource>()
+        modelBuilder.Entity<ReportResource>()
             .HasIndex(x => new { x.FacilityId, x.PatientId });
 
-        modelBuilder.Entity<FhirResource>()
+        modelBuilder.Entity<ReportResource>()
             .HasIndex(x => x.ResourceType);
 
-        modelBuilder.Entity<FhirResource>()
-            .HasIndex(x => x.ResourceCategoryType);
+        // Indexes for ReportPopulation
+        modelBuilder.Entity<ReportPopulation>()
+            .HasIndex(x => new { x.FacilityId });
 
-        // Indexes for PatientSubmissionEntryResourceMap
-        modelBuilder.Entity<PatientSubmissionEntryResourceMap>()
-            .HasIndex(x => new { x.ReportScheduleId, x.SubmissionEntryId, x.ResourceType, x.ResourceId });
-
-        modelBuilder.Entity<PatientSubmissionEntryResourceMap>()
-            .HasIndex(x => x.ReportScheduleId);
-
-        modelBuilder.Entity<PatientSubmissionEntryResourceMap>()
-            .HasIndex(x => new { x.SubmissionEntryId, x.FhirResourceId });
-
-        modelBuilder.Entity<PatientSubmissionEntryResourceMap>()
-            .HasIndex(x => x.ReportTypes);
+        modelBuilder.Entity<ReportPopulation>()
+            .HasIndex(x => new { x.FacilityId, x.ReportScheduleId });
     }
 
     /// <summary>
@@ -151,58 +129,49 @@ public class MongoDbContext : DbContext
                 new CreateIndexModel<ReportSchedule>(reportScheduleBuilders.Descending(x => x.CreateDate), indexOptions),
                 cancellationToken: cancellationToken);
 
-            // Indexes for patientSubmissionEntry collection
-            var patientSubmissionEntryCollection = MongoDatabase.GetCollection<PatientSubmissionEntry>("patientSubmissionEntry");
-            var patientSubmissionEntryBuilders = Builders<PatientSubmissionEntry>.IndexKeys;
-            await patientSubmissionEntryCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<PatientSubmissionEntry>(patientSubmissionEntryBuilders.Ascending(x => x.FacilityId).Ascending(x => x.ReportScheduleId).Ascending(x => x.PatientId).Ascending(x => x.ReportType), indexOptions),
+            // Indexes for reportEntry collection
+            var reportEntryCollection = MongoDatabase.GetCollection<ReportEntry>("reportEntry");
+            var reportEntryBuilders = Builders<ReportEntry>.IndexKeys;
+            await reportEntryCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<ReportEntry>(reportEntryBuilders.Ascending(x => x.FacilityId).Ascending(x => x.ReportScheduleId).Ascending(x => x.PatientId), indexOptions),
                 cancellationToken: cancellationToken);
-            await patientSubmissionEntryCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<PatientSubmissionEntry>(patientSubmissionEntryBuilders.Ascending(x => x.ReportScheduleId).Ascending(x => x.Status), indexOptions),
+            await reportEntryCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<ReportEntry>(reportEntryBuilders.Ascending(x => x.ReportScheduleId).Ascending(x => x.ReportingStatus), indexOptions),
                 cancellationToken: cancellationToken);
-            await patientSubmissionEntryCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<PatientSubmissionEntry>(patientSubmissionEntryBuilders.Ascending(x => x.FacilityId).Ascending(x => x.PatientId), indexOptions),
+            await reportEntryCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<ReportEntry>(reportEntryBuilders.Ascending(x => x.FacilityId).Ascending(x => x.PatientId), indexOptions),
                 cancellationToken: cancellationToken);
-            await patientSubmissionEntryCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<PatientSubmissionEntry>(patientSubmissionEntryBuilders.Ascending(x => x.Status).Ascending(x => x.ValidationStatus), indexOptions),
+            await reportEntryCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<ReportEntry>(reportEntryBuilders.Ascending(x => x.ReportingStatus).Ascending(x => x.SubmissionStatus), indexOptions),
                 cancellationToken: cancellationToken);
-            await patientSubmissionEntryCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<PatientSubmissionEntry>(patientSubmissionEntryBuilders.Ascending(x => x.ReportScheduleId), indexOptions),
+            await reportEntryCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<ReportEntry>(reportEntryBuilders.Ascending(x => x.ReportScheduleId), indexOptions),
                 cancellationToken: cancellationToken);
-            await patientSubmissionEntryCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<PatientSubmissionEntry>(patientSubmissionEntryBuilders.Descending(x => x.CreateDate), indexOptions),
-                cancellationToken: cancellationToken);
-
-            // Indexes for fhirResource collection
-            var fhirResourceCollection = MongoDatabase.GetCollection<FhirResource>("fhirResource");
-            var fhirResourceBuilders = Builders<FhirResource>.IndexKeys;
-            await fhirResourceCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<FhirResource>(fhirResourceBuilders.Ascending(x => x.FacilityId).Ascending(x => x.ResourceType).Ascending(x => x.ResourceId), indexOptions),
-                cancellationToken: cancellationToken);
-            await fhirResourceCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<FhirResource>(fhirResourceBuilders.Ascending(x => x.FacilityId).Ascending(x => x.PatientId), indexOptions),
-                cancellationToken: cancellationToken);
-            await fhirResourceCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<FhirResource>(fhirResourceBuilders.Ascending(x => x.ResourceType), indexOptions),
-                cancellationToken: cancellationToken);
-            await fhirResourceCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<FhirResource>(fhirResourceBuilders.Ascending(x => x.ResourceCategoryType), indexOptions),
+            await reportEntryCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<ReportEntry>(reportEntryBuilders.Descending(x => x.CreateDate), indexOptions),
                 cancellationToken: cancellationToken);
 
-            // Indexes for patientSubmissionEntryResourceMap collection
-            var patientEntryResourceMapCollection = MongoDatabase.GetCollection<PatientSubmissionEntryResourceMap>("patientSubmissionEntryResourceMap");
-            var patientEntryResourceMapBuilders = Builders<PatientSubmissionEntryResourceMap>.IndexKeys;
-            await patientEntryResourceMapCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<PatientSubmissionEntryResourceMap>(patientEntryResourceMapBuilders.Ascending(x => x.ReportScheduleId).Ascending(x => x.SubmissionEntryId).Ascending(x => x.ResourceType).Ascending(x => x.ResourceId), indexOptions),
+            // Indexes for reportResource collection
+            var reportResourceCollection = MongoDatabase.GetCollection<ReportResource>("reportResource");
+            var reportResourceBuilders = Builders<ReportResource>.IndexKeys;
+            await reportResourceCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<ReportResource>(reportResourceBuilders.Ascending(x => x.FacilityId).Ascending(x => x.ResourceType).Ascending(x => x.ResourceId), indexOptions),
                 cancellationToken: cancellationToken);
-            await patientEntryResourceMapCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<PatientSubmissionEntryResourceMap>(patientEntryResourceMapBuilders.Ascending(x => x.ReportScheduleId), indexOptions),
+            await reportResourceCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<ReportResource>(reportResourceBuilders.Ascending(x => x.FacilityId).Ascending(x => x.PatientId), indexOptions),
                 cancellationToken: cancellationToken);
-            await patientEntryResourceMapCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<PatientSubmissionEntryResourceMap>(patientEntryResourceMapBuilders.Ascending(x => x.SubmissionEntryId).Ascending(x => x.FhirResourceId), indexOptions),
+            await reportResourceCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<ReportResource>(reportResourceBuilders.Ascending(x => x.ResourceType), indexOptions),
                 cancellationToken: cancellationToken);
-            await patientEntryResourceMapCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<PatientSubmissionEntryResourceMap>(patientEntryResourceMapBuilders.Ascending(x => x.ReportTypes), indexOptions),
+
+            // Indexes for reportPopulation collection
+            var reportPopulationCollection = MongoDatabase.GetCollection<ReportPopulation>("reportPopulation");
+            var reportPopulationBuilders = Builders <ReportPopulation>.IndexKeys;
+            await reportPopulationCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<ReportPopulation>(reportPopulationBuilders.Ascending(x => x.FacilityId), indexOptions),
+                cancellationToken: cancellationToken);
+            await reportPopulationCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<ReportPopulation>(reportPopulationBuilders.Ascending(x => x.FacilityId).Ascending(x => x.ReportScheduleId), indexOptions),
                 cancellationToken: cancellationToken);
         }
         catch(Exception ex)

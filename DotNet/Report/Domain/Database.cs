@@ -8,7 +8,7 @@ namespace LantanaGroup.Link.Report.Domain
         IEntityRepository<ReportSchedule> ReportScheduledRepository { get; set; }
         IEntityRepository<ReportEntry> ReportEntryRepository { get; set; }
         IEntityRepository<ReportPopulation> ReportPopulationRepository { get; set; }
-        MongoEntityRepository<ReportResource> ReportResourceRepository { get; set; }
+        IEntityRepository<ReportResource> ReportResourceRepository { get; set; }
 
         Task SaveChangesAsync();
     }
@@ -20,13 +20,13 @@ namespace LantanaGroup.Link.Report.Domain
         public IEntityRepository<ReportSchedule> ReportScheduledRepository { get; set; }
         public IEntityRepository<ReportEntry> ReportEntryRepository { get; set; }
         public IEntityRepository<ReportPopulation> ReportPopulationRepository { get; set; }
-        public MongoEntityRepository<ReportResource> ReportResourceRepository { get; set; }
+        public IEntityRepository<ReportResource> ReportResourceRepository { get; set; }
 
         public Database(MongoDbContext context,
             IEntityRepository<ReportSchedule> reportScheduledRepository,
             IEntityRepository<ReportEntry> reportEntryRepository,
             IEntityRepository<ReportPopulation> reportPopulationRepository,
-            MongoEntityRepository<ReportResource> reportResourceRepository)
+            IEntityRepository<ReportResource> reportResourceRepository)
         {
             DbContext = context;
 

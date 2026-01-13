@@ -27,19 +27,19 @@ public class ScheduledReportFactory
 
 public class MeasureReportSummaryFactory
 {
-    public MeasureReportSummary FromDomain(PatientSubmissionEntry measureReport)
-    {
-        var summary = new MeasureReportSummary()
-        {
-            Id = measureReport.Id ?? string.Empty,
-            ReportScheduleId = measureReport.ReportScheduleId,
-            PatientId = measureReport.PatientId,
-            ReportType = measureReport.ReportType,
-            Status = measureReport.Status.ToString(),
-            ValidationStatus = measureReport.ValidationStatus.ToString(),
-        };
+    //public MeasureReportSummary FromDomain(PatientSubmissionEntry measureReport)
+    //{
+    //    var summary = new MeasureReportSummary()
+    //    {
+    //        Id = measureReport.Id ?? string.Empty,
+    //        ReportScheduleId = measureReport.ReportScheduleId,
+    //        PatientId = measureReport.PatientId,
+    //        ReportType = measureReport.ReportType,
+    //        Status = measureReport.Status.ToString(),
+    //        ValidationStatus = measureReport.ValidationStatus.ToString(),
+    //    };
         
         
-        return summary;
-    }
+    //    return summary;
+    //}
 }
