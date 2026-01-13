@@ -1,5 +1,6 @@
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
+using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
@@ -14,6 +15,7 @@ using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using LinqKit;
@@ -193,7 +195,7 @@ namespace LantanaGroup.Link.Report.Controllers
                     ReadOnlyMemory<byte> lineFeed = new([0x0a]);
                     foreach (var bundleEntry in bundle.Value.Entry)
                     {
-                        await JsonSerializer.SerializeAsync(zipEntryStream, bundleEntry.Resource, SerializerOptions.ForFhirLenientDeserialization);
+                        await JsonSerializer.SerializeAsync(zipEntryStream, bundleEntry.Resource, LinkFhirSerializerOptions.ForFhirLenientSerialization);
                         await zipEntryStream.WriteAsync(lineFeed);
                     }
                 }
