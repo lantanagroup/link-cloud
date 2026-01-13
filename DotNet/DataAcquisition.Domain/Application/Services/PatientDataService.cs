@@ -398,8 +398,8 @@ public class PatientDataService : IPatientDataService
                 {
                     var nonReferenceLogsCnt = await _dataAcquisitionLogQueries.GetCountOfNonRefLogsIncompleteAsync(
                         log.FacilityId,
-                        log.CorrelationId,
                         log.ReportTrackingId,
+                        log.CorrelationId,
                         cancellationToken);
 
                     if (nonReferenceLogsCnt > 0 && (log.RetryAttempts ?? 0) < DataAcquisitionLog.MaxRetryAttempts)
