@@ -634,13 +634,81 @@ namespace LantanaGroup.Link.Submission.Application.Services
             try
             {
                 using var doc = JsonDocument.Parse(json);
-                var cleanedJson = RemoveEmptyStrings(doc.RootElement);
-                return JsonSerializer.Serialize(cleanedJson);
+                var root = doc.RootElement;
+
+                // Clone and modify
+                var cleaned = ModifyForDeviceVersion(root);
+                return JsonSerializer.Serialize(cleaned);
             }
             catch
             {
-                // If cleaning fails, return original
-                return json;
+                return json; // fallback
+            }
+        }
+
+        private object ModifyForDeviceVersion(JsonElement element)
+        {
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    var obj = new Dictionary<string, object>();
+
+                    foreach (var prop in element.EnumerateObject())
+                    {
+                        if (prop.NameEquals("resourceType") && prop.Value.GetString() == "Device")
+                        {
+                            // Special handling for Device
+                            obj[prop.Name] = prop.Value.GetString()!;
+                            continue;
+                        }
+
+                        var value = prop.Value;
+
+                        // Handle version array specifically
+                        if (prop.NameEquals("version") && value.ValueKind == JsonValueKind.Array)
+                        {
+                            var cleanedVersions = new List<object>();
+                            foreach (var item in value.EnumerateArray())
+                            {
+                                if (item.ValueKind == JsonValueKind.Object && !item.EnumerateObject().Any())
+                                {
+                                    // Empty object {} → replace with minimal valid version
+                                    cleanedVersions.Add(new Dictionary<string, object>
+                            {
+                                { "value", "unknown" }
+                            });
+                                }
+                                else
+                                {
+                                    cleanedVersions.Add(RemoveEmptyStrings(item)); // recursive
+                                }
+                            }
+                            obj[prop.Name] = cleanedVersions;
+                        }
+                    }
+                    return obj;
+
+                case JsonValueKind.Array:
+                    var arr = new List<object>();
+                    foreach (var item in element.EnumerateArray())
+                    {
+                        arr.Add(ModifyForDeviceVersion(item));
+                    }
+                    return arr;
+
+                // ... (rest unchanged)
+                case JsonValueKind.String:
+                    return element.GetString();
+                case JsonValueKind.Number:
+                    return element.GetDouble();
+                case JsonValueKind.True:
+                    return true;
+                case JsonValueKind.False:
+                    return false;
+                case JsonValueKind.Null:
+                    return null;
+                default:
+                    return null;
             }
         }
 
