@@ -82,7 +82,7 @@ namespace LantanaGroup.Link.Report.Services
             ReadOnlyMemory<byte> lineFeed = new([0x0a]);
             foreach (Bundle.EntryComponent entry in patientSubmission.Bundle.Entry)
             {
-                await JsonSerializer.SerializeAsync(stream, entry.Resource, LinkFhirSerializerOptions.ForFhirLenientDeserialization, cancellationToken);
+                await JsonSerializer.SerializeAsync(stream, entry.Resource, LinkFhirSerializerOptions.ForFhirLenientSerialization, cancellationToken);
                 await stream.WriteAsync(lineFeed, cancellationToken);
             }
             return blobClient.Uri;
@@ -110,7 +110,7 @@ namespace LantanaGroup.Link.Report.Services
 
             foreach (var resource in resources)
             {
-                await JsonSerializer.SerializeAsync(stream, resource, LinkFhirSerializerOptions.ForFhirLenientDeserialization, cancellationToken);
+                await JsonSerializer.SerializeAsync(stream, resource, LinkFhirSerializerOptions.ForFhirLenientSerialization, cancellationToken);
                 await stream.WriteAsync(lineFeed, cancellationToken);
             }
 

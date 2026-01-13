@@ -195,7 +195,7 @@ namespace LantanaGroup.Link.Report.Controllers
                     ReadOnlyMemory<byte> lineFeed = new([0x0a]);
                     foreach (var bundleEntry in bundle.Value.Entry)
                     {
-                        await JsonSerializer.SerializeAsync(zipEntryStream, bundleEntry.Resource, LinkFhirSerializerOptions.ForFhirLenientDeserialization);
+                        await JsonSerializer.SerializeAsync(zipEntryStream, bundleEntry.Resource, LinkFhirSerializerOptions.ForFhirLenientSerialization);
                         await zipEntryStream.WriteAsync(lineFeed);
                     }
                 }

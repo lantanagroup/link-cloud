@@ -239,7 +239,7 @@ namespace LantanaGroup.Link.Report.Listeners
             Resource? resource = null;
             try
             {
-                resource = JsonSerializer.Deserialize<Resource>(value.Resource.ToString(), LinkFhirSerializerOptions.ForFhirLenientDeserialization) ?? throw new Exception($"{Name}: Unable to deserialize event resource");
+                resource = JsonSerializer.Deserialize<Resource>(value.Resource.ToString(), LinkFhirSerializerOptions.ForFhirLenientSerialization) ?? throw new Exception($"{Name}: Unable to deserialize event resource");
             }
             catch (Exception ex)
             {

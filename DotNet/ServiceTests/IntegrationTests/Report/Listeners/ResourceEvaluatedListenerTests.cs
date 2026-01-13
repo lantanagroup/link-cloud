@@ -290,7 +290,7 @@ namespace IntegrationTests.Report
             // Create reportable MeasureReport resource
             var measureReport = new MeasureReport { Id = "mr-1", Type = MeasureReport.MeasureReportType.Individual };
 
-            var mrStr = JsonSerializer.Serialize(measureReport, LinkFhirSerializerOptions.ForFhirLenientDeserialization);
+            var mrStr = JsonSerializer.Serialize(measureReport, LinkFhirSerializerOptions.ForFhirLenientSerialization);
 
             var consumeResult = CreateConsumeResult(facilityId, schedule.Id, patientId, reportType,
                 JsonDocument.Parse(mrStr).RootElement, isReportable: true);
@@ -408,7 +408,7 @@ namespace IntegrationTests.Report
             var patient = new Patient();
             patient.Id = patientId;
 
-            var patientStr = JsonSerializer.Serialize(patient, LinkFhirSerializerOptions.ForFhirLenientDeserialization);
+            var patientStr = JsonSerializer.Serialize(patient, LinkFhirSerializerOptions.ForFhirLenientSerialization);
 
             var consumeResult = CreateConsumeResult(facilityId, "nonexistent", patientId, "TestReport", JsonDocument.Parse(patientStr).RootElement, true);
 
@@ -450,7 +450,7 @@ namespace IntegrationTests.Report
             var patient = new Patient();
             patient.Id = patientId;
 
-            var patientStr = JsonSerializer.Serialize(patient, LinkFhirSerializerOptions.ForFhirLenientDeserialization);
+            var patientStr = JsonSerializer.Serialize(patient, LinkFhirSerializerOptions.ForFhirLenientSerialization);
 
             var consumeResult = CreateConsumeResult(facilityId, "testid", patientId, "TestReport", JsonDocument.Parse(patientStr).RootElement, true);
 
@@ -499,7 +499,7 @@ namespace IntegrationTests.Report
             var patient = new Patient();
             patient.Id = patientId;
 
-            var patientStr = JsonSerializer.Serialize(patient, LinkFhirSerializerOptions.ForFhirLenientDeserialization);
+            var patientStr = JsonSerializer.Serialize(patient, LinkFhirSerializerOptions.ForFhirLenientSerialization);
 
             var consumeResult = CreateConsumeResult(facilityId, "testid", patientId, "TestReport", JsonDocument.Parse(patientStr).RootElement, true);
 

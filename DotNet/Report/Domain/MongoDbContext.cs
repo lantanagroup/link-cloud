@@ -49,14 +49,14 @@ public class MongoDbContext : DbContext
         modelBuilder.Entity<FhirResource>()
             .Property(p => p.Resource)
             .HasConversion(
-                v => JsonSerializer.Serialize(v, LinkFhirSerializerOptions.ForFhirLenientDeserialization),
-                v => JsonSerializer.Deserialize<Resource>(v, LinkFhirSerializerOptions.ForFhirLenientDeserialization)!);
+                v => JsonSerializer.Serialize(v, LinkFhirSerializerOptions.ForFhirLenientSerialization),
+                v => JsonSerializer.Deserialize<Resource>(v, LinkFhirSerializerOptions.ForFhirLenientSerialization)!);
 
         modelBuilder.Entity<PatientSubmissionEntry>()
             .Property(e => e.MeasureReport)
             .HasConversion(
-                v => JsonSerializer.Serialize(v, LinkFhirSerializerOptions.ForFhirLenientDeserialization),
-                v => JsonSerializer.Deserialize<MeasureReport>(v, LinkFhirSerializerOptions.ForFhirLenientDeserialization));
+                v => JsonSerializer.Serialize(v, LinkFhirSerializerOptions.ForFhirLenientSerialization),
+                v => JsonSerializer.Deserialize<MeasureReport>(v, LinkFhirSerializerOptions.ForFhirLenientSerialization));
 
         // Indexes for ReportSchedule
         modelBuilder.Entity<ReportSchedule>()

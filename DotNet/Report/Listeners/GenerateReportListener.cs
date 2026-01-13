@@ -396,7 +396,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 admittedPatients =
                     JsonSerializer.Deserialize<List>(
                         censusContent,
-                        LinkFhirSerializerOptions.ForFhirLenientDeserialization);
+                        LinkFhirSerializerOptions.ForFhirLenientSerialization);
             }
             catch (Exception ex)
             {
