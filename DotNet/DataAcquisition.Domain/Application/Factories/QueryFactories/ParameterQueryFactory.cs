@@ -10,17 +10,22 @@ using OperationType = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Mo
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.QueryFactories;
 
-public class ParameterQueryFactory
+public class ParameterQueryFactory : IParameterQueryFactory
 {
-    private static readonly ILogger<ParameterQueryFactory> _logger;
+    private readonly ILogger<ParameterQueryFactory> _logger;
+    private readonly ILiteralParameterFactory _literalParameterFactory;
+    private readonly IVariableParameterFactory _variableParameterFactory;
+    private readonly IResourceIdParameterFactory _resourceIdParameterFactory;
 
-    static ParameterQueryFactory()
+    public ParameterQueryFactory(ILogger<ParameterQueryFactory> logger, ILiteralParameterFactory literalParameterFactory, IVariableParameterFactory variableParameterFactory, IResourceIdParameterFactory resourceIdParameterFactory)
     {
-        using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
-        _logger = loggerFactory.CreateLogger<ParameterQueryFactory>();
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _literalParameterFactory = literalParameterFactory ?? throw new ArgumentNullException(nameof(literalParameterFactory));
+        _variableParameterFactory = variableParameterFactory ?? throw new ArgumentNullException(nameof(variableParameterFactory));
+        _resourceIdParameterFactory = resourceIdParameterFactory ?? throw new ArgumentNullException(nameof(resourceIdParameterFactory));
     }
 
-    public static async Task<ParameterQueryFactoryResult> Build(ParameterQueryConfig config, GetPatientDataRequest request, ScheduledReport scheduledReport, string lookback, IDataAcquisitionLogQueries dataAcquisitionLogQueries)
+    public async Task<ParameterQueryFactoryResult> Build(ParameterQueryConfig config, GetPatientDataRequest request, ScheduledReport scheduledReport, string lookback, IDataAcquisitionLogQueries dataAcquisitionLogQueries)
     {
         var isPaged = false;
         var searchParams = new List<KeyValuePair<string, string>>();
@@ -30,9 +35,9 @@ public class ParameterQueryFactory
         {
             ParameterFactoryResult? searchParam = parameter switch
             {
-                LiteralParameter literalParameter => LiteralParameterFactory.Build(literalParameter),
-                VariableParameter variableParameter => VariableParameterFactory.Build(variableParameter, request, scheduledReport, lookback),
-                ResourceIdsParameter idsParameter => await ResourceIdParameterFactory.Build(idsParameter, request, dataAcquisitionLogQueries),
+                LiteralParameter literalParameter => _literalParameterFactory.Build(literalParameter),
+                VariableParameter variableParameter => _variableParameterFactory.Build(variableParameter, request, scheduledReport, lookback),
+                ResourceIdsParameter idsParameter => await _resourceIdParameterFactory.Build(idsParameter, request, dataAcquisitionLogQueries),
                 _ => throw new Exception("Unable to determine parameter type."),
             };
 

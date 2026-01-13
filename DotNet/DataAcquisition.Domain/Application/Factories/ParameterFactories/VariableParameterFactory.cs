@@ -8,17 +8,16 @@ using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.ParameterFactories;
 
-public class VariableParameterFactory
+public class VariableParameterFactory : IVariableParameterFactory
 {
-    private static readonly ILogger<VariableParameterFactory> _logger;
+    private readonly ILogger<VariableParameterFactory> _logger;
 
-    static VariableParameterFactory()
+    public VariableParameterFactory(ILogger<VariableParameterFactory> logger)
     {
-        using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
-        _logger = loggerFactory.CreateLogger<VariableParameterFactory>();
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public static ParameterFactoryResult? Build(VariableParameter parameter, GetPatientDataRequest request, ScheduledReport scheduledReport, string lookback)
+    public ParameterFactoryResult? Build(VariableParameter parameter, GetPatientDataRequest request, ScheduledReport scheduledReport, string lookback)
     {
         ParameterFactoryResult parameterFactoryResult = parameter.Variable switch
         {

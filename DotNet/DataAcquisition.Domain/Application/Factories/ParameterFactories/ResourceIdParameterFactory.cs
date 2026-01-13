@@ -6,16 +6,15 @@ using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.ParameterFactories;
 
-public class ResourceIdParameterFactory
+public class ResourceIdParameterFactory : IResourceIdParameterFactory
 {
-    private static readonly ILogger<ResourceIdParameterFactory> _logger;
+    private readonly ILogger<ResourceIdParameterFactory> _logger;
 
-    static ResourceIdParameterFactory()
+    public ResourceIdParameterFactory(ILogger<ResourceIdParameterFactory> logger)
     {
-        using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
-        _logger = loggerFactory.CreateLogger<ResourceIdParameterFactory>();
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
-    public static async Task<ParameterFactoryResult?> Build(ResourceIdsParameter parameter, GetPatientDataRequest request, IDataAcquisitionLogQueries dataAcquisitionLogQueries)
+    public async Task<ParameterFactoryResult?> Build(ResourceIdsParameter parameter, GetPatientDataRequest request, IDataAcquisitionLogQueries dataAcquisitionLogQueries)
     {
         List<string> resourceIds = await
             dataAcquisitionLogQueries.GetResourceIdsForReportPatient(request.CorrelationId, request.FacilityId, parameter.Resource);

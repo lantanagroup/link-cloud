@@ -2,6 +2,7 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Task = System.Threading.Tasks.Task;
 
@@ -10,10 +11,13 @@ namespace IntegrationTests.DataAcquisition.Factories
     public class ResourceIdParameterFactoryTests
     {
         private readonly Mock<IDataAcquisitionLogQueries> _dataAcquisitionLogQueriesMock;
+        private readonly IResourceIdParameterFactory _resourceIdParameterFactory;
 
         public ResourceIdParameterFactoryTests()
         {
             _dataAcquisitionLogQueriesMock = new Mock<IDataAcquisitionLogQueries>();
+            var logger = new Mock<ILogger<ResourceIdParameterFactory>>().Object;
+            _resourceIdParameterFactory = new ResourceIdParameterFactory(logger);
         }
 
         [Fact]
@@ -38,7 +42,7 @@ namespace IntegrationTests.DataAcquisition.Factories
                 .ReturnsAsync(resourceIds);
 
             // Act
-            var result = await ResourceIdParameterFactory.Build(parameter, request, _dataAcquisitionLogQueriesMock.Object);
+            var result = await _resourceIdParameterFactory.Build(parameter, request, _dataAcquisitionLogQueriesMock.Object);
 
             // Assert
             Assert.NotNull(result);
@@ -70,7 +74,7 @@ namespace IntegrationTests.DataAcquisition.Factories
                 .ReturnsAsync(resourceIds);
 
             // Act
-            var result = await ResourceIdParameterFactory.Build(parameter, request, _dataAcquisitionLogQueriesMock.Object);
+            var result = await _resourceIdParameterFactory.Build(parameter, request, _dataAcquisitionLogQueriesMock.Object);
 
             // Assert
             Assert.NotNull(result);
@@ -101,7 +105,7 @@ namespace IntegrationTests.DataAcquisition.Factories
                 .ReturnsAsync(resourceIds);
 
             // Act
-            var result = await ResourceIdParameterFactory.Build(parameter, request, _dataAcquisitionLogQueriesMock.Object);
+            var result = await _resourceIdParameterFactory.Build(parameter, request, _dataAcquisitionLogQueriesMock.Object);
 
             // Assert
             Assert.NotNull(result);
@@ -134,7 +138,7 @@ namespace IntegrationTests.DataAcquisition.Factories
                 .ReturnsAsync(new List<string>());
 
             // Act
-            var result = await ResourceIdParameterFactory.Build(parameter, request, _dataAcquisitionLogQueriesMock.Object);
+            var result = await _resourceIdParameterFactory.Build(parameter, request, _dataAcquisitionLogQueriesMock.Object);
 
             // Assert
             Assert.Null(result);

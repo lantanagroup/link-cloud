@@ -1,10 +1,12 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.QueryFactories;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.ParameterFactories;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.QueryFactories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ParameterQuery;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Task = System.Threading.Tasks.Task;
 
@@ -13,10 +15,22 @@ namespace IntegrationTests.DataAcquisition.Factories
     public class ParameterQueryFactoryTests
     {
         private readonly Mock<IDataAcquisitionLogQueries> _dataAcquisitionLogQueriesMock;
+        private readonly IParameterQueryFactory _parameterQueryFactory;
 
         public ParameterQueryFactoryTests()
         {
             _dataAcquisitionLogQueriesMock = new Mock<IDataAcquisitionLogQueries>();
+
+            var logger = new Mock<ILogger<ParameterQueryFactory>>().Object;
+            var literalLogger = new Mock<ILogger<LiteralParameterFactory>>().Object;
+            var variableLogger = new Mock<ILogger<VariableParameterFactory>>().Object;
+            var resourceIdLogger = new Mock<ILogger<ResourceIdParameterFactory>>().Object;
+
+            var literalFactory = new LiteralParameterFactory(literalLogger);
+            var variableFactory = new VariableParameterFactory(variableLogger);
+            var resourceIdFactory = new ResourceIdParameterFactory(resourceIdLogger);
+
+            _parameterQueryFactory = new ParameterQueryFactory(logger, literalFactory, variableFactory, resourceIdFactory);
         }
 
         [Fact]
@@ -35,7 +49,7 @@ namespace IntegrationTests.DataAcquisition.Factories
             var request = new GetPatientDataRequest { CorrelationId = "corr1", FacilityId = "fac1" };
 
             // Act
-            var result = await ParameterQueryFactory.Build(config, request, null, null, _dataAcquisitionLogQueriesMock.Object);
+            var result = await _parameterQueryFactory.Build(config, request, null, null, _dataAcquisitionLogQueriesMock.Object);
 
             // Assert
             var singularResult = Assert.IsType<SingularParameterQueryFactoryResult>(result);
@@ -65,7 +79,7 @@ namespace IntegrationTests.DataAcquisition.Factories
                 .ReturnsAsync(resourceIds);
 
             // Act
-            var result = await ParameterQueryFactory.Build(config, request, null, null, _dataAcquisitionLogQueriesMock.Object);
+            var result = await _parameterQueryFactory.Build(config, request, null, null, _dataAcquisitionLogQueriesMock.Object);
 
             // Assert
             var pagedResult = Assert.IsType<PagedParameterQueryFactoryResult>(result);
@@ -100,7 +114,7 @@ namespace IntegrationTests.DataAcquisition.Factories
                 .ReturnsAsync(new List<string> { "id1", "id2", "id3" });
 
             // Act
-            var result = await ParameterQueryFactory.Build(config, request, null, null, _dataAcquisitionLogQueriesMock.Object);
+            var result = await _parameterQueryFactory.Build(config, request, null, null, _dataAcquisitionLogQueriesMock.Object);
 
             // Assert
             Assert.Null(result);
@@ -122,7 +136,7 @@ namespace IntegrationTests.DataAcquisition.Factories
             var request = new GetPatientDataRequest { CorrelationId = "corr1", FacilityId = "fac1" };
 
             // Act
-            var result = await ParameterQueryFactory.Build(config, request, null, null, _dataAcquisitionLogQueriesMock.Object);
+            var result = await _parameterQueryFactory.Build(config, request, null, null, _dataAcquisitionLogQueriesMock.Object);
 
             // Assert
             var singularResult = Assert.IsType<SingularParameterQueryFactoryResult>(result);

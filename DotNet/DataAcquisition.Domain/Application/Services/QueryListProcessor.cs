@@ -56,6 +56,7 @@ public class QueryListProcessor : IQueryListProcessor
     private readonly ProducerConfig _producerConfig;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
     private readonly IDataAcquisitionLogQueries _dataAcquisitionLogQueries;
+    private readonly IParameterQueryFactory _parameterQueryFactory;
 
     public QueryListProcessor(
         ILogger<QueryListProcessor> logger,
@@ -63,7 +64,8 @@ public class QueryListProcessor : IQueryListProcessor
         IProducer<string, ResourceAcquired> kafkaProducer,
         IReferenceResourceService referenceResourceService,
         IDataAcquisitionLogManager dataAcquisitionLogManager,
-        IDataAcquisitionLogQueries dataAcquisitionLogQueries)
+        IDataAcquisitionLogQueries dataAcquisitionLogQueries,
+        IParameterQueryFactory parameterQueryFactory)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _fhirRepo = fhirRepo ?? throw new ArgumentNullException(nameof(fhirRepo));
@@ -71,6 +73,7 @@ public class QueryListProcessor : IQueryListProcessor
         _referenceResourceService = referenceResourceService ?? throw new ArgumentNullException(nameof(referenceResourceService));
         _dataAcquisitionLogManager = dataAcquisitionLogManager ?? throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
         _dataAcquisitionLogQueries = dataAcquisitionLogQueries;
+        _parameterQueryFactory = parameterQueryFactory ?? throw new ArgumentNullException(nameof(parameterQueryFactory));
 
         _producerConfig = new ProducerConfig();
         _producerConfig.CompressionType = CompressionType.Zstd;
@@ -136,7 +139,7 @@ public class QueryListProcessor : IQueryListProcessor
 
             QueryFactoryResult builtQuery = queryConfig switch
             {
-                ParameterQueryConfig config => await ParameterQueryFactory.Build(config, request, scheduledReport, queryPlan.LookBack, _dataAcquisitionLogQueries),
+                ParameterQueryConfig config => await _parameterQueryFactory.Build(config, request, scheduledReport, queryPlan.LookBack, _dataAcquisitionLogQueries),
                 ReferenceQueryConfig config => ReferenceQueryFactory.Build(config, new List<ResourceReference>()),
                 _ => throw new Exception("Unable to identify type for query operation."),
             };

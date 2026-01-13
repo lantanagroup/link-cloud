@@ -4,17 +4,16 @@ using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.ParameterFactories;
 
-public class LiteralParameterFactory
+public class LiteralParameterFactory : ILiteralParameterFactory
 {
-    private static readonly ILogger<LiteralParameterFactory> _logger;
+    private readonly ILogger<LiteralParameterFactory> _logger;
 
-    static LiteralParameterFactory()
+    public LiteralParameterFactory(ILogger<LiteralParameterFactory> logger)
     {
-        using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
-        _logger = loggerFactory.CreateLogger<LiteralParameterFactory>();
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public static ParameterFactoryResult? Build(LiteralParameter parameter)
+    public ParameterFactoryResult? Build(LiteralParameter parameter)
     {
         if (string.IsNullOrWhiteSpace(parameter.Name) || string.IsNullOrWhiteSpace(parameter.Literal))
         {
