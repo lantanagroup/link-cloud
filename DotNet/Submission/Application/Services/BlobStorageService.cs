@@ -180,7 +180,10 @@ namespace LantanaGroup.Link.Submission.Application.Services
             {
                 try
                 {
-                    var resource = JsonSerializer.Deserialize<Resource>(line, jsonOptions);
+                    // Clean the JSON by removing properties with empty string values
+                    var cleanedLine = CleanEmptyStringProperties(line);
+
+                    var resource = JsonSerializer.Deserialize<Resource>(cleanedLine, jsonOptions);
                     if (resource != null)
                     {
                         manifestResources.Add(resource);
@@ -289,7 +292,10 @@ namespace LantanaGroup.Link.Submission.Application.Services
                 {
                     try
                     {
-                        var res = JsonSerializer.Deserialize<Resource>(line, jsonOptions);
+                        // Clean the JSON by removing properties with empty string values
+                        var cleanedLine = CleanEmptyStringProperties(line);
+
+                        var res = JsonSerializer.Deserialize<Resource>(cleanedLine, jsonOptions);
                         if (res != null) patientResources.Add(res);
                     }
                     catch (Exception ex)
@@ -621,6 +627,62 @@ namespace LantanaGroup.Link.Submission.Application.Services
             BlobUriBuilder uriBuilder = new(new Uri(payloadRootUri));
             string prefix = ChangeBlobRoot(uriBuilder.BlobName);
             return DownloadAsync(_externalContainerClient, prefix, cancellationToken);
+        }
+
+        private string CleanEmptyStringProperties(string json)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                var cleanedJson = RemoveEmptyStrings(doc.RootElement);
+                return JsonSerializer.Serialize(cleanedJson);
+            }
+            catch
+            {
+                // If cleaning fails, return original
+                return json;
+            }
+        }
+
+        private object RemoveEmptyStrings(JsonElement element)
+        {
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    var obj = new Dictionary<string, object>();
+                    foreach (var prop in element.EnumerateObject())
+                    {
+                        // Skip properties with empty string values
+                        if (prop.Value.ValueKind == JsonValueKind.String &&
+                            string.IsNullOrEmpty(prop.Value.GetString()))
+                        {
+                            continue;
+                        }
+                        obj[prop.Name] = RemoveEmptyStrings(prop.Value);
+                    }
+                    return obj;
+
+                case JsonValueKind.Array:
+                    var arr = new List<object>();
+                    foreach (var item in element.EnumerateArray())
+                    {
+                        arr.Add(RemoveEmptyStrings(item));
+                    }
+                    return arr;
+
+                case JsonValueKind.String:
+                    return element.GetString();
+                case JsonValueKind.Number:
+                    return element.GetDouble();
+                case JsonValueKind.True:
+                    return true;
+                case JsonValueKind.False:
+                    return false;
+                case JsonValueKind.Null:
+                    return null;
+                default:
+                    return null;
+            }
         }
     }
 }
