@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.Shared.Application.Models;
 
+
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum AdHocType
 {
