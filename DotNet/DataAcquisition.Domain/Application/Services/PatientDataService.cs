@@ -402,28 +402,11 @@ public class PatientDataService : IPatientDataService
                         log.CorrelationId,
                         cancellationToken);
 
-                    if (nonReferenceLogsCnt > 0 && (log.RetryAttempts ?? 0) < DataAcquisitionLog.MaxRetryAttempts)
-                    {
-                        log.Status = RequestStatus.Pending;
-                        log.RetryAttempts = (log.RetryAttempts ?? 0) + 1;
-                        await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
-                        {
-                            Id = log.Id,
-                            ResourceAcquiredIds = log.ResourceAcquiredIds,
-                            RetryAttempts = log.RetryAttempts,
-                            CompletionDate = log.CompletionDate,
-                            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
-                            ExecutionDate = log.ExecutionDate,
-                            Notes = log.Notes,
-                            Status = log.Status,
-                        }, cancellationToken);
-                        return;
-                    }
-                    else if ((log.RetryAttempts ?? 0) >= DataAcquisitionLog.MaxRetryAttempts)
+                    if (nonReferenceLogsCnt > 0)
                     {
                         log.Notes ??= new List<string>();
-                        log.Status = RequestStatus.Failed;
-                        log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has exceeded the maximum retry attempts. Not all Non-reference resource queries are completed. Marking as Failed.");
+                        log.Status = RequestStatus.Pending;
+                        log.Notes.Add($"[{DateTime.UtcNow}] Deferring log with ID {log.Id} due to {nonReferenceLogsCnt} incomplete non-reference log(s).");
                         await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                         {
                             Id = log.Id,
