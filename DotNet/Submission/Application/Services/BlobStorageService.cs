@@ -178,19 +178,25 @@ namespace LantanaGroup.Link.Submission.Application.Services
             var lines = manifestContent.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             foreach (var line in lines)
             {
-                var trimmed = line.Trim();
-                if (string.IsNullOrWhiteSpace(trimmed) || !trimmed.StartsWith("{")) continue;
-
-                // Quick skip for known non-essential / problematic types
-                if (trimmed.Contains("\"resourceType\":\"OperationOutcome\""))
+                var trimmedLine = line.TrimStart();  // remove leading whitespace
+                if (string.IsNullOrWhiteSpace(trimmedLine) || !trimmedLine.StartsWith("{"))
                 {
-                    _logger.LogDebug("Skipping OperationOutcome line (validation.json not needed)");
+                    _logger.LogWarning("Skipping invalid manifest line (doesn't start with '{{'): length={Length}, preview='{Preview}'",
+                        line.Length, line.Length > 60 ? line.Substring(0, 60).Replace("\r", "\\r").Replace("\n", "\\n") + "..." : line);
                     continue;
                 }
 
+                // Remove common invisible prefix (BOM + whitespace)
+                trimmedLine = trimmedLine.TrimStart('\uFEFF', '\u200B', '\u200C', '\u200D', ' ', '\t', '\r', '\n');
+
+                _logger.LogDebug("Cleaned line starts with: '{Start}' (length after trim: {Len})",
+                    trimmedLine.Length >= 40 ? trimmedLine.Substring(0, 40) : trimmedLine,
+                    trimmedLine.Length);
+
+                var cleanedLine = CleanEmptyStringProperties(trimmedLine);
+
                 try
                 {
-                    var cleanedLine = CleanEmptyStringProperties(trimmed);
                     var resource = JsonSerializer.Deserialize<Resource>(cleanedLine, jsonOptions);
                     if (resource != null)
                     {
@@ -199,8 +205,10 @@ namespace LantanaGroup.Link.Submission.Application.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to deserialize manifest line. Preview: {Preview}",
-                        trimmed.Length > 200 ? trimmed.Substring(0, 200) + "..." : trimmed);
+                    _logger.LogWarning(ex, "Deserialization still failed after cleaning. Raw line preview (escaped): '{Escaped}'",
+                        line.Length > 200
+                            ? line.Substring(0, 200).Replace("\r", "\\r").Replace("\n", "\\n").Replace("\0", "\\0") + "..."
+                            : line.Replace("\r", "\\r").Replace("\n", "\\n").Replace("\0", "\\0"));
                 }
             }
 
