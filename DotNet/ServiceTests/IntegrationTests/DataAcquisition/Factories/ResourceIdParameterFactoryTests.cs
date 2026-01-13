@@ -53,7 +53,7 @@ namespace IntegrationTests.DataAcquisition.Factories
         }
 
         [Fact]
-        public async Task Build_WhenPagedSetAndResultsLessThenPageSize_ReturnsJoinedEntries()
+        public async Task Build_WhenPagedSetAndResultsLessThanPageSize_ReturnsJoinedEntries()
         {
             // Arrange
             var parameter = new ResourceIdsParameter
