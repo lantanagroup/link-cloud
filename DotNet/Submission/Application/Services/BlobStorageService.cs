@@ -24,14 +24,6 @@ namespace LantanaGroup.Link.Submission.Application.Services
         private readonly BlobContainerClient? _externalContainerClient;
         private readonly bool _useNdJson;
 
-        private static readonly FhirJsonParser _fhirParser = new FhirJsonParser(
-            new ParserSettings
-            {
-                AcceptUnknownMembers = true,
-                AllowUnrecognizedEnums = true,
-                PermissiveParsing = true
-            });
-
         private static BlobContainerClient? GetContainerClient(BlobStorageSettings settings)
         {
             if (settings.ConnectionString == null)
@@ -186,41 +178,18 @@ namespace LantanaGroup.Link.Submission.Application.Services
             var lines = manifestContent.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             foreach (var line in lines)
             {
-                var trimmedLine = line.TrimStart();  // remove leading whitespace
-                if (string.IsNullOrWhiteSpace(trimmedLine) || !trimmedLine.StartsWith("{"))
-                {
-                    _logger.LogWarning("Skipping invalid manifest line (doesn't start with '{{'): length={Length}, preview='{Preview}'",
-                        line.Length, line.Length > 60 ? line.Substring(0, 60).Replace("\r", "\\r").Replace("\n", "\\n") + "..." : line);
-                    continue;
-                }
-
-                // Remove common invisible prefix (BOM + whitespace)
-                trimmedLine = trimmedLine.TrimStart('\uFEFF', '\u200B', '\u200C', '\u200D', ' ', '\t', '\r', '\n');
-
-                _logger.LogDebug("Cleaned line starts with: '{Start}' (length after trim: {Len})",
-                    trimmedLine.Length >= 40 ? trimmedLine.Substring(0, 40) : trimmedLine,
-                    trimmedLine.Length);
-
-                var cleanedLine = CleanEmptyStringProperties(trimmedLine);
-
                 try
                 {
-                    var resource = _fhirParser.Parse<Resource>(cleanedLine);
+                    var resource = JsonSerializer.Deserialize<Resource>(line, jsonOptions);
                     if (resource != null)
                     {
                         manifestResources.Add(resource);
                     }
                 }
-                catch (FormatException fex)  // FhirJsonParser throws FormatException on parse failures
-                {
-                    _logger.LogWarning(fex, "FhirJsonParser failed on manifest line. Raw preview (escaped): '{Escaped}'",
-                        line.Length > 200
-                        ? line.Substring(0, 200).Replace("\r", "\\r").Replace("\n", "\\n").Replace("\0", "\\0") + "..."
-                        : line.Replace("\r", "\\r").Replace("\n", "\\n").Replace("\0", "\\0"));
-                }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Unexpected error parsing manifest line...");
+                    _logger.LogWarning(ex, "Failed to deserialize manifest line. Line preview: {LinePreview}",
+                        line.Length > 200 ? line.Substring(0, 200) + "..." : line);
                 }
             }
 
@@ -229,7 +198,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
             // Extract specific resource types from manifest
             var organization = manifestResources.OfType<Organization>().FirstOrDefault();
             var device = manifestResources.OfType<Device>().FirstOrDefault();
-            var censusList = manifestResources.OfType<List>().FirstOrDefault();
+            var censusList = manifestResources.OfType<Hl7.Fhir.Model.List>().FirstOrDefault();
             var aggregateReports = manifestResources.OfType<MeasureReport>().Where(IsAggregateMeasureReport).ToList();
             var operationOutcome = manifestResources.OfType<OperationOutcome>().FirstOrDefault();
 
@@ -320,10 +289,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
                 {
                     try
                     {
-                        // Clean the JSON by removing properties with empty string values
-                        var cleanedLine = CleanEmptyStringProperties(line);
-
-                        var res = JsonSerializer.Deserialize<Resource>(cleanedLine, jsonOptions);
+                        var res = JsonSerializer.Deserialize<Resource>(line, jsonOptions);
                         if (res != null) patientResources.Add(res);
                     }
                     catch (Exception ex)
@@ -501,7 +467,21 @@ namespace LantanaGroup.Link.Submission.Application.Services
             }
 
             // validation.json - use OperationOutcome from manifest
-            _logger.LogInformation("Skipping validation.json upload as per current requirements");
+            if (operationOutcome != null)
+            {
+                var validationJson = JsonSerializer.Serialize(operationOutcome, jsonOptions);
+                byte[] validationBytes = Encoding.UTF8.GetBytes(validationJson);
+                string validationBlobName = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, "validation.json");
+                _logger.LogDebug("Uploading validation file: {BlobName}", validationBlobName);
+
+                BlockBlobClient validationClient = _externalContainerClient!.GetBlockBlobClient(validationBlobName);
+                await using var validationStream = await validationClient.OpenWriteAsync(true, sharedOptions, cancellationToken);
+                await validationStream.WriteAsync(validationBytes, cancellationToken);
+            }
+            else
+            {
+                _logger.LogWarning("No OperationOutcome found in manifest - skipping validation.json upload");
+            }
 
             _logger.LogInformation("Completed processing and uploading {PatientCount} expanded patient bundles", patientIds.Count);
         }
@@ -541,6 +521,29 @@ namespace LantanaGroup.Link.Submission.Application.Services
 
             // Fallback: use the first report type or empty string
             return reportTypes.FirstOrDefault() ?? string.Empty;
+        }
+
+        private HashSet<(string ResourceType, string ResourceId)> FindReferencesInResources(List<Resource> resources)
+        {
+            var references = new HashSet<(string, string)>();
+            var jsonOptions = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
+
+            foreach (var resource in resources)
+            {
+                try
+                {
+                    var json = JsonSerializer.Serialize(resource, jsonOptions);
+                    var doc = JsonDocument.Parse(json);
+
+                    FindReferencesInJson(doc.RootElement, references);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to find references in resource {}", resource.TypeName);
+                }
+            }
+
+            return references;
         }
 
         private void FindReferencesInJson(JsonElement element, HashSet<(string, string)> references)
@@ -618,130 +621,6 @@ namespace LantanaGroup.Link.Submission.Application.Services
             BlobUriBuilder uriBuilder = new(new Uri(payloadRootUri));
             string prefix = ChangeBlobRoot(uriBuilder.BlobName);
             return DownloadAsync(_externalContainerClient, prefix, cancellationToken);
-        }
-
-        private string CleanEmptyStringProperties(string json)
-        {
-            try
-            {
-                using var doc = JsonDocument.Parse(json);
-                var root = doc.RootElement;
-
-                // Clone and modify
-                var cleaned = ModifyForDeviceVersion(root);
-                return JsonSerializer.Serialize(cleaned);
-            }
-            catch
-            {
-                return json; // fallback
-            }
-        }
-
-        private object ModifyForDeviceVersion(JsonElement element)
-        {
-            switch (element.ValueKind)
-            {
-                case JsonValueKind.Object:
-                    var obj = new Dictionary<string, object>();
-
-                    foreach (var prop in element.EnumerateObject())
-                    {
-                        if (prop.NameEquals("resourceType") && prop.Value.GetString() == "Device")
-                        {
-                            // Special handling for Device
-                            obj[prop.Name] = prop.Value.GetString()!;
-                            continue;
-                        }
-
-                        var value = prop.Value;
-
-                        // Handle version array specifically
-                        if (prop.NameEquals("version") && value.ValueKind == JsonValueKind.Array)
-                        {
-                            var cleanedVersions = new List<object>();
-                            foreach (var item in value.EnumerateArray())
-                            {
-                                if (item.ValueKind == JsonValueKind.Object && !item.EnumerateObject().Any())
-                                {
-                                    // Empty object {} → replace with minimal valid version
-                                    cleanedVersions.Add(new Dictionary<string, object>
-                            {
-                                { "value", "unknown" }
-                            });
-                                }
-                                else
-                                {
-                                    cleanedVersions.Add(RemoveEmptyStrings(item)); // recursive
-                                }
-                            }
-                            obj[prop.Name] = cleanedVersions;
-                        }
-                    }
-                    return obj;
-
-                case JsonValueKind.Array:
-                    var arr = new List<object>();
-                    foreach (var item in element.EnumerateArray())
-                    {
-                        arr.Add(ModifyForDeviceVersion(item));
-                    }
-                    return arr;
-
-                // ... (rest unchanged)
-                case JsonValueKind.String:
-                    return element.GetString();
-                case JsonValueKind.Number:
-                    return element.GetDouble();
-                case JsonValueKind.True:
-                    return true;
-                case JsonValueKind.False:
-                    return false;
-                case JsonValueKind.Null:
-                    return null;
-                default:
-                    return null;
-            }
-        }
-
-        private object RemoveEmptyStrings(JsonElement element)
-        {
-            switch (element.ValueKind)
-            {
-                case JsonValueKind.Object:
-                    var obj = new Dictionary<string, object>();
-                    foreach (var prop in element.EnumerateObject())
-                    {
-                        // Skip properties with empty string values
-                        if (prop.Value.ValueKind == JsonValueKind.String &&
-                            string.IsNullOrEmpty(prop.Value.GetString()))
-                        {
-                            continue;
-                        }
-                        obj[prop.Name] = RemoveEmptyStrings(prop.Value);
-                    }
-                    return obj;
-
-                case JsonValueKind.Array:
-                    var arr = new List<object>();
-                    foreach (var item in element.EnumerateArray())
-                    {
-                        arr.Add(RemoveEmptyStrings(item));
-                    }
-                    return arr;
-
-                case JsonValueKind.String:
-                    return element.GetString();
-                case JsonValueKind.Number:
-                    return element.GetDouble();
-                case JsonValueKind.True:
-                    return true;
-                case JsonValueKind.False:
-                    return false;
-                case JsonValueKind.Null:
-                    return null;
-                default:
-                    return null;
-            }
         }
     }
 }
