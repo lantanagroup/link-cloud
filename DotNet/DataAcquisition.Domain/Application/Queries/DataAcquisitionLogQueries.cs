@@ -88,7 +88,12 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
     public async Task<List<string>> GetResourceIdsForReportPatient(string correlationId, string facilityId, string resourceType, CancellationToken cancellationToken = default)
     {
-        var parsedResourceType = (ResourceType)Enum.Parse(typeof(ResourceType), resourceType);
+        if (!Enum.TryParse<ResourceType>(resourceType, out var parsedResourceType))
+        {
+            _logger.LogError("Failed to parse resource type: {ResourceType}", resourceType);
+            return new List<string>();
+        }
+
         var logsWithResources = await (from log in _dbContext.DataAcquisitionLogs
                                      join query in _dbContext.FhirQueries on log.Id equals query.DataAcquisitionLogId
                                      join resourceTypeEntry in _dbContext.FhirQueryResourceTypes on query.Id equals resourceTypeEntry.FhirQueryId
