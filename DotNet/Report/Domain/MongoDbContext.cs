@@ -1,6 +1,7 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Services;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.EntityFrameworkCore;
 using MongoDB.Driver;
 using MongoDB.EntityFrameworkCore.Extensions;
@@ -48,14 +49,14 @@ public class MongoDbContext : DbContext
         modelBuilder.Entity<FhirResource>()
             .Property(p => p.Resource)
             .HasConversion(
-                v => JsonSerializer.Serialize(v, SerializerOptions.ForFhirWithModelInspectorNoValidator),
-                v => JsonSerializer.Deserialize<Resource>(v, SerializerOptions.ForFhirLenientDeserialization)!);
+                v => JsonSerializer.Serialize(v, LinkFhirSerializerOptions.ForFhirLenientSerialization),
+                v => JsonSerializer.Deserialize<Resource>(v, LinkFhirSerializerOptions.ForFhirLenientSerialization)!);
 
         modelBuilder.Entity<PatientSubmissionEntry>()
             .Property(e => e.MeasureReport)
             .HasConversion(
-                v => JsonSerializer.Serialize(v, SerializerOptions.ForFhirWithModelInspectorNoValidator),
-                v => JsonSerializer.Deserialize<MeasureReport>(v, SerializerOptions.ForFhirLenientDeserialization));
+                v => JsonSerializer.Serialize(v, LinkFhirSerializerOptions.ForFhirLenientSerialization),
+                v => JsonSerializer.Deserialize<MeasureReport>(v, LinkFhirSerializerOptions.ForFhirLenientSerialization));
 
         // Indexes for ReportSchedule
         modelBuilder.Entity<ReportSchedule>()
