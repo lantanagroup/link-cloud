@@ -32,7 +32,7 @@ namespace LantanaGroup.Link.Report.Listeners
             IKafkaConsumerFactory<string, PatientListMessage> kafkaConsumerFactory,
             ITransientExceptionHandler<string, PatientListMessage> transientExceptionHandler,
             IDeadLetterExceptionHandler<string, PatientListMessage> deadLetterExceptionHandler, 
-            IServiceScopeFactory serviceScopeFactory, IReportEntryManager reportEntryStatusManager)
+            IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));

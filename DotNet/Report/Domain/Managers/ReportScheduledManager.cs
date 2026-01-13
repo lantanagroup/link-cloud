@@ -39,15 +39,13 @@ namespace LantanaGroup.Link.Report.Domain.Managers
     {
         private readonly IDatabase _database;
         private readonly ScheduledReportFactory _scheduledReportFactory;
-        private readonly IReportPopulationManager _reportPopulationManager;
-        private readonly IReportEntryManager _reportEntryManager;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
-        public ReportScheduledManager(IDatabase database, ScheduledReportFactory scheduledReportFactory, IReportPopulationManager reportPopulationManager, IReportEntryManager reportEntryManager)
+        public ReportScheduledManager(IDatabase database, ScheduledReportFactory scheduledReportFactory, IServiceScopeFactory serviceScopeFactory)
         {
             _database = database;
             _scheduledReportFactory = scheduledReportFactory;
-            _reportPopulationManager = reportPopulationManager;
-            _reportEntryManager = reportEntryManager;
+            _serviceScopeFactory = serviceScopeFactory;
         }
 
         public async Task<ReportSchedule?> GetReportSchedule(string facilityid, string reportId, CancellationToken cancellationToken = default)
@@ -97,8 +95,10 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             foreach (var summary in summaries)
             {
                 // Get the initial population count for each report
+                using var scope = _serviceScopeFactory.CreateScope();
+                var reportPopulationManager = scope.ServiceProvider.GetRequiredService<IReportPopulationManager>();
                 //TODO: Eventually may need to check validation results
-                var population = await _reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == summary.Id);
+                var population = await reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == summary.Id);
 
                 summary.InitialPopulationCount = population == null ? 0 : population.GroupPopulationList.Count;
 
@@ -129,16 +129,21 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 var summary = _scheduledReportFactory.FromDomain(scheduledReport);
                 if (string.IsNullOrWhiteSpace(summary?.Id)) return summary;
 
+                using var scope = _serviceScopeFactory.CreateScope();
+                var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+                var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+                var reportPopulationManager = scope.ServiceProvider.GetRequiredService<IReportPopulationManager>();
+
                 //TODO: Eventually may need to check validation results
                 // Get individual measure report entries for this report
                 //var measureReportEntries = await _database.ReportEntryStatusRepository
                 //    .FindAsync(x => x.ReportScheduleId == reportId, cancellationToken);
-                var measureReportEntries = await _reportEntryManager.FindAsync(x => x.ReportScheduleId == reportId);
+                var measureReportEntries = await reportEntryManager.FindAsync(x => x.ReportScheduleId == reportId);
 
 
                 // Get the initial population count for each report
                 //TODO: I don't think this is right. Need to look into adding all measures for the scheduled report
-                summary.InitialPopulationCount = (await _reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == summary.Id)).GroupPopulationList.Count;
+                summary.InitialPopulationCount = (await reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == summary.Id)).GroupPopulationList.Count;
                 //measureReportEntries.Count(
                 //    x => x.ReportScheduleId == summary.Id &&
                 //         x.Status != PatientSubmissionStatus.PendingEvaluation &&
@@ -165,7 +170,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
 
                 //TODO: Change to group by report type and use name shortner after updating test data to have reportType in population document
-                var pop = (await _reportPopulationManager.FindAsync(x => x.ReportScheduleId == reportId)).GroupBy(x => MeasureNameShortener.ShortenMeasureName(x.ReportType)).ToDictionary(x => x.Key, x => x.Count());
+                var pop = (await reportPopulationManager.FindAsync(x => x.ReportScheduleId == reportId)).GroupBy(x => MeasureNameShortener.ShortenMeasureName(x.ReportType)).ToDictionary(x => x.Key, x => x.Count());
 
                 var valid = new Dictionary<string, int>();
 

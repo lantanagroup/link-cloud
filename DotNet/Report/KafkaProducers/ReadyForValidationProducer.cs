@@ -10,13 +10,11 @@ namespace LantanaGroup.Link.Report.KafkaProducers
     {
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly IProducer<ReadyForValidationKey, ReadyForValidationValue> _readyForValidationProducer;
-        private readonly IReportEntryManager _reportEntryStatusManager;
 
-        public ReadyForValidationProducer(IProducer<ReadyForValidationKey, ReadyForValidationValue> readyForValidationProducer, IServiceScopeFactory serviceScopeFactory, IReportEntryManager reportEntryStatusManager)
+        public ReadyForValidationProducer(IProducer<ReadyForValidationKey, ReadyForValidationValue> readyForValidationProducer, IServiceScopeFactory serviceScopeFactory)
         {
             _readyForValidationProducer = readyForValidationProducer;
             _serviceScopeFactory = serviceScopeFactory;
-            _reportEntryStatusManager = reportEntryStatusManager;
         }
 
         public class ProduceValidationModel
@@ -65,10 +63,13 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             _readyForValidationProducer.Flush();
 
-            var entry = await _reportEntryStatusManager.GetEntry(scheduleId, patientId);
+            var reportEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportEntryManager>();
+            var entry = await reportEntryManager.GetEntry(scheduleId, patientId);
+
             entry.ReportingStatus = Domain.Enums.ReportingStatus.PendingValidation;
             entry.SubmissionStatus = Domain.Enums.SubmissionStatus.PendingValidation;
-            await _reportEntryStatusManager.UpdateAsync(entry);
+            
+            await reportEntryManager.UpdateAsync(entry);
         }
     }
 }
