@@ -1,11 +1,12 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
 public class FhirResourceConverter : JsonConverter<DomainResource>
 {
-    private readonly FhirJsonParser _fhirParser = new FhirJsonParser();
+    private readonly FhirJsonParser _fhirParser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
 
     public override DomainResource Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
