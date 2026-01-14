@@ -9,6 +9,6 @@ public enum AdHocType
 {
     [StringValue("Manual")]
     Manual = 0,
-    [StringValue("Automatic")]
-    Automatic = 1
+    [StringValue("Census")]
+    Census = 1
 }
