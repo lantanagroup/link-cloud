@@ -51,6 +51,9 @@
         </mat-option>
       }
     </mat-select>
+    <mat-error *ngIf="reportTypesControl.hasError('required')">
+      At least one report type is required
+    </mat-error>
   </mat-form-field>
 
   <mat-checkbox formControlName="bypassSubmission">Bypass submission?</mat-checkbox>
@@ -63,6 +66,11 @@
       <input matInput [matDatepicker]="startPicker" formControlName="startDate" required/>
       <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
       <mat-datepicker #startPicker></mat-datepicker>
+      @if (startDateControl.touched && startDateControl.hasError('required')) {
+        <mat-error>
+          Start date is required
+        </mat-error>
+      }
     </mat-form-field>
 
     <mat-form-field appearance="outline" class="full-width">
@@ -70,13 +78,19 @@
       <input matInput [matDatepicker]="endPicker" formControlName="endDate" required/>
       <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
       <mat-datepicker #endPicker></mat-datepicker>
+      @if (endDateControl.touched && endDateControl.hasError('required')) {
+        <mat-error>
+         End date is required
+        </mat-error>
+      }
     </mat-form-field>
   </div>
 
   <div class="row">
     <mat-radio-group formControlName="selectedForm">
       <mat-radio-button value="fileUpload">File Upload</mat-radio-button>
-      <mat-radio-button value="censusPatients">Census Patients</mat-radio-button>
+      <mat-radio-button value="manualPatients">Enter Patients</mat-radio-button>
+      <mat-radio-button value="censusPatients">Use Census</mat-radio-button>
     </mat-radio-group>
   </div>
   <!-- File Upload Form -->
@@ -94,7 +108,7 @@
     }
 
     <!-- Census Patients Form -->
-    @if (selectedFormControl.value === 'censusPatients') {
+    @if (selectedFormControl.value === 'manualPatients') {
       <div>
         <h3>Census Patients</h3>
         <div>
@@ -132,7 +146,7 @@
   </div>
   <!-- Button -->
   <div class="text-center mt-6" style="margin-top: 50px;">
-    <button type="button" mat-raised-button color="primary" [disabled]="generateReportForm.invalid"
+    <button type="button" mat-raised-button color="primary" [disabled]="!canGenerateReport"
             (click)="generateReport()">Generate Report
     </button>
   </div>

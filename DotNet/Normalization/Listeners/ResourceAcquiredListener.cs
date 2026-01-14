@@ -16,6 +16,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Options;
 using System.Text;
@@ -273,7 +274,7 @@ public class ResourceAcquiredListener : BackgroundService
 
     private async Task ProduceResourceNormalizedMessage(ConsumeResult<string, ResourceAcquiredMessage>? message, string facilityId, string correlationId, DomainResource? resource = null)
     {
-        var serializedResource = JsonSerializer.SerializeToElement(resource, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
+        var serializedResource = JsonSerializer.SerializeToElement(resource, LinkFhirSerializerOptions.ForFhirLenientSerialization);
 
         var headers = new Headers
         {
@@ -319,7 +320,7 @@ public class ResourceAcquiredListener : BackgroundService
 
     private DomainResource DeserializeStringToResource(string json)
     {
-        return JsonSerializer.Deserialize<DomainResource>(json, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector, new FhirJsonPocoDeserializerSettings { Validator = null }));
+        return JsonSerializer.Deserialize<DomainResource>(json, LinkFhirSerializerOptions.ForFhirLenientSerialization);
     }
 
     private DomainResource DeserializeResource(object resource)
