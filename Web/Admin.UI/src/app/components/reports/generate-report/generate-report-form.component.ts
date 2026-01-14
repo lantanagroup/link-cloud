@@ -26,14 +26,27 @@ import {
 } from "../../../interfaces/tenant/facility-config-model.interface";
 import {TenantService} from "../../../services/gateway/tenant/tenant.service";
 import {MeasureDefinitionService} from "../../../services/gateway/measure-definition/measure.service";
-import {IMeasureDefinitionConfigModel} from "../../../interfaces/measure-definition/measure-definition-config-model.interface";
+import {
+  IMeasureDefinitionConfigModel
+} from "../../../interfaces/measure-definition/measure-definition-config-model.interface";
 import {IReportGenerationResponse} from "../../../interfaces/entity-created-response.model";
-import {debounceTime, distinctUntilChanged, firstValueFrom, forkJoin, map, Observable, of, startWith, tap} from "rxjs";
+import {
+  debounceTime,
+  distinctUntilChanged,
+  firstValueFrom,
+  forkJoin,
+  map,
+  Observable,
+  of,
+  startWith,
+  Subject, takeUntil,
+  tap
+} from "rxjs";
 import {MatCheckboxModule} from "@angular/material/checkbox";
 import {MatRadioModule} from "@angular/material/radio";
 import * as Papa from 'papaparse';
 import {FileUploadComponent} from "../../core/file-upload/file-upload.component";
-import { Router } from '@angular/router';
+import {Router} from '@angular/router';
 import {facilityExistsValidator} from "../../validators/FacilityValidator";
 import {switchMap} from "rxjs/operators";
 import {FaIconComponent} from "@fortawesome/angular-fontawesome";
@@ -71,7 +84,7 @@ import {fromZonedTime} from 'date-fns-tz';
   templateUrl: './generate-report-form.component.html',
   styleUrls: ['./generate-report-form.component.scss']
 })
-export class GenerateReportFormComponent implements OnInit{
+export class GenerateReportFormComponent implements OnInit, OnDestroy {
 
   generateReportForm: FormGroup;
   facilities: Array<{ facilityId: string, facilityName: string }> = [];
@@ -80,6 +93,8 @@ export class GenerateReportFormComponent implements OnInit{
   formSubmitted = false; // Flag to track form submission
   errorMessage: string = '';
   lastGeneratedReport: { facilityId: string, reportId: string } | null = null;
+
+  private destroy$ = new Subject<void>();
 
   @Output() formValueChanged = new EventEmitter<boolean>();
 
@@ -103,7 +118,7 @@ export class GenerateReportFormComponent implements OnInit{
       endDate: ['', Validators.required],
       reportTypes: ['', Validators.required],
       patients: [],
-      selectedForm: ['fileUpload']
+      selectedForm: ['manualPatients']
     });
   }
 
@@ -118,30 +133,29 @@ export class GenerateReportFormComponent implements OnInit{
       debounceTime(300),
       distinctUntilChanged(),
       switchMap(term => this.tenantService.autocompleteFacilities(term || '')),
-      map(results => Object.entries(results || {}).map(([facilityId, facilityName]) => ({ facilityId, facilityName }))),
+      map(results => Object.entries(results || {}).map(([facilityId, facilityName]) => ({facilityId, facilityName}))),
       tap(facilities => (this.facilities = facilities))
     );
 
-    this.generateReportForm.valueChanges.subscribe(() => {
+    this.generateReportForm.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => {
       this.formValueChanged.emit(this.generateReportForm.invalid);
     });
   }
 
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
   onFacilityInputBlur() {
     setTimeout(() => {
-      const inputVal = this.facilityInputControl.value;
+      const inputVal = this.facilityInputControl.value?.trim();
       const facilityIdControl = this.facilityIdControl;
 
-      const match = this.facilities.find(f => f.facilityId=== inputVal);
       if (!inputVal) {
-        facilityIdControl.setErrors({ required: true });
-        facilityIdControl.setValue("");
-      } else if (!match) {
-        facilityIdControl.setErrors({ notFound: true });
-        facilityIdControl.setValue(inputVal);
+        facilityIdControl.setValue('');
       } else {
-        facilityIdControl.setErrors(null);
-        facilityIdControl.setValue(match.facilityId);
+        facilityIdControl.setValue(inputVal);
       }
 
       facilityIdControl.markAsTouched();
@@ -149,8 +163,9 @@ export class GenerateReportFormComponent implements OnInit{
     }, 200);
   }
 
-  onFacilitySelected(selectedValue: string) {
-    const facility = this.facilities.find(f => f.facilityId === selectedValue);
+
+  onFacilitySelected(selectedValue: { facilityId: string; facilityName: string }) {
+    const facility = this.facilities.find(f => f.facilityId === selectedValue.facilityId);
     if (facility) {
       this.facilityIdControl.setValue(facility.facilityId);
       this.facilityInputControl.setValue(facility.facilityId);
@@ -175,12 +190,12 @@ export class GenerateReportFormComponent implements OnInit{
     return this.generateReportForm.get('facilityInput') as FormControl;
   }
 
-  get startDateControl(): FormArray {
-    return this.generateReportForm.get('startDate') as FormArray;
+  get startDateControl(): FormControl {
+    return this.generateReportForm.get('startDate') as FormControl;
   }
 
-  get endDateControl(): FormArray {
-    return this.generateReportForm.get('endDate') as FormArray;
+  get endDateControl(): FormControl {
+    return this.generateReportForm.get('endDate') as FormControl;
   }
 
   get bypassSubmissionControl(): FormControl {
@@ -222,20 +237,31 @@ export class GenerateReportFormComponent implements OnInit{
 
       let adHocReportRequest: IAdHocReportRequest = {
         'bypassSubmission': this.bypassSubmissionControl.value,
-        'startDate': startUtc ,
+        'startDate': startUtc,
         'endDate': endUtc,
         'reportTypes': this.reportTypesControl.value,
         'patientIds': this.patients
       };
-      this.tenantService.generateAdHocReport(this.facilityIdControl.value, adHocReportRequest).subscribe((response: IReportGenerationResponse) => {
-        this.snackBar.open(`Successfully generated report with ID: ${response.reportId}.`, '', {
-          duration: 3500,
-          panelClass: 'success-snackbar',
-          horizontalPosition: 'end',
-          verticalPosition: 'top'
-        });
-        this.lastGeneratedReport = { facilityId: this.facilityIdControl.value, reportId: response.reportId };
-        this.resetForm();
+      this.tenantService.generateAdHocReport(this.facilityIdControl.value, adHocReportRequest).subscribe({
+        next: (response: IReportGenerationResponse) => {
+          this.snackBar.open(`Successfully generated report with ID: ${response.reportId}.`, '', {
+            duration: 3500,
+            panelClass: 'success-snackbar',
+            horizontalPosition: 'end',
+            verticalPosition: 'top'
+          });
+          this.lastGeneratedReport = {facilityId: this.facilityIdControl.value, reportId: response.reportId};
+          this.resetForm();
+        },
+        error: (err) => {
+          // Display error message
+          this.snackBar.open('Failed to generate report. Please try again.', '', {
+            duration: 3500,
+            panelClass: 'error-snackbar',
+            horizontalPosition: 'end',
+            verticalPosition: 'top'
+          });
+        }
       });
     } else {
       this.snackBar.open(`Invalid form, please check for errors.`, '', {
@@ -318,7 +344,7 @@ export class GenerateReportFormComponent implements OnInit{
     if (patient) {
       enteredPatients = patient.split(',').map(item => item.trim());
     }
-    return enteredPatients;``
+    return enteredPatients;
   }
 
   navToReport() {
@@ -327,5 +353,25 @@ export class GenerateReportFormComponent implements OnInit{
     }
   }
 
+  get canGenerateReport(): boolean {
+    if (this.generateReportForm.invalid) {
+      return false;
+    }
+
+    const selectedForm = this.selectedFormControl.value;
+    const hasPatients = this.patients && this.patients.length > 0;
+
+    if (selectedForm === 'censusPatients') {
+      return true;
+    }
+
+    if (selectedForm === 'fileUpload' || selectedForm === 'manualPatients') {
+      return hasPatients;
+    }
+
+    return false;
+  }
+
   protected readonly faSearch = faSearch;
+
 }
