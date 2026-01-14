@@ -209,7 +209,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     ReportStartDate = startDate.Value,
                                     ReportEndDate = endDate.Value,
                                     Frequency = Frequency.Adhoc,
-                                    AdHocType = isAutomatic ? AdHocType.Automatic : AdHocType.Manual,
+                                    AdHocType = isAutomatic ? AdHocType.Census : AdHocType.Manual,
                                     ReportTypes = reportTypes,
                                     EndOfReportPeriodJobHasRun = true,
                                     EnableSubmission = !value.BypassSubmission,
