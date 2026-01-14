@@ -4,9 +4,12 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- This project primarily contains HAPI interceptors and thus inherits from the HAPI parent POM -->
+    <!-- This project contains servlet filters and HAPI interceptors -->
+    <!-- These are intended to be integrated with a HAPI server, so this project inherits from the HAPI parent POM -->
     <!-- The parent version should match (or at least be binary compatible with) the target HAPI server -->
-    <!-- Upgrading to version 7+ will require changing usages of javax.* to jakarta.* -->
+    <!-- Upgrading to version 7+ will require (at least) changing usages of javax.* to jakarta.* -->
+    <!-- See the upgrade notes in the Dockerfile as well -->
+
     <parent>
         <groupId>ca.uhn.hapi.fhir</groupId>
         <artifactId>hapi-fhir</artifactId>
@@ -17,4 +20,38 @@
     <groupId>com.lantanagroup.link</groupId>
     <artifactId>hapi</artifactId>
     <version>0.4.1</version>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>ca.uhn.hapi.fhir</groupId>
+                <artifactId>hapi-fhir-bom</artifactId>
+                <version>${project.parent.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+        </dependency>
+    </dependencies>
 </project>
