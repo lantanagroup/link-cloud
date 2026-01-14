@@ -272,7 +272,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
             _logger.LogInformation("Discovered {Count} unique patient IDs for bundle creation: {Ids}", patientIds.Count, string.Join(", ", patientIds));
 
             string startDateStr = value.StartDate?.ToString("yyyyMMdd") ?? "unknown";
-            string measureAcronym = string.Join("_", value.ReportTypes.Select(rt => rt.ToLowerInvariant()));
+            string measureAcronym = GetMeasureAcronym(value.ReportTypes);
 
             // Process each patient
             foreach (var patientId in patientIds)
@@ -704,6 +704,34 @@ namespace LantanaGroup.Link.Submission.Application.Services
             BlobUriBuilder uriBuilder = new(new Uri(payloadRootUri));
             string prefix = ChangeBlobRoot(uriBuilder.BlobName);
             return DownloadAsync(_externalContainerClient, prefix, cancellationToken);
+        }
+
+        private string GetMeasureAcronym(List<string> reportTypes)
+        {
+            if (reportTypes == null || reportTypes.Count == 0)
+                return "unknown";
+
+            var reportTypesStr = string.Join(",", reportTypes).ToLowerInvariant();
+
+            // Map report types to short acronyms
+            if (reportTypesStr.Contains("nhsnacutecarehospitalinitialpopulation"))
+            {
+                return "ach1";
+            }
+            else if (reportTypesStr.Contains("respiratorypathogenssurveillance") ||
+                     reportTypesStr.Contains("rps"))
+            {
+                return "rps";
+            }
+            else if (reportTypesStr.Contains("glycemiccontrol") ||
+                     reportTypesStr.Contains("hypo"))
+            {
+                return "hypo";
+            }
+
+            // Fallback: use first report type as-is or first 10 chars
+            var firstType = reportTypes.First().ToLowerInvariant();
+            return firstType.Length > 10 ? firstType.Substring(0, 10) : firstType;
         }
     }
 }
