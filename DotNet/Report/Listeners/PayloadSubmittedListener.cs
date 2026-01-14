@@ -80,6 +80,7 @@ public class PayloadSubmittedListener(
                                 reportEntry.SubmissionStatus = SubmissionStatus.Submitted;
                                 reportEntry.ModifyDate = DateTime.UtcNow;
                                 database.ReportEntryRepository.Update(reportEntry);
+                                await database.SaveChangesAsync();
 
                                 //TODO: START - TEST CODE ONLY! REMOVE AFTER TESTING
                                 var reportSchedule = await database.ReportScheduledRepository
