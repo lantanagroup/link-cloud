@@ -435,8 +435,26 @@ namespace LantanaGroup.Link.Submission.Application.Services
             }
 
             // submitting-org.json - use Organization from manifest
+            // submitting-org.json - use Organization from manifest
             if (organization != null)
             {
+                // Inject dummy address if missing
+                if (organization.Address == null || !organization.Address.Any())
+                {
+                    organization.Address = new List<Address>
+                    {
+                        new Address
+                        {
+                            Line = new List<string> { "1 Center Drive" },
+                            City = "Ann Arbor",
+                            State = "MI",
+                            PostalCode = "48109",
+                            Country = "USA"
+                        }
+                    };
+                    _logger.LogDebug("Injected dummy address for Organization {OrgId}", organization.Id ?? "no-id");
+                }
+
                 var orgJson = JsonSerializer.Serialize(organization, jsonOptions);
                 byte[] orgBytes = Encoding.UTF8.GetBytes(orgJson);
                 string orgBlobName = GetBlobName(_externalSettings.BlobRoot, measureFolder, reportName, "submitting-org.json");
