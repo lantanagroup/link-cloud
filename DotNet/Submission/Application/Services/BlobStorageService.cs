@@ -327,6 +327,16 @@ namespace LantanaGroup.Link.Submission.Application.Services
                     Resource = patientMR
                 });
 
+                // Add Organization to each patient bundle
+                if (organization != null)
+                {
+                    expandedBundle.Entry.Add(new Bundle.EntryComponent
+                    {
+                        FullUrl = $"http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Organization/{organization.Id}",
+                        Resource = organization
+                    });
+                }
+
                 foreach (var resource in patientResources.Where(r => r != patientMR))
                 {
                     expandedBundle.Entry.Add(new Bundle.EntryComponent
