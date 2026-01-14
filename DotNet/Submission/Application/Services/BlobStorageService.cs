@@ -435,11 +435,17 @@ namespace LantanaGroup.Link.Submission.Application.Services
             }
 
             // submitting-org.json - use Organization from manifest
-            // submitting-org.json - use Organization from manifest
             if (organization != null)
             {
-                // Inject dummy address if missing
-                if (organization.Address == null || !organization.Address.Any())
+                // Inject dummy address if missing or only contains data-absent-reason extensions
+                bool needsDummyAddress = organization.Address == null ||
+                                         !organization.Address.Any() ||
+                                         organization.Address.All(a =>
+                                             string.IsNullOrEmpty(a.City) &&
+                                             string.IsNullOrEmpty(a.State) &&
+                                             (a.Line == null || !a.Line.Any()));
+
+                if (needsDummyAddress)
                 {
                     organization.Address = new List<Address>
                     {
