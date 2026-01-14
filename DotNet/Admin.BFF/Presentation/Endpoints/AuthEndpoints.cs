@@ -7,7 +7,6 @@ using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
@@ -109,7 +108,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 context.SignOutAsync(LinkAdminConstants.AuthenticationSchemes.Cookie);
                 return Results.SignOut(properties: new AuthenticationProperties
                 {
-                    RedirectUri = referer
+                    RedirectUri = "/logout"
                 },
                  authenticationSchemes: [LinkAdminConstants.AuthenticationSchemes.Cookie]);
             }

@@ -1,5 +1,5 @@
 import { Component, Inject, OnInit, ViewChild } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -15,12 +15,11 @@ import { CensusConfigFormComponent } from '../census-config-form/census-config-f
     templateUrl: './census-config-dialog.component.html',
     styleUrls: ['./census-config-dialog.component.scss'],
     imports: [
-        CommonModule,
-        MatDialogModule,
-        MatButtonModule,
-        MatIconModule,
-        CensusConfigFormComponent
-    ]
+    MatDialogModule,
+    MatButtonModule,
+    MatIconModule,
+    CensusConfigFormComponent
+]
 })
 export class CensusConfigDialogComponent implements OnInit {
   dialogTitle: string = '';
@@ -52,9 +51,9 @@ export class CensusConfigDialogComponent implements OnInit {
     this.formIsInvalid = formValidity;
   }
 
-  onSubmittedConfiguration(outcome: IEntityCreatedResponse) {    
-    if (outcome.id.length > 0) {
-      this.dialogRef.close(outcome.message);
+  onSubmittedConfiguration(outcome: any) {
+    if (outcome)  {
+      this.dialogRef.close(outcome);
     }
     else {
       this.snackBar.open(`Failed to create census configuration for the facility, see error for details.`, '', {

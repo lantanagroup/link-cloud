@@ -1,16 +1,13 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Interfaces;
-using Quartz;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using System.Text;
-using QueryDispatch.Application.Settings;
-using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
-using QueryDispatch.Domain.Managers;
-using QueryDispatch.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using Quartz;
+using QueryDispatch.Application.Models;
+using QueryDispatch.Application.Settings;
+using QueryDispatch.Domain.Managers;
+using System.Text;
 
 namespace LanatanGroup.Link.QueryDispatch.Jobs
 {
@@ -54,7 +51,7 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
                 {
                     PatientId = patientDispatchEntity.PatientId,
                     ScheduledReports = new List<ScheduledReport>(),
-                    QueryType = QueryTypes.Initial.ToString(),
+                    QueryType = QueryType.Initial.ToString(),
                     ReportableEvent = ReportableEvents.Discharge.ToString()
                 };
 
@@ -63,9 +60,10 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
                     dataAcquisitionRequestedValue.ScheduledReports.Add(new ScheduledReport
                     {
                         ReportTypes = scheduledReportPeriod.ReportTypes,
-                        Frequency = scheduledReportPeriod.Frequency,
+                        Frequency = (Frequency)scheduledReportPeriod.Frequency,
                         StartDate = scheduledReportPeriod.StartDate,
-                        EndDate = scheduledReportPeriod.EndDate
+                        EndDate = scheduledReportPeriod.EndDate,
+                        ReportTrackingId = scheduledReportPeriod.ReportTrackingId
                     });
                 }
 
@@ -83,7 +81,7 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
 
                 _acquisitionProducer.Flush();
 
-                _logger.LogInformation($"Produced Data Acquisition Requested event for facilityId: {HtmlInputSanitizer.Sanitize(patientDispatchEntity.FacilityId)}");
+                _logger.LogInformation("Produced Data Acquisition Requested event for facilityId: {FacilityId}", HtmlInputSanitizer.Sanitize(patientDispatchEntity.FacilityId));
 
                 await patientDispatchMgr.deletePatientDispatch(patientDispatchEntity.FacilityId, patientDispatchEntity.PatientId);
 

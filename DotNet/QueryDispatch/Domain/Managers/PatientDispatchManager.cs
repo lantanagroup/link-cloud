@@ -4,8 +4,8 @@ using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.QueryDispatch.Presentation.Services;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Quartz;
 using QueryDispatch.Application.Settings;
 
@@ -20,7 +20,7 @@ namespace QueryDispatch.Domain.Managers
 
     public class PatientDispatchManager : IPatientDispatchManager
     {
-        private readonly IEntityRepository<PatientDispatchEntity> _repository;
+        private readonly IBaseEntityRepository<PatientDispatchEntity> _repository;
         private readonly ILogger<QueryDispatchConfigurationManager> _logger;
         private readonly IProducer<string, AuditEventMessage> _producer;
         private readonly CompareLogic _compareLogic;
@@ -45,7 +45,7 @@ namespace QueryDispatch.Domain.Managers
                 //_datastore.Add(patientDispatch);
                 await _repository.AddAsync(patientDispatch);
 
-                _logger.LogInformation($"Created patient dispatch for patient id {HtmlInputSanitizer.Sanitize(patientDispatch.PatientId)} in facility {HtmlInputSanitizer.Sanitize(patientDispatch.FacilityId)}");
+                _logger.LogInformation("Created patient dispatch for patient id {PatientId} in facility {FacilityId}", HtmlInputSanitizer.Sanitize(patientDispatch.PatientId), HtmlInputSanitizer.Sanitize(patientDispatch.FacilityId));
 
                 await ScheduleService.CreateJobAndTrigger(patientDispatch, await _schedulerFactory.GetScheduler());
 
@@ -76,7 +76,7 @@ namespace QueryDispatch.Domain.Managers
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Create patient dispatch exception for patient id {HtmlInputSanitizer.Sanitize(patientDispatch.PatientId)} in facility {HtmlInputSanitizer.Sanitize(patientDispatch.FacilityId)}.", ex);
+                _logger.LogError(ex, "Create patient dispatch exception for patient id {PatientId} in facility {FacilityId}", HtmlInputSanitizer.Sanitize(patientDispatch.PatientId), HtmlInputSanitizer.Sanitize(patientDispatch.FacilityId));
                 throw new ApplicationException($"Failed to create patient dispatch record for patient id {HtmlInputSanitizer.Sanitize(patientDispatch.PatientId)} in facility {HtmlInputSanitizer.Sanitize(patientDispatch.FacilityId)}.");
             }
         }
@@ -90,7 +90,7 @@ namespace QueryDispatch.Domain.Managers
                 {
                     await _repository.RemoveAsync(entity);
                 }
-                _logger.LogInformation($"Deleted Patient Dispatch record for patient id {HtmlInputSanitizer.Sanitize(patientId)} in facility {HtmlInputSanitizer.Sanitize(facilityId)}");
+                _logger.LogInformation("Deleted Patient Dispatch record for patient id {PatientId} in facility {FacilityId}", HtmlInputSanitizer.Sanitize(patientId), HtmlInputSanitizer.Sanitize(facilityId));
 
 
                     var headers = new Headers

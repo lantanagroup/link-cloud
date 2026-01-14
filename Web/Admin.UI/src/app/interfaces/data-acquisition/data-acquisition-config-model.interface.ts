@@ -7,31 +7,13 @@ export interface ITenantDataAcquisitionConfigModel {
     facilities: IDataAcquisitionFacilityModel[];
   }
 
-export interface IDataAcquisitionFacilityModel { 
+export interface IDataAcquisitionFacilityModel {
     facilityId: string;
     fhirVersion: FhirVersion;
     baseFhirUrl: string;
     auth?: IDataAcquisitionAuthenticationConfigModel;
     resourceSettings: IDataAcquisitionConfigResourceModel[];
 }
-
-export interface IDataAcquisitionQueryConfigModel {
-    id: string;
-    facilityId: string;
-    fhirServerBaseUrl: string;
-    authentication?: IDataAcquisitionAuthenticationConfigModel;
-    queryPlanIds: string[];
-}
-
-//export interface IDataAcquisitionAuthenticationConfigModel {
-//    authType: string;
-//    key: string;
-//    tokenUrl: string;
-//    audience: string;
-//    clientId: string;
-//    userName: string;
-//    password: string;
-//}
 
 export interface IDataAcquisitionConfigResourceModel {
     resourceType: string[];

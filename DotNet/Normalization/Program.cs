@@ -1,27 +1,32 @@
 using Azure.Identity;
+using Confluent.Kafka;
 using HealthChecks.UI.Client;
-using LantanaGroup.Link.Normalization.Application.Interfaces;
-
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
-using LantanaGroup.Link.Normalization.Application.Serializers;
 using LantanaGroup.Link.Normalization.Application.Services;
+using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Application.Settings;
+using LantanaGroup.Link.Normalization.Domain;
 using LantanaGroup.Link.Normalization.Domain.Entities;
+using LantanaGroup.Link.Normalization.Domain.Managers;
+using LantanaGroup.Link.Normalization.Domain.Queries;
+using LantanaGroup.Link.Normalization.Domain.Repositories;
 using LantanaGroup.Link.Normalization.Listeners;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
-using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Factory;
+using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -30,16 +35,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.OpenApi.Models;
 using Quartz;
-using Quartz.Impl;
 using Quartz.Spi;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
-using LantanaGroup.Link.Normalization.Application.Managers;
 using AuditEventMessage = LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage;
-using Confluent.Kafka;
-using LantanaGroup.Link.Shared.Application.Health;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -53,33 +54,8 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
-    //load external configuration source if specified
-    var externalConfigurationSource = builder.Configuration.GetSection(NormalizationConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
-
-    if (!string.IsNullOrEmpty(externalConfigurationSource))
-    {
-        switch (externalConfigurationSource)
-        {
-            case ("AzureAppConfiguration"):
-                builder.Configuration.AddAzureAppConfiguration(options =>
-                {
-                    options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
-                         // Load configuration values with no label
-                         .Select("*", LabelFilter.Null)
-                         // Load configuration values for service name
-                         .Select("*", NormalizationConstants.ServiceName)
-                         // Load configuration values for service name and environment
-                         .Select("*", NormalizationConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
-
-                    options.ConfigureKeyVault(kv =>
-                    {
-                        kv.SetCredential(new DefaultAzureCredential());
-                    });
-
-                });
-                break;
-        }
-    }
+    // load external configuration source (if specified)
+    builder.AddExternalConfiguration(NormalizationConstants.ServiceName);
 
     IConfigurationSection serviceInformationSection = builder.Configuration.GetRequiredSection(NormalizationConstants.AppSettingsSectionNames.ServiceInformation);
     builder.Services.Configure<ServiceInformation>(serviceInformationSection);
@@ -122,13 +98,13 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITransientExceptionHandler<string, ResourceAcquiredMessage>, TransientExceptionHandler<string, ResourceAcquiredMessage>>();
 
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
-    builder.Services.AddTransient<IAuditService, AuditService>();
 
     builder.Services.AddControllers()
-        .AddJsonOptions(options =>
-        {
-            options.JsonSerializerOptions.Converters.Add(new NormalizationConverter());
-        });
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new FhirResourceConverter());
+    });
+
     builder.Services.AddHttpClient();
     builder.Services.AddProblemDetails();
 
@@ -170,6 +146,16 @@ static void RegisterServices(WebApplicationBuilder builder)
         }
     });
 
+    builder.Services.AddScoped<IEntityRepository<Operation>, OperationRepository>();
+    builder.Services.AddScoped<IEntityRepository<OperationSequence>, OperationSequenceRepository>();
+    builder.Services.AddScoped<IEntityRepository<ResourceType>, ResourceTypeRepository>();
+    builder.Services.AddScoped<IEntityRepository<OperationResourceType>, OperationResourceTypeRepository>();
+    builder.Services.AddScoped<IEntityRepository<Vendor>, VendorRepository>();
+    builder.Services.AddScoped<IEntityRepository<VendorVersion>, VendorVersionRepository>();
+    builder.Services.AddScoped<IEntityRepository<VendorVersionOperationPreset>, VendorVersionOperationPresetRepository>();
+
+    builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();  
+
     // Logging using Serilog
     builder.Logging.AddSerilog();
     Log.Logger = new LoggerConfiguration()
@@ -182,22 +168,41 @@ static void RegisterServices(WebApplicationBuilder builder)
                     .Enrich.With<ActivityEnricher>()
                     .CreateLogger();
 
-    builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
-
-    builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
-    builder.Services.AddTransient<IEntityRepository<NormalizationConfig>, NormalizationEntityRepository<NormalizationConfig>>();
-    builder.Services.AddTransient<IEntityRepository<RetryEntity>, NormalizationEntityRepository<RetryEntity>>();
-
     //Managers
-    builder.Services.AddTransient<INormalizationConfigManager, NormalizationConfigManager>();
+    builder.Services.AddScoped<IDatabase, Database>();
+    builder.Services.AddScoped<IOperationManager, OperationManager>();
+    builder.Services.AddScoped<IResourceManager, ResourceManager>();
+    builder.Services.AddScoped<IVendorManager, VendorManager>();
+    builder.Services.AddScoped<IOperationQueries, OperationQueries>(); 
+    builder.Services.AddScoped<IOperationSequenceQueries, OperationSequenceQueries>();
+    builder.Services.AddScoped<IVendorQueries, VendorQueries>();
+    builder.Services.AddScoped<IResourceQueries, ResourceQueries>();
 
-    builder.Services.AddTransient<INormalizationService, NormalizationService>();
+    builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+        options.JsonSerializerOptions.Converters.Add(new OperationConverter());
+    });
 
-    builder.Services.AddTransient<IJobFactory, JobFactory>();
-    builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
+
+    builder.Services.AddTransient<IJobFactory, QuartzJobFactory>();
+    builder.Services.AddSingleton<InMemorySchedulerFactory>();
+    builder.Services.AddKeyedSingleton<ISchedulerFactory>(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
+    builder.Services.AddSingleton<ISchedulerFactory>(provider => provider.GetRequiredService<InMemorySchedulerFactory>());
     builder.Services.AddTransient<RetryJob>();
 
-    builder.Services.AddSingleton<IConditionalTransformationEvaluationService, ConditionalTransformationEvaluationService>();
+    builder.Services.AddSingleton<CopyPropertyOperationService>();
+    builder.Services.AddHostedService(provider => provider.GetRequiredService<CopyPropertyOperationService>());
+
+    builder.Services.AddSingleton<CodeMapOperationService>();
+    builder.Services.AddHostedService(provider => provider.GetRequiredService<CodeMapOperationService>());
+
+    builder.Services.AddSingleton<ConditionalTransformOperationService>();
+    builder.Services.AddHostedService(provider => provider.GetRequiredService<ConditionalTransformOperationService>());
+
+    builder.Services.AddSingleton<CopyLocationOperationService>();
+    builder.Services.AddHostedService(provider => provider.GetRequiredService<CopyLocationOperationService>());
 
     if (consumerSettings != null && !consumerSettings.DisableConsumer)
     {
@@ -217,9 +222,10 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database")
-        .AddKafka(kafkaHealthOptions);
+        .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
+        .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
+    builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(c =>
     {
         if (!allowAnonymousAccess)
@@ -257,6 +263,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
+        c.DocumentFilter<HealthChecksFilter>();
     });
 
     //Add CORS
@@ -306,11 +313,12 @@ static void SetupMiddleware(WebApplication app)
 
     app.MapControllers();   
     
-    //map health check middleware
+    //map health check middleware and info endpoint
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     }).RequireCors("HealthCheckPolicy");
+    app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "normalization");
 
     app.AutoMigrateEF<NormalizationDbContext>();
 

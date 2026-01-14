@@ -1,0 +1,7 @@
+{
+  "type": "object",
+  "properties": {
+    "patientIds": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": ["patientIds"]
+}

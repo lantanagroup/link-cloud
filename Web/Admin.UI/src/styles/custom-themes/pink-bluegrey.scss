@@ -1,20 +1,28 @@
-@use 'sass:map';
-@use '@angular/material' as mat;
-@include mat.core();
 
+/*
 
-// Define the dark theme.
-$primary: mat.define-palette(mat.$pink-palette);
-$accent: mat.define-palette(mat.$blue-grey-palette);
-$theme: mat.define-dark-theme((
-    color: (
-      primary: $primary,
-      accent: $accent
-    )
-));
+*.pink-bluegrey {
+  color-scheme: dark;
+}
+*/
 
-@include mat.all-component-themes($theme);
+/*
+html {
+  color-scheme:  dark;
+  @include mat.theme((
+    color: mat.$violet-palette,
+    typography: Roboto,
+    density: 0
+  ));
+}
 
-/*.pink-bluegrey {
-  @include mat.all-component-colors($theme);
-}*/
+body.dark-mode {
+  color-scheme: dark;
+}
+*/
+
+/*
+!*.pink-bluegrey {
+   @include mat.all-component-colors($theme);
+ }*!
+  */

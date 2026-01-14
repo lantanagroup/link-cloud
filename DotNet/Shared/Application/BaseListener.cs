@@ -7,7 +7,6 @@ using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Text;
 
 namespace LantanaGroup.Link.Shared.Application;
 public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, ProduceKeyType, ProduceValueType>
@@ -93,7 +92,11 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                         }
                         catch (Exception ex)
                         {
-                            DeadLetterConsumerHandler.HandleException(consumeResult, new DeadLetterException("Data Acquisition Exception thrown: " + ex.Message), ExtractFacilityId(consumeResult));
+                            Logger.LogError(ex,
+                                "Unhandled exception in listener for {ServiceName} on topic {Topic}",
+                                ServiceInformation.Value.ServiceName, this.TopicName);
+
+                            TransientExceptionHandler.HandleException(consumeResult, new TransientException($"{ServiceInformation.Value.ServiceName} Exception thrown: " + ex.Message), ExtractFacilityId(consumeResult));
                         }
                         finally
                         {
@@ -141,13 +144,13 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
         }
         catch (OperationCanceledException oce)
         {
-            Logger.LogError(oce, "Operation Canceled: {1}", oce.Message);
+            Logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
             consumer.Close();
             consumer.Dispose();
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "BaseListener Exception Encountered: {1}", ex.Message);
+            Logger.LogError(ex, "BaseListener Exception Encountered: {Message}", ex.Message);
             throw;
         }
     }

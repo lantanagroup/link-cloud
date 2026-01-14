@@ -12,6 +12,15 @@
 	</PropertyGroup>
 
 	<PropertyGroup>
+		<!-- Custom Properties -->
+		<CompanyName>LantanaGroup</CompanyName>
+		<ProjectName>Link</ProjectName>
+		<!-- Redefine MSBuild Properties -->
+		<Company>$(CompanyName)</Company>
+		<RootNamespace>$(CompanyName).$(ProjectName).$(MSBuildProjectName.Replace(" ", "_"))</RootNamespace>
+	</PropertyGroup>
+	
+	<PropertyGroup>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<NoWarn>$(NoWarn);1591</NoWarn>
 	</PropertyGroup>
@@ -25,9 +34,9 @@
 
 	<ItemGroup>
     
-		<PackageReference Include="AspNetCore.HealthChecks.SqlServer" Version="8.0.2" />
-		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.*" />
-		<PackageReference Include="Azure.Identity" Version="1.12.0" />
+		<PackageReference Include="AspNetCore.HealthChecks.SqlServer" Version="8.*" />
+		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.*" />
+		<PackageReference Include="Azure.Identity" Version="1.*" />
 		<PackageReference Include="CompareNETObjects" Version="4.*" />
 		<PackageReference Include="Confluent.Kafka" Version="2.*" />
 		<PackageReference Include="Grpc.AspNetCore" Version="2.*" />
@@ -35,48 +44,44 @@
 		<PackageReference Include="Grpc.Net.Client" Version="2.*" />
 		<PackageReference Include="jose-jwt" Version="4.*" />
 		<PackageReference Include="JWT" Version="10.*" />
-		<PackageReference Include="LinqKit" Version="1.3.0" />
-		<!--<PackageReference Include="Hl7.Fhir.DSTU2" Version="1.*" />-->
-		<PackageReference Include="Microsoft.AspNetCore.HeaderPropagation" Version="8.0.4" />
-		<PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.0.0" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.4" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" Version="8.0.4" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.4">
+		<PackageReference Include="LinqKit" Version="1.*" />
+		<PackageReference Include="Microsoft.AspNetCore.HeaderPropagation" Version="8.*" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.*" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" Version="8.*" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.*">
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.4" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.4">
+		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.*" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.*">
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="8.0.4" />
+		<PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="8.*" />
 		<PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="7.4.*" />
 		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
-		<PackageReference Include="PemUtils" Version="3.*" />
-		<PackageReference Include="Portable.BouncyCastle" Version="1.*" />
-		<PackageReference Include="Serilog.AspNetCore" Version="8.*" />
-		<PackageReference Include="Serilog.Enrichers.Span" Version="3.*" />
-		<PackageReference Include="Serilog.Exceptions" Version="8.*" />
-		<PackageReference Include="Serilog.Expressions" Version="4.0.0" />
-		<PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.*" />
+		
 		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
+		
+		<PackageReference Include="System.Text.Json" Version="8.*" />
 	</ItemGroup>
 
 	<ItemGroup>
 	  <ProjectReference Include="..\DataAcquisition.Domain\DataAcquisition.Domain.csproj" />
+	  <ProjectReference Include="..\Link.Authorization\Link.Authorization.csproj" />
 	  <ProjectReference Include="..\Shared\Shared.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
-	  <None Update="Scripts\dataAcqDb.sql">
-	    <Generator>TextTemplatingFileGenerator</Generator>
-	    <LastGenOutput>dataAcqDb.cs</LastGenOutput>
-	  </None>
+	  <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
+	  <Compile Update="Scripts\dataAcqDb.cs">
+	    <DesignTime>True</DesignTime>
+	    <AutoGen>True</AutoGen>
+	    <DependentUpon>dataAcqDb.sql</DependentUpon>
+	  </Compile>
 	</ItemGroup>
 
 </Project>

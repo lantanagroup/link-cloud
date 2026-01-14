@@ -1,6 +1,6 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories;
+﻿using DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
@@ -15,11 +15,13 @@ public class FhirQueriesController : ControllerBase
 {
     private readonly ILogger<FhirQueriesController> _logger;
     private IFhirQueryManager _fhirQueryManager;
+    private IFhirQueryQueries _fhirQueryQueries;
 
-    public FhirQueriesController(ILogger<FhirQueriesController> logger, IFhirQueryManager fhirQueryManager)
+    public FhirQueriesController(ILogger<FhirQueriesController> logger, IFhirQueryManager fhirQueryManager, IFhirQueryQueries fhirQueryQueries)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _fhirQueryManager = fhirQueryManager ?? throw new ArgumentNullException(nameof(fhirQueryManager));
+        _logger = logger;
+        _fhirQueryManager = fhirQueryManager;
+        _fhirQueryQueries = fhirQueryQueries;
     }
 
     /// <summary>
@@ -30,8 +32,6 @@ public class FhirQueriesController : ControllerBase
     /// <param name="patientId"></param>
     /// <param name="resourceType"></param>
     /// <param name="cancellationToken"></param>
-    /// <param name="queryType"></param>
-    /// <param name="successOnly"></param>
     /// <returns>
     /// Success: 200
     /// Bad Request: 400
@@ -53,8 +53,7 @@ public class FhirQueriesController : ControllerBase
 
         try
         {
-            var results =
-                await _fhirQueryManager.GetFhirQueriesAsync(facilityId, correlationId, patientId, resourceType, cancellationToken);
+            var results = await _fhirQueryQueries.GetFhirQueriesAsync(facilityId, correlationId, patientId, resourceType, cancellationToken);
 
             if (results.Queries.Count == 0)
             {

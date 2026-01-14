@@ -1,12 +1,12 @@
 ﻿using Census.Domain.Entities;
 using Confluent.Kafka;
 using LantanaGroup.Link.Census.Application.Settings;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using Quartz;
 
 namespace LantanaGroup.Link.Census.Application.Jobs;
 
+[DisallowConcurrentExecution]
 public class SchedulePatientListRetrieval : IJob
 {
     private readonly ILogger<SchedulePatientListRetrieval> _logger;
@@ -22,7 +22,14 @@ public class SchedulePatientListRetrieval : IJob
     {
         //get facility
         var facility = (CensusConfigEntity)context.JobDetail.JobDataMap.Get(CensusConstants.Scheduler.Facility);
-        _logger.LogInformation($"Triggering {KafkaTopic.PatientCensusScheduled.ToString()} for facility: {facility.FacilityID} ");
+        _logger.LogDebug("Triggering {Topic} for facility: {FacilityId}", KafkaTopic.PatientCensusScheduled.ToString(), facility.FacilityID);
+
+        // Skip execution if facility is disabled
+        if (facility.Enabled == false)
+        {
+            _logger.LogInformation("Skipping execution for disabled facility: {FacilityId}", facility.FacilityID);
+            return;
+        }
 
         await _kafkaProducer.ProduceAsync(KafkaTopic.PatientCensusScheduled.ToString(), new Message<string, Null>
         {

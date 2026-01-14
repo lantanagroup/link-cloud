@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Caching.Distributed;
 using System.Text.Json;
 
@@ -18,9 +19,9 @@ using System.Text.Json;
 
             if (string.IsNullOrEmpty(key)) throw new ArgumentNullException(nameof(key));
 
-            string value = _cache.GetString(key);
+            string? value = _cache.GetString(key);
 
-            if (string.IsNullOrEmpty(value)) return default(T);
+            if (string.IsNullOrEmpty(value)) return default;
 
             try
             {
@@ -33,7 +34,7 @@ using System.Text.Json;
 
         }
 
-        public void Set<T>(string key, T value, TimeSpan expiration)
+        public void Set<T>(string key, T value, TimeSpan expiration, ExpirationType expirationType = ExpirationType.Sliding)
         {
             if (string.IsNullOrEmpty(key))
                 throw new ArgumentNullException(nameof(key));
@@ -44,9 +45,12 @@ using System.Text.Json;
             try
             {
                 var serializedValue = JsonSerializer.Serialize(value);
-                var options = new DistributedCacheEntryOptions
+                var options = expirationType == ExpirationType.Sliding ? new DistributedCacheEntryOptions
                 {
                     SlidingExpiration = expiration
+                } : new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = expiration
                 };
                 _cache.SetString(key, serializedValue, options);
             }

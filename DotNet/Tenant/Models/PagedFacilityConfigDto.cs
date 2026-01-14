@@ -1,16 +1,16 @@
 ﻿using LantanaGroup.Link.Shared.Application.Models.Responses;
-using LantanaGroup.Link.Tenant.Models;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 
 namespace LantanaGroup.Link.Tenant.Models
 {
     public class PagedFacilityConfigDto
     {
-        public List<FacilityConfigDto> Records { get; set; } = new List<FacilityConfigDto>();
+        public List<FacilityModel> Records { get; set; } = new List<FacilityModel>();
         public PaginationMetadata Metadata { get; set; } = null!;
 
         public PagedFacilityConfigDto() { }
 
-        public PagedFacilityConfigDto(List<FacilityConfigDto> records, PaginationMetadata metadata)
+        public PagedFacilityConfigDto(List<FacilityModel> records, PaginationMetadata metadata)
         {
             Records = records;
             Metadata = metadata;

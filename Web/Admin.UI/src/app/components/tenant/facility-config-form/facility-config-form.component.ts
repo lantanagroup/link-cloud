@@ -1,41 +1,87 @@
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+
+import {
+    AbstractControl,
+  FormControl,
+  FormGroup,
+  FormsModule,
+  ReactiveFormsModule,
+  ValidatorFn,
+  Validators
+} from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { IFacilityConfigModel, IScheduledTaskModel } from 'src/app/interfaces/tenant/facility-config-model.interface';
+import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
+import {IFacilityConfigModel} from 'src/app/interfaces/tenant/facility-config-model.interface';
 import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
 import { FormMode } from 'src/app/models/FormMode.enum';
 import { ENTER, COMMA } from '@angular/cdk/keycodes';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
 import { MatToolbarModule } from '@angular/material/toolbar';
+import {MatSelectModule} from "@angular/material/select";
+import {MatCardModule} from "@angular/material/card";
+import {MatTabsModule} from "@angular/material/tabs";
+import {MatExpansionModule} from "@angular/material/expansion";
+import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
+import * as moment from 'moment-timezone';
+import {ScheduledReportsValidator} from "../../validators/ScheduledReportsValidator";
+import {MeasureDefinitionService} from "../../../services/gateway/measure-definition/measure.service";
+import { AppConfig, AppConfigService } from '../../../services/app-config.service';
+
+export function facilityIdConditionalValidator(allowAlphaNumeric: boolean): ValidatorFn {
+  return (control: AbstractControl) => {
+    const value = control.value;
+    if (allowAlphaNumeric) {
+      const valid = /^[a-zA-Z0-9-]+$/.test(value);
+      return valid ? null : { invalidFacilityId: 'Facility ID must be alphanumeric plus hyphens only.' };
+    } else {
+      const valid = /^[0-9]{5}$/.test(value);
+      return valid ? null : { invalidFacilityId: 'Facility ID must be a valid NHSN ORG ID (5 numbers).' };
+    }
+  };
+}
 
 @Component({
   selector: 'app-facility-config-form',
   standalone: true,
   imports: [
-    CommonModule,
     MatButtonModule,
-    MatFormFieldModule,    
+    MatFormFieldModule,
     MatInputModule,
     MatIconModule,
     MatChipsModule,
+    MatSelectModule,
     MatSlideToggleModule,
     ReactiveFormsModule,
     MatSnackBarModule,
-    MatToolbarModule
-  ],
+    MatToolbarModule,
+    FormsModule,
+    ReactiveFormsModule,
+    MatFormFieldModule,
+    MatSnackBarModule,
+    FormsModule,
+    ReactiveFormsModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+    MatToolbarModule,
+    MatCardModule,
+    MatTabsModule,
+    MatButtonModule,
+    MatIconModule,
+    MatExpansionModule,
+    MatProgressSpinnerModule
+],
   templateUrl: './facility-config-form.component.html',
   styleUrls: ['./facility-config-form.component.scss']
 })
 export class FacilityConfigFormComponent implements OnInit, OnChanges {
 
-  @Input() item!: IFacilityConfigModel;  
+  @Input() item!: IFacilityConfigModel;
 
   private _viewOnly: boolean = false;
   @Input()
@@ -46,24 +92,53 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
 
   @Output() submittedConfiguration = new EventEmitter<IEntityCreatedResponse>();
 
+  timezones: string[] = moment.tz.names();
+
   formMode!: FormMode;
   facilityConfigForm!: FormGroup;
   addOnBlur = true;
   readonly separatorKeysCodes = [ENTER, COMMA] as const;
 
-  constructor(private snackBar: MatSnackBar, private tenantService: TenantService) { 
+  reportTypes: string[] = [];
 
-    //initialize form with fields based on IFacilityConfigModel
-    this.facilityConfigForm = new FormGroup({
-      facilityId: new FormControl('', Validators.required),
-      facilityName: new FormControl('', Validators.required),
-      scheduledTasks: new FormArray([])
-    }); 
+  appConfig?: AppConfig;
 
+  constructor(
+    private snackBar: MatSnackBar,
+    private tenantService: TenantService,
+    private measureDefinitionConfigurationService: MeasureDefinitionService,
+    private appConfigService: AppConfigService) { }
+
+  compareReportTypes(object1: any, object2: any) {
+    return (object1 && object2) && object1 === object2;
   }
 
-  ngOnInit(): void {
-    this.facilityConfigForm.reset();
+  async ngOnInit(): Promise<void> {
+
+
+    this.appConfig = await this.appConfigService.loadConfig();
+
+    this.facilityConfigForm = new FormGroup(
+      {
+        facilityId: new FormControl('', [Validators.required, facilityIdConditionalValidator(this.appConfig?.allowAlphaNumericFacilityId ?? true)]),
+        facilityName: new FormControl('', Validators.required),
+        timeZone: new FormControl('', Validators.required), // Add timezone control
+        monthlyReports: new FormControl([]),
+        dailyReports: new FormControl([]),
+        weeklyReports: new FormControl([]),
+      },
+      { validators: ScheduledReportsValidator() } // Apply the custom validator to the entire FormGroup
+    );
+
+    this.measureDefinitionConfigurationService.getMeasureDefinitionConfigurations().subscribe(
+      {
+        next: (response) => {
+          this.reportTypes = response.map(model => model.id);
+        },
+        error: (err) => {
+          this.submittedConfiguration.emit({id: '', message: err.message});
+        }
+      });
 
     if(this.item) {
       this.formMode = FormMode.Edit;
@@ -72,33 +147,76 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
       this.facilityIdControl.setValue(this.item.facilityId);
       this.facilityIdControl.updateValueAndValidity();
 
-      this.facilityNameControl.setValue(this.item.facilityName);     
+      this.facilityNameControl.setValue(this.item.facilityName);
       this.facilityNameControl.updateValueAndValidity();
 
-      this.loadScheduledTasks(this.item.scheduledTasks);
-      this.scheduledTasks.updateValueAndValidity();
+      this.timeZoneControl.setValue(this.item.timeZone);
+      this.timeZoneControl.updateValueAndValidity();
+
+      this.monthlyReportsControl.setValue(this.item.scheduledReports.monthly);
+      this.monthlyReportsControl.updateValueAndValidity();
+
+      this.weeklyReportsControl.setValue(this.item.scheduledReports.weekly);
+      this.weeklyReportsControl.updateValueAndValidity();
+
+      this.dailyReportsControl.setValue(this.item.scheduledReports.daily);
+      this.dailyReportsControl.updateValueAndValidity();
+
     }
     else {
       this.formMode = FormMode.Create;
-    }   
+    }
+
+    // toggle view
+    this.toggleViewOnly(this.viewOnly);
 
     this.facilityConfigForm.valueChanges.subscribe(() => {
       this.formValueChanged.emit(this.facilityConfigForm.invalid);
     });
-
   }
 
-  ngOnChanges(changes: SimpleChanges) {     
-    
+  ngOnChanges(changes: SimpleChanges) {
+
     if (changes['item'] && changes['item'].currentValue) {
       this.facilityIdControl.setValue(this.item.facilityId);
       this.facilityIdControl.updateValueAndValidity();
 
-      this.facilityNameControl.setValue(this.item.facilityName);     
+      this.facilityNameControl.setValue(this.item.facilityName);
       this.facilityNameControl.updateValueAndValidity();
 
-      this.loadScheduledTasks(this.item.scheduledTasks);
-      this.scheduledTasks.updateValueAndValidity();     
+      this.timeZoneControl.setValue(this.item.timeZone);
+      this.timeZoneControl.updateValueAndValidity();
+
+      this.monthlyReportsControl.setValue(this.item.scheduledReports.monthly)
+      this.monthlyReportsControl.updateValueAndValidity();
+
+      this.weeklyReportsControl.setValue(this.item.scheduledReports.weekly);
+      this.weeklyReportsControl.updateValueAndValidity();
+
+      this.dailyReportsControl.setValue(this.item.scheduledReports.daily);
+      this.dailyReportsControl.updateValueAndValidity();
+
+      // toggle view
+      this.toggleViewOnly(this.viewOnly);
+    }
+  }
+
+  toggleViewOnly(viewOnly: boolean) {
+
+    if (viewOnly) {
+      this.facilityIdControl.disable();
+      this.facilityNameControl.disable();
+      this.timeZoneControl.disable();
+      this.monthlyReportsControl.disable();
+      this.weeklyReportsControl.disable();
+      this.dailyReportsControl.disable();
+    } else {
+      this.facilityIdControl.enable();
+      this.facilityNameControl.enable();
+      this.timeZoneControl.enable();
+      this.monthlyReportsControl.enable();
+      this.weeklyReportsControl.enable();
+      this.dailyReportsControl.enable();
     }
   }
 
@@ -116,67 +234,20 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
     return this.facilityConfigForm.get('facilityName') as FormControl;
   }
 
-  get scheduledTasks(): FormArray {
-    return this.facilityConfigForm.get('scheduledTasks') as FormArray;
+  get timeZoneControl(): FormControl {
+    return this.facilityConfigForm.get('timeZone') as FormControl;
   }
 
-  get reportTypeSchedulesForms(): FormArray {
-    return this.scheduledTasks.get('reportTypeSchedules') as FormArray;
-  }  
-
-  addScheduledTask(): void {
-    this.scheduledTasks.push(new FormGroup({
-      kafkaTopic: new FormControl('', Validators.required),
-      reportTypeSchedules: new FormArray([
-        new FormGroup({
-          reportType: new FormControl('', Validators.required),
-          scheduledTriggers: new FormArray([
-            new FormGroup({ trigger: new FormControl('', Validators.required) })
-          ])
-        })
-      ])
-    }));
-
-    this.scheduledTasks.updateValueAndValidity();
-  }  
-
-  deleteScheduledTask(taskIndex: number): void {
-    this.scheduledTasks.removeAt(taskIndex);
+  get monthlyReportsControl(): FormControl {
+    return this.facilityConfigForm.get('monthlyReports') as FormControl;
   }
 
-  getReportTypeSchedules(taskIndex: number) {
-    return (this.scheduledTasks.at(taskIndex) as FormGroup).get('reportTypeSchedules') as FormArray;
+  get weeklyReportsControl(): FormControl {
+    return this.facilityConfigForm.get('weeklyReports') as FormControl;
   }
 
-  addReportTypeSchedule(taskIndex: number): void {
-    const reportTypeSchedules = this.getReportTypeSchedules(taskIndex);
-    reportTypeSchedules.push(new FormGroup({
-      reportType: new FormControl('', Validators.required),
-      scheduledTriggers: new FormArray([
-        new FormGroup({trigger: new FormControl('', Validators.required)})
-      ])
-    }));
-
-    reportTypeSchedules.updateValueAndValidity();
-  }  
-  
-  deleteReportTypeSchedule(taskIndex: number, scheduleIndex: number): void {
-    const reportTypeSchedules = this.scheduledTasks.at(taskIndex).get('reportTypeSchedules') as FormArray;
-    reportTypeSchedules.removeAt(scheduleIndex);
-  }
-
-  getScheduledTriggers(taskIndex: number, scheduleIndex: number): FormArray {
-    return (this.getReportTypeSchedules(taskIndex).at(scheduleIndex) as FormGroup).get('scheduledTriggers') as FormArray;
-  }
-
-  addScheduledTrigger(taskIndex: number, scheduleIndex: number): void {
-    const scheduledTriggers = this.getReportTypeSchedules(taskIndex).at(scheduleIndex).get('scheduledTriggers') as FormArray;
-    scheduledTriggers.push(new FormGroup({trigger: new FormControl('', Validators.required)}));
-  }
-
-  deleteScheduledTrigger(taskIndex: number, scheduleIndex: number, triggerIndex: number): void {
-    const scheduledTriggers = this.getScheduledTriggers(taskIndex, scheduleIndex) as FormArray;
-    scheduledTriggers.removeAt(triggerIndex);
+  get dailyReportsControl(): FormControl {
+    return this.facilityConfigForm.get('dailyReports') as FormControl;
   }
 
   clearFacilityId(): void {
@@ -189,28 +260,42 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
     this.facilityNameControl.updateValueAndValidity();
   }
 
-  clearScheduledTasks(): void {
-    this.scheduledTasks.clear();
-    this.scheduledTasks.updateValueAndValidity();
+  get noReportsEntered(): string | null {
+    return this.facilityConfigForm.errors?.['noReportsEntered'] || null;
   }
 
-  removeScheduledTask(index: number): void {
-    this.scheduledTasks.removeAt(index);
-    this.scheduledTasks.updateValueAndValidity();
+  get reportsNotUniqueError(): string | null {
+    return this.facilityConfigForm.errors?.['reportsNotUnique'] || null;
   }
 
   submitConfiguration(): void {
     if(this.facilityConfigForm.valid) {
+
+      let monthlyReports : string[] = this.monthlyReportsControl.value ?? [];
+      let weeklyReports : string[] = this.weeklyReportsControl.value ?? [];
+      let dailyReports : string[] = this.dailyReportsControl.value ?? [];
+      let scheduledReports: { daily: string[], monthly: string[], weekly: string[] } = {"daily": dailyReports, "monthly": monthlyReports, "weekly": weeklyReports};
+
       if(this.formMode == FormMode.Create) {
-        let scheduledTasks: IScheduledTaskModel[] = this.mapScheduledTasks();
-        this.tenantService.createFacility(this.facilityIdControl.value ?? '', this.facilityNameControl.value, scheduledTasks).subscribe((response: IEntityCreatedResponse) => {
-          this.submittedConfiguration.emit(response);
+        this.tenantService.createFacility(this.facilityIdControl.value, this.facilityNameControl.value, this.timeZoneControl.value, scheduledReports).subscribe({
+          next: (response) => {
+            if (response) {
+              this.submittedConfiguration.emit({id: response.id, message: "Facility Created"});
+            }
+          },
+          error: (err) => {
+            this.submittedConfiguration.emit({id: "", message: err.message});
+          }
         });
       }
       else if(this.formMode == FormMode.Edit) {
-        let scheduledTasks: IScheduledTaskModel[] = this.mapScheduledTasks();
-        this.tenantService.updateFacility(this.item.id ?? '', this.facilityIdControl.value ?? '', this.facilityNameControl.value, scheduledTasks).subscribe((response: IEntityCreatedResponse) => {
-          this.submittedConfiguration.emit(response);
+        this.tenantService.updateFacility(this.item.id ?? '', this.facilityIdControl.value, this.facilityNameControl.value, this.timeZoneControl.value, scheduledReports).subscribe( {
+          next: (response) => {
+            this.submittedConfiguration.emit({id:  this.item.id ?? '', message: "Facility Updated"});
+          },
+          error: (err) => {
+            this.submittedConfiguration.emit({id: this.item.id ?? '', message: err.message});
+          }
         });
       }
     }
@@ -223,45 +308,4 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
       });
     }
   }
-
-  private mapScheduledTasks(): IScheduledTaskModel[] {
-    return this.scheduledTasks.value.map((task: any) => {
-      return {
-        kafkaTopic: task.kafkaTopic,
-        reportTypeSchedules: task.reportTypeSchedules.map((schedule: any) => {
-          return {
-            reportType: schedule.reportType,
-            scheduledTriggers: schedule.scheduledTriggers.map((trigger: any) => {
-              return trigger.trigger;
-            })
-          }
-        })
-      }
-    });
-  }
-
-  private loadScheduledTasks(scheduledTasks: IScheduledTaskModel[]): void {
-
-    this.scheduledTasks.clear();
-    this.scheduledTasks.updateValueAndValidity();
-
-    scheduledTasks.forEach((task: IScheduledTaskModel) => {
-      this.scheduledTasks.push(new FormGroup({
-        kafkaTopic: new FormControl(task.kafkaTopic, Validators.required),
-        reportTypeSchedules: new FormArray(
-          task.reportTypeSchedules.map((schedule: any) => {
-            return new FormGroup({
-              reportType: new FormControl(schedule.reportType, Validators.required),
-              scheduledTriggers: new FormArray(
-                schedule.scheduledTriggers.map((trigger: any) => {
-                  return new FormGroup({ trigger: new FormControl(trigger, Validators.required) });
-                })
-              )
-            })
-          })
-        )
-      }));
-    });
-  }
-
 }

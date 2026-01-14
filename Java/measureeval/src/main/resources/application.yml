@@ -1,3 +1,29 @@
+service-information:
+  service-name: Link Measure Evaluation Service
+
+management:
+  endpoints:
+    web:
+      base-path: /
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+  health:
+    discover-composite:
+      enabled: false
+    ping:
+      enabled: false
+    refresh:
+      enabled: false
+    diskspace:
+      enabled: false
+    mongo:
+      enabled: false
+    kafka:
+      enabled: true  # Ensures Kafka health is checked
+
 logging:
   level:
     com.lantanagroup.link: debug
@@ -11,7 +37,7 @@ telemetry:
 loki:
   enabled: true
   url: http://localhost:3100
-  app: link-dev
+  app: link-cloud
 
 springdoc:
   api-docs:
@@ -21,20 +47,22 @@ springdoc:
 
 spring:
 
+  cloud:
+    discovery:
+      enabled: false
+
   application:
     name: measureeval
 
   data:
     mongodb:
-      host: localhost
-      port: 27017
+      uri: mongodb://localhost:27017/${spring.application.name}?serverSelectionTimeoutMS=4000
       database: ${spring.application.name}
 
   jackson:
     mapper:
       accept-case-insensitive-enums: true
       accept-case-insensitive-properties: true
-      default-view-inclusion: false
 
   kafka:
     bootstrap-servers: localhost:9092
@@ -44,6 +72,8 @@ spring:
 
     producer:
       client-id: ${spring.application.name}
+      properties:
+        max.request.size: 10485760
 
     retry:
       maxAttempts: 3

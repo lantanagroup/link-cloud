@@ -1,0 +1,37 @@
+<div class="sub-pre-qual-report">
+  <div style="margin: 2rem 4rem">
+    <nav mat-tab-nav-bar [tabPanel]="tabPanel" style="display: inline-block;">
+      <a mat-tab-link
+         [routerLink]="['/tenant/facility', facilityId, 'report', submissionId]"
+         routerLinkActive #reportDetailsActive="routerLinkActive"
+         [active]="reportDetailsActive.isActive">
+        Report Details
+      </a>
+      <a mat-tab-link
+         [routerLink]="['/sub-pre-qual-report/facility', facilityId, 'report', submissionId]"
+         routerLinkActive #prequalReportActive="routerLinkActive"
+         [active]="prequalReportActive.isActive">
+        Prequalification Report
+      </a>
+    </nav>
+    <mat-tab-nav-panel #tabPanel></mat-tab-nav-panel>
+  </div>
+  @if(isLoading){
+  <div class="loading-container">
+    <mat-spinner></mat-spinner>
+  </div>
+  } @else {
+  <app-sub-pre-qual-report-meta [reportSummary]="reportSummary"></app-sub-pre-qual-report-meta>
+  <app-sub-pre-qual-report-summary [reportIssues]="reportIssues" [reportIssuesSummary]="reportIssuesSummary"></app-sub-pre-qual-report-summary>
+  <div class="sub-pre-qual-report--tables">
+    <div>
+      <h4>Unacceptable Categories</h4>
+      <app-sub-pre-qual-report-categories-table [showAcceptable]="false" [reportIssues]="reportIssues" [reportIssuesSummary]="reportIssuesSummary"></app-sub-pre-qual-report-categories-table>
+    </div>
+    <div>
+      <h4>Acceptable Categories</h4>
+      <app-sub-pre-qual-report-categories-table [showAcceptable]="true" [reportIssues]="reportIssues" [reportIssuesSummary]="reportIssuesSummary"></app-sub-pre-qual-report-categories-table>
+    </div>
+  </div>
+  }
+</div>

@@ -2,76 +2,71 @@
   <div class="form-input">
     <mat-form-field appearance="outline" class="subject-input form-input ">
       <mat-label>Facility Id</mat-label>
-      <input matInput formControlName="facilityId" [readonly]="viewOnly" placeholder="Facility Id">
-      <button *ngIf="facilityIdControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearFacilityId()">
-        <mat-icon>close</mat-icon>
-      </button>
-      <mat-error *ngIf="facilityIdControl.hasError('required')">
-        A facility id is <strong>required</strong>
-      </mat-error>
+      <input matInput formControlName="facilityId" [disabled]="true" placeholder="Facility Id">
     </mat-form-field>
   </div>
 
   <div class="form-input">
     <mat-form-field appearance="outline" class="subject-input form-input ">
       <mat-label>Fhir Server Base Url</mat-label>
-      <input matInput formControlName="fhirServerBaseUrl" [readonly]="viewOnly" placeholder="Fhir Server Base URL">
-      <button *ngIf="fhirServerBaseUrlControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearFhirServerBaseUrl()">
-        <mat-icon>close</mat-icon>
-      </button>
-      <mat-error *ngIf="fhirServerBaseUrlControl.hasError('required')">
-        A fhir server base url is <strong>required</strong>
-      </mat-error>
+      <input matInput formControlName="fhirServerBaseUrl" [disabled]="viewOnly" placeholder="Fhir Server Base URL">
+      @if (fhirServerBaseUrlControl.value && !viewOnly) {
+        <button matSuffix mat-icon-button aria-label="Clear"
+                (click)="clearFhirServerBaseUrl()">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+      @if (!viewOnly && fhirServerBaseUrlControl.hasError('required')) {
+        <mat-error>
+          A fhir server base url is <strong>required</strong>
+        </mat-error>
+      }
     </mat-form-field>
   </div>
 
-  <!--<div class="form-input">
-    <mat-form-field appearance="outline" class="subject-input form-input ">
-      <mat-label>EHR Patient Lists</mat-label>
-      <input matInput formControlName="eHRPatientLists" [readonly]="viewOnly" >
-      <button *ngIf="eHRPatientListControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearEHRPatientList()">
-        <mat-icon>close</mat-icon>
-      </button>
-      <mat-error *ngIf="eHRPatientListControl.hasError('required')">
-        A measure id or list id is <strong>required</strong>
-      </mat-error>
-    </mat-form-field>
-  </div>-->
-  <!--<p>
-    <mat-toolbar class="form-section-bar">
-      <span class="title">Scheduled Tasks</span>
-      <button mat-icon-button aria-label="Add a new EHR Patient List Item" (click)="addEHRPatientList()" *ngIf="!viewOnly">
-        <mat-icon>add</mat-icon>
-      </button>
-    </mat-toolbar>
-  </p>-->
+  <div formArrayName="patientListControl">
+    <!-- Header Row -->
+    <div class="patient-row header-row">
+      <div class="column">Status</div>
+      <div class="column">Time Frame</div>
+      <div class="column">FhirId</div>
+    </div>
 
-  <div formArrayName="eHRPatientLists"  *ngIf="eHRPatientListControl && eHRPatientListControl.controls.length > 0">
-      <div *ngFor="let list of eHRPatientListControl.controls; let i=index">
-        <div class="input-container list-item-container" [formGroupName]="i">
-          <div style="display: flex;">
-            <div style="flex: auto;">
-              <mat-form-field appearance="outline" class="data-acq-list-task-input">
-                <mat-label>Measure ID</mat-label>
-                <input matInput formControlName="measureId" [readonly]="viewOnly" placeholder="Measure Id">
-              </mat-form-field>
-              <mat-form-field appearance="outline" class="data-acq-list-task-input">
-                <mat-label>List ID</mat-label>
-                <input matInput formControlName="listId" [readonly]="viewOnly" placeholder="List Id">
-              </mat-form-field>
-            </div>
-            <div style="flex-shrink: 2;">
-              <button mat-stroked-button (click)="addEHRPatientList(i)" *ngIf="!viewOnly">
-                Add EHR Patient List
-              </button>
-              <button mat-stroked-button color="warn" style="margin-left: .5em;" (click)="removeEHRPatientList(i)" *ngIf="!viewOnly">
-                Delete EHR Patient List
-              </button>
-            </div>
+    @for (patientForm of patientListControl.controls; track patientForm; let i = $index) {
+      <div [formGroup]="patientForm" class="patient-container">
+        <!-- Value Row -->
+        <div class="patient-row value-row">
+          <div class="column">{{ patientForm.get('status')?.value }}</div>
+          <div class="column">{{ patientForm.get('timeFrame')?.value }}</div>
+          <div class="column">
+            <mat-form-field appearance="outline" class="form-input fhir-field">
+              <input
+                [readonly]="viewOnly"
+                matInput
+                formControlName="fhirId"
+                placeholder="FhirId"
+              />
+              <!-- Error messages -->
+              @if (patientForm.get('fhirId')?.hasError('required') && (patientForm.get('fhirId')?.touched || patientForm.get('fhirId')?.value == '')){
+                <mat-error>
+                  FhirId is required
+                </mat-error>
+              }
+              @if (patientForm.get('fhirId')?.hasError('duplicate')) {
+                <mat-error>Duplicate FhirId</mat-error>
+              }
+            </mat-form-field>
           </div>
+
+          @if (!viewOnly){
+            <button mat-icon-button type="button" (click)="clearFhirId(patientForm)">
+              <mat-icon>close</mat-icon>
+            </button>
+          }
         </div>
       </div>
-    </div>
+    }
+  </div>
 </form>
 
 

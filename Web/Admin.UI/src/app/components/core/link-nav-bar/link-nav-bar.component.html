@@ -1,0 +1,37 @@
+<nav class="subnavbar">
+  <ul class="subnav-menu">
+    <li class="subnav-item" *ngFor="let item of subnavItems" [class.dropdown]="item.children"
+        [class.active]="item.children && isChildRouteActive(item.children)">
+      <!-- Top-level item -->
+      <a *ngIf="!item.children" [routerLink]="[item.path!]" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+        {{ item.label }}
+      </a>
+
+      <!-- Dropdown item -->
+      <ng-container *ngIf="item.children">
+        <a role="button"
+           tabindex="0"
+           [attr.aria-haspopup]="true"
+           [attr.aria-expanded]="isChildRouteActive(item.children)">
+          {{ item.label }}
+          <div class="dropdown-icon">
+            <vd-icon filePath="../../../assets/icons/chevron-default.svg"></vd-icon>
+          </div>
+        </a>
+        <ul class="dropdown-menu">
+          <li *ngFor="let child of item.children">
+            <a *ngIf="child.path?.startsWith('/')" [routerLink]="[child.path]" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+              {{ child.label }}
+            </a>
+            <a *ngIf="child.path && !child.path.startsWith('/')"
+               [href]="child.path"
+               [attr.target]="child.path.startsWith('http') ? '_blank' : null"
+               [attr.rel]="child.path.startsWith('http') ? 'noopener noreferrer' : null">
+              {{ child.label }}
+            </a>
+          </li>
+        </ul>
+      </ng-container>
+    </li>
+  </ul>
+</nav>

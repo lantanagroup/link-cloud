@@ -1,0 +1,9 @@
+spring:
+  cloud:
+    azure:
+      appconfiguration:
+        enabled: false
+        stores:
+          - selects:
+              - key-filter: '/'
+                label-filter: ',MeasureEval'

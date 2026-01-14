@@ -3,8 +3,8 @@ using KellermanSoftware.CompareNetObjects;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Quartz;
 using QueryDispatch.Application.Settings;
 
@@ -19,8 +19,8 @@ namespace QueryDispatch.Domain.Managers
 
     public class ScheduledReportManager : IScheduledReportManager
     {
-        IEntityRepository<ScheduledReportEntity> _scheduledReportRepository;
-        IEntityRepository<QueryDispatchConfigurationEntity> _queryDispatchRepository;
+        IBaseEntityRepository<ScheduledReportEntity> _scheduledReportRepository;
+        IBaseEntityRepository<QueryDispatchConfigurationEntity> _queryDispatchRepository;
 
         private readonly ILogger<QueryDispatchConfigurationManager> _logger;
         private readonly IProducer<string, AuditEventMessage> _producer;
@@ -44,12 +44,7 @@ namespace QueryDispatch.Domain.Managers
             {
                 await _scheduledReportRepository.AddAsync(scheduledReport);
 
-                _logger.LogInformation($"Created schedule report for faciltiy {HtmlInputSanitizer.Sanitize(scheduledReport.FacilityId)}");
-
-                var headers = new Headers
-                        {
-                            { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(scheduledReport.ReportPeriods[0].CorrelationId) }
-                        };
+                _logger.LogInformation("Created schedule report for facility {FacilityId}", HtmlInputSanitizer.Sanitize(scheduledReport.FacilityId));
 
                 var auditMessage = new AuditEventMessage
                 {
@@ -58,24 +53,22 @@ namespace QueryDispatch.Domain.Managers
                     Action = AuditEventType.Create,
                     EventDate = DateTime.UtcNow,
                     Resource = typeof(ScheduledReportEntity).Name,
-                    Notes = $"Created schedule report {scheduledReport.Id} for facility {scheduledReport.FacilityId} "
+                    Notes = $"Created schedule report {scheduledReport.Id} for facility {scheduledReport.FacilityId}. "
                 };
 
                 _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                 {
                     Value = auditMessage,
-                    Headers = headers
-                });
+                    Headers = new Headers()
+            });
 
                 _producer.Flush();
-
-
 
                 return scheduledReport.FacilityId;
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Failed to create scheduled report for facility {HtmlInputSanitizer.Sanitize(scheduledReport.FacilityId)}.", ex);
+                _logger.LogError(ex, "Failed to create scheduled report for facility {FacilityId}", HtmlInputSanitizer.Sanitize(scheduledReport.FacilityId));
                 throw new ApplicationException($"Failed to create scheduled report for facility {HtmlInputSanitizer.Sanitize(scheduledReport.FacilityId)}.");
             }
         }
@@ -107,7 +100,7 @@ namespace QueryDispatch.Domain.Managers
                     existingReportPeriod.EndDate = newReportPeriod.EndDate;
                     existingReportPeriod.Frequency = newReportPeriod.Frequency;
                     existingReportPeriod.ReportTypes = newReportPeriod.ReportTypes;
-                    existingReportPeriod.CorrelationId = newReportPeriod.CorrelationId;
+                    existingReportPeriod.ReportTrackingId = newReportPeriod.ReportTrackingId;
                     existingReportPeriod.ModifyDate = DateTime.UtcNow;
                 }
                 else
@@ -120,19 +113,14 @@ namespace QueryDispatch.Domain.Managers
                         Frequency = newReportPeriod.Frequency,
                         CreateDate = DateTime.UtcNow,
                         ModifyDate = DateTime.UtcNow,
-                        CorrelationId = newReportPeriod.CorrelationId
+                        ReportTrackingId = newReportPeriod.ReportTrackingId
                     });
 
                 }
 
                 await _scheduledReportRepository.UpdateAsync(existingReport);
 
-                _logger.LogInformation($"Update scheduled report type {HtmlInputSanitizer.Sanitize(newReportPeriod.ReportTypes.ToString())} for facility id {HtmlInputSanitizer.Sanitize(existingReport.FacilityId)}");
-
-                var headers = new Headers
-                    {
-                        { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(newReportPeriod.CorrelationId) }
-                    };
+                _logger.LogInformation("Update scheduled report type {ReportTypes} for facility id {FacilityId}", HtmlInputSanitizer.Sanitize(newReportPeriod.ReportTypes.ToString()), HtmlInputSanitizer.Sanitize(existingReport.FacilityId));
 
                 var auditMessage = new AuditEventMessage
                 {
@@ -148,8 +136,8 @@ namespace QueryDispatch.Domain.Managers
                 _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                 {
                     Value = auditMessage,
-                    Headers = headers
-                });
+                    Headers = new Headers()
+            });
 
                 _producer.Flush();
 
@@ -157,7 +145,7 @@ namespace QueryDispatch.Domain.Managers
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Failed to update scheduled report for facility id {HtmlInputSanitizer.Sanitize(existingReport.FacilityId)}.", ex);
+                _logger.LogError(ex, "Failed to update scheduled report for facility id {FacilityId}", HtmlInputSanitizer.Sanitize(existingReport.FacilityId));
                 throw new ApplicationException($"Failed to update scheduled report for facility id {HtmlInputSanitizer.Sanitize(existingReport.FacilityId)}.");
             }
         }

@@ -1,0 +1,60 @@
+<mat-card-content>
+
+  @if (errorMessage) {
+    <div class="error-snackbar" #errorDiv>
+      <mat-icon color="warn">error_outline</mat-icon>
+      {{ errorMessage }}
+    </div>
+  }
+  <form [formGroup]="form" class="operation-form">
+    <h2 class="section-title">Operation Details</h2>
+
+    <!-- Facility Id -->
+    @if (!isVendorMode) {
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Facility Id</mat-label>
+        <input matInput formControlName="facilityId" [disabled]="true" placeholder="Facility Id"/>
+      </mat-form-field>
+    }
+
+    <!-- Vendor Id -->
+    @if (isVendorMode) {
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Select Vendor</mat-label>
+        <mat-select formControlName="selectedVendor" [disabled]="viewOnly" multiple>
+          @for (vendor of vendors; track vendor) {
+            <mat-option [value]="vendor.id">{{ vendor.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
+
+    @if (showFacilityOrVendorError) {
+      <div class="validation-error">
+        Vendor is <strong>required</strong>
+      </div>
+    }
+
+    <!-- Name -->
+    <mat-form-field appearance="fill" class="full-width">
+      <mat-label>Name</mat-label>
+      <input matInput formControlName="name" [disabled]="true"/>
+    </mat-form-field>
+
+    <!-- Description -->
+    <mat-form-field appearance="fill" class="full-width">
+      <mat-label>Description</mat-label>
+      <input matInput formControlName="description" [disabled]="true"/>
+    </mat-form-field>
+
+    <!-- Resource Types -->
+    @if (selectedResourceTypesControl.value?.length > 0) {
+      <div class="selected-resource-types">
+        <strong>Selected Resource Types: </strong> {{ selectedResourceTypesControl.value.join(', ') }}
+      </div>
+    }
+
+    <!-- Enable/Disable checkbox -->
+    <mat-checkbox formControlName="isEnabled">Enabled</mat-checkbox>
+  </form>
+</mat-card-content>

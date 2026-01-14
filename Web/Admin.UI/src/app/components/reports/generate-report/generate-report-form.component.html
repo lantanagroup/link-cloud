@@ -1,0 +1,147 @@
+<form class="report-form" [formGroup]="generateReportForm">
+  <h2 class="mat-headline">Generate Ad-Hoc Report</h2>
+
+  <!-- Row 1: Facility, Report Type, Bypass Submission -->
+  <div class="row">
+    <div class="vertical-container full-width">
+      <mat-form-field class="form-select" appearance="outline">
+        <span matPrefix><fa-icon [icon]="faSearch" class="fa-lg"></fa-icon></span>
+        <mat-label>Facility</mat-label>
+        <input
+          matInput
+          formControlName="facilityInput"
+          [matAutocomplete]="auto"
+          (blur)="onFacilityInputBlur()"
+        >
+        <button *ngIf="facilityInputControl.value" matSuffix mat-icon-button matTooltip="Clear" aria-label="Clear"
+                (click)="clearSearchInput()" class="clear-btn">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-autocomplete #auto="matAutocomplete" (optionSelected)="onFacilitySelected($event.option.value)">
+          <mat-option *ngFor="let fac of filteredFacilities | async" [value]="fac.facilityId">
+            {{ fac.facilityId }}
+          </mat-option>
+        </mat-autocomplete>
+
+      </mat-form-field>
+
+      <!-- Facility error messages -->
+      <div class="facility-errors-container">
+        @if (facilityIdControl.touched && facilityIdControl.hasError('required')) {
+          <div class="facility-error">
+            Facility is <strong>required</strong>
+          </div>
+        }
+        @if (facilityIdControl.touched && facilityIdControl.hasError('notFound')) {
+          <div class="facility-error">
+            Facility <strong>not found</strong>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+
+  <!-- Report Types -->
+  <mat-form-field class="form-select" appearance="outline" class="full-width">
+    <mat-label>Report Types</mat-label>
+    <mat-select matInput formControlName="reportTypes" [compareWith]="compareReportTypes" multiple>
+      @for (reportType of reportTypes; track reportType) {
+        <mat-option [value]="reportType">
+          {{ reportType }}
+        </mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <mat-checkbox formControlName="bypassSubmission">Bypass submission?</mat-checkbox>
+
+
+  <!-- Row 2: Dates -->
+  <div class="row">
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Start Date</mat-label>
+      <input matInput [matDatepicker]="startPicker" formControlName="startDate" required/>
+      <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
+      <mat-datepicker #startPicker></mat-datepicker>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>End Date</mat-label>
+      <input matInput [matDatepicker]="endPicker" formControlName="endDate" required/>
+      <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
+      <mat-datepicker #endPicker></mat-datepicker>
+    </mat-form-field>
+  </div>
+
+  <div class="row">
+    <mat-radio-group formControlName="selectedForm">
+      <mat-radio-button value="fileUpload">File Upload</mat-radio-button>
+      <mat-radio-button value="censusPatients">Census Patients</mat-radio-button>
+    </mat-radio-group>
+  </div>
+  <!-- File Upload Form -->
+  <div class="row">
+    @if (selectedFormControl.value === 'fileUpload') {
+      <div>
+        <h3>File Upload</h3>
+        <file-upload (fileChange)="loadFile($event)">Upload</file-upload>
+        @if (errorMessage) {
+          <div class="text-red-600 mt-2">
+            {{ errorMessage }}
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Census Patients Form -->
+    @if (selectedFormControl.value === 'censusPatients') {
+      <div>
+        <h3>Census Patients</h3>
+        <div>
+          <mat-form-field appearance="outline">
+            <input matInput formControlName="patients" placeholder="Enter comma-delimited string of patients"/>
+          </mat-form-field>
+          <button mat-raised-button color="primary" type="button" class="custom-height-button" (click)="addPatient()">
+            Add
+          </button>
+        </div>
+      </div>
+    }
+    <div class="input-container">
+      <thead>
+        @if (patients.length > 0) {
+          <tr>
+            <th class="header-cell">Patient</th>
+            <th class="header-cell">Delete</th>
+          </tr>
+        }
+      </thead>
+      @for (patient of patients; track patient; let i = $index) {
+        <tr>
+          <td class="header-cell">{{ patient }}</td>
+          <td class="header-cell">
+            @if (patients.length > 0) {
+              <button mat-icon-button color="warn" (click)="removePatient(i)">
+                <mat-icon>remove_circle</mat-icon>
+              </button>
+            }
+          </td>
+        </tr>
+      }
+    </div>
+  </div>
+  <!-- Button -->
+  <div class="text-center mt-6" style="margin-top: 50px;">
+    <button type="button" mat-raised-button color="primary" [disabled]="generateReportForm.invalid"
+            (click)="generateReport()">Generate Report
+    </button>
+  </div>
+  @if (lastGeneratedReport?.reportId) {
+    <div class="text-center mt-6" style="margin-top: 50px;">
+      <button type="button" mat-raised-button color="secondary"
+              (click)="navToReport()">View Report
+      </button>
+    </div>
+  }
+
+</form>

@@ -3,9 +3,9 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
-using System.Text.Json;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 {
@@ -24,19 +24,22 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
         public async Task<string> Execute(ReportScheduled model, string? userId = null)
         {
-            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Producing Report Scheduled Event");
-            string correlationId = Guid.NewGuid().ToString();
+            using var activity = ServiceActivitySource.Instance.StartActivity("Producing Report Scheduled Event");
+            var correlationId = model.reportTrackingId; //Guid.NewGuid().ToString();
 
             try
             {
+                if (string.IsNullOrEmpty(model.FacilityId))
+                {
+                    throw new ArgumentException("FacilityId cannot be null or empty");
+                }
+                
                 var headers = new Headers
                 {
                     { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(correlationId) }
                 };
-
-                string Key = string.IsNullOrEmpty(model.FacilityId) ? throw new ArgumentException("FacilityId cannot be null or empty", nameof(model.FacilityId)) : model.FacilityId;
-
-                DateTime EndDate = DateTime.UtcNow;
+                
+                DateTime endDate;
 
                 if (double.TryParse(model.Delay, out double delay))
                 {
@@ -48,15 +51,15 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     {
                         throw new ArgumentException($"Delay cannot exceed {MAX_DELAY_MINUTES} minutes", nameof(model.Delay));
                     }
-                    EndDate = DateTime.UtcNow.AddMinutes(delay);
+                    endDate = DateTime.UtcNow.AddMinutes(delay);
                 }
                 else
                 {
-                    _logger.LogWarning("Invalid delay value '{Delay}'. Using default delay of {DefaultDelay} minutes", model.Delay, DEFAULT_DELAY_MINUTES);
-                    EndDate = DateTime.UtcNow.AddMinutes(DEFAULT_DELAY_MINUTES); // default to 5 minutes
+                    _logger.LogWarning("Invalid delay value '{Delay}'. Using default delay of {DefaultDelay} minutes", HtmlInputSanitizer.Sanitize(model.Delay), DEFAULT_DELAY_MINUTES);
+                    endDate = DateTime.UtcNow.AddMinutes(DEFAULT_DELAY_MINUTES); // default to 5 minutes
                 }
                
-                 DateTime normalizedEndDate = new DateTime(EndDate.Year, EndDate.Month, EndDate.Day, EndDate.Hour, EndDate.Minute, 0, DateTimeKind.Utc);
+                 var normalizedEndDate = new DateTime(endDate.Year, endDate.Month, endDate.Day, endDate.Hour, endDate.Minute, 0, DateTimeKind.Utc);
                  if (model.ReportTypes == null || !model.ReportTypes.Any())
                  {
                     throw new ArgumentException("At least one report type must be specified", nameof(model.ReportTypes));
@@ -71,7 +74,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 {
                     throw new ArgumentException("Start date must be earlier than end date", nameof(model.StartDate));
                 }
-                
+
                 var message = new Message<string, object>
                 {
                     Key = model.FacilityId,
@@ -82,8 +85,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                         Frequency = model.Frequency.ToString(),
                         StartDate = model.StartDate,
                         EndDate = normalizedEndDate,
-
-                    },
+                        ReportTrackingId = correlationId
+                    }
                 };
 
                 await _producer.ProduceAsync(nameof(KafkaTopic.ReportScheduled), message);

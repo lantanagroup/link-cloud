@@ -6,7 +6,6 @@
 
         public static class AppSettingsSectionNames
         {
-            public const string ExternalConfigurationSource = "ExternalConfigurationSource";
             public const string DatabaseProvider = "DatabaseProvider";
             public const string UserManagement = "UserManagement";
         }

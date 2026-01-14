@@ -8,7 +8,7 @@
 # Update Strategy:
 # - Weekly checks on Tuesdays
 # - Security updates and version updates are grouped
-# - Managed by @lantanagroup/link-security-team
+# - Managed by lantanagroup/link-security-team
 
 version: 2
 updates:
@@ -17,10 +17,8 @@ updates:
     schedule:
       interval: "weekly"
       day: "tuesday"
-    reviewers:
-      - "@lantanagroup/link-security-team"
     assignees:
-      - "sdmcgeown"
+      - "@lantanagroup/link-release-management-team"
     # Group minor and patch security and version updates into a PR
     # so we don't get overwhelmed
     groups:
@@ -32,8 +30,9 @@ updates:
         update-types: ["patch", "minor"]
     labels:
       - "link-security"
+      - "dependencies"
     commit-message:
-      prefix: "[npm update]: "
+      prefix: "TECH_DEBT: [npm update]: "
 
   # Repeat for docker
   - package-ecosystem: "docker"
@@ -41,10 +40,8 @@ updates:
     schedule:
       interval: "weekly"
       day: "tuesday"
-    reviewers:
-      - "@lantanagroup/link-security-team"
     assignees:
-      - "sdmcgeown"
+      - "@lantanagroup/link-release-management-team"
     # Group minor and patch security and version updates into a PR
     # so we don't get overwhelmed
     groups:
@@ -56,5 +53,6 @@ updates:
         update-types: ["patch", "minor"]
     labels:
       - "link-security"
+      - "dependencies"
     commit-message:
-      prefix: "[docker update]: "
+      prefix: "TECH_DEBT: [docker update]: "

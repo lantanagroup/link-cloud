@@ -1,0 +1,431 @@
+openapi: 3.0.4
+
+info:
+  version: 0.3.0
+  title: Census
+paths:
+  /api/census/config:
+    post:
+      tags:
+      - CensusConfig
+      summary: Creates a CensusConfig for a given censusConfig
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CensusConfigModel'
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CensusConfigEntity'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/census/config/{facilityId}:
+    get:
+      tags:
+      - CensusConfig
+      summary: Returns the CensusConfig for a given facilityId
+      parameters:
+      - name: facilityId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CensusConfigModel'
+        "500":
+          description: Internal Server Error
+    put:
+      tags:
+      - CensusConfig
+      summary: Updates a CensusConfig for a given censusConfigModel and facilityId
+      parameters:
+      - name: facilityId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CensusConfigModel'
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CensusConfigEntity'
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CensusConfigEntity'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        "500":
+          description: Internal Server Error
+    delete:
+      tags:
+      - CensusConfig
+      summary: Deletes the CensusConfig for a given facilityId
+      parameters:
+      - name: facilityId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: No Content
+        "500":
+          description: Internal Server Error
+
+  /api/census/patient-events:
+    get:
+      tags:
+      - PatientEvents
+      summary: Returns all events stored in the dbo.PatientEvents data store for the given facility.
+      parameters:
+      - name: facilityId
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: correlationId
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: startDate
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: endDate
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PatientEventModel'
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+  /api/census/patient-events/{id}:
+    delete:
+      tags:
+      - PatientEvents
+      summary: Soft deletes a patient event and rebuilds the materialized view for the related correlation id.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+  /api/census/patient-events/visit/{correlationId}:
+    delete:
+      tags:
+      - PatientEvents
+      summary: Soft deletes the patient event store for the given correlation id and removes the corresponding materialized view.
+      parameters:
+      - name: correlationId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+
+  /api/census/patient-encounters/current:
+    get:
+      tags:
+      - PatientEncounters
+      summary: Returns the current materialized view state for patient(s) events for a given facility.
+      parameters:
+      - name: facilityId
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: correlationId
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PatientEventModel'
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+  /api/census/patient-encounters/historical:
+    get:
+      tags:
+      - PatientEncounters
+      summary: Returns an ad hoc generated materialized view state for patient(s) events for a given facility as of a specific date.
+      parameters:
+      - name: facilityId
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: correlationId
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: dateThreshold
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PatientEncounterModel'
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+  /api/census/patient-encounters/rebuild:
+    post:
+      tags:
+      - PatientEncounters
+      summary: Deletes and rebuilds the materialized view records for a given facility.
+      parameters:
+      - name: facilityId
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: correlationId
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+
+  /health:
+    get:
+      tags:
+      - Health
+      summary: Health check endpoint
+      description: Returns the health status of the service and its dependencies
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: Overall health status
+                  totalDuration:
+                    type: string
+                    description: Total duration of health checks
+                  entries:
+                    type: object
+                    properties:
+                      Database:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                          description:
+                            type: string
+                          duration:
+                            type: string
+                          data:
+                            type: object
+                      Kafka:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                          description:
+                            type: string
+                          duration:
+                            type: string
+                          data:
+                            type: object
+        "503":
+          description: Unhealthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: Overall health status
+                  totalDuration:
+                    type: string
+                    description: Total duration of health checks
+                  entries:
+                    type: object
+                    properties:
+                      Database:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                          description:
+                            type: string
+                          duration:
+                            type: string
+                          data:
+                            type: object
+                      Kafka:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                          description:
+                            type: string
+                          duration:
+                            type: string
+                          data:
+                            type: object
+components:
+  schemas:
+    CensusConfigEntity:
+      type: object
+      properties:
+        id:
+          type: string
+        createDate:
+          type: string
+          format: date-time
+        modifyDate:
+          type: string
+          format: date-time
+        facilityID:
+          type: string
+        scheduledTrigger:
+          type: string
+    CensusConfigModel:
+      required:
+      - facilityId
+      - scheduledTrigger
+      type: object
+      properties:
+        facilityId:
+          type: string
+        scheduledTrigger:
+          type: string
+    PatientEventModel:
+      type: object
+      properties:
+        id:
+          type: string
+        facilityId:
+          type: string
+        correlationId:
+          type: string
+        eventType:
+          type: string
+        eventTimestamp:
+          type: string
+          format: date-time
+        payload:
+          type: object
+    PatientEncounterModel:
+      type: object
+      properties:
+        id:
+          type: string
+        facilityId:
+          type: string
+        correlationId:
+          type: string
+        encounterDate:
+          type: string
+          format: date-time
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/PatientEventModel'
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+          format: int32
+        detail:
+          type: string
+        instance:
+          type: string

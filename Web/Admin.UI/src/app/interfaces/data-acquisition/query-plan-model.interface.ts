@@ -1,12 +1,12 @@
 export interface IQueryPlanModel {
     id: string;
     planName: string;
-    reportType: string;
     facilityId: string;
-    eHRDescription: string;
-    lookback: string;
-    initialQueries: Map<string, QueryConfigModel>;
-    supplementalQueries: Map<string, QueryConfigModel>;
+    ehrDescription: string;
+    lookBack: string;
+    initialQueries: string;
+    supplementalQueries: string;
+    type: string;
 }
 
 export type QueryConfigModel = IParameterQueryConfigModel | IReferenceQueryConfigModel;
@@ -46,7 +46,7 @@ export interface IVariableParameterModel extends IQueryParameterModel {
     variable: VariableParameterType;
 }
 
-export enum VariableParameterType { 
+export enum VariableParameterType {
     patientId = 0,
     lookbackStart = 1,
     periodStart = 2,

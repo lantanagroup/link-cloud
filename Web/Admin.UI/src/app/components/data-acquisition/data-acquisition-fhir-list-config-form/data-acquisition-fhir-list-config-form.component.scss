@@ -1,0 +1,38 @@
+@use '../../../../styles/core.scss';
+
+.patient-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap:  0.1rem;
+}
+
+.patient-row {
+  display: flex;
+  justify-content: flex-start;
+  gap: 1rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+
+.column {
+  flex: 1;
+  text-align: left;
+}
+
+.header-row {
+  font-weight: 600;
+  border-bottom: 1px solid #ccc;
+  padding-top: 0.1rem; 
+  padding-bottom: 0.1rem;
+}
+
+.value-row .column {
+  display: flex;
+  align-items: center;
+}
+
+.fhir-field {
+  width: 100%;
+  max-width: 180px;
+}

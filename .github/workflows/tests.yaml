@@ -1,0 +1,257 @@
+name: "Tests"
+
+on:
+#  schedule:
+#    - cron: "0 0 * * *"
+  pull_request:
+    branches:
+      - dev
+      - workflow/**
+
+permissions:
+  contents: read
+
+jobs:
+  
+  changes:
+    runs-on: ubuntu-latest
+    outputs: 
+      run_job: ${{ steps.should.outputs.run_job }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # needed for accurate PR base comparisons
+
+      - name: Compute whether to run smoke tests
+        id: should
+        shell: bash
+        run: |
+          # For PRs, pass base…HEAD; for other events, the script will fallback
+          chmod +x Scripts/should-run-smoke-test.sh
+          result=$(Scripts/should-run-smoke-test.sh "origin/${{ github.base_ref }}...HEAD")
+          echo "$result"
+          echo "$result" >> "$GITHUB_OUTPUT"
+
+      - name: Show decision
+        run: echo "run_job=${{ steps.should.outputs.run_job }}"
+          
+  docker-build-and-run:    
+    name: Smoke Test with Docker Compose
+    runs-on: [docker-16core-64gb]
+    
+    needs: changes
+    if: ${{ needs.changes.outputs.run_job == 'true' }}
+
+    env:
+      PROJECT_NAME: link
+      HEALTH_CHECK_TIMEOUT: 10
+      CHECK_INTERVAL: 5
+
+    steps:          
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build services with cache
+        run: |
+          docker buildx bake --file docker-compose.yml \
+            --set *.cache-from=type=gha \
+            --set *.cache-to=type=gha \
+            --set *.output=type=docker   # <-- makes images visible to `docker compose`
+      - name: Start services
+        run: docker compose up --no-build -d
+
+      - name: Wait for services to start
+        run: sleep 30
+
+      - name: Wait for Services to Become Healthy
+        run: |
+          chmod +x Scripts/check_health.sh
+          Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
+
+      - name: Run Backend E2E Tests
+        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=SmokeTest" --logger "trx;LogFileName=test-results.trx"
+        env:
+          SMOKE_TEST_DOWNLOAD_PATH: ./Tests/BackendE2ETests/TestResults/
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ./Tests/BackendE2ETests/TestResults/test-results.trx
+
+      - name: Upload submission ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ./Tests/BackendE2ETests/TestResults/adhoc-reporting-smoke-test-submission.zip
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    needs: changes
+    if: ${{ needs.changes.outputs.run_job == 'true' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Pull Azurite Docker image
+        run: docker pull mcr.microsoft.com/azure-storage/azurite:latest
+
+      - name: Restore dependencies
+        run: dotnet restore DotNet/ServiceTests/ServiceTests.csproj
+
+      - name: Build
+        run: dotnet build DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-restore
+
+      - name: Run integration tests
+        run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-build --verbosity detailed --logger "trx;LogFileName=dotnet-integration-test-results.trx" --results-directory ./TestResults --filter "Category=IntegrationTests"
+        continue-on-error: true
+        timeout-minutes: 5
+
+      - name: Debug test results
+        run: ls -la ./TestResults
+        continue-on-error: true
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-results
+          path: ./TestResults/*.trx
+
+      - name: .NET Integration Test Report
+        uses: dorny/test-reporter@v2
+        if: always()
+        with:
+          name: XUnit Integration Tests
+          path: ./TestResults/dotnet-integration-test-results.trx
+          reporter: dotnet-trx
+          
+  dotnet-unit-tests:
+    name: Unit Tests for DotNet
+    runs-on: windows-latest
+    timeout-minutes: 10
+    
+    needs: changes
+    if: ${{ needs.changes.outputs.run_job == 'true' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore dependencies
+        run: dotnet restore DotNet/ServiceTests/ServiceTests.csproj
+
+      - name: Build
+        run: dotnet build DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-restore
+
+      - name: Run dotnet-unit tests
+        run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-build --verbosity detailed --logger "trx;LogFileName=dotnet-unit-test-results.trx" --results-directory ./TestResults --filter "Category=UnitTests"
+        continue-on-error: true
+        timeout-minutes: 5
+
+      - name: Debug test results
+        run: dir .\TestResults
+        continue-on-error: true
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dotnet-unit-test-results
+          path: ./TestResults/*.trx
+
+      - name: .NET Integration Test Report
+        uses: dorny/test-reporter@v2
+        if: always()
+        with:
+          name: XUnit Integration Tests
+          path: ./TestResults/dotnet-unit-test-results.trx
+          reporter: dotnet-trx
+
+  docs-build:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ./docs
+
+      - name: Build documentation
+        run: npm run build
+        working-directory: ./docs
+
+  java-unit-tests:
+    name: Unit Tests for Java
+    runs-on: ['ubuntu-latest']
+    
+    needs: changes
+    if: ${{ needs.changes.outputs.run_job == 'true' }}
+    
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Build and Test with Maven
+        run: mvn clean test
+        working-directory: Java
+
+      - name: Java Unit Test Report
+        uses: dorny/test-reporter@v2
+        if: always()
+        with:
+          name: XUnit Tests
+          path: "**/surefire-reports/*.xml"
+          reporter: java-junit

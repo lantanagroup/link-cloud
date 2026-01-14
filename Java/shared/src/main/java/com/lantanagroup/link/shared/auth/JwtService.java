@@ -9,8 +9,13 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Function;
 
+import io.jsonwebtoken.security.Keys;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
+
+import javax.crypto.SecretKey;
 
 @Component
 public class JwtService {
@@ -79,13 +84,28 @@ public class JwtService {
 
   //for retrieving any information from token we will need the secret key
   public Claims getAllClaimsFromToken (String token, String secret) {
-    return Jwts.parser().setSigningKey(secret.getBytes(StandardCharsets.UTF_8)).parseClaimsJws(token).getBody();
+    SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    return Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token).getBody();
   }
 
   //check if the token has expired
   private Boolean isTokenExpired (String token, String secret) {
     final Date expiration = getExpirationDateFromToken(token, secret);
     return expiration.before(new Date());
+  }
+
+  public PrincipalUser getAdminUser() {
+    List<GrantedAuthority> authorities = List.of(
+            new SimpleGrantedAuthority(RolePrefix + LinkUserClaims_LinkAdministrator),
+            new SimpleGrantedAuthority(LinkSystemPermissions_IsLinkAdmin));
+    return new PrincipalUser(LinkUserClaims_LinkSystemAccount, authenticationConfig.getAdminEmail(), authorities);
+  }
+
+  public String generateInterServiceToken() {
+    if (authenticationConfig.isAnonymous()) {
+      return null;
+    }
+    return generateToken(getAdminUser(), authenticationConfig.getSigningKey());
   }
 
   //generate token for user
@@ -111,7 +131,11 @@ public class JwtService {
     if (StringUtils.isEmpty(this.authenticationConfig.getAuthority())) {
       throw new RuntimeException("authentication.authority is null");
     }
+    if (StringUtils.isEmpty(secret)) {
+      throw new RuntimeException("Signing key is empty");
+    }
 
+    SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     return Jwts.builder().setHeaderParam("typ","JWT")
             .setClaims(claims)
             .setSubject(subject).
@@ -119,7 +143,8 @@ public class JwtService {
             .setIssuer(this.authenticationConfig.getAuthority())
             .setAudience(Audiences)
             .setExpiration(new Date(System.currentTimeMillis() + JWT_TOKEN_VALIDITY))
-            .signWith(SignatureAlgorithm.HS512, secret.getBytes(StandardCharsets.UTF_8)).compact();
+            .signWith(key, SignatureAlgorithm.HS512)
+            .compact();
   }
 
   //validate token

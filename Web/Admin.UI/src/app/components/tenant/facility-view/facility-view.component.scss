@@ -1,1 +1,81 @@
 @use '../../../../styles/core.scss';
+@use '../../../../styles/link-table.scss';
+
+.report-type-list {
+    list-style-type: none;
+    padding-left: 0;
+    margin-left: 0;
+}
+
+.frequency {
+  display: inline-block;
+  width: 65px; // Set a fixed width
+  text-align: center; // Center the text
+}
+
+.monthly-frequency {
+    @extend .frequency;
+    background-color: #007D74;
+    color: #fff;
+    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
+.weekly-frequency {
+    @extend .frequency;
+    background-color: #87003B;
+    color: #fff;
+    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
+.daily-frequency {
+    @extend .frequency;
+    background-color: #003B87;
+    color: #fff;
+    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
+.adhoc-frequency {
+    @extend .frequency;
+    background-color: #43007D;
+    color: #fff;
+    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
+.report-period-col {
+    color: #5f6672;
+    display: block;
+}
+
+.report-period-col label{
+    font-weight: 400;
+    color: #000;
+}
+
+.status-pending {
+    background-color: #eef2ff;
+    color: #4338ca;
+    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
+.status-submitted {
+    background-color: #ecfdf5;
+    color: #047857;
+    box-shadow: 0 0 0 1px rgba(5, 150, 105, 0.2);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
+.highlighted {
+  background-color: #fff9e6;
+  transition: background-color 0.3s ease;
+}

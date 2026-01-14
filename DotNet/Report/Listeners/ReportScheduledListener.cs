@@ -1,14 +1,15 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
 using Quartz;
 using System.Text;
@@ -24,14 +25,16 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IDeadLetterExceptionHandler<string, ReportScheduledValue> _deadLetterExceptionHandler;
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly IServiceScopeFactory _serviceScopeFactory;
+        private readonly BlobStorageService _blobStorageService;
 
         private string Name => this.GetType().Name;
 
         public ReportScheduledListener(ILogger<ReportScheduledListener> logger, IKafkaConsumerFactory<string, ReportScheduledValue> kafkaConsumerFactory,
-            ISchedulerFactory schedulerFactory,
+            [FromKeyedServices("MongoScheduler")] ISchedulerFactory schedulerFactory,
             ITransientExceptionHandler<string, ReportScheduledValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<string, ReportScheduledValue> deadLetterExceptionHandler,
-            IServiceScopeFactory serviceScopeFactory)
+            IServiceScopeFactory serviceScopeFactory,
+            BlobStorageService blobStorageService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -49,6 +52,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
             _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ReportScheduled) + "-Error";
+
+            _blobStorageService = blobStorageService;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -69,7 +74,7 @@ namespace LantanaGroup.Link.Report.Listeners
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.ReportScheduled));
-                _logger.LogInformation($"Started report scheduled consumer for topic '{nameof(KafkaTopic.ReportScheduled)}' at {DateTime.UtcNow}");
+                _logger.LogInformation("Started report scheduled consumer for topic '{Topic}' at {StartTime}", nameof(KafkaTopic.ReportScheduled), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -80,62 +85,68 @@ namespace LantanaGroup.Link.Report.Listeners
                         {
                             if (result == null)
                             {
+                                _logger.LogWarning("ReportScheduled event is null. Commiting and moving on.");
                                 consumer.Commit();
                                 return;
                             }
 
                             try
                             {
-                                var scope = _serviceScopeFactory.CreateScope();
-                                var measureReportScheduledManager =
-                                    scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
-
                                 var key = result.Message.Key;
                                 var value = result.Message.Value;
 
+                                if (!value.IsValid())
+                                {
+                                    throw new DeadLetterException("Invalid Report Scheduled event");
+                                }
+
+                                using var scope = _serviceScopeFactory.CreateScope();
+                                var measureReportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
                                 facilityId = key;
-                                var startDate = value.StartDate;
-                                var endDate = value.EndDate;
+                                var startDate = value.StartDate.UtcDateTime;
+                                var endDate = value.EndDate.UtcDateTime;
                                 var frequency = value.Frequency;
                                 var reportTypes = value.ReportTypes;
-
-                                if (string.IsNullOrWhiteSpace(facilityId))
-                                {
-                                    throw new DeadLetterException(
-                                        $"{Name}: FacilityId is null or empty.");
-                                }
-
-                                if (reportTypes == null || reportTypes.Length == 0)
-                                {
-                                    throw new DeadLetterException(
-                                        $"{Name}: ReportTypes is null or empty.");
-                                }
+                                var reportId = value.ReportTrackingId;
 
                                 // Check if this already exists
-                                var existing = await measureReportScheduledManager.SingleOrDefaultAsync(x => x.FacilityId == facilityId 
-                                                                                                        && x.ReportStartDate == startDate 
-                                                                                                        && x.ReportEndDate == endDate
-                                                                                                        && reportTypes.Any(r => x.ReportTypes.Contains(r)), consumeCancellationToken);
+                                ReportSchedule? existing = null;
 
-                                ReportScheduleModel? reportSchedule;
-                                if(existing != null) 
+                                if (!string.IsNullOrEmpty(reportId))
                                 {
-                                    reportSchedule = await measureReportScheduledManager.UpdateAsync(existing, consumeCancellationToken);
-
-                                    await MeasureReportScheduleService.RescheduleJob(reportSchedule,
-                                        await _schedulerFactory.GetScheduler(consumeCancellationToken));
+                                    _logger.LogDebug($"Report ID is not null. Checking if the report already exists.");
+                                    existing = await measureReportScheduledManager.SingleOrDefaultAsync(
+                                        x => x.Id == reportId, consumeCancellationToken);
                                 }
                                 else
                                 {
-                                    reportSchedule = new ReportScheduleModel
+                                    _logger.LogDebug($"Report ID is null. Generating a new ID.");
+                                    reportId = Guid.NewGuid().ToString();
+                                }
+
+                                ReportSchedule? reportSchedule;
+                                if (existing != null) 
+                                {
+                                    _logger.LogError("Report with id {ReportId} already exists. Creating dead letter for event/message.", reportId);
+                                    throw new DeadLetterException($"Report with id {reportId} already exists.");
+                                }
+                                else
+                                {
+                                    _logger.LogInformation("Report with id {ReportId} does not exist... Creating.", reportId);
+                                    reportSchedule = new ReportSchedule
                                     {
+                                        Id = reportId,
                                         FacilityId = facilityId,
                                         ReportStartDate = startDate,
                                         ReportEndDate = endDate,
                                         Frequency = frequency,
                                         ReportTypes = reportTypes,
+                                        Status = ScheduleStatus.Scheduled,
                                         CreateDate = DateTime.UtcNow
                                     };
+                                    var reportName = _blobStorageService.GetReportName(reportSchedule);
+                                    reportSchedule.PayloadRootUri = _blobStorageService.GetUri(reportName)?.ToString();
 
                                     reportSchedule = await measureReportScheduledManager.AddAsync(reportSchedule, consumeCancellationToken);
 
@@ -153,8 +164,8 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (TimeoutException ex)
                             {
-                                var transientException = new TransientException(ex.Message, ex.InnerException);
-
+                                var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [{string.Join(", ", consumer.Subscription)}] at offset: {result.TopicPartitionOffset}";
+                                var transientException = new TransientException(exceptionMessage, ex);
                                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
                             }
                             catch (Exception ex)
@@ -170,7 +181,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (ConsumeException ex)
                     {
-                        _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+                        _logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
 
                         if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                         {
@@ -193,9 +204,8 @@ namespace LantanaGroup.Link.Report.Listeners
             }
             catch (OperationCanceledException oce)
             {
-                _logger.LogError(oce, $"Operation Canceled: {oce.Message}");
+                _logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
                 consumer.Close();
-                consumer.Dispose();
             }
 
         }

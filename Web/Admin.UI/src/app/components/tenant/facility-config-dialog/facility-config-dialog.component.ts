@@ -1,5 +1,5 @@
 import { AfterViewInit, Component, OnInit, Inject, ViewChild } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -13,12 +13,11 @@ import { FacilityConfigFormComponent } from '../facility-config-form/facility-co
   selector: 'app-facility-config-dialog',
   standalone: true,
   imports: [
-    CommonModule,
     MatDialogModule,
     MatButtonModule,
     MatIconModule,
     FacilityConfigFormComponent
-  ],
+],
   templateUrl: './facility-config-dialog.component.html',
   styleUrls: ['./facility-config-dialog.component.scss']
 })
@@ -56,12 +55,12 @@ export class FacilityConfigDialogComponent implements OnInit, AfterViewInit {
     this.formIsInvalid = formValidity;
   }
 
-  onSubmittedConfiguration(outcome: IEntityCreatedResponse) {    
+  onSubmittedConfiguration(outcome: IEntityCreatedResponse) {
     if (outcome.id.length > 0) {
       this.dialogRef.close(outcome.message);
     }
     else {
-      this.snackBar.open(`Failed to create facility, see error for details.`, '', {
+      this.snackBar.open(`Failed to create/update facility, see error for details.`, '', {
         duration: 3500,
         panelClass: 'error-snackbar',
         horizontalPosition: 'end',

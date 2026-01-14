@@ -1,0 +1,109 @@
+@use '../facility-view.component.scss';
+@use 'sass:color';
+
+.reporting-status {
+  display: inline-block;
+  min-width: 85px;
+  text-align: center;
+}
+
+// Reporting Status
+$processing-status: #0d7494;
+$not-reportable-status: #d97706;
+$submitted-status: #047832;
+
+.status-processing {
+    @extend .reporting-status;
+    background-color: color.adjust($processing-status, $lightness: 60%);
+    color: $processing-status;
+    border: 1px solid color.adjust($processing-status, $lightness: -10%);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
+.status-not-reportable {
+    @extend .reporting-status;
+    background-color: color.adjust($not-reportable-status, $lightness: 45%);
+    color: $not-reportable-status;
+    box-shadow: 0 0 0 1px color.adjust($not-reportable-status, $lightness: -10%);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
+.status-submitted {
+    @extend .reporting-status;
+    background-color: color.adjust($submitted-status, $lightness: 65%);
+    color: $submitted-status;
+    box-shadow: 0 0 0 1px color.adjust($submitted-status, $lightness: -10%);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
+// Validation Status
+$pending-status: #4338ca;
+$passed-status: #047832;
+$failed-status: #a1030eb3;
+
+.status-pending {
+    @extend .reporting-status;
+    background-color: color.adjust($pending-status, $lightness: 45%);
+    color: $pending-status;
+    box-shadow: 0 0 0 1px color.adjust($pending-status, $lightness: -10%);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
+.status-passed {
+    @extend .reporting-status;
+    background-color: color.adjust($passed-status, $lightness: 65%);
+    color: $passed-status;
+    box-shadow: 0 0 0 1px color.adjust($passed-status, $lightness: -10%);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+    
+.status-failed {
+    @extend .reporting-status;
+    background-color: color.adjust($failed-status, $lightness: 60%);
+    color: $failed-status;
+    box-shadow: 0 0 0 1px color.adjust($failed-status, $lightness: -10%);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
+.animate-spin {
+  height: 1.25rem;
+  width: 1.25rem;
+  animation: spin 1s linear infinite;
+  vertical-align: middle;
+  margin-top: 1em;
+}
+
+@keyframes spin {
+  0% {
+    transform: translateY(-50%) rotate(0deg);
+  }
+  100% {
+    transform: translateY(-50%) rotate(360deg);
+  }
+}
+
+.pulse-warning {
+  animation: pulse-red 1.2s infinite;
+  vertical-align: middle;
+}
+
+@keyframes pulse-red {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}

@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, Inject, ViewChild } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
@@ -9,18 +9,18 @@ import { IEntityCreatedResponse } from '../../../interfaces/entity-created-respo
 import { FormMode } from '../../../models/FormMode.enum';
 import { DataAcquisitionFhirQueryConfigFormComponent } from '../data-acquisition-fhir-query-config-form/data-acquisition-fhir-query-config-form.component';
 
+
 @Component({
   selector: 'app-data-acquisition-fhir-query-config-dialog',
   standalone: true,
   imports: [
-    CommonModule,
     MatDialogModule,
     MatButtonModule,
     MatIconModule,
     DataAcquisitionFhirQueryConfigFormComponent
-  ],
+],
   templateUrl: './data-acquisition-fhir-query-config-dialog.component.html',
-  styleUrls: ['./data-acquisition-fhir-query-config-dialog.component.css']
+  styleUrls: ['./data-acquisition-fhir-query-config-dialog.component.scss']
 })
 export class DataAcquisitionFhirQueryConfigDialogComponent {
   dialogTitle: string = '';
@@ -31,14 +31,16 @@ export class DataAcquisitionFhirQueryConfigDialogComponent {
 
   @ViewChild(DataAcquisitionFhirQueryConfigFormComponent) configForm!: DataAcquisitionFhirQueryConfigFormComponent;
 
-  constructor(@Inject(MAT_DIALOG_DATA) public data: { dialogTitle: string, formMode: FormMode, viewOnly: boolean, config: IDataAcquisitionQueryConfigModel },
+  constructor(@Inject(MAT_DIALOG_DATA) public data: { dialogTitle: string, formMode: FormMode, viewOnly: boolean, dataAcqFhirQueryConfig: IDataAcquisitionQueryConfigModel },
     private dialogRef: MatDialogRef<DataAcquisitionFhirQueryConfigFormComponent>,
-    private snackBar: MatSnackBar) { }
+    private snackBar: MatSnackBar) {
+
+  }
 
   ngOnInit(): void {
     this.dialogTitle = this.data.dialogTitle;
     this.viewOnly = this.data.viewOnly;
-    this.config = this.data.config;
+    this.config = this.data.dataAcqFhirQueryConfig;
     this.formMode = this.data.formMode;
   }
 
@@ -52,7 +54,7 @@ export class DataAcquisitionFhirQueryConfigDialogComponent {
   }
 
   onSubmittedConfiguration(outcome: IEntityCreatedResponse) {
-    if (outcome.id.length > 0) {
+    if (outcome.message.length > 0) {
       this.dialogRef.close(outcome.message);
     }
     else {

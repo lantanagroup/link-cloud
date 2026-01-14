@@ -1,14 +1,13 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
-using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Settings;
 using QueryDispatch.Application.Settings;
 using QueryDispatch.Domain.Managers;
@@ -87,7 +86,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     var scheduledReportMgr = scope.ServiceProvider.GetRequiredService<IScheduledReportManager>();
 
-                                    var scheduledReportRepo = scope.ServiceProvider.GetRequiredService<IEntityRepository<ScheduledReportEntity>>();
+                                    var scheduledReportRepo = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<ScheduledReportEntity>>();
 
                                     ReportScheduledValue value = consumeResult.Message.Value;
 
@@ -98,22 +97,13 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                         throw new DeadLetterException("Invalid Report Scheduled event");
                                     }
 
-                                    string correlationId = string.Empty;
-
-                                    if (consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
-                                    {
-                                        correlationId = Encoding.UTF8.GetString(headerValue);
-                                    }
-                                    else
-                                    {
-                                        throw new DeadLetterException("Correlation Id missing");
-                                    }
+                                    string reportTrackingId = value.ReportTrackingId;
 
                                     string key = consumeResult.Message.Key;
 
                                     var startDate = value.StartDate.UtcDateTime;
                                     var endDate = value.EndDate.UtcDateTime;
-                                    var frequency = value.Frequency.ToString();
+                                    var frequency = value.Frequency;
 
                                     _logger.LogInformation("Consumed Event for: Facility '{FacilityId}' has a report type of '{ReportType}' with a report period of {startDate} to {endDate}", key, value.ReportTypes, startDate, endDate);
 
@@ -123,12 +113,12 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     {
                                         _logger.LogInformation("Facility {facilityId} found", key);
 										
-                                        ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, correlationId);
+                                        ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, reportTrackingId);
                                         await scheduledReportMgr.UpdateScheduledReport(existingRecord, scheduledReport);
                                     }
                                     else
                                     {
-                                        ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, correlationId);
+                                        ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, reportTrackingId);
                                         await scheduledReportMgr.createScheduledReport(scheduledReport);                                     
                                     }
 
@@ -142,7 +132,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                 }
                                 catch (Exception ex)
                                 {
-                                    _logger.LogError(ex, $"Failed to process Report Scheduled event.");
+                                    _logger.LogError(ex, "Failed to process Report Scheduled event");
 
                                     var auditValue = new AuditEventMessage
                                     {
@@ -164,7 +154,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                         }
                         catch (ConsumeException ex)
                         {
-                            _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", _reportScheduledConsumer.Subscription), DateTime.UtcNow);
+                            _logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", _reportScheduledConsumer.Subscription), DateTime.UtcNow);
 
                             if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                             {
@@ -185,7 +175,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                 }
                 catch (OperationCanceledException oce)
                 {
-                    _logger.LogError(oce, $"Operation Canceled: {oce.Message}");
+                    _logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
                     _reportScheduledConsumer.Close();
                     _reportScheduledConsumer.Dispose();
                 }

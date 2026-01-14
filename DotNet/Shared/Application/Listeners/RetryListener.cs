@@ -5,7 +5,6 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,7 +25,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
 
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly IOptions<ConsumerSettings> _consumerSettings;
-        private readonly IRetryEntityFactory _retryEntityFactory;
+        private readonly IRetryModelFactory _retryEntityFactory;
         private readonly IDeadLetterExceptionHandler<string, string> _deadLetterExceptionHandler;
         private readonly RetryListenerSettings _retryListenerSettings;
         private readonly IServiceScopeFactory _serviceScopeFactory;
@@ -35,7 +34,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
             IKafkaConsumerFactory<string, string> kafkaConsumerFactory,
             ISchedulerFactory schedulerFactory,
             IOptions<ConsumerSettings> consumerSettings,
-            IRetryEntityFactory retryEntityFactory,
+            IRetryModelFactory retryEntityFactory,
             IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler,
             RetryListenerSettings retryListenerSettings,
             IServiceScopeFactory serviceScopeFactory)
@@ -70,7 +69,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
             {
                 consumer.Subscribe(_retryListenerSettings.Topics);
 
-                _logger.LogInformation($"Started {_retryListenerSettings.ServiceName} retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] {DateTime.UtcNow}");
+                _logger.LogInformation("Started {ServiceName} retry consumer for topics: [{Topics}] {Timestamp}", _retryListenerSettings.ServiceName, string.Join(", ", consumer.Subscription), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -107,15 +106,11 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
 
                                 using var scope = _serviceScopeFactory.CreateScope();
 
-                                var _retryRepository = scope.ServiceProvider.GetRequiredService<IEntityRepository<RetryEntity>>();
-
-                                var retryEntity = _retryEntityFactory.CreateRetryEntity(consumeResult, _consumerSettings.Value);
-
-                                await _retryRepository.AddAsync(retryEntity, cancellationToken);
+                                var retryModel = _retryEntityFactory.CreateRetryModel(consumeResult, _consumerSettings.Value);                                
 
                                 var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
 
-                                await RetryScheduleService.CreateJobAndTrigger(retryEntity, scheduler);
+                                await RetryScheduleService.CreateJobAndTrigger(retryModel, scheduler);
                             }
                             catch (DeadLetterException ex)
                             {
@@ -125,7 +120,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                             }
                             catch (Exception ex)
                             {
-                                _logger.LogError(ex, $"Error in {_retryListenerSettings.ServiceName} retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] at {DateTime.UtcNow}");
+                                _logger.LogError(ex, "Error in {ServiceName} retry consumer for topics: [{Topics}] at {Timestamp}", _retryListenerSettings.ServiceName, string.Join(", ", consumer.Subscription), DateTime.UtcNow);
                             }
                             finally
                             {
@@ -140,14 +135,14 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
 
                         _deadLetterExceptionHandler.Topic = ex.ConsumerRecord.Topic.Replace("-Retry", "-Error");
                         _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
-                        _logger.LogError(ex, $"Error consuming message for topics: [{string.Join(", ", consumer.Subscription)}] at {DateTime.UtcNow}");
+                        _logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
                         continue;
                     }                    
                 }
             }
             catch (OperationCanceledException oce)
             {
-                _logger.LogError(oce, $"Operation Cancelled: {oce.Message}");
+                _logger.LogError(oce, "Operation Cancelled: {Message}", oce.Message);
                 consumer.Close();
                 consumer.Dispose();
             }

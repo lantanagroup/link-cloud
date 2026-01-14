@@ -1,11 +1,13 @@
-﻿using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
+﻿using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Net;
 using System.Net.Http.Headers;
-using LantanaGroup.Link.Shared.Application.Services.Security;
-using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.Shared.Application.Services;
 
@@ -38,23 +40,19 @@ public class TenantApiService : ITenantApiService
         if (!_serviceRegistry.Value.TenantService.CheckIfTenantExists)
             return true;
 
-       var tenantServiceUrl = _serviceRegistry.Value.TenantService.TenantServiceUrl;
+       var tenantServiceUrl = _serviceRegistry.Value.TenantServiceApiUrl;
 
         if (string.IsNullOrWhiteSpace(tenantServiceUrl))
             throw new Exception("Tenant Service URL is missing.");
 
         var httpClient = _httpClientFactory.CreateClient();
 
-
-        var baseUri = new Uri(tenantServiceUrl);
-
-
-       var endpoint = new Uri(baseUri, $"{_serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint.TrimStart('/')}/{sanitizedFacilityId}").ToString();
+        var endpoint = new Uri(tenantServiceUrl.TrimEnd('/') + $"/{_serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint.Trim('/')}/{sanitizedFacilityId}").ToString();
 
 
-        _logger.LogInformation("Tenant Base Endpoint: {0}", tenantServiceUrl);
-        _logger.LogInformation("Tenant Relative Endpoint: {0}", _serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint);
-        _logger.LogInformation("Checking if facility ({1}) exists in Tenant Service. Endpoint: {2}", sanitizedFacilityId, endpoint);
+        _logger.LogInformation("Tenant Base Endpoint: {TenantServiceUrl}", tenantServiceUrl);
+        _logger.LogInformation("Tenant Relative Endpoint: {RelativeEndpoint}", _serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint);
+        _logger.LogInformation("Checking if facility ({FacilityId}) exists in Tenant Service. Endpoint: {Endpoint}", sanitizedFacilityId, endpoint);
 
         //TODO: add method to get key that includes looking at redis for future use case
         if (!_linkBearerServiceOptions.Value.AllowAnonymous && _linkTokenServiceConfig.Value.SigningKey is null)
@@ -79,8 +77,51 @@ public class TenantApiService : ITenantApiService
             return false;
         }
 
-        var message = $"Error checking if facility ({sanitizedFacilityId}) exists in Tenant Service. Status Code: {response.StatusCode}";
-        _logger.LogError(message);
-        throw new Exception(message);
+        _logger.LogError("Error checking if facility ({sanitizedFacilityId}) exists in Tenant Service. Status Code: {statusCode}", sanitizedFacilityId, response.StatusCode);
+        throw new Exception($"Error checking if facility ({sanitizedFacilityId}) exists in Tenant Service. Status Code: {response.StatusCode}");
+    }
+
+    public async Task<FacilityModel> GetFacilityConfig(string facilityId, CancellationToken cancellationToken = default)
+    {
+        string sanitizedFacilityId = HtmlInputSanitizer.SanitizeAndRemove(facilityId);
+
+        if (_serviceRegistry.Value.TenantService == null)
+            throw new Exception("Tenant Service configuration is missing.");
+
+        var tenantServiceUrl = _serviceRegistry.Value.TenantServiceApiUrl;
+
+        if (string.IsNullOrWhiteSpace(tenantServiceUrl))
+            throw new Exception("Tenant Service URL is missing.");
+
+        var httpClient = _httpClientFactory.CreateClient();
+
+        var endpoint = new Uri(tenantServiceUrl.TrimEnd('/') + $"/{_serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint.Trim('/')}/{sanitizedFacilityId}").ToString();
+
+        //TODO: add method to get key that includes looking at redis for future use case
+        if (!_linkBearerServiceOptions.Value.AllowAnonymous && _linkTokenServiceConfig.Value.SigningKey is null)
+            throw new Exception("Link Token Service Signing Key is missing.");
+
+        //get link token
+        if (!_linkBearerServiceOptions.Value.AllowAnonymous)
+        {
+            var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2);
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
+        var response = await httpClient.GetAsync(endpoint, cancellationToken);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var result = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<FacilityModel>(result);
+        }
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            throw new InvalidOperationException($"No Facility Config found for ({sanitizedFacilityId}). Status Code: {response.StatusCode}");
+        }
+
+        _logger.LogError("Error checking if facility ({sanitizedFacilityId}) exists in Tenant Service. Status Code: {statusCode}", sanitizedFacilityId, response.StatusCode);
+        throw new Exception($"Error checking if facility ({sanitizedFacilityId}) exists in Tenant Service. Status Code: {response.StatusCode}");
     }
 }

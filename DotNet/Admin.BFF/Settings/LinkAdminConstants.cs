@@ -6,11 +6,8 @@
 
         public static class AppSettingsSectionNames
         {
-            public const string ExternalConfigurationSource = "ExternalConfigurationSource";
             public const string ServiceInformation = "ServiceInformation";
-            public const string IdentityProvider = "IdentityProviderConfig";
             public const string CORS = "CORS";
-            public const string Telemetry = "Telemetry";
             public const string Serilog = "Serilog";                        
         }
 

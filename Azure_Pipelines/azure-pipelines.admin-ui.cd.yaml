@@ -1,7 +1,7 @@
 resources:
   pipelines:
   - pipeline: pipeline-trigger
-    source: Deploy_All_Services
+    source: Build_And_Push_All
     trigger: true
 
 trigger:
@@ -9,6 +9,7 @@ trigger:
     include:
     - dev
     - release/*
+    - linkathon/*
   paths:
     include:
     - Web/Admin.UI/*
@@ -23,29 +24,22 @@ pool:
 variables:
 - group: link-cloud-variables
 - name: registry-repo-Name
-  value: 'link-demo-app'
+  value: 'link-admin-ui'
 - name: dockerPath
   value: '**/Web/Admin.UI/Dockerfile'
 - name: workingDir
   value: 'Web/Admin.UI/'
 - name: serviceName
   value: 'Admin.UI'
-- name: containerRegistry
-  value: 'NHSNLink ACR Premium'
 
 steps:
   - task: NodeTool@0
     inputs:
-      versionSpec: '16.x'
+      versionSpec: '20.x'
     displayName: 'Install Node.js'
 
-  - task: GetRevision@1
-    displayName: 'Get Revision'
-    inputs:
-      VariableName: Revision
-
   - task: Npm@1  
-    displayName: 'Angular CLI 13.2.5'  
+    displayName: 'Angular CLI 20.3.7'  
     inputs:  
       command: custom  
       verbose: false  
@@ -79,19 +73,18 @@ steps:
       targetType: 'inline'
       script: |
         if ("$(Build.SourceBranch)" -like "*release/*") {
-        $myTag1 = "release-$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
+        $myTag1 = "release-$(Build.SourceBranchName)-$(GIT_COMMIT)"
         }
         else { 
-        $myTag1 = "$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
+        $myTag1 = "$(Build.SourceBranchName)-$(GIT_COMMIT)"
         }
         Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
         Write-Host "Set MyTag to: $myTag1"
-
   - task: Docker@2
     displayName: "Build & Push DemoApiGateway Docker Image"
     condition: always()
     inputs:
-      containerRegistry: $(containerRegistry)
+      containerRegistry: $(containerRegistry) # Variable Group
       repository: $(registry-repo-name)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)

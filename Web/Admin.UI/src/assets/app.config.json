@@ -1,8 +1,13 @@
 {
   "production": false,
+  "allowAlphaNumericFacilityId":  true,
+  "authRequired": true,
   "baseApiUrl": "/api",
-  "idpIssuer": "",
-  "idpClientId": "",
-  "idpClientSecret": "",
-  "idpScope": "openid profile email"
+  "oauth2": {
+    "enabled": false,
+    "scope": "openid profile email",
+    "responseType": "code"
+  },
+  "grafanaUrl": "http://localhost:3000",
+  "kafkaUrl": "http://localhost:9095"
 }

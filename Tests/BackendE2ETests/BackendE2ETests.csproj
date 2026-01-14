@@ -1,0 +1,96 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <LangVersion>latest</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <OutputType>Exe</OutputType>
+        <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+        <!--
+          Displays error on console in addition to the log file. Note that this feature comes with a performance impact.
+          For more information, visit https://learn.microsoft.com/dotnet/core/testing/unit-testing-platform-integration-dotnet-test#show-failure-per-test
+          -->
+        <TestingPlatformShowTestsFailure>true</TestingPlatformShowTestsFailure>
+        <RootNamespace>LantanaGroup.Link.Tests.BackendE2ETests</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Hl7.Fhir.R4" Version="5.*" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
+        <PackageReference Include="Moq.AutoMock" Version="*-*" />
+        <PackageReference Include="coverlet.collector" Version="6.*">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="System.Text.Json" Version="8.*" />
+        <PackageReference Include="xunit" Version="2.*" />
+        <PackageReference Include="xunit.runner.visualstudio" Version="3.*">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="RestSharp" Version="112.*" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="fhir_server_data\20250527_ACH_1.json" />
+      <None Remove="fhir_server_data\20250527_ACH_2.json" />
+      <None Remove="fhir_server_data\20250527_ACH_3.json" />
+      <None Remove="fhir_server_data\20250527_ACH_4.json" />
+      <None Remove="fhir_server_data\20250527_ACH_5.json" />
+      <None Remove="fhir_server_data\20250527_HYPO_1.json" />
+      <None Remove="fhir_server_data\20250527_HYPO_2.json" />
+      <None Remove="fhir_server_data\20250527_HYPO_3.json" />
+      <None Remove="fhir_server_data\20250527_HYPO_4.json" />
+      <None Remove="fhir_server_data\20250527_HYPO_5.json" />
+      <None Remove="fhir_server_data\William805_Daniel959_f5f7ab42-31d5-53f7-5d5c-c1e7a20611da.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_ACH_1.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_ACH_2.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_ACH_3.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_ACH_4.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_ACH_5.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_HYPO_1.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_HYPO_2.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_HYPO_3.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_HYPO_4.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_HYPO_5.json" />
+      <EmbeddedResource Include="fhir_server_data\20250527_STU3_AdhocSmokeTestList_Admit_LessThan24Hrs.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <EmbeddedResource Include="fhir_server_data\20250527_STU3_AdhocSmokeTestList_Admit_Between24To48Hrs.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <EmbeddedResource Include="fhir_server_data\20250527_STU3_AdhocSmokeTestList_Admit_MoreThan48Hrs.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <EmbeddedResource Include="fhir_server_data\20250527_STU3_AdhocSmokeTestList_Discharge_Between24To48Hrs.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <EmbeddedResource Include="fhir_server_data\20250527_STU3_AdhocSmokeTestList_Discharge_LessThan24Hrs.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <EmbeddedResource Include="fhir_server_data\William805_Daniel959_f5f7ab42-31d5-53f7-5d5c-c1e7a20611da.json" />
+	  <EmbeddedResource Include="fhir_server_data\20250527_STU3_AdhocSmokeTestList_Discharge_MoreThan48Hrs.json">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </EmbeddedResource>
+      <None Remove="measures\NHSNAcuteCareHospitalMonthlyInitialPopulation.json" />
+      <EmbeddedResource Include="measures\NHSNAcuteCareHospitalMonthlyInitialPopulation.json" />
+      <None Remove="test_data\smoke-test\concept-map.json" />
+      <EmbeddedResource Include="test_data\smoke_test\concept-map.json" />
+      <None Update="fhir_server_data\2025_edTest1.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="fhir_server_data\2025_edTest2.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="fhir_server_data\2025_edTest3.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\DotNet\Normalization\Normalization.csproj" />
+      <ProjectReference Include="..\..\DotNet\Shared\Shared.csproj" />
+    </ItemGroup>
+
+</Project>

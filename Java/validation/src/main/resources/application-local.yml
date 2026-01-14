@@ -1,0 +1,24 @@
+logging:
+  level:
+    org.hibernate.SQL: debug
+
+spring:
+  jpa:
+    properties:
+      hibernate:
+        hbm2ddl:
+          schema-generation:
+            script:
+              append: false
+
+      jakarta:
+        persistence:
+          schema-generation:
+            database:
+              action: update
+            scripts:
+              action: create-drop
+              create-source: metadata
+              create-target: ./validation/src/main/resources/database/reference/create.sql
+              drop-source: metadata
+              drop-target: ./validation/src/main/resources/database/reference/drop.sql

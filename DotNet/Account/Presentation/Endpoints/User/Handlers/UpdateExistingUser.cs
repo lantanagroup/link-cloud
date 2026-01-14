@@ -59,6 +59,15 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 
                     return Results.Created(uriBuilder.ToString(), createdUser);
                 }
+                else
+                {
+                    //verify that the email is not already in use by another user
+                    LinkUserModel existingUserByEmail = await queryUserByEmail.Execute(model.Email, context.RequestAborted);
+                    if (existingUserByEmail != null && existingUserByEmail.Id.ToString() != id.ToString())
+                    {
+                        return Results.Conflict("A user with the same email already exists.");
+                    }
+                }
 
                 //update an existing user
                 var updateResult = await command.Execute(requestor, model, context.RequestAborted);

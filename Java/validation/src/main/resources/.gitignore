@@ -1,1 +1,2 @@
-!packages/*
+!artifacts/
+!artifacts/packages/*

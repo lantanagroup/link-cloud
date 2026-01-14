@@ -1,0 +1,89 @@
+{
+  "sidebar": [
+    {
+      "label": "Additional Architecture",
+      "items": [
+        {
+          "label": "Auth Flow",
+          "slug": "arch/auth_flow"
+        },
+        {
+          "label": "Persistence",
+          "slug": "arch/persistence"
+        },
+        {
+          "label": "Retry Topics",
+          "slug": "arch/retry_topics"
+        },
+        {
+          "label": "Security",
+          "slug": "arch/security"
+        },
+        {
+          "label": "Observability & Telemetry",
+          "slug": "arch/telemetry"
+        }
+      ]
+    },
+    {
+      "label": "User Documentation",
+      "items": [
+        {
+          "label": "Tenant Management",
+          "slug": "user/tenant_management"
+        }
+      ]
+    },
+    {
+      "label": "Configuration",
+      "items": [
+        {
+          "label": "Configuring .NET Services",
+          "slug": "config/dotnet"
+        },
+        {
+          "label": "Configuring Java Services",
+          "slug": "config/java"
+        }
+      ]
+    },
+    {
+      "label": "Development",
+      "items": [
+        {
+          "label": "API Guidance",
+          "slug": "dev/api_guidance"
+        },
+        {
+          "label": "Authorization Policies",
+          "slug": "dev/auth_policies"
+        },
+        {
+          "label": "Logging & Error Handling",
+          "slug": "dev/logging_error_handling"
+        },
+        {
+          "label": "Open Telemetry",
+          "slug": "dev/otel"
+        },
+        {
+          "label": "Testing",
+          "slug": "dev/testing"
+        },
+        {
+          "label": "Kafka Error/Retry Scenarios",
+          "slug": "dev/kafka_retry_error"
+        }
+      ]
+    },
+    {
+      "label": "Change Proposals",
+      "items": [
+        {
+          "label": "HSLOC and Org ID Location Mapping",
+          "slug": "proposals/location-proposal"
+        }
+      ]
+    }
+  ]
+}

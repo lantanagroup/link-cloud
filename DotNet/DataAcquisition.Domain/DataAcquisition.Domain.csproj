@@ -6,24 +6,49 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Compile Remove="Application\Models\Api\Response\**" />
+    <EmbeddedResource Remove="Application\Models\Api\Response\**" />
+    <None Remove="Application\Models\Api\Response\**" />
+  </ItemGroup>
+
 	<ItemGroup>
 		<FrameworkReference Include="Microsoft.AspNetCore.App" />
 	</ItemGroup>
+
+	<PropertyGroup>
+		<!-- Custom Properties -->
+		<CompanyName>LantanaGroup</CompanyName>
+		<ProjectName>Link</ProjectName>
+		<!-- Redefine MSBuild Properties -->
+		<Company>$(CompanyName)</Company>
+		<RootNamespace>$(CompanyName).$(ProjectName).$(MSBuildProjectName.Replace(" ", "_"))</RootNamespace>
+	</PropertyGroup>
 	
   <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.4" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" Version="8.0.4" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Analyzers" Version="8.0.4" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.4">
+    <PackageReference Include="LinqKit" Version="1.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" Version="8.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Analyzers" Version="8.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.*">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.4" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.4" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.4">
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite.Core" Version="8.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.*">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Portable.BouncyCastle" Version="1.*" />
+	  <PackageReference Include="PemUtils" Version="3.*" />
+	  <PackageReference Include="Serilog.AspNetCore" Version="8.*" />
+	  <PackageReference Include="Serilog.Enrichers.Span" Version="3.*" />
+	  <PackageReference Include="Serilog.Exceptions" Version="8.*" />
+	  <PackageReference Include="Serilog.Expressions" Version="4.*" />
+	  <PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.*" />
+	  <PackageReference Include="System.Text.Json" Version="8.*" />
   </ItemGroup>
 	
   <ItemGroup>
@@ -31,14 +56,15 @@
   </ItemGroup>
 	
   <ItemGroup>
-    <None Update="Scripts\dataAcqDb.sql">
-      <LastGenOutput>dataAcqDb.cs</LastGenOutput>
-      <Generator>TextTemplatingFileGenerator</Generator>
-    </None>
+    <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
   </ItemGroup>
 	
   <ItemGroup>
-    <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
+    <Compile Update="Scripts\dataAcqDb.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>dataAcqDb.sql</DependentUpon>
+    </Compile>
   </ItemGroup>
 
 </Project>

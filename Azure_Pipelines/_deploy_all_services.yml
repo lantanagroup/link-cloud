@@ -1,0 +1,206 @@
+name: Deploy_All_Services
+
+trigger: none
+
+pr: none
+
+pool:
+    vmImage: ubuntu-latest
+    
+parameters:
+  - name: environment
+    displayName: Which environment is this for? (DEV | TEST | QA)
+    type: string
+    values:
+      - dev-scale
+      - scale-test
+      - scale-qa
+
+variables:
+- group: link-cloud-variables
+- name: containerRegistry
+  value: 'nhsnlinkprem.azurecr.io'
+- name: kube_namespace
+  value: '${{ parameters.environment }}'
+- name: kube_clustername
+  value: 'nhsnlink-aks'
+- name: nhsn_resourcegroup
+  value: 'nhsnlink-rg'
+- name: env
+  ${{ if eq(parameters.environment, 'dev-scale') }}:
+    value:  'dev'
+  ${{ if eq(parameters.environment, 'scale-test') }}:
+    value:  'test'
+  ${{ if eq(parameters.environment, 'scale-qa') }}:
+    value:  'qa'
+
+jobs:
+
+- job: Summarize
+  displayName: Summarize deployment changes
+  pool:
+    vmImage: 'ubuntu-latest'
+  steps:
+    - task: Bash@3
+      name: getDeployedCommit
+      displayName: 'Get deployed commit'
+      inputs:
+        targetType: 'inline'
+        script: |
+          python Scripts/get_deployed_commit.py "${{ parameters.environment }}"
+
+    - task: Bash@3
+      displayName: 'List deployment changes (save + show)'
+      env:
+        AZURE_OPENAI_ENDPOINT: "$(azure_endpoint)"
+        AZURE_OPENAI_COMPLETIONS_DEPLOYMENT: "$(azure_deployment)"
+        AZURE_OPENAI_API_KEY: "$(azure_key)"
+      inputs:
+        targetType: 'inline'
+        script: |
+          set -euo pipefail
+          OUT_DIR="$(Build.ArtifactStagingDirectory)/deploy-summary"
+          mkdir -p "${OUT_DIR}"
+          OUT_FILE="${OUT_DIR}/deploy-changes-$(kube_namespace).txt"
+          TO_COMMIT=$(git rev-parse HEAD)
+
+          echo "Getting summary for $(FromCommit) to ${TO_COMMIT}..."          
+          python Scripts/list-deploy-changes.py "$(FromCommit)" "${TO_COMMIT}" | tee "${OUT_FILE}"
+
+          echo "Created file ${OUT_FILE}:"
+          ls -l "${OUT_FILE}"
+
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publish deploy change summary artifact'
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)/deploy-summary'
+        artifact: 'deploy-changes-$(kube_namespace)'
+        publishLocation: 'pipeline'
+
+- job: Deploy
+  dependsOn: Summarize
+  condition: succeeded()
+  displayName: Deploy multiple services
+  pool:
+    vmImage: 'ubuntu-latest'
+  strategy:
+    matrix:
+      account:
+        serviceName: account
+        repoName: account
+        containerName: account
+        healthUrl: https://$(env)-account.nhsnlink.org/health
+      admin:
+        serviceName: admin
+        repoName: admin
+        containerName: admin
+        healthUrl: https://$(env)-admin.nhsnlink.org/api/health
+      admin-ui:
+        serviceName: admin-ui
+        repoName: admin-ui
+        containerName: admin-ui
+        healthUrl: https://$(env)-admin.nhsnlink.org/
+      audit:
+        serviceName: audit
+        repoName: audit
+        containerName: audit
+        healthUrl: https://$(env)-audit.nhsnlink.org/health
+      census:
+        serviceName: census
+        repoName: census
+        containerName: census
+        healthUrl: https://$(env)-census.nhsnlink.org/health
+      data-acquisition:
+        serviceName: data-acquisition
+        repoName: dataacquisition
+        containerName: data
+        healthUrl: https://$(env)-data.nhsnlink.org/health
+      data-acquisition-worker:
+        serviceName: data-acquisition-worker
+        repoName: dataacquisition-worker
+        containerName: data-worker
+        healthUrl: https://$(env)-data.nhsnlink.org/health
+      measure-eval:
+        serviceName: measure
+        repoName: measureeval
+        containerName: measure
+        healthUrl: https://$(env)-measure.nhsnlink.org/health
+      normalization:
+        serviceName: normalization
+        repoName: normalization
+        containerName: normalization
+        healthUrl: https://$(env)-normalization.nhsnlink.org/health
+      query-dispatch:
+        serviceName: query-dispatch
+        repoName: querydispatch
+        containerName: query-dispatch
+        healthUrl: https://$(env)-querydispatch.nhsnlink.org/health
+      report:
+        serviceName: report
+        repoName: report
+        containerName: report
+        healthUrl: https://$(env)-report.nhsnlink.org/health
+      submission:
+        serviceName: submission
+        repoName: submission
+        containerName: submission
+        healthUrl: https://$(env)-submission.nhsnlink.org/health
+      tenant:
+        serviceName: tenant
+        repoName: tenant
+        containerName: tenant
+        healthUrl: https://$(env)-tenant.nhsnlink.org/health
+      terminology:
+        serviceName: terminology
+        repoName: terminology
+        containerName: terminology
+        healthUrl: https://$(env)-terminology.nhsnlink.org/health
+      validation:
+        serviceName: validation
+        repoName: validation
+        containerName: validation
+        healthUrl: https://$(env)-validation.nhsnlink.org/health
+
+  steps:
+    - task: KubeloginInstaller@0
+      displayName: 'Install Kubelogin latest'
+      
+    - task: Bash@3
+      inputs:
+        targetType: 'inline'
+        script: |
+          GIT_COMMIT=$(git rev-parse --short HEAD)
+          echo "GIT_COMMIT: ${GIT_COMMIT}"
+          echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
+
+    - task: Kubernetes@1
+      displayName: 'Deploy $(serviceName)'
+      inputs:
+        connectionType: 'Azure Resource Manager'
+        azureSubscriptionEndpoint: 'NHSNLink-RG ARM'
+        azureResourceGroup: '$(nhsn_resourcegroup)'
+        kubernetesCluster: '$(kube_clustername)'
+        namespace: '$(kube_namespace)'
+        command: set
+        arguments: 'image -n $(kube_namespace) deployment $(serviceName)-deploy $(containerName)=$(containerRegistry)/link-$(repoName):$(Build.SourceBranchName)-$(GIT_COMMIT)'
+
+    - task: Bash@3
+      displayName: 'Site Validation for $(serviceName)'
+      inputs:
+        targetType: 'inline'
+        script: |
+          echo "Starting health check for app..."
+          URL="$(healthUrl)"
+          
+          for i in {1..20}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" $URL)
+            if [ "$STATUS" == "200" ]; then
+              echo "Health check succeeded with HTTP $STATUS"
+              exit 0
+            fi
+            echo "Attempt $i: App not healthy yet (HTTP $STATUS)"
+            sleep 10
+          done
+          
+          echo "Application failed health check after 10 attempts."
+          exit 1

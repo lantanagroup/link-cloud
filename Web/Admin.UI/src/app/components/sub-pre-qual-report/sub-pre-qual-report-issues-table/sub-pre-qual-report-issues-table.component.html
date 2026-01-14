@@ -1,0 +1,20 @@
+<div class="sub-pre-qual-report-issues-table">
+  <div class="vd-mat-table limited-height">
+    <table mat-table #sort="matSort" [dataSource]="dataSource" matSort>
+      <!-- Issue Columns -->
+      @for (column of issueColumns; track column) {
+      <ng-container matColumnDef="{{column}}">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> {{column}} </th>
+        <td mat-cell *matCellDef="let issue"> {{issue[column]}} </td>
+      </ng-container>
+      }
+
+      <!-- Main Header Row -->
+      <tr mat-header-row *matHeaderRowDef="issueColumns; sticky: true"></tr>
+      <!-- Main Data Row -->
+      <tr mat-row *matRowDef="let row; columns: issueColumns;" class="main-row">
+      </tr>
+    </table>
+  </div>
+  <mat-paginator [pageSizeOptions]="[10, 25, 50, 100]" showFirstLastButtons></mat-paginator>
+</div>

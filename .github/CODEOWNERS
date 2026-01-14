@@ -1,6 +1,15 @@
-# Stephen is interested in changes to each microservice's version numbers so will be added to code reviews where they may have been modified
-**/appsettings.json @sdmcgeown
-**/pom.xml @sdmcgeown
+# Release and DevOps teams are interested in config changes, and also version number changes
+**/appsettings.json @lantanagroup/link-release-management-team @lantanagroup/devops
+**/pom.xml @lantanagroup/link-release-management-team
+**/application*.yml @lantanagroup/link-release-management-team @lantanagroup/devops
+
+docs/* @lantanagroup/devops @lantanagroup/link-arch
+
+# Similarly, the DevOps team is interested in any changes to Kafka topics
+topics.txt @lantanagroup/devops
+
+# This entry replaces the 'reviewers' field in dependabot.yml, which was deprecated by GitHub
+Web/Admin.UI/* @lantanagroup/link-security-team
 
 # The following is pasted from https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners and may be useful for extending different patterns to different reviews in our repo
 

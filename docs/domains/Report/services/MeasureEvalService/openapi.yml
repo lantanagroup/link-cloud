@@ -1,0 +1,1318 @@
+﻿openapi: 3.0.1
+info:
+  version: 0.3.0
+  title: Measure Evaluation Service
+paths:
+  /api/measureeval/measure-definition:
+    get:
+      tags:
+      - Measure Definitions
+      summary: Get all measure definitions
+      operationId: getAll
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MeasureDefinition_Summary'
+    put:
+      tags:
+      - Measure Definitions
+      summary: Put (create or update) a measure definition
+      operationId: put
+      requestBody:
+        content:
+          application/json: {}
+        required: true
+      responses:
+        "200":
+          description: OK
+          content: {}
+  /api/measureeval/measure-definition/{id}/$evaluate:
+    post:
+      tags:
+      - Measure Definitions
+      summary: Evaluate a measure against data in request body
+      operationId: evaluate
+      parameters:
+      - name: id
+        in: path
+        description: The ID of the measure definition
+        required: true
+        schema:
+          type: string
+      - name: debug
+        in: query
+        description: Whether to log CQL debugging information during evaluation
+        required: false
+        schema:
+          type: boolean
+          default: false
+      - name: parameters
+        in: query
+        description: The parameters to use in the evaluation
+        required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Parameters'
+        required: true
+      responses:
+        "200":
+          description: OK
+          content: {}
+  /api/measureeval/patient/{facilityId}/{reportId}/{patientId}:
+    get:
+      tags:
+      - patient-controller
+      operationId: getPatientData
+      parameters:
+      - name: facilityId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: reportId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: patientId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content: {}
+  /api/measureeval/measure-definition/{id}:
+    get:
+      tags:
+      - Measure Definitions
+      summary: Get a measure definition
+      operationId: getOne
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content: {}
+  /api/measureeval/measure-definition/{id}/{library-id}/$cql:
+    get:
+      tags:
+      - Measure Definitions
+      summary: Get the CQL for a measure definition's library
+      operationId: getMeasureLibraryCQL
+      parameters:
+      - name: id
+        in: path
+        description: The ID of the measure definition
+        required: true
+        schema:
+          type: string
+      - name: library-id
+        in: path
+        description: The ID of the library in the measure definition
+        required: true
+        schema:
+          type: string
+      - name: range
+        in: query
+        description: The range of the CQL to return (e.g. 37:1-38:22)
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+  /api/measureeval/measure-definition/info:
+    get:
+      tags:
+      - api-info-controller
+      operationId: info
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ServiceInformationConfig'
+components:
+  schemas:
+    BooleanType:
+      type: object
+      properties:
+        formatCommentsPre:
+          type: array
+          items:
+            type: string
+        formatCommentsPost:
+          type: array
+          items:
+            type: string
+        id:
+          type: string
+        extension:
+          type: array
+          items:
+            $ref: '#/components/schemas/Extension'
+        disallowExtensions:
+          type: boolean
+        booleanPrimitive:
+          type: boolean
+        valueAsString:
+          type: string
+        value:
+          type: boolean
+        empty:
+          type: boolean
+        primitive:
+          type: boolean
+        extensionFirstRep:
+          $ref: '#/components/schemas/Extension'
+        idBase:
+          type: string
+        idElement:
+          $ref: '#/components/schemas/StringType'
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
+        dateTime:
+          type: boolean
+        resource:
+          type: boolean
+    CanonicalType:
+      type: object
+      properties:
+        formatCommentsPre:
+          type: array
+          items:
+            type: string
+        formatCommentsPost:
+          type: array
+          items:
+            type: string
+        id:
+          type: string
+        extension:
+          type: array
+          items:
+            $ref: '#/components/schemas/Extension'
+        disallowExtensions:
+          type: boolean
+        valueAsString:
+          type: string
+        primitive:
+          type: boolean
+        value:
+          type: string
+        empty:
+          type: boolean
+        extensionFirstRep:
+          $ref: '#/components/schemas/Extension'
+        idBase:
+          type: string
+        idElement:
+          $ref: '#/components/schemas/StringType'
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
+        booleanPrimitive:
+          type: boolean
+        dateTime:
+          type: boolean
+        resource:
+          type: boolean
+    CodeType:
+      type: object
+      properties:
+        formatCommentsPre:
+          type: array
+          items:
+            type: string
+        formatCommentsPost:
+          type: array
+          items:
+            type: string
+        id:
+          type: string
+        extension:
+          type: array
+          items:
+            $ref: '#/components/schemas/Extension'
+        disallowExtensions:
+          type: boolean
+        system:
+          type: string
+        display:
+          type: string
+        code:
+          type: string
+        version:
+          type: string
+        valueNotNull:
+          type: string
+        valueAsString:
+          type: string
+        primitive:
+          type: boolean
+        value:
+          type: string
+        empty:
+          type: boolean
+        extensionFirstRep:
+          $ref: '#/components/schemas/Extension'
+        idBase:
+          type: string
+        idElement:
+          $ref: '#/components/schemas/StringType'
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
+        booleanPrimitive:
+          type: boolean
+        dateTime:
+          type: boolean
+        resource:
+          type: boolean
+    Coding:
+      type: object
+      properties:
+        formatCommentsPre:
+          type: array
+          items:
+            type: string
+        formatCommentsPost:
+          type: array
+          items:
+            type: string
+        id:
+          type: string
+        extension:
+          type: array
+          items:
+            $ref: '#/components/schemas/Extension'
+        disallowExtensions:
+          type: boolean
+        system:
+          type: string
+        version:
+          type: string
+        code:
+          type: string
+        display:
+          type: string
+        userSelected:
+          type: boolean
+        versionElement:
+          $ref: '#/components/schemas/StringType'
+        userSelectedElement:
+          $ref: '#/components/schemas/BooleanType'
+        displayElement:
+          $ref: '#/components/schemas/StringType'
+        systemElement:
+          $ref: '#/components/schemas/UriType'
+        codeElement:
+          $ref: '#/components/schemas/CodeType'
+        empty:
+          type: boolean
+        extensionFirstRep:
+          $ref: '#/components/schemas/Extension'
+        idBase:
+          type: string
+        idElement:
+          $ref: '#/components/schemas/StringType'
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
+        booleanPrimitive:
+          type: boolean
+        dateTime:
+          type: boolean
+        primitive:
+          type: boolean
+        resource:
+          type: boolean
+    Extension:
+      type: object
+      properties:
+        formatCommentsPre:
+          type: array
+          items:
+            type: string
+        formatCommentsPost:
+          type: array
+          items:
+            type: string
+        id:
+          type: string
+        extension:
+          type: array
+          items:
+            $ref: '#/components/schemas/Extension'
+        disallowExtensions:
+          type: boolean
+        url:
+          type: string
+        value:
+          $ref: '#/components/schemas/Type'
+        urlElement:
+          $ref: '#/components/schemas/UriType'
+        empty:
+          type: boolean
+        valueAsPrimitive:
+          $ref: '#/components/schemas/IPrimitiveTypeObject'
+        extensionFirstRep:
+          $ref: '#/components/schemas/Extension'
+        idBase:
+          type: string
+        idElement:
+          $ref: '#/components/schemas/StringType'
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
+        booleanPrimitive:
+          type: boolean
+        dateTime:
+          type: boolean
+        primitive:
+          type: boolean
+        resource:
+          type: boolean
+    IPrimitiveTypeObject:
+      type: object
+      properties:
+        valueAsString:
+          type: string
+        value:
+          type: object
+        formatCommentsPre:
+          type: array
+          items:
+            type: string
+        formatCommentsPost:
+          type: array
+          items:
+            type: string
+        empty:
+          type: boolean
+    IdType:
+      type: object
+      properties:
+        formatCommentsPre:
+          type: array
+          items:
+            type: string
+        formatCommentsPost:
+          type: array
+          items:
+            type: string
+        id:
+          type: string
+        extension:
+          type: array
+          items:
+            $ref: '#/components/schemas/Extension'
+        disallowExtensions:
+          type: boolean
+        idPartAsBigDecimal:
+          type: number
+        urn:
+          type: boolean
+        idPartAsLong:
+          type: integer
+          format: int64
+        versionIdPart:
+          type: string
+        versionIdPartAsLong:
+          type: integer
+          format: int64
+        versionIdPartValidLong:
+          type: boolean
+        idPartValid:
+          type: boolean
+        idPartValidLong:
+          type: boolean
+        valueAsString:
+          type: string
+        baseUrl:
+          type: string
+        idPart:
+          type: string
+        resourceType:
+          type: string
+        local:
+          type: boolean
+        value:
+          type: string
+        empty:
+          type: boolean
+        absolute:
+          type: boolean
+        primitive:
+          type: boolean
+        extensionFirstRep:
+          $ref: '#/components/schemas/Extension'
+        idBase:
+          type: string
+        idElement:
+          $ref: '#/components/schemas/StringType'
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
+        booleanPrimitive:
+          type: boolean
+        dateTime:
+          type: boolean
+        resource:
+          type: boolean
+    InstantType:
+      type: object
+      properties:
+        formatCommentsPre:
+          type: array
+          items:
+            type: string
+        formatCommentsPost:
+          type: array
+          items:
+            type: string
+        id:
+          type: string
+        extension:
+          type: array
+          items:
+            $ref: '#/components/schemas/Extension'
+        disallowExtensions:
+          type: boolean
+        precision:
+          type: string
+          enum:
+          - YEAR
+          - MONTH
+          - DAY
+          - MINUTE
+          - SECOND
+          - MILLI
+        valueAsV3String:
+          type: string
+          writeOnly: true
+        secondsMilli:
+          type: number
+          format: float
+        valueAsCalendar:
+          type: string
+          format: date-time
+        timeZoneZulu:
+          type: boolean
+        today:
+          type: boolean
+        day:
+          type: integer
+          format: int32
+        hour:
+          type: integer
+          format: int32
+        minute:
+          type: integer
+          format: int32
+        second:
+          type: integer
+          format: int32
+        valueAsString:
+          type: string
+        dateTime:
+          type: boolean
+        nanos:
+          type: integer
+          format: int64
+        value:
+          type: string
+          format: date-time
+        year:
+          type: integer
+          format: int32
+        timeZone:
+          type: object
+          properties:
+            displayName:
+              type: string
+            id:
+              type: string
+            dstsavings:
+              type: integer
+              format: int32
+            rawOffset:
+              type: integer
+              format: int32
+        month:
+          type: integer
+          format: int32
+        millis:
+          type: integer
+          format: int32
+        primitive:
+          type: boolean
+        empty:
+          type: boolean
+        extensionFirstRep:
+          $ref: '#/components/schemas/Extension'
+        idBase:
+          type: string
+        idElement:
+          $ref: '#/components/schemas/StringType'
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
+        booleanPrimitive:
+          type: boolean
+        resource:
+          type: boolean
+    Location:
+      type: object
+      properties:
+        line:
+          type: integer
+          format: int32
+        column:
+          type: integer
+          format: int32
+    Meta:
+      type: object
+      properties:
+        formatCommentsPre:
+          type: array
+          items:
+            type: string
+        formatCommentsPost:
+          type: array
+          items:
+            type: string
+        id:
+          type: string
+        extension:
+          type: array
+          items:
+            $ref: '#/components/schemas/Extension'
+        disallowExtensions:
+          type: boolean
+        versionId:
+          type: string
+        lastUpdated:
+          type: string
+          format: date-time
+        source:
+          type: string
+        profile:
+          type: array
+          items:
+            $ref: '#/components/schemas/CanonicalType'
+        security:
+          type: array
+          items:
+            $ref: '#/components/schemas/Coding'
+        tag:
+          type: array
+          items:
+            $ref: '#/components/schemas/Coding'
+        versionIdElement:
+          $ref: '#/components/schemas/IdType'
+        lastUpdatedElement:
+          $ref: '#/components/schemas/InstantType'
+        securityFirstRep:
+          $ref: '#/components/schemas/Coding'
+        sourceElement:
+          $ref: '#/components/schemas/UriType'
+        tagFirstRep:
+          $ref: '#/components/schemas/Coding'
+        empty:
+          type: boolean
+        extensionFirstRep:
+          $ref: '#/components/schemas/Extension'
+        idBase:
+          type: string
+        idElement:
+          $ref: '#/components/schemas/StringType'
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
+        booleanPrimitive:
+          type: boolean
+        dateTime:
+          type: boolean
+        primitive:
+          type: boolean
+        resource:
+          type: boolean
+    Parameters:
+      type: object
+      properties:
+        formatCommentsPre:
+          type: array
+          items:
+            type: string
+        formatCommentsPost:
+          type: array
+          items:
+            type: string
+        id:
+          type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        implicitRules:
+          type: string
+        language:
+          type: string
+        parameter:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParametersParameterComponent'
+        parameterFirstRep:
+          $ref: '#/components/schemas/ParametersParameterComponent'
+        resourceType:
+          type: string
+          enum:
+          - Account
+          - ActivityDefinition
+          - AdverseEvent
+          - AllergyIntolerance
+          - Appointment
+          - AppointmentResponse
+          - AuditEvent
+          - Basic
+          - Binary
+          - BiologicallyDerivedProduct
+          - BodyStructure
+          - Bundle
+          - CapabilityStatement
+          - CarePlan
+          - CareTeam
+          - CatalogEntry
+          - ChargeItem
+          - ChargeItemDefinition
+          - Claim
+          - ClaimResponse
+          - ClinicalImpression
+          - CodeSystem
+          - Communication
+          - CommunicationRequest
+          - CompartmentDefinition
+          - Composition
+          - ConceptMap
+          - Condition
+          - Consent
+          - Contract
+          - Coverage
+          - CoverageEligibilityRequest
+          - CoverageEligibilityResponse
+          - DetectedIssue
+          - Device
+          - DeviceDefinition
+          - DeviceMetric
+          - DeviceRequest
+          - DeviceUseStatement
+          - DiagnosticReport
+          - DocumentManifest
+          - DocumentReference
+          - EffectEvidenceSynthesis
+          - Encounter
+          - Endpoint
+          - EnrollmentRequest
+          - EnrollmentResponse
+          - EpisodeOfCare
+          - EventDefinition
+          - Evidence
+          - EvidenceVariable
+          - ExampleScenario
+          - ExplanationOfBenefit
+          - FamilyMemberHistory
+          - Flag
+          - Goal
+          - GraphDefinition
+          - Group
+          - GuidanceResponse
+          - HealthcareService
+          - ImagingStudy
+          - Immunization
+          - ImmunizationEvaluation
+          - ImmunizationRecommendation
+          - ImplementationGuide
+          - InsurancePlan
+          - Invoice
+          - Library
+          - Linkage
+          - List
+          - Location
+          - Measure
+          - MeasureReport
+          - Media
+          - Medication
+          - MedicationAdministration
+          - MedicationDispense
+          - MedicationKnowledge
+          - MedicationRequest
+          - MedicationStatement
+          - MedicinalProduct
+          - MedicinalProductAuthorization
+          - MedicinalProductContraindication
+          - MedicinalProductIndication
+          - MedicinalProductIngredient
+          - MedicinalProductInteraction
+          - MedicinalProductManufactured
+          - MedicinalProductPackaged
+          - MedicinalProductPharmaceutical
+          - MedicinalProductUndesirableEffect
+          - MessageDefinition
+          - MessageHeader
+          - MolecularSequence
+          - NamingSystem
+          - NutritionOrder
+          - Observation
+          - ObservationDefinition
+          - OperationDefinition
+          - OperationOutcome
+          - Organization
+          - OrganizationAffiliation
+          - Parameters
+          - Patient
+          - PaymentNotice
+          - PaymentReconciliation
+          - Person
+          - PlanDefinition
+          - Practitioner
+          - PractitionerRole
+          - Procedure
+          - Provenance
+          - Questionnaire
+          - QuestionnaireResponse
+          - RelatedPerson
+          - RequestGroup
+          - ResearchDefinition
+          - ResearchElementDefinition
+          - ResearchStudy
+          - ResearchSubject
+          - RiskAssessment
+          - RiskEvidenceSynthesis
+          - Schedule
+          - SearchParameter
+          - ServiceRequest
+          - Slot
+          - Specimen
+          - SpecimenDefinition
+          - StructureDefinition
+          - StructureMap
+          - Subscription
+          - Substance
+          - SubstanceNucleicAcid
+          - SubstancePolymer
+          - SubstanceProtein
+          - SubstanceReferenceInformation
+          - SubstanceSourceMaterial
+          - SubstanceSpecification
+          - SupplyDelivery
+          - SupplyRequest
+          - Task
+          - TerminologyCapabilities
+          - TestReport
+          - TestScript
+          - ValueSet
+          - VerificationResult
+          - VisionPrescription
+        empty:
+          type: boolean
+        structureFhirVersionEnum:
+          type: string
+          enum:
+          - DSTU2
+          - DSTU2_HL7ORG
+          - DSTU2_1
+          - DSTU3
+          - R4
+          - R4B
+          - R5
+        deleted:
+          type: boolean
+        idElement:
+          $ref: '#/components/schemas/IdType'
+        languageElement:
+          $ref: '#/components/schemas/CodeType'
+        implicitRulesElement:
+          $ref: '#/components/schemas/UriType'
+        idBase:
+          type: string
+        idPart:
+          type: string
+        resource:
+          type: boolean
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
+        booleanPrimitive:
+          type: boolean
+        dateTime:
+          type: boolean
+        primitive:
+          type: boolean
+      description: The parameters to use in the evaluation
+    ParametersParameterComponent:
+      type: object
+      properties:
+        formatCommentsPre:
+          type: array
+          items:
+            type: string
+        formatCommentsPost:
+          type: array
+          items:
+            type: string
+        id:
+          type: string
+        extension:
+          type: array
+          items:
+            $ref: '#/components/schemas/Extension'
+        disallowExtensions:
+          type: boolean
+        modifierExtension:
+          type: array
+          items:
+            $ref: '#/components/schemas/Extension'
+        name:
+          type: string
+        value:
+          $ref: '#/components/schemas/Type'
+        resource:
+          $ref: '#/components/schemas/Resource'
+        part:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParametersParameterComponent'
+        partFirstRep:
+          $ref: '#/components/schemas/ParametersParameterComponent'
+        nameElement:
+          $ref: '#/components/schemas/StringType'
+        empty:
+          type: boolean
+        modifierExtensionFirstRep:
+          $ref: '#/components/schemas/Extension'
+        extensionFirstRep:
+          $ref: '#/components/schemas/Extension'
+        idBase:
+          type: string
+        idElement:
+          $ref: '#/components/schemas/StringType'
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
+        booleanPrimitive:
+          type: boolean
+        dateTime:
+          type: boolean
+        primitive:
+          type: boolean
+    Resource:
+      type: object
+      properties:
+        formatCommentsPre:
+          type: array
+          items:
+            type: string
+        formatCommentsPost:
+          type: array
+          items:
+            type: string
+        id:
+          type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        implicitRules:
+          type: string
+        language:
+          type: string
+        languageElement:
+          $ref: '#/components/schemas/CodeType'
+        implicitRulesElement:
+          $ref: '#/components/schemas/UriType'
+        idBase:
+          type: string
+        idPart:
+          type: string
+        idElement:
+          $ref: '#/components/schemas/IdType'
+        resourceType:
+          type: string
+          enum:
+          - Account
+          - ActivityDefinition
+          - AdverseEvent
+          - AllergyIntolerance
+          - Appointment
+          - AppointmentResponse
+          - AuditEvent
+          - Basic
+          - Binary
+          - BiologicallyDerivedProduct
+          - BodyStructure
+          - Bundle
+          - CapabilityStatement
+          - CarePlan
+          - CareTeam
+          - CatalogEntry
+          - ChargeItem
+          - ChargeItemDefinition
+          - Claim
+          - ClaimResponse
+          - ClinicalImpression
+          - CodeSystem
+          - Communication
+          - CommunicationRequest
+          - CompartmentDefinition
+          - Composition
+          - ConceptMap
+          - Condition
+          - Consent
+          - Contract
+          - Coverage
+          - CoverageEligibilityRequest
+          - CoverageEligibilityResponse
+          - DetectedIssue
+          - Device
+          - DeviceDefinition
+          - DeviceMetric
+          - DeviceRequest
+          - DeviceUseStatement
+          - DiagnosticReport
+          - DocumentManifest
+          - DocumentReference
+          - EffectEvidenceSynthesis
+          - Encounter
+          - Endpoint
+          - EnrollmentRequest
+          - EnrollmentResponse
+          - EpisodeOfCare
+          - EventDefinition
+          - Evidence
+          - EvidenceVariable
+          - ExampleScenario
+          - ExplanationOfBenefit
+          - FamilyMemberHistory
+          - Flag
+          - Goal
+          - GraphDefinition
+          - Group
+          - GuidanceResponse
+          - HealthcareService
+          - ImagingStudy
+          - Immunization
+          - ImmunizationEvaluation
+          - ImmunizationRecommendation
+          - ImplementationGuide
+          - InsurancePlan
+          - Invoice
+          - Library
+          - Linkage
+          - List
+          - Location
+          - Measure
+          - MeasureReport
+          - Media
+          - Medication
+          - MedicationAdministration
+          - MedicationDispense
+          - MedicationKnowledge
+          - MedicationRequest
+          - MedicationStatement
+          - MedicinalProduct
+          - MedicinalProductAuthorization
+          - MedicinalProductContraindication
+          - MedicinalProductIndication
+          - MedicinalProductIngredient
+          - MedicinalProductInteraction
+          - MedicinalProductManufactured
+          - MedicinalProductPackaged
+          - MedicinalProductPharmaceutical
+          - MedicinalProductUndesirableEffect
+          - MessageDefinition
+          - MessageHeader
+          - MolecularSequence
+          - NamingSystem
+          - NutritionOrder
+          - Observation
+          - ObservationDefinition
+          - OperationDefinition
+          - OperationOutcome
+          - Organization
+          - OrganizationAffiliation
+          - Parameters
+          - Patient
+          - PaymentNotice
+          - PaymentReconciliation
+          - Person
+          - PlanDefinition
+          - Practitioner
+          - PractitionerRole
+          - Procedure
+          - Provenance
+          - Questionnaire
+          - QuestionnaireResponse
+          - RelatedPerson
+          - RequestGroup
+          - ResearchDefinition
+          - ResearchElementDefinition
+          - ResearchStudy
+          - ResearchSubject
+          - RiskAssessment
+          - RiskEvidenceSynthesis
+          - Schedule
+          - SearchParameter
+          - ServiceRequest
+          - Slot
+          - Specimen
+          - SpecimenDefinition
+          - StructureDefinition
+          - StructureMap
+          - Subscription
+          - Substance
+          - SubstanceNucleicAcid
+          - SubstancePolymer
+          - SubstanceProtein
+          - SubstanceReferenceInformation
+          - SubstanceSourceMaterial
+          - SubstanceSpecification
+          - SupplyDelivery
+          - SupplyRequest
+          - Task
+          - TerminologyCapabilities
+          - TestReport
+          - TestScript
+          - ValueSet
+          - VerificationResult
+          - VisionPrescription
+        empty:
+          type: boolean
+        structureFhirVersionEnum:
+          type: string
+          enum:
+          - DSTU2
+          - DSTU2_HL7ORG
+          - DSTU2_1
+          - DSTU3
+          - R4
+          - R4B
+          - R5
+        deleted:
+          type: boolean
+        resource:
+          type: boolean
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
+        booleanPrimitive:
+          type: boolean
+        dateTime:
+          type: boolean
+        primitive:
+          type: boolean
+    StringType:
+      type: object
+      properties:
+        formatCommentsPre:
+          type: array
+          items:
+            type: string
+        formatCommentsPost:
+          type: array
+          items:
+            type: string
+        id:
+          type: string
+        disallowExtensions:
+          type: boolean
+        valueNotNull:
+          type: string
+        valueAsString:
+          type: string
+        primitive:
+          type: boolean
+        value:
+          type: string
+        empty:
+          type: boolean
+        extensionFirstRep:
+          $ref: '#/components/schemas/Extension'
+        idBase:
+          type: string
+        idElement:
+          $ref: '#/components/schemas/StringType'
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
+        booleanPrimitive:
+          type: boolean
+        dateTime:
+          type: boolean
+        resource:
+          type: boolean
+    Type:
+      type: object
+      properties:
+        formatCommentsPre:
+          type: array
+          items:
+            type: string
+        formatCommentsPost:
+          type: array
+          items:
+            type: string
+        id:
+          type: string
+        extension:
+          type: array
+          items:
+            $ref: '#/components/schemas/Extension'
+        disallowExtensions:
+          type: boolean
+        empty:
+          type: boolean
+        extensionFirstRep:
+          $ref: '#/components/schemas/Extension'
+        idBase:
+          type: string
+        idElement:
+          $ref: '#/components/schemas/StringType'
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
+        booleanPrimitive:
+          type: boolean
+        dateTime:
+          type: boolean
+        primitive:
+          type: boolean
+        resource:
+          type: boolean
+    UriType:
+      type: object
+      properties:
+        formatCommentsPre:
+          type: array
+          items:
+            type: string
+        formatCommentsPost:
+          type: array
+          items:
+            type: string
+        id:
+          type: string
+        disallowExtensions:
+          type: boolean
+        valueAsString:
+          type: string
+        primitive:
+          type: boolean
+        value:
+          type: string
+        empty:
+          type: boolean
+        extensionFirstRep:
+          $ref: '#/components/schemas/Extension'
+        idBase:
+          type: string
+        idElement:
+          $ref: '#/components/schemas/StringType'
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
+        booleanPrimitive:
+          type: boolean
+        dateTime:
+          type: boolean
+        resource:
+          type: boolean
+    XhtmlNode:
+      type: object
+      properties:
+        location:
+          $ref: '#/components/schemas/Location'
+        nodeType:
+          type: string
+          enum:
+          - Element
+          - Text
+          - Comment
+          - DocType
+          - Document
+          - Instruction
+        name:
+          type: string
+        attributes:
+          type: object
+          additionalProperties:
+            type: string
+        childNodes:
+          type: array
+          properties:
+            inPara:
+              type: boolean
+            inLink:
+              type: boolean
+            empty:
+              type: boolean
+          items:
+            $ref: '#/components/schemas/XhtmlNode'
+        content:
+          type: string
+        emptyExpanded:
+          type: boolean
+        valueAsString:
+          type: string
+        firstElement:
+          $ref: '#/components/schemas/XhtmlNode'
+        nsDecl:
+          type: string
+        noPretty:
+          type: boolean
+        para:
+          type: boolean
+        formatCommentsPre:
+          type: array
+          items:
+            type: string
+        formatCommentsPost:
+          type: array
+          items:
+            type: string
+        value:
+          type: string
+        empty:
+          type: boolean
+    MeasureDefinition_Summary:
+      type: object
+      properties:
+        id:
+          type: string
+        version:
+          type: integer
+          format: int64
+        createdDate:
+          type: string
+          format: date-time
+        modifiedDate:
+          type: string
+          format: date-time
+    ServiceInformationConfig:
+      type: object
+      properties:
+        serviceName:
+          type: string
+        version:
+          type: string
+        productVersion:
+          type: string
+        build:
+          type: string
+  securitySchemes:
+    bearer-key:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+

@@ -3,6 +3,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
+using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.Swagger;
 using Swashbuckle.AspNetCore.SwaggerUI;
 
@@ -10,7 +11,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions;
 
 public static class ConfigureSwaggerExtension
 {
-    public static void ConfigureSwagger(this WebApplication app, Action<SwaggerOptions> specAction = null, Action<SwaggerUIOptions> uiAction = null)
+    public static void ConfigureSwagger(this WebApplication app, Action<SwaggerOptions>? specAction = null, Action<SwaggerUIOptions>? uiAction = null)
     {
         if (!app.Configuration.GetValue<bool>(ConfigurationConstants.AppSettings.EnableSwagger, false))
             return;
@@ -21,6 +22,7 @@ public static class ConfigureSwaggerExtension
         
         app.UseSwagger(opts =>
         {
+            opts.OpenApiVersion = OpenApiSpecVersion.OpenApi2_0;
             specAction?.Invoke(opts);
         });
         
@@ -29,7 +31,7 @@ public static class ConfigureSwaggerExtension
             opts
                 .SwaggerEndpoint("/swagger/v1/swagger.json",
                     serviceInformation != null
-                        ? $"{serviceInformation.Name} - {serviceInformation.Version}"
+                        ? $"{serviceInformation.ServiceName} - {serviceInformation.Version}"
                         : "Link " + Assembly.GetExecutingAssembly().GetName() + " Service");
             
             uiAction?.Invoke(opts);

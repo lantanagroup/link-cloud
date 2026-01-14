@@ -1,0 +1,102 @@
+<div class="link-dialog-header">
+  <div class="link-dialog-title">
+    {{title}}
+  </div>
+  <div class="link-dialog-button">
+    <button class="link-button light" (click)="onModalClose()">
+      <fa-icon [icon]="faXmark"></fa-icon>
+    </button>
+  </div>
+
+</div>
+
+<div class="link-dialog-content">
+  <div class="split-container">
+    <div class="left-pane">
+      <div class="data-label">
+        Report
+        <span class="data-value selectable-value">{{measureReport.reportScheduleId }}</span>
+      </div>
+      <div class="data-label">
+        Facility
+        <span class="data-value selectable-value">{{facilityId}}</span>
+      </div>
+      <div class="data-label">
+        Measure
+        <span class="data-value selectable-value">{{measureReport.reportType}}</span>
+      </div>
+      <div class="data-label">
+        Patient
+        <span class="data-value selectable-value">{{measureReport.patientId}}
+          <button class="link-button primary" (click)="downloadReport()">
+            <fa-icon [icon]="faDownload"></fa-icon>
+            Download Measure Eval Input
+          </button></span>
+      </div>
+
+      <div class="data-label">
+        Validation Status
+        <span class="data-value">{{measureReport.validationStatus}}</span>
+      </div>
+      <div class="data-label">
+        Submission Status
+        <span class="data-value">{{measureReport.status}}</span>
+      </div>
+    </div>
+    <div class="right-pane" style="display: flex; align-items: center;">
+      <app-donut-chart [data]="measureReport?.resourceCountSummary"></app-donut-chart>
+    </div>
+  </div>
+
+  @if (resources.length > 0) {
+    <div>
+      <div class="filter-bar">
+        <span class="filter-bar-header">Filters</span>
+        <div class="filter-bar-row">
+          <div class="filter-bar-col" style="margin-left: 0;">
+            <div>
+              <label>
+                Resource Type
+              </label>
+              <select id="resourceType" [(ngModel)]="selectedResourceType" (change)="onResourceTypeChange($event)">
+                <option value="any">Any</option>
+                @for (type of resourceTypes; track type) {
+                  <option [value]="type">{{type}}</option>
+                }
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="table-container">
+        <table class="link-table">
+          <thead>
+            <tr>
+              <th class="header-column">Resource Type</th>
+              <th class="header-column">Fhir Id</th>
+              <th class="header-column">Category</th>
+            </tr>
+          </thead>
+          <tbody class="table-body">
+            @for (resource of resources; track resource) {
+              <tr>
+                <td class="table-cell">{{resource.resourceType}}</td>
+                <td class="table-cell selectable-value">{{resource.fhirId}}</td>
+                <td class="table-cell">{{resource.resourceCategory}}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+        <mat-paginator
+          [length]="paginationMetadata.totalCount"
+          [pageIndex]="paginationMetadata.pageNumber"
+          [pageSize]="paginationMetadata.pageSize"
+          [pageSizeOptions]="[5, 10, 20]"
+          (page)="pagedEvent($event)"
+          showFirstLastButtons
+          aria-label="Select page of measure report resources">
+        </mat-paginator>
+      </div>
+    </div>
+  }
+</div>

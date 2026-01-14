@@ -1,0 +1,137 @@
+---
+
+id: MeasureEvalService
+name: Measure Evaluation Service
+version: 0.2.0
+
+summary: |
+Service that evaluates data against FHIR measure definitions (aka: CQL)
+
+owners:
+  - arch_team
+
+receives:
+  - id: EvaluationRequested
+  - id: ResourceNormalized
+
+sends:
+  - id: ResourceEvaluated
+  - id: DataAcquisitionRequested
+  - id: MeasureEvaluated
+
+specifications:
+  openapiPath: openapi.yml
+
+badges:
+  - content: "Java"
+    backgroundColor: green
+    textColor: white
+  - content: MONGO
+    backgroundColor: green
+    textColor: white
+  - content: '8067:8080'
+    backgroundColor: gray
+    textColor: white
+
+---
+
+## Overview
+
+The Measure Eval service is a Java based application that is primarily responsible for evaluating bundles of acquired patient resources against the measures that Link Cloud tenants are configured to evaluate with. The service utilizes the CQF framework to perform the measure evaluations.
+
+## Nodes
+
+<NodeGraph />
+
+## Common Configurations
+
+* [Azure App Config](/docs/custom/config/java#azure-app-config)
+* [Telemetry](/docs/custom/config/java#telemetry)
+* [Swagger](/docs/custom/config/java#swagger)
+* [Mongo DB](/docs/custom/config/java#mongo-db)
+* [Kafka](/docs/custom/config/java#kafka)
+* [Service Authentication](/docs/custom/config/java#service-authentication)
+
+## Custom Configurations
+
+| Property Name                      | Description                                                                                                                                                                     | Type/Value                               | Required | Secret? |
+|------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------|----------|---------|
+| link.reportability-predicate       | Predicate to determine if a patient is reportable                                                                                                                               | "...IsInInitialPopulation"<br/>(default) | No       | No      |
+| link.max-collect-resources-threads | The maximum number of threads to use to collect resources from the mongo database when bundling a patient's resources. Defaults to maximum threads available on the server/pod. | Integer                                  | No       | No      |
+
+### Reportability Predicates
+
+The `link.reportability-predicate` property is used to determine if a patient is reportable. The default value is "com.lantanagroup.link.measureeval.reportability.IsInInitialPopulation", whichi s a class that implements `Predicate<MeasureReport>`. Other predicate implementations may be built over time in the same package and should be listed here.
+
+Package `com.lantanagroup.link.measureeval.reportability`:
+
+* `IsInInitialPopulation`: Determines if a patient is reportable if they are in the initial population (a count of 1 or more for the "InitialPopulation" population of the patient's MeasureReport).
+
+## Features and Functionality
+
+**Measure Evaluation** is a critical process in assessing clinical data against FHIR digital quality measures. It ensures that healthcare data is analyzed consistently and accurately using standardized logic and definitions.
+
+### Key Concepts
+
+- **FHIR Digital Quality Measures**: Defined standards that outline how clinical data is measured for quality reporting and compliance.
+- **Measure Package**: A comprehensive bundle (in FHIR JSON Bundle format) required for evaluation, including:
+  - Measure definitions.
+  - CQL logic in FHIR Library resources.
+  - Terminology, such as pre-expanded value sets and optimized code systems.
+
+### Evaluation Process
+
+1. **Pre-preparation**:
+ - Data is collected and normalized to align with FHIR standards.
+ - Measure packages are prepared, containing all artifacts necessary for evaluation.
+2. **Execution**: Measures are executed systematically against the acquired data for each patient, including multiple evaluations during **progressive querying** as described in [Progressive Querying](/docs/services/DataAcquisitionService).
+3. **Results**: Each measure produces results indicating compliance or performance, which can be consumed by reporting or downstream systems. These results are in the form of a MeasureReport resource specific to the individual patient that the measure was executed against.
+
+### Role in Progressive Querying
+
+Measure evaluation is performed multiple times for each patient during **progressive querying** to support an efficient and focused reporting pipeline:
+- Determines whether the patient from the census meets the initial criteria for submission.
+- Identifies what data should be submitted for the reporting scenario if the patient is relevant.
+- Includes "FHIR Profile" assertion statements in the resulting data to support the validation service in determining which profiles to validate the data against.
+
+### Integration
+
+Measure evaluation is often part of a broader workflow:
+- **Data Acquisition**: Data is collected and normalized to a standard format.
+- **Measure Execution**: Evaluations are run against pre-configured measures as data becomes available.
+- **Result Propagation**: Evaluated results are consumed by the report service.
+
+This approach ensures consistent, reliable evaluation of healthcare quality measures, supporting improved care outcomes and regulatory adherence.
+
+### Testing
+
+The measure engine may be tested against arbitrary data using the $evaluate operation (which is custom-built for this purpose in the measure evaluation service) or using the `measureeval-cli.jar` that can be built separately from the service; see <a href="https://github.com/lantanagroup/link-cloud/blob/dev/Java/measureeval/README.md" target="new">measureeval/README.md</a> for more information.
+
+### Upload & Storage
+- Bundles are uploaded via: `PUT /api/measureeval/measureDefinition`
+- The uploaded bundle is a FHIR JSON Bundle and typically includes: `Measure`, `Library`, `StructureDefinition` (Profile), `ValueSet`, `CodeSystem`
+- Bundles are stored **as-is** in the measureeval service's database.
+
+<Admonition type="info">
+  Measure definition bundles that are generated by CQF Tooling do not include StructureDefinition resources that are necessary for validation.
+</Admonition>
+
+### Evaluation Execution
+
+When a request is made to evaluate a measure:
+
+1. The service checks if a `MeasureEvaluator` instance has already been compiled and cached.
+2. If not, it:
+- Retrieves the corresponding bundle from the database.
+- Compiles a `MeasureEvaluator` instance.
+- Stores the compiled instance in memory/cache for future use.
+
+**Terminology Handling:**
+  - Currently, the bundle must include all required `ValueSet` and `CodeSystem` resources for evaluation to succeed.
+  - There are future plans to integrate a FHIR Terminology (TX) Service, which would offload terminology expansion (e.g., `$expand`) and eliminate the need for local terminology resources in the bundle.
+  - Note: At this time, value sets and code systems must be pre-expanded, or enumerate all of the codes that should be included in a value set's intensional definition. A terminology service is being explored to address this.
+
+### Known Deficiencies
+- **No version tracking**: Only a single bundle per `:id` is retained.
+- **Overwrites are destructive**: Uploading a new bundle overwrites the existing one.
+- **No version selection**: There is no support for evaluating a measure against a specific version of the bundle.

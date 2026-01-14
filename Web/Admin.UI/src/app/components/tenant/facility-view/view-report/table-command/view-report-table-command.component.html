@@ -1,0 +1,16 @@
+<div class="menu-container" (clickOutside)="isOpen = false">
+  <button
+    class="menu-button"
+    (click)="toggleMenu()"
+    aria-haspopup="true"
+    [attr.aria-expanded]="isOpen">
+    <fa-icon [icon]="faEllipsisV"></fa-icon>
+  </button>
+  @if (isOpen) {
+    <ul class="menu-dropdown">
+      <li (click)="onViewDetails()">
+        <fa-icon [icon]="faEye"></fa-icon> View Details
+      </li>
+    </ul>
+  }
+</div>

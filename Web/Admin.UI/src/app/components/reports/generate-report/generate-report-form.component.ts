@@ -1,0 +1,309 @@
+import {Component, EventEmitter, OnDestroy, OnInit, Output} from '@angular/core';
+import {
+  FormArray,
+  FormBuilder,
+  FormControl,
+  FormGroup,
+  FormsModule,
+  ReactiveFormsModule,
+  Validators
+} from '@angular/forms';
+import {CommonModule} from "@angular/common";
+import {MatSnackBar, MatSnackBarModule} from "@angular/material/snack-bar";
+import {MatFormFieldModule} from "@angular/material/form-field";
+import {MatInputModule} from "@angular/material/input";
+import {MatSelectModule} from "@angular/material/select";
+import {MatToolbarModule} from "@angular/material/toolbar";
+import {MatCardModule} from "@angular/material/card";
+import {MatTabsModule} from "@angular/material/tabs";
+import {MatButtonModule} from "@angular/material/button";
+import {MatIconModule} from "@angular/material/icon";
+import {MatExpansionModule} from "@angular/material/expansion";
+import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
+import {MatDatepickerModule} from "@angular/material/datepicker";
+import {
+  IAdHocReportRequest
+} from "../../../interfaces/tenant/facility-config-model.interface";
+import {TenantService} from "../../../services/gateway/tenant/tenant.service";
+import {MeasureDefinitionService} from "../../../services/gateway/measure-definition/measure.service";
+import {IMeasureDefinitionConfigModel} from "../../../interfaces/measure-definition/measure-definition-config-model.interface";
+import {IEntityCreatedResponse, IReportGenerationResponse} from "../../../interfaces/entity-created-response.model";
+import {debounceTime, distinctUntilChanged, forkJoin, map, Observable, of, startWith, tap} from "rxjs";
+import {MatCheckboxModule} from "@angular/material/checkbox";
+import {MatRadioModule} from "@angular/material/radio";
+import * as Papa from 'papaparse';
+import {FileUploadComponent} from "../../core/file-upload/file-upload.component";
+import { Router } from '@angular/router';
+import {facilityExistsValidator} from "../../validators/FacilityValidator";
+import {switchMap} from "rxjs/operators";
+import {FaIconComponent} from "@fortawesome/angular-fontawesome";
+import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocomplete";
+import {faSearch} from "@fortawesome/free-solid-svg-icons";
+
+@Component({
+  selector: 'generate-report-form',
+  standalone: true,
+  imports: [
+    CommonModule,
+    MatSnackBarModule,
+    FormsModule,
+    ReactiveFormsModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+    MatToolbarModule,
+    MatCardModule,
+    MatTabsModule,
+    MatButtonModule,
+    MatIconModule,
+    MatCheckboxModule,
+    MatExpansionModule,
+    MatProgressSpinnerModule,
+    MatDatepickerModule,
+    MatRadioModule,
+    FileUploadComponent,
+    FaIconComponent,
+    MatAutocompleteTrigger,
+    MatAutocomplete
+  ],
+  templateUrl: './generate-report-form.component.html',
+  styleUrls: ['./generate-report-form.component.scss']
+})
+export class GenerateReportFormComponent implements OnInit{
+
+  generateReportForm: FormGroup;
+  facilities: Array<{ facilityId: string, facilityName: string }> = [];
+  reportTypes: string[] = [];
+  patients: string[] = [];
+  formSubmitted = false; // Flag to track form submission
+  errorMessage: string = '';
+  lastGeneratedReport: { facilityId: string, reportId: string } | null = null;
+
+  @Output() formValueChanged = new EventEmitter<boolean>();
+
+  filteredFacilities: Observable<{ facilityId: string; facilityName: string }[]> = of([]);
+
+  constructor(
+    private fb: FormBuilder,
+    private tenantService: TenantService,
+    private measureDefinitionConfigurationService: MeasureDefinitionService,
+    private snackBar: MatSnackBar,
+    private router: Router) {
+    this.generateReportForm = this.fb.group({
+      facilityInput: [''], // typed text
+      facilityId: this.fb.control('', {
+        validators: [Validators.required],
+        asyncValidators: [facilityExistsValidator(this.tenantService)],
+        updateOn: 'blur'
+      }),
+      bypassSubmission: [false],
+      startDate: ['', Validators.required],
+      endDate: ['', Validators.required],
+      reportTypes: ['', Validators.required],
+      patients: [],
+      selectedForm: ['fileUpload']
+    });
+  }
+
+  ngOnInit() {
+    // Load report types only
+    this.getReportTypes().subscribe(reportTypes => {
+      this.reportTypes = reportTypes.map(r => r.id);
+    });
+
+    this.filteredFacilities = this.facilityInputControl.valueChanges.pipe(
+      startWith(''),
+      debounceTime(300),
+      distinctUntilChanged(),
+      switchMap(term => this.tenantService.autocompleteFacilities(term || '')),
+      map(results => Object.entries(results || {}).map(([facilityId, facilityName]) => ({ facilityId, facilityName }))),
+      tap(facilities => (this.facilities = facilities))
+    );
+
+    this.generateReportForm.valueChanges.subscribe(() => {
+      this.formValueChanged.emit(this.generateReportForm.invalid);
+    });
+  }
+
+  onFacilityInputBlur() {
+    setTimeout(() => {
+      const inputVal = this.facilityInputControl.value;
+      const facilityIdControl = this.facilityIdControl;
+
+      const match = this.facilities.find(f => f.facilityId=== inputVal);
+      if (!inputVal) {
+        facilityIdControl.setErrors({ required: true });
+        facilityIdControl.setValue("");
+      } else if (!match) {
+        facilityIdControl.setErrors({ notFound: true });
+        facilityIdControl.setValue(inputVal);
+      } else {
+        facilityIdControl.setErrors(null);
+        facilityIdControl.setValue(match.facilityId);
+      }
+
+      facilityIdControl.markAsTouched();
+      facilityIdControl.updateValueAndValidity();
+    }, 200);
+  }
+
+  onFacilitySelected(selectedValue: string) {
+    const facility = this.facilities.find(f => f.facilityId === selectedValue);
+    if (facility) {
+      this.facilityIdControl.setValue(facility.facilityId);
+      this.facilityInputControl.setValue(facility.facilityId);
+      this.facilityIdControl.setErrors(null);
+    }
+  }
+
+  clearSearchInput() {
+    this.facilityInputControl.setValue('');
+    this.facilityIdControl.setValue('');
+  }
+
+  get selectedFormControl(): FormControl {
+    return this.generateReportForm.get('selectedForm') as FormControl;
+  }
+
+  get facilityIdControl(): FormControl {
+    return this.generateReportForm.get('facilityId') as FormControl;
+  }
+
+  get facilityInputControl(): FormControl {
+    return this.generateReportForm.get('facilityInput') as FormControl;
+  }
+
+  get startDateControl(): FormArray {
+    return this.generateReportForm.get('startDate') as FormArray;
+  }
+
+  get endDateControl(): FormArray {
+    return this.generateReportForm.get('endDate') as FormArray;
+  }
+
+  get bypassSubmissionControl(): FormControl {
+    return this.generateReportForm.get('bypassSubmission') as FormControl;
+  }
+
+  get reportTypesControl(): FormControl {
+    return this.generateReportForm.get('reportTypes') as FormControl;
+  }
+
+  // Remove patient name by index
+  removePatient(index: number): void {
+    this.patients.splice(index, 1);
+  }
+
+  generateReport() {
+    this.formSubmitted = true; // Set flag when form is submitted
+    if (this.generateReportForm.valid) {
+      console.log('Report Data:', this.generateReportForm.value);
+      let adHocReportRequest: IAdHocReportRequest = {
+        'bypassSubmission': this.bypassSubmissionControl.value,
+        'startDate': this.startDateControl.value,
+        'endDate': this.endDateControl.value,
+        'reportTypes': this.reportTypesControl.value,
+        'patientIds': this.patients
+      };
+      this.tenantService.generateAdHocReport(this.facilityIdControl.value, adHocReportRequest).subscribe((response: IReportGenerationResponse) => {
+        this.snackBar.open(`Successfully generated report with ID: ${response.reportId}.`, '', {
+          duration: 3500,
+          panelClass: 'success-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
+        this.lastGeneratedReport = { facilityId: this.facilityIdControl.value, reportId: response.reportId };
+        this.resetForm();
+      });
+    } else {
+      this.snackBar.open(`Invalid form, please check for errors.`, '', {
+        duration: 2500,
+        panelClass: 'error-snackbar',
+        horizontalPosition: 'center',
+        verticalPosition: 'top'
+      });
+    }
+  }
+
+  private resetForm() {
+    this.patients = [];
+    this.generateReportForm.controls['startDate'].reset();
+    this.generateReportForm.controls['endDate'].reset();
+    this.generateReportForm.controls['facilityId'].reset();
+    this.generateReportForm.controls['reportTypes'].reset();
+    this.generateReportForm.controls['patients'].reset();
+    this.generateReportForm.controls['bypassSubmission'].reset();
+  }
+
+  getReportTypes(): Observable<IMeasureDefinitionConfigModel[]> {
+    return this.measureDefinitionConfigurationService.getMeasureDefinitionConfigurations();
+  }
+
+  compareReportTypes(object1: any, object2: any) {
+    return (object1 && object2) && object1 === object2;
+  }
+
+  // Add patient name to array
+  addPatient(): void {
+    const patientNameControl = this.generateReportForm.get('patients');
+    if (patientNameControl && patientNameControl.valid) {
+      if (patientNameControl?.valid) {
+        let enteredPatients = this.parseString(patientNameControl.value);
+        // Filter out duplicates before adding to the array
+        const newPatients = enteredPatients.filter(patient =>
+          !this.patients.includes(patient) && patient.length > 0
+        );
+        if (newPatients.length > 0) {
+          this.patients.push(...newPatients); // Add to array
+        } else if (enteredPatients.length > 0 && newPatients.length === 0) {
+          this.snackBar.open('All patient IDs already added', '', {
+            duration: 2000,
+            horizontalPosition: 'center'
+          });
+        }
+        patientNameControl.reset(); // Reset the input field
+      }
+    }
+  }
+
+  loadFile(file: any) {
+    const reader = new FileReader();
+    reader.readAsText(file);
+    const fileName = file.name.toLowerCase();
+    if (fileName.endsWith('.csv')) {
+      this.errorMessage = '';
+    } else {
+      this.errorMessage = 'Please upload a valid CSV file (with .csv extension).';
+      return;
+    }
+    reader.onload = () => {
+      const csvData = reader.result as string;
+      Papa.parse(csvData, {
+        header: false,
+        skipEmptyLines: true,
+        complete: (result) => {
+          this.patients = (result.data as string[][]).map(row => row[0]);
+        },
+      });
+    };
+    reader.onerror = () => {
+      throw new Error('Error reading the file.');
+    };
+  }
+
+  parseString(patient: string): string[] {
+    let enteredPatients: string[] = [];
+    if (patient) {
+      enteredPatients = patient.split(',').map(item => item.trim());
+    }
+    return enteredPatients;``
+  }
+
+  navToReport() {
+    if (this.lastGeneratedReport?.reportId) {
+      this.router.navigate([`tenant/facility/${this.lastGeneratedReport.facilityId}/report/${this.lastGeneratedReport.reportId}`]);
+    }
+  }
+
+  protected readonly faSearch = faSearch;
+}

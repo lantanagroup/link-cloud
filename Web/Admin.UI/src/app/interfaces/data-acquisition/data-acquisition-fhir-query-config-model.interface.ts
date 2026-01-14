@@ -1,9 +1,12 @@
 import { IDataAcquisitionAuthenticationConfigModel } from "./data-acquisition-auth-config-model.interface";
 
 export interface IDataAcquisitionQueryConfigModel {
-  id: string;
+  id?: string;
   facilityId: string;
   fhirServerBaseUrl: string;
-  authentication?: IDataAcquisitionAuthenticationConfigModel;
-  queryPlanIds: string[];
+  authentication?: IDataAcquisitionAuthenticationConfigModel | null;
+  timeZone: string,
+  minAcquisitionPullTime?: string
+  maxAcquisitionPullTime?: string,
+  maxConcurrentRequests?: number
 }

@@ -1,10 +1,12 @@
-﻿using LantanaGroup.Link.Account.Application.Commands.AuditEvent;
+﻿using Hl7.Fhir.Utility;
+using LantanaGroup.Link.Account.Application.Commands.AuditEvent;
 using LantanaGroup.Link.Account.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
@@ -20,13 +22,15 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
         private readonly IUserRepository _userRepository;
         private readonly IAccountServiceMetrics _metrics;
         private readonly ICreateAuditEvent _createAuditEvent;
+        private readonly ICacheService _cache;
 
-        public DeleteUser(ILogger<CreateUser> logger, IUserRepository userRepository, IAccountServiceMetrics metrics, ICreateAuditEvent createAuditEvent)
+        public DeleteUser(ILogger<CreateUser> logger, IUserRepository userRepository, ICacheService cache, IAccountServiceMetrics metrics, ICreateAuditEvent createAuditEvent)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
             _createAuditEvent = createAuditEvent ?? throw new ArgumentNullException(nameof(createAuditEvent));
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         }
 
         public async Task<bool> Execute(ClaimsPrincipal? requestor, Guid userId, CancellationToken cancellationToken = default)
@@ -83,6 +87,18 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                 };
 
                 _ = Task.Run(() => _createAuditEvent.Execute(auditMessage, cancellationToken));
+
+                var userKey = "user:" + user.Email;
+
+                try
+                {
+                    _cache.Remove(userKey);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogCacheException(userKey, ex.Message);
+                }
+
 
                 return result;
             }

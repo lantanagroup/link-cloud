@@ -1,57 +1,23 @@
-.sidenav-container {
-  height: 100%;
-}
-
-.sidenav {
-  width: 200px;
-}
-
-.sidenav .mat-toolbar {
-  background: inherit;
-}
-
-.close-menu-icon {
-  margin-right: 0 !important;
-}
-
-.mat-mdc-list-item .mat-icon {
-  margin-right: .5em;
-}
-
-.mat-expansion-panel-header-title {
-}
-
-.mat-expansion-panel-header-title .mat-icon {
-    margin-right: .5em;
-}
+@use "@angular/material" as mat;
 
 .mat-toolbar {
-  //color: #FFFFFF;
-  padding-left: 0;
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  box-shadow: 0 3px 5px -1px #0003, 0 6px 10px #00000024, 0 1px 18px #0000001f;
+  background:#00455D;
 }
 
-.toolbar-divider {
-  padding-left: .75em;
-}
-
-.toggle-menu-btn {
-    
-}
-
-.user-profile {
+.toolbar-icon {
+  height: 24px;
+  margin-right: .5em;
+  width: 24px;
+  vertical-align: middle;
 }
 
 .profile-name {
   vertical-align: super;
 }
 
-/*.profile-icon {
-  vertical-align: text-bottom;
-}*/
+.profile-icon {
+  color: #fff;
+}
 
 .example-spacer {
   flex: 1 1 auto;

@@ -1,7 +1,8 @@
-﻿using LantanaGroup.Link.QueryDispatch.Domain.Entities;
+﻿using AppAny.Quartz.EntityFrameworkCore.Migrations;
+using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
+using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Design;
 using System.Text.Json;
 
 namespace QueryDispatch.Domain.Context;
@@ -21,7 +22,6 @@ public class QueryDispatchDbContext : DbContext
     public DbSet<QueryDispatchConfigurationEntity> QueryDispatchConfigurations { get; set; }
     public DbSet<ScheduledReportEntity> ScheduledReports { get; set; }
     public DbSet<PatientDispatchEntity> PatientDispatches { get; set; }
-    public DbSet<RetryEntity> EventRetries { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -46,12 +46,9 @@ public class QueryDispatchDbContext : DbContext
                 v => JsonSerializer.Deserialize<List<DispatchSchedule>>(v, new JsonSerializerOptions())
             );
 
-        modelBuilder.Entity<RetryEntity>()
-            .Property(b => b.Headers)
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions())
-            );
+
+        // Adds Quartz.NET SqlServer schema to EntityFrameworkCore
+        modelBuilder.AddQuartz(builder => builder.UseSqlServer());
     }
 
     //--------------------IMPORTANT--------------------
@@ -61,14 +58,14 @@ public class QueryDispatchDbContext : DbContext
     //dotnet ef migrations add <NAME OF MIGRATION>
     //dotnet ef database update
 
-    public class QueryDispatchDbContextFactory : IDesignTimeDbContextFactory<QueryDispatchDbContext>
-    {
-        public QueryDispatchDbContext CreateDbContext(string[] args)
-        {
-            var optionsBuilder = new DbContextOptionsBuilder<QueryDispatchDbContext>();
-            optionsBuilder.UseSqlServer("");
+    //public class QueryDispatchDbContextFactory : IDesignTimeDbContextFactory<QueryDispatchDbContext>
+    //{
+    //    public QueryDispatchDbContext CreateDbContext(string[] args)
+    //    {
+    //        var optionsBuilder = new DbContextOptionsBuilder<QueryDispatchDbContext>();
+    //        optionsBuilder.UseSqlServer("");
 
-            return new QueryDispatchDbContext(optionsBuilder.Options);
-        }
-    }
+    //        return new QueryDispatchDbContext(optionsBuilder.Options);
+    //    }
+    //}
 }

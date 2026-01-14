@@ -1,10 +1,12 @@
-import { HttpClient } from "@angular/common/http";
-import { Injectable } from "@angular/core";
-import { UserClaims, UserProfile } from "../../models/user-pofile.model";
-import { AppConfigService } from "../app-config.service";
-import { ErrorHandlingService } from "../error-handling.service";
-import { UserProfileService } from "../user-profile.service";
-import { join as pathJoin } from '@fireflysemantics/join';
+import {HttpClient} from "@angular/common/http";
+import {Injectable} from "@angular/core";
+import {UserProfile} from "../../models/user-pofile.model";
+import {AppConfigService} from "../app-config.service";
+import {UserProfileService} from "../user-profile.service";
+import {join as pathJoin} from '@fireflysemantics/join';
+import {OAuthService} from "angular-oauth2-oidc";
+import {firstValueFrom} from "rxjs/internal/firstValueFrom";
+
 
 @Injectable({
   providedIn: 'root'
@@ -13,47 +15,43 @@ import { join as pathJoin } from '@fireflysemantics/join';
 export class AuthenticationService {
   userProfile!: UserProfile;
 
-
-
-  constructor(private http: HttpClient, private profileService: UserProfileService, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
-
-  loadUser() {
-    this.http.get<UserProfile>(`${this.appConfigService.config?.baseApiUrl}/user`, { withCredentials: true })
-      .subscribe((response: UserProfile) => {
-        this.userProfile = new UserProfile(
-          response.email,
-          response.firstName,
-          response.lastName,
-          response.roles,
-          response.permissions
-        );
-        this.profileService.setProfile(this.userProfile);
-      });
+  constructor(private http: HttpClient, private profileService: UserProfileService, public appConfigService: AppConfigService, private oauthService: OAuthService) {
   }
 
-  async isLoginRequired(): Promise<boolean> {
-    return new Promise((resolve, reject) => {
-      const testUrl = pathJoin(this.appConfigService.config?.baseApiUrl || '/api', 'login');
-      // If options was successful, the /api/login endpoint is available and must be used
-      this.http.get(testUrl).subscribe(() => {
-        resolve(true);
-      }, (error) => {
-        if(error.status == 404) {
-          resolve(false);
-        }
-        else{
-          resolve(true);
-        }
-      });
-    });
+  async loadProfile(): Promise<UserProfile | null> {
+    const response: UserProfile = await firstValueFrom(this.http.get<UserProfile>(`${this.appConfigService.config?.baseApiUrl}/user`, {withCredentials: true}));
+
+    this.userProfile = new UserProfile(
+      response.email,
+      response.firstName,
+      response.lastName,
+      response.roles,
+      response.permissions
+    );
+    this.profileService.setProfile(this.userProfile);
+
+    return this.userProfile;
   }
 
-  login() {
-    window.location.href = pathJoin(this.appConfigService.config?.baseApiUrl || '/api', 'login');
+  async login() {
+    if (this.appConfigService.config?.oauth2?.enabled) {
+      await this.oauthService.tryLogin();
+
+      if (!this.oauthService.hasValidAccessToken()) {
+        this.oauthService.initCodeFlow();
+      }
+    } else {
+      window.location.href = pathJoin(this.appConfigService.config?.baseApiUrl || '/api', 'login');
+    }
   }
 
   logout() {
-    window.location.href = pathJoin(this.appConfigService.config?.baseApiUrl || '/api', 'logout');
+    this.profileService.clearProfile();
+    if (this.appConfigService.config?.oauth2?.enabled) {
+      // this.oauthService.logOut();
+    } else {
+      window.location.href = pathJoin(this.appConfigService.config?.baseApiUrl || '/api', 'logout');
+    }
   }
 
 }

@@ -1,5 +1,5 @@
-﻿using AngleSharp.Css.Values;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Models;
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Models;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
 {
@@ -32,7 +32,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         /// The Delay for the report period
         /// </summary>
         public string Delay { get; set; } = string.Empty;
-  
+
+        public string reportTrackingId { get; set; } = string.Empty;
+
     }
 
     public class ReportScheduledMessage
@@ -59,6 +61,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         /// </summary>
         /// <example>Daily</example>
         public string Frequency { get; set;}
+
+        public string ReportTrackingId { get; set; } = string.Empty;
     }
 
     public class ReportScheduledKey

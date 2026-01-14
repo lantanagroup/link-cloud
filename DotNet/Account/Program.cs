@@ -25,6 +25,7 @@ using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Middleware;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Settings;
@@ -34,7 +35,6 @@ using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Compliance.Classification;
 using Microsoft.Extensions.Compliance.Redaction;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.OpenApi.Models;
 using Serilog;
 using Serilog.Enrichers.Span;
@@ -57,42 +57,20 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
+    // load external configuration source (if specified)
+    builder.AddExternalConfiguration(AccountConstants.ServiceName);
+    
     //Initialize activity source
-    var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
-    ServiceActivitySource.Initialize(version);
-
-    //load external configuration source if specified
-    var externalConfigurationSource = builder.Configuration.GetSection(AccountConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
-    if (!string.IsNullOrEmpty(externalConfigurationSource))
-    {
-        switch (externalConfigurationSource)
-        {
-            case ("AzureAppConfiguration"):
-                builder.Configuration.AddAzureAppConfiguration(options =>
-                {
-                    options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
-                            // Load configuration values with no label
-                            .Select("*", LabelFilter.Null)
-                            // Load configuration values for service name
-                            .Select("*", AccountConstants.ServiceName)
-                            // Load configuration values for service name and environment
-                            .Select("*", AccountConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
-
-                    options.ConfigureKeyVault(kv =>
-                    {
-                        kv.SetCredential(new DefaultAzureCredential());
-                    });
-
-                });
-                break;
-        }
-    }
+    var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+    var serviceInfoConfigSection = builder.Configuration.GetRequiredSection(ServiceInformation.SectionName);
+    var serviceInfo = ServiceInformation.GetServiceInformation(Assembly.GetExecutingAssembly(), builder.Configuration);
+    ServiceActivitySource.Initialize(assemblyVersion, serviceInfo);
 
     //Add problem details
     builder.Services.AddProblemDetailsService(options =>
     {
         options.Environment = builder.Environment;
-        options.ServiceName = AccountConstants.ServiceName;
+        options.ServiceName = serviceInfo?.ServiceName ?? AccountConstants.ServiceName;
         options.IncludeExceptionDetails = builder.Configuration.GetValue<bool>("ProblemDetails:IncludeExceptionDetails");
     });
 
@@ -104,6 +82,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
     builder.Services.Configure<UserManagementSettings>(builder.Configuration.GetSection(AccountConstants.AppSettingsSectionNames.UserManagement));
+    builder.Services.Configure<ServiceInformation>(serviceInfoConfigSection);
 
     //add factories
     builder.Services.AddFactories(kafkaConnection);
@@ -209,8 +188,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, AccountConstants.ServiceName).GetHealthCheckOptions();
 
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database")
-        .AddKafka(kafkaHealthOptions);
+        .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
+        .AddCheck<CacheHealthCheck>(HealthCheckType.Cache.ToString())
+        .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
     // Add tenant API service
     builder.Services.AddHttpClient();
@@ -260,6 +240,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
+        c.DocumentFilter<HealthChecksFilter>();
     });
 
     builder.Services.Configure<JsonOptions>(opt => opt.SerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
@@ -343,8 +324,6 @@ static void SetupMiddleware(WebApplication app)
     app.UseAuthorization();
 
     // Register endpoints
-    app.MapGet("/api/account/info", () => Results.Ok($"Welcome to {ServiceActivitySource.ServiceName} version {ServiceActivitySource.Version}!")).AllowAnonymous();
-
     var apis = app.Services.GetServices<IApi>();
     foreach (var api in apis)
     {
@@ -352,11 +331,12 @@ static void SetupMiddleware(WebApplication app)
         api.RegisterEndpoints(app);
     }
 
-    //map health check middleware
+    //map health check middleware and info endpoint
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     }).RequireCors("HealthCheckPolicy");
+    app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "account");
 }
 
 #endregion

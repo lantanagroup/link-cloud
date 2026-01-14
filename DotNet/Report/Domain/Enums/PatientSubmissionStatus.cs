@@ -1,14 +1,12 @@
-﻿using System.Runtime.Serialization;
-
-namespace LantanaGroup.Link.Report.Domain.Enums;
+﻿namespace LantanaGroup.Link.Report.Domain.Enums;
 
 public enum PatientSubmissionStatus
 {
-    [EnumMember(Value = "NotEvaluated")]
-    NotEvaluated = 1,
-    [EnumMember(Value = "NotReportable")]
+    PendingEvaluation = 1,
     NotReportable = 2,
-    [EnumMember(Value = "ReadyForSubmission")]
-    ReadyForSubmission = 3
+    ReadyForValidation = 3,
+    ValidationRequested = 4,
+    ValidationComplete = 5,
+    Submitted = 6
 }
 

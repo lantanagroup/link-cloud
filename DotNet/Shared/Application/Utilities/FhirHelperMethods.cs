@@ -2,24 +2,26 @@
 
 namespace LantanaGroup.Link.Shared.Application.Utilities
 {
-    public class FhirHelperMethods
+    public static class FhirHelperMethods
     {
-        public static Organization CreateOrganization(string facilityId, string submittingOrganizationProfile, string organizationTypeSystem, string codeIdSystem, string dataAbsentReasonExtensionUrl, string dataAbsentReasonUnknownCode)
+        public static Organization CreateOrganization(string facilityName, string facilityId, string submittingOrganizationProfile, string organizationTypeSystem, string codeIdSystem, string dataAbsentReasonExtensionUrl, string dataAbsentReasonUnknownCode)
         {
-            Organization org = new Organization();
-            org.Meta = new Meta
+            Organization org = new Organization
             {
-                Profile = new string[] { submittingOrganizationProfile }
+                Meta = new Meta
+                {
+                    Profile = [submittingOrganizationProfile]
+                },
+                Active = true,
+                Id = Guid.NewGuid().ToString() // or National Provider Identifier (NPI) from config?
             };
-            org.Active = true;
-            org.Id = Guid.NewGuid().ToString(); // or National Provider Identifier (NPI) from config?
-            org.Type = new List<CodeableConcept>
+            CodeableConcept type = new CodeableConcept()
             {
-                new CodeableConcept(organizationTypeSystem, "prov", "Healthcare Provider", null)
+                Coding = [new Coding(organizationTypeSystem, "prov", "Healthcare Provider")]
             };
+            org.Type = [type];
 
-            //TODO: Replace this placeholder code?
-            org.Name = "EHR Test On Prem"; // should be org name from config?
+            org.Name = facilityName; // should be org name from config?
 
             org.Identifier.Add(new Identifier
             {
@@ -29,23 +31,23 @@ namespace LantanaGroup.Link.Shared.Application.Utilities
 
             // TODO: should phone and email be in config?
             // if phone and email not configured add data absent extension
-            org.Telecom = new List<ContactPoint>
-            {
+            org.Telecom =
+            [
                 new ContactPoint
                 {
-                    Extension = new List<Extension>{ new Extension(dataAbsentReasonExtensionUrl, new Code(dataAbsentReasonUnknownCode) ) }
+                    Extension = [new Extension(dataAbsentReasonExtensionUrl, new Code(dataAbsentReasonUnknownCode))]
                 }
-            };
+            ];
 
             // TODO: should be only if address is in config?
             // if no address configured add data absent extension
-            org.Address = new List<Address>
-            {
+            org.Address =
+            [
                 new Address
                 {
-                    Extension = new List<Extension>{ new Extension(dataAbsentReasonExtensionUrl, new Code(dataAbsentReasonUnknownCode) ) }
+                    Extension = [new Extension(dataAbsentReasonExtensionUrl, new Code(dataAbsentReasonUnknownCode))]
                 }
-            };
+            ];
 
             return org;
         }

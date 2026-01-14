@@ -1,7 +1,8 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
@@ -32,6 +33,7 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
     {
         string facilityId;
         string correlationId;
+        string reportTrackingId;
 
         try
         {
@@ -56,15 +58,16 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
             throw new DeadLetterException("FacilityId is missing from the message key.", ex);
         }
 
-        var scope = _serviceScopeFactory.CreateScope();
+        using var scope = _serviceScopeFactory.CreateScope();
         var patientDataService =
             scope.ServiceProvider.GetRequiredService<IPatientDataService>();
 
-        await patientDataService.Get(new GetPatientDataRequest
+        await patientDataService.CreateLogEntries(new GetPatientDataRequest
         {
             ConsumeResult = consumeResult,
             FacilityId = facilityId,
             CorrelationId = correlationId,
+            QueryPlanType = Enum.Parse<QueryPlanType>(consumeResult.Message.Value.QueryType, true),
         }, cancellationToken);
     }
 
@@ -85,6 +88,7 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
         return facilityId;
     }
 
+    
     protected override string ExtractCorrelationId(ConsumeResult<string, DataAcquisitionRequested> consumeResult)
     {
         var cIBytes = consumeResult.Headers

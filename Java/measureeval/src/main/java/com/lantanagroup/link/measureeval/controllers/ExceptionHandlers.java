@@ -1,17 +1,14 @@
 package com.lantanagroup.link.measureeval.controllers;
 
-import com.lantanagroup.link.measureeval.exceptions.FhirParseException;
-import com.lantanagroup.link.measureeval.exceptions.ValidationException;
-import io.jsonwebtoken.security.SignatureException;
+import com.lantanagroup.link.shared.exceptions.FhirParseException;
+import com.lantanagroup.link.shared.exceptions.ValidationException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;

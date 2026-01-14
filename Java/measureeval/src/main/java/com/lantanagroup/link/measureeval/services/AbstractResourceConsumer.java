@@ -1,199 +1,198 @@
 package com.lantanagroup.link.measureeval.services;
 
-import com.lantanagroup.link.measureeval.entities.AbstractResourceEntity;
 import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
-import com.lantanagroup.link.measureeval.entities.PatientResource;
-import com.lantanagroup.link.measureeval.entities.SharedResource;
-import com.lantanagroup.link.measureeval.exceptions.ValidationException;
-import com.lantanagroup.link.measureeval.kafka.Headers;
-import com.lantanagroup.link.measureeval.kafka.Topics;
-import com.lantanagroup.link.measureeval.models.NormalizationStatus;
-import com.lantanagroup.link.measureeval.models.QueryType;
+import com.lantanagroup.link.measureeval.entities.Resource;
+import com.lantanagroup.link.measureeval.repositories.ResourceRepository;
+import com.lantanagroup.link.shared.exceptions.ValidationException;
+import com.lantanagroup.link.shared.kafka.AsyncListener;
+import com.lantanagroup.link.shared.kafka.Headers;
+import com.lantanagroup.link.shared.kafka.Topics;
+import com.lantanagroup.link.measureeval.entities.QueryType;
 import com.lantanagroup.link.measureeval.records.AbstractResourceRecord;
 import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
-import com.lantanagroup.link.measureeval.records.ResourceEvaluated;
-import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
+import com.lantanagroup.link.shared.utils.DiagnosticNames;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
+import org.apache.commons.collections4.map.PassiveExpiringMap;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.MeasureReport;
-import org.hl7.fhir.r4.model.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.support.KafkaUtils;
+import org.springframework.util.StopWatch;
 
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static io.opentelemetry.api.common.AttributeKey.stringKey;
 
-public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord> {
+public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord> extends AsyncListener<String, T> {
     private static final Logger logger = LoggerFactory.getLogger(AbstractResourceConsumer.class);
-    private final AbstractResourceRepository resourceRepository;
+    private static final Logger performanceLogger =LoggerFactory.getLogger(
+            "com.lantanagroup.link.performance." + AbstractResourceConsumer.class.getSimpleName());
+
+    private final ResourceRepository resourceRepository;
     private final PatientReportingEvaluationStatusRepository patientStatusRepository;
-    private final MeasureEvaluatorCache measureEvaluatorCache;
-    private final MeasureReportNormalizer measureReportNormalizer;
+    private final Map<String, PatientReportingEvaluationStatus> patientStatusCache;
     private final Predicate<MeasureReport> reportabilityPredicate;
     private final MeasureEvalMetrics measureEvalMetrics;
     private final KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate;
-    @Qualifier("compressedKafkaTemplate")
-    private final KafkaTemplate<ResourceEvaluated.Key, ResourceEvaluated> resourceEvaluatedTemplate;
-
-    protected abstract NormalizationStatus getNormalizationStatus ();
+    private final EvaluateMeasureService evaluateMeasureService;
+    private final PatientStatusBundler patientStatusBundler;
+    private final ResourceEvaluatedProducer resourceEvaluatedProducer;
 
     public AbstractResourceConsumer (
-            AbstractResourceRepository resourceRepository,
+            ResourceRepository resourceRepository,
             PatientReportingEvaluationStatusRepository patientStatusRepository,
-            MeasureEvaluatorCache measureEvaluatorCache,
-            MeasureReportNormalizer measureReportNormalizer,
             Predicate<MeasureReport> reportabilityPredicate,
+            MeasureEvalMetrics measureEvalMetrics,
             KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate,
-            @Qualifier("compressedKafkaTemplate")
-            KafkaTemplate<ResourceEvaluated.Key, ResourceEvaluated> resourceEvaluatedTemplate,
-            MeasureEvalMetrics measureEvalMetrics) {
+            EvaluateMeasureService evaluateMeasureService,
+            PatientStatusBundler patientStatusBundler,
+            ResourceEvaluatedProducer resourceEvaluatedProducer,
+            ConsumerRecordRecoverer recoverer) {
+        super(recoverer);
         this.resourceRepository = resourceRepository;
         this.patientStatusRepository = patientStatusRepository;
-        this.measureEvaluatorCache = measureEvaluatorCache;
-        this.measureReportNormalizer = measureReportNormalizer;
+        patientStatusCache = Collections.synchronizedMap(new PassiveExpiringMap<>(1L, TimeUnit.MINUTES));
         this.reportabilityPredicate = reportabilityPredicate;
-        this.dataAcquisitionRequestedTemplate = dataAcquisitionRequestedTemplate;
-        this.resourceEvaluatedTemplate = resourceEvaluatedTemplate;
         this.measureEvalMetrics = measureEvalMetrics;
+        this.dataAcquisitionRequestedTemplate = dataAcquisitionRequestedTemplate;
+        this.evaluateMeasureService = evaluateMeasureService;
+        this.patientStatusBundler = patientStatusBundler;
+        this.resourceEvaluatedProducer = resourceEvaluatedProducer;
     }
 
-    protected void doConsume (String correlationId, ConsumerRecord<String, T> record) {
+    @Override
+    protected void process(ConsumerRecord<String, T> record) {
+        String correlationId = Headers.getCorrelationId(record.headers());
 
-        Span currentSpan = Span.current();
-        MDC.put("traceId", currentSpan.getSpanContext().getTraceId());
-        MDC.put("spanId", currentSpan.getSpanContext().getSpanId());
+        StopWatch totalStopWatch = new StopWatch();
+        StopWatch taskStopWatch = new StopWatch();
+        totalStopWatch.start();
 
-        Attributes attributes = Attributes.builder().put(stringKey("correlationId"), correlationId).build();
-        measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
+        try {
+            Span currentSpan = Span.current();
+            MDC.put("traceId", currentSpan.getSpanContext().getTraceId());
+            MDC.put("spanId", currentSpan.getSpanContext().getSpanId());
 
-        String facilityId = record.key();
+            taskStopWatch.start("incrementRecordCount");
+            Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.CORRELATION_ID), correlationId).build();
+            measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
+            taskStopWatch.stop();
 
-        if (facilityId == null || facilityId.isEmpty()) {
-            logger.error("Facility ID is null or empty. Exiting.");
-            throw new ValidationException("Facility ID is null or empty.");
-        }
-
-        T value = record.value();
-
-        if (value.getResource() == null && !value.isAcquisitionComplete()) {
-            logger.error("Record Resource is null and AcquisitionComplete is false. Exiting.");
-            throw new ValidationException("Record Resource is null and AcquisitionComplete is false.");
-        }
-        if (value.getQueryType() == null) {
-            logger.error("Query Type is null. Exiting.");
-            throw new ValidationException("Query Type is null.");
-        }
-        if (value.getScheduledReports() == null || value.getScheduledReports().isEmpty()) {
-            logger.error("Scheduled Reports is null or empty. Exiting.");
-            throw new ValidationException("Scheduled Reports is null or empty.");
-        }
-        if (value.getReportableEvent() == null) {
-            logger.error("Reportable Event is null or empty. Exiting.");
-            throw new ValidationException("Reportable Event is null or empty.");
-        }
-
-        if (value.isAcquisitionComplete()) {
-            if (logger.isInfoEnabled()) {
-                logger.info("Consuming record: RECORD=[{}] FACILITY=[{}] CORRELATION=[{}] ACQUISITION COMPLETE=[{}]", KafkaUtils.format(record), facilityId, correlationId, value.isAcquisitionComplete());
+            taskStopWatch.start("validateRecord");
+            String facilityId = record.key();
+            if (facilityId == null || facilityId.isEmpty()) {
+                throw new ValidationException("Facility ID is null or empty.");
             }
-            PatientReportingEvaluationStatus patientStatus = Objects.requireNonNullElseGet(retrievePatientStatus(facilityId, correlationId), () -> createPatientStatus(facilityId, correlationId, value));
-            Bundle bundle = createBundle(patientStatus);
-            evaluateMeasures(value, patientStatus, bundle);
-            return;
-        }
-
-        if (logger.isInfoEnabled()) {
-            logger.info("Consuming record: RECORD=[{}] FACILITY=[{}] CORRELATION=[{}] RESOURCE=[{}/{}] ACQUISITION COMPLETE=[{}]", KafkaUtils.format(record), facilityId, correlationId, value.getResourceType(), value.getResourceId(), value.isAcquisitionComplete());
-            logger.info("Beginning resource update");
-        }
-
-        AbstractResourceEntity resource = Objects.requireNonNullElseGet(retrieveResource(facilityId, value), () -> createResource(facilityId, value));
-        resource.setResource(value.getResource());
-        resourceRepository.save(resource);
-
-        if (logger.isInfoEnabled()) {
-            logger.info("Beginning patient status update");
-        }
-        PatientReportingEvaluationStatus patientStatus = Objects.requireNonNullElseGet(retrievePatientStatus(facilityId, correlationId), () -> createPatientStatus(facilityId, correlationId, value));
-
-        if (patientStatus.getPatientId() == null) {
-            if (logger.isDebugEnabled()) {
-                logger.debug("Patient Id is set to : {}", value.getPatientId());
+            T value = record.value();
+            if (value.getResource() == null && !value.isAcquisitionComplete()) {
+                throw new ValidationException("Record Resource is null and AcquisitionComplete is false.");
             }
-            patientStatus.setPatientId(value.getPatientId());
-        }
+            if (value.getQueryType() == null) {
+                throw new ValidationException("Query Type is null.");
+            }
+            if (value.getScheduledReports() == null || value.getScheduledReports().isEmpty()) {
+                throw new ValidationException("Scheduled Reports is null or empty.");
+            }
+            if (value.getReportableEvent() == null) {
+                throw new ValidationException("Reportable Event is null or empty.");
+            }
+            taskStopWatch.stop();
 
-        // add the resource in the PatientReportingEvaluationStatus only if does not exist already
-        PatientReportingEvaluationStatus.Resource existingResource = patientStatus.getResources() == null ? null : patientStatus.getResources().stream().filter(res -> res.getResourceType() == value.getResourceType() && Objects.equals(res.getResourceId(), value.getResourceId())).findFirst().orElse(null);
+            logger.debug(
+                    "Consuming {}: FACILITY=[{}] CORRELATION=[{}] RESOURCE=[{}] TAIL=[{}]",
+                    KafkaUtils.format(record),
+                    facilityId,
+                    correlationId,
+                    value.getResourceTypeAndId(),
+                    value.isAcquisitionComplete());
 
-        if (existingResource == null) {
-            PatientReportingEvaluationStatus.Resource statusResource = new PatientReportingEvaluationStatus.Resource();
-            statusResource.setResourceType(value.getResourceType());
-            statusResource.setResourceId(value.getResourceId());
-            statusResource.setQueryType(value.getQueryType());
-            statusResource.setIsPatientResource(value.isPatientResource());
-            statusResource.setNormalizationStatus(getNormalizationStatus());
-            patientStatus.getResources().add(statusResource);
-            patientStatusRepository.save(patientStatus);
-        }
-        else {
-            String resourceKey =  value.getResourceType() + ":" + value.getResourceId();
-            logger.error("Duplicate resource: {}", resourceKey);
-            throw new ValidationException("Duplicate resource: " + resourceKey);
+            logger.trace("Beginning patient status update");
+
+            PatientReportingEvaluationStatus patientStatus = patientStatusCache.computeIfAbsent(correlationId, key -> {
+                taskStopWatch.start("retrieveOrCreatePatientStatus");
+                PatientReportingEvaluationStatus _patientStatus = Objects.requireNonNullElseGet(
+                        retrievePatientStatus(facilityId, correlationId),
+                        () -> createPatientStatus(facilityId, correlationId, value));
+                taskStopWatch.stop();
+
+                return _patientStatus;
+            });
+
+            if (patientStatus.getPatientId() == null) {
+                logger.trace("Setting patient status patient ID: {}", value.getPatientId());
+                patientStatus.setPatientId(value.getPatientId());
+
+                taskStopWatch.start("setPatientStatusPatientId");
+                patientStatus = patientStatusRepository.setPatientId(patientStatus);
+                taskStopWatch.stop();
+
+                patientStatusCache.put(correlationId, patientStatus);
+            }
+
+            if (value.isAcquisitionComplete()) {
+                logger.trace("Beginning measure evaluation");
+
+                taskStopWatch.start("createBundle");
+                Bundle bundle = patientStatusBundler.createBundle(facilityId, correlationId);
+                taskStopWatch.stop();
+
+                taskStopWatch.start("evaluateMeasures");
+                evaluateMeasures(value, patientStatus, bundle);
+                taskStopWatch.stop();
+
+                return;
+            }
+
+            logger.trace("Beginning resource update");
+
+            taskStopWatch.start("upsertResource");
+            upsertResource(facilityId, correlationId, value);
+            taskStopWatch.stop();
+        } finally {
+            totalStopWatch.stop();
+            for (StopWatch.TaskInfo task : taskStopWatch.getTaskInfo()) {
+                performanceLogger.trace("{}: {} ns", task.getTaskName(), task.getTimeNanos());
+            }
+            performanceLogger.trace("SUM_OF_TASKS: {} ns", taskStopWatch.getTotalTimeNanos());
+            performanceLogger.trace("TOTAL: {} ns", totalStopWatch.getTotalTimeNanos());
         }
     }
 
-    private AbstractResourceEntity retrieveResource (String facilityId, T value) {
-        if (logger.isDebugEnabled()) {
-            logger.debug("Retrieving resource from database");
-        }
-        return resourceRepository.findOne(facilityId, value);
-    }
-
-    private AbstractResourceEntity createResource (String facilityId, T value) {
-        if (logger.isDebugEnabled()) {
-            logger.debug("Resource not found; creating");
-        }
-        AbstractResourceEntity resource;
-        if (value.isPatientResource()) {
-            PatientResource patientResource = new PatientResource();
-            patientResource.setPatientId(value.getPatientId());
-            resource = patientResource;
-        } else {
-            resource = new SharedResource();
-        }
+    private Resource upsertResource (String facilityId, String correlationId, T value) {
+        logger.trace("Upserting resource in database");
+        Resource resource = new Resource();
         resource.setFacilityId(facilityId);
+        resource.setCorrelationId(correlationId);
+        resource.setPatientId(value.getPatientId());
         resource.setResourceType(value.getResourceType());
         resource.setResourceId(value.getResourceId());
-        return resource;
+        resource.setResource(value.getResource());
+        return resourceRepository.upsert(resource);
     }
 
     private PatientReportingEvaluationStatus retrievePatientStatus (String facilityId, String correlationId) {
-        if (logger.isDebugEnabled()) {
-            logger.debug("Retrieving patient status from database");
-        }
-        return patientStatusRepository.findOne(facilityId, correlationId).orElse(null);
+        logger.trace("Retrieving patient status from database");
+        return patientStatusRepository.findByFacilityIdAndCorrelationId(facilityId, correlationId).orElse(null);
     }
 
     private PatientReportingEvaluationStatus createPatientStatus (String facilityId, String correlationId, T value) {
-        if (logger.isDebugEnabled()) {
-            logger.debug("Patient status not found; creating");
-        }
+        logger.trace("Patient status not found; creating");
         PatientReportingEvaluationStatus patientStatus = new PatientReportingEvaluationStatus();
         patientStatus.setFacilityId(facilityId);
         patientStatus.setCorrelationId(correlationId);
+        patientStatus.setPatientId(value.getPatientId());
         patientStatus.setReportableEvent(value.getReportableEvent().toString());
         patientStatus.setReports(value.getScheduledReports().stream()
                 .flatMap(scheduledReport -> Arrays.stream(scheduledReport.getReportTypes())
@@ -203,58 +202,23 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                             report.setFrequency(scheduledReport.getFrequency());
                             report.setStartDate(scheduledReport.getStartDate());
                             report.setEndDate(scheduledReport.getEndDate());
+                            report.setReportTrackingId(scheduledReport.getReportTrackingId());
                             return report;
                         })
                 ).collect(Collectors.toList()));
-        return patientStatus;
-    }
-
-    private Bundle createBundle (PatientReportingEvaluationStatus patientStatus) {
-        if (logger.isDebugEnabled()) {
-            logger.debug("Creating bundle");
-        }
-        Bundle bundle = new Bundle();
-        bundle.setType(Bundle.BundleType.COLLECTION);
-        retrieveResources(patientStatus).stream()
-                .map(AbstractResourceEntity::getResource)
-                .map(Resource.class::cast)
-                .forEachOrdered(resource -> bundle.addEntry().setResource(resource));
-        return bundle;
-    }
-
-    private List<AbstractResourceEntity> retrieveResources (PatientReportingEvaluationStatus patientStatus) {
-        if (logger.isDebugEnabled()) {
-            logger.debug("Retrieving resources");
-        }
-
-        Set<Map.Entry<String, String>> singles = new HashSet<>();
-
-        return patientStatus.getResources().stream()
-                .filter(resource -> resource.getNormalizationStatus() == NormalizationStatus.NORMALIZED)
-                .filter(resource -> singles.add(new AbstractMap.SimpleEntry<>(resource.getResourceType().toString(), resource.getResourceId())))
-                .map(resource -> retrieveResource(patientStatus.getFacilityId(), resource))
-                .toList();
-    }
-
-    private AbstractResourceEntity retrieveResource (
-            String facilityId,
-            PatientReportingEvaluationStatus.Resource resource) {
-        logger.trace("Retrieving resource: {}/{}", resource.getResourceType(), resource.getResourceId());
-        return resourceRepository.findOne(facilityId, resource);
+        return patientStatusRepository.insert(patientStatus);
     }
 
     private void evaluateMeasures (T value, PatientReportingEvaluationStatus patientStatus, Bundle bundle) {
-        if (logger.isDebugEnabled()) {
-            logger.debug("Evaluating measures");
-        }
+        logger.debug("Evaluating measures");
         for (PatientReportingEvaluationStatus.Report report : patientStatus.getReports()) {
-            MeasureReport measureReport = evaluateMeasure(value.getQueryType().toString(), patientStatus, report, bundle);
+            MeasureReport measureReport = evaluateMeasureService.evaluateMeasure(value.getQueryType().toString(), patientStatus, report, bundle);
             switch (value.getQueryType()) {
                 case INITIAL -> {
                     updateReportability(patientStatus, report, measureReport);
-                    produceResourceEvaluatedRecords(value.getQueryType(), patientStatus, report, measureReport);
+                    resourceEvaluatedProducer.produceResourceEvaluatedRecords(value.getQueryType(), patientStatus, report, measureReport);
                 }
-                case SUPPLEMENTAL -> produceResourceEvaluatedRecords(value.getQueryType(), patientStatus, report, measureReport);
+                case SUPPLEMENTAL -> resourceEvaluatedProducer.produceResourceEvaluatedRecords(value.getQueryType(), patientStatus, report, measureReport);
                 default -> throw new IllegalStateException(String.format("Unexpected query type: %s", value.getQueryType()));
             }
         }
@@ -272,65 +236,15 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     private void updatePatientMetrics (T value, PatientReportingEvaluationStatus patientStatus, boolean reportablePatient) {
 
         if (value.getQueryType() == QueryType.INITIAL) {
-            Attributes attributes = Attributes.builder().put(stringKey("facilityId"), patientStatus.getFacilityId()).
-                    put(stringKey("patientId"), patientStatus.getPatientId()).
-                    put(stringKey("correlationId"), patientStatus.getCorrelationId()).build();
+            Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.FACILITY_ID), patientStatus.getFacilityId()).
+                    put(stringKey(DiagnosticNames.PATIENT_ID), patientStatus.getPatientId()).
+                    put(stringKey(DiagnosticNames.CORRELATION_ID), patientStatus.getCorrelationId()).build();
             if (reportablePatient) {
                 measureEvalMetrics.IncrementPatientReportableCounter(attributes);
             } else {
                 measureEvalMetrics.IncrementPatientNonReportableCounter(attributes);
             }
         }
-    }
-
-    private MeasureReport evaluateMeasure (
-            String queryType,
-            PatientReportingEvaluationStatus patientStatus,
-            PatientReportingEvaluationStatus.Report report,
-            Bundle bundle) {
-
-        long start = System.currentTimeMillis();
-
-        String measureId = report.getReportType();
-        if (logger.isDebugEnabled()) {
-            logger.debug("Evaluating measure: {}", measureId);
-        }
-        MeasureEvaluator measureEvaluator = measureEvaluatorCache.get(measureId);
-        if (measureEvaluator == null) {
-            throw new IllegalStateException(String.format("Unknown measure: %s", measureId));
-        }
-        MeasureReport measureReport = measureEvaluator.evaluate(
-                report.getStartDate(),
-                report.getEndDate(),
-                patientStatus.getPatientId(),
-                bundle);
-        if (logger.isDebugEnabled()) {
-            logger.debug("Population counts: {}", measureReport.getGroup().stream()
-                    .flatMap(group -> group.getPopulation().stream())
-                    .map(population -> String.format(
-                            "%s=[%d]",
-                            population.getCode().getCodingFirstRep().getCode(),
-                            population.getCount()))
-                    .collect(Collectors.joining(" ")));
-        }
-
-        long timeElapsed = System.currentTimeMillis() - start;
-        Attributes attributes = Attributes.builder().put(stringKey("facilityId"), patientStatus.getFacilityId()).
-                put(stringKey("patientId"), patientStatus.getPatientId()).
-                put(stringKey("reportTypes"), report.getReportType()).
-                put(stringKey("frequency"), report.getFrequency()).
-                put(stringKey("startDate"), report.getStartDate().toString()).
-                put(stringKey("endDate"), report.getEndDate().toString()).
-                put(stringKey("queryType"), queryType).
-                put(stringKey("correlationId"), patientStatus.getCorrelationId()).build();
-        if (logger.isInfoEnabled()) {
-            logger.info("Measure evaluation duration for Patient {} on {} query: {}", patientStatus.getPatientId(), queryType, timeElapsed + " milliseconds");
-        }
-
-        // Record the duration of the evaluation
-        measureEvalMetrics.MeasureEvalDuration(timeElapsed, attributes);
-
-        return measureReport;
     }
 
     private void updateReportability (
@@ -341,67 +255,10 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         patientStatusRepository.save(patientStatus);
     }
 
-    private void produceResourceEvaluatedRecords (
-            QueryType phase,
-            PatientReportingEvaluationStatus patientStatus,
-            PatientReportingEvaluationStatus.Report report,
-            MeasureReport measureReport) {
 
-        if (logger.isDebugEnabled()) {
-            logger.debug("Producing {} records", Topics.RESOURCE_EVALUATED);
-        }
-
-        var list = measureReportNormalizer.normalize(measureReport);
-
-        if (phase == QueryType.INITIAL && !report.getReportable()) { // produce Evaluated Resource the Initial phase only if the measure is not reportable
-            list.stream().filter(resource -> resource instanceof MeasureReport).findFirst().ifPresent(measure -> produceResourceEvaluatedRecord(patientStatus, report, measure.getIdPart(), measure));
-        }  else if (phase == QueryType.SUPPLEMENTAL && report.getReportable())  { //produce Evaluated Resource only on the Supplemental phase if the measure is reportable
-            for (Resource resource : list) {
-                produceResourceEvaluatedRecord(patientStatus, report, measureReport.getIdPart(), resource);
-            }
-        }
-
-
-    }
-
-    private void produceResourceEvaluatedRecord (
-            PatientReportingEvaluationStatus patientStatus,
-            PatientReportingEvaluationStatus.Report report,
-            String measureReportId,
-            Resource resource) {
-
-        if (logger.isTraceEnabled()) {
-            logger.trace(
-                    "Producing {} record: {}/{}",
-                    Topics.RESOURCE_EVALUATED, resource.getResourceType(), resource.getIdPart());
-        }
-        ResourceEvaluated.Key key = new ResourceEvaluated.Key();
-        key.setFacilityId(patientStatus.getFacilityId());
-        key.setStartDate(report.getStartDate());
-        key.setEndDate(report.getEndDate());
-        key.setFrequency(report.getFrequency());
-        ResourceEvaluated value = new ResourceEvaluated();
-        value.setMeasureReportId(measureReportId);
-        value.setPatientId(patientStatus.getPatientId());
-        value.setResource(resource);
-        value.setReportType(report.getReportType());
-        value.setIsReportable(report.getReportable());
-
-        org.apache.kafka.common.header.Headers headers = new RecordHeaders()
-                .add(Headers.CORRELATION_ID, Headers.getBytes(patientStatus.getCorrelationId()));
-
-        resourceEvaluatedTemplate.send(new ProducerRecord<>(
-                Topics.RESOURCE_EVALUATED,
-                null,
-                key,
-                value,
-                headers));
-    }
 
     private void produceDataAcquisitionRequestedRecord (T value, PatientReportingEvaluationStatus patientStatus) {
-        if (logger.isDebugEnabled()) {
-            logger.debug("Producing {} record", Topics.DATA_ACQUISITION_REQUESTED);
-        }
+        logger.debug("Producing {}", Topics.DATA_ACQUISITION_REQUESTED);
         DataAcquisitionRequested valueDa = new DataAcquisitionRequested();
         valueDa.setPatientId(patientStatus.getPatientId());
         valueDa.setQueryType(QueryType.SUPPLEMENTAL);
@@ -412,6 +269,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             scheduledReportDa.setStartDate(scheduledReport.getStartDate());
             scheduledReportDa.setEndDate(scheduledReport.getEndDate());
             scheduledReportDa.setFrequency(scheduledReport.getFrequency());
+            scheduledReportDa.setReportTrackingId(scheduledReport.getReportTrackingId());
             valueDa.getScheduledReports().add(scheduledReportDa);
         });
         org.apache.kafka.common.header.Headers headers = new RecordHeaders().add(Headers.CORRELATION_ID, Headers.getBytes(patientStatus.getCorrelationId()));

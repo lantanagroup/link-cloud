@@ -1,23 +1,31 @@
-import { Injectable } from '@angular/core';
-import { ErrorHandlingService } from '../../error-handling.service';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { IFacilityConfigModel, IScheduledTaskModel, PagedFacilityConfigModel } from 'src/app/interfaces/tenant/facility-config-model.interface';
-import { Observable, catchError, map, tap, of } from 'rxjs';
-import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
-import { AppConfigService } from '../../app-config.service';
+import {Injectable} from '@angular/core';
+import {ErrorHandlingService} from '../../error-handling.service';
+import {HttpClient, HttpErrorResponse, HttpHeaders, HttpParams} from '@angular/common/http';
+import {
+  IAdHocReportRequest,
+  IFacilityConfigModel,
+  IScheduledReportModel,
+  PagedFacilityConfigModel
+} from 'src/app/interfaces/tenant/facility-config-model.interface';
+import {Observable, catchError, map, tap, of} from 'rxjs';
+import {IEntityCreatedResponse} from 'src/app/interfaces/entity-created-response.model';
+import {AppConfigService} from '../../app-config.service';
+import {IEntityDeletedResponse} from "../../../interfaces/entity-deleted-response.interface";
 
 @Injectable({
   providedIn: 'root'
 })
 export class TenantService {
-  constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
+  constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) {
+  }
 
 
-  createFacility(facilityId: string, facilityName: string, scheduledTasks: IScheduledTaskModel[]): Observable<IEntityCreatedResponse> {
+  createFacility(facilityId: string, facilityName: string, timeZone: string, scheduledReports: IScheduledReportModel): Observable<IEntityCreatedResponse> {
     let facility: IFacilityConfigModel = {
       facilityId: facilityId,
       facilityName: facilityName,
-      scheduledTasks: scheduledTasks
+      timeZone: timeZone,
+      scheduledReports: scheduledReports
     };
 
     return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/facility`, facility)
@@ -30,21 +38,32 @@ export class TenantService {
       )
   }
 
-  updateFacility(id: string, facilityId: string, facilityName: string, scheduledTasks: IScheduledTaskModel[]): Observable<IEntityCreatedResponse> {
+  updateFacility(id: string, facilityId: string, facilityName: string, timeZone: string, scheduledReports: IScheduledReportModel): Observable<IEntityCreatedResponse> {
     let facility: IFacilityConfigModel = {
       id: id,
       facilityId: facilityId,
       facilityName: facilityName,
-      scheduledTasks: scheduledTasks
+      timeZone: timeZone,
+      scheduledReports: scheduledReports
     };
 
-    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/facility/${id}`, facility)
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/facility/${facilityId}`, facility)
       .pipe(
         tap(_ => console.log(`Request for facility update was sent.`)),
         map((response: IEntityCreatedResponse) => {
           return response;
         }),
         catchError((error) => this.errorHandler.handleError(error))
+      )
+  }
+
+  deleteFacilityConfiguration(facilityId: string): Observable<IEntityDeletedResponse> {
+    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/facility/${facilityId}`)
+      .pipe(
+        tap(_ => console.log(`Delete Facility configuration.`)),
+        catchError((error) => {
+          return this.errorHandler.handleError(error);
+        })
       )
   }
 
@@ -61,21 +80,82 @@ export class TenantService {
     return this.http.get<boolean>(`${this.appConfigService.config?.baseApiUrl}/facility/${facilityId}`)
       .pipe(
         catchError(() => of(false)) // Return false if there's an error
-    );
+      );
+  }
+
+  getAllFacilities(): Observable<Record<string, string>> {
+    return this.http.get<Record<string, string>>(`${this.appConfigService.config?.baseApiUrl}/facility/list`)
+      .pipe(
+        catchError((error) => this.errorHandler.handleError(error))
+      )
+  }
+
+  autocompleteFacilities(search: string | null): Observable<Record<string, string>> {
+    const headers = new HttpHeaders({'X-Skip-Loading': 'true'});
+    const params = new HttpParams().set('search', search || '');
+    return this.http.get<Record<string, string>>(`${this.appConfigService.config?.baseApiUrl}/facility/list`, {
+      headers,
+      params
+    })
+      .pipe(
+        catchError((error) => this.errorHandler.handleError(error))
+      )
   }
 
 
-  listFacilities(facilityId: string, facilityName: string): Observable<PagedFacilityConfigModel> {
-    return this.http.get<PagedFacilityConfigModel>(`${this.appConfigService.config?.baseApiUrl}/facility?facilityId=${facilityId}&facilityName=${facilityName}`)
+  listFacilities(facilityId: string, facilityName: string, sortBy: string, sortOrder: number, pageSize: number, pageNumber: number): Observable<PagedFacilityConfigModel> {
+
+    //javascript based paging is zero based, so increment page number by 1
+    pageNumber = pageNumber + 1;
+
+    const params = new HttpParams()
+      .set('facilityId', facilityId)
+      .set('facilityName', facilityName)
+      .set('sortBy', sortBy)
+      .set('sortOrder', sortOrder)
+      .set('pageSize', pageSize)
+      .set('pageNumber', pageNumber);
+
+    return this.http.get<PagedFacilityConfigModel>(`${this.appConfigService.config?.baseApiUrl}/facility`, {params})
       .pipe(
         tap(_ => console.log(`Fetched facilities.`)),
         map((response: PagedFacilityConfigModel) => {
           //revert back to zero based paging
-          response.metadata.pageNumber--;
+          if (response) {
+            response.metadata.pageNumber--;
+          }
           return response;
         }),
-        catchError(this.handleError)
+        catchError((err) => this.handleError(err))
       )
+  }
+
+  generateAdHocReport(facilityId: string, adHocReportRequest: IAdHocReportRequest) {
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/Facility/${facilityId}/AdHocReport`, adHocReportRequest)
+      .pipe(
+        tap(_ => console.log(`Request for adHoc reporting was sent.`)),
+        map((response: any) => {
+          return response;
+        }),
+        catchError((error) => this.errorHandler.handleError(error))
+      )
+  }
+
+  regenerateReport(facilityId: string, reportId: string, bypassSubmission?: boolean) {
+    // Include bypassValue if provided
+    const adHocReportRequest: any = {reportId};
+    if (bypassSubmission) {
+      adHocReportRequest.bypassSubmission = bypassSubmission;
+    }
+
+    return this.http.post<IEntityCreatedResponse>(
+      `${this.appConfigService.config?.baseApiUrl}/Facility/${facilityId}/RegenerateReport`,
+      adHocReportRequest
+    ).pipe(
+      tap(_ => console.log(`Request to regenerate report was sent.`)),
+      map((response: any) => response),
+      catchError((error) => this.errorHandler.handleError(error))
+    );
   }
 
   private handleError(err: HttpErrorResponse) {

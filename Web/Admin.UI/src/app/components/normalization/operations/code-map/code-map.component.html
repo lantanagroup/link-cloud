@@ -1,0 +1,241 @@
+<mat-card-content>
+
+  @if (errorMessage) {
+    <div class="error-snackbar" #errorDiv>
+      <mat-icon color="warn">error</mat-icon>
+      {{ errorMessage }}
+    </div>
+  }
+  <form [formGroup]="form" class="operation-form">
+    <h2 class="section-title">Operation Details</h2>
+    <!-- Facility Id -->
+    @if (!isVendorMode) {
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Facility ID</mat-label>
+        <input matInput formControlName="facilityId" disabled/>
+      </mat-form-field>
+    }
+
+    <!-- Vendor Id -->
+    @if (isVendorMode) {
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Select Vendor</mat-label>
+        <mat-select formControlName="selectedVendor" [disabled]="viewOnly" multiple>
+          @for (vendor of vendors; track vendor) {
+            <mat-option [value]="vendor.id">{{ vendor.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
+
+    @if (showFacilityOrVendorError) {
+      <div class="validation-error">
+        Vendor is <strong>required</strong>
+      </div>
+    }
+
+    <!-- Name -->
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Name</mat-label>
+      <input matInput formControlName="name" [readonly]="viewOnly"/>
+      @if (!viewOnly && nameControl.value) {
+        <button matSuffix mat-icon-button (click)="clearName()"
+          aria-label="Clear name">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+      @if (nameControl?.hasError('required') && (nameControl.touched || nameControl.dirty)) {
+        <mat-error>
+          Name is <strong>required</strong>
+        </mat-error>
+      }
+    </mat-form-field>
+
+    <!-- Description -->
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Description</mat-label>
+      <textarea matInput formControlName="description" rows="3" [readonly]="viewOnly"></textarea>
+      @if (!viewOnly && descriptionControl.value) {
+        <button matSuffix mat-icon-button (click)="clearDescription()"
+          aria-label="Clear description">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+    </mat-form-field>
+
+    <!-- Resource Types -->
+    @if (selectedResourceTypesControl.value?.length > 0) {
+      <div class="selected-resource-types">
+        <strong>Selected Resource Types: </strong> {{ selectedResourceTypesControl.value.join(', ') }}
+      </div>
+    }
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Select Resource Types</mat-label>
+      <input
+        matInput
+        placeholder="Start typing to search"
+        [formControl]="resourceTypeControl"
+        [matAutocomplete]="auto"
+        (keydown)="onInputKeydown($event)"
+        (mousedown)="userClicked = true"
+        [readonly]="viewOnly"
+        (focus)="openAutocompletePanel()"
+        />
+
+        <mat-autocomplete #auto="matAutocomplete" autoActiveFirstOption="">
+          @for (type of filteredResourceTypes; track type) {
+            <mat-option [value]="type">
+              <mat-checkbox [checked]="selectedResourceTypesControl.value?.includes(type)"
+                (click)="$event.stopPropagation()"
+                (change)="toggleSelection(type, $event.source.checked)">
+                {{ type }}
+              </mat-checkbox>
+            </mat-option>
+          }
+        </mat-autocomplete>
+      </mat-form-field>
+
+      @if (selectedResourceTypesControl.hasError('required')  &&  (resourceTypeControl.touched || resourceTypeControl.dirty )) {
+        <div class="validation-error">
+          Resource Type is <strong>required</strong>
+        </div>
+      }
+
+      <!-- FHIR Path -->
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>FHIR Path</mat-label>
+        <input matInput formControlName="fhirPath" [readonly]="viewOnly"/>
+        @if (!viewOnly && fhirPathControl.value) {
+          <button matSuffix mat-icon-button (click)="clearFhirPath()"
+            aria-label="Clear description">
+            <mat-icon>close</mat-icon>
+          </button>
+        }
+        @if (fhirPathControl.hasError('required') && (fhirPathControl.dirty || fhirPathControl.touched)) {
+          <mat-error>
+            FHIR Path is <strong>required</strong></mat-error>
+          }
+        </mat-form-field>
+
+        <!-- Code System Maps Section -->
+        <h2 class="section-title">Code System Maps</h2>
+
+        <div formArrayName="codeSystemMaps" class="code-system-maps">
+          @for (csMap of codeSystemMaps.controls; track csMap; let i = $index) {
+            <div [formGroupName]="i"
+              class="code-system-map-group">
+              <mat-card class="code-system-card">
+                <mat-card-header class="card-header-flex">
+                  <mat-card-title class="code-map-title">Code System Map {{ i + 1 }}</mat-card-title>
+                  <span class="spacer"></span>
+                  @if (!viewOnly) {
+                    <button mat-icon-button color="warn" (click)="removeCodeSystemMap(i)"
+                      aria-label="Remove map">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  }
+                </mat-card-header>
+                <mat-card-content>
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Source System</mat-label>
+                    <input matInput formControlName="sourceSystem" [readonly]="viewOnly"/>
+                    @if (csMap.get('sourceSystem')?.hasError('required') && (csMap.get('sourceSystem')?.dirty || csMap.get('sourceSystem')?.touched)) {
+                      <mat-error
+                        >
+                        Source System is required
+                      </mat-error>
+                    }
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Target System</mat-label>
+                    <input matInput formControlName="targetSystem" [readonly]="viewOnly"/>
+                    @if (csMap.get('targetSystem')?.hasError('required') && (csMap.get('targetSystem')?.dirty || csMap.get('targetSystem')?.touched)) {
+                      <mat-error
+                        >
+                        Target System is required
+                      </mat-error>
+                    }
+                  </mat-form-field>
+                  <div formArrayName="codeMaps" class="code-maps indent-code-map code-map-block">
+                    @for (codeMapCtrl of codeMapsAt(i).controls; track codeMapCtrl; let j = $index) {
+                      <div [formGroupName]="j"
+                        class="code-map-entry-flex">
+                        <!-- Code Map Title -->
+                        <h4 class="code-map-title">Code Map {{ j + 1 }}</h4>
+                        <mat-form-field appearance="outline" class="key-field">
+                          <mat-label>Source Code</mat-label>
+                          <input matInput formControlName="key" [readonly]="viewOnly"/>
+                          @if (codeMapCtrl.get('key')?.hasError('required') && (codeMapCtrl.get('key')?.dirty || codeMapCtrl.get('key')?.touched)) {
+                            <mat-error
+                              >
+                              Source Code is required
+                            </mat-error>
+                          }
+                        </mat-form-field>
+                        <div formGroupName="value" class="value-group">
+                          <mat-form-field appearance="outline" class="code-field">
+                            <mat-label>Target Code</mat-label>
+                            <input matInput formControlName="code" [readonly]="viewOnly"/>
+                            @if (codeMapCtrl.get('value.code')?.hasError('required') && (codeMapCtrl.get('value.code')?.dirty || codeMapCtrl.get('value.code')?.touched)) {
+                              <mat-error
+                                >
+                                Target Code is required
+                              </mat-error>
+                            }
+                          </mat-form-field>
+                          <mat-form-field appearance="outline" class="display-field">
+                            <mat-label>Display</mat-label>
+                            <input matInput formControlName="display" [readonly]="viewOnly"/>
+                            @if (codeMapCtrl.get('value.display')?.hasError('required') && (codeMapCtrl.get('value.display')?.dirty || codeMapCtrl.get('value.display')?.touched)) {
+                              <mat-error
+                                >
+                                Display is required
+                              </mat-error>
+                            }
+                          </mat-form-field>
+                        </div>
+                        <span class="spacer"></span>
+                        @if (!viewOnly) {
+                          <button
+                            mat-icon-button
+                            color="warn"
+                            aria-label="Remove code map entry"
+                            (click)="removeCodeMap(i, j)">
+                            <mat-icon>delete</mat-icon>
+                          </button>
+                        }
+                      </div>
+                    }
+                    @if (codeMapsAt(i).hasError('atLeastOneRequired')) {
+                      <div class="validation-error">
+                        At least one code map is required.
+                      </div>
+                    }
+                  </div>
+                  <div class="code-map-btn">
+                    <button type="button" mat-raised-button color="primary" (click)="addCodeMap(i)">
+                      Add Code Map
+                    </button>
+                  </div>
+                </mat-card-content>
+              </mat-card>
+            </div>
+          }
+        </div>
+
+        <div class="code-system-map-btn">
+          <button type="button" mat-raised-button color="accent" (click)="addCodeSystemMap()">
+            Add Code System Map
+          </button>
+        </div>
+
+        @if (form.get('codeSystemMaps')?.hasError('atLeastOneRequired')) {
+          <div class="validation-error">
+            At least code system map is required.
+          </div>
+        }
+        <!-- Enable/Disable checkbox -->
+        <mat-checkbox formControlName="isEnabled">Enabled</mat-checkbox>
+      </form>
+    </mat-card-content>

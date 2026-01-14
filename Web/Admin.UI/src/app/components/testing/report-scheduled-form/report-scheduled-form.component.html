@@ -7,28 +7,34 @@
     <mat-form-field class="form-select" appearance="outline">
       <mat-label>Report Type</mat-label>
       <mat-select formControlName="selectedReportTypes" [compareWith]="compareReportTypes"  multiple>
-        <mat-option>None</mat-option>
-        <mat-option *ngFor="let type of reportTypes" [value]="type">
-          {{type}}
-        </mat-option>
+        @for (type of reportTypes; track type) {
+          <mat-option [value]="type">
+            {{type}}
+          </mat-option>
+        }
       </mat-select>
-      <mat-error *ngIf="reportTypeControl.hasError('required')">
-        Report Type is <strong>required</strong>
-      </mat-error>
+      @if (reportTypeControl.hasError('required')) {
+        <mat-error>
+          Report Type is <strong>required</strong>
+        </mat-error>
+      }
     </mat-form-field>
   </div>
   <div class="input-container">
     <mat-form-field class="form-select" appearance="outline">
       <mat-label>Frequency</mat-label>
       <mat-select formControlName="selectedFrequency">
-        <mat-option>None</mat-option>
-        <mat-option *ngFor="let frequency of frequencies" [value]="frequency">
-          {{frequency}}
-        </mat-option>
+        @for (frequency of frequencies; track frequency) {
+          <mat-option [value]="frequency">
+            {{frequency}}
+          </mat-option>
+        }
       </mat-select>
-      <mat-error *ngIf="frequencyControl.hasError('required')">
-       Frequency is <strong>required</strong>
-      </mat-error>
+      @if (frequencyControl.hasError('required')) {
+        <mat-error>
+          Frequency is <strong>required</strong>
+        </mat-error>
+      }
     </mat-form-field>
   </div>
   <div class="input-container">
@@ -38,38 +44,43 @@
       <mat-hint>MM/DD/YYYY</mat-hint>
       <mat-datepicker-toggle matIconSuffix [for]="startDatePicker"></mat-datepicker-toggle>
       <mat-datepicker #startDatePicker></mat-datepicker>
-      <mat-error *ngIf="startDateControl.hasError('required')">
-        Report Start Date is <strong>required</strong>
-      </mat-error>
+      @if (startDateControl.hasError('required')) {
+        <mat-error>
+          Report Start Date is <strong>required</strong>
+        </mat-error>
+      }
     </mat-form-field>
   </div>
   <div class="input-container">
     <mat-form-field class="form-input" appearance="outline">
       <mat-label>Run Report In (Minutes)</mat-label>
       <mat-select formControlName="selectedDelay">
-        <mat-option>None</mat-option>
-        <mat-option *ngFor="let delay of delays" [value]="delay">
-          {{ delay }} minute{{ delay > 1 ? 's' : '' }}
-        </mat-option>
+        @for (delay of delays; track delay) {
+          <mat-option [value]="delay">
+            {{ delay }} minute{{ delay > 1 ? 's' : '' }}
+          </mat-option>
+        }
       </mat-select>
-      <mat-error *ngIf="delayControl.hasError('required')">
-        Delay is <strong>required</strong>
-      </mat-error>
+      @if (delayControl.hasError('required')) {
+        <mat-error>
+          Delay is <strong>required</strong>
+        </mat-error>
+      }
     </mat-form-field>
   </div>
 
   <!--<div class="input-container">
-    <mat-form-field class="form-input" appearance="outline">
-      <mat-label>End Date</mat-label>
-      <input matInput formControlName="endDate" [matDatepicker]="endDatePicker">
-      <mat-hint>MM/DD/YYYY</mat-hint>
-      <mat-datepicker-toggle matIconSuffix [for]="endDatePicker"></mat-datepicker-toggle>
-      <mat-datepicker #endDatePicker></mat-datepicker>
-      <mat-error *ngIf="endDateControl.hasError('required')">
-        Report End Date is <strong>required</strong>
-      </mat-error>
-    </mat-form-field>
-  </div>-->
+  <mat-form-field class="form-input" appearance="outline">
+    <mat-label>End Date</mat-label>
+    <input matInput formControlName="endDate" [matDatepicker]="endDatePicker">
+    <mat-hint>MM/DD/YYYY</mat-hint>
+    <mat-datepicker-toggle matIconSuffix [for]="endDatePicker"></mat-datepicker-toggle>
+    <mat-datepicker #endDatePicker></mat-datepicker>
+    <mat-error *ngIf="endDateControl.hasError('required')">
+      Report End Date is <strong>required</strong>
+    </mat-error>
+  </mat-form-field>
+</div>-->
 </form>
 
 <div class="form-bar">

@@ -1,0 +1,107 @@
+@use '../../../../styles/core.scss';
+.report-form {
+  display: block; /* or just remove display entirely, default is block */
+  max-width: 1000px;
+  margin: 50px;
+  padding: 20px;
+  border-radius: 12px;
+  background-color: #f9f9f9;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+.row {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;   /* all children same height */
+  flex-wrap: wrap;
+}
+
+.form-select {
+  flex: 1;
+}
+
+.btn-toggle button {
+  margin-right: 8px;
+}
+
+.form-input {
+  width: 100%;
+  margin-bottom: 1em;
+}
+
+.input-container {
+  width: 100%;
+}
+
+.header-cell {
+  padding: 0 20px; /* Increase horizontal space */
+}
+
+button[color="primary"] {
+  color: #1e88e5; // Custom blue
+}
+
+.full-width {
+  width: 100%;
+}
+
+button[color="warn"] {
+  color: #e53935; // Custom red
+}
+
+.custom-height-button {
+  height: 56px; /* Matches the height of Angular Material form field */
+  margin-left: 8px; /* Optional spacing between input and button */
+  box-sizing: border-box; /* Ensures padding doesn't affect height */
+}
+
+.form-select {
+  width: 100%; /* makes field full width */
+}
+
+.form-select .mat-form-field-infix {
+  padding-left: 0.5rem; /* adjusts input text spacing */
+}
+
+
+.form-select mat-icon,
+.form-select fa-icon {
+  margin-right: 0.5rem; /* space between icon and text */
+  margin-left: 0.5rem; /* space between icon and text */
+}
+
+.vertical-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;           // grow and shrink
+  min-width: 0;           // important to allow shrinking inside flex
+}
+
+.mat-mdc-form-field,
+.form-input,
+.form-select,
+.vertical-container input.mat-mdc-input-element {
+  width: 100%;
+  min-width: 0;
+}
+
+.mat-mdc-autocomplete-panel {
+  width: 100% !important; // ensures dropdown matches input width
+  min-width: 0 !important;
+}
+
+.facility-errors-container {
+  display: flex;
+  flex-direction: column;
+  margin-top: -10px;
+  margin-bottom: 10px;
+}
+
+.facility-error {
+  color: red;
+  font-size: 12px;
+}
+
+.clear-btn {
+  margin-right: 8px; /* adjust as needed, e.g. 4px, 12px */
+}

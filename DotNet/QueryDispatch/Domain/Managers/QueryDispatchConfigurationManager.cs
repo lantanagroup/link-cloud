@@ -6,8 +6,8 @@ using LantanaGroup.Link.QueryDispatch.Presentation.Services;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Quartz;
 using QueryDispatch.Application.Settings;
 
@@ -25,7 +25,7 @@ namespace QueryDispatch.Domain.Managers
 
     public class QueryDispatchConfigurationManager : IQueryDispatchConfigurationManager
     {
-        private readonly IEntityRepository<QueryDispatchConfigurationEntity> _repository;
+        private readonly IBaseEntityRepository<QueryDispatchConfigurationEntity> _repository;
         private readonly ILogger<QueryDispatchConfigurationManager> _logger;
         private readonly IProducer<string, AuditEventMessage> _producer;
         private readonly CompareLogic _compareLogic;
@@ -64,7 +64,7 @@ namespace QueryDispatch.Domain.Managers
 
                 await _repository.UpdateAsync(config, cancellationToken);
 
-                _logger.LogInformation($"Updated query dispatch configuration for facility {HtmlInputSanitizer.Sanitize(config.FacilityId)}");
+                _logger.LogInformation("Updated query dispatch configuration for facility {FacilityId}", HtmlInputSanitizer.Sanitize(config.FacilityId));
 
 
 
@@ -89,7 +89,7 @@ namespace QueryDispatch.Domain.Managers
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Failed to update query dispatch configuration for facility {HtmlInputSanitizer.Sanitize(config.FacilityId)}.", ex);
+                _logger.LogError(ex, "Failed to update query dispatch configuration for facility {FacilityId}", HtmlInputSanitizer.Sanitize(config.FacilityId));
                 throw new ApplicationException($"Failed to update query dispatch configuration for facility {HtmlInputSanitizer.Sanitize(config.FacilityId)}.");
             }
         }
@@ -102,7 +102,7 @@ namespace QueryDispatch.Domain.Managers
             {
                 await _repository.AddAsync(config, cancellationToken);
 
-                _logger.LogInformation($"Created query dispatch configuration for facility {HtmlInputSanitizer.Sanitize(config.FacilityId)}");
+                _logger.LogInformation("Created query dispatch configuration for facility {FacilityId}", HtmlInputSanitizer.Sanitize(config.FacilityId));
 
 
                     var auditMessage = new AuditEventMessage
@@ -126,7 +126,7 @@ namespace QueryDispatch.Domain.Managers
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Failed to create query dispatch configuration for facility {HtmlInputSanitizer.Sanitize(config.FacilityId)}.", ex);
+                _logger.LogError(ex, "Failed to create query dispatch configuration for facility {FacilityId}", HtmlInputSanitizer.Sanitize(config.FacilityId));
                 throw new ApplicationException($"Failed to create query dispatch configuration for facility {HtmlInputSanitizer.Sanitize(config.FacilityId)}.");
             }
         }
@@ -148,7 +148,7 @@ namespace QueryDispatch.Domain.Managers
                 }
                 await _repository.DeleteAsync(config.Id, cancellationToken);
 
-                _logger.LogInformation($"Deleted query dispatch configuration for facility {HtmlInputSanitizer.Sanitize(facilityId)}");
+                _logger.LogInformation("Deleted query dispatch configuration for facility {FacilityId}", HtmlInputSanitizer.Sanitize(facilityId));
 
 
                     var auditMessage = new AuditEventMessage
@@ -175,7 +175,7 @@ namespace QueryDispatch.Domain.Managers
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Failed to delete query dispatch configuration for facilityId {HtmlInputSanitizer.Sanitize(facilityId)}", ex);
+                _logger.LogError(ex, "Failed to delete query dispatch configuration for facilityId {FacilityId}", HtmlInputSanitizer.Sanitize(facilityId));
                 throw new ApplicationException($"Failed to delete query dispatch configuration for facilityId {HtmlInputSanitizer.Sanitize(facilityId)}");
             }
         }

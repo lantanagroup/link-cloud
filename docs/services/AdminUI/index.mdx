@@ -1,0 +1,95 @@
+---
+
+id: AdminUI
+name: Admin UI (front-end)
+version: 0.2.0
+
+summary: The administrative front-end UI service
+
+owners:
+  - arch_tea
+
+badges:
+  - content: "Angular"
+    backgroundColor: yellow
+    textColor: black
+  - content: '8066:80'
+    backgroundColor: gray
+    textColor: white
+
+---
+
+## Overview
+
+* **Tenant Configuration & Management**: Administrators can configure and manage tenant-level settings, including operational parameters, identifiers, and environment-specific options—enabling scalable multi-tenant deployments.
+* **User Management**: Allows for full lifecycle management of users within each tenant context, including user creation, role assignment, account activation/deactivation, and permission updates.
+* **Integration Testing Support**: Offers tools to initiate and track integration tests, enabling administrators to validate service connectivity and workflow correctness within tenant environments.
+* **Viewing Report Metadata**: Users can browse report records, view detailed metadata (e.g. status, timestamps, versions), and audit submission history within the system.
+* **Report Downloading**: Enables secure download of generated report packages for manual delivery, archival, or verification—retrieved via AdminBFF endpoints.
+
+## Volumes
+
+| Volume                        | Mount Path                                           | Sub-path                |
+|-------------------------------|------------------------------------------------------|-------------------------|
+| Azure Storage Account         | `/usr/share/nginx/html/assets/app.config.local.json` | `app.config.local.json` |
+
+## Configuration
+
+An `app.config.local.json` file is used to configure the Admin UI service at deployment time, overriding the defaults in `app.config.json`.
+
+```json
+{
+  "baseApiUrl": "<ADMIN-BFF-BASE-URL>/api",
+  "authRequired": true,
+  "oauth2": {
+    "enabled": true,
+    "issuer": "...",
+    "clientId": "...",
+    "scope": "openid profile email",
+    "responseType": "code"
+  }
+}
+```
+
+This configuration file can be customized at deployment time and mounted in the `/assets` folder, or it can be overridden by ENV variables in a docker deployment.
+
+### Authentication
+
+The Admin UI supports authentication using:
+
+* OAuth2 via an identity provider (e.g., Azure AD, Keycloak), enabling secure login with centralized identity and access management.
+* Token Generation via AdminBFF /api/login, which provides session tokens for downstream API access when deployed in a simplified or standalone context.
+
+## Environment Variables
+
+| **ENV variable**          | **JSON Property**     | **Description**                                                | **Default Value**      | **Required**             |
+|---------------------------|-----------------------|----------------------------------------------------------------|------------------------|--------------------------|
+| LINK_BASE_API_URL         | `baseApiUrl`          | The base URL for the Admin BFF API.                            | `http://localhost`     | Yes                      |
+| LINK_AUTH_REQUIRED        | `authRequired`        | Indicates whether authentication is required for the Admin UI. | `true`                 | Yes                      |
+| LINK_OAUTH2_ENABLED       | `oauth2.enabled`      | Indicates whether OAuth2 authentication is enabled.            | `false`                | Yes                      |
+| LINK_OAUTH2_ISSUER        | `oauth2.issuer`       | The issuer URL for the OAuth2 provider.                        | `null`                 | If oauth2 enabled        |
+| LINK_OAUTH2_CLIENT_ID     | `oauth2.clientId`     | The client ID for the OAuth2 application.                      | `null`                 | If oauth2 enabled        |
+| LINK_OAUTH2_SCOPE         | `oauth2.scope`        | The scope for the OAuth2 application.                          | `openid profile email` | If oauth2 enabled        |
+| LINK_OAUTH2_RESPONSE_TYPE | `oauth2.responseType` | The response type for the OAuth2 application.                  | `code`                 | If oauth2 enabled        |
+| GRAFANA_URL               | `grafanaUrl`          | URL for the Grafana UI.                                        | `http://localhost:3000`| Yes                      |
+| KAFKA_URL                 | `kafkaUrl`            | URL for the Kafka UI.                                          | `http://localhost:9095`| If Kafka UI is available |
+
+## Local Development with Proxy Configuration
+To facilitate local development and testing, the Admin UI can be configured to proxy API requests to a local or remote instance of the Admin BFF service. This is achieved by setting up a proxy configuration file.
+
+```json
+{
+    "/api": {
+      "target": "http://localhost:5218",
+      "secure": false,
+      "changeOrigin": true,
+      "logLevel": "debug"
+    }
+}
+```
+
+To use the proxy configuration, start the Angular development server with the following command:
+
+```bash 
+ng serve --proxy-config proxy.conf.json --configuration=development
+```

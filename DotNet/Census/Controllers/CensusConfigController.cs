@@ -5,6 +5,7 @@ using LantanaGroup.Link.Census.Domain.Managers;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Quartz;
 
 namespace Census.Controllers;
 
@@ -47,11 +48,16 @@ public class CensusConfigController : Controller
             return BadRequest("ScheduledTrigger is required.");
         }
 
+        if (!CronExpression.IsValidExpression(censusConfig.ScheduledTrigger))
+        {
+            return BadRequest("ScheduledTrigger is not a valid cron expression.");
+        }
+
         try
         {
-            var entity = await _censusConfigManager.AddOrUpdateCensusConfig(censusConfig);
+            var entity =  CensusConfigModel.FromDomain(await _censusConfigManager.AddOrUpdateCensusConfig(censusConfig));
 
-            return Created(entity.Id.ToString(), entity);
+            return Created(entity.FacilityId, entity);
         }
         catch (MissingTenantConfigurationException ex)
         {
@@ -86,10 +92,16 @@ public class CensusConfigController : Controller
         try
         {
             var response = await _censusConfigManager.GetCensusConfigByFacilityId(facilityId);
-            if (response == null)
+            if (response is null)
                 return NotFound();
 
-            return Ok(response);
+            CensusConfigModel model = new CensusConfigModel
+            {
+                FacilityId = response.FacilityID,
+                ScheduledTrigger = response.ScheduledTrigger,
+                Enabled = response.Enabled
+            };
+            return Ok(model);
         }
         catch (Exception ex)
         {
@@ -135,17 +147,22 @@ public class CensusConfigController : Controller
             return BadRequest($"FacilityID in request path does not match facility in request body.");
         }
 
+        if (!CronExpression.IsValidExpression(censusConfig.ScheduledTrigger))
+        {
+            return BadRequest("ScheduledTrigger is not a valid cron expression.");
+        }
+
         try
         {
             var existingEntity = await _censusConfigManager.GetCensusConfigByFacilityId(censusConfig.FacilityId);
             var entity = await _censusConfigManager.AddOrUpdateCensusConfig(censusConfig);
             if (existingEntity != null)
             {
-                return Accepted(entity);
+                return Accepted(CensusConfigModel.FromDomain(entity));
             }
             else
             {
-                return Created(entity.Id.ToString(), entity);
+                return Created(entity.Id.ToString(), CensusConfigModel.FromDomain(entity));
             }
         }
         catch (MissingTenantConfigurationException ex)

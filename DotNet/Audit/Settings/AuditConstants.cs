@@ -6,10 +6,8 @@
 
         public static class AppSettingsSectionNames
         {
-            public const string ExternalConfigurationSource = "ExternalConfigurationSource";
             public const string ServiceInformation = "ServiceInformation";
-            public const string DatabaseProvider = "DatabaseProvider";            
-            public const string IdentityProvider = "IdentityProviderConfig";
+            public const string DatabaseProvider = "DatabaseProvider";      
             public const string Serilog = "Serilog";
         }
 

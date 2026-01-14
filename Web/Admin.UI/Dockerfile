@@ -1,19 +1,23 @@
-FROM node:18-alpine AS build
+# Build Stage: Angular App
+FROM node:23-alpine AS build
+WORKDIR /app
+COPY . .
+RUN npm install
+RUN npm run build
 
-RUN mkdir /build
+# Runtime Stage: Node.js Server
+FROM node:23-alpine AS runtime
+WORKDIR /app
 
-WORKDIR /build
+# Copy the Angular build output
+COPY --from=build /app/dist/admin-ui/browser ./dist
 
-COPY package.json /build/
-COPY package-lock.json /build/
+# Copy the server files
+COPY server ./server
 
+# Install only server dependencies
+WORKDIR /app/server
 RUN npm ci
 
-COPY . .
-RUN npm install -g @angular/cli
-RUN ng build
-
-FROM nginx:1.20.0-alpine
-COPY nginx.conf /etc/nginx/nginx.conf
-COPY --from=build /build/dist/admin-ui/. /usr/share/nginx/html
 EXPOSE 80
+CMD ["node", "main.js"]

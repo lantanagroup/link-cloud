@@ -1,0 +1,20 @@
+<div class="input-container list-item-container">
+  <form [formGroup]="vendorForm" class="dialog-form">
+    <div class="form-input">
+      <mat-form-field appearance="outline" class="subject-input form-input ">
+        <mat-label>Name</mat-label>
+        <input matInput formControlName="name" [readonly]="viewOnly">
+        @if (name.value && !viewOnly) {
+          <button matSuffix mat-icon-button aria-label="Clear">
+            <mat-icon>close</mat-icon>
+          </button>
+        }
+        @if (name.hasError('required')) {
+          <mat-error>
+            Name is <strong>required</strong>
+          </mat-error>
+        }
+      </mat-form-field>
+    </div>
+  </form>
+</div>

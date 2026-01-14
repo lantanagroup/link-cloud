@@ -1,22 +1,33 @@
 using Azure.Identity;
+using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Health;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Middleware;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Settings;
+using LantanaGroup.Link.Tenant.Business.Managers;
+using LantanaGroup.Link.Tenant.Business.Queries;
 using LantanaGroup.Link.Tenant.Commands;
 using LantanaGroup.Link.Tenant.Config;
+using LantanaGroup.Link.Tenant.Data.Repository;
+using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Interfaces;
 using LantanaGroup.Link.Tenant.Jobs;
 using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Repository.Context;
-using LantanaGroup.Link.Tenant.Repository.Implementations.Sql;
-using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
 using LantanaGroup.Link.Tenant.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using Microsoft.Extensions.Options;
 using Quartz;
 using Quartz.Impl;
 using Quartz.Spi;
@@ -24,19 +35,14 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
+using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Reflection;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Middleware;
-using LantanaGroup.Link.Shared.Application.Factories;
-using Confluent.Kafka;
-using LantanaGroup.Link.Shared.Application.Health;
 
 namespace Tenant
 {
     public class Program
     {
-
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
@@ -50,39 +56,12 @@ namespace Tenant
             app.Run();
         }
 
-
-
         #region Register Services
 
         static void RegisterServices(WebApplicationBuilder builder)
         {
-            //load external configuration source if specified
-            var externalConfigurationSource = builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
-
-            if (!string.IsNullOrEmpty(externalConfigurationSource))
-            {
-                switch (externalConfigurationSource)
-                {
-                    case ("AzureAppConfiguration"):
-                        builder.Configuration.AddAzureAppConfiguration(options =>
-                        {
-                            options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
-                                    // Load configuration values with no label
-                                    .Select("*", LabelFilter.Null)
-                                    // Load configuration values for service name
-                                    .Select("*", TenantConstants.ServiceName)
-                                    // Load configuration values for service name and environment
-                                    .Select("*", TenantConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
-
-                            options.ConfigureKeyVault(kv =>
-                            {
-                                kv.SetCredential(new DefaultAzureCredential());
-                            });
-
-                        });
-                        break;
-                }
-            }
+            // load external configuration source (if specified)
+            builder.AddExternalConfiguration(TenantConstants.ServiceName);
 
             // Add Link Security
             bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
@@ -99,7 +78,7 @@ namespace Tenant
             var serviceInformation = builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
             if (serviceInformation != null)
             {
-                ServiceActivitySource.Initialize(serviceInformation);                
+                ServiceActivitySource.Initialize(serviceInformation);
             }
             else
             {
@@ -107,7 +86,12 @@ namespace Tenant
             }
 
             // Add services to the container.
-            builder.Services.AddHostedService<ScheduleService>();
+            builder.Services.AddSingleton<ScheduleService>();
+            builder.Services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<ScheduleService>());
+
+            builder.Services.Configure<FacilityIdSettings>(builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.FacilityIdSettings));
+            builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<FacilityIdSettings>>().Value);
+
 
             builder.Services.Configure<MeasureConfig>(builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.MeasureConfig));
             builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
@@ -116,16 +100,19 @@ namespace Tenant
             builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
             builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
 
-            builder.Services.AddScoped<IFacilityConfigurationService, FacilityConfigurationService>();
-            builder.Services.AddScoped<IFacilityConfigurationRepo, FacilityConfigurationRepo>();
+            //Entity Repositories
+            builder.Services.AddScoped<IEntityRepository<Facility>, FacilityRepository>();
+
+            //Managers and Queries
+            builder.Services.AddScoped<IFacilityManager, FacilityManager>();
+            builder.Services.AddScoped<IFacilityQueries, FacilityQueries>();
 
             builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
             builder.Services.AddSingleton<CreateAuditEventCommand>();
 
             //Add database context
-            builder.Services.AddDbContext<FacilityDbContext>((sp, options) =>
+            builder.Services.AddDbContext<TenantDbContext>((sp, options) =>
             {
-
                 var updateBaseEntityInterceptor = sp.GetService<UpdateBaseEntityInterceptor>()!;
 
                 switch (builder.Configuration.GetValue<string>(TenantConstants.AppSettingsSectionNames.DatabaseProvider))
@@ -137,7 +124,7 @@ namespace Tenant
 
                         if (string.IsNullOrEmpty(connectionString))
                             throw new InvalidOperationException("Database connection string is null or empty.");
-                        
+
                         options.UseSqlServer(connectionString)
                            .AddInterceptors(updateBaseEntityInterceptor);
                         break;
@@ -146,14 +133,10 @@ namespace Tenant
                 }
             });
 
-
-
-            builder.Services.AddTransient<LantanaGroup.Link.Shared.Application.Interfaces.IKafkaProducerFactory<string, object>, LantanaGroup.Link.Shared.Application.Factories.KafkaProducerFactory<string, object>>();
-            var producer = new KafkaProducerFactory<string, object>(kafkaConnection).CreateProducer(new Confluent.Kafka.ProducerConfig());
-            builder.Services.AddSingleton<IProducer<string, object>>(producer);
-
-            builder.Services.AddTransient<LantanaGroup.Link.Shared.Application.Interfaces.IKafkaConsumerFactory<string, object>, LantanaGroup.Link.Shared.Application.Factories.KafkaConsumerFactory<string, object>>();
-
+            builder.Services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, KafkaProducerFactory<string, GenerateReportValue>>();
+            builder.Services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
+            var producer = new KafkaProducerFactory<string, AuditEventMessage>(kafkaConnection).CreateProducer(new ProducerConfig());
+            builder.Services.AddSingleton(producer);
 
             builder.Services.AddHttpClient();
 
@@ -179,17 +162,15 @@ namespace Tenant
                     {
                         ctx.ProblemDetails.Extensions.Remove("exception");
                     }
-
                 };
             });
-
 
             //Add health checks
             var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, TenantConstants.ServiceName).GetHealthCheckOptions();
 
             builder.Services.AddHealthChecks()
-                .AddCheck<DatabaseHealthCheck>("Database")
-                .AddKafka(kafkaHealthOptions);
+                .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
+                .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
@@ -198,6 +179,7 @@ namespace Tenant
                 var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
                 var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
                 c.IncludeXmlComments(xmlPath);
+                c.DocumentFilter<HealthChecksFilter>();
             });
 
             // Logging using Serilog
@@ -205,37 +187,52 @@ namespace Tenant
             var loggerOptions = new ConfigurationReaderOptions { SectionName = TenantConstants.AppSettingsSectionNames.Serilog };
             Log.Logger = new LoggerConfiguration()
                 .ReadFrom.Configuration(builder.Configuration, loggerOptions)
-                                        .Filter.ByExcluding("RequestPath like '/health%'")
-                                        .Filter.ByExcluding("RequestPath like '/swagger%'")
-                                        .Enrich.WithExceptionDetails()
-                                        .Enrich.FromLogContext()
-                                        .Enrich.WithSpan()
-                                        .Enrich.With<ActivityEnricher>()
-                                        .Enrich.FromLogContext()
-                                        .CreateLogger();
-            
+                .Filter.ByExcluding("RequestPath like '/health%'")
+                .Filter.ByExcluding("RequestPath like '/swagger%'")
+                .Enrich.WithExceptionDetails()
+                .Enrich.FromLogContext()
+                .Enrich.WithSpan()
+                .Enrich.With<ActivityEnricher>()
+                .Enrich.FromLogContext()
+                .CreateLogger();
+
             Serilog.Debugging.SelfLog.Enable(Console.Error);
 
+            builder.Services.AddSingleton<IJobFactory, QuartzJobFactory>();
 
-            builder.Services.AddSingleton<IJobFactory, JobFactory>();
+            var quartzProps = new NameValueCollection
+            {
+                ["quartz.scheduler.instanceName"] = "TenantScheduler",
+                ["quartz.scheduler.instanceId"] = "AUTO",
+                ["quartz.jobStore.clustered"] = "true",
+                ["quartz.jobStore.type"] = "Quartz.Impl.AdoJobStore.JobStoreTX, Quartz",
+                ["quartz.jobStore.driverDelegateType"] = "Quartz.Impl.AdoJobStore.SqlServerDelegate, Quartz",
+                ["quartz.jobStore.tablePrefix"] = "quartz.QRTZ_",
+                ["quartz.jobStore.dataSource"] = "default",
+                ["quartz.dataSource.default.connectionString"] = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection),
+                ["quartz.dataSource.default.provider"] = "SqlServer",
+                ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
+                ["quartz.threadPool.threadCount"] = "5",
+                ["quartz.jobStore.useProperties"] = "false",
+                ["quartz.serializer.type"] = "json"
+            };
 
-            builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
+            builder.Services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
 
             builder.Services.AddSingleton<ReportScheduledJob>();
-
             builder.Services.AddSingleton<RetentionCheckScheduledJob>();
 
             //Add CORS
-            builder.Services.AddLinkCorsService(options => { 
+            builder.Services.AddLinkCorsService(options => {
                 options.Environment = builder.Environment;
-            });            
+            });
 
             //Add telemetry if enabled
             builder.Services.AddLinkTelemetry(builder.Configuration, options =>
             {
                 options.Environment = builder.Environment;
                 options.ServiceName = TenantConstants.ServiceName;
-                options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+                options.ServiceVersion = serviceInformation.Version;
             });
 
             builder.Services.AddSingleton<ITenantServiceMetrics, TenantServiceMetrics>();
@@ -250,9 +247,9 @@ namespace Tenant
             // Configure the HTTP request pipeline.
             app.ConfigureSwagger();
 
-            app.AutoMigrateEF<FacilityDbContext>();
+            app.AutoMigrateEF<TenantDbContext>();
 
-            app.UseRouting();            
+            app.UseRouting();
             app.UseCors(CorsSettings.DefaultCorsPolicyName);
 
             //check for anonymous access
@@ -266,26 +263,18 @@ namespace Tenant
 
             app.MapControllers();
 
-            //map health check middleware
+            //map health check middleware and info endpoint
             app.MapHealthChecks("/health", new HealthCheckOptions
             {
                 ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
             });
+            app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "facility");
 
-            // Ensure database created
-            using (var scope = app.Services.CreateScope())
-            {
-                var context = scope.ServiceProvider.GetRequiredService<FacilityDbContext>();
-                context.Database.EnsureCreated();
-
-            }
             // Configure the HTTP request pipeline.
             //app.MapGrpcService<TenantService>();
             //app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client. To learn how to create a client, visit: https://go.microsoft.com/fwlink/?linkid=2086909");
         }
 
         #endregion
-
     }
-
 }

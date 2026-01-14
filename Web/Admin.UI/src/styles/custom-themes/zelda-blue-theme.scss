@@ -2,38 +2,43 @@
 @use '../styles/zelda-blue-theme-colors.scss' as zeldaBlue;
 @include mat.core();
 
-$my-primary: mat.define-palette(zeldaBlue.$zelda-blue-primary, 700, 500, 300);
-$my-accent: mat.define-palette(zeldaBlue.$zelda-blue-accent, 600, 400, 200);
-//$my-warn: mat.define-palette(zeldaBlue.$zelda-blue-warn, 400);
+$zelda-blue-primary: zeldaBlue.$primary-palette;
+$zelda-blue-tertiary: zeldaBlue.$tertiary-palette;
 
-$zelda-blue-theme: mat.define-light-theme((
-    color: (
-      primary: $my-primary,
-      accent: $my-accent,
-      //warn: $my-warn
-    )
+
+html {
+  @include mat.theme((
+    color:(
+      theme-type: light,
+      primary: $zelda-blue-primary,
+      tertiary: $zelda-blue-tertiary,
+    ),
+    typography: Roboto,
+    density: 0
   ));
-
-//@include mat.all-component-themes($zelda-blue-theme);
-
-.zelda-blue {
-  @include mat.all-component-colors($zelda-blue-theme);
 }
 
-
-$my-primary-dark: mat.define-palette(zeldaBlue.$zelda-blue-primary, 900, 700, 500);
-$my-accent-dark: mat.define-palette(zeldaBlue.$zelda-blue-accent, 900, 700, 500);
-//$my-warn-dark: mat.define-palette(zeldaBlue.$zelda-blue-warn, 900);
-
-
-$zelda-blue-dark-theme: mat.define-dark-theme((
+*.zelda-blue {
+  @include mat.theme((
     color: (
-      primary: $my-primary-dark,
-      accent: $my-accent-dark,
-      //warn: $my-warn-dark
-    )
-  ));
-
-.zelda-blue-dark {
-  @include mat.all-component-colors($zelda-blue-dark-theme);
+      theme-type: light,
+      primary: $zelda-blue-primary,
+      tertiary: $zelda-blue-tertiary,
+    ),
+    typography: Roboto,
+    density: 0
+  ))
 }
+
+*.zelda-blue-dark {
+  @include mat.theme((
+    color: (
+      theme-type: dark,
+      primary: $zelda-blue-primary,
+      tertiary: $zelda-blue-tertiary,
+    ),
+    typography: Roboto,
+    density: 0
+  ))
+}
+

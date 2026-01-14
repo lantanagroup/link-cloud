@@ -1,10 +1,11 @@
-﻿using LantanaGroup.Link.Shared.Application.Models;
+﻿using AngleSharp.Dom;
 using LanatanGroup.Link.QueryDispatch.Jobs;
-using Quartz;
-using Quartz.Spi;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
-using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using Quartz;
+using Quartz.Impl.Matchers;
+using Quartz.Spi;
 
 namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
 {
@@ -23,9 +24,9 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
         }
 
         public ScheduleService(
-            ISchedulerFactory schedulerFactory, 
-            IJobFactory jobFactory, 
-            ILogger<ScheduleService> logger, 
+            ISchedulerFactory schedulerFactory,
+            IJobFactory jobFactory,
+            ILogger<ScheduleService> logger,
             IServiceScopeFactory serviceScopeFactory)
         {
             _schedulerFactory = schedulerFactory;
@@ -41,52 +42,109 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
             try
             {
                 using var scope = _serviceScopeFactory.CreateScope();
-                // var _getAllQueryDispatchConfigurationQuery = scope.ServiceProvider.GetRequiredService<IGetAllQueryDispatchConfigurationQuery>();
-                var queryDispatchConfigurationRepo = scope.ServiceProvider.GetRequiredService<IEntityRepository<QueryDispatchConfigurationEntity>>();
+                var queryDispatchConfigurationRepo = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<QueryDispatchConfigurationEntity>>();
 
-                var queryPatientDispatchRepo = scope.ServiceProvider.GetRequiredService<IEntityRepository<PatientDispatchEntity>>();
+                var queryPatientDispatchRepo = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<PatientDispatchEntity>>();
 
                 Scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
                 Scheduler.JobFactory = _jobFactory;
 
-                //List<QueryDispatchConfigurationEntity> configs = await _getAllQueryDispatchConfigurationQuery.Execute();
-                List<QueryDispatchConfigurationEntity> configs  = await queryDispatchConfigurationRepo.GetAllAsync(cancellationToken);
-
-                foreach (var config in configs)
-                {
-                    var job = CreateJob(config.FacilityId);
-                    await Scheduler.AddJob(job, true);
-                }
-
-               // List<PatientDispatchEntity> patientDispatches = await _getAllPatientDispatchQuery.Execute();
+                List<QueryDispatchConfigurationEntity> configs = await queryDispatchConfigurationRepo.GetAllAsync(cancellationToken);
 
                 List<PatientDispatchEntity> patientDispatches = await queryPatientDispatchRepo.GetAllAsync(cancellationToken);
 
-                foreach (var patientDispatch in patientDispatches)
+                // Get all unique facility IDs from configs and dispatches
+                var allFacilityIds = configs.Select(c => c.FacilityId)
+                    .Union(patientDispatches.Select(p => p.FacilityId))
+                    .ToList();
+
+                string group = nameof(KafkaTopic.PatientEvent);
+
+                // Ensure jobs exist for all facilities
+                foreach (var facilityId in allFacilityIds)
                 {
-                    JobKey jobKey = new JobKey(patientDispatch.FacilityId)
+                    JobKey jobKey = new JobKey(facilityId, group);
+                    if (!await Scheduler.CheckExists(jobKey))
                     {
-                        Group = nameof(KafkaTopic.PatientEvent)
-                    };
+                        IJobDetail job = CreateJob(facilityId);
+                        await Scheduler.AddJob(job, true);
+                    }
+                }
 
-                    IJobDetail job = await Scheduler.GetJobDetail(jobKey);
+                // Group dispatches by facility
+                var dispatchesByFacility = patientDispatches.GroupBy(p => p.FacilityId)
+                    .ToDictionary(g => g.Key, g => g.ToList());
 
-                    //NOTE: Converting back to local time for trigger...This feels wrong. Maybe there's a way to have the trigger set by UTC
-                    patientDispatch.TriggerDate = patientDispatch.TriggerDate.ToLocalTime();
+                // Sync triggers for each facility
+                foreach (var facilityId in allFacilityIds)
+                {
+                    JobKey jobKey = new JobKey(facilityId, group);
+                    var existingTriggers = await Scheduler.GetTriggersOfJob(jobKey);
 
-                    var trigger = CreateTrigger(patientDispatch, job.Key);
-                    await Scheduler.ScheduleJob(trigger);
+                    // Clean orphan triggers
+                    foreach (var trigger in existingTriggers)
+                    {
+                        string patientId = trigger.Description;
+                        DateTimeOffset startTimeUtc = trigger.StartTimeUtc;
+
+                        var matchingDispatch = dispatchesByFacility.GetValueOrDefault(facilityId)?
+                            .FirstOrDefault(d => d.PatientId == patientId && ComputeOffset(d).UtcDateTime == startTimeUtc.UtcDateTime);
+
+                        if (matchingDispatch == null)
+                        {
+                            await Scheduler.UnscheduleJob(trigger.Key);
+                            _logger.LogInformation("Removed orphan trigger for patient {PatientId} in facility {FacilityId}.", patientId, facilityId);
+                        }
+                    }
+
+                    // Add missing triggers
+                    if (dispatchesByFacility.TryGetValue(facilityId, out var dispatches))
+                    {
+                        foreach (var dispatch in dispatches)
+                        {
+                            DateTimeOffset expectedStart = ComputeOffset(dispatch);
+
+                            var matchingTrigger = existingTriggers.FirstOrDefault(t =>
+                                t.Description == dispatch.PatientId && t.StartTimeUtc.UtcDateTime == expectedStart.UtcDateTime);
+
+                            if (matchingTrigger == null)
+                            {
+                                ITrigger trigger = CreateTrigger(dispatch, jobKey);
+                                await Scheduler.ScheduleJob(trigger);
+                                _logger.LogInformation("Added trigger for patient in facility {FacilityId}.", facilityId);
+                            }
+                        }
+                    }
+                }
+
+                // Clean up orphan jobs (facilities no longer present, with no triggers)
+                var matcher = GroupMatcher<JobKey>.GroupEquals(group);
+                var allJobKeys = await Scheduler.GetJobKeys(matcher);
+                foreach (var jobKey in allJobKeys)
+                {
+                    if (!allFacilityIds.Contains(jobKey.Name))
+                    {
+                        var triggers = await Scheduler.GetTriggersOfJob(jobKey);
+                        if (triggers.Count == 0)
+                        {
+                            await Scheduler.DeleteJob(jobKey);
+                            _logger.LogInformation("Cleaned up orphan job for removed facility: {FacilityId}.", jobKey.Name);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Orphan job for removed facility {FacilityId} has pending triggers, not deleting.", jobKey.Name);
+                        }
+                    }
                 }
 
                 await Scheduler.Start(cancellationToken);
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Failed to start quartz schedule", ex);
-                throw new ApplicationException($"Failed to start quartz schedule");
+                _logger.LogError(ex, "Failed to start quartz schedule");
+                throw new ApplicationException("Failed to start quartz schedule");
             }
         }
-
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
@@ -95,35 +153,36 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
 
         public static async Task CreateJobAndTrigger(PatientDispatchEntity patientDispatch, IScheduler scheduler)
         {
-            JobKey jobKey = new JobKey(patientDispatch.FacilityId)
-            {
-                Group = nameof(KafkaTopic.PatientEvent)
-            };
+            string group = nameof(KafkaTopic.PatientEvent);
+            JobKey jobKey = new JobKey(patientDispatch.FacilityId, group);
 
-            IJobDetail? job = await scheduler.GetJobDetail(jobKey);
-
-            if (job == null)
+            if (!await scheduler.CheckExists(jobKey))
             {
-                job = CreateJob(patientDispatch.FacilityId);
+                IJobDetail job = CreateJob(patientDispatch.FacilityId);
                 await scheduler.AddJob(job, true);
             }
 
-            ITrigger trigger = CreateTrigger(patientDispatch, job.Key);
-            await scheduler.ScheduleJob(trigger);
+            var existingTriggers = await scheduler.GetTriggersOfJob(jobKey);
+            DateTimeOffset expectedStart = ComputeOffset(patientDispatch);
+
+            var matchingTrigger = existingTriggers.FirstOrDefault(t =>
+                t.Description == patientDispatch.PatientId && t.StartTimeUtc.UtcDateTime == expectedStart.UtcDateTime);
+
+            if (matchingTrigger == null)
+            {
+                ITrigger trigger = CreateTrigger(patientDispatch, jobKey);
+                await scheduler.ScheduleJob(trigger);
+            }
         }
 
         public static async Task DeleteJob(string facilityId, IScheduler scheduler)
         {
-            JobKey jobKey = new JobKey(facilityId)
-            {
-                Group = nameof(KafkaTopic.PatientEvent)
-            };
+            string group = nameof(KafkaTopic.PatientEvent);
+            JobKey jobKey = new JobKey(facilityId, group);
 
-            IJobDetail job = await scheduler.GetJobDetail(jobKey);
-
-            if (job != null)
+            if (await scheduler.CheckExists(jobKey))
             {
-                await scheduler.DeleteJob(job.Key);
+                await scheduler.DeleteJob(jobKey);
             }
         }
 
@@ -148,7 +207,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
 
             jobDataMap.Put("PatientDispatchEntity", patientDispatchEntity);
 
-            var offset = DateBuilder.DateOf(patientDispatchEntity.TriggerDate.Hour, patientDispatchEntity.TriggerDate.Minute, patientDispatchEntity.TriggerDate.Second, patientDispatchEntity.TriggerDate.Day, patientDispatchEntity.TriggerDate.Month);
+            var offset = ComputeOffset(patientDispatchEntity);
 
             return TriggerBuilder
                 .Create()
@@ -158,6 +217,13 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
                 .WithDescription(patientDispatchEntity.PatientId)
                 .UsingJobData(jobDataMap)
                 .Build();
+        }
+
+        private static DateTimeOffset ComputeOffset(PatientDispatchEntity entity)
+        {
+            var dt = entity.TriggerDate;
+            var local = dt.Kind == DateTimeKind.Utc ? dt.ToLocalTime() : dt;
+            return DateBuilder.DateOf(local.Hour, local.Minute, local.Second, local.Day, local.Month, local.Year);
         }
     }
 }

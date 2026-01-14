@@ -1,101 +1,106 @@
-<form [formGroup]="facilityConfigForm" class="dialog-form">
+@if (facilityConfigForm) {
+  <form [formGroup]="facilityConfigForm" class="dialog-form">
     <div class="form-input">
       <mat-form-field appearance="outline" class="subject-input form-input ">
         <mat-label>Facility Id</mat-label>
-        <input matInput formControlName="facilityId" [readonly]="viewOnly">
-        <button *ngIf="facilityIdControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearFacilityId()">
-          <mat-icon>close</mat-icon>
-        </button>
-        <mat-error *ngIf="facilityIdControl.hasError('required')">
-          A facility id is <strong>required</strong>
-        </mat-error>
+        <input matInput formControlName="facilityId" [disabled]="viewOnly">
+        @if (facilityIdControl.value && !viewOnly) {
+          <button matSuffix mat-icon-button aria-label="Clear" (click)="clearFacilityId()">
+            <mat-icon>close</mat-icon>
+          </button>
+        }
+        @if (facilityIdControl.hasError('required')) {
+          <mat-error>
+            A facility id is <strong>required</strong>
+          </mat-error>
+        }
+        @if (facilityIdControl.hasError('invalidFacilityId') && facilityIdControl.touched) {
+          <mat-error>
+            {{ facilityIdControl.getError('invalidFacilityId') }}
+          </mat-error>
+        }
       </mat-form-field>
     </div>
 
     <div class="form-input">
-        <mat-form-field appearance="outline" class="subject-input form-input ">
-          <mat-label>Facility Name</mat-label>
-          <input matInput formControlName="facilityName" [readonly]="viewOnly">
-          <button *ngIf="facilityNameControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearFacilityName()">
+      <mat-form-field appearance="outline" class="subject-input form-input ">
+        <mat-label>Facility Name</mat-label>
+        <input matInput formControlName="facilityName" [disabled]="viewOnly">
+        @if (facilityNameControl.value && !viewOnly) {
+          <button matSuffix mat-icon-button aria-label="Clear" (click)="clearFacilityName()">
             <mat-icon>close</mat-icon>
           </button>
-          <mat-error *ngIf="facilityNameControl.hasError('required')">
+        }
+        @if (facilityNameControl.hasError('required')) {
+          <mat-error>
             A facility name is <strong>required</strong>
           </mat-error>
-        </mat-form-field>
-    </div>       
-   
-    <p>
-      <mat-toolbar class="form-section-bar">
-        <span class="title">Scheduled Tasks</span>
-        <button mat-icon-button aria-label="Add a new scheduled task" (click)="addScheduledTask()" *ngIf="!viewOnly">
-          <mat-icon>add</mat-icon>
-        </button>
-      </mat-toolbar>
-    </p>
+        }
+      </mat-form-field>
+    </div>
 
-      <div formArrayName="scheduledTasks">
-        <div *ngFor="let task of scheduledTasks.controls; let i=index">
-            <div class="input-container list-item-container" [formGroupName]="i">
-              <div style="display: flex;">
-                <div style="flex: auto;">
-                  <mat-form-field appearance="outline" class="tenant-facility-task-input">
-                    <mat-label>kafka Topic</mat-label>
-                    <input matInput formControlName="kafkaTopic" [readonly]="viewOnly">
-                  </mat-form-field>  
-                </div>
-                <div style="flex-shrink: 2;">
-                  <button mat-stroked-button (click)="addReportTypeSchedule(i)" *ngIf="!viewOnly">
-                    Add Schedule
-                  </button>
-                  <button mat-stroked-button color="warn" style="margin-left: .5em;" (click)="removeScheduledTask(i)" *ngIf="!viewOnly">
-                    Delete Task
-                  </button>                  
-                </div> 
-              </div>
-             
-              <div formArrayName="reportTypeSchedules" *ngIf="getReportTypeSchedules(i).controls.length > 0">
-                <div *ngFor="let type of getReportTypeSchedules(i).controls; let j=index">  
-                  <div class="list-item-container" [formGroupName]="j">
-                    <div style="display: flex;">
-                      <div style="flex: auto;">
-                        <div class="input-container">
-                          <mat-form-field appearance="outline" class="tenant-facility-task-input">
-                              <mat-label>Report Type</mat-label>
-                              <input matInput formControlName="reportType" [readonly]="viewOnly">
-                          </mat-form-field>
-                        </div> 
-                      </div>  
-                      <div style="flex-shrink: 2;">
-                        <button mat-stroked-button aria-label="Add a schedule trigger" (click)="addScheduledTrigger(i, j)" *ngIf="!viewOnly">
-                          Add Trigger
-                        </button>
-                        <button mat-stroked-button color="warn" style="margin-left: .5em;" aria-label="Remove report type schedule" (click)="deleteReportTypeSchedule(i, j)" *ngIf="!viewOnly">
-                          Delete Schedule           
-                        </button> 
-                      </div>                    
-                    </div>                 
-                    <div formArrayName="scheduledTriggers" *ngIf="getScheduledTriggers(i, j).controls.length > 0">
-                      <div *ngFor="let trigger of getScheduledTriggers(i, j).controls; let k=index">            
-                        <div class="input-container" [formGroupName]="k">
-                          <mat-form-field appearance="outline" class="tenant-facility-task-input">
-                              <mat-label>Trigger</mat-label>
-                              <input matInput formControlName="trigger" [readonly]="viewOnly">
-                          </mat-form-field>                         
-                          <button mat-icon-button aria-label="Delete trigger" (click)="deleteScheduledTrigger(i, j, k)" *ngIf="!viewOnly">
-                            <mat-icon>delete</mat-icon>
-                          </button>
-                        </div>                           
-                      </div>                   
-                    </div>                                
-                  </div> 
-                </div>
-              </div>
+    <mat-form-field appearance="outline">
+      <mat-label>Timezone</mat-label>
+      <mat-select formControlName="timeZone" [placeholder]="'Select Timezone'" [disabled]="viewOnly">
+        @for (timezone of timezones; track timezone) {
+          <mat-option [disabled]="viewOnly" [value]="timezone">
+            {{ timezone }}
+          </mat-option>
+        }
+      </mat-select>
+      @if (timeZoneControl.hasError('required')) {
+        <mat-error>
+          Timezone is required
+        </mat-error>
+      }
+    </mat-form-field>
 
-            </div>          
+    <div class="scheduled-reports-container">
+      <span class="title">Scheduled Reports</span>
 
-            
-        </div>
-        
+      <mat-form-field class="form-select" appearance="outline">
+        <mat-label>Monthly</mat-label>
+        <mat-select formControlName="monthlyReports" [disabled]="viewOnly" [compareWith]="compareReportTypes" multiple>
+          @for (type of reportTypes; track type) {
+            <mat-option [disabled]="viewOnly" [value]="type">
+              {{type}}
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="form-select" appearance="outline">
+        <mat-label>Daily</mat-label>
+        <mat-select formControlName="dailyReports" [disabled]="viewOnly" [compareWith]="compareReportTypes" multiple>
+          @for (type of reportTypes; track type) {
+            <mat-option [disabled]="viewOnly" [value]="type">
+              {{type}}
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="form-select" appearance="outline">
+        <mat-label>Weekly</mat-label>
+        <mat-select formControlName="weeklyReports" [disabled]="viewOnly" [compareWith]="compareReportTypes" multiple>
+          @for (type of reportTypes; track type) {
+            <mat-option [disabled]="viewOnly" [value]="type">
+              {{type}}
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    @if (reportsNotUniqueError && !viewOnly && (this.facilityConfigForm.touched || this.facilityConfigForm.dirty)) {
+      <div>
+        <small class="error">{{ reportsNotUniqueError }}</small>
       </div>
-</form>
+    }
+
+    @if (noReportsEntered && !viewOnly &&  (this.facilityConfigForm.touched || this.facilityConfigForm.dirty)) {
+      <div>
+        <small class="error">{{ noReportsEntered }}</small>
+      </div>
+    }
+
+  </form>
+}

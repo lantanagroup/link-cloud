@@ -1,0 +1,57 @@
+---
+
+id: AccountService
+name: Account Service
+version: 0.2.0
+
+summary: |
+  Service that contains Account related information and functionality
+
+owners:
+  - arch_team
+
+sends:
+  - id: AuditableEventOccurred
+
+specifications:
+  openapiPath: openapi.yml
+
+badges:
+  - content: ".NET"
+    backgroundColor: yellow
+    textColor: black
+  - content: MSSQL
+    backgroundColor: red
+    textColor: white
+  - content: '8060:8080'
+    backgroundColor: gray
+    textColor: white
+
+---
+
+## Overview
+
+The Account service is responsible for maintaining roles and permissions for Link Cloud users.
+
+## Configuration
+
+| Property        | Type    | Description                                                                                      |
+|-----------------|---------|--------------------------------------------------------------------------------------------------|
+| `Redis:Enabled` | boolean | If enabled, Redis will be used to cache account information associated with authenticated users. |
+
+## Nodes
+
+<NodeGraph />
+
+- **Image Name**: link-account
+
+## Common Configurations
+
+* [Swagger](/docs/custom/config/dotnet#swagger)
+* [Azure App Configuration](/docs/custom/config/dotnet#azure-app-config-environment-variables)
+* [Kafka Configuration](/docs/custom/config/dotnet#kafka)
+* [Service Registry Configuration](/docs/custom/config/dotnet#service-registry)
+* [CORS Configuration](/docs/custom/config/dotnet#cors)
+* [Token Service Configuration](/docs/custom/config/dotnet#token-service-settings)
+* [Service Authentication](/docs/custom/config/dotnet#service-authentication)
+* [SQL Server Database Configuration](/docs/custom/config/dotnet#sql-server-database)

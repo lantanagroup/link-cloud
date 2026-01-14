@@ -1,6 +1,7 @@
 version: '3.4'
 
 #### services and ports
+## fhir_server: 6157
 ## redis_cache: 6379
 ## mssql: 1433
 ## mongo: 17017
@@ -11,6 +12,7 @@ version: '3.4'
 ## prometheus: 9090
 ## kafka_b: 9092, 9094
 ## kafka-ui: 9095
+## azurite: 10000
 ## rest-proxy: 8082
 ## schema-registry: 8081
 ## account: 8060
@@ -18,17 +20,51 @@ version: '3.4'
 ## admin-bff: 8063
 ## census: 8064
 ## dataacquisition: 8065
+## dataacquisition.acquisitionworker: 8078
 ## admin-ui: 8066
 ## measureeval: 8067
 ## normalization: 8068
-## notification: 8069
 ## querydispatch: 8071
 ## report: 8072
 ## submission: 8073
 ## tenant: 8074
 ## validation: 8075
+## terminology: 8076
 
 services:
+  
+  ###########################################
+  ### FHIR Server (HAPI) - For testing
+  ###########################################
+  fhir_server:
+    image: hapiproject/hapi:latest
+    container_name: fhir-server
+    ports:
+      - "6157:8080"
+    environment:
+      - hapi.fhir.fhir_version=R4
+      - hapi.fhir.allow_multiple_delete=true
+      - hapi.fhir.allow_external_references=true
+      - hapi.fhir.allow_cascading_deletes=true
+      - hapi.fhir.delete_enabled=true
+      - hapi.fhir.expunge_enabled=true
+      - hapi.fhir.enforce_referential_integrity_on_delete=false
+      - hapi.fhir.enforce_referential_integrity_on_write=false
+      - hapi.fhir.delete_expunge_enabled=true
+      - hapi.fhir.reuse_cached_search_results_millis=0
+      - hapi.fhir.subscription_enabled=false
+      - hapi.fhir.client_id_strategy=ANY
+      - hapi.fhir.server_id_strategy=UUID
+    volumes:
+      - fhir_data:/data
+      - ./healthcheck-1.0.0.jar:/app/healthcheck.jar:ro
+    networks:
+      - link-nw
+    healthcheck:
+      test: ["CMD", "java", "-jar", "/app/healthcheck.jar", "http://localhost:8080/fhir/metadata"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
       
   ###########################################
   ### Redis Cache
@@ -39,23 +75,60 @@ services:
     restart: always
     ports:
       - '6379:6379'
-    container_name: redis
+    container_name: redis_cache
     command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASS}
     volumes: 
       - redis_cache:/data
     networks:
       - link-nw
-      
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASS}", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  ###########################################
+  ### Blob Storage
+  ###########################################
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.35.0
+    ports:
+      - "10000:10000"
+    container_name: azurite
+    volumes:
+      - azurite_data:/data
+    healthcheck:
+      test: >-
+        nc -z 127.0.0.1 10000
+      interval: 3s
+      timeout: 3s
+      retries: 15
+    networks:
+      - link-nw
+
+  azurite_init:
+    image: mcr.microsoft.com/azure-cli:2.75.0
+    container_name: azurite-init
+    environment:
+      AZURE_STORAGE_CONNECTION_STRING: ${AZURITE_CONNECTION_STRING}
+    command: bash -c 'az storage container create -n ${INTERNAL_BLOB_CONTAINER_NAME}; az storage container create -n ${EXTERNAL_BLOB_CONTAINER_NAME}'
+    depends_on:
+      azurite:
+        condition: service_healthy
+    networks:
+      - link-nw
+
   ###########################################
   ### Databases
   ###########################################
   
   mssql:
-    image: mcr.microsoft.com/mssql/server:2019-latest
+    image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=${LINK_DB_PASS}
-      - MSSQL_PID=Developer
     ports:
       - 1433:1433
     container_name: sql-server
@@ -63,11 +136,12 @@ services:
       - mssql_data:/var/opt/mssql
     restart: always
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P ${LINK_DB_PASS} -Q 'SELECT 1' -C || exit 1"]
-      interval: 10s
-      retries: 10
-      start_period: 10s
-      timeout: 3s
+      test: >-
+        /opt/mssql-tools18/bin/sqlcmd -C -U sa -P "$$SA_PASSWORD" -Q 'SELECT 1;'
+      interval: 5s
+      retries: 15
+      start_period: 5s
+      timeout: 5s
     networks:
       - link-nw
       
@@ -78,12 +152,13 @@ services:
       LINK_DB_PASS: ${LINK_DB_PASS}
     volumes:
       - type: bind
-        source: create-dbs.sql
+        source: .docker/create-dbs.sql
         target: /create-dbs.sql
     command: bash -c "/opt/mssql-tools/bin/sqlcmd -S mssql -U sa -P ${LINK_DB_PASS} -i /create-dbs.sql"
     depends_on:
       mssql:
         condition: service_healthy
+        
     networks:
       - link-nw
       
@@ -96,13 +171,20 @@ services:
       - mongo_data:/data/db
     networks:
       - link-nw
+    healthcheck:
+      test: ["CMD","mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
       
   ###########################################
   ### Telemetry
   ###########################################
       
   loki:
-    image: grafana/loki:2.9.0
+    image: grafana/loki:3.3.1
     ports:
       - "3100:3100"
     container_name: loki
@@ -116,7 +198,7 @@ services:
     restart: always
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
-      - ./docker-compose.collector.yml:/etc/otel-collector-config.yaml
+      - .docker/collector.yml:/etc/otel-collector-config.yaml
     ports:
       - "1888:1888"   # pprof extension
       - "8888:8888"   # Prometheus metrics exposed by the collector
@@ -133,7 +215,7 @@ services:
       - "9090:9090"
     container_name: prometheus
     volumes:
-      - ./docker-compose.prometheus.yml:/etc/prometheus/prometheus.yml
+      - .docker/prometheus.yml:/etc/prometheus/prometheus.yml
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
     networks:
@@ -147,14 +229,14 @@ services:
     container_name: tempo
     hostname: tempo
     volumes:
-      - ./docker-compose.tempo.yml:/etc/tempo.yaml
+      - .docker/tempo.yml:/etc/tempo.yaml
     ports:
       - "3200:3200"
       - "4417:4417"
     healthcheck:
       interval: 5s
       retries: 10
-      test: wget --no-verbose --tries=1 --spider http://localhost:3200/status || exit 1
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3200/status"]
     networks:
       - link-nw
 
@@ -168,7 +250,7 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
     volumes:
-      - ./docker-compose.grafana.yml:/etc/grafana/provisioning/datasources/ds.yaml
+      - .docker/grafana.yml:/etc/grafana/provisioning/datasources/ds.yaml
     networks:
       - link-nw
       
@@ -177,95 +259,57 @@ services:
   ###########################################
   
   kafka_b:
-     image: bitnami/kafka:3.4
+     image: bitnamilegacy/kafka:3.4
      ports:
        - "9092:9092"
        - "9094:9094"
      container_name: kafka-broker
      volumes:
        - kafka_data:/bitnami
-       - ./kafka-client.properties:/etc/kafka-client.properties
+       - .docker/kafka-client.properties:/etc/kafka-client.properties
      environment:
-       - KAFKA_BROKER_ID=1
-       - KAFKA_CFG_NODE_ID=1
-       - KAFKA_CFG_PROCESS_ROLES=broker,controller
-       - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@127.0.0.1:9093 
-       - KAFKA_CFG_LISTENERS=SASL_PLAINTEXT://127.0.0.1:9092,CONTROLLER://127.0.0.1:9093,EXTERNAL://127.0.0.1:9094
-       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:SASL_PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT,EXTERNAL:SASL_PLAINTEXT
-       - KAFKA_CFG_ADVERTISED_LISTENERS=SASL_PLAINTEXT://127.0.0.1:9092,EXTERNAL://kafka_b:9094
-       - KAFKA_CLIENT_USERS=${KAFKA_SASL_CLIENT_USER}
-       - KAFKA_CLIENT_PASSWORDS=${KAFKA_SASL_CLIENT_PASSWORD}
-       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=SASL_PLAINTEXT
-       - KAFKA_CFG_SASL_MECHANISM_INTER_BROKER_PROTOCOL=PLAIN
-       - KAFKA_INTER_BROKER_USER=controller_user
-       - KAFKA_INTER_BROKER_PASSWORD=controller_password
-       - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-       - KAFKA_CFG_SASL_MECHANISM_CONTROLLER_PROTOCOL=PLAIN
-       - KAFKA_CONTROLLER_USER=${KAFKA_INTER_BROKER_USER}
-       - KAFKA_CONTROLLER_PASSWORD=${KAFKA_INTER_BROKER_PASSWORD}
-       - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
-       - KAFKA_CFG_NUM_PARTITIONS=2
+      KAFKA_BROKER_ID: "1"
+      KAFKA_CFG_NODE_ID: "1"
+      KAFKA_CFG_PROCESS_ROLES: "broker,controller"
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "1@127.0.0.1:9093"
+      KAFKA_CFG_LISTENERS: "SASL_PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094"
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:SASL_PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT,EXTERNAL:SASL_PLAINTEXT"
+      KAFKA_CFG_ADVERTISED_LISTENERS: "SASL_PLAINTEXT://127.0.0.1:9092,EXTERNAL://kafka-broker:9094"
+      KAFKA_CLIENT_USERS: "${KAFKA_SASL_CLIENT_USER}"
+      KAFKA_CLIENT_PASSWORDS: "${KAFKA_SASL_CLIENT_PASSWORD}"
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: "SASL_PLAINTEXT"
+      KAFKA_CFG_SASL_MECHANISM_INTER_BROKER_PROTOCOL: "PLAIN"
+      KAFKA_INTER_BROKER_USER: "controller_user"
+      KAFKA_INTER_BROKER_PASSWORD: "controller_password"
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CFG_SASL_MECHANISM_CONTROLLER_PROTOCOL: "PLAIN"
+      KAFKA_CONTROLLER_USER: "${KAFKA_INTER_BROKER_USER}"
+      KAFKA_CONTROLLER_PASSWORD: "${KAFKA_INTER_BROKER_PASSWORD}"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_CFG_NUM_PARTITIONS: "2"
+      KAFKA_CFG_MESSAGE_MAX_BYTES: 10485760
+      KAFKA_CFG_REPLICA_FETCH_MAX_BYTES: 10485760
      networks:
        - link-nw
      healthcheck:
-      test: [ "CMD-SHELL", "kafka-topics.sh --bootstrap-server kafka:9092 --command-config /etc/kafka-client.properties --list" ]
+      test: [ "CMD-SHELL", "kafka-topics.sh --bootstrap-server kafka-broker:9092 --command-config /etc/kafka-client.properties --list" ]
       interval: 5s
-      timeout: 10s
-      retries: 5
+      timeout: 5s
+      retries: 10
      
   kafka_init:
     image: confluentinc/cp-kafka:6.1.1
     container_name: kafka-init
     volumes:
-      - ./kafka-client.properties:/etc/kafka-client.properties
+      - .docker/kafka-client.properties:/etc/kafka-client.properties
+      - ./Scripts/create-topics-rest.sh:/create-topics-rest.sh
+      - ./topics.txt:/topics.txt
     depends_on:
-      - kafka_b
-    entrypoint: [ '/bin/sh', '-c' ]
+      rest-proxy:
+        condition: service_healthy
+    entrypoint: [ 'bash', '/create-topics-rest.sh', 'http://rest-proxy:8082', '${KAFKA_SASL_CLIENT_USER}', '${KAFKA_SASL_CLIENT_PASSWORD}', '/topics.txt' ]
     networks:
       - link-nw
-    command: |
-      "
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ReportScheduled --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ReportScheduled-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ReportScheduled-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic RetentionCheckScheduled --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic RetentionCheckScheduled-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic RetentionCheckScheduled-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientCensusScheduled --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientCensusScheduled-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientCensusScheduled-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientEvent --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientEvent-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientEvent-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic DataAcquisitionRequested --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic DataAcquisitionRequested-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic DataAcquisitionRequested-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientIDsAcquired --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientIDsAcquired-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientIDsAcquired-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceAcquired --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceAcquired-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceAcquired-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceNormalized --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceNormalized-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceNormalized-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceEvaluated --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceEvaluated-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceEvaluated-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic SubmitReport --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic SubmitReport-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic SubmitReport-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ReportSubmitted --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ReportSubmitted-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ReportSubmitted-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic NotificationRequested --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic NotificationRequested-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic NotificationRequested-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic AuditableEventOccurred --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic AuditableEventOccurred-Error --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic AuditableEventOccurred-Retry --replication-factor 1 --partitions 1
-        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic Service-Healthcheck --replication-factor 1 --partitions 1 --config retention.ms=1
-      "
       
   kafka-ui:
     container_name: kafka-ui
@@ -280,13 +324,15 @@ services:
       KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL: SASL_PLAINTEXT
       KAFKA_CLUSTERS_0_PROPERTIES_SASL_MECHANISM: PLAIN
       KAFKA_CLUSTERS_0_PROPERTIES_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";'
+      FILTERING_GROOVY_ENABLED: 'true'
     networks:
       - link-nw
 
   rest-proxy:
     image: confluentinc/cp-kafka-rest:latest
     depends_on:
-      - kafka_b
+      kafka_b:
+        condition: service_healthy
     ports:
       - 8082:8082
     container_name: kafka-rest-proxy
@@ -294,9 +340,16 @@ services:
       KAFKA_REST_HOST_NAME: rest-proxy
       KAFKA_REST_BOOTSTRAP_SERVERS: 'kafka_b:9094'
       KAFKA_REST_LISTENERS: "http://0.0.0.0:8082"
+      KAFKA_REST_KAFKA_CLUSTER_ID: "link-cluster"
       KAFKA_REST_CLIENT_SECURITY_PROTOCOL: SASL_PLAINTEXT
       KAFKA_REST_CLIENT_SASL_MECHANISM: PLAIN
       KAFKA_REST_CLIENT_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";'
+    healthcheck:
+      test: ["CMD", "curl", "-sSf", "http://localhost:8082/v3/clusters"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - link-nw
 
@@ -325,20 +378,21 @@ services:
     container_name: link-account
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      ServiceInformation__Name: Link Account Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ServiceName: Link Account Service
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       DatabaseProvider: SqlServer
       AutoMigrate: true
-      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-account;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433; Initial Catalog=link-account;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       ConnectionStrings__Redis: redis_cache:6379
       Cache__Enabled: true
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       ServiceRegistry: "{}"
       Telemetry__EnableTelemetry: true
+      Telemetry__EnableTracing: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
@@ -351,21 +405,29 @@ services:
     build:
       context: .
       dockerfile: DotNet/Account/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
     networks:
       - link-nw
     depends_on:
-      - loki
-      - otel-collector
-      - kafka_init
-      - mssql_init
-
+      kafka_init:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+      loki:
+        condition: service_started
+      mssql_init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8060/health"]
+        
   audit:
     image: link-audit
     container_name: link-audit
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      ServiceInformation__Name: Link Audit Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ServiceName: Link Audit Service
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
@@ -375,6 +437,7 @@ services:
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-audit;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
+      Telemetry__EnableTracing: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
@@ -384,18 +447,28 @@ services:
     build:
       context: .
       dockerfile: DotNet/Audit/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
     networks:
       - link-nw
     depends_on:
-      - loki
-      - otel-collector
-      - kafka_init
-      - mssql_init
+      kafka_init:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+      loki:
+        condition: service_started
+      mssql_init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8062/health"]
       
   admin-bff:
     image: link-admin-bff
     container_name: link-admin-bff
     environment:
+      ServiceInformation__ServiceName: Link Admin BFF
+      ServiceInformation__ProductVersion: dev
       Serilog__MinimumLevel__Default: Debug
       ASPNETCORE_ENVIRONMENT: Docker
       KafkaConnection__BootstrapServers__0: kafka_b:9094
@@ -403,6 +476,7 @@ services:
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       Serilog__WriteTo__0__Args__uri: http://loki:3100
+      Redis__Password: ${REDIS_PASS}
       ConnectionStrings__Redis: redis_cache:6379
       Cache__Type: Redis
       EnableIntegrationFeature: true
@@ -412,7 +486,15 @@ services:
       LinkTokenService__LinkAdminEmail:      
       LinkTokenService__TokenLifeSpan: 10    
       Authentication__EnableAnonymousAccess: true
-      CORS__AllowAllOrigins: true
+      CORS__AllowAllOrigins: false  # Change from true to false
+      CORS__AllowedOrigins__0: http://localhost:8066  # Add the frontend origin
+      CORS__AllowCredentials: true  # Ensure this is set
+      CORS__AllowedMethods__0: GET
+      CORS__AllowedMethods__1: POST
+      CORS__AllowedMethods__2: PUT
+      CORS__AllowedMethods__3: DELETE
+      CORS__AllowedMethods__4: OPTIONS
+      CORS__AllowedHeaders__0: "*"
       ServiceRegistry__TenantService__TenantServiceURL: http://tenant:8074
       ServiceRegistry__AccountServiceUrl: http://account:8060
       ServiceRegistry__AuditServiceUrl: http://audit:8062
@@ -420,43 +502,10 @@ services:
       ServiceRegistry__DataAcquisitionServiceUrl: http://dataacquisition:8065
       ServiceRegistry__MeasureServiceUrl: http://measureeval:8067
       ServiceRegistry__NormalizationServiceUrl: http://normalization:8068
-      ServiceRegistry__NotificationServiceUrl: http://notification:8069
       ServiceRegistry__ReportServiceUrl: http://report:8072
       ServiceRegistry__SubmissionServiceUrl: http://submission:8073
       ServiceRegistry__QueryDispatchServiceUrl: http://querydispatch:8071
-      ReverseProxy__Routes__route1__ClusterId: AccountService
-      ReverseProxy__Routes__route1__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route1__Match__Path: api/account/{**catch-all}
-      ReverseProxy__Routes__route2__ClusterId: AuditService
-      ReverseProxy__Routes__route2__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route2__Match__Path: api/audit/{**catch-all}
-      ReverseProxy__Routes__route3__ClusterId: CensusService
-      ReverseProxy__Routes__route3__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route3__Match__Path: api/census/{**catch-all}
-      ReverseProxy__Routes__route4__ClusterId: DataAcquisitionService
-      ReverseProxy__Routes__route4__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route4__Match__Path: api/data/{**catch-all}
-      ReverseProxy__Routes__route5__ClusterId: MeasureEvaluationService
-      ReverseProxy__Routes__route5__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route5__Match__Path: api/measure-definition/{**catch-all}
-      ReverseProxy__Routes__route6__ClusterId: NormalizationService
-      ReverseProxy__Routes__route6__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route6__Match__Path: api/normalization/{**catch-all}
-      ReverseProxy__Routes__route7__ClusterId: NotificationService
-      ReverseProxy__Routes__route7__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route7__Match__Path: api/notification/{**catch-all}
-      ReverseProxy__Routes__route8__ClusterId: ReportService
-      ReverseProxy__Routes__route8__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route8__Match__Path: api/report/{**catch-all}
-      ReverseProxy__Routes__route9__ClusterId: ReportService
-      ReverseProxy__Routes__route9__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route9__Match__Path: api/reportconfig/{**catch-all}
-      ReverseProxy__Routes__route10__ClusterId: TenantService
-      ReverseProxy__Routes__route10__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route10__Match__Path: api/facility/{**catch-all}
-      ReverseProxy__Routes__route11__ClusterId: QueryDispatchService
-      ReverseProxy__Routes__route11__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route11__Match__Path: api/querydispatch/{**catch-all}
+      ServiceRegistry__TerminologyServiceUrl: http://terminology:8076
       ReverseProxy__Clusters__AccountService__Destinations__destination1__Address: http://account:8060
       ReverseProxy__Clusters__AuditService__Destinations__destination1__Address: http://audit:8062
       ReverseProxy__Clusters__CensusService__Destinations__destination1__Address: http://census:8064
@@ -467,7 +516,10 @@ services:
       ReverseProxy__Clusters__ReportService__Destinations__destination1__Address: http://report:8072
       ReverseProxy__Clusters__TenantService__Destinations__destination1__Address: http://tenant:8074
       ReverseProxy__Clusters__QueryDispatchService__Destinations__destination1__Address: http://querydispatch:8071
+      ReverseProxy__Clusters__ValidationService__Destinations__destination1__Address: http://validation:8075
+      ReverseProxy__Clusters__TerminologyService__Destinations__destination1__Address: http://terminology:8076
       Telemetry__EnableTelemetry: true
+      Telemetry__EnableTracing: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
     ports:
@@ -478,27 +530,40 @@ services:
     networks:
       - link-nw
     depends_on:
-      - kafka_init
-      - otel-collector
-      - redis_cache
-      - account
-      - audit
-      - census
-      - dataacquisition
-      - measureeval
-      - normalization
-      - notification
-      - report
-      - submission
-      - tenant
+      otel-collector:
+        condition: service_started
+      redis_cache:
+        condition: service_healthy
+      loki:
+        condition: service_started
+      account:
+        condition: service_healthy
+      census:
+        condition: service_healthy
+      dataacquisition:
+        condition: service_healthy
+      measureeval:
+        condition: service_healthy
+      normalization:
+        condition: service_healthy
+      report:
+        condition: service_healthy
+      submission:
+        condition: service_healthy
+      tenant:
+        condition: service_healthy
+      terminology:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8063/api/health"]
   
   census:
     image: link-census
     container_name: link-census
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      ServiceInformation__Name: Link Census Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ServiceName: Link Census Service
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
@@ -508,6 +573,7 @@ services:
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-census;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
+      Telemetry__EnableTracing: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       ServiceRegistry__TenantService__TenantServiceURL: http://tenant:8074
@@ -520,22 +586,31 @@ services:
     build:
       context: .
       dockerfile: DotNet/Census/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
     networks:
       - link-nw
     depends_on:
-      - loki
-      - kafka_init
-      - otel-collector
-      - mssql_init
-      - tenant
+      kafka_init:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+      loki:
+        condition: service_started
+      mssql_init:
+        condition: service_completed_successfully
+      tenant:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8064/health" ]
 
   dataacquisition:
     image: link-dataacquisition
     container_name: link-dataacquisition
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      ServiceInformation__Name: Link Data Acquisition Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ServiceName: Link Data Acquisition Service
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
@@ -543,8 +618,14 @@ services:
       DatabaseProvider: SqlServer      
       AutoMigrate: true
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+      ConnectionStrings__Redis: redis_cache:6379
+      Redis__Password: ${REDIS_PASS}
+      DistributedLockSettings__Expiration: 10
+      DistributedLockSettings__RetryDelay: 5
+      DistributedLockSettings__MaxRetryCount: 3
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
+      Telemetry__EnableTracing: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       ServiceRegistry__TenantService__TenantServiceURL: http://tenant:8074
@@ -557,14 +638,81 @@ services:
     build:
       context: .
       dockerfile: DotNet/DataAcquisition/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
     networks:
       - link-nw
     depends_on:
-      - kafka_init
-      - otel-collector
-      - mssql_init
-      - loki
+      kafka_init:
+        condition: service_completed_successfully
+      mssql_init:
+        condition: service_completed_successfully
+      tenant:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+      loki:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8065/health"]
+      start_period: 5s
+      interval: 5s
+      retries: 10
 
+  dataacquisition.acquisitionworker:
+     image: link-dataacquisitionworker
+     container_name: link-dataacquisitionworker
+     environment:
+       ASPNETCORE_ENVIRONMENT: Docker
+       ServiceInformation__ServiceName: Link Data Acquisition Worker Service
+       ServiceInformation__ProductVersion: dev
+       KafkaConnection__BootstrapServers__0: kafka_b:9094
+       KafkaConnection__SaslProtocolEnabled: true
+       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
+       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
+       DatabaseProvider: SqlServer      
+       AutoMigrate: false
+       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+       ConnectionStrings__Redis: redis_cache:6379
+       Redis__Password: ${REDIS_PASS}
+       Serilog__WriteTo__0__Args__uri: http://loki:3100
+       Telemetry__EnableTelemetry: true
+       Telemetry__EnableTracing: true
+       Telemetry__EnableOtelCollector: true
+       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
+       ServiceRegistry__TenantService__TenantServiceURL: http://tenant:8074
+       ServiceRegistry__TenantService__CheckIfTenantExists: false
+       ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
+       EnableSwagger: true
+       Authentication__EnableAnonymousAccess: true
+     ports:
+       - "8078:8078"
+     build:
+       context: .
+       dockerfile: DotNet/DataAcquisition.AcquisitionWorker/Dockerfile
+       args:
+         BUILD_CONFIGURATION: Debug
+     networks:
+       - link-nw
+     depends_on:
+       kafka_init:
+         condition: service_completed_successfully
+       mssql_init:
+         condition: service_completed_successfully
+       otel-collector:
+         condition: service_started
+       dataacquisition:
+         condition: service_healthy
+       loki:
+         condition: service_started
+       redis_cache:
+         condition: service_healthy
+     healthcheck:
+       test: ["CMD", "curl", "-f", "http://localhost:8078/health"]
+       start_period: 3s
+       interval: 3s
+       retries: 10
+  
   admin-ui:
     image: link-admin-ui
     container_name: link-admin-ui
@@ -572,15 +720,22 @@ services:
       - "8066:80"
     build:
       context: Web/Admin.UI
+    environment:
+      LINK_AUTH_REQUIRED: false
+      LINK_BASE_API_URL: http://localhost:8063/api
+      GRAFANA_URL: http://localhost:3000
+      KAFKA_URL: http://localhost:9095
     networks:
       - link-nw
     depends_on:
-      - kafka_b
+      - admin-bff
 
   measureeval:
     image: link-measureeval
     container_name: link-measureeval
     environment:
+      service-information.service-name: "Link Measure Evaluation Service"
+      service-information.product-version: dev
       server.port: 8067
       spring.data.mongodb.uri: mongodb://mongo:27017
       spring.data.mongodb.database: link-measureeval
@@ -590,11 +745,16 @@ services:
       spring.kafka.properties.security.protocol: SASL_PLAINTEXT
       spring.kafka.properties.sasl.mechanism: PLAIN
       spring.kafka.properties.sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";
+      spring.kafka.producer.properties.max.request.size: 10485760
       spring.security.oauth2.resourceserver.jwt.issuer-uri: https://oauth.nhsnlink.org/realms/NHSNLink
+      springdoc.api-docs.enabled: true
+      springdoc.swagger-ui.enabled: true
       authentication.anonymous: true
       link.data-acquisition.base-url: http://dataacquisition:8065
       spring_profiles_active: dev
-      loki.enabled: false
+      telemetry.exporter_endpoint: http://otel-collector:4317
+      loki.enabled: true
+      loki.url: http://loki:3100
     ports:
       - "8067:8067"
     build:
@@ -603,17 +763,27 @@ services:
     networks:
       - link-nw
     depends_on:
-      - kafka_init
-      - mongo
-      - dataacquisition
+      kafka_init:
+        condition: service_completed_successfully
+      mongo:
+        condition: service_healthy
+      dataacquisition:
+        condition: service_healthy
+      dataacquisition.acquisitionworker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8067/health"]
+      start_period: 15s
+      interval: 5s
+      retries: 10
       
   normalization:
     image: link-normalization
     container_name: link-normalization
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      ServiceInformation__Name: Link Normalization Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ServiceName: Link Normalization Service
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
@@ -623,6 +793,7 @@ services:
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-normalization;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
+      Telemetry__EnableTracing: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       ServiceRegistry__TenantService__TenantServiceURL: http://tenant:8074
@@ -635,58 +806,32 @@ services:
     build:
       context: .
       dockerfile: DotNet/Normalization/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
     networks:
       - link-nw
     depends_on:
-      - kafka_init
-      - otel-collector
-      - loki
-      
-  notification:
-    image: link-notification
-    container_name: link-notification
-    environment:
-      ASPNETCORE_ENVIRONMENT: Docker
-      ServiceInformation__Name: Link Notification Service
-      ServiceInformation__Version: 1.1.00-dev
-      KafkaConnection__BootstrapServers__0: kafka_b:9094
-      KafkaConnection__SaslProtocolEnabled: true
-      KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
-      KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
-      DatabaseProvider: SqlServer
-      AutoMigrate: true
-      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-notification;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
-      ServiceRegistry__TenantService__TenantServiceURL: http://tenant:8074
-      ServiceRegistry__TenantService__CheckIfTenantExists: false
-      ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
-      IdentityProviderConfig__Issuer: https://oauth.nhsnlink.org/realms/NHSNLink
-      IdentityProviderConfig__Audience: https://oauth.nhsnlink.org/realms/NHSNLink
-      Serilog__WriteTo__0__Args__uri: http://loki:3100
-      Telemetry__EnableTelemetry: true
-      Telemetry__EnableOtelCollector: true
-      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
-      EnableSwagger: true
-      Authentication__EnableAnonymousAccess: true
-    ports:
-      - "8069:8069"
-    build:
-      context: .
-      dockerfile: DotNet/Notification/Dockerfile
-    networks:
-      - link-nw
-    depends_on:
-      - kafka_init
-      - otel-collector
-      - mssql_init
-      - loki
+      kafka_init:
+        condition: service_completed_successfully
+      mssql_init:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+      loki:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8068/health"]
+      start_period: 3s
+      interval: 3s
+      retries: 10
       
   querydispatch:
     image: link-querydispatch
     container_name: link-querydispatch
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      ServiceInformation__Name: Link Query Dispatch Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ServiceName: Link Query Dispatch Service
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
@@ -696,9 +841,10 @@ services:
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-querydispatch;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
+      Telemetry__EnableTracing: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
-      ServiceRegistry__TenantService__TenantServiceURL: http://tenant:8074
+      ServiceRegistry__TenantService__TenantServiceURL: http://tenant:8074/api
       ServiceRegistry__TenantService__CheckIfTenantExists: false
       ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
       EnableSwagger: true
@@ -708,141 +854,197 @@ services:
     build:
       context: .
       dockerfile: DotNet/QueryDispatch/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
     networks:
       - link-nw
     depends_on:
-      - kafka_init
-      - otel-collector
-      - mongo
-      - loki
+      kafka_init:
+        condition: service_completed_successfully
+      mongo:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+      loki:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8071/health"]
+      start_period: 3s
+      interval: 3s
+      retries: 10
 
   report:
     image: link-report
     container_name: link-report
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      ServiceInformation__Name: Link Report Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ServiceName: Link Report Service
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       MongoDB__ConnectionString: mongodb://mongo:27017
       MongoDB__DatabaseName: link-report
+      ConnectionStrings__Redis: redis_cache:6379
+      Redis__Password: ${REDIS_PASS}
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
+      Telemetry__EnableTracing: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
       ServiceRegistry__TenantService__CheckIfTenantExists: false
       ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
+      ServiceRegistry__CensusServiceUrl: http://census:8064
       EnableSwagger: true
       Authentication__EnableAnonymousAccess: true
+      Logging__LogLevel__LantanaGroup.Link.Report: DEBUG
+      InternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
+      InternalBlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
     ports:
       - "8072:8072"
     build:
       context: .
       dockerfile: DotNet/Report/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
     networks:
       - link-nw
     depends_on:
-      - kafka_init
-      - otel-collector
-      - mongo
-      - loki
+      kafka_init:
+        condition: service_completed_successfully
+      mongo:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+      loki:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8072/health"]
+      start_period: 5s
+      interval: 5s
+      retries: 10
 
   submission:
     image: link-submission
     container_name: link-submission
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      ServiceInformation__Name: Link Submission Service
-      ServiceInformation__Version: 1.1.00-dev
-      KafkaConnection__BootstrapServers__0: kafka_b:9094
-      KafkaConnection__SaslProtocolEnabled: true
-      KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
-      KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
-      MongoDB__ConnectionString: mongodb://mongo:27017
-      MongoDB__DatabaseName: link-report
-      # TODO: Replce with Mongo dependency when LNK-2166 finishes
-      # DatabaseProvider: SqlServer
-      # AutoMigrate: true
-      # ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-submission;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
-      SubmissionServiceConfig__ReportServiceUrl: http://report:8072/api/Report
-      SubmissionServiceConfig__CensusUrl: http://census:8064/api/Census
-      SubmissionServiceConfig__DataAcquisitionUrl: http://dataacquisition:8065/api
-      SubmissionServiceConfig__SubmissionDirectory: submissions
-      SubmissionServiceConfig__PatientBundleBatchSize: 5
-      SubmissionServiceConfig__MeasureNames__0__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNdQMAcuteCareHospitalInitialPopulation
-      SubmissionServiceConfig__MeasureNames__0__MeasureId: NHSNdQMAcuteCareHospitalInitialPopulation
-      SubmissionServiceConfig__MeasureNames__0__ShortName: HYPO
-      SubmissionServiceConfig__MeasureNames__1__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNGlycemicControlHypoglycemicInitialPopulation
-      SubmissionServiceConfig__MeasureNames__1__MeasureId: NHSNGlycemicControlHypoglycemicInitialPopulation
-      SubmissionServiceConfig__MeasureNames__1__ShortName: ACH
-      SubmissionServiceConfig__MeasureNames__2__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNRespiratoryPathogensSurveillanceInitialPopulation
-      SubmissionServiceConfig__MeasureNames__2__MeasureId: NHSNRespiratoryPathogensSurveillanceInitialPopulation
-      SubmissionServiceConfig__MeasureNames__2__ShortName: RPS
-      Serilog__WriteTo__0__Args__uri: http://loki:3100
-      Telemetry__EnableTelemetry: true
-      Telemetry__EnableOtelCollector: true
-      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
-      EnableSwagger: true
-      Authentication__EnableAnonymousAccess: true
-    ports:
-      - "8073:8073"
-    build:
-      context: .
-      dockerfile: DotNet/Submission/Dockerfile
-    networks:
-      - link-nw
-    volumes: 
-      - submission_data:/data/Submission
-    depends_on:
-      - kafka_init
-      - otel-collector
-      - mongo
-      #- mssql_init
-      - loki
-
-
-  tenant:
-    image: link-tenant
-    container_name: link-tenant
-    environment:
-      ASPNETCORE_ENVIRONMENT: Docker
-      ServiceInformation__Name: Link Tenant Service
-      ServiceInformation__Version: 1.1.00-dev
+      ServiceInformation__ServiceName: Link Submission Service
+      ServiceInformation__ProductVersion: dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       DatabaseProvider: SqlServer
       AutoMigrate: true
+      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-submission;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+      ServiceRegistry__ReportServiceUrl: http://report:8072
+      SubmissionServiceConfig__SubmissionDirectory: /data/submission
+      SubmissionServiceConfig__PatientBundleBatchSize: 5
+      SubmissionServiceConfig__MeasureNames__0__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNAcuteCareHospitalMonthlyInitialPopulation
+      SubmissionServiceConfig__MeasureNames__0__MeasureId: NHSNAcuteCareHospitalMonthlyInitialPopulation
+      SubmissionServiceConfig__MeasureNames__0__ShortName: ACHM
+      SubmissionServiceConfig__MeasureNames__1__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNGlycemicControlHypoglycemicInitialPopulation
+      SubmissionServiceConfig__MeasureNames__1__MeasureId: NHSNGlycemicControlHypoglycemicInitialPopulation
+      SubmissionServiceConfig__MeasureNames__1__ShortName: HYPO
+      SubmissionServiceConfig__MeasureNames__2__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNAcuteCareHospitalDailyInitialPopulation
+      SubmissionServiceConfig__MeasureNames__2__MeasureId: NHSNAcuteCareHospitalDailyInitialPopulation
+      SubmissionServiceConfig__MeasureNames__2__ShortName: ACHD
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
+      Telemetry__EnableTelemetry: true
+      Telemetry__EnableTracing: true
+      Telemetry__EnableOtelCollector: true
+      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
+      EnableSwagger: true
+      Authentication__EnableAnonymousAccess: true
+      Features__DownloadReportEnabled: true
+      Logging__LogLevel__LantanaGroup.Link: DEBUG
+      InternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
+      InternalBlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
+      ExternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
+      ExternalBlobStorage__BlobContainerName: ${EXTERNAL_BLOB_CONTAINER_NAME}
+    ports:
+      - "8073:8073"
+    build:
+      context: .
+      dockerfile: DotNet/Submission/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
+    networks:
+      - link-nw
+    volumes: 
+      - submission_data:/data/submission
+    depends_on:
+      kafka_init:
+        condition: service_completed_successfully
+      mssql_init:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+      loki:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8073/health"]
+      start_period: 30s
+      interval: 5s
+      retries: 10
+
+  tenant:
+    image: link-tenant
+    container_name: link-tenant
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ServiceInformation__ServiceName: Link Tenant Service
+      ServiceInformation__ProductVersion: dev
+      KafkaConnection__BootstrapServers__0: kafka_b:9094
+      KafkaConnection__SaslProtocolEnabled: true
+      KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
+      KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
+      DatabaseProvider: SqlServer
+      AutoMigrate: true
+      FacilityIdSettings__NumericOnlyFacilityId: false
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-tenant;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
+      Telemetry__EnableTracing: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
       Authentication__EnableAnonymousAccess: true
       ServiceRegistry__MeasureServiceUrl: http://measureeval:8067
+      ServiceRegistry__ReportServiceUrl: http://report:8072
     ports:
       - "8074:8074"
     build:
       context: .
       dockerfile: DotNet/Tenant/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
     networks:
       - link-nw
     depends_on:
-      - kafka_init
-      - otel-collector
-      - loki
-      - mssql_init
+      kafka_init:
+        condition: service_completed_successfully
+      mssql_init:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+      loki:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8074/health"]
+      start_period: 5s
+      interval: 5s
+      retries: 10
 
   validation:
     image: link-validation
     container_name: link-validation
     environment:
+      service-information.service-name: "Link Validation Service"
+      service-information.product-version: dev
       server.port: 8075
       spring.security.oauth2.resourceserver.jwt.issuer-uri: https://oauth.nhsnlink.org/realms/NHSNLink
       spring.datasource.url: jdbc:sqlserver://;serverName=mssql;databaseName=link-validation;encrypt=true;trustServerCertificate=true
@@ -855,10 +1057,19 @@ services:
       authentication.enableAnonymousAccess: true
       secretManagement.managerUri: https://link-vault.vault.azure.net/
       spring.jpa.hibernate.ddl-auto: update
+      springdoc.api-docs.enabled: true
+      springdoc.swagger-ui.enabled: true
       authentication.anonymous: true
       spring_profiles_active: dev
-      loki.enabled: false
+      loki.enabled: true
       loki.url: http://loki:3100
+      LINK_REPORT_BASE-URL: http://report:8072
+      internal-blob-storage.connection-string: ${AZURITE_CONNECTION_STRING}
+      internal-blob-storage.blob-container-name: ${INTERNAL_BLOB_CONTAINER_NAME}
+      spring.data.redis.host: redis_cache
+      spring.data.redis.port: 6379
+      spring.data.redis.password: ${REDIS_PASS}
+      telemetry.exporter_endpoint: http://otel-collector:4317
     ports:
       - "8075:8075"
     build:
@@ -867,8 +1078,51 @@ services:
     networks:
       - link-nw
     depends_on:
-      - kafka_init
-      - mssql_init
+      kafka_init:
+        condition: service_completed_successfully
+      mssql_init:
+        condition: service_completed_successfully
+      redis_cache:
+        condition: service_healthy
+      report:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8075/health"]
+      start_period: 15s
+      interval: 5s
+      retries: 10
+
+  terminology:
+    image: link-terminology
+    container_name: link-terminology
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      Terminology__Path: "/data"
+      ServiceInformation__Name: Link Terminology
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
+      Telemetry__EnableTelemetry: true
+      Telemetry__EnableOtelCollector: true
+      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
+      EnableSwagger: true
+      Authentication__EnableAnonymousAccess: true
+    volumes:
+      - terminology_data:/data
+    ports:
+      - "8076:8076"
+    build:
+      context: .
+      dockerfile: DotNet/Terminology/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
+    networks:
+      - link-nw
+    depends_on:
+      otel-collector:
+        condition: service_started
+      loki:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8076/health"]
 
 networks:
   link-nw:
@@ -883,4 +1137,10 @@ volumes:
   mongo_data:
     driver: local
   submission_data:
+    driver: local
+  fhir_data:
+    driver: local
+  azurite_data:
+    driver: local
+  terminology_data:
     driver: local

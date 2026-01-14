@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, Inject, ViewChild } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
@@ -13,12 +13,11 @@ import { DataAcquisitionFhirListConfigFormComponent } from '../data-acquisition-
   selector: 'app-data-acquisition-fhir-list-config-dialog',
   standalone: true,
   imports: [
-    CommonModule,
     MatDialogModule,
     MatButtonModule,
     MatIconModule,
     DataAcquisitionFhirListConfigFormComponent
-  ],
+],
   templateUrl: './data-acquisition-fhir-list-config-dialog.component.html',
   styleUrls: ['./data-acquisition-fhir-list-config-dialog.component.css']
 })
@@ -31,14 +30,14 @@ export class DataAcquisitionFhirListConfigDialogComponent {
 
   @ViewChild(DataAcquisitionFhirListConfigFormComponent) configForm!: DataAcquisitionFhirListConfigFormComponent;
 
-  constructor(@Inject(MAT_DIALOG_DATA) public data: { dialogTitle: string, formMode: FormMode, viewOnly: boolean, config: IDataAcquisitionFhirListConfigModel },
+  constructor(@Inject(MAT_DIALOG_DATA) public data: { dialogTitle: string, formMode: FormMode, viewOnly: boolean, dataAcqFhirListConfig: IDataAcquisitionFhirListConfigModel },
     private dialogRef: MatDialogRef<DataAcquisitionFhirListConfigFormComponent>,
     private snackBar: MatSnackBar) { }
 
   ngOnInit(): void {
     this.dialogTitle = this.data.dialogTitle;
     this.viewOnly = this.data.viewOnly;
-    this.config = this.data.config;
+    this.config = this.data.dataAcqFhirListConfig;
     this.formMode = this.data.formMode;
   }
 
@@ -52,7 +51,7 @@ export class DataAcquisitionFhirListConfigDialogComponent {
   }
 
   onSubmittedConfiguration(outcome: IEntityCreatedResponse) {
-    if (outcome.id.length > 0) {
+    if (outcome.message.length > 0) {
       this.dialogRef.close(outcome.message);
     }
     else {

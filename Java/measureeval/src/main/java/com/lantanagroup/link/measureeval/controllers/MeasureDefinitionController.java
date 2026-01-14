@@ -4,12 +4,12 @@ import ca.uhn.fhir.context.FhirContext;
 import com.fasterxml.jackson.annotation.JsonView;
 import com.lantanagroup.link.measureeval.entities.MeasureDefinition;
 import com.lantanagroup.link.measureeval.repositories.MeasureDefinitionRepository;
-import com.lantanagroup.link.measureeval.serdes.Views;
 import com.lantanagroup.link.measureeval.services.MeasureDefinitionBundleValidator;
 import com.lantanagroup.link.measureeval.services.MeasureEvaluator;
 import com.lantanagroup.link.measureeval.services.MeasureEvaluatorCache;
 import com.lantanagroup.link.measureeval.utils.CqlUtils;
 import com.lantanagroup.link.shared.auth.PrincipalUser;
+import com.lantanagroup.link.shared.serdes.Views;
 import io.opentelemetry.api.trace.Span;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -30,7 +30,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/measure-definition")
+@RequestMapping("/api/measureeval/measure-definition")
 @PreAuthorize("hasRole('LinkUser')")
 public class MeasureDefinitionController {
 
@@ -69,6 +69,7 @@ public class MeasureDefinitionController {
     }
 
     @GetMapping("/{id}")
+    @JsonView(Views.Detail.class)
     @Operation(summary = "Get a measure definition", tags = {"Measure Definitions"})
     public MeasureDefinition getOne(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id) {
 
@@ -80,15 +81,22 @@ public class MeasureDefinitionController {
         return repository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
-    @PutMapping("/{id}")
+    @PutMapping
     @PreAuthorize("hasAuthority('IsLinkAdmin')")
     @Operation(summary = "Put (create or update) a measure definition", tags = {"Measure Definitions"})
-    public MeasureDefinition put(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id, @RequestBody Bundle bundle) {
-        _logger.info("Put measure definition {}", StringEscapeUtils.escapeJava(id));
+    @JsonView(Views.Detail.class)
+    public MeasureDefinition put(@AuthenticationPrincipal PrincipalUser user, @RequestBody Bundle bundle) {
 
         if (user != null){
             Span currentSpan = Span.current();
             currentSpan.setAttribute("user", user.getEmailAddress());
+        }
+        if (bundle == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body must be a FHIR Bundle");
+        }
+        String id = (bundle.getIdElement() != null) ? bundle.getIdElement().getIdPart() : null;
+        if (id == null || id.isBlank()) {
+           throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bundle.id is required");
         }
         bundleValidator.validate(bundle);
         MeasureDefinition entity = repository.findById(id).orElseGet(() -> {

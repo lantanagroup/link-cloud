@@ -9,7 +9,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule, MatIconRegistry } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { NgFor } from '@angular/common';
+
 import { ActivatedRoute, ParamMap } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -25,7 +25,7 @@ import { DocsSiteTheme, ThemeStorage } from './theme-storage/theme-storage';
   changeDetection: ChangeDetectionStrategy.OnPush,
   encapsulation: ViewEncapsulation.None,
   standalone: true,
-  imports: [MatButtonModule, MatTooltipModule, MatMenuModule, MatIconModule, NgFor]
+  imports: [MatButtonModule, MatTooltipModule, MatMenuModule, MatIconModule]
 })
 export class ThemePickerComponent implements OnInit, OnDestroy {
   private _queryParamSubscription = Subscription.EMPTY;
@@ -36,9 +36,9 @@ export class ThemePickerComponent implements OnInit, OnDestroy {
     {
       primary: '#3F51B5',
       accent: '#E91E63',
-      displayName: 'Indigo & Pink',
-      name: 'indigo-pink',
-      isDark: false      
+      displayName: 'Blue & Rose',
+      name: 'blue-rose',
+      isDark: false
     },
     //{
     //  primary: '#E91E63',
@@ -128,7 +128,7 @@ export class ThemePickerComponent implements OnInit, OnDestroy {
     const body = document.getElementsByTagName('body')[0];
     if (prevThemeName) {
       body.classList.remove(prevThemeName);
-    }    
+    }
     body.classList.add(this.currentTheme.name);
 
 

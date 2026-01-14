@@ -89,7 +89,7 @@ jobs:
       displayName: "Build & Push Account Docker Image"
       condition: always()
       inputs:
-        containerRegistry: $(containerRegistry)
+        containerRegistry: $(containerRegistry) # Variable Group
         repository: link-${{ value }}
         command: 'buildAndPush'
         Dockerfile: '**/DotNet/${{ value }}/Dockerfile'
@@ -145,7 +145,7 @@ jobs:
       displayName: "Build & Push Account Docker Image - BFF"
       condition: always()
       inputs:
-        containerRegistry: $(containerRegistry)
+        containerRegistry: $(containerRegistry) # Variable Group
         repository: 'link-bff'
         command: 'buildAndPush'
         Dockerfile: '**/DotNet/LinkAdmin.BFF/Dockerfile'
@@ -156,7 +156,7 @@ jobs:
       displayName: "Build & Push Account Docker Image - DEMO"
       condition: always()
       inputs:
-        containerRegistry: $(containerRegistry)
+        containerRegistry: $(containerRegistry) # Variable Group
         repository: 'link-demo'
         command: 'buildAndPush'
         Dockerfile: '**/Web/DemoApp/Dockerfile'
@@ -167,7 +167,7 @@ jobs:
       displayName: "Build & Push Account Docker Image - MeasureEval"
       condition: always()
       inputs:
-        containerRegistry: $(containerRegistry)
+        containerRegistry: $(containerRegistry) # Variable Group
         repository: 'link-measureeval'
         command: 'buildAndPush'
         Dockerfile: 'Java/measureeval/Dockerfile'
@@ -178,7 +178,7 @@ jobs:
       displayName: "Build & Push Account Docker Image - Validation"
       condition: always()
       inputs:
-        containerRegistry: $(containerRegistry)
+        containerRegistry: $(containerRegistry) # Variable Group
         repository: 'link-validation'
         command: 'buildAndPush'
         Dockerfile: 'Java/validation/Dockerfile'

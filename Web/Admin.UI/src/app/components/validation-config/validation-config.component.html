@@ -1,0 +1,45 @@
+<mat-card class="upload-card">
+  <mat-card-title>Upload Implementation Guide</mat-card-title>
+  <mat-card-content>
+    <div class="form-layout">
+      <!-- File Upload Field -->
+      <div class="form-section">
+        <mat-label class="form-label">Implementation Guide File</mat-label>
+        <file-upload (fileChange)="loadFile($event)">Upload</file-upload>
+        @if (errorMessage) {
+          <mat-error class="error-text">
+            <mat-icon>error</mat-icon> {{ errorMessage }}
+          </mat-error>
+        }
+      </div>
+
+      <!-- Display Guide Name -->
+      @if (configForm.get('name')?.value; as name) {
+        <div class="form-section">
+          <mat-label class="form-label">Implementation Guide Name</mat-label>
+          <div class="guide-name">{{ name }}</div>
+        </div>
+      }
+    </div>
+  </mat-card-content>
+
+  <mat-card-actions align="end">
+    <button mat-raised-button color="primary" [disabled]="configForm.invalid" (click)="submitConfiguration()">
+      <mat-icon>save</mat-icon>
+      Upload Implementation Guide
+    </button>
+  </mat-card-actions>
+</mat-card>
+<!-- IG Names -->
+<mat-card class="upload-card">
+  <mat-card-content>
+    <mat-card-title>Uploaded Implementation Guides</mat-card-title>
+    <mat-list>
+      @for (ig of implementationGuides; track ig) {
+        <mat-list-item>
+          {{ ig.name }}
+        </mat-list-item>
+      }
+    </mat-list>
+  </mat-card-content>
+</mat-card>

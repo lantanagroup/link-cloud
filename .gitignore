@@ -4,6 +4,7 @@
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
 secrets.json
+.runsettings
 
 # User-specific files
 *.rsuser
@@ -412,3 +413,5 @@ FodyWeavers.xsd
 /DotNet/Submission/appsettings.Development.json
 /DotNet/Submission/submissions
 /DotNet/Census/appsettings.Local.json
+/DotNet/Normalization/efpt.config.json
+/Java/**/application-dev.yml

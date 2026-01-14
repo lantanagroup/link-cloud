@@ -1,7 +1,7 @@
 package com.lantanagroup.link.measureeval.entities;
 
 import com.fasterxml.jackson.annotation.JsonView;
-import com.lantanagroup.link.measureeval.serdes.Views;
+import com.lantanagroup.link.shared.serdes.Views;
 import lombok.Getter;
 import lombok.Setter;
 import org.hl7.fhir.r4.model.Bundle;
@@ -19,6 +19,7 @@ public class MeasureDefinition {
     @JsonView(Views.Summary.class)
     private String id;
 
+    @JsonView(Views.Detail.class)
     private Bundle bundle;
 
     @Version

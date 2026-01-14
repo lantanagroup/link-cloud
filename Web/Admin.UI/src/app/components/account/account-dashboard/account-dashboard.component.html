@@ -3,65 +3,93 @@
   <p>
     <mat-toolbar class="page-header-bar" color="primary">
       <span>User Accounts</span>
-      <button mat-mini-fab aria-label="Create a new user " matTooltip="Create User" >
+      <button mat-mini-fab aria-label="Create a new user " matTooltip="Create Account" (click)="onAdd()">
         <mat-icon>add</mat-icon>
       </button>
     </mat-toolbar>
   </p>
 
-  <div class="account-table-container" *ngIf="users.length > 0;else no_user_found">
-
-    <table mat-table [dataSource]="users">
-
-      <!-- First Name Column -->
-      <ng-container matColumnDef="FirstName">
-        <th mat-header-cell *matHeaderCellDef> First Name </th>
-        <td mat-cell *matCellDef="let user"> {{user.firstName}} </td>
-      </ng-container>
-
-      <!-- Last Name Column -->
-      <ng-container matColumnDef="LastName">
-        <th mat-header-cell *matHeaderCellDef> Last Name </th>
-        <td mat-cell *matCellDef="let user"> {{user.lastName}} </td>
-      </ng-container>
-
-      <ng-container matColumnDef="Role">
-        <th mat-header-cell *matHeaderCellDef> Role </th>
-        <td mat-cell *matCellDef="let user"> LinkAdmin </td>
-      </ng-container>
-
-      <!-- Email Column -->
-      <ng-container matColumnDef="Email">
-        <th mat-header-cell *matHeaderCellDef> Email </th>
-        <td mat-cell *matCellDef="let user"> {{user.email}} </td>
-      </ng-container>
-
-      <!-- Actions Column -->
-      <ng-container matColumnDef="Actions">
-        <th mat-header-cell *matHeaderCellDef> Actions </th>
-        <td mat-cell *matCellDef="let row">
-          <div class="actions">
-            <button mat-icon-button color="primary" (click)="onEdit(row)" matTooltip="Edit User">
-              <mat-icon>edit</mat-icon>
-            </button>
-            <button mat-icon-button color="warn" (click)="onDelete(row)" matTooltip="Delete User">
-              <mat-icon>delete</mat-icon>
-            </button>
-          </div>
-        </td>
-      </ng-container>
-
-
-      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-
-    </table>
-
+  <div>
+    <label>
+      <input type="checkbox" [(ngModel)]="showDeletedAccounts" (change)="getAccounts()" />
+      Show Deleted Accounts
+    </label>
   </div>
-  <ng-template #no_user_found>
-    <div class="no-results-found-container">
-      <span>No users found.</span>
+
+  @if (users.length > 0) {
+    <div class="account-table-container">
+      <table mat-table [dataSource]="users">
+        <!-- User Name Column -->
+        <ng-container matColumnDef="UserName">
+          <th mat-header-cell *matHeaderCellDef> Username </th>
+          <td mat-cell *matCellDef="let user"> {{user.username}} </td>
+        </ng-container>
+        <!-- First Name Column -->
+        <ng-container matColumnDef="FirstName">
+          <th mat-header-cell *matHeaderCellDef> First Name </th>
+          <td mat-cell *matCellDef="let user"> {{user.firstName}} </td>
+        </ng-container>
+        <!-- Last Name Column -->
+        <ng-container matColumnDef="LastName">
+          <th mat-header-cell *matHeaderCellDef> Last Name </th>
+          <td mat-cell *matCellDef="let user"> {{user.lastName}} </td>
+        </ng-container>
+        <ng-container matColumnDef="Roles">
+          <th mat-header-cell *matHeaderCellDef> Roles </th>
+          <td mat-cell *matCellDef="let user">
+            <div class="d-flex flex-wrap gap-2">
+              @for (role of user.roles; track role) {
+                <span class="badge bg-primary text-white">
+                  {{ role }}
+                </span>
+              }
+            </div>
+          </td>
+        </ng-container>
+        <!-- Email Column -->
+        <ng-container matColumnDef="Email">
+          <th mat-header-cell *matHeaderCellDef> Email </th>
+          <td mat-cell *matCellDef="let user"> {{user.email}} </td>
+        </ng-container>
+        <!-- Actions Column -->
+        <ng-container matColumnDef="Actions">
+          <th mat-header-cell *matHeaderCellDef> Actions </th>
+          <td mat-cell *matCellDef="let user" >
+            <div class="actions" >
+              @if (user.isDeleted === false) {
+                <button mat-icon-button color="primary" class="mat-elevation-z2" (click)="onEdit(user)" matTooltip="Edit Account">
+                  <mat-icon>edit</mat-icon>
+                </button>
+              }
+              @if (user.isDeleted === false) {
+                <button mat-icon-button color="warn" class="mat-elevation-z2" (click)="onDelete(user)"   matTooltip="Delete Account">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              }
+              @if (user.isDeleted === true) {
+                <button mat-icon-button color="warn" class="mat-elevation-z2" (click)="onRestore(user)"   matTooltip="Undelete Account">
+                  <mat-icon>restore</mat-icon>
+                </button>
+              }
+            </div>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+      </table>
+      <mat-paginator [length]="paginationMetadata.totalCount"
+        [pageIndex]="paginationMetadata.pageNumber"
+        [pageSize]="paginationMetadata.pageSize"
+        [pageSizeOptions]="[5, 10, 20]"
+        (page)="pagedEvent($event)"
+        showFirstLastButtons
+        aria-label="Select page of account logs">
+      </mat-paginator>
     </div>
-  </ng-template>
+  } @else {
+    <div class="no-results-found-container">
+      <span>No accounts found.</span>
+    </div>
+  }
 
 </div>

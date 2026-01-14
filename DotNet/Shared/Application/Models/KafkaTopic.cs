@@ -5,9 +5,10 @@ namespace LantanaGroup.Link.Shared.Application.Models;
 public enum KafkaTopic
 {
     DataAcquired,
-    PatientIDsAcquired,
-    [StringValue("PatientIDsAcquired-Retry")]
-    PatientIDsAcquiredRetry,
+    [StringValue("PatientListsAcquired")]
+    PatientListsAcquired,
+    [StringValue("PatientListsAcquired-Retry")]
+    PatientListsAcquiredRetry,
     PatientAcquired,
     ResourceAcquired,
     [StringValue("ResourceAcquired-Retry")]
@@ -24,6 +25,9 @@ public enum KafkaTopic
     ResourceNormalized,
     PatientDischarged,
     PatientDataAcquired,
+    ReadyToAcquire,
+    [StringValue("ReadyToAcquire-Retry")]
+    ReadyToAcquireRetry,
     ReportBundled,
     ReportFailed,
     ReportRequestRejected,
@@ -44,18 +48,26 @@ public enum KafkaTopic
     [StringValue("PatientEvent-Retry")]
     PatientEventRetry,
     ResourceEvaluated,
-    ReportSubmitted,
+    PayloadSubmitted,
     BundleEvalRequested,
-    SubmitReport,
     [StringValue("ResourceEvaluated-Retry")]
     ResourceEvaluatedRetry,
-    [StringValue("ReportSubmitted-Retry")]
-    ReportSubmittedRetry,
+    [StringValue("PayloadSubmitted-Retry")]
+    PayloadSubmittedRetry,
     [StringValue("BundleEvalRequested-Retry")]
     BundleEvalRequestedRetry,
-    [StringValue("SubmitReport-Retry")]
-    SubmitReportRetry,
     [StringValue("ReportScheduled-Retry")]
     ReportScheduledRetry,
-    MeasureEvaluated
+    MeasureEvaluated,
+    GenerateReportRequested,
+    [StringValue("GenerateReportRequested-Retry")]
+    GenerateReportRequestedRetry,
+    EvaluationRequested,
+    ReadyForValidation,
+    ValidationComplete,
+    [StringValue("ValidationComplete-Retry")]
+    ValidationCompleteRetry,
+    SubmitPayload,
+    [StringValue("SubmitPayload-Retry")]
+    SubmitPayloadRetry
 }

@@ -1,12 +1,13 @@
-artifact:
-  init: true
 loki:
-  enabled: false
-  url: ''
-  app: link-dev
+  enabled: true
+  url: http://localhost:3100
+  app: link-cloud
 
 server:
   port: 31820
+
+telemetry:
+  exporterEndpoint: http://localhost:55690
 
 springdoc:
   api-docs:
@@ -14,10 +15,26 @@ springdoc:
   swagger-ui:
     enabled: false
 
-
 spring:
   application:
     name: ValidationService
+
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+
+  cloud:
+    discovery:
+      enabled: false
+      
+  jackson:
+    mapper:
+      accept-case-insensitive-enums: true
+      accept-case-insensitive-properties: true
+  mvc:
+    problemdetails:
+      enabled: true
   security:
     oauth2:
       resourceserver:
@@ -27,28 +44,76 @@ spring:
   #  url: jdbc:sqlserver://;serverName=localhost\SQLEXPRESS;encrypt=true;trustServerCertificate=true
   #  username: link-user
   #  password: link-password
-  jpa:
-    hibernate:
-      ddl-auto: none
-    properties:
-      show_sql: true
-      hibernate:
-        dialect: org.hibernate.dialect.SQLServerDialect
   kafka:
-    bootstrap-servers: ''
+    bootstrap-servers: localhost:9092
     consumer:
       group-id: validation
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
     producer:
       client-id: validation-service
     #properties:
       #security.protocol: SASL_SSL
       #sasl.mechanism: PLAIN
       #sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="$ConnectionString" password="";
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 100MB
+      
+  #data:
+    #redis:
+      #host: localhost
+      #port: 6379
+      #password:
+
+cache:
+  type: redis   # or "redis" and uncomment spring.data.redis properties
+  validate-code:
+    ttl: 3600
+
+management:
+  endpoints:
+    web:
+      base-path: /
+      exposure:
+        include:
+          - health
+          - info
+  endpoint:
+    health:
+      show-details: always
+  health:
+    diskspace:
+      enabled: false
+    ping:
+      enabled: false
+    refresh:
+      enabled: false
+
+logging:
+  level:
+    com.lantanagroup.link: debug
 
 secret-management:
   key-vault-uri: ''
 
 authentication:
   anonymous: false
-  authority: ''
+  authority: 'https://localhost:7004'
+
+link:
+  terminology-service-url: ''
+  report:
+    base-url: http://localhost:5110
+    routes:
+      submission-model:
+        path: /api/Report/Bundle/Patient
+        query:
+          - facilityId={facilityId}
+          - patientId={patientId}
+          - reportScheduleId={reportId}
+      report-schedule-summary-model:
+        path: /api/Report/schedule
+        query:
+            - facilityId={facilityId}
+            - reportScheduleId={reportId}
+

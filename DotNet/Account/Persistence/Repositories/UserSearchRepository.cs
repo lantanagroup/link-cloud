@@ -20,6 +20,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
         {
             IEnumerable<LinkUser> users;
             var query = _dbContext.Users.AsNoTracking().AsQueryable();
+            query = query.Include(x => x.UserRoles).ThenInclude(x => x.Role);
 
             #region Build Query
             if (searchText is not null && searchText.Length > 0)

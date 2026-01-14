@@ -1,27 +1,34 @@
 <form [formGroup]="configForm" class="dialog-form">
-    <div class="form-input">
-        <mat-form-field appearance="outline" class="subject-input form-input ">
-          <mat-label>Facility Id</mat-label>
-          <input matInput formControlName="facilityId" [readonly]="viewOnly">
-          <button *ngIf="facilityIdControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearFacilityId()">
-            <mat-icon>close</mat-icon>
-          </button>
-          <mat-error *ngIf="facilityIdControl.hasError('required')">
-            A facility id is <strong>required</strong>
-          </mat-error>
-        </mat-form-field>
-      </div>
+  <div class="form-input">
+    <mat-form-field appearance="outline" class="subject-input form-input ">
+      <mat-label>Facility Id</mat-label>
+      <input matInput formControlName="facilityId" [disabled]="true">
+    </mat-form-field>
+  </div>
 
-      <div class="form-input">
-        <mat-form-field appearance="outline" class="subject-input form-input ">
-          <mat-label>Scheduled Trigger</mat-label>
-          <input matInput formControlName="scheduledTrigger" [readonly]="viewOnly">
-          <button *ngIf="scheduledTriggerControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearScheduledTrigger()">
-            <mat-icon>close</mat-icon>
-          </button>
-          <mat-error *ngIf="scheduledTriggerControl.hasError('required')">
-            A scheduled trigger is <strong>required</strong>
-          </mat-error>
-        </mat-form-field>
-      </div>
+  <div class="form-input">
+    <mat-slide-toggle
+      formControlName="enabled"
+      [disabled]="viewOnly"
+      color="primary">
+      Enable Census Configuration
+    </mat-slide-toggle>
+  </div>
+
+  <div class="form-input">
+    <mat-form-field appearance="outline" class="subject-input form-input ">
+      <mat-label>Scheduled Trigger</mat-label>
+      <input matInput formControlName="scheduledTrigger" [disabled]="viewOnly">
+      @if (scheduledTriggerControl.value && !viewOnly) {
+        <button matSuffix mat-icon-button aria-label="Clear" (click)="clearScheduledTrigger()">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+      @if (scheduledTriggerControl.hasError('required')) {
+        <mat-error>
+          A scheduled trigger is <strong>required</strong>
+        </mat-error>
+      }
+    </mat-form-field>
+  </div>
 </form>

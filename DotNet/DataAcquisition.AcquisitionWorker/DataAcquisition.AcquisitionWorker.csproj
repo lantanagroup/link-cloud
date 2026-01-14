@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<UserSecretsId>40b6b0d0-fb4c-4650-a7c8-146c74214acb</UserSecretsId>
+		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+		<DockerComposeProjectPath>..\docker-compose.dcproj</DockerComposeProjectPath>
+		<RootNamespace>LantanaGroup.Link.DataAcquisition</RootNamespace>
+		<AssemblyName>$(MSBuildProjectName)</AssemblyName>
+	</PropertyGroup>
+
+<PropertyGroup>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<NoWarn>$(NoWarn);1591</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <Compile Remove="Settings\**" />
+	  <Content Remove="Settings\**" />
+	  <EmbeddedResource Remove="Settings\**" />
+	  <None Remove="Settings\**" />
+	</ItemGroup>
+
+
+  <ItemGroup>
+    <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.*" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.*" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="8.*" />
+    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
+	  <PackageReference Include="PemUtils" Version="3.*" />
+	  <PackageReference Include="Portable.BouncyCastle" Version="1.*" />
+	  <PackageReference Include="Serilog.AspNetCore" Version="8.*" />
+	  <PackageReference Include="Serilog.Enrichers.Span" Version="3.*" />
+	  <PackageReference Include="Serilog.Exceptions" Version="8.*" />
+	  <PackageReference Include="Serilog.Expressions" Version="4.*" />
+	  <PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.*" />
+	  <PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
+	  <PackageReference Include="JWT" Version="10.*" />
+	  <PackageReference Include="LinqKit" Version="1.*" />
+	  <PackageReference Include="Azure.Identity" Version="1.*" />
+	  <PackageReference Include="System.Text.Json" Version="8.*" />
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <ProjectReference Include="..\DataAcquisition.Domain\DataAcquisition.Domain.csproj" />
+    <ProjectReference Include="..\Shared\Shared.csproj" />
+  </ItemGroup>
+
+</Project>

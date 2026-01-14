@@ -40,7 +40,7 @@ namespace LantanaGroup.Link.Tenant.Jobs
 
                 string trigger = (string)triggerMap[TenantConstants.Scheduler.JobTrigger];
 
-                FacilityConfigModel facility = (FacilityConfigModel)dataMap[TenantConstants.Scheduler.Facility];
+                Facility facility = (Facility)dataMap[TenantConstants.Scheduler.Facility];
 
                 string frequency = (string)dataMap[TenantConstants.Scheduler.Frequency];
 
@@ -85,7 +85,7 @@ namespace LantanaGroup.Link.Tenant.Jobs
                 startDate = TimeZoneInfo.ConvertTimeToUtc(startDate, timeZone);
                 endDate = TimeZoneInfo.ConvertTimeToUtc(endDate, timeZone);
 
-                _logger.LogInformation($"Produce {KafkaTopic.ReportScheduled} event on facility time {currentDateInTimeZone} for facility {facility.FacilityId}, frequency {frequency}, trigger: {trigger}");
+                _logger.LogInformation("Produce {Topic} event on facility time {CurrentDateTime} for facility {FacilityId}, frequency {Frequency}, trigger: {Trigger}", KafkaTopic.ReportScheduled, currentDateInTimeZone, facility.FacilityId, frequency, trigger);
 
                 var headers = new Headers();
                 string correlationId = Guid.NewGuid().ToString();
@@ -109,7 +109,14 @@ namespace LantanaGroup.Link.Tenant.Jobs
 
                 var producer = _kafkaProducerFactory.CreateProducer(producerConfig);
 
-                await producer.ProduceAsync(KafkaTopic.ReportScheduled.ToString(), message);
+                try
+                {
+                    await producer.ProduceAsync(KafkaTopic.ReportScheduled.ToString(), message);
+                }
+                catch (ProduceException<string, ReportScheduledMessage> ex)
+                {
+                    _logger.LogError(ex, "An error was encountered generating a ReportScheduled event.\n\tFacilityId: {facilityId}\n\tReportTypes: {reportTypes}", facility.FacilityId, string.Join(',',reportTypes));
+                }
 
                 _metrics.IncrementReportScheduledCounter([
                     new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facility.FacilityId),

@@ -1,5 +1,8 @@
 @use '../../../../styles/core.scss';
 
+
+$primary: #398eb4;
+
 .filter-fields {
   display: flex;
   align-items: flex-start;
@@ -8,4 +11,21 @@
 
 .account-table-container {
   border: solid 1px rgba(0, 0, 0, 0.12);
+}
+
+button[color="primary"] {
+  color: #1e88e5; // Custom blue
+}
+
+button[color="warn"] {
+  color: #e53935; // Custom red
+}
+
+.badge {
+  background-color: $primary;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 16px;
+  margin-right: 5px;
+  display: inline-block;
 }

@@ -1,5 +1,7 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 
@@ -26,6 +28,24 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             HttpResponseMessage response = await _client.GetAsync($"health", cancellationToken);
 
             return response;
+        }
+        
+        public async Task<LinkServiceHealthReport> LinkServiceHealthCheck(CancellationToken cancellationToken)
+        {
+            // HTTP GET
+            try
+            {
+                var response = await _client.GetAsync($"health", cancellationToken);
+                var healthResult = await response.Content.ReadFromJsonAsync<LinkServiceHealthReport>(cancellationToken: cancellationToken);
+                if (healthResult is not null) healthResult.Service = "Data Acquisition";
+
+                return healthResult;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Data Acquisition service health check failed");
+                return new LinkServiceHealthReport { Service = "Data Acquisition", Status = HealthStatus.Unhealthy };
+            }
         }
 
         private void InitHttpClient()

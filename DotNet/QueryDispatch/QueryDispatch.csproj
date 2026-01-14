@@ -14,35 +14,37 @@
 	</PropertyGroup>
 
   <ItemGroup>
-	<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.*" />
-	<PackageReference Include="Azure.Identity" Version="1.12.0" />
+	<PackageReference Include="AppAny.Quartz.EntityFrameworkCore.Migrations" Version="0.*" />
+	<PackageReference Include="AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer" Version="0.*" />
+	<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.*" />
+	<PackageReference Include="Azure.Identity" Version="1.*" />
 	<!--<PackageReference Include="com.lantanagroup.link.Shared" Version="2.*" />-->
     <PackageReference Include="CompareNETObjects" Version="4.*" />
     <PackageReference Include="Confluent.Kafka" Version="2.*" />
     <PackageReference Include="Grpc.AspNetCore" Version="2.*" />
-    <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.4" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Analyzers" Version="8.0.4" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.4">
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Analyzers" Version="8.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.*">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.4" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.4" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.4">
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.*">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="8.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="8.*" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
     <PackageReference Include="Quartz" Version="3.*" />
     <PackageReference Include="Serilog" Version="3.*" />
     <PackageReference Include="Serilog.AspNetCore" Version="8.*" />
-    <PackageReference Include="Serilog.Enrichers.Span" Version="3.1.0" />
-    <PackageReference Include="Serilog.Exceptions" Version="8.4.0" />
-    <PackageReference Include="Serilog.Expressions" Version="4.0.0" />
+    <PackageReference Include="Serilog.Enrichers.Span" Version="3.*" />
+    <PackageReference Include="Serilog.Exceptions" Version="8.*" />
+    <PackageReference Include="Serilog.Expressions" Version="4.*" />
     <PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.*" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
+    <PackageReference Include="System.Text.Json" Version="8.*" />
   </ItemGroup>
 
 	<ItemGroup>

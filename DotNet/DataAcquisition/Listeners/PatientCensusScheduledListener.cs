@@ -1,6 +1,6 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
@@ -9,21 +9,21 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.Options;
 using System.Text;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 
 namespace LantanaGroup.Link.DataAcquisition.Listeners;
 
-public class PatientCensusScheduledListener : BaseListener<PatientCensusScheduled, string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>
+public class PatientCensusScheduledListener : BaseListener<PatientCensusScheduled, string, PatientCensusScheduled, string, List<PatientListModel>>
 {
     private readonly IServiceScopeFactory _serviceScopeFactory;
 
-    public PatientCensusScheduledListener(ILogger<BaseListener<PatientCensusScheduled, string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>> logger,
+    public PatientCensusScheduledListener(ILogger<BaseListener<PatientCensusScheduled, string, PatientCensusScheduled, string, List<PatientListModel>>> logger,
         IKafkaConsumerFactory<string, PatientCensusScheduled> kafkaConsumerFactory,
         ITransientExceptionHandler<string, PatientCensusScheduled> transientExceptionHandler,
         IDeadLetterExceptionHandler<string, PatientCensusScheduled> deadLetterExceptionHandler,
         IDeadLetterExceptionHandler<string, string> deadLetterConsumerErrorHandler,
         IServiceScopeFactory serviceScopeFactory,
-        IOptions<ServiceInformation> serviceInformation,
-        IProducer<string, PatientIDsAcquiredMessage> kafkaProducer) : base(logger, kafkaConsumerFactory, deadLetterExceptionHandler, deadLetterConsumerErrorHandler, transientExceptionHandler, serviceInformation)
+        IOptions<ServiceInformation> serviceInformation) : base(logger, kafkaConsumerFactory, deadLetterExceptionHandler, deadLetterConsumerErrorHandler, transientExceptionHandler, serviceInformation)
     {
         _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
     }
@@ -46,31 +46,15 @@ public class PatientCensusScheduledListener : BaseListener<PatientCensusSchedule
         var patientCensusService =
             scope.ServiceProvider.GetRequiredService<IPatientCensusService>();
 
-        PatientIDsAcquiredMessage? patientIDsAcquiredMessage;
+        List<PatientListModel>? patientLists;
         try
         {
-            patientIDsAcquiredMessage = await patientCensusService.Get(facilityId, cancellationToken);
+            await patientCensusService.CreateLog(facilityId, cancellationToken);
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error occurred while processing the message.");
-            throw new TransientException("Error occurred while processing the message.", ex);
-        }
-
-        var produceMessage = new Message<string, PatientIDsAcquiredMessage>
-        {
-            Key = facilityId,
-            Value = patientIDsAcquiredMessage
-        };
-
-        try
-        {
-            var kafkaProducer = scope.ServiceProvider.GetRequiredService<IProducer<string, PatientIDsAcquiredMessage>>();
-            await kafkaProducer.ProduceAsync(KafkaTopic.PatientIDsAcquired.ToString(), produceMessage, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            throw new TransientException("An error producing a PatientIdsAcquiredMessage", ex);
+            throw new DeadLetterException("Error occurred while processing the message.", ex);
         }
     }
 

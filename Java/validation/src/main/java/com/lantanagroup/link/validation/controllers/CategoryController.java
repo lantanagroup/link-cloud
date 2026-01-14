@@ -1,182 +1,206 @@
 package com.lantanagroup.link.validation.controllers;
 
-import com.lantanagroup.link.validation.entities.CategoryEntity;
-import com.lantanagroup.link.validation.entities.CategoryRuleSetsEntity;
-import com.lantanagroup.link.validation.model.BulkSaveCategory;
-import com.lantanagroup.link.validation.model.CategoryRuleSetsModel;
-import com.lantanagroup.link.validation.model.LatestCategoryRuleSetsModel;
+import com.lantanagroup.link.validation.entities.Category;
+import com.lantanagroup.link.validation.entities.CategoryRule;
+import com.lantanagroup.link.validation.entities.CategorySnapshot;
+import com.lantanagroup.link.validation.entities.Result;
+import com.lantanagroup.link.validation.matchers.Matcher;
 import com.lantanagroup.link.validation.repositories.CategoryRepository;
-import com.lantanagroup.link.validation.repositories.CategoryRuleSetsRepository;
+import com.lantanagroup.link.validation.repositories.CategoryRuleRepository;
+import com.lantanagroup.link.validation.services.CategorizationService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.transaction.Transactional;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.server.ServerErrorException;
 
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/category")
+@RequestMapping("/api/validation/category")
 @SecurityRequirement(name = "bearer-key")
 public class CategoryController {
-    private static final Logger log = org.slf4j.LoggerFactory.getLogger(CategoryController.class);
-
     private final CategoryRepository categoryRepository;
-    private final CategoryRuleSetsRepository categoryRuleSetsRepository;
+    private final CategoryRuleRepository categoryRuleRepository;
+    private final CategorizationService categorizationService;
 
-    public CategoryController(CategoryRepository categoryRepository, CategoryRuleSetsRepository categoryRuleSetsRepository) {
+    public CategoryController(
+            CategoryRepository categoryRepository,
+            CategoryRuleRepository categoryRuleRepository,
+            CategorizationService categorizationService) {
         this.categoryRepository = categoryRepository;
-        this.categoryRuleSetsRepository = categoryRuleSetsRepository;
+        this.categoryRuleRepository = categoryRuleRepository;
+        this.categorizationService = categorizationService;
     }
 
-    @Operation(summary = "Create or update a category", tags = {"Categories"})
-    @PostMapping
-    public void createOrUpdateCategory(@RequestBody CategoryEntity category) {
+    private String formatReason(String reason, Integer index) {
+        return index == null ? reason : String.format("%s at index %d", reason, index);
+    }
+
+    private void validateCategory(Category category, Integer index) {
         if (StringUtils.isEmpty(category.getId())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Category ID is required");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, formatReason("No ID provided", index));
         }
-
+        if ("uncategorized".equalsIgnoreCase(category.getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, formatReason("'uncategorized' is a reserved ID and cannot be used", index));
+        }
+        if (StringUtils.isEmpty(category.getTitle())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, formatReason("No title provided", index));
+        }
+        if (category.getSeverity() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, formatReason("No severity provided", index));
+        }
         if (StringUtils.isEmpty(category.getGuidance())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Category guidance is required");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, formatReason("No guidance provided", index));
         }
-
-        log.info("Creating/updating category with ID: {}", category.getId());
-
-        this.categoryRepository.save(category);
     }
 
-    @Operation(summary = "Get all categories", tags = {"Categories"})
+    private void validateCategoryRule(CategoryRule categoryRule, Integer index) {
+        Matcher matcher = categoryRule.getMatcher();
+        if (matcher == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, formatReason("No matcher provided", index));
+        }
+        try {
+            matcher.isMatch(new Result());
+        } catch (Exception e) {
+            String reason = String.format("Failed to evaluate matcher (%s)", e.getMessage());
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, formatReason(reason, index));
+        }
+    }
+
+    private void validateCategorySnapshot(CategorySnapshot categorySnapshot, Integer index) {
+        CategoryRule categoryRule = categorySnapshot.toCategoryRule();
+        validateCategory(categoryRule.getCategory(), index);
+        validateCategoryRule(categoryRule, index);
+    }
+
+    @Operation(summary = "Creates or updates categories using classpath resources")
+    @PostMapping("/$initialize")
+    public void initializeCategories() {
+        try {
+            categorizationService.initializeCategories();
+        } catch (Exception e) {
+            throw new ServerErrorException("Failed to initialize categories", e);
+        }
+    }
+
+    @Operation(summary = "Imports categories and rules")
+    @PostMapping("/$bulk-import")
+    @Transactional
+    public void bulkImportCategories(@RequestBody List<CategorySnapshot> categorySnapshots) {
+        if (CollectionUtils.isEmpty(categorySnapshots)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No categories provided");
+        }
+        for (int index = 0; index < categorySnapshots.size(); index++) {
+            validateCategorySnapshot(categorySnapshots.get(index), index);
+        }
+        List<String> duplicateIds = categorySnapshots.stream()
+                .collect(Collectors.groupingBy(CategorySnapshot::getId, Collectors.counting()))
+                .entrySet().stream()
+                .filter(entry -> entry.getValue() > 1)
+                .map(Map.Entry::getKey)
+                .toList();
+        if (!duplicateIds.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    String.format("Duplicate IDs provided: %s", String.join(", ", duplicateIds)));
+        }
+        for (CategorySnapshot categorySnapshot : categorySnapshots) {
+            categorizationService.saveCategorySnapshot(categorySnapshot);
+        }
+    }
+
+    @Operation(summary = "Exports categories and rules")
+    @GetMapping("/$bulk-export")
+    public List<CategorySnapshot> bulkExportCategories() {
+        return categoryRepository.findAll().stream()
+                .map(CategorySnapshot::new)
+                .toList();
+    }
+
+    @Operation(summary = "Gets all categories")
     @GetMapping
-    public List<CategoryEntity> getCategories() {
-        String val = System.getProperty("loki.enabled");
-        return this.categoryRepository.findAll()
-                .stream().peek(category -> category.setRequireAllRuleSets(null))
-                .toList();
+    public List<Category> getCategories() {
+        return categoryRepository.findAll();
     }
 
-    @Operation(summary = "Get the latest version of rules for a category by ID", tags = {"Categories"})
-    @GetMapping("/{categoryId}/rules")
-    public LatestCategoryRuleSetsModel getCategoryRules(@PathVariable String categoryId) {
-        CategoryRuleSetsEntity entity = this.categoryRuleSetsRepository.getLatestCategoryRules(categoryId);
-        LatestCategoryRuleSetsModel model = null;
-
-        if (entity != null) {
-            model = new LatestCategoryRuleSetsModel();
-            model.setVersion(entity.getVersion());
-            model.setTimestamp(entity.getCreated());
-            model.setRequireAllRuleSets(entity.isRequireAllRuleSets());
-            model.setRuleSets(entity.getRuleSets());
-        }
-
-        return model;
-    }
-
-    @Operation(summary = "Create or update rule sets for a category by ID", tags = {"Categories"})
-    @PostMapping("/{categoryId}/rules")
-    public void createOrUpdateCategoryRules(@PathVariable String categoryId, @RequestBody CategoryRuleSetsModel categoryRuleSets) {
-        if (StringUtils.isEmpty(categoryId)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Category ID is required");
-        }
-
-        if (categoryRuleSets == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Category rules are required");
-        }
-
-        if (categoryRuleSets.getRuleSets() == null || categoryRuleSets.getRuleSets().isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Category rule sets are required");
-        }
-
-        log.info("Creating/updating rule sets for category with ID: {}", categoryId);
-
-        CategoryEntity category = this.categoryRepository.findById(categoryId)
+    @Operation(summary = "Gets a category")
+    @GetMapping("/{id}")
+    public Category getCategory(@PathVariable String id) {
+        return categoryRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Category not found"));
-
-        CategoryRuleSetsEntity entity = new CategoryRuleSetsEntity();
-        entity.setCategory(category);
-        entity.setRequireAllRuleSets(categoryRuleSets.isRequireAllRuleSets());
-        entity.setRuleSets(categoryRuleSets.getRuleSets());
-
-        // Set the version of the new category rule set
-        CategoryRuleSetsEntity foundCategoryRules = this.categoryRuleSetsRepository.getLatestCategoryRules(categoryId);
-        entity.setVersion(foundCategoryRules != null ? foundCategoryRules.getVersion() + 1 : 1);
-
-        this.categoryRuleSetsRepository.save(entity);       // Always save a new category rule set version
     }
 
-    @Operation(summary = "Get the history of rule sets for a category by ID", tags = {"Categories"})
-    @GetMapping("/{categoryId}/rules/history")
-    public List<LatestCategoryRuleSetsModel> getCategoryRulesHistory(@PathVariable String categoryId) {
-        return this.categoryRuleSetsRepository.findByCategoryId(categoryId)
-                .stream().map(entity -> {
-                    LatestCategoryRuleSetsModel model = new LatestCategoryRuleSetsModel();
-                    model.setVersion(entity.getVersion());
-                    model.setTimestamp(entity.getCreated());
-                    model.setRequireAllRuleSets(entity.isRequireAllRuleSets());
-                    model.setRuleSets(entity.getRuleSets());
-                    return model;
-                })
-                .sorted((a, b) -> b.getVersion() - a.getVersion())
+    @Operation(summary = "Gets the latest rule for a category", description = "Returns the rule that has the most recent `timestamp`.")
+    @GetMapping("/{id}/rule")
+    public CategoryRule getLatestCategoryRule(@PathVariable String id) {
+        CategoryRule categoryRule = getCategory(id).getLatestRule();
+        if (categoryRule == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Category rule not found");
+        }
+        return categoryRule;
+    }
+
+    @Operation(summary = "Gets all historical rules for a category", description = "The rule with the most recent timestamp is the considered the \"latest\" rule.")
+    @GetMapping("/{id}/rule/history")
+    public List<CategoryRule> getCategoryRules(@PathVariable String id) {
+        return getCategory(id).getRules().stream()
+                .sorted(Comparator.comparing(CategoryRule::getTimestamp).reversed())
                 .toList();
     }
 
-    @Operation(summary = "Bulk save categories and their rule sets", tags = {"Categories"})
-    @PostMapping("/bulk")
-    @Transactional
-    public void bulkSaveCategories(@RequestBody List<BulkSaveCategory> categories) {
-        if (categories == null || categories.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Categories are required");
-        } else if (categories.stream().anyMatch(category -> StringUtils.isEmpty(category.getId()))) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID is required for all categories");
+    @Operation(summary = "Creates or updates a category")
+    @PutMapping("/{id}")
+    public void saveCategory(@PathVariable String id, @RequestBody Category category) {
+        if ("uncategorized".equalsIgnoreCase(id)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "'uncategorized' is a reserved ID and cannot be used");
         }
-
-        boolean hasDuplicateIds = categories.stream()
-                .collect(Collectors.groupingBy(BulkSaveCategory::getId))
-                .values()
-                .stream()
-                .anyMatch(ids -> ids.size() > 1);
-
-        if (hasDuplicateIds) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duplicate category IDs are not allowed");
+        validateCategory(category, null);
+        if (!StringUtils.equals(category.getId(), id)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID does not match URL");
         }
-
-        if (categories.stream().anyMatch(category -> category.getRuleSets() == null || category.getRuleSets().isEmpty())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rule sets are required for all categories");
-        }
-
-        log.info("Bulk saving {} categories", categories.size());
-
-        for (BulkSaveCategory category : categories) {
-            CategoryEntity categoryEntity = new CategoryEntity();
-            categoryEntity.setId(category.getId());
-            categoryEntity.setAcceptable(category.isAcceptable());
-            categoryEntity.setGuidance(category.getGuidance());
-            categoryEntity.setRequireAllRuleSets(category.isRequireAllRuleSets());
-            this.categoryRepository.save(categoryEntity);
-
-            if (category.getRuleSets() != null) {
-                CategoryRuleSetsEntity categoryRules = new CategoryRuleSetsEntity();
-                categoryRules.setCategory(categoryEntity);
-                categoryRules.setRuleSets(category.getRuleSets());
-
-                // Set the version of the new category rule set
-                CategoryRuleSetsEntity foundCategoryRules = this.categoryRuleSetsRepository.getLatestCategoryRules(category.getId());
-                categoryRules.setVersion(foundCategoryRules != null ? foundCategoryRules.getVersion() + 1 : 1);
-
-                this.categoryRuleSetsRepository.save(categoryRules);
-            }
-        }
+        categoryRepository.save(category);
     }
 
-    @Operation(summary = "Delete a category by ID", tags = {"Categories"})
-    @DeleteMapping("/{categoryId}")
+    @Operation(summary = "Creates a rule for a category", description = "Creating a rule for a category automatically makes it the `latest` rule.")
+    @PutMapping("/{id}/rule")
+    public void saveCategoryRule(@PathVariable String id, @RequestBody Matcher matcher) {
+        if ("uncategorized".equalsIgnoreCase(id)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "'uncategorized' is a reserved ID and cannot be modified");
+        }
+        Category category = getCategory(id);
+        CategoryRule categoryRule = new CategoryRule();
+        categoryRule.setCategory(category);
+        categoryRule.setMatcher(matcher);
+        validateCategoryRule(categoryRule, null);
+        categoryRuleRepository.save(categoryRule);
+    }
+
+    @Operation(summary = "Deletes a category")
+    @DeleteMapping("/{id}")
     @Transactional
-    public void deleteCategory(@PathVariable String categoryId) {
-        log.info("Deleting category with ID: {}", categoryId);
-        this.categoryRuleSetsRepository.deleteByCategoryId(categoryId);
-        this.categoryRepository.deleteById(categoryId);
+    public void deleteCategory(@PathVariable String id) {
+        categoryRuleRepository.deleteByCategoryId(id);
+        categoryRepository.deleteById(id);
+    }
+
+    @Operation(
+            summary = "Deletes a category rule",
+            parameters = {
+                    @Parameter(name = "ruleId", description = "The internal auto-incrementing id of the category's rule. This id can be found in the results of \"Gets the latest rule for a category\"")
+            },
+            description = "This should primarily be used to delete a rule that was entered in error. The `ruleId` may be the latest or it could be a historical rule. The primary use-case is to delete the latest, which was entered in error."
+    )
+    @DeleteMapping("/{ruleId}")
+    public void deleteCategoryRule(@PathVariable long ruleId) {
+        categoryRuleRepository.deleteById(ruleId);
     }
 }

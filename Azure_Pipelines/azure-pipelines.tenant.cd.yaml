@@ -1,7 +1,7 @@
 resources:
   pipelines:
   - pipeline: pipeline-trigger
-    source: Deploy_All_Services
+    source: Build_And_Push_All
     trigger: true
 
 trigger:
@@ -9,6 +9,7 @@ trigger:
     include:
     - dev
     - release/*
+    - linkathon/*
   paths:
     include:
     - DotNet/Tenant/*
@@ -33,8 +34,8 @@ variables:
   value: '**/DotNet/Tenant/Dockerfile'
 - name: serviceName
   value: 'Tenant'
-- name: containerRegistry
-  value: 'NHSNLink ACR Premium'
+- name: projectDir
+  value: 'DotNet/Tenant'
   
 steps:
   - task: DotNetCoreCLI@2
@@ -43,11 +44,6 @@ steps:
       command: restore
       projects: '$(project)'
 
-  - task: GetRevision@1
-    displayName: 'Get Revision'
-    inputs:
-      VariableName: Revision
-
   - task: Bash@3
     inputs:
       targetType: 'inline'
@@ -55,6 +51,14 @@ steps:
         GIT_COMMIT=$(git rev-parse --short HEAD)
         echo "GIT_COMMIT: ${GIT_COMMIT}"
         echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
+
+  - task: PythonScript@0
+    displayName: "Inject Service Info"
+    inputs:
+      scriptSource: 'filePath'
+      scriptPath: '$(Build.SourcesDirectory)/Scripts/set_service_info.py'
+      workingDirectory: '$(Build.SourcesDirectory)'
+      arguments: './ "$(projectDir)" "$(GIT_COMMIT)" "$(Build.BuildNumber)"'
 
   - task: DotNetCoreCLI@2
     displayName: Build
@@ -73,19 +77,18 @@ steps:
       targetType: 'inline'
       script: |
         if ("$(Build.SourceBranch)" -like "*release/*") {
-        $myTag1 = "release-$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
+        $myTag1 = "release-$(Build.SourceBranchName)-$(GIT_COMMIT)"
         }
         else { 
-        $myTag1 = "$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
+        $myTag1 = "$(Build.SourceBranchName)-$(GIT_COMMIT)"
         }
         Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
         Write-Host "Set MyTag to: $myTag1"
-
   - task: Docker@2
     displayName: "Build & Push Tenant Docker Image"
     condition: always()
     inputs:
-      containerRegistry: $(containerRegistry)
+      containerRegistry: $(containerRegistry) # Variable Group
       repository: $(registry-repo-name)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)

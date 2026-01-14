@@ -1,22 +1,18 @@
 #See https://aka.ms/containerfastmode to understand how Visual Studio uses this Dockerfile to build your images for faster debugging.
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS base
-USER 1001
-WORKDIR /app
-EXPOSE 80
-EXPOSE 443
-
+FROM lantanagroup/aspnet8-run AS base
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
 COPY ["DotNet/Report/Report.csproj", "DotNet/Report/"]
 RUN dotnet restore "DotNet/Report/Report.csproj"
 COPY . .
 WORKDIR "/src/DotNet/Report"
-RUN dotnet build "Report.csproj" -c Release -o /app/build
+RUN dotnet build "Report.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 FROM build AS publish
-RUN dotnet publish "Report.csproj" -c Release -o /app/publish
+RUN dotnet publish "Report.csproj" -c $BUILD_CONFIGURATION -o /app/publish --no-self-contained
 
 FROM base AS final
 WORKDIR /app

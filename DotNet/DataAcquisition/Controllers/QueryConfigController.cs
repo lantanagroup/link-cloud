@@ -1,8 +1,12 @@
 ﻿using KellermanSoftware.CompareNetObjects;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories;
-using LantanaGroup.Link.DataAcquisition.Domain.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
@@ -20,10 +24,15 @@ public class QueryConfigController : Controller
     private readonly ILogger<QueryConfigController> _logger;
     private readonly CompareLogic _compareLogic;
     private readonly IFhirQueryConfigurationManager _queryConfigurationManager;
-    public QueryConfigController(ILogger<QueryConfigController> logger, IFhirQueryConfigurationManager queryConfigurationManager)
+    private readonly IFhirQueryConfigurationQueries _queryConfigurationQueries;
+    private readonly ITenantApiService _tenantApiService;
+
+    public QueryConfigController(ILogger<QueryConfigController> logger, IFhirQueryConfigurationManager queryConfigurationManager, IFhirQueryConfigurationQueries queryConfigurationQueries, ITenantApiService tenantApiService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _queryConfigurationManager = queryConfigurationManager;
+        _queryConfigurationQueries = queryConfigurationQueries;
+        _tenantApiService = tenantApiService;
         _compareLogic = new CompareLogic();
         _compareLogic.Config.MaxDifferences = 25;
     }
@@ -40,11 +49,11 @@ public class QueryConfigController : Controller
     ///     Server Error: 500
     /// </returns>
     [HttpGet("{facilityId}/fhirQueryConfiguration")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FhirQueryConfiguration))]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResultFhirQueryConfigurationModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<FhirQueryConfiguration>> GetFhirConfiguration(string facilityId, CancellationToken cancellationToken)
+    public async Task<ActionResult<ApiResultFhirQueryConfigurationModel>> GetFhirConfiguration(string facilityId, CancellationToken cancellationToken)
     {
         facilityId = HtmlInputSanitizer.SanitizeAndRemove(string.IsNullOrEmpty(facilityId) ? string.Empty : facilityId);
 
@@ -55,23 +64,44 @@ public class QueryConfigController : Controller
                 throw new BadRequestException("GetFhirQueryConfigQuery.FacilityId is null or empty.");
             }
 
-            var result = await _queryConfigurationManager.GetAsync(facilityId, cancellationToken);
+            var result = await _queryConfigurationQueries.GetByFacilityIdAsync(facilityId, cancellationToken);
 
             if (result == null)
             {
                 throw new NotFoundException($"No {nameof(FhirQueryConfiguration)} found for facilityId: {facilityId}");
             }
 
-            return Ok(result);
+            // get the tenant timezone
+
+            var facilityConfig = await _tenantApiService.GetFacilityConfig(facilityId, cancellationToken);
+
+            var timeZone = !string.IsNullOrEmpty(facilityConfig.TimeZone)? facilityConfig.TimeZone : "UTC";
+
+            if (!string.IsNullOrEmpty(facilityConfig?.TimeZone))
+            {
+                result.MinAcquisitionPullTime = ConvertUtcTimeOfDayToLocal(result.MinAcquisitionPullTime, timeZone);
+                result.MaxAcquisitionPullTime = ConvertUtcTimeOfDayToLocal(result.MaxAcquisitionPullTime, timeZone);
+            }
+
+            return Ok(new ApiResultFhirQueryConfigurationModel
+            {
+                Id = result.Id,
+                FacilityId = result.FacilityId,
+                Authentication = result.Authentication,
+                MinAcquisitionPullTime = result.MinAcquisitionPullTime,
+                MaxAcquisitionPullTime = result.MaxAcquisitionPullTime,
+                FhirServerBaseUrl = result.FhirServerBaseUrl,
+                MaxConcurrentRequests = result.MaxConcurrentRequests
+            });
         }
         catch (BadRequestException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning("Exception occurred: {ExceptionMessage}\n{StackTrace}", ex.Message, ex.StackTrace);
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning("Exception occurred: {ExceptionMessage}\n{StackTrace}", ex.Message, ex.StackTrace);
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
@@ -95,12 +125,12 @@ public class QueryConfigController : Controller
     ///     Server Error: 500
     /// </returns>
     [HttpPost("fhirQueryConfiguration")]
-    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(FhirQueryConfiguration))]
+    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(ApiResultFhirQueryConfigurationModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<FhirQueryConfiguration>> CreateFhirConfiguration(FhirQueryConfiguration? fhirQueryConfiguration, CancellationToken cancellationToken)
+    public async Task<ActionResult<ApiResultFhirQueryConfigurationModel>> CreateFhirConfiguration(ApiCreateFhirQueryConfigurationModel? fhirQueryConfiguration, CancellationToken cancellationToken)
     {
         string? facilityId = HtmlInputSanitizer.SanitizeAndRemove(fhirQueryConfiguration?.FacilityId ?? string.Empty);
 
@@ -111,7 +141,7 @@ public class QueryConfigController : Controller
                 throw new BadRequestException("fhirQueryConfiguration is null.");
             }
 
-            var existing = await _queryConfigurationManager.GetAsync(facilityId, cancellationToken);
+            var existing = await _queryConfigurationQueries.GetByFacilityIdAsync(facilityId, cancellationToken);
 
             if (existing != null)
             {
@@ -119,7 +149,15 @@ public class QueryConfigController : Controller
                     $"A FhirQueryConfiguration already exists for facilityId: {facilityId}. Use PUT endpoint to update it.");
             }
 
-            var result = await _queryConfigurationManager.AddAsync(fhirQueryConfiguration, cancellationToken);
+            var result = await _queryConfigurationManager.CreateAsync(new CreateFhirQueryConfigurationModel
+            {
+                Authentication = fhirQueryConfiguration.Authentication,
+                MaxAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MaxAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
+                MinAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MinAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
+                FacilityId = facilityId,
+                MaxConcurrentRequests = fhirQueryConfiguration.MaxConcurrentRequests,
+                FhirServerBaseUrl = fhirQueryConfiguration.FhirServerBaseUrl
+            }, cancellationToken);
 
             if (result == null)
             {
@@ -131,34 +169,41 @@ public class QueryConfigController : Controller
                 {
                     FacilityId = facilityId,
                     FhirQueryConfiguration = fhirQueryConfiguration
-                }, result);
+                }, new ApiResultFhirQueryConfigurationModel
+                {
+                    Id = result.Id,
+                    FacilityId = result.FacilityId,
+                    Authentication = result.Authentication,
+                    MinAcquisitionPullTime = result.MinAcquisitionPullTime,
+                    MaxAcquisitionPullTime = result.MaxAcquisitionPullTime,
+                    FhirServerBaseUrl= result.FhirServerBaseUrl,
+                    MaxConcurrentRequests= result.MaxConcurrentRequests
+                });
         }
         catch (EntityAlreadyExistsException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning("Exception occurred: {ExceptionMessage}\n{StackTrace}", ex.Message, ex.StackTrace);
             return Problem(title: "Entity Already Exists", detail: ex.Message, statusCode: (int)HttpStatusCode.Conflict);
         }
         catch (BadRequestException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning("Exception occurred: {ExceptionMessage}\n{StackTrace}", ex.Message, ex.StackTrace);
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning("Exception occurred: {ExceptionMessage}\n{StackTrace}", ex.Message, ex.StackTrace);
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (MissingFacilityConfigurationException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning("Exception occurred: {ExceptionMessage}\n{StackTrace}", ex.Message, ex.StackTrace);
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
-            string message =
-                $"An exception occurred while attempting to get a FhirQueryConfiguration with a facility id of {facilityId}. " + Environment.NewLine + ex.Message;
-            _logger.LogError(new EventId(LoggingIds.InsertItem, "CreateFhirConfiguration"), ex, message, facilityId);
-            return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
+            _logger.LogError(new EventId(LoggingIds.InsertItem, "CreateFhirConfiguration"), ex, "An exception occurred while attempting to get a FhirQueryConfiguration with a facility id of {FacilityId}.\n{ExceptionMessage}", facilityId, ex.Message);
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
 
@@ -176,12 +221,12 @@ public class QueryConfigController : Controller
     /// </returns>
     /// <exception cref="NotImplementedException"></exception>
     [HttpPut("fhirQueryConfiguration")]
-    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(ApiResultFhirQueryConfigurationModel))]
     [ProducesResponseType(StatusCodes.Status304NotModified)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult> UpdateFhirConfiguration(FhirQueryConfiguration? fhirQueryConfiguration, CancellationToken cancellationToken)
+    public async Task<ActionResult> UpdateFhirConfiguration(ApiUpdateFhirQueryConfigurationModel? fhirQueryConfiguration, CancellationToken cancellationToken)
     {
         string? facilityId = HtmlInputSanitizer.SanitizeAndRemove(fhirQueryConfiguration?.FacilityId ?? string.Empty);
 
@@ -192,14 +237,28 @@ public class QueryConfigController : Controller
                 throw new BadRequestException("fhirQueryConfiguration is null.");
             }
 
-            var existing = await _queryConfigurationManager.GetAsync(facilityId, cancellationToken);
+            if (string.IsNullOrEmpty(fhirQueryConfiguration.FacilityId))
+            {
+                throw new BadRequestException("FhirQueryConfiguration.FacilityId cannot be null.");
+            }
+
+            var existing = await _queryConfigurationQueries.GetByFacilityIdAsync(facilityId, cancellationToken);
 
             if (existing == null)
             {
                 throw new NotFoundException("No FhirQueryConfiguration found for the provided facilityId");
             }
 
-            var result = await _queryConfigurationManager.UpdateAsync(fhirQueryConfiguration, cancellationToken);
+            var result = await _queryConfigurationManager.UpdateAsync(new UpdateFhirQueryConfigurationModel
+            {
+                Id = fhirQueryConfiguration.Id,
+                FacilityId = fhirQueryConfiguration.FacilityId,
+                FhirServerBaseUrl = fhirQueryConfiguration.FhirServerBaseUrl,
+                Authentication = fhirQueryConfiguration.Authentication,
+                MaxConcurrentRequests = fhirQueryConfiguration.MaxConcurrentRequests,
+                MinAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MinAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
+                MaxAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MaxAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
+            }, cancellationToken);
 
             if (result == null)
             {
@@ -220,29 +279,36 @@ public class QueryConfigController : Controller
 
             });
 
-            return Accepted(result);
+            return Accepted(new ApiResultFhirQueryConfigurationModel
+            {
+                Id = result.Id,
+                FacilityId = result.FacilityId,
+                Authentication = result.Authentication,
+                MinAcquisitionPullTime = result.MinAcquisitionPullTime,
+                MaxAcquisitionPullTime = result.MaxAcquisitionPullTime,
+                FhirServerBaseUrl = result.FhirServerBaseUrl,
+                MaxConcurrentRequests = result.MaxConcurrentRequests
+            });
         }
         catch (MissingFacilityConfigurationException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning("Exception occurred: {ExceptionMessage}\n{StackTrace}", ex.Message, ex.StackTrace);
             return BadRequest(ex.Message);
         }
         catch (BadRequestException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning("Exception occurred: {ExceptionMessage}\n{StackTrace}", ex.Message, ex.StackTrace);
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning("Exception occurred: {ExceptionMessage}\n{StackTrace}", ex.Message, ex.StackTrace);
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
-            string message =
-                $"An exception occurred while attempting to update a fhir query configuration with a facility id of {facilityId}. " + Environment.NewLine + ex.Message;
-            _logger.LogError(new EventId(LoggingIds.UpdateItem, "UpdateFhirConfiguration"), ex, message, facilityId);
-            return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
+            _logger.LogError(new EventId(LoggingIds.UpdateItem, "UpdateFhirConfiguration"), ex, "An exception occurred while attempting to update a fhir query configuration with a facility id of {FacilityId}.\n{ExceptionMessage}", facilityId, ex.Message);
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
 
@@ -257,7 +323,6 @@ public class QueryConfigController : Controller
     ///     Missing Facility ID: 400
     ///     Server Error: 500
     /// </returns>
-    /// <exception cref="NotImplementedException"></exception>
     [HttpDelete("{facilityId}/fhirQueryConfiguration")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -279,20 +344,92 @@ public class QueryConfigController : Controller
         }
         catch (BadRequestException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning("Exception occurred: {ExceptionMessage}\n{StackTrace}", ex.Message, ex.StackTrace);
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning("Exception occurred: {ExceptionMessage}\n{StackTrace}", ex.Message, ex.StackTrace);
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
-            string message =
-                $"An exception occurred while attempting to delete a fhir query configuration with a facility id of {facilityId}. " + Environment.NewLine + ex.Message;
-            _logger.LogError(new EventId(LoggingIds.DeleteItem, "DeleteFhirConfiguration"), ex, message, facilityId);
-            return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
+            _logger.LogError(new EventId(LoggingIds.DeleteItem, "DeleteFhirConfiguration"), ex, "An exception occurred while attempting to delete a fhir query configuration with a facility id of {FacilityId}.\n{ExceptionMessage}", facilityId, ex.Message);
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    private TimeSpan? ConvertTimeOfDayToUtc(TimeSpan? localTime, string timeZone)
+    {
+        if (localTime == null || string.IsNullOrEmpty(timeZone))
+            return localTime;
+
+        try
+        {
+            var tz = TimeZoneInfo.FindSystemTimeZoneById(timeZone);
+
+            var utcNow = DateTime.UtcNow;
+
+            var localNow = TimeZoneInfo.ConvertTimeFromUtc(utcNow, tz);
+
+            var referenceDate = localNow.Date;
+
+            var localDateTime = referenceDate.Add(localTime.Value);
+
+            var offset = tz.GetUtcOffset(localDateTime);
+
+            var utcTimeOfDay = localTime.Value - offset;
+
+            if (utcTimeOfDay < TimeSpan.Zero) utcTimeOfDay += TimeSpan.FromDays(1);
+            else if (utcTimeOfDay >= TimeSpan.FromDays(1)) utcTimeOfDay -= TimeSpan.FromDays(1);
+
+            return utcTimeOfDay;
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            _logger.LogError("Invalid timezone: {timeZone}", HtmlInputSanitizer.SanitizeAndRemove(timeZone));
+            throw new ArgumentException($"Invalid timezone: {timeZone}");
+        }
+        catch (InvalidTimeZoneException)
+        {
+            _logger.LogError("Corrupted timezone: {timeZone}", HtmlInputSanitizer.SanitizeAndRemove(timeZone));
+            throw new ArgumentException($"Corrupted timezone data: {timeZone}");
+        }
+    }
+
+    private TimeSpan? ConvertUtcTimeOfDayToLocal(TimeSpan? utcTime, string timeZone)
+    {
+        if (utcTime == null || string.IsNullOrEmpty(timeZone))
+            return utcTime;
+
+        try
+        {
+            var tz = TimeZoneInfo.FindSystemTimeZoneById(timeZone);
+
+            var utcNow = DateTime.UtcNow;
+
+            var localNow = TimeZoneInfo.ConvertTimeFromUtc(utcNow, tz);
+            var referenceDate = localNow.Date;
+
+            var utcDateTime = referenceDate.Add(utcTime.Value);
+            var offset = tz.GetUtcOffset(utcDateTime);
+
+            var localTimeOfDay = utcTime.Value + offset;
+
+            if (localTimeOfDay < TimeSpan.Zero) localTimeOfDay += TimeSpan.FromDays(1);
+            else if (localTimeOfDay >= TimeSpan.FromDays(1))  localTimeOfDay -= TimeSpan.FromDays(1);
+
+            return localTimeOfDay;
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            _logger.LogError("Invalid timezone: {timeZone}", HtmlInputSanitizer.SanitizeAndRemove(timeZone));
+            throw new ArgumentException($"Invalid timezone: {timeZone}");
+        }
+        catch (InvalidTimeZoneException)
+        {
+            _logger.LogError("Corrupted timezone: {timeZone}", HtmlInputSanitizer.SanitizeAndRemove(timeZone));
+            throw new ArgumentException($"Corrupted timezone data: {timeZone}");
         }
     }
 }
