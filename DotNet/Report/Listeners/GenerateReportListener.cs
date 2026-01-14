@@ -17,6 +17,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Options;
@@ -197,6 +198,8 @@ namespace LantanaGroup.Link.Report.Listeners
                                     DateTimeKind.Utc
                                 );
 
+                                bool isCensus = !value.Regenerate && (value.PatientIds == null || value.PatientIds.Count == 0);
+                                
                                 // Create ReportSchedule for AdHoc Report
                                 var reportSchedule = new ReportSchedule
                                 {
@@ -205,6 +208,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     ReportStartDate = startDate.Value,
                                     ReportEndDate = endDate.Value,
                                     Frequency = Frequency.Adhoc,
+                                    AdHocType = isCensus ? AdHocType.Census : AdHocType.Manual,
                                     ReportTypes = reportTypes,
                                     EndOfReportPeriodJobHasRun = true,
                                     EnableSubmission = !value.BypassSubmission,
@@ -405,7 +409,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 admittedPatients =
                     JsonSerializer.Deserialize<List>(
                         censusContent,
-                        SerializerOptions.ForFhirLenientDeserialization);
+                        LinkFhirSerializerOptions.ForFhirLenientSerialization);
             }
             catch (Exception ex)
             {

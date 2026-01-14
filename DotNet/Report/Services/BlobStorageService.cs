@@ -5,6 +5,7 @@ using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Options;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
@@ -81,7 +82,7 @@ namespace LantanaGroup.Link.Report.Services
             ReadOnlyMemory<byte> lineFeed = new([0x0a]);
             foreach (Bundle.EntryComponent entry in patientSubmission.Bundle.Entry)
             {
-                await JsonSerializer.SerializeAsync(stream, entry.Resource, SerializerOptions.ForFhirLenientDeserialization, cancellationToken);
+                await JsonSerializer.SerializeAsync(stream, entry.Resource, LinkFhirSerializerOptions.ForFhirLenientSerialization, cancellationToken);
                 await stream.WriteAsync(lineFeed, cancellationToken);
             }
             return blobClient.Uri;
@@ -109,7 +110,7 @@ namespace LantanaGroup.Link.Report.Services
 
             foreach (var resource in resources)
             {
-                await JsonSerializer.SerializeAsync(stream, resource, SerializerOptions.ForFhirLenientDeserialization, cancellationToken);
+                await JsonSerializer.SerializeAsync(stream, resource, LinkFhirSerializerOptions.ForFhirLenientSerialization, cancellationToken);
                 await stream.WriteAsync(lineFeed, cancellationToken);
             }
 
