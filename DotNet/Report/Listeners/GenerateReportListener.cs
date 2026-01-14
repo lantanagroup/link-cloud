@@ -199,7 +199,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     DateTimeKind.Utc
                                 );
 
-                                bool isAutomatic = !value.Regenerate && (value.PatientIds == null || value.PatientIds.Count == 0);
+                                bool isCensus = !value.Regenerate && (value.PatientIds == null || value.PatientIds.Count == 0);
                                 
                                 // Create ReportSchedule for AdHoc Report
                                 var reportSchedule = new ReportSchedule
@@ -209,7 +209,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     ReportStartDate = startDate.Value,
                                     ReportEndDate = endDate.Value,
                                     Frequency = Frequency.Adhoc,
-                                    AdHocType = isAutomatic ? AdHocType.Census : AdHocType.Manual,
+                                    AdHocType = isCensus ? AdHocType.Census : AdHocType.Manual,
                                     ReportTypes = reportTypes,
                                     EndOfReportPeriodJobHasRun = true,
                                     EnableSubmission = !value.BypassSubmission,
