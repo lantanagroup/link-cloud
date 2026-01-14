@@ -11,6 +11,7 @@ using System.Net;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Services;
 using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
@@ -24,17 +25,19 @@ public class SftpConfigurationController : Controller
     private readonly ISftpConfigurationManager _sftpConfigurationManager;
     private readonly ISftpConfigurationQueries _sftpConfigurationQueries;
     private readonly ISftpCredentialService _sftpCredentialService;
+    private readonly ITenantApiService _tenantApiService;
 
     public SftpConfigurationController(
         ILogger<SftpConfigurationController> logger,
         ISftpConfigurationManager sftpConfigurationManager,
         ISftpConfigurationQueries sftpConfigurationQueries,
-        ISftpCredentialService sftpCredentialService)
+        ISftpCredentialService sftpCredentialService, ITenantApiService tenantApiService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _sftpConfigurationManager = sftpConfigurationManager ?? throw new ArgumentNullException(nameof(sftpConfigurationManager));
         _sftpConfigurationQueries = sftpConfigurationQueries ?? throw new ArgumentNullException(nameof(sftpConfigurationQueries));
         _sftpCredentialService = sftpCredentialService ?? throw new ArgumentNullException(nameof(sftpCredentialService));
+        _tenantApiService = tenantApiService ?? throw new ArgumentNullException(nameof(tenantApiService));
     }
 
     /// <summary>
@@ -167,6 +170,14 @@ public class SftpConfigurationController : Controller
             if (string.IsNullOrWhiteSpace(organizationId))
             {
                 return BadRequest("OrganizationId is null or empty.");
+            }
+            
+            // Verify that the facility/organization exists
+            var facilityExists = await _tenantApiService.CheckFacilityExists(organizationId, cancellationToken);
+            
+            if (!facilityExists)
+            {
+                return NotFound($"No facility found for organizationId: {organizationId}");
             }
 
             // Default AuthType to Basic until other authentication options are supported
