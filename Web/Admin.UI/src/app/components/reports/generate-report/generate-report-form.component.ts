@@ -353,6 +353,25 @@ export class GenerateReportFormComponent implements OnInit, OnDestroy {
     }
   }
 
+  get canGenerateReport(): boolean {
+    if (this.generateReportForm.invalid) {
+      return false;
+    }
+
+    const selectedForm = this.selectedFormControl.value;
+    const hasPatients = this.patients && this.patients.length > 0;
+
+    if (selectedForm === 'censusPatients') {
+      return true;
+    }
+
+    if (selectedForm === 'fileUpload' || selectedForm === 'manualPatients') {
+      return hasPatients;
+    }
+
+    return false;
+  }
+
   protected readonly faSearch = faSearch;
 
 }

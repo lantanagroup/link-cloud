@@ -146,7 +146,7 @@
   </div>
   <!-- Button -->
   <div class="text-center mt-6" style="margin-top: 50px;">
-    <button type="button" mat-raised-button color="primary" [disabled]="generateReportForm.invalid"
+    <button type="button" mat-raised-button color="primary" [disabled]="!canGenerateReport"
             (click)="generateReport()">Generate Report
     </button>
   </div>
