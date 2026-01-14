@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Net;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
@@ -55,6 +56,8 @@ public class SftpConfigurationController : Controller
     public async Task<ActionResult<SftpConfigurationModel>> GetSftpConfigurationById(Guid id, CancellationToken cancellationToken)
     {
         var httpContext = HttpContext;
+        
+        // validate user access to organization before proceeding - future enhancement
 
         try
         {
@@ -99,6 +102,8 @@ public class SftpConfigurationController : Controller
     public async Task<ActionResult<SftpConfigurationModel>> GetOrgSftpConfiguration(string organizationId, CancellationToken cancellationToken)
     {
         var httpContext = HttpContext;
+        
+        // validate user access to organization before proceeding - future enhancement
 
         try
         {
@@ -130,7 +135,7 @@ public class SftpConfigurationController : Controller
     /// Optionally accepts credentials which will be stored securely in a configured secret manager.
     /// Supported Authentication Types: Basic (default)
     /// </summary>
-    /// <param name="organizationId">The organization identifier.</param>
+    /// <param name="organizationId">The identifier for the reporting organization.</param>
     /// <param name="sftpConfiguration">The SFTP configuration model with optional credentials.</param>
     /// <param name="cancellationToken"></param>
     /// <returns>
@@ -149,6 +154,8 @@ public class SftpConfigurationController : Controller
     public async Task<ActionResult<SftpConfigurationModel>> CreateSftpConfiguration(string organizationId, CreateSftpConfigurationModel? sftpConfiguration, CancellationToken cancellationToken)
     {
         var httpContext = HttpContext;
+        
+        // validate user access to organization before proceeding - future enhancement
 
         try
         {
@@ -201,6 +208,13 @@ public class SftpConfigurationController : Controller
                 organizationId);
             return Conflict($"An SftpConfiguration already exists for organization: {organizationId}. Use PUT endpoint to update it.");
         }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.InsertItem, "CreateSftpConfiguration"), ex,
+                "An attempt was made to create an SFTP configuration for organizationId: {OrganizationId} which already has a FHIR List configuration",
+                organizationId);
+            return Conflict(ex.Message);
+        }
         catch (Exception ex)
         {
             var message =
@@ -217,6 +231,8 @@ public class SftpConfigurationController : Controller
     /// Updates an SftpConfiguration record for an organization. This update will do a clean replace of the existing record.
     /// Supported Authentication Types: Basic (default)
     /// </summary>
+    /// <param name="organizationId">The identifier for the reporting organization.</param>
+    /// <param name="configurationId">The identifier of the SFTP configuration.</param>
     /// <param name="sftpConfiguration">The SFTP configuration model.</param>
     /// <param name="cancellationToken"></param>
     /// <returns>
@@ -226,18 +242,25 @@ public class SftpConfigurationController : Controller
     ///     Not Found: 404
     ///     Server Error: 500
     /// </returns>
-    [HttpPut("sftp-configurations")]
+    [HttpPut("{organizationId}/sftp-configurations/{configurationId}")]
     [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(SftpConfigurationModel))]
     [ProducesResponseType(StatusCodes.Status304NotModified)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<SftpConfigurationModel>> UpdateSftpConfiguration(SftpConfigurationModel? sftpConfiguration, CancellationToken cancellationToken)
+    public async Task<ActionResult<SftpConfigurationModel>> UpdateSftpConfiguration(string organizationId, string configurationId, SftpConfigurationModel? sftpConfiguration, CancellationToken cancellationToken)
     {
         var httpContext = HttpContext;
 
+        // validate user access to organization before proceeding - future enhancement
+
         try
         {
+            if (string.IsNullOrWhiteSpace(organizationId))
+            {
+                return BadRequest("OrganizationId is null or empty.");
+            }
+
             if (sftpConfiguration is null)
             {
                 return BadRequest("sftpConfiguration is null.");
@@ -248,10 +271,14 @@ public class SftpConfigurationController : Controller
                 return BadRequest("SftpConfiguration.Id cannot be empty.");
             }
 
-            // Default AuthType to Basic as per requirements
-            sftpConfiguration.AuthenticationProtocol = AuthType.Basic;
+            if (!Guid.TryParse(configurationId, out var configId) || configId != sftpConfiguration.Id)
+            {
+                return BadRequest("The Id in the request does not match the Id in the SftpConfiguration model.");
+            }
 
-            var result = await _sftpConfigurationManager.UpdateAsync(sftpConfiguration, cancellationToken);
+            organizationId = organizationId.SanitizeAndRemove();
+            
+            var result = await _sftpConfigurationManager.UpdateAsync(organizationId, sftpConfiguration, cancellationToken);
 
             if (result is null)
             {
@@ -259,6 +286,15 @@ public class SftpConfigurationController : Controller
             }
 
             return Accepted(result);
+        }
+        catch (OrganizationalAccessException ex)
+        {
+            _logger.LogWarning(
+                new EventId(LoggingIds.UpdateItem, "UpdateSftpConfiguration"),
+                ex,
+                "The organizationId: {OrganizationId} does not have access to SFTP configuration Id: {ConfigurationId}",
+                organizationId, configurationId.SanitizeAndRemove());
+            return BadRequest($"The organizationId: {organizationId} does not have access to SFTP configuration Id: {configurationId.SanitizeAndRemove()}");
         }
         catch (NotFoundException ex)
         {
@@ -282,7 +318,8 @@ public class SftpConfigurationController : Controller
     /// <summary>
     /// Deletes an SftpConfiguration record for a given organization.
     /// </summary>
-    /// <param name="organizationId">The organization identifier.</param>
+    /// <param name="organizationId">The identifier for the reporting organization</param>
+    /// <param name="configurationId">The identifier for the SFTP configuration</param>
     /// <param name="cancellationToken"></param>
     /// <returns>
     ///     Success: 202
@@ -290,14 +327,16 @@ public class SftpConfigurationController : Controller
     ///     Not Found: 404
     ///     Server Error: 500
     /// </returns>
-    [HttpDelete("{organizationId}/sftp-configurations")]
+    [HttpDelete("{organizationId}/sftp-configurations/{configurationId}")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult> DeleteSftpConfiguration(string organizationId, CancellationToken cancellationToken)
+    public async Task<ActionResult> DeleteSftpConfiguration(string organizationId, string configurationId, CancellationToken cancellationToken)
     {
         var httpContext = HttpContext;
+        
+        // validate user access to organization before proceeding - future enhancement
 
         try
         {
@@ -305,33 +344,49 @@ public class SftpConfigurationController : Controller
             {
                 return BadRequest("OrganizationId is null or empty.");
             }
+            
+            if(!Guid.TryParse(configurationId, out var configId))
+            {
+                return BadRequest("The SFTP configuration Id is in an invalid format.");
+            }
 
             organizationId = organizationId.SanitizeAndRemove();
 
             // Delete the configuration from the database
-            var result = await _sftpConfigurationManager.DeleteAsync(organizationId, cancellationToken);
-
-            // Also delete credentials from Key Vault (if they exist)
             try
             {
-                await _sftpCredentialService.DeleteCredentialsAsync(organizationId, cancellationToken);
+                var result = await _sftpConfigurationManager.DeleteAsync(organizationId, configId, cancellationToken);
+
+                // Also delete credentials from Key Vault (if they exist)
+                try
+                {
+                    await _sftpCredentialService.DeleteCredentialsAsync(configurationId, cancellationToken);
+                }
+                catch (Exception credEx)
+                {
+                    // Log but don't fail the request if credential deletion fails
+                    _logger.LogWarning(
+                        new EventId(LoggingIds.DeleteItem, "DeleteSftpConfiguration"),
+                        credEx,
+                        "SFTP configuration deleted but credentials could not be removed for organizationId: {OrganizationId}",
+                        organizationId);
+                }
+
+                return Accepted(result);
             }
-            catch (Exception credEx)
-            {
-                // Log but don't fail the request if credential deletion fails
+            catch (OrganizationalAccessException ex) {
                 _logger.LogWarning(
                     new EventId(LoggingIds.DeleteItem, "DeleteSftpConfiguration"),
-                    credEx,
-                    "SFTP configuration deleted but credentials could not be removed for organizationId: {OrganizationId}",
-                    organizationId);
+                    ex,
+                    "The organizationId: {OrganizationId} does not have access to SFTP configuration Id: {ConfigurationId}",
+                    organizationId, configurationId.SanitizeAndRemove());
+                return BadRequest($"The organizationId: {organizationId} does not have access to SFTP configuration Id: {configurationId.SanitizeAndRemove()}");
             }
-
-            return Accepted(result);
         }
         catch (Exception ex)
         {
-            var message = $"An unexpected error occurred while attempting to delete an SFTP configuration for organizationId: {organizationId}. Trace Id: {httpContext.TraceIdentifier}";
-            _logger.LogError(new EventId(LoggingIds.DeleteItem, "DeleteSftpConfiguration"), ex, "An exception occurred while attempting to delete an SFTP configuration for organizationId: {OrganizationId}", organizationId);
+            var message = $"An unexpected error occurred while attempting to delete an SFTP configuration for organizationId: {configurationId}. Trace Id: {httpContext.TraceIdentifier}";
+            _logger.LogError(new EventId(LoggingIds.DeleteItem, "DeleteSftpConfiguration"), ex, "An exception occurred while attempting to delete an SFTP configuration for organizationId: {OrganizationId}", configurationId);
             return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
@@ -359,6 +414,8 @@ public class SftpConfigurationController : Controller
     public async Task<ActionResult> UpdateSftpCredentials(string organizationId, SftpCredentialsModel? credentials, CancellationToken cancellationToken)
     {
         var httpContext = HttpContext;
+        
+        // validate user access to organization before proceeding - future enhancement
 
         try
         {
@@ -428,6 +485,8 @@ public class SftpConfigurationController : Controller
     public async Task<ActionResult<SftpCredentialStatusModel>> GetSftpCredentialStatus(string organizationId, CancellationToken cancellationToken)
     {
         var httpContext = HttpContext;
+        
+        // validate user access to organization before proceeding - future enhancement
 
         try
         {
@@ -476,6 +535,8 @@ public class SftpConfigurationController : Controller
     public async Task<ActionResult> DeleteSftpCredentials(string organizationId, CancellationToken cancellationToken)
     {
         var httpContext = HttpContext;
+        
+        // validate user access to organization before proceeding - future enhancement
 
         try
         {

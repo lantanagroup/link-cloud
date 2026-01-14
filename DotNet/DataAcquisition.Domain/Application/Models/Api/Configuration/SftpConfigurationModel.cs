@@ -29,7 +29,7 @@ public class CreateSftpConfigurationModel : SftpConfigurationModel
 
 public static class SftpConfigurationModelExtensions
 {
-    public static SftpConfigurationModel ToModel(this Infrastructure.Entities.SftpConfiguration entity)
+    public static SftpConfigurationModel ToModel(this SftpConfiguration entity)
     {
         return new SftpConfigurationModel
         {
