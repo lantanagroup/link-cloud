@@ -18,10 +18,12 @@ COPY validation/pom.xml validation/
 RUN mvn -pl hapi -am -B -e -ntp dependency:go-offline
 COPY hapi/ hapi/
 RUN mvn -pl hapi -am -B -DskipTests -e -ntp package
+RUN mvn -pl hapi dependency:copy-dependencies -DoutputDirectory=target/dependencies
 
 FROM hapiproject/hapi:v5.6.0-distroless AS run
 WORKDIR /app
 COPY --from=build /app/hapi/target/hapi-*.jar extra-classes/link.jar
+COPY --from=build /app/hapi/target/dependencies/*.jar extra-classes/
 ENTRYPOINT [ \
     "java", \
     "--class-path", \
