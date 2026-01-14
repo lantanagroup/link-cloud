@@ -57,12 +57,14 @@
           <span class="data-value">{{reportSummary?.frequency}}</span>
         </div>
       </div>
-      <div>
-        <div class="data-label">
-          AdHoc Source
-          <span class="data-value">{{reportSummary?.adHocType}}</span>
+      @if (reportSummary?.adHocType) {
+        <div>
+          <div class="data-label">
+            AdHoc Source
+            <span class="data-value">{{reportSummary?.adHocType}}</span>
+          </div>
         </div>
-      </div>
+      }
       <div>
         <div class="data-label">
           Reporting Period
