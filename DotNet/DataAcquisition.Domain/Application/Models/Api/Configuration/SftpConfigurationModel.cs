@@ -6,6 +6,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Config
 public class SftpConfigurationModel
 {
     public Guid Id { get; set; }
+    public string OrganizationId { get; set; } = string.Empty;
     public string Host { get; set; } = string.Empty;
     public int Port { get; set; }
     public string? RemoteDirectory { get; set; }
@@ -34,6 +35,7 @@ public static class SftpConfigurationModelExtensions
         return new SftpConfigurationModel
         {
             Id = entity.Id,
+            OrganizationId =  entity.OrganizationId,
             Host = entity.Host,
             Port = entity.Port,
             RemoteDirectory = entity.RemoteDirectory,
