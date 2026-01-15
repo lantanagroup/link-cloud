@@ -14,14 +14,13 @@ namespace LantanaGroup.Link.Report.Entities
         public string ReportScheduleId { get; set; } = string.Empty;
         public string Measure { get; set; }
         public string ReportType { get; set; }
-        public List<GroupPopulation> GroupPopulationList = new List<GroupPopulation>();
+        public List<GroupPopulation> GroupPopulationList { get; set; } = new List<GroupPopulation>();
     }
 
     [BsonIgnoreExtraElements]
     public class GroupPopulation
     {
         public string PopulationId { get; set; }
-        [BsonSerializer(typeof(MongoFhirBaseSerDes<CodeableConcept>))]
         public CodeableConcept PopulationCode { get; set; }
         public int TotalPopulationCount { get; set; }
         public List<GroupPopulationMeasureReport> GroupPopulationMeasureReportList = new List<GroupPopulationMeasureReport>();

@@ -214,7 +214,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
 
             await reportEntryManager.UpdateAsyncWithAggregateResult(reportEntry, aggregateResult);
-            //await reportResourceManager.AddAsyncWithAggregateResult(facilityId, result.Message.Value.ReportTrackingId, result.Message.Value.PatientId, aggregateResult, cancellationToken);
+            await reportResourceManager.AddAsyncWithAggregateResult(facilityId, result.Message.Value.ReportTrackingId, result.Message.Value.PatientId, aggregateResult, cancellationToken);
 
             foreach (var aggregateMeasureReport in aggregateResult.MeasureReportResults)
             {

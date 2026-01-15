@@ -1,6 +1,7 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Services;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.EntityFrameworkCore;
 using MongoDB.Driver;
 using MongoDB.EntityFrameworkCore.Extensions;
@@ -97,6 +98,21 @@ public class MongoDbContext : DbContext
 
         modelBuilder.Entity<ReportPopulation>()
             .HasIndex(x => new { x.FacilityId, x.ReportScheduleId });
+
+        modelBuilder.Entity<ReportPopulation>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.OwnsMany(e => e.GroupPopulationList, gp =>
+            {
+                gp.Property(p => p.PopulationCode)
+                    .HasConversion(
+                        v => JsonSerializer.Serialize(v, LinkFhirSerializerOptions.ForFhirLenientSerialization),
+                        v => JsonSerializer.Deserialize<CodeableConcept>(v, LinkFhirSerializerOptions.ForFhirLenientSerialization)!);
+
+                gp.OwnsMany(g => g.GroupPopulationMeasureReportList);
+            });
+        });
     }
 
     /// <summary>
