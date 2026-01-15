@@ -1,5 +1,6 @@
 package ca.uhn.fhir.jpa.starter.link.filters;
 
+import com.lantanagroup.link.hapi.utils.HttpServletRequestUtils;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import org.slf4j.Logger;
@@ -55,7 +56,7 @@ public class RequestRateLimitingFilter extends OncePerRequestFilter {
             return;
         }
 
-        String clientIp = getClientIpAddress(request);
+        String clientIp = HttpServletRequestUtils.getClientIpAddress(request);
         Bucket bucket = clientBuckets.computeIfAbsent(clientIp, this::createBucket);
 
         // Calculate when the bucket refills
@@ -104,19 +105,5 @@ public class RequestRateLimitingFilter extends OncePerRequestFilter {
         Instant now = Instant.now();
         long intervalsPassed = Duration.between(bucketCreated, now).toMillis() / duration.toMillis();
         return bucketCreated.plus(duration.multipliedBy(intervalsPassed + 1));
-    }
-
-    private String getClientIpAddress(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-        
-        String xRealIp = request.getHeader("X-Real-IP");
-        if (xRealIp != null && !xRealIp.isEmpty()) {
-            return xRealIp;
-        }
-        
-        return request.getRemoteAddr();
     }
 }

@@ -1,5 +1,6 @@
 package ca.uhn.fhir.jpa.starter.link.filters;
 
+import com.lantanagroup.link.hapi.utils.HttpServletRequestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
@@ -28,7 +29,7 @@ public class RequestConcurrencyLoggingFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws IOException, ServletException {
-        String address = request.getRemoteAddr();
+        String address = HttpServletRequestUtils.getClientIpAddress(request);
         int count = increment(address);
         try {
             logger.info("ADDRESS=[{}] COUNT=[{}]", address, count);
