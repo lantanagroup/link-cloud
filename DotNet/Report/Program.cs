@@ -337,7 +337,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.Environment = builder.Environment;
         options.ServiceName = ReportConstants.ServiceName;
-        options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+        options.ServiceVersion = serviceInformation.Version;                
     });
 
     // Logging using Serilog

@@ -174,12 +174,12 @@ namespace LantanaGroup.Link.Report.Listeners
 
             if (schedule == null)
             {
-                throw new DeadLetterException($"No ReportSchedule found for ID {reportId}");
+                throw new DeadLetterException($"{Name}: No scheduled report record was found (ReportId = {reportId}, FacilityId = {facilityId}).");
             }
 
             if (!result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
             {
-                throw new DeadLetterException($"{Name}: Received message without correlation ID in topic: {result.Topic}, offset: {result.TopicPartitionOffset}");
+                throw new DeadLetterException($"{Name}: Received message without correlation ID (ReportId = {reportId}, FacilityId = {facilityId}).");
             }
 
             var correlationIdStr = Encoding.UTF8.GetString(headerValue);
@@ -187,7 +187,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             if (reportEntry == null)
             {
-                throw new DeadLetterException($"No Patient Submission Entries were found for schedule ID {schedule.Id}, patient ID {value.PatientId}");
+                throw new DeadLetterException($"{Name}: No patient report entry records were found (ReportId = {schedule.Id}, FacilityId = {facilityId}, PatientId {value.PatientId}).");
             }
 
             if (!value.IsValid)
@@ -213,8 +213,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 }
                 catch (Exception ex)
                 {
-                    //TODO: Do something with this
-                    throw ex;
+                    throw new TransientException($"{Name}: Could not append OperationOutcome resource to patient aggregate report (ReportId = {schedule.Id}, FacilityId = {facilityId}, PatientId {value.PatientId}).");
                 }
             }
 
@@ -226,12 +225,10 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, correlationIdStr, reportEntry.AggregateReportUri);
             }
-            catch (ProduceException<SubmitPayloadKey, SubmitPayloadValue> ex)
+            catch (Exception ex)
             {
-                _logger.LogError(ex, "An error was encountered generating a Submit Payload event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
-                throw new TransientException($"An error was encountered generating a Submit Payload event.\n\tFacilityId: {facilityId}\n\t", ex);
+                throw new TransientException($"{Name}: An error was encountered when producing a Submit Payload event(ReportId = {schedule.Id}, FacilityId = {facilityId}, PatientId {value.PatientId}).", ex);
             }
-
 
             await _reportManifestProducer.Produce(schedule, correlationIdStr);
         }

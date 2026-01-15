@@ -76,21 +76,21 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                     $"{GetType().Name}.Topic has not been configured. Cannot Produce Dead Letter Event for {ServiceName}");
             }
 
-            if (!consumeResult.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var headerValue))
+            if (!consumeResult.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var headerValue))
             {
-                consumeResult.Headers.Add(KafkaConstants.HeaderConstants.ExceptionService, Encoding.UTF8.GetBytes(ServiceName));
+                consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.ExceptionService, Encoding.UTF8.GetBytes(ServiceName));
             }
 
-            consumeResult.Headers.Add(KafkaConstants.HeaderConstants.ExceptionPartition, Encoding.UTF8.GetBytes(consumeResult.Partition.Value.ToString()));
-            consumeResult.Headers.Add(KafkaConstants.HeaderConstants.ExceptionOffset, Encoding.UTF8.GetBytes(consumeResult.Offset.Value.ToString()));
-            consumeResult.Headers.Add(KafkaConstants.HeaderConstants.ExceptionMessage, Encoding.UTF8.GetBytes(exceptionMessage));
+            consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.ExceptionPartition, Encoding.UTF8.GetBytes(consumeResult.Partition.Value.ToString()));
+            consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.ExceptionOffset, Encoding.UTF8.GetBytes(consumeResult.Offset.Value.ToString()));
+            consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.ExceptionMessage, Encoding.UTF8.GetBytes(exceptionMessage));
 
             using var producer = ProducerFactory.CreateProducer(new ProducerConfig() { CompressionType = CompressionType.Zstd });
             producer.Produce(Topic, new Message<K, V>
             {
-                Key = consumeResult.Key,
-                Value = consumeResult.Value,
-                Headers = consumeResult.Headers
+                Key = consumeResult.Message.Key,
+                Value = consumeResult.Message.Value,
+                Headers = consumeResult.Message.Headers
             });
 
             producer.Flush();

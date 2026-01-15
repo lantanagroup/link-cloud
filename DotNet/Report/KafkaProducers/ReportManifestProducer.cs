@@ -48,11 +48,17 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
             var reportEntries = await database.ReportEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
 
-            //TODO: ADD ERROR
+            if (reportEntries == null || reportEntries.Count == 0) 
+            {
+                return null;
+            }
 
             var facilityConfig = await _tenantApiService.GetFacilityConfig(schedule.FacilityId, CancellationToken.None);
 
-            //TODO: ADD ERROR
+            if (facilityConfig == null) 
+            {
+                throw new Exception($"Facility config was not found when attempting to generate a report manifest (ReportId = {schedule.Id}, FacilityId = {schedule.FacilityId});");
+            }
 
             var organization = FhirHelperMethods.CreateOrganization(facilityConfig.FacilityName, schedule.FacilityId, ReportConstants.BundleSettings.SubmittingOrganizationProfile, ReportConstants.BundleSettings.OrganizationTypeSystem, ReportConstants.BundleSettings.CdcOrgIdSystem, ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);
 
@@ -143,7 +149,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             catch (Exception ex)
             {
                 payloadUri = null;
-                _logger.LogError(ex, "Failed to upload to blob storage.");
+                _logger.LogError(ex, "Failed to upload report manifest to blob storage (ReportId = {ReportId}, FacilityId = {FacilityId}).", schedule.Id, schedule.FacilityId);
                 AuditEventMessage auditEvent = new()
                 {
                     FacilityId = schedule.FacilityId,

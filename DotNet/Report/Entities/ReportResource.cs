@@ -15,6 +15,6 @@ namespace LantanaGroup.Link.Report.Entities
         public string MeasureReportId { get; set; }
         public string ResourceType { get; set; }
         public string ResourceId { get; set; }
-        //TODO: Add info on ResourceDetails and some of the ideas Sean mentioned on storing specific pieces of resource info to help QA and Data teams track reports
+        //Note: Daniel - @Sean mentioned that there may be a need to store key pieces of resource information (codes, dates, etc) for UI purposes. We can add an additional 'ResourceDetails' property here to keep tack of those things if we need to. 
     }
 }

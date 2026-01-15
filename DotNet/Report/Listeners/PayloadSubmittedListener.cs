@@ -27,6 +27,8 @@ public class PayloadSubmittedListener(
     ReportManifestProducer reportManifestProducer)
     : BackgroundService
 {
+    private string Name => this.GetType().Name;
+
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
         return Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
@@ -44,8 +46,7 @@ public class PayloadSubmittedListener(
         try
         {
             consumer.Subscribe(nameof(KafkaTopic.PayloadSubmitted));
-            logger.LogInformation(
-                "Started report submitted consumer for topic '{Topic}' at {StartTime}", nameof(KafkaTopic.PayloadSubmitted), DateTime.UtcNow);
+            logger.LogInformation("Started report submitted consumer for topic '{Topic}' at {StartTime}", nameof(KafkaTopic.PayloadSubmitted), DateTime.UtcNow);
 
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -95,13 +96,10 @@ public class PayloadSubmittedListener(
 
                                 if (reportSchedule == null)
                                 {
-                                    logger.LogError("Report schedule {ReportTrackingId} not found", reportTrackingId);
-                                    throw new Exception($"Report schedule {reportTrackingId} not found");
+                                    throw new DeadLetterException($"{Name}: Report schedule {reportTrackingId} not found");
                                 }
 
-                                logger.LogInformation("Report submitted for {FacilityId} at {SubmissionTime}", 
-                                    reportSchedule.FacilityId.SanitizeAndRemove(), 
-                                    DateTime.UtcNow);
+                                logger.LogInformation("{Name}: Report submitted for {FacilityId} at {SubmissionTime}", Name, reportSchedule.FacilityId.SanitizeAndRemove(), DateTime.UtcNow);
 
                                 reportSchedule.Status = ScheduleStatus.Submitted;
                                 reportSchedule.SubmitReportDateTime = DateTime.UtcNow;

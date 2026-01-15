@@ -112,7 +112,6 @@ namespace LantanaGroup.Link.Report.Listeners
                         {
                             try
                             {
-                                //TODO: Look into if this is needed
                                 facilityId = result.Message.Value.FacilityId;
                                 await ProcessMessageAsync(result, facilityId, cancellationToken);
                             }
@@ -167,12 +166,12 @@ namespace LantanaGroup.Link.Report.Listeners
         {
             if (result.Message.Value == null)
             {
-                throw new DeadLetterException($"MeasureReportGenerated event value segment missing");
+                throw new DeadLetterException($"{Name}: MeasureReportGenerated event value segment missing");
             }
 
             if (!result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
             {
-                throw new DeadLetterException("Correlation Id missing");
+                throw new DeadLetterException($"{Name}: Received message without correlation ID (ReportId = {result.Message.Value.ReportTrackingId}, FacilityId = {result.Message.Value.FacilityId}).");
             }
 
             using var scope = _serviceScopeFactory.CreateScope();
@@ -192,7 +191,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             if (schedule == null)
             {
-                throw new DeadLetterException($"No scheduled report record was found (ReportId = {result.Message.Value.ReportTrackingId}, FacilityId = {result.Message.Value.FacilityId}).");
+                throw new DeadLetterException($"{Name}: No scheduled report record was found (ReportId = {result.Message.Value.ReportTrackingId}, FacilityId = {result.Message.Value.FacilityId}).");
             }
 
             if (!readyForValidation)
@@ -235,7 +234,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An error was encountered producing a ReadyForValidation (ReportId = {reportId}, FacilityId = {facilityId}, PatientId = {patientId}).\n\t", schedule.Id, schedule.FacilityId, result.Message.Value.PatientId);
+                _logger.LogError(ex, "An error was encountered producing a ReadyForValidation (ReportId = {reportId}, FacilityId = {facilityId}, PatientId = {patientId}).", schedule.Id, schedule.FacilityId, result.Message.Value.PatientId);
                 throw new DeadLetterException(ex.Message);
             }
         }
