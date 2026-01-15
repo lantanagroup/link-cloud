@@ -3,6 +3,7 @@ package ca.uhn.fhir.jpa.starter.link.filters;
 import com.lantanagroup.link.hapi.utils.HttpServletRequestUtils;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
+import io.github.bucket4j.ConsumptionProbe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,7 +18,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
@@ -28,7 +28,6 @@ public class RequestRateLimitingFilter extends OncePerRequestFilter {
     private final int count;
     private final Duration duration;
     private final ConcurrentHashMap<String, Bucket> clientBuckets = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Instant> bucketCreationTimes = new ConcurrentHashMap<>();
 
     public RequestRateLimitingFilter(
             @Value("${hapi.fhir.rate-limiting.count:-1}") int count,
@@ -59,18 +58,14 @@ public class RequestRateLimitingFilter extends OncePerRequestFilter {
         String clientIp = HttpServletRequestUtils.getClientIpAddress(request);
         Bucket bucket = clientBuckets.computeIfAbsent(clientIp, this::createBucket);
 
-        // Calculate when the bucket refills
-        Instant bucketCreated = bucketCreationTimes.get(clientIp);
-        Instant nextRefill = getNextRefillTime(bucketCreated);
-        long secondsUntilRefill = Duration.between(Instant.now(), nextRefill).getSeconds();
-        // Ensure we don't show negative seconds
-        secondsUntilRefill = Math.max(0, secondsUntilRefill);
+        ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
+        long secondsUntilRefill = probe.getNanosToWaitForReset() / 1_000_000_000;
 
         response.setHeader("X-RateLimit-Limit", String.valueOf(count));
-        response.setHeader("X-RateLimit-Remaining", String.valueOf(bucket.getAvailableTokens()));
+        response.setHeader("X-RateLimit-Remaining", String.valueOf(probe.getRemainingTokens()));
         response.setHeader("X-RateLimit-Reset", String.valueOf(secondsUntilRefill));
 
-        if (bucket.tryConsume(1)) {
+        if (probe.isConsumed()) {
             logger.debug("Request from {} allowed. Remaining tokens: {}", clientIp, bucket.getAvailableTokens());
             chain.doFilter(request, response);
         } else {
@@ -82,9 +77,6 @@ public class RequestRateLimitingFilter extends OncePerRequestFilter {
 
     private Bucket createBucket(String clientIp) {
         logger.debug("Creating new rate limiting bucket for client: {}", clientIp);
-        
-        // Track when this bucket was created
-        bucketCreationTimes.put(clientIp, Instant.now());
 
         // simple bandwidth that completely refills every duration
         Bandwidth bandwidth = Bandwidth.builder()
@@ -95,15 +87,5 @@ public class RequestRateLimitingFilter extends OncePerRequestFilter {
         return Bucket.builder()
                 .addLimit(bandwidth)
                 .build();
-    }
-
-    private Instant getNextRefillTime(Instant bucketCreated) {
-        if (bucketCreated == null) {
-            return Instant.now().plus(duration);
-        }
-        
-        Instant now = Instant.now();
-        long intervalsPassed = Duration.between(bucketCreated, now).toMillis() / duration.toMillis();
-        return bucketCreated.plus(duration.multipliedBy(intervalsPassed + 1));
     }
 }
