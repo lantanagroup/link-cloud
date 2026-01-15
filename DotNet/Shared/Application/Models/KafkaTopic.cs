@@ -58,7 +58,6 @@ public enum KafkaTopic
     BundleEvalRequestedRetry,
     [StringValue("ReportScheduled-Retry")]
     ReportScheduledRetry,
-    MeasureEvaluated,
     GenerateReportRequested,
     [StringValue("GenerateReportRequested-Retry")]
     GenerateReportRequestedRetry,

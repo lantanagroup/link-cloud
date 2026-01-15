@@ -1,4 +1,4 @@
-package com.lantanagroup.link.validation.entities;
+package com.lantanagroup.link.shared.entities;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.lantanagroup.link.shared.serdes.FhirIdDeserializer;

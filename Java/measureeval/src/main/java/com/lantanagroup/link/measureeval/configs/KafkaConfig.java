@@ -2,6 +2,7 @@ package com.lantanagroup.link.measureeval.configs;
 
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lantanagroup.link.measureeval.models.MeasureReportGenerated;
 import com.lantanagroup.link.measureeval.records.*;
 import com.lantanagroup.link.measureeval.services.EvaluationRequestedConsumer;
 import com.lantanagroup.link.measureeval.services.ResourceAcquiredErrorConsumer;
@@ -87,7 +88,7 @@ public class KafkaConfig {
                         .trustedPackages("*")
                         .ignoreTypeHeaders()
                         .typeResolver(KafkaConfig::resolveType),
-                Topics.RESOURCE_EVALUATED, new JsonDeserializer<>(ResourceEvaluated.class, objectMapper)
+                Topics.MEASURE_REPORT_GENERATED, new JsonDeserializer<>(MeasureReportGenerated.Value.class, objectMapper)
                         .trustedPackages("*")
                         .ignoreTypeHeaders()
                         .typeResolver(KafkaConfig::resolveType),
@@ -117,7 +118,6 @@ public class KafkaConfig {
             case Topics.DATA_ACQUISITION_REQUESTED -> new ObjectMapper().constructType(DataAcquisitionRequested.class);
             case Topics.RESOURCE_ACQUIRED_ERROR -> new ObjectMapper().constructType(ResourceAcquired.class);
             case Topics.RESOURCE_NORMALIZED -> new ObjectMapper().constructType(ResourceNormalized.class);
-            case Topics.RESOURCE_EVALUATED -> new ObjectMapper().constructType(ResourceEvaluated.class);
             case Topics.RESOURCE_NORMALIZED_ERROR -> new ObjectMapper().constructType(ResourceNormalized.class);
             case Topics.RESOURCE_NORMALIZED_RETRY -> new ObjectMapper().constructType(ResourceNormalized.class);
             case Topics.EVALUATION_REQUESTED -> new ObjectMapper().constructType(EvaluationRequested.class);
@@ -147,7 +147,7 @@ public class KafkaConfig {
 
         Map<Class<?>, Serializer<?>> serializers = Map.of(
                 String.class, new StringSerializer(),
-                ResourceEvaluated.Key.class, new JsonSerializer<>(objectMapper.constructType(ResourceEvaluated.Key.class), objectMapper),
+                MeasureReportGenerated.Key.class, new JsonSerializer<>(objectMapper.constructType(MeasureReportGenerated.Key.class), objectMapper),
                 Object.class, new JsonSerializer<>(),
                 byte[].class, new ByteArraySerializer()
         );

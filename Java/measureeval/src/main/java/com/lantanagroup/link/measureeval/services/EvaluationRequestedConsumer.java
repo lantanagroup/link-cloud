@@ -1,10 +1,11 @@
 package com.lantanagroup.link.measureeval.services;
 
+import ca.uhn.fhir.context.FhirContext;
 import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
 import com.lantanagroup.link.measureeval.entities.ReportableEvent;
+import com.lantanagroup.link.measureeval.models.MeasureReportGenerated;
 import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.records.EvaluationRequested;
-import com.lantanagroup.link.measureeval.records.ResourceEvaluated;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.measureeval.repositories.ResourceRepository;
 import com.lantanagroup.link.shared.kafka.AsyncListener;
@@ -18,7 +19,6 @@ import org.hl7.fhir.r4.model.MeasureReport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.stereotype.Service;
@@ -35,26 +35,26 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
     private final PatientReportingEvaluationStatusRepository patientStatusRepository;
     private final MeasureEvalMetrics measureEvalMetrics;
     private final PatientStatusBundler patientStatusBundler;
-    private final ResourceEvaluatedProducer resourceEvaluatedProducer;
+    private final MeasureReportGeneratedProducer measureReportGeneratedProducer;
+    private final BlobStorageService blobStorageService;
     private final EvaluateMeasureService evaluateMeasureService;
 
     EvaluationRequestedConsumer(ResourceRepository resourceRepository,
                                 PatientReportingEvaluationStatusRepository patientStatusRepository,
-                                MeasureReportNormalizer measureReportNormalizer,
                                 Predicate<MeasureReport> reportabilityPredicate,
                                 KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate,
-                                @Qualifier("compressedKafkaTemplate")
-                                KafkaTemplate<ResourceEvaluated.Key, ResourceEvaluated> resourceEvaluatedTemplate,
                                 MeasureEvalMetrics measureEvalMetrics,
                                 PatientStatusBundler patientStatusBundler,
-                                ResourceEvaluatedProducer resourceEvaluatedProducer,
+                                MeasureReportGeneratedProducer measureReportGeneratedProducer,
+                                BlobStorageService blobStorageService,
                                 EvaluateMeasureService evaluateMeasureService,
                                 ConsumerRecordRecoverer recoverer) {
         super(recoverer);
         this.patientStatusRepository = patientStatusRepository;
         this.measureEvalMetrics = measureEvalMetrics;
         this.patientStatusBundler = patientStatusBundler;
-        this.resourceEvaluatedProducer = resourceEvaluatedProducer;
+        this.measureReportGeneratedProducer = measureReportGeneratedProducer;
+        this.blobStorageService = blobStorageService;
         this.evaluateMeasureService = evaluateMeasureService;
     }
 
@@ -99,14 +99,43 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
         newPatientStatus.setReports(reports);
         patientStatusRepository.insert(newPatientStatus);
 
+        FhirContext ctx = FhirContext.forR4();
         reports.forEach(r -> {
             MeasureReport measureReport = evaluateMeasureService.evaluateMeasure(patientStatus, r, bundle);
-            this.resourceEvaluatedProducer.produceResourceEvaluatedRecords(patientStatus, r, measureReport);
+            produceMeasureReportGenerated(newPatientStatus, r, measureReport, ctx);
         });
 
         boolean reportablePatient = patientStatus.getReports().stream().anyMatch(PatientReportingEvaluationStatus.Report::getReportable);
         // if at least one reportable measure, increment the reportable patient counter otherwise increment the non-reportable patient counter
         updatePatientMetrics(value, patientStatus, reportablePatient);
+    }
+
+    private void produceMeasureReportGenerated(
+            PatientReportingEvaluationStatus patientStatus,
+            PatientReportingEvaluationStatus.Report report,
+            MeasureReport measureReport,
+            FhirContext ctx) {
+
+        String fileName = String.format("%s-%s.json", patientStatus.getPatientId(), measureReport.getIdPart());
+        String content = ctx.newJsonParser().encodeResourceToString(measureReport);
+        String uri = blobStorageService.uploadPayload(fileName, content);
+
+        MeasureReportGenerated.Key key = new MeasureReportGenerated.Key();
+        key.setFacilityId(patientStatus.getFacilityId());
+        key.setStartDate(report.getStartDate());
+        key.setEndDate(report.getEndDate());
+        key.setFrequency(report.getFrequency());
+
+        MeasureReportGenerated.Value measureReportGenerated = new MeasureReportGenerated.Value();
+        measureReportGenerated.setMeasureReportId(measureReport.getIdPart());
+        measureReportGenerated.setPatientId(patientStatus.getPatientId());
+        measureReportGenerated.setReportType(report.getReportType());
+        measureReportGenerated.setIsReportable(report.getReportable());
+        measureReportGenerated.setReportTrackingId(report.getReportTrackingId());
+        measureReportGenerated.setMeasureReportURI(uri);
+        measureReportGenerated.setMeasureReportFileName(fileName);
+
+        measureReportGeneratedProducer.produce(patientStatus.getCorrelationId(), key, measureReportGenerated);
     }
 
     private void updatePatientMetrics (EvaluationRequested value, PatientReportingEvaluationStatus patientStatus, boolean reportablePatient) {

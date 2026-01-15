@@ -1,16 +1,18 @@
 package com.lantanagroup.link.measureeval.services;
 
+import ca.uhn.fhir.context.FhirContext;
 import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
+import com.lantanagroup.link.measureeval.entities.QueryType;
 import com.lantanagroup.link.measureeval.entities.Resource;
+import com.lantanagroup.link.measureeval.models.MeasureReportGenerated;
+import com.lantanagroup.link.measureeval.records.AbstractResourceRecord;
+import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
+import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.measureeval.repositories.ResourceRepository;
 import com.lantanagroup.link.shared.exceptions.ValidationException;
 import com.lantanagroup.link.shared.kafka.AsyncListener;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
-import com.lantanagroup.link.measureeval.entities.QueryType;
-import com.lantanagroup.link.measureeval.records.AbstractResourceRecord;
-import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
-import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
@@ -28,7 +30,10 @@ import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.support.KafkaUtils;
 import org.springframework.util.StopWatch;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -48,7 +53,8 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     private final KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate;
     private final EvaluateMeasureService evaluateMeasureService;
     private final PatientStatusBundler patientStatusBundler;
-    private final ResourceEvaluatedProducer resourceEvaluatedProducer;
+    private final MeasureReportGeneratedProducer measureReportGeneratedProducer;
+    private final BlobStorageService blobStorageService;
 
     public AbstractResourceConsumer (
             ResourceRepository resourceRepository,
@@ -58,7 +64,8 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate,
             EvaluateMeasureService evaluateMeasureService,
             PatientStatusBundler patientStatusBundler,
-            ResourceEvaluatedProducer resourceEvaluatedProducer,
+            MeasureReportGeneratedProducer measureReportGeneratedProducer,
+            BlobStorageService blobStorageService,
             ConsumerRecordRecoverer recoverer) {
         super(recoverer);
         this.resourceRepository = resourceRepository;
@@ -69,7 +76,8 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         this.dataAcquisitionRequestedTemplate = dataAcquisitionRequestedTemplate;
         this.evaluateMeasureService = evaluateMeasureService;
         this.patientStatusBundler = patientStatusBundler;
-        this.resourceEvaluatedProducer = resourceEvaluatedProducer;
+        this.measureReportGeneratedProducer = measureReportGeneratedProducer;
+        this.blobStorageService = blobStorageService;
     }
 
     @Override
@@ -211,14 +219,15 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
 
     private void evaluateMeasures (T value, PatientReportingEvaluationStatus patientStatus, Bundle bundle) {
         logger.debug("Evaluating measures");
+        FhirContext ctx = FhirContext.forR4();
         for (PatientReportingEvaluationStatus.Report report : patientStatus.getReports()) {
             MeasureReport measureReport = evaluateMeasureService.evaluateMeasure(value.getQueryType().toString(), patientStatus, report, bundle);
             switch (value.getQueryType()) {
                 case INITIAL -> {
                     updateReportability(patientStatus, report, measureReport);
-                    resourceEvaluatedProducer.produceResourceEvaluatedRecords(value.getQueryType(), patientStatus, report, measureReport);
+                    produceMeasureReportGenerated(patientStatus, report, measureReport, ctx);
                 }
-                case SUPPLEMENTAL -> resourceEvaluatedProducer.produceResourceEvaluatedRecords(value.getQueryType(), patientStatus, report, measureReport);
+                case SUPPLEMENTAL -> produceMeasureReportGenerated(patientStatus, report, measureReport, ctx);
                 default -> throw new IllegalStateException(String.format("Unexpected query type: %s", value.getQueryType()));
             }
         }
@@ -231,6 +240,34 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         if (value.getQueryType() == QueryType.INITIAL && reportablePatient) {
             produceDataAcquisitionRequestedRecord(value, patientStatus);
         }
+    }
+
+    private void produceMeasureReportGenerated(
+            PatientReportingEvaluationStatus patientStatus,
+            PatientReportingEvaluationStatus.Report report,
+            MeasureReport measureReport,
+            FhirContext ctx) {
+
+        String fileName = String.format("%s-%s.json", patientStatus.getPatientId(), measureReport.getIdPart());
+        String content = ctx.newJsonParser().encodeResourceToString(measureReport);
+        String uri = blobStorageService.uploadPayload(fileName, content);
+
+        MeasureReportGenerated.Key key = new MeasureReportGenerated.Key();
+        key.setFacilityId(patientStatus.getFacilityId());
+        key.setStartDate(report.getStartDate());
+        key.setEndDate(report.getEndDate());
+        key.setFrequency(report.getFrequency());
+
+        MeasureReportGenerated.Value measureReportGenerated = new MeasureReportGenerated.Value();
+        measureReportGenerated.setMeasureReportId(measureReport.getIdPart());
+        measureReportGenerated.setPatientId(patientStatus.getPatientId());
+        measureReportGenerated.setReportType(report.getReportType());
+        measureReportGenerated.setIsReportable(report.getReportable());
+        measureReportGenerated.setReportTrackingId(report.getReportTrackingId());
+        measureReportGenerated.setMeasureReportURI(uri);
+        measureReportGenerated.setMeasureReportFileName(fileName);
+
+        measureReportGeneratedProducer.produce(patientStatus.getCorrelationId(), key, measureReportGenerated);
     }
 
     private void updatePatientMetrics (T value, PatientReportingEvaluationStatus patientStatus, boolean reportablePatient) {
