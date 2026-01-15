@@ -30,6 +30,10 @@ public class MeasureValidationService {
         this.repository = repository;
     }
 
+    /**
+     * Retrieves related artifact information for a measure, indicating if each artifact is present in the
+     * measure definition, and where the artifact is used by other libraries.
+     */
     public List<RelatedArtifactInfo> getRelatedArtifacts(String id) {
         MeasureDefinition measureDefinition = repository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Measure definition not found"));
@@ -40,6 +44,8 @@ public class MeasureValidationService {
         }
 
         Set<String> bundleResourceUrls = new HashSet<>();
+
+        // Collects URLs of resources within the bundle
         for (Bundle.BundleEntryComponent entry : bundle.getEntry()) {
             Resource resource = entry.getResource();
             if (resource == null) continue;
@@ -51,11 +57,14 @@ public class MeasureValidationService {
             }
         }
 
+        logger.debug("Found {} resources in measure bundle", bundleResourceUrls.size());
+
         List<RelatedArtifactInfo> relatedArtifactInfos = new ArrayList<>();
 
         for (Bundle.BundleEntryComponent entry : bundle.getEntry()) {
             if (entry.getResource() instanceof Library library) {
                 for (RelatedArtifact relatedArtifact : library.getRelatedArtifact()) {
+                    // Processes related artifacts to extract dependency information
                     if (relatedArtifact.getType() == RelatedArtifact.RelatedArtifactType.DEPENDSON) {
                         String artifactUrl = relatedArtifact.getResource();
                         if (artifactUrl == null || artifactUrl.isEmpty()) {
@@ -81,6 +90,7 @@ public class MeasureValidationService {
 
                         String finalBaseUrl = baseUrl;
                         String finalVersion = version;
+                        // Finds or creates artifact info; populates if needed
                         RelatedArtifactInfo info = relatedArtifactInfos.stream()
                                 .filter(i -> finalBaseUrl.equals(i.getUrl()))
                                 .findFirst()
@@ -104,9 +114,21 @@ public class MeasureValidationService {
             }
         }
 
+        logger.debug("Found {} related artifacts in measure definition {}", relatedArtifactInfos.size(), id);
+
+        int notFoundCount = relatedArtifactInfos.stream()
+                .filter(info -> !info.isFound())
+                .mapToInt(info -> 1)
+                .sum();
+
+        logger.debug("Found {} artifacts not present in measure bundle {}", notFoundCount, id);
+
         return relatedArtifactInfos;
     }
 
+    /**
+     * Extracts resource URL, appending version if present
+     */
     private String getResourceUrl(Resource resource) {
         if (resource instanceof org.hl7.fhir.r4.model.MetadataResource metadataResource) {
             String url = metadataResource.getUrl();
