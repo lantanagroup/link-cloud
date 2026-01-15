@@ -233,11 +233,10 @@ namespace LantanaGroup.Link.Report.Listeners
             {
                 await _readyForValidationProducer.Produce(schedule.Id, schedule.ReportTypes, schedule.FacilityId, result.Message.Value.PatientId, aggregateResult.Uri.AbsolutePath, correlationId);
             }
-            catch (ProduceException<ReadyForValidationKey, ReadyForValidationValue> ex)
+            catch (Exception ex)
             {
-                //TODO: Add logic
-                //TODO: Test 
-                _logger.LogError(ex, "An error was encountered generating a MeasureReportGenerated event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
+                _logger.LogError(ex, "An error was encountered producing a ReadyForValidation (ReportId = {reportId}, FacilityId = {facilityId}, PatientId = {patientId}).\n\t", schedule.Id, schedule.FacilityId, result.Message.Value.PatientId);
+                throw new DeadLetterException(ex.Message);
             }
         }
     }
