@@ -121,7 +121,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             //}
 
             var reportEntries = await database.ReportEntryRepository.FindAsync(x => x.FacilityId == schedule.FacilityId && x.ReportScheduleId == schedule.Id);
-
+            
+            //TODO: See if we can add to the query above...Add function to manager to handle 'ready for manifest' check
             foreach (var entry in reportEntries)
             {
                 if ((entry.ReportingStatus == ReportingStatus.NoReportableReports || entry.ReportingStatus == ReportingStatus.PassedValidation || entry.ReportingStatus == ReportingStatus.FailedValidation) && entry.SubmissionStatus == SubmissionStatus.Submitted)
@@ -131,8 +132,6 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
                 return false;
             }
-
-
 
             List<Resource> manifestResources = await Generate(schedule);
 

@@ -192,7 +192,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             if (schedule == null)
             {
-                throw new DeadLetterException($"No scheduled report record was found for report id '{result.Message.Value.ReportTrackingId}'");
+                throw new DeadLetterException($"No scheduled report record was found (ReportId = {result.Message.Value.ReportTrackingId}, FacilityId = {result.Message.Value.FacilityId}).");
             }
 
             if (!readyForValidation)
@@ -202,15 +202,19 @@ namespace LantanaGroup.Link.Report.Listeners
                 return;
             }
 
-            AggregateResult aggregateResult = await _patientAggregator.AggregateToABS(result.Message.Value.PatientId, schedule);
+            AggregateResult aggregateResult;
 
-            if (aggregateResult == null)
+            try
             {
-                throw new DeadLetterException($"No aggregated results were generated for patient '{result.Message.Value.PatientId}' for report id '{result.Message.Value.ReportTrackingId}'");
+                aggregateResult = await _patientAggregator.AggregateToABS(result.Message.Value.PatientId, schedule);
+            }
+            catch (Exception ex) 
+            {
+                throw new DeadLetterException(ex.Message);
             }
 
             await reportEntryManager.UpdateAsyncWithAggregateResult(reportEntry, aggregateResult);
-            await reportResourceManager.AddAsyncWithAggregateResult(facilityId, result.Message.Value.ReportTrackingId, result.Message.Value.PatientId, aggregateResult, cancellationToken);
+            //await reportResourceManager.AddAsyncWithAggregateResult(facilityId, result.Message.Value.ReportTrackingId, result.Message.Value.PatientId, aggregateResult, cancellationToken);
 
             foreach (var aggregateMeasureReport in aggregateResult.MeasureReportResults)
             {

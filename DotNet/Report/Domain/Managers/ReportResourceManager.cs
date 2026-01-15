@@ -61,9 +61,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 }
 
                 await _database.ReportResourceRepository.AddRangeAsync(resources);
+                await _database.SaveChangesAsync();
             }
-
-            await _database.SaveChangesAsync();
         }
 
         public async Task<List<ReportResource>> FindAsync(Expression<Func<ReportResource, bool>> predicate, CancellationToken cancellationToken = default)

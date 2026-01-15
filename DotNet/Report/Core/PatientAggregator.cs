@@ -50,7 +50,10 @@ namespace LantanaGroup.Link.Report.Core
 
         public async Task<AggregateResult> AggregateToABS(string patientId, ReportSchedule reportSchedule)
         {
-            //TODO: Add error check to see if _containerClient is null
+            if (_containerClient == null) 
+            {
+                throw new Exception($"Blob Container Client could not be initialized when attempting to run patient aggregator (PatientId = {patientId}, FacilityId = {reportSchedule.FacilityId}).");    
+            }
 
             AggregateResult aggregateResult = new AggregateResult();
 
@@ -58,7 +61,7 @@ namespace LantanaGroup.Link.Report.Core
 
             if (entry == null)
             {
-                return null;
+                throw new Exception($"No ReportEntry record found when running patient aggregator (PatientId = {patientId}, FacilityId = {reportSchedule.FacilityId}).");
             }
 
             //The 'resourcesAdded' Dictionary will keep track of FHIR resource id's that have been added to the bundle to avoid adding duplicates across entries. The value of each dictionary entry will contain the associated FHIR types. It's a string List type in case there are different FHIR resources that share the same id. This is probably unlikely to happen, but is possible. 
@@ -96,6 +99,7 @@ namespace LantanaGroup.Link.Report.Core
                                 continue;
                             }
 
+                            //TODO: Test for malformed references
                             string[] split_reference = resource_reference.Split('/');
 
                             if (aggregateMeasureReport.ResourceCount.ContainsKey(split_reference[0]))
