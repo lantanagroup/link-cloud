@@ -16,9 +16,14 @@ internal class HeaderCapturingHandler : DelegatingHandler
 
 internal static class FhirCommandUtils
 {
-    public static TimeSpan? ParseRetryAfter(HttpResponseHeaders? headers)
+    private const int DEFAULT_DELAY_SECONDS = 60;
+
+    public static TimeSpan ParseRetryAfter(HttpResponseHeaders? headers)
     {
-        if (headers == null || headers.RetryAfter == null) return null;
+        if (headers == null || headers.RetryAfter == null)
+        {
+            return DateTime.UtcNow.AddSeconds(DEFAULT_DELAY_SECONDS).TimeOfDay;
+        }
 
         var retryValue = headers.RetryAfter;
         TimeSpan? delay = null;
@@ -34,9 +39,9 @@ internal static class FhirCommandUtils
 
         if (!delay.HasValue || delay.Value <= TimeSpan.Zero)
         {
-            delay = DateTime.UtcNow.AddSeconds(60).TimeOfDay;
+            delay = DateTime.UtcNow.AddSeconds(DEFAULT_DELAY_SECONDS).TimeOfDay;
         }
 
-        return delay;
+        return delay.Value;
     }
 }
