@@ -318,7 +318,7 @@ public class SftpConfigurationController : Controller
             _logger.LogWarning(new EventId(LoggingIds.UpdateItem, "UpdateSftpConfiguration"), ex,
                 "An attempt was made to update a non-existent SFTP configuration with Id: {Id}",
                 sftpConfiguration?.Id);
-            return NotFound($"No {nameof(SftpConfiguration)} found for the provided Id: {sftpConfiguration?.Id}. Unable to update configuration.");
+            return NotFound($"No {nameof(SftpConfiguration)} found for the provided Id: {sftpConfiguration?.Id.ToString().SanitizeAndRemove()}. Unable to update configuration.");
         }
         catch (Exception ex)
         {
@@ -326,7 +326,7 @@ public class SftpConfigurationController : Controller
                 $"An unexpected error occurred while attempting to update an SFTP configuration with Id: {sftpConfiguration?.Id}. Trace Id: {httpContext.TraceIdentifier}";
             _logger.LogError(new EventId(LoggingIds.UpdateItem, "UpdateSftpConfiguration"), ex,
                 "An exception occurred while attempting to update an SFTP configuration with Id: {Id}",
-                sftpConfiguration?.Id);
+                sftpConfiguration?.Id.ToString().SanitizeAndRemove());
             return Problem(title: "Internal Server Error", detail: message,
                 statusCode: (int)HttpStatusCode.InternalServerError);
         }
@@ -403,7 +403,7 @@ public class SftpConfigurationController : Controller
         }
         catch (Exception ex)
         {
-            var message = $"An unexpected error occurred while attempting to delete an SFTP configuration for organizationId: {configurationId}. Trace Id: {httpContext.TraceIdentifier}";
+            var message = $"An unexpected error occurred while attempting to delete an SFTP configuration for organizationId: {configurationId.SanitizeAndRemove()}. Trace Id: {httpContext.TraceIdentifier}";
             _logger.LogError(new EventId(LoggingIds.DeleteItem, "DeleteSftpConfiguration"), ex, "An exception occurred while attempting to delete an SFTP configuration for organizationId: {OrganizationId}", configurationId);
             return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
