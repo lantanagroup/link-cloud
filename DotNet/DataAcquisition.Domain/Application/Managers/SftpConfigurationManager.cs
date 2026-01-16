@@ -1,10 +1,14 @@
+using System.Diagnostics;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Shared.Application.Services.Security;
+using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
@@ -50,19 +54,25 @@ public interface ISftpConfigurationManager
 
 
 public class SftpConfigurationManager(
+    ILogger<SftpConfigurationManager> logger,
     IDatabase database,
     IFhirQueryListConfigurationQueries fhirListConfigurationQueries) : ISftpConfigurationManager
 {
     /// <inheritdoc/>
     public async Task<SftpConfigurationModel> CreateAsync(SftpConfigurationModel model, string organizationId, CancellationToken cancellationToken = default)
     {
+        using var activity = Activity.Current?.Source.StartActivity();
+        activity?.SetTag(DiagnosticNames.FacilityId, organizationId);
+        
         if (string.IsNullOrEmpty(organizationId))
         {
+            activity?.SetStatus(ActivityStatusCode.Error, "OrganizationId cannot be null or empty");
             throw new ArgumentNullException(nameof(organizationId), "OrganizationId cannot be null or empty");
         }
 
         if (string.IsNullOrEmpty(model.Host))
         {
+            activity?.SetStatus(ActivityStatusCode.Error, "Host cannot be null or empty");
             throw new ArgumentNullException(nameof(model.Host), "Host cannot be null or empty");
         }
 
@@ -71,6 +81,7 @@ public class SftpConfigurationManager(
         var existingFhirListConfig = await fhirListConfigurationQueries.GetByFacilityIdAsync(organizationId, cancellationToken);
         if (existingFhirListConfig is not null)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, "FHIR List configuration already exists for facility");
             throw new InvalidOperationException(
                 $"The facility '{organizationId}' already has a FHIR List configuration. A facility can only have one census acquisition method.");
         }
@@ -81,72 +92,119 @@ public class SftpConfigurationManager(
 
         if (existingEntity is not null)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, "SFTP configuration already exists for organization");
             throw new EntityAlreadyExistsException(
                 $"A {nameof(SftpConfiguration)} already exists for organizationId: {organizationId}");
         }
 
-        // Default AuthType to Basic as per requirements
-        model.AuthenticationProtocol = AuthType.Basic;
+        try
+        {
+            // Default AuthType to Basic as per requirements
+            model.AuthenticationProtocol = AuthType.Basic;
 
-        var entity = model.ToEntity(organizationId);
+            var entity = model.ToEntity(organizationId);
 
-        await database.SftpConfigurationRepository.AddAsync(entity, cancellationToken);
-        await database.SftpConfigurationRepository.SaveChangesAsync(cancellationToken);
+            await database.SftpConfigurationRepository.AddAsync(entity, cancellationToken);
+            await database.SftpConfigurationRepository.SaveChangesAsync(cancellationToken);
 
-        return entity.ToModel();
+            return entity.ToModel();
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.SetTag("SftpConfiguration", System.Text.Json.JsonSerializer.Serialize(model, LinkFhirSerializerOptions.ActivityTagging));
+            logger.LogError(ex, "Error creating SFTP Configuration for OrganizationId: {OrganizationId}", organizationId.Sanitize());
+            throw;
+        }
     }
 
     /// <inheritdoc/>
     public async Task<SftpConfigurationModel> UpdateAsync(string organizationId, SftpConfigurationModel model, CancellationToken cancellationToken = default)
     {
+        using var activity = Activity.Current?.Source.StartActivity();
+        activity?.SetTag(DiagnosticNames.FacilityId, organizationId);
+        
         var existingEntity = await database.SftpConfigurationRepository
             .SingleOrDefaultAsync(q => q.Id == model.Id, cancellationToken);
 
         if (existingEntity is null)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "No configuration found to update");
             throw new NotFoundException($"No configuration found for Id: {model.Id}. Unable to update configuration.");
+        }
 
         if (existingEntity.OrganizationId != organizationId)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "Organizational access violation");
             throw new OrganizationalAccessException(existingEntity.OrganizationId, organizationId);
+        }
 
         if (string.IsNullOrEmpty(model.Host))
         {
+            activity?.SetStatus(ActivityStatusCode.Error, "Host cannot be null or empty");
             throw new ArgumentNullException(nameof(model.Host), "Host cannot be null or empty");
         }
 
-        // Default AuthType to Basic as per requirements
-        model.AuthenticationProtocol = AuthType.Basic;
+        try
+        {
+            // Default AuthType to Basic as per requirements
+            model.AuthenticationProtocol = AuthType.Basic;
 
-        existingEntity.Host = model.Host;
-        existingEntity.Port = model.Port;
-        existingEntity.RemoteDirectory = model.RemoteDirectory;
-        existingEntity.Timeout = model.Timeout;
-        existingEntity.RemoveAfterProcessing = model.RemoveAfterProcessing;
+            existingEntity.Host = model.Host;
+            existingEntity.Port = model.Port;
+            existingEntity.RemoteDirectory = model.RemoteDirectory;
+            existingEntity.Timeout = model.Timeout;
+            existingEntity.RemoveAfterProcessing = model.RemoveAfterProcessing;
         
-        // For now, we are only allowing Basic auth, so no need to update this field
-        //existingEntity.AuthenticationProtocol = model.AuthenticationProtocol;
+            // For now, we are only allowing Basic auth, so no need to update this field
+            //existingEntity.AuthenticationProtocol = model.AuthenticationProtocol;
 
-        await database.SftpConfigurationRepository.SaveChangesAsync(cancellationToken);
+            await database.SftpConfigurationRepository.SaveChangesAsync(cancellationToken);
 
-        return existingEntity.ToModel();
+            return existingEntity.ToModel();
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.SetTag("SftpConfiguration", System.Text.Json.JsonSerializer.Serialize(model, LinkFhirSerializerOptions.ActivityTagging));
+            logger.LogError(ex, "Error updating SFTP Configuration for OrganizationId: {OrganizationId}, ConfigurationId: {ConfigurationId}", organizationId.Sanitize(), model.Id);
+            throw;
+        }
     }
 
     /// <inheritdoc/>
     public async Task<bool> DeleteAsync(string organizationId, Guid configurationId, CancellationToken cancellationToken = default)
     {
+        using var activity = Activity.Current?.Source.StartActivity();
+        activity?.SetTag(DiagnosticNames.FacilityId, organizationId);
+        
         var entity = await database.SftpConfigurationRepository
             .FirstOrDefaultAsync(x => x.OrganizationId == organizationId, cancellationToken);
 
         if (entity is null)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "No configuration found to delete");
             throw new NotFoundException($"No configuration found for organizationId: {organizationId}. Unable to delete configuration.");
+        }
 
         if (entity.OrganizationId != organizationId)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, "Organizational access violation");
             throw new OrganizationalAccessException(entity.OrganizationId, organizationId);
         }
 
-        database.SftpConfigurationRepository.Remove(entity);
-        await database.SftpConfigurationRepository.SaveChangesAsync(cancellationToken);
+        try
+        {
+            database.SftpConfigurationRepository.Remove(entity);
+            await database.SftpConfigurationRepository.SaveChangesAsync(cancellationToken);
 
-        return true;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            logger.LogError(ex, "Error deleting SFTP Configuration for OrganizationId: {OrganizationId}, ConfigurationId: {ConfigurationId}", organizationId.Sanitize(), configurationId);
+            throw;
+        }
     }
 }
