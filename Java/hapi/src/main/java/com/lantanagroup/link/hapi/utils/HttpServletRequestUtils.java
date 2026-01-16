@@ -14,6 +14,11 @@ public class HttpServletRequestUtils {
             return xRealIp;
         }
 
-        return request.getRemoteAddr();
+        String remoteAddr = request.getRemoteAddr();
+        if (remoteAddr != null && !remoteAddr.isEmpty()) {
+            return remoteAddr;
+        }
+
+        return "0.0.0.0";
     }
 }
