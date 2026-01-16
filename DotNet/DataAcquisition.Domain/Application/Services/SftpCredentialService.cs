@@ -65,8 +65,7 @@ public class SftpCredentialService : ISftpCredentialService
     /// <summary>
     /// Generates a consistent secret name for the given organization.
     /// </summary>
-    private static string GetSecretName(string organizationId) =>
-        $"{SecretNamePrefix}{organizationId}";
+    private static string GetSecretName(string organizationId) => $"{SecretNamePrefix}{organizationId}";
 
     /// <inheritdoc/>
     public async Task<bool> SetCredentialsAsync(string organizationId, SftpCredentialsModel credentials, CancellationToken cancellationToken)
