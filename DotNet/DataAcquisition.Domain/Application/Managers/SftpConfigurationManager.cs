@@ -177,14 +177,14 @@ public class SftpConfigurationManager(
     {
         using var activity = Activity.Current?.Source.StartActivity();
         activity?.SetTag(DiagnosticNames.FacilityId, organizationId);
-        
+
         var entity = await database.SftpConfigurationRepository
-            .FirstOrDefaultAsync(x => x.OrganizationId == organizationId, cancellationToken);
+            .FirstOrDefaultAsync(x => x.Id == configurationId, cancellationToken);
 
         if (entity is null)
         {
             activity?.SetStatus(ActivityStatusCode.Error, "No configuration found to delete");
-            throw new NotFoundException($"No configuration found for organizationId: {organizationId}. Unable to delete configuration.");
+            throw new NotFoundException($"No configuration found for Id: {configurationId}. Unable to delete configuration.");
         }
 
         if (entity.OrganizationId != organizationId)
