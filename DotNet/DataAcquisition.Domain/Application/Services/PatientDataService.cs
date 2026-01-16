@@ -553,10 +553,9 @@ public class PatientDataService : IPatientDataService
 
                 log.RetryAttempts ??= 0;
 
-                var delay = ex.RetryAfter ?? TimeSpan.FromSeconds(Math.Min(Math.Pow(2, log.RetryAttempts.Value), 60));
-                log.ExecutionDate = DateTime.UtcNow.Add(delay);
+                log.ExecutionDate = DateTime.UtcNow.Add(ex.RetryAfter);
                 log.Status = RequestStatus.Pending; //Don't count this as a failure
-                log.Notes.Add($"[{DateTime.UtcNow}] Throttled (429): Retrying after {delay.TotalSeconds}s. Attempt {log.RetryAttempts}.");
+                log.Notes.Add($"[{DateTime.UtcNow}] Throttled (429): Retrying after {ex.RetryAfter.TotalSeconds}s. Attempt {log.RetryAttempts}.");
 
                 await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {

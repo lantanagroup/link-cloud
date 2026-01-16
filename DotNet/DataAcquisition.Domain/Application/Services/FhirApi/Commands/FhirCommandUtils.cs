@@ -16,17 +16,17 @@ internal class HeaderCapturingHandler : DelegatingHandler
 
 internal static class FhirCommandUtils
 {
-    private const int DEFAULT_DELAY_SECONDS = 60;
-
-    public static TimeSpan ParseRetryAfter(HttpResponseHeaders? headers)
+    public static TimeSpan ParseRetryAfter(HttpResponseHeaders? headers, TimeSpan defaultDelay = default)
     {
+        defaultDelay = defaultDelay == default ? TimeSpan.FromSeconds(60) : defaultDelay;
+
         if (headers == null || headers.RetryAfter == null)
         {
-            return DateTime.UtcNow.AddSeconds(DEFAULT_DELAY_SECONDS).TimeOfDay;
+            return defaultDelay;
         }
 
         var retryValue = headers.RetryAfter;
-        TimeSpan? delay = null;
+        TimeSpan delay;
 
         if (retryValue.Delta.HasValue)
         {
@@ -36,12 +36,16 @@ internal static class FhirCommandUtils
         {
             delay = retryValue.Date.Value - DateTimeOffset.UtcNow;
         }
-
-        if (!delay.HasValue || delay.Value <= TimeSpan.Zero)
+        else
         {
-            delay = DateTime.UtcNow.AddSeconds(DEFAULT_DELAY_SECONDS).TimeOfDay;
+            return defaultDelay;
         }
 
-        return delay.Value;
+        if (delay <= TimeSpan.Zero)
+        {
+            return defaultDelay;
+        }
+
+        return delay;
     }
 }
