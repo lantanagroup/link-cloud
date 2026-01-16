@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Logging;
 using System.Security.Cryptography;
 using System.Text.Json;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Shared.Application.Services.SecretManager
 {
@@ -63,7 +64,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.SecretManager
         {
             _secrets[secretName] = secretValue;
             SaveSecretsToFile();
-            _logger.LogInformation("Secret {SecretName} saved to local secret manager", secretName);
+            _logger.LogInformation("Secret {SecretName} saved to local secret manager", secretName.SanitizeAndRemove());
             return Task.FromResult(true);
         }
 
@@ -74,7 +75,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.SecretManager
             {
                 SaveSecretsToFile();
             }
-            _logger.LogInformation("Secret {SecretName} {Result} from local secret manager", secretName, removed ? "deleted" : "not found");
+            _logger.LogInformation("Secret {SecretName} {Result} from local secret manager", secretName.SanitizeAndRemove(), removed ? "deleted" : "not found");
             return Task.FromResult(true);
         }
 

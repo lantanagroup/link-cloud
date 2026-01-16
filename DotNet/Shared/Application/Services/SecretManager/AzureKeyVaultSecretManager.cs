@@ -2,6 +2,7 @@
 using Azure.Security.KeyVault.Secrets;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -43,7 +44,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.SecretManager
         {
             var operation = await _secretClient.StartDeleteSecretAsync(secretName, cancellationToken);
             await operation.WaitForCompletionAsync(cancellationToken);
-            _logger.LogInformation("Secret {SecretName} deleted from Azure Key Vault", secretName);
+            _logger.LogInformation("Secret {SecretName} deleted from Azure Key Vault", secretName.SanitizeAndRemove());
             return true;
         }
     }
