@@ -108,19 +108,21 @@ public class SftpConfigurationController : Controller
         
         // validate user access to organization before proceeding - future enhancement
 
+        // Sanitize organizationId
+        organizationId = organizationId.SanitizeAndRemove();
+        
         try
         {
             if (string.IsNullOrWhiteSpace(organizationId))
             {
                 return BadRequest("OrganizationId is null or empty.");
             }
-
-            organizationId = organizationId.SanitizeAndRemove();
+            
             var result = await _sftpConfigurationQueries.GetByOrganizationIdAsync(organizationId, cancellationToken);
 
             if (result is null)
             {
-                return NotFound($"No {nameof(SftpConfiguration)} found for organization: {organizationId}");
+                return NotFound($"No {nameof(SftpConfiguration)} found for organization: {organizationId.SanitizeAndRemove()}");
             }
 
             return Ok(result);
@@ -159,7 +161,10 @@ public class SftpConfigurationController : Controller
         var httpContext = HttpContext;
         
         // validate user access to organization before proceeding - future enhancement
-
+        
+        // Sanitize organizationId
+        organizationId = organizationId.SanitizeAndRemove();
+        
         try
         {
             if (sftpConfiguration is null)
@@ -182,9 +187,7 @@ public class SftpConfigurationController : Controller
 
             // Default AuthType to Basic until other authentication options are supported
             sftpConfiguration.AuthenticationProtocol = AuthType.Basic;
-
-            organizationId = organizationId.SanitizeAndRemove();
-
+            
             // Create the configuration in the database
             var result =
                 await _sftpConfigurationManager.CreateAsync(sftpConfiguration, organizationId, cancellationToken);
@@ -265,6 +268,9 @@ public class SftpConfigurationController : Controller
 
         // validate user access to organization before proceeding - future enhancement
 
+        // Sanitize organizationId
+        organizationId = organizationId.SanitizeAndRemove();
+        
         try
         {
             if (string.IsNullOrWhiteSpace(organizationId))
@@ -349,6 +355,9 @@ public class SftpConfigurationController : Controller
         
         // validate user access to organization before proceeding - future enhancement
 
+        // Sanitize organizationId
+        organizationId = organizationId.SanitizeAndRemove();
+        
         try
         {
             if (string.IsNullOrWhiteSpace(organizationId))
@@ -360,8 +369,6 @@ public class SftpConfigurationController : Controller
             {
                 return BadRequest("The SFTP configuration Id is in an invalid format.");
             }
-
-            organizationId = organizationId.SanitizeAndRemove();
 
             // Delete the configuration from the database
             try
@@ -428,6 +435,9 @@ public class SftpConfigurationController : Controller
         
         // validate user access to organization before proceeding - future enhancement
 
+        // Sanitize organizationId
+        organizationId = organizationId.SanitizeAndRemove();
+        
         try
         {
             if (string.IsNullOrWhiteSpace(organizationId))
@@ -449,8 +459,6 @@ public class SftpConfigurationController : Controller
             {
                 return BadRequest("Password is required.");
             }
-
-            organizationId = organizationId.SanitizeAndRemove();
 
             // Verify the SFTP configuration exists
             var existingConfig = await _sftpConfigurationQueries.GetByOrganizationIdAsync(organizationId, cancellationToken);
@@ -499,14 +507,15 @@ public class SftpConfigurationController : Controller
         
         // validate user access to organization before proceeding - future enhancement
 
+        // Sanitize organizationId
+        organizationId = organizationId.SanitizeAndRemove();
+        
         try
         {
             if (string.IsNullOrWhiteSpace(organizationId))
             {
                 return BadRequest("OrganizationId is null or empty.");
             }
-
-            organizationId = organizationId.SanitizeAndRemove();
 
             // Verify the SFTP configuration exists
             var existingConfig = await _sftpConfigurationQueries.GetByOrganizationIdAsync(organizationId, cancellationToken);
@@ -549,14 +558,15 @@ public class SftpConfigurationController : Controller
         
         // validate user access to organization before proceeding - future enhancement
 
+        // Sanitize organizationId
+        organizationId = organizationId.SanitizeAndRemove();
+        
         try
         {
             if (string.IsNullOrWhiteSpace(organizationId))
             {
                 return BadRequest("OrganizationId is null or empty.");
             }
-
-            organizationId = organizationId.SanitizeAndRemove();
 
             // Verify the SFTP configuration exists
             var existingConfig = await _sftpConfigurationQueries.GetByOrganizationIdAsync(organizationId, cancellationToken);
