@@ -550,20 +550,13 @@ public class PatientDataService : IPatientDataService
                 _logger.LogWarning(ex, "Throttled by 429 for facility {FacilityId}", log.FacilityId.Sanitize());
 
                 log.Notes ??= new List<string>();
-                log.RetryAttempts = (log.RetryAttempts ?? 0) + 1;
 
-                if (log.RetryAttempts > DataAcquisitionLog.MaxRetryAttempts)
-                {
-                    log.Status = RequestStatus.Failed;
-                    log.Notes.Add($"[{DateTime.UtcNow}] Max retries ({DataAcquisitionLog.MaxRetryAttempts}) exceeded after 429: {ex.Message}");
-                }
-                else
-                {
-                    var delay = ex.RetryAfter ?? TimeSpan.FromSeconds(Math.Min(Math.Pow(2, log.RetryAttempts.Value), 60));
-                    log.ExecutionDate = DateTime.UtcNow.Add(delay);
-                    log.Status = RequestStatus.Pending;
-                    log.Notes.Add($"[{DateTime.UtcNow}] Throttled (429): Retrying after {delay.TotalSeconds}s. Attempt {log.RetryAttempts}.");
-                }
+                log.RetryAttempts ??= 0;
+
+                var delay = ex.RetryAfter ?? TimeSpan.FromSeconds(Math.Min(Math.Pow(2, log.RetryAttempts.Value), 60));
+                log.ExecutionDate = DateTime.UtcNow.Add(delay);
+                log.Status = RequestStatus.Failed;
+                log.Notes.Add($"[{DateTime.UtcNow}] Throttled (429): Retrying after {delay.TotalSeconds}s. Attempt {log.RetryAttempts}.");
 
                 await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {
@@ -578,7 +571,6 @@ public class PatientDataService : IPatientDataService
                     TraceId = log.TraceId
                 }, cancellationToken);
 
-                return; // Requeue for later
             }
             catch (Exception ex)
             {

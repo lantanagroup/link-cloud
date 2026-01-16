@@ -571,8 +571,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         var query = from log in _dbContext.DataAcquisitionLogs
                     where log.FacilityId == facilityId
                         && (lastId == null || log.Id > lastId)
-                        && (log.Status == RequestStatus.Pending ||
-                            (log.Status == RequestStatus.Failed && log.RetryAttempts < DataAcquisitionLog.MaxRetryAttempts))
+                        && (log.Status == RequestStatus.Pending || log.Status == RequestStatus.Failed)
                     orderby log.Priority descending, log.ExecutionDate ascending, log.Id ascending
                     select new DataAcquisitionLogModel
                     {
