@@ -61,7 +61,7 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
         var logQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
         var dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
         DataAcquisitionLogModel? log = null; 
-        _logger.LogInformation("Processing ReadyToAcquire message with log id: {consumeResult.Message.Value.LogId}, and facility id: {consumeResult.Message.Value.FacilityId}", consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId);
+        _logger.LogInformation("Processing ReadyToAcquire message with log id: {LogId}, and facility id: {FacilityId}", consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId);
 
         try
         {
@@ -103,7 +103,7 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
                 }, cancellationToken);
             }
 
-            _logger.LogError(ex, "Error processing ReadyToAcquire message with log id: {consumeResult.Message.Value.LogId}, and facility id: {consumeResult.Message.Value.FacilityId}", consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId);
+            _logger.LogError(ex, "Error processing ReadyToAcquire message with log id: {LogId}, and facility id: {FacilityId}", consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId);
             throw new DeadLetterException("Error processing ReadyToAcquire message: " + ex.Message, ex);
         }
     }

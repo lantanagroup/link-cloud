@@ -106,7 +106,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             {
                 if (!IsDurationFormatValid(schedule.Duration))
                 {
-                    _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.GenerateItems), "Duration format is invalid: {schedule.Duration}.", HtmlInputSanitizer.Sanitize(schedule.Duration));
+                    _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.GenerateItems), "Duration format is invalid: {Duration}.", HtmlInputSanitizer.Sanitize(schedule.Duration));
                     return BadRequest("Duration format is invalid: " + HtmlInputSanitizer.Sanitize(schedule.Duration) + ". Please provide a valid duration format.");
                 }
             }
@@ -207,7 +207,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             {
                 if (!IsDurationFormatValid(schedule.Duration))
                 {
-                    _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.UpdateItem, "Update QueryDispatch configuration"), "Duration format is invalid: {schedule.Duration}.", HtmlInputSanitizer.Sanitize(schedule.Duration));
+                    _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.UpdateItem, "Update QueryDispatch configuration"), "Duration format is invalid: {Duration}.", HtmlInputSanitizer.Sanitize(schedule.Duration));
                     return BadRequest("Duration format is invalid: " + schedule.Duration + ". Please provide a valid duration format.");
                 }
             }

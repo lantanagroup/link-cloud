@@ -6,6 +6,7 @@ using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Domain;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using System.Text.Json;
@@ -70,7 +71,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string locationPath = Path.Combine(assemblyLocation, "Resources", "Location.txt");
             string location_text = File.ReadAllText(locationPath);
@@ -131,7 +132,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string locationPath = Path.Combine(assemblyLocation, "Resources", "LocationWithCodeSection.txt");
             string location_text = File.ReadAllText(locationPath);
@@ -187,7 +188,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Patient.txt");
             string text = File.ReadAllText(resourcePath);
@@ -243,7 +244,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Observation.txt");
             string text = File.ReadAllText(resourcePath);
@@ -305,7 +306,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.NotEqual(default, fetched.Id);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Patient.txt");
             string text = File.ReadAllText(resourcePath);
@@ -367,7 +368,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.NotEqual(default, fetched.Id);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "MedicationRequest.txt");
             string text = File.ReadAllText(resourcePath);
@@ -431,7 +432,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.NotEqual(default, fetched.Id);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Condition.txt");
             string text = File.ReadAllText(resourcePath);
@@ -493,7 +494,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "EncounterCopyTest.txt");
             string text = File.ReadAllText(resourcePath);
@@ -558,7 +559,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "PatientBirthDateTest.txt");
             string text = File.ReadAllText(resourcePath);
@@ -622,7 +623,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "MedicationRequestAuthoredOnToNote.txt");
             string text = File.ReadAllText(resourcePath);
@@ -686,7 +687,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "AllergyIntolerance.txt");
             string text = File.ReadAllText(resourcePath);
@@ -752,7 +753,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "DiagnosticReport.txt");
             string text = File.ReadAllText(resourcePath);
@@ -790,7 +791,7 @@ namespace IntegrationTests.Normalization
         [Fact]
         public async Task Integration_CopyPropertyOperation_MultipleOperations_Queue()
         {
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Patient.txt");
             string text = File.ReadAllText(resourcePath);
@@ -943,7 +944,7 @@ namespace IntegrationTests.Normalization
             Assert.NotEmpty(codeMapOperation.CodeSystemMaps);
 
             // Load Encounter resource
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string encounterPath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string encounterText = File.ReadAllText(encounterPath);
@@ -1023,7 +1024,7 @@ namespace IntegrationTests.Normalization
             Assert.NotEmpty(codeMapOperation.CodeSystemMaps);
 
             // Load Encounter resource
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string encounterPath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string encounterText = File.ReadAllText(encounterPath);
@@ -1106,7 +1107,7 @@ namespace IntegrationTests.Normalization
             Assert.NotEmpty(codeMapOperation.CodeSystemMaps);
 
             // Load Encounter resource
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string encounterPath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string encounterText = File.ReadAllText(encounterPath);
@@ -1190,7 +1191,7 @@ namespace IntegrationTests.Normalization
             Assert.NotEmpty(codeMapOperation.CodeSystemMaps);
 
             // Load Observation resource
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string observationPath = Path.Combine(assemblyLocation, "Resources", "BodyTempObservation.txt");
             string observationText = File.ReadAllText(observationPath);
@@ -1274,7 +1275,7 @@ namespace IntegrationTests.Normalization
             Assert.NotEmpty(codeMapOperation.CodeSystemMaps);
 
             // Load Condition resource
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string conditionPath = Path.Combine(assemblyLocation, "Resources", "DiabetesCondition.txt");
             string conditionText = File.ReadAllText(conditionPath);
@@ -1346,7 +1347,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
@@ -1410,7 +1411,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
@@ -1472,7 +1473,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
@@ -1532,7 +1533,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
@@ -1594,7 +1595,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
@@ -1654,7 +1655,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
@@ -1716,7 +1717,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
@@ -1776,7 +1777,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
@@ -1838,7 +1839,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
@@ -1898,7 +1899,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
@@ -1960,7 +1961,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
@@ -2020,7 +2021,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
@@ -2082,7 +2083,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
@@ -2142,7 +2143,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
@@ -2204,7 +2205,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
@@ -2264,7 +2265,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
@@ -2326,7 +2327,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "ConditionalObservation.txt");
             string text = File.ReadAllText(resourcePath);
@@ -2386,7 +2387,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "ConditionalObservation.txt");
             string text = File.ReadAllText(resourcePath);
@@ -2436,7 +2437,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string locationPath = Path.Combine(assemblyLocation, "Resources", "Location.txt");
             string location_text = File.ReadAllText(locationPath);

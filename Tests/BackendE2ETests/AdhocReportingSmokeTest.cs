@@ -1,12 +1,13 @@
-﻿using Xunit.Abstractions;
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
+using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests;
 using Newtonsoft.Json.Linq;
 using RestSharp;
+using System.Diagnostics;
 using System.Net;
 using Xunit;
+using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
-using LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests;
-using System.Diagnostics;
 
 namespace LantanaGroup.Link.Tests.E2ETests;
 
@@ -204,7 +205,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
         using var zipStream = new MemoryStream(response.RawBytes ?? []);
         using var archive = new System.IO.Compression.ZipArchive(zipStream, System.IO.Compression.ZipArchiveMode.Read);
-        var jsonParser = new Hl7.Fhir.Serialization.FhirJsonParser();
+        var jsonParser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
 
         foreach (var entry in archive.Entries)
         {
