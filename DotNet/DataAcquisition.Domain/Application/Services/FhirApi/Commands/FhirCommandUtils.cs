@@ -18,16 +18,30 @@ internal static class FhirCommandUtils
 {
     public static TimeSpan? ParseRetryAfter(HttpResponseHeaders? headers)
     {
-        if (headers == null) return null;
+        if (headers == null || headers.RetryAfter == null) return null;
 
-        if (headers.TryGetValues("Retry-After", out var values))
+        var retryValue = headers.RetryAfter;
+        TimeSpan? delay = null;
+
+        if (retryValue.Delta.HasValue)
         {
-            var value = values.FirstOrDefault();
-            if (int.TryParse(value, out int seconds))
-                return TimeSpan.FromSeconds(seconds);
-            if (DateTimeOffset.TryParse(value, out var date))
-                return date - DateTimeOffset.UtcNow;
+            delay = retryValue.Delta.Value;
         }
-        return null;
+        else if (retryValue.Date.HasValue)
+        {
+            delay = retryValue.Date.Value - DateTimeOffset.UtcNow;
+        }
+
+        if (delay.HasValue)
+        {
+            if (delay.Value <= TimeSpan.Zero)
+            {
+                return DateTime.UtcNow.AddSeconds(60).TimeOfDay;
+            }
+
+            return delay;
+        }
+
+        return null;  // Invalid or missing
     }
 }
