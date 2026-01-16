@@ -1,5 +1,7 @@
 package ca.uhn.fhir.jpa.starter.link.filters;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.lantanagroup.link.hapi.utils.HttpServletRequestUtils;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
@@ -18,7 +20,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Duration;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 @Order(-10)
@@ -27,7 +28,7 @@ public class RequestRateLimitingFilter extends OncePerRequestFilter {
 
     private final int count;
     private final Duration duration;
-    private final ConcurrentHashMap<String, Bucket> clientBuckets = new ConcurrentHashMap<>();
+    private final Cache<String, Bucket> clientBuckets;
 
     public RequestRateLimitingFilter(
             @Value("${hapi.fhir.rate-limiting.count:-1}") int count,
@@ -37,6 +38,9 @@ public class RequestRateLimitingFilter extends OncePerRequestFilter {
         logger.info("DURATION=[{}]", duration);
         this.count = count;
         this.duration = duration;
+        clientBuckets = Caffeine.newBuilder()
+                .expireAfterAccess(duration.multipliedBy(2))
+                .build();
     }
 
     @Override
@@ -56,7 +60,7 @@ public class RequestRateLimitingFilter extends OncePerRequestFilter {
         }
 
         String clientIp = HttpServletRequestUtils.getClientIpAddress(request);
-        Bucket bucket = clientBuckets.computeIfAbsent(clientIp, this::createBucket);
+        Bucket bucket = clientBuckets.get(clientIp, this::createBucket);
 
         ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
         long secondsUntilRefill = probe.getNanosToWaitForReset() / 1_000_000_000;
