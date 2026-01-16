@@ -223,6 +223,12 @@ namespace LantanaGroup.Link.Submission.Application.Services
                 .FirstOrDefault(i => i.System == "https://www.cdc.gov/nhsn/OrgID")?.Value;
             nhsnOrgId ??= key.FacilityId;
 
+            if (string.IsNullOrEmpty(value.PayloadUri))
+            {
+                _logger.LogError("PayloadUri is null or empty for ReportSchedule - cannot process expanded bundles");
+                return;
+            }
+
             // Derive root prefix from value.PayloadUri
             BlobUriBuilder uriBuilder = new(new Uri(value.PayloadUri!));
             string manifestBlobName = uriBuilder.BlobName;
@@ -398,7 +404,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
                 BlockBlobClient blobClient = _externalContainerClient!.GetBlockBlobClient(blobName);
                 BlockBlobOpenWriteOptions blobOptions = new() { HttpHeaders = new BlobHttpHeaders { ContentType = "application/json" } };
                 await using var stream = await blobClient.OpenWriteAsync(true, blobOptions, cancellationToken);
-                await stream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(fallbackAgg, jsonOptions)), cancellationToken);
+                await stream.WriteAsync(aggregateBytes, cancellationToken);
             }
 
             // shared-resources.json - now an EMPTY Bundle
