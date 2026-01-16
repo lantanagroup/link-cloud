@@ -227,6 +227,9 @@ public class PatientDataService : IPatientDataService
             {
                 if (request.QueryPlanType == QueryPlanType.Initial)
                 {
+                    var priority = schedReport.ReportTypes?.Any(t => t.Equals("Daily", StringComparison.OrdinalIgnoreCase)) == true
+                        ? AcquisitionPriority.High : AcquisitionPriority.Normal;
+
                     try
                     {
                         await _dataAcquisitionLogManager.CreateAsync(
@@ -235,8 +238,8 @@ public class PatientDataService : IPatientDataService
                                 FacilityId = request.FacilityId,
                                 CorrelationId = request.CorrelationId,
                                 PatientId = request.ConsumeResult.Message.Value.PatientId,
+                                Priority = priority,
                                 ExecutionDate = System.DateTime.UtcNow,
-                                Priority = AcquisitionPriority.Normal,
                                 ReportableEvent = request.ConsumeResult.Message.Value.ReportableEvent,
                                 Status = RequestStatus.Pending,
                                 FhirVersion = "R4",
@@ -413,7 +416,8 @@ public class PatientDataService : IPatientDataService
                             ResourceAcquiredIds = log.ResourceAcquiredIds,
                             RetryAttempts = log.RetryAttempts,
                             CompletionDate = log.CompletionDate,
-                            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
+                            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                            TraceId = log.TraceId,
                             ExecutionDate = log.ExecutionDate,
                             Notes = log.Notes,
                             Status = log.Status,
@@ -436,7 +440,8 @@ public class PatientDataService : IPatientDataService
                     ResourceAcquiredIds = log.ResourceAcquiredIds,
                     RetryAttempts = log.RetryAttempts,
                     CompletionDate = log.CompletionDate,
-                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
+                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                    TraceId = log.TraceId,
                     ExecutionDate = log.ExecutionDate,
                     Notes = log.Notes,
                     Status = log.Status,
@@ -459,23 +464,23 @@ public class PatientDataService : IPatientDataService
                 var resourceIds = new HashSet<string>();
 
                 bool skipFetch = false;
-                
+
                 //4. call api
                 foreach (var fhirQuery in log.FhirQuery.ToList())
                 {
-                    if(skipFetch)
+                    if (skipFetch)
                     {
                         break;
                     }
 
                     //check if log is search and not census, if true,
-                    if ((fhirQuery.QueryType == FhirQueryType.Search || fhirQuery.QueryType == FhirQueryType.SearchPost)&& !log.IsCensus)
+                    if ((fhirQuery.QueryType == FhirQueryType.Search || fhirQuery.QueryType == FhirQueryType.SearchPost) && !log.IsCensus)
                     {
                         var idParams = fhirQuery.QueryParameters.Where(x => x.StartsWith("_id=", StringComparison.InvariantCultureIgnoreCase)).ToList();
-                        if(idParams.Any())
+                        if (idParams.Any())
                         {
                             var ids = new List<string>();
-                            foreach(var idParam in idParams)
+                            foreach (var idParam in idParams)
                             {
                                 var splitIds = idParam.Substring(4).Trim().Split(',');
                                 ids.AddRange(splitIds);
@@ -515,7 +520,7 @@ public class PatientDataService : IPatientDataService
                             {
                                 throw new NotSupportedException("Bulk Data is currently not supported.");
                             }
-                        } 
+                        }
                     }
                 }
 
@@ -533,11 +538,47 @@ public class PatientDataService : IPatientDataService
                     RetryAttempts = log.RetryAttempts,
                     ResourceAcquiredIds = log.ResourceAcquiredIds,
                     CompletionDate = log.CompletionDate,
-                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
+                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                    TraceId = log.TraceId,
                     ExecutionDate = log.ExecutionDate,
                     Notes = log.Notes,
                     Status = log.Status,
                 }, cancellationToken);
+            }
+            catch (TooManyRequestsException ex)
+            {
+                _logger.LogWarning(ex, "Throttled by 429 for facility {FacilityId}", log.FacilityId.Sanitize());
+
+                log.Notes ??= new List<string>();
+                log.RetryAttempts = (log.RetryAttempts ?? 0) + 1;
+
+                if (log.RetryAttempts > DataAcquisitionLog.MaxRetryAttempts)
+                {
+                    log.Status = RequestStatus.Failed;
+                    log.Notes.Add($"[{DateTime.UtcNow}] Max retries ({DataAcquisitionLog.MaxRetryAttempts}) exceeded after 429: {ex.Message}");
+                }
+                else
+                {
+                    var delay = ex.RetryAfter ?? TimeSpan.FromSeconds(Math.Min(Math.Pow(2, log.RetryAttempts.Value), 60));
+                    log.ExecutionDate = DateTime.UtcNow.Add(delay);
+                    log.Status = RequestStatus.Pending;
+                    log.Notes.Add($"[{DateTime.UtcNow}] Throttled (429): Retrying after {delay.TotalSeconds}s. Attempt {log.RetryAttempts}.");
+                }
+
+                await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                {
+                    Id = log.Id,
+                    RetryAttempts = log.RetryAttempts,
+                    ExecutionDate = log.ExecutionDate,
+                    Status = log.Status,
+                    Notes = log.Notes,
+                    ResourceAcquiredIds = log.ResourceAcquiredIds,
+                    CompletionDate = log.CompletionDate,
+                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                    TraceId = log.TraceId
+                }, cancellationToken);
+
+                return; // Requeue for later
             }
             catch (Exception ex)
             {
@@ -553,7 +594,8 @@ public class PatientDataService : IPatientDataService
                     ResourceAcquiredIds = log.ResourceAcquiredIds,
                     RetryAttempts = log.RetryAttempts,
                     CompletionDate = log.CompletionDate,
-                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
+                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                    TraceId = log.TraceId,
                     ExecutionDate = log.ExecutionDate,
                     Notes = log.Notes,
                     Status = log.Status,
@@ -581,4 +623,3 @@ public class PatientDataService : IPatientDataService
         return true;
     }
 }
-

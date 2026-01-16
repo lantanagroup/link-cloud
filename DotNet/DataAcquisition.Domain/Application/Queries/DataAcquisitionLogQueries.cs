@@ -569,10 +569,11 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     public async Task<List<DataAcquisitionLogModel>> GetNextEligibleBatchForFacility(string facilityId, long? lastId, int batchSize, CancellationToken cancellationToken = default)
     {
         var query = from log in _dbContext.DataAcquisitionLogs
-                    orderby log.Id
                     where log.FacilityId == facilityId
                         && (lastId == null || log.Id > lastId)
-                        && (log.Status == RequestStatus.Pending || log.Status == RequestStatus.Failed)
+                        && (log.Status == RequestStatus.Pending ||
+                            (log.Status == RequestStatus.Failed && log.RetryAttempts < DataAcquisitionLog.MaxRetryAttempts))
+                    orderby log.Priority descending, log.ExecutionDate ascending, log.Id ascending
                     select new DataAcquisitionLogModel
                     {
                         Id = log.Id,
