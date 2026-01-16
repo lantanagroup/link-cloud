@@ -99,13 +99,11 @@ namespace LantanaGroup.Link.Report.Listeners
                                     throw new DeadLetterException("Invalid Patient Id's Acquired Event");
                                 }
 
-                                var scheduledReports =
-                                    await database.ReportScheduledRepository.FindAsync(x => x.FacilityId == key && x.EndOfReportPeriodJobHasRun == false, cancellationToken);
+                                var scheduledReports = await database.ReportScheduledRepository.FindAsync(x => x.FacilityId == key && x.EndOfReportPeriodJobHasRun == false, cancellationToken);
 
                                 if (!scheduledReports?.Any() ?? false)
                                 {
-                                    throw new TransientException(
-                                        $"{Name}: No Scheduled Reports found for facilityId: {key}");
+                                    throw new TransientException($"{Name}: No Scheduled Reports found for facilityId: {key}");
                                 }
 
                                 foreach (var scheduledReport in scheduledReports)
@@ -115,10 +113,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         foreach (var pId in patientListItem.PatientIds)
                                         {
                                             var patientId = pId.Split('/').Last();
-
-                                            var entry = await reportEntryManager.SingleOrDefaultAsync(e =>
-                                                        e.ReportScheduleId == scheduledReport.Id
-                                                        && e.PatientId == patientId, consumeCancellationToken);
+                                            var entry = await reportEntryManager.SingleOrDefaultAsync(e => e.ReportScheduleId == scheduledReport.Id && e.PatientId == patientId, consumeCancellationToken);
 
                                             if (entry == null)
                                             {
@@ -137,18 +132,14 @@ namespace LantanaGroup.Link.Report.Listeners
                                             {
                                                 var measureReportEntry = entry.MeasureReportList.Where(x => x.ReportType == reportType).FirstOrDefault();
 
-                                                if (measureReportEntry == null)
-                                                {
-                                                    entry.MeasureReportList.Add(new EvaluatedMeasureReport()
-                                                    {
-                                                        ReportType = reportType,
-                                                        Status = MeasureReportStatus.EntryCreated,
-                                                    });
+                                                if (measureReportEntry != null) {
+                                                    continue;
                                                 }
-                                                else
+
+                                                entry.MeasureReportList.Add(new EvaluatedMeasureReport()
                                                 {
-                                                    measureReportEntry.Status = MeasureReportStatus.EntryCreated;
-                                                }
+                                                    ReportType = reportType
+                                                });
 
                                                 await reportEntryManager.UpdateAsync(entry);
                                             }
@@ -172,8 +163,6 @@ namespace LantanaGroup.Link.Report.Listeners
                             {
                                 consumer.Commit(result);
                             }
-
-
                         }, cancellationToken);
                     }
                     catch (ConsumeException ex)

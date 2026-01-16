@@ -46,7 +46,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             {
                 List<ReportResource> resources = new List<ReportResource>();
 
-                foreach (var resource in measureReport.Resources)
+                foreach (var resource in measureReport.ResourceReferences)
                 {
                     resources.Add(new ReportResource()
                     {

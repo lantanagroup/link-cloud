@@ -26,11 +26,11 @@ namespace LantanaGroup.Link.Report.Entities
     {
         public string MeasureReportId { get; set; } = string.Empty;
         [BsonRepresentation(MongoDB.Bson.BsonType.String)]
-        public MeasureReportStatus Status { get; set; } = MeasureReportStatus.PendingEvaluation;
+        public MeasureReportStatus Status { get; set; } = MeasureReportStatus.EntryCreated;
         public string ReportType { get; set; } = string.Empty;
         public string MeasureReportUri { get; set; } = string.Empty;
         public string MeasureReportFileName { get; set; } = string.Empty;
         //Key = ResourceType
-        public Dictionary<string, int> ResourceCount = new Dictionary<string, int>();
+        public Dictionary<string, int> ResourceCount { get; set; } = new Dictionary<string, int>();
     }
 }

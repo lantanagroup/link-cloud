@@ -131,7 +131,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             //TODO: See if we can add to the query above...Add function to manager to handle 'ready for manifest' check
             foreach (var entry in reportEntries)
             {
-                if ((entry.ReportingStatus == ReportingStatus.NoReportableReports || entry.ReportingStatus == ReportingStatus.PassedValidation || entry.ReportingStatus == ReportingStatus.FailedValidation) && entry.SubmissionStatus == SubmissionStatus.Submitted)
+                if ((entry.ReportingStatus == ReportingStatus.NotReportable || entry.ReportingStatus == ReportingStatus.PassedValidation || entry.ReportingStatus == ReportingStatus.FailedValidation) && entry.SubmissionStatus == SubmissionStatus.Submitted)
                 {
                     continue;
                 }

@@ -14,7 +14,7 @@ namespace LantanaGroup.Link.Report.Entities
         public string ReportScheduleId { get; set; } = string.Empty;
         public string Measure { get; set; }
         public string ReportType { get; set; }
-        public List<GroupPopulation> GroupPopulationList { get; set; } = new List<GroupPopulation>();
+        public List<GroupPopulation> GroupPopulations { get; set; } = new List<GroupPopulation>();
     }
 
     [BsonIgnoreExtraElements]
@@ -23,10 +23,10 @@ namespace LantanaGroup.Link.Report.Entities
         public string PopulationId { get; set; }
         public CodeableConcept PopulationCode { get; set; }
         public int TotalPopulationCount { get; set; }
-        public List<GroupPopulationMeasureReport> GroupPopulationMeasureReportList = new List<GroupPopulationMeasureReport>();
+        public List<MeasureReportPopulation> MeasureReportPopulations { get; set; } = new List<MeasureReportPopulation>();
     }
 
-    public class GroupPopulationMeasureReport
+    public class MeasureReportPopulation
     {
         public string MeasureReportId { get; set; }
         public int PopulationCount { get; set; }

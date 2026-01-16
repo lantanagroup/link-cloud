@@ -209,7 +209,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 try
                 {
-                    _patientAggregator.AppendToBlob(reportEntry.AggregateReportBlobName, operationOutcome);
+                    _patientAggregator.AppendResourceToBlob(reportEntry.AggregateReportBlobName, operationOutcome);
                 }
                 catch (Exception ex)
                 {

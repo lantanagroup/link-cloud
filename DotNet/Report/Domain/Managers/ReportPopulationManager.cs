@@ -60,15 +60,15 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     PopulationId = measureReportpopulation.PopulationId,
                     PopulationCode = measureReportpopulation.PopulationCode,
                     TotalPopulationCount = measureReportpopulation.PopulationCount,
-                    GroupPopulationMeasureReportList = new List<GroupPopulationMeasureReport>() {
-                        new GroupPopulationMeasureReport() {
+                    MeasureReportPopulations = new List<MeasureReportPopulation>() {
+                        new MeasureReportPopulation() {
                             MeasureReportId = aggregateResult.MeasureReportId,
                             PopulationCount = measureReportpopulation.PopulationCount
                         }
                     }
                 };
 
-                populationModel.GroupPopulationList.Add(group);
+                populationModel.GroupPopulations.Add(group);
             }
 
             await _database.ReportPopulationRepository.AddAsync(populationModel, cancellationToken);
@@ -81,7 +81,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         {
             foreach (var measureReportpopulation in aggregateResult.PopulationList)
             {
-                var group = populationModel.GroupPopulationList.FirstOrDefault(x => x.PopulationId == measureReportpopulation.PopulationId);
+                var group = populationModel.GroupPopulations.FirstOrDefault(x => x.PopulationId == measureReportpopulation.PopulationId);
 
                 if (group == null)
                 {
@@ -90,20 +90,20 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                         PopulationId = measureReportpopulation.PopulationId,
                         PopulationCode = measureReportpopulation.PopulationCode,
                         TotalPopulationCount = measureReportpopulation.PopulationCount,
-                        GroupPopulationMeasureReportList = new List<GroupPopulationMeasureReport>() {
-                            new GroupPopulationMeasureReport() {
+                        MeasureReportPopulations = new List<MeasureReportPopulation>() {
+                            new MeasureReportPopulation() {
                                 MeasureReportId = aggregateResult.MeasureReportId,
                                 PopulationCount = measureReportpopulation.PopulationCount
                             }
                         }
                     };
 
-                    populationModel.GroupPopulationList.Add(group);
+                    populationModel.GroupPopulations.Add(group);
                 }
                 else
                 {
                     group.TotalPopulationCount += measureReportpopulation.PopulationCount;
-                    group.GroupPopulationMeasureReportList.Add(new GroupPopulationMeasureReport()
+                    group.MeasureReportPopulations.Add(new MeasureReportPopulation()
                     {
                         MeasureReportId = aggregateResult.MeasureReportId,
                         PopulationCount = measureReportpopulation.PopulationCount

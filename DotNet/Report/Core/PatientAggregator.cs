@@ -52,7 +52,7 @@ namespace LantanaGroup.Link.Report.Core
         {
             if (_containerClient == null) 
             {
-                throw new Exception($"Blob Container Client could not be initialized when attempting to run patient aggregator (PatientId = {patientId}, FacilityId = {reportSchedule.FacilityId}).");    
+                throw new Exception($"Blob Container Client could not be initialized when attempting to run patient aggregator (ReportId = {reportSchedule.Id}, PatientId = {patientId}, FacilityId = {reportSchedule.FacilityId}).");    
             }
 
             AggregateResult aggregateResult = new AggregateResult();
@@ -61,7 +61,7 @@ namespace LantanaGroup.Link.Report.Core
 
             if (entry == null)
             {
-                throw new Exception($"No ReportEntry record found when running patient aggregator (PatientId = {patientId}, FacilityId = {reportSchedule.FacilityId}).");
+                throw new Exception($"No ReportEntry record found when running patient aggregator (ReportId = {reportSchedule.Id}, PatientId = {patientId}, FacilityId = {reportSchedule.FacilityId}).");
             }
 
             //The 'resourcesAdded' Dictionary will keep track of FHIR resource id's that have been added to the bundle to avoid adding duplicates across entries. The value of each dictionary entry will contain the associated FHIR types. It's a string List type in case there are different FHIR resources that share the same id. This is probably unlikely to happen, but is possible. 
@@ -72,20 +72,20 @@ namespace LantanaGroup.Link.Report.Core
             string reportName = _blobStorageService.GetReportName(reportSchedule);
             string blobName = _blobStorageService.GetBlobName(reportName, bundleName);
 
-            AppendBlobClient blockWriteBlobClient = _containerClient.GetAppendBlobClient(blobName);
+            AppendBlobClient writeBlobClient = _containerClient.GetAppendBlobClient(blobName);
 
-            aggregateResult.Uri = blockWriteBlobClient.Uri;
+            aggregateResult.Uri = writeBlobClient.Uri;
             aggregateResult.BlobName = blobName;
 
-            using (Stream write_stream = await blockWriteBlobClient.OpenWriteAsync(true))
+            using (Stream write_stream = await writeBlobClient.OpenWriteAsync(true))
             using (StreamWriter writer = new StreamWriter(write_stream))
             {
                 foreach (var measureReportEntry in entry.MeasureReportList)
                 {
-                    BlockBlobClient blockReadBlobClient = _containerClient.GetBlockBlobClient(measureReportEntry.MeasureReportFileName);
+                    BlockBlobClient readBlobClient = _containerClient.GetBlockBlobClient(measureReportEntry.MeasureReportFileName);
                     var aggregateMeasureReport = new AggregateMeasureReportResult() { ReportType = measureReportEntry.ReportType };
 
-                    using (Stream read_stream = await blockReadBlobClient.OpenReadAsync(true))
+                    using (Stream read_stream = await readBlobClient.OpenReadAsync(true))
                     using (StreamReader reader = new StreamReader(read_stream))
                     {
                         while (reader.Peek() >= 0)
@@ -111,7 +111,7 @@ namespace LantanaGroup.Link.Report.Core
                                 aggregateMeasureReport.ResourceCount.Add(split_reference[0], 1);
                             }
 
-                            aggregateMeasureReport.Resources.Add(split_reference);
+                            aggregateMeasureReport.ResourceReferences.Add(split_reference);
 
                             if (split_reference[0] != "MeasureReport")
                             {
@@ -156,7 +156,7 @@ namespace LantanaGroup.Link.Report.Core
             return aggregateResult;
         }
 
-        public async void AppendToBlob(string uri, DomainResource domainResource)
+        public async void AppendResourceToBlob(string uri, DomainResource domainResource)
         {
             AppendBlobClient appendBlobClient = _containerClient.GetAppendBlobClient(uri);
 

@@ -196,7 +196,6 @@ namespace LantanaGroup.Link.Report.Listeners
 
             if (!readyForValidation)
             {
-                //TODO: Follow up on this logic
                 await _reportManifestProducer.Produce(schedule, correlationId);
                 return;
             }
