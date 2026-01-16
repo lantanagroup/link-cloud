@@ -32,16 +32,11 @@ internal static class FhirCommandUtils
             delay = retryValue.Date.Value - DateTimeOffset.UtcNow;
         }
 
-        if (delay.HasValue)
+        if (!delay.HasValue || delay.Value <= TimeSpan.Zero)
         {
-            if (delay.Value <= TimeSpan.Zero)
-            {
-                return DateTime.UtcNow.AddSeconds(60).TimeOfDay;
-            }
-
-            return delay;
+            delay = DateTime.UtcNow.AddSeconds(60).TimeOfDay;
         }
 
-        return null;  // Invalid or missing
+        return delay;
     }
 }
