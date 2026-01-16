@@ -100,7 +100,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 //TODO: Eventually may need to check validation results
                 var population = await reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == summary.Id);
 
-                summary.InitialPopulationCount = population == null ? 0 : population.GroupPopulationList.Count;
+                summary.InitialPopulationCount = population == null ? 0 : population.GroupPopulations.Count;
 
                 //reportEntries.Count(
                 //    x => x.ReportScheduleId == summary.Id &&
@@ -140,7 +140,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
             // Get the initial population count for each report
             //TODO: I don't think this is right. Need to look into adding all measures for the scheduled report
-            summary.InitialPopulationCount = (await reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == summary.Id)).GroupPopulationList.Count;
+            summary.InitialPopulationCount = (await reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == summary.Id)).GroupPopulations.Count;
             //measureReportEntries.Count(
             //    x => x.ReportScheduleId == summary.Id &&
             //         x.Status != PatientSubmissionStatus.PendingEvaluation &&

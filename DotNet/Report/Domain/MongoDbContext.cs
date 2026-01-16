@@ -103,14 +103,14 @@ public class MongoDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
 
-            entity.OwnsMany(e => e.GroupPopulationList, gp =>
+            entity.OwnsMany(e => e.GroupPopulations, gp =>
             {
                 gp.Property(p => p.PopulationCode)
                     .HasConversion(
                         v => JsonSerializer.Serialize(v, LinkFhirSerializerOptions.ForFhirLenientSerialization),
                         v => JsonSerializer.Deserialize<CodeableConcept>(v, LinkFhirSerializerOptions.ForFhirLenientSerialization)!);
 
-                gp.OwnsMany(g => g.GroupPopulationMeasureReportList);
+                gp.OwnsMany(g => g.MeasureReportPopulations);
             });
         });
     }

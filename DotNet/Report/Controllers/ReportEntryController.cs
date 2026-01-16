@@ -14,12 +14,12 @@ namespace LantanaGroup.Link.Report.Controllers
     [ApiController]
     public class ReportEntryController : ControllerBase
     {
-        private readonly ILogger<ReportController> _logger;
+        private readonly ILogger<ReportEntryController> _logger;
         private readonly IDatabase _database;
         private readonly IReportEntryManager _reportEntryManager;
         private readonly IReportScheduledManager _reportScheduledManager;
 
-        public ReportEntryController(ILogger<ReportController> logger, IDatabase database, IReportEntryManager reportEntryManager, IReportScheduledManager reportScheduledManager)
+        public ReportEntryController(ILogger<ReportEntryController> logger, IDatabase database, IReportEntryManager reportEntryManager, IReportScheduledManager reportScheduledManager)
         {
             _logger = logger;
             _database = database;

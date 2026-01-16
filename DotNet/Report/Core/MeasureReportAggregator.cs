@@ -54,11 +54,11 @@ public class MeasureReportAggregator
             measureReport.Period = new Period(new FhirDateTime(new DateTimeOffset(reportSchedule.ReportStartDate)), new FhirDateTime(new DateTimeOffset(reportSchedule.ReportEndDate)));
             measureReport.Reporter = new ResourceReference($"Organization/{organizationId}");
 
-            foreach (var reportPopulation in populationModel.GroupPopulationList)
+            foreach (var reportPopulation in populationModel.GroupPopulations)
             {
                 List measureReportList = new List();
 
-                foreach (var measureReportPopulation in reportPopulation.GroupPopulationMeasureReportList)
+                foreach (var measureReportPopulation in reportPopulation.MeasureReportPopulations)
                 {
                     measureReportList.Entry.Add(new List.EntryComponent()
                     {
