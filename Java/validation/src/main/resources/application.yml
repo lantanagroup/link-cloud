@@ -117,3 +117,6 @@ link:
             - facilityId={facilityId}
             - reportScheduleId={reportId}
 
+internal-blob-storage:
+  connection-string: ''
+  blob-container-name: ''

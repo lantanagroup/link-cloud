@@ -20,7 +20,7 @@ public class BlobStorageService {
         BlobServiceClient blobServiceClient = new BlobServiceClientBuilder()
                 .connectionString(config.getConnectionString())
                 .buildClient();
-        this.containerClient = blobServiceClient.getBlobContainerClient(config.getContainerName());
+        this.containerClient = blobServiceClient.getBlobContainerClient(config.getBlobContainerName());
         if (!this.containerClient.exists()) {
             this.containerClient.create();
         }

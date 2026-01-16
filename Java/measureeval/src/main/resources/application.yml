@@ -89,3 +89,7 @@ secret-management:
 authentication:
   anonymous: false
   authority: 'https://localhost:7004'
+
+internal-blob-storage:
+  connection-string: ''
+  blob-container-name: ''
