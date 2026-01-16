@@ -1,6 +1,7 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Terminology.Application.Models;
 using LantanaGroup.Link.Terminology.Application.Settings;
 using LantanaGroup.Link.Terminology.Services;
@@ -155,8 +156,8 @@ public class FhirServiceTests
     
         _mockValueSets =
         [
-            new FhirJsonParser().Parse<ValueSet>(valueSet1),
-            new FhirJsonParser().Parse<ValueSet>(valueSet2)
+            LinkFhirSerializerOptions.FhirJsonParserPermissive.Parse<ValueSet>(valueSet1),
+            LinkFhirSerializerOptions.FhirJsonParserPermissive.Parse<ValueSet>(valueSet2)
         ];
     }
 

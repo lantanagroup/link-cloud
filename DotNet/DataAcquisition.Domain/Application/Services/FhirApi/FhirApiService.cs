@@ -14,6 +14,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Diagnostics;
 using System.Net;
@@ -33,7 +34,7 @@ public interface IFhirApiService
 
 public class FhirApiService : IFhirApiService
 {
-    private static readonly JsonSerializerOptions _options = new JsonSerializerOptions().ForFhir();
+    private static readonly JsonSerializerOptions _options = LinkFhirSerializerOptions.ForFhirLenientSerialization;
 
     private readonly IReferenceResourcesManager _referenceResourceManager;
     private readonly IReferenceResourcesQueries _referenceResourcesQueries;
@@ -239,7 +240,7 @@ public class FhirApiService : IFhirApiService
                 FacilityId = log.FacilityId,
                 ResourceId = resource.Id,
                 ResourceType = resource.TypeName,
-                ReferenceResource = System.Text.Json.JsonSerializer.Serialize(resource, new System.Text.Json.JsonSerializerOptions().ForFhir())
+                ReferenceResource = JsonSerializer.Serialize(resource, LinkFhirSerializerOptions.ForFhirLenientSerialization)
             }, cancellationToken);
         }
         else
@@ -249,7 +250,7 @@ public class FhirApiService : IFhirApiService
                 Id = existingReference.Id,
                 QueryPhase = existingReference.QueryPhase,
                 ResourceType = resource.TypeName,
-                ReferenceResource = JsonSerializer.Serialize(resource, new JsonSerializerOptions().ForFhir())
+                ReferenceResource = JsonSerializer.Serialize(resource, LinkFhirSerializerOptions.ForFhirLenientSerialization)
             }, cancellationToken);
         }
     }
