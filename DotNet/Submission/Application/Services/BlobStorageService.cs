@@ -55,8 +55,6 @@ namespace LantanaGroup.Link.Submission.Application.Services
             _internalContainerClient = GetContainerClient(_internalSettings);
             _externalContainerClient = GetContainerClient(_externalSettings);
             _useNdJson = configuration.GetValue<bool>("useNdJson");
-
-            _logger.LogWarning("_useNdJson is set to {}", _useNdJson);
         }
 
         private string ChangeBlobRoot(string blobName)
