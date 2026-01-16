@@ -92,28 +92,6 @@ namespace LantanaGroup.Link.Report.Jobs
                             _logger.LogError(ex, "An error was encountered generating a Data Acquisition Requested event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
                         }
                     }
-
-                    //TODO: Is this needed?
-                    //var needsValidation = (await database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status == MeasureReportStatus.ReadyForValidation && x.ValidationStatus != ValidationStatus.Requested)).ToList();
-
-                    //if (needsValidation.Any())
-                    //{
-                    //    try
-                    //    {
-                    //        await _readyForValidationProducer.Produce(needsValidation.Select(v => new ProduceValidationModel()
-                    //        {
-                    //            ReportScheduleId = schedule.Id,
-                    //            FacilityId = v.FacilityId,
-                    //            ReportTypes = schedule.ReportTypes,
-                    //            PatientId = v.PatientId,
-                    //            PayloadUri = v.PayloadUri
-                    //        }).ToList());
-                    //    }
-                    //    catch (ProduceException<string, string> ex)
-                    //    {
-                    //        _logger.LogError(ex, "An error was encountered generating a Ready For Validation event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
-                    //    }
-                    //}
                 }
 
                 schedule.Status = ScheduleStatus.EndOfPeriod;

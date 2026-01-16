@@ -31,6 +31,6 @@ namespace LantanaGroup.Link.Report.Entities
         public string MeasureReportUri { get; set; } = string.Empty;
         public string MeasureReportFileName { get; set; } = string.Empty;
         //Key = ResourceType
-        public Dictionary<string, int> ResourceCount = new Dictionary<string, int>();
+        public Dictionary<string, int> ResourceCount { get; set; } = new Dictionary<string, int>();
     }
 }
