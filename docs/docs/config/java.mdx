@@ -138,18 +138,18 @@ If using a service principal for authentication, the `AZURE_TENANT_ID` is _not_ 
 
 # HAPI FHIR Server Configuration
 
-The HAPI module supports rate limiting configuration to control the number of requests allowed within a specified time period. When rate limiting is enabled, clients that exceed the configured limits will receive HTTP 429 (Too Many Requests) responses.
+The HAPI module supports rate-limiting configuration to control the number of requests allowed within a specified time period. When rate-limiting is enabled, clients that exceed the configured limits will receive HTTP 429 (Too Many Requests) responses.
 
 | Property Name                    | Description                                                                                                                | Type/Value               | Secret? |
 |----------------------------------|----------------------------------------------------------------------------------------------------------------------------|--------------------------|---------|
-| hapi.fhir.rate-limiting.count    | Maximum number of requests allowed per client within the specified duration. Set to -1 to disable rate limiting entirely.  | Integer (default: -1)    | No      |
-| hapi.fhir.rate-limiting.duration | Duration for the rate limiting window. Uses ISO-8601 duration format.                                                      | Duration (default: PT1M) | No      |
+| hapi.fhir.rate-limiting.count    | Maximum number of requests allowed per client within the specified duration. Set to -1 to disable rate-limiting entirely.  | Integer (default: -1)    | No      |
+| hapi.fhir.rate-limiting.duration | Duration for the rate-limiting window. Uses ISO-8601 duration format.                                                      | Duration (default: PT1M) | No      |
 
 **Environment Variable Examples:**
 - `HAPI_FHIR_RATELIMITING_COUNT=100` - Allow 100 requests per time window
 - `HAPI_FHIR_RATELIMITING_DURATION=PT5M` - Set time window to 5 minutes
 
-**Note:** Rate limiting is applied per client IP address. When `count` is set to -1 (default), no rate limiting is applied.
+**Note:** Rate-limiting is applied per client IP address. When `count` is set to -1 (default), no rate-limiting is applied.
 
 # Service Information
 
