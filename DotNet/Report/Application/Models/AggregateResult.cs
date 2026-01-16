@@ -16,7 +16,7 @@ namespace LantanaGroup.Link.Report.Application.Models
         public string MeasureReportId;
         public List<AggregateMeasureReportPopulation> PopulationList = new List<AggregateMeasureReportPopulation>();
         public Dictionary<string, int> ResourceCount = new Dictionary<string, int>();
-        public List<string[]> Resources = new List<string[]>();
+        public List<string[]> ResourceReferences = new List<string[]>();
     }
 
     public class AggregateMeasureReportPopulation

@@ -23,22 +23,12 @@ public class MeasureReportAggregator
         "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/subjectlist-measurereport";
 
     private readonly ILogger<MeasureReportAggregator> _logger;
-    private readonly BlobStorageService _blobStorageService;
-    private readonly BlobContainerClient _containerClient;
-    private readonly BlobStorageSettings _settings;
     private readonly IDatabase _database;
 
-    public MeasureReportAggregator(ILogger<MeasureReportAggregator> logger, BlobStorageService blobStorageService, IOptions<BlobStorageSettings> settings, IDatabase database)
+    public MeasureReportAggregator(ILogger<MeasureReportAggregator> logger, IDatabase database)
     {
         _logger = logger;
-        _blobStorageService = blobStorageService;
-        _settings = settings.Value;
         _database = database ?? throw new ArgumentNullException(nameof(database));
-
-        if (_settings.ConnectionString != null)
-        {
-            _containerClient = new BlobContainerClient(_settings.ConnectionString, _settings.BlobContainerName);
-        }
     }
 
     public async Task<List<MeasureReport>> CreateMeasureReportAggregate(ReportSchedule reportSchedule, string organizationId)
