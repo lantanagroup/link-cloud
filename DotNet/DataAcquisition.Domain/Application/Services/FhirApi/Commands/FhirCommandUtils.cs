@@ -14,7 +14,7 @@ internal class HeaderCapturingHandler : DelegatingHandler
     }
 }
 
-internal static class FhirCommandUtils
+public static class FhirCommandUtils
 {
     public static TimeSpan ParseRetryAfter(HttpResponseHeaders? headers, TimeSpan defaultDelay = default)
     {

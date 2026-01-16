@@ -572,7 +572,9 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     where log.FacilityId == facilityId
                         && (lastId == null || log.Id > lastId)
                         && (log.Status == RequestStatus.Pending || log.Status == RequestStatus.Failed)
-                    orderby log.Priority descending, log.ExecutionDate ascending, log.Id ascending
+                    orderby log.Priority ascending, 
+                    log.ExecutionDate ascending, 
+                    log.Id ascending
                     select new DataAcquisitionLogModel
                     {
                         Id = log.Id,
