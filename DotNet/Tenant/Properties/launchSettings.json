@@ -1,5 +1,13 @@
 {
   "profiles": {
+    "ConsoleApp": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "http://localhost:7331;https://localhost:7332",
+      "dotnetRunMessages": true
+    },
     "http-docker": {
       "commandName": "Project",
       "launchBrowser": false,
