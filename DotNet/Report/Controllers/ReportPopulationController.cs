@@ -31,7 +31,6 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="id"></param>
         [HttpGet("{id}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ReportPopulation))]
-        //[ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<ReportPopulation>> GetById(string id)
@@ -62,7 +61,6 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="reportType"></param>
         [HttpGet("schedules/{reportScheduleId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ReportPopulation))]
-        //[ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<List<ReportPopulation>>> GetByReportScheduleId(string reportScheduleId, string? reportType)

@@ -33,7 +33,6 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="id"></param>
         [HttpGet("{id}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ReportEntry))]
-        //[ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<ReportEntry>> GetById(string id)
@@ -63,7 +62,6 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="reportScheduleId"></param>
         [HttpGet("schedules/{reportScheduleId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ReportEntry))]
-        //[ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<List<ReportEntry>>> GetByReportScheduleId(string reportScheduleId)
@@ -94,7 +92,6 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="patientId"></param>
         [HttpGet("schedules/{reportScheduleId}/patients/{patientId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ReportEntry))]
-        //[ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<ReportEntry>> GetByReportScheduleIdAndPatientId(string reportScheduleId, string patientId)
@@ -122,9 +119,8 @@ namespace LantanaGroup.Link.Report.Controllers
         /// Returns report entry records for the given patient Id. 
         /// </summary>
         /// <param name="patientId"></param>
-        [HttpGet("schedules/patients/{patientId}")]
+        [HttpGet("patients/{patientId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ReportEntry))]
-        //[ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<List<ReportEntry>>> GetByPatientId(string patientId)
