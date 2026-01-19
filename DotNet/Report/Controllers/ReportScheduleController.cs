@@ -26,7 +26,7 @@ namespace LantanaGroup.Link.Report.Controllers
         }
 
         /// <summary>
-        /// TODO
+        /// Returns a scheduled report record for the given report schedule Id
         /// </summary>
         /// <param name="id"></param>
         [HttpGet("{id}")]
@@ -56,7 +56,7 @@ namespace LantanaGroup.Link.Report.Controllers
         }
 
         /// <summary>
-        /// TODO
+        /// Returns scheduled reports for the given facility Id. An optional 'active' parameter is available to only return current active reports.
         /// </summary>
         /// <param name="facilityId"></param>
         /// <param name="active"></param>

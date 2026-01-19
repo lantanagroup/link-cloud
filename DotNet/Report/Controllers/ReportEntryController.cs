@@ -28,7 +28,7 @@ namespace LantanaGroup.Link.Report.Controllers
         }
 
         /// <summary>
-        /// TODO
+        /// Returns a report entry record for the given entry Id
         /// </summary>
         /// <param name="id"></param>
         [HttpGet("{id}")]
@@ -58,7 +58,7 @@ namespace LantanaGroup.Link.Report.Controllers
         }
 
         /// <summary>
-        /// TODO
+        /// Returns report entries for the given entry report schedule Id. 
         /// </summary>
         /// <param name="reportScheduleId"></param>
         [HttpGet("schedules/{reportScheduleId}")]
@@ -88,7 +88,7 @@ namespace LantanaGroup.Link.Report.Controllers
         }
 
         /// <summary>
-        /// TODO
+        /// Returns a report entry record for the given entry report schedule Id and patient Id. 
         /// </summary>
         /// <param name="reportScheduleId"></param>
         /// <param name="patientId"></param>
@@ -119,7 +119,7 @@ namespace LantanaGroup.Link.Report.Controllers
         }
 
         /// <summary>
-        /// TODO
+        /// Returns report entry records for the given patient Id. 
         /// </summary>
         /// <param name="patientId"></param>
         [HttpGet("schedules/patients/{patientId}")]

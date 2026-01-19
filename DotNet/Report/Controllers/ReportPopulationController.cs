@@ -26,7 +26,7 @@ namespace LantanaGroup.Link.Report.Controllers
         }
 
         /// <summary>
-        /// TODO
+        /// Returns a report population record for the given Id
         /// </summary>
         /// <param name="id"></param>
         [HttpGet("{id}")]
@@ -56,7 +56,7 @@ namespace LantanaGroup.Link.Report.Controllers
         }
 
         /// <summary>
-        /// TODO
+        /// Returns report population records for the given report schedule Id. An optional 'reportType' parameter is available to specify which associated report type the returned population should be for. 
         /// </summary>
         /// <param name="reportScheduleId"></param>
         /// <param name="reportType"></param>

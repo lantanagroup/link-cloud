@@ -26,7 +26,7 @@ namespace LantanaGroup.Link.Report.Controllers
         }
 
         /// <summary>
-        /// TODO
+        /// Returns a report resource record for the given report resource Id
         /// </summary>
         /// <param name="id"></param>
         [HttpGet("{id}")]
@@ -56,7 +56,7 @@ namespace LantanaGroup.Link.Report.Controllers
         }
 
         /// <summary>
-        /// TODO
+        /// Returns report resource entries for the given report schedule Id. 
         /// </summary>
         /// <param name="reportScheduleId"></param>
         [HttpGet("schedules/{reportScheduleId}")]
@@ -64,7 +64,7 @@ namespace LantanaGroup.Link.Report.Controllers
         //[ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<ReportResource>> GetByReportScheduleId(string reportScheduleId)
+        public async Task<ActionResult<List<ReportResource>>> GetByReportScheduleId(string reportScheduleId)
         {
             try
             {
@@ -86,7 +86,7 @@ namespace LantanaGroup.Link.Report.Controllers
         }
 
         /// <summary>
-        /// TODO
+        /// Returns report resource records for the given report schedule Id and patient Id.
         /// </summary>
         /// <param name="reportScheduleId"></param>
         /// <param name="patientId"></param>
@@ -95,7 +95,7 @@ namespace LantanaGroup.Link.Report.Controllers
         //[ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<ReportResource>> GetByReportScheduleIdAndPatientId(string reportScheduleId, string patientId)
+        public async Task<ActionResult<List<ReportResource>>> GetByReportScheduleIdAndPatientId(string reportScheduleId, string patientId)
         {
             try
             {
@@ -117,7 +117,7 @@ namespace LantanaGroup.Link.Report.Controllers
         }
 
         /// <summary>
-        /// TODO
+        /// Returns report resource records for the given patient Id. 
         /// </summary>
         /// <param name="patientId"></param>
         [HttpGet("schedules/patients/{patientId}")]
@@ -125,7 +125,7 @@ namespace LantanaGroup.Link.Report.Controllers
         //[ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<ReportResource>> GetByPatientId(string patientId)
+        public async Task<ActionResult<List<ReportResource>>> GetByPatientId(string patientId)
         {
             try
             {
