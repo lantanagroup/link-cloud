@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace LantanaGroup.Link.Report.Controllers
 {
-    [Route("api/report-entries")]
+    [Route("api/entries")]
     [Authorize(Policy = PolicyNames.IsLinkAdmin)]
     [ApiController]
     public class ReportEntryController : ControllerBase
@@ -61,7 +61,7 @@ namespace LantanaGroup.Link.Report.Controllers
         /// TODO
         /// </summary>
         /// <param name="reportScheduleId"></param>
-        [HttpGet("report-schedules/{reportScheduleId}")]
+        [HttpGet("schedules/{reportScheduleId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ReportEntry))]
         //[ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -92,7 +92,7 @@ namespace LantanaGroup.Link.Report.Controllers
         /// </summary>
         /// <param name="reportScheduleId"></param>
         /// <param name="patientId"></param>
-        [HttpGet("report-schedules/{reportScheduleId}/patients/{patientId}")]
+        [HttpGet("schedules/{reportScheduleId}/patients/{patientId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ReportEntry))]
         //[ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -122,7 +122,7 @@ namespace LantanaGroup.Link.Report.Controllers
         /// TODO
         /// </summary>
         /// <param name="patientId"></param>
-        [HttpGet("report-schedules/patients/{patientId}")]
+        [HttpGet("schedules/patients/{patientId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ReportEntry))]
         //[ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
