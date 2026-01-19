@@ -24,6 +24,7 @@ import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
+import java.util.UUID;
 import java.util.function.Predicate;
 
 import static io.opentelemetry.api.common.AttributeKey.stringKey;
@@ -102,6 +103,11 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
         FhirContext ctx = FhirContext.forR4();
         reports.forEach(r -> {
             MeasureReport measureReport = evaluateMeasureService.evaluateMeasure(patientStatus, r, bundle);
+
+            if (measureReport.getIdPart() == null) {
+                measureReport.setId(UUID.randomUUID().toString());
+            }
+
             produceMeasureReportGenerated(newPatientStatus, r, measureReport, ctx);
         });
 
@@ -115,6 +121,9 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
             PatientReportingEvaluationStatus.Report report,
             MeasureReport measureReport,
             FhirContext ctx) {
+        if (measureReport.getIdPart() == null) {
+            throw new RuntimeException("MeasureReport ID is null");
+        }
 
         String fileName = String.format("%s-%s.json", patientStatus.getPatientId(), measureReport.getIdPart());
         String content = ctx.newJsonParser().encodeResourceToString(measureReport);
