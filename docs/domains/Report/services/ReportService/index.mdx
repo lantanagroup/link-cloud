@@ -45,7 +45,7 @@ badges:
 
 ## Overview
 
-The Report service is responsible for persisting the Measure Reports and FHIR resources that the Measure Eval service generates after evaluating a patient against a measure. When a tenant's reporting period end date has been met, the Report Service performs various workflows to determine if all of the patient MeasureReports are accounted for that period prior to initiating the submission process.
+The Report service is responsible for tracking the reporting progress for each facility. As patients are evaluated across report measures, the Report service will package each patient report(s) into a single aggregate file. After performing the aggregation logic, the files are then sent to the submission destination. When a tenants reporting period end date has been met, the Report Service will initiate evaluations for each patient still admitted within the facility. Once all patient aggregate files are accounted for, the Report service will submit a manifest file to the submission location that contains a summary of the facility reporting period. 
 
 ## Nodes
 
@@ -141,11 +141,11 @@ The following environment variables and settings are used for the Report Service
 
 Retry Scheduling in the Report Service:
 
-Within the Report service, retries are scheduled using Quartz.NET�s in-memory scheduler, even though the service itself leverages a persistent MongoDB-backed scheduler for critical, long-lived jobs like report period completions. The retry jobs are managed by a dedicated RetryScheduleService that uses the "InMemoryScheduler" (registered via keyed dependency injection) to schedule and execute retry operations. This approach ensures that retry jobs are lightweight, fast, and do not persist across service restarts�making them ideal for transient, short-lived retry logic where durability is not required.
+Within the Report service, retries are scheduled using Quartz.NET's in-memory scheduler, even though the service itself leverages a persistent MongoDB-backed scheduler for critical, long-lived jobs like report period completions. The retry jobs are managed by a dedicated RetryScheduleService that uses the "InMemoryScheduler" (registered via keyed dependency injection) to schedule and execute retry operations. This approach ensures that retry jobs are lightweight, fast, and do not persist across service restarts making them ideal for transient, short-lived retry logic where durability is not required.
 
 Impact of InMemory vs. MongoDB Persistence:
 
-Using the in-memory scheduler for retries means that retry jobs are lost if the service restarts or crashes, but this is often acceptable for retry logic that can be safely re-queued or recalculated. In contrast, MongoDB persistence (used for report scheduling) ensures that jobs survive restarts, support clustering, and provide fault tolerance�critical for business workflows that must not be lost. This dual approach allows the Report service to balance reliability and performance: persistent scheduling for essential workflows, and fast, resource-efficient in-memory scheduling for retries and transient operations.
+Using the in-memory scheduler for retries means that retry jobs are lost if the service restarts or crashes, but this is often acceptable for retry logic that can be safely re-queued or recalculated. In contrast, MongoDB persistence (used for report scheduling) ensures that jobs survive restarts, support clustering, and provide fault tolerance critical for business workflows that must not be lost. This dual approach allows the Report service to balance reliability and performance: persistent scheduling for essential workflows, and fast, resource-efficient in-memory scheduling for retries and transient operations.
 
 Different types of report generation methods:
 
