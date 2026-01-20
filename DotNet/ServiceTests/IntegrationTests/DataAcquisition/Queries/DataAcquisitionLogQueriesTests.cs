@@ -954,7 +954,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
         // Act
-        var batch = await queries.GetNextEligibleBatchForFacility(facilityId, null, 3);
+        var batch = await queries.GetNextEligibleBatchForFacility(facilityId, null, 3, new() { RequestStatus.Pending });
 
         // Assert
         Assert.Equal(3, batch.Count);
