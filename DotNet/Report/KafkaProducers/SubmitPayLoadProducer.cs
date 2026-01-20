@@ -33,11 +33,6 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 return false;
             }
 
-            var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
-
-            //TODO: Can this line be removed?
-            //var submissionEntries = await database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && (patientId == null || (x.PatientId == patientId && x.Status != MeasureReportStatus.NotReportable)));
-
             _submitPayloadProducer.Produce(nameof(KafkaTopic.SubmitPayload),
                 new Message<SubmitPayloadKey, SubmitPayloadValue>
                 {
