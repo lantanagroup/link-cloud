@@ -148,7 +148,6 @@ public class KafkaConfig {
 
         Map<Class<?>, Serializer<?>> serializers = Map.of(
                 String.class, new StringSerializer(),
-                MeasureReportGenerated.Key.class, new JsonSerializer<>(objectMapper.constructType(MeasureReportGenerated.Key.class), objectMapper),
                 Object.class, new JsonSerializer<>(),
                 byte[].class, new ByteArraySerializer()
         );

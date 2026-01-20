@@ -13,13 +13,13 @@ import org.springframework.stereotype.Service;
 @Service
 public class MeasureReportGeneratedProducer {
     private static final Logger logger = LoggerFactory.getLogger(MeasureReportGeneratedProducer.class);
-    private final KafkaTemplate<MeasureReportGenerated.Key, MeasureReportGenerated.Value> template;
+    private final KafkaTemplate<String, MeasureReportGenerated.Value> template;
 
-    public MeasureReportGeneratedProducer(KafkaTemplate<MeasureReportGenerated.Key, MeasureReportGenerated.Value> template) {
+    public MeasureReportGeneratedProducer(KafkaTemplate<String, MeasureReportGenerated.Value> template) {
         this.template = template;
     }
 
-    public void produce(String correlationId, MeasureReportGenerated.Key key, MeasureReportGenerated.Value value) {
+    public void produce(String correlationId, MeasureReportGenerated.Value value) {
         if (logger.isDebugEnabled()) {
             logger.debug("Producing {} record: {}", Topics.MEASURE_REPORT_GENERATED, value.getMeasureReportId());
         }
@@ -30,7 +30,7 @@ public class MeasureReportGeneratedProducer {
         template.send(new ProducerRecord<>(
                 Topics.MEASURE_REPORT_GENERATED,
                 null,
-                key,
+                (String) null,
                 value,
                 headers));
     }

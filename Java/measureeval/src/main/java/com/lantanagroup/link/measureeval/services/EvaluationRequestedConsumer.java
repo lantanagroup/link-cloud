@@ -39,6 +39,7 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
     private final MeasureReportGeneratedProducer measureReportGeneratedProducer;
     private final BlobStorageService blobStorageService;
     private final EvaluateMeasureService evaluateMeasureService;
+    private final FhirContext fhirContext;
 
     EvaluationRequestedConsumer(ResourceRepository resourceRepository,
                                 PatientReportingEvaluationStatusRepository patientStatusRepository,
@@ -49,7 +50,7 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
                                 MeasureReportGeneratedProducer measureReportGeneratedProducer,
                                 BlobStorageService blobStorageService,
                                 EvaluateMeasureService evaluateMeasureService,
-                                ConsumerRecordRecoverer recoverer) {
+                                ConsumerRecordRecoverer recoverer, FhirContext fhirContext) {
         super(recoverer);
         this.patientStatusRepository = patientStatusRepository;
         this.measureEvalMetrics = measureEvalMetrics;
@@ -57,6 +58,7 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
         this.measureReportGeneratedProducer = measureReportGeneratedProducer;
         this.blobStorageService = blobStorageService;
         this.evaluateMeasureService = evaluateMeasureService;
+        this.fhirContext = fhirContext;
     }
 
     @Override
@@ -100,7 +102,6 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
         newPatientStatus.setReports(reports);
         patientStatusRepository.insert(newPatientStatus);
 
-        FhirContext ctx = FhirContext.forR4();
         reports.forEach(r -> {
             MeasureReport measureReport = evaluateMeasureService.evaluateMeasure(patientStatus, r, bundle);
 
@@ -108,7 +109,7 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
                 measureReport.setId(UUID.randomUUID().toString());
             }
 
-            produceMeasureReportGenerated(newPatientStatus, r, measureReport, ctx);
+            produceMeasureReportGenerated(newPatientStatus, r, measureReport, fhirContext);
         });
 
         boolean reportablePatient = patientStatus.getReports().stream().anyMatch(PatientReportingEvaluationStatus.Report::getReportable);
@@ -129,14 +130,9 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
         String content = ctx.newJsonParser().encodeResourceToString(measureReport);
         String uri = blobStorageService.uploadPayload(fileName, content);
 
-        MeasureReportGenerated.Key key = new MeasureReportGenerated.Key();
-        key.setFacilityId(patientStatus.getFacilityId());
-        key.setStartDate(report.getStartDate());
-        key.setEndDate(report.getEndDate());
-        key.setFrequency(report.getFrequency());
-
         MeasureReportGenerated.Value measureReportGenerated = new MeasureReportGenerated.Value();
         measureReportGenerated.setMeasureReportId(measureReport.getIdPart());
+        measureReportGenerated.setFacilityId(patientStatus.getFacilityId());
         measureReportGenerated.setPatientId(patientStatus.getPatientId());
         measureReportGenerated.setReportType(report.getReportType());
         measureReportGenerated.setIsReportable(report.getReportable());
@@ -144,7 +140,7 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
         measureReportGenerated.setMeasureReportURI(uri);
         measureReportGenerated.setMeasureReportFileName(fileName);
 
-        measureReportGeneratedProducer.produce(patientStatus.getCorrelationId(), key, measureReportGenerated);
+        measureReportGeneratedProducer.produce(patientStatus.getCorrelationId(), measureReportGenerated);
     }
 
     private void updatePatientMetrics (EvaluationRequested value, PatientReportingEvaluationStatus patientStatus, boolean reportablePatient) {

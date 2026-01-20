@@ -30,10 +30,7 @@ import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.support.KafkaUtils;
 import org.springframework.util.StopWatch;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -222,6 +219,11 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         FhirContext ctx = FhirContext.forR4();
         for (PatientReportingEvaluationStatus.Report report : patientStatus.getReports()) {
             MeasureReport measureReport = evaluateMeasureService.evaluateMeasure(value.getQueryType().toString(), patientStatus, report, bundle);
+
+            if (measureReport.getIdPart() == null) {
+                measureReport.setId(UUID.randomUUID().toString());
+            }
+
             switch (value.getQueryType()) {
                 case INITIAL -> {
                     updateReportability(patientStatus, report, measureReport);
@@ -252,14 +254,9 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         String content = ctx.newJsonParser().encodeResourceToString(measureReport);
         String uri = blobStorageService.uploadPayload(fileName, content);
 
-        MeasureReportGenerated.Key key = new MeasureReportGenerated.Key();
-        key.setFacilityId(patientStatus.getFacilityId());
-        key.setStartDate(report.getStartDate());
-        key.setEndDate(report.getEndDate());
-        key.setFrequency(report.getFrequency());
-
         MeasureReportGenerated.Value measureReportGenerated = new MeasureReportGenerated.Value();
         measureReportGenerated.setMeasureReportId(measureReport.getIdPart());
+        measureReportGenerated.setFacilityId(patientStatus.getFacilityId());
         measureReportGenerated.setPatientId(patientStatus.getPatientId());
         measureReportGenerated.setReportType(report.getReportType());
         measureReportGenerated.setIsReportable(report.getReportable());
@@ -267,7 +264,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         measureReportGenerated.setMeasureReportURI(uri);
         measureReportGenerated.setMeasureReportFileName(fileName);
 
-        measureReportGeneratedProducer.produce(patientStatus.getCorrelationId(), key, measureReportGenerated);
+        measureReportGeneratedProducer.produce(patientStatus.getCorrelationId(), measureReportGenerated);
     }
 
     private void updatePatientMetrics (T value, PatientReportingEvaluationStatus patientStatus, boolean reportablePatient) {
