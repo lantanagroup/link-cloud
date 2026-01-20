@@ -1,64 +1,154 @@
-﻿using LantanaGroup.Link.Shared.Application.Interfaces.Services;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services;
 using Link.Authorization.Infrastructure;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Logging;
 using System.Security.Cryptography;
+using System.Text.Json;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Shared.Application.Services.SecretManager
 {
-    internal class LocalSecretManager : ISecretManager
+    /// <summary>
+    /// Local secret manager for development environments.
+    /// Stores secrets in an encrypted JSON file using Data Protection API.
+    /// Secrets are loaded into memory on startup for fast access.
+    /// </summary>
+    public class LocalSecretManager : ISecretManager
     {
         private readonly ILogger<LocalSecretManager> _logger;
+        private readonly IDataProtector _protector;
+        private readonly string _secretsFilePath;
+        private readonly object _fileLock = new();
         private Dictionary<string, string> _secrets = [];
 
-        public LocalSecretManager(ILogger<LocalSecretManager> logger)
+        private const string ProtectorPurpose = "LocalSecretManager.Secrets.v1";
+        private const string SecretsFileName = "link-local-secrets.enc";
+        private readonly JsonSerializerOptions _jsonSerializerOptions = new() { WriteIndented = false };
+
+        public LocalSecretManager(
+            ILogger<LocalSecretManager> logger,
+            IDataProtectionProvider dataProtectionProvider)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _protector = dataProtectionProvider?.CreateProtector(ProtectorPurpose)
+                ?? throw new ArgumentNullException(nameof(dataProtectionProvider));
 
-            _secrets.Add(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, GenerateRandomKey(64));
-            _logger.LogInformation("Local Secret Manager initialized");
+            // Store secrets file in user's local app data folder
+            var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            var linkSecretsPath = Path.Combine(appDataPath, "Link", "Secrets");
+            Directory.CreateDirectory(linkSecretsPath);
+            _secretsFilePath = Path.Combine(linkSecretsPath, SecretsFileName);
+
+            // Load existing secrets from file
+            LoadSecretsFromFile();
+
+            // Ensure the bearer key exists (generate if not present)
+            EnsureBearerKeyExists();
+
+            _logger.LogInformation("Local Secret Manager initialized with persistence at {SecretsPath}", linkSecretsPath);
         }
 
-
-        public Task<string> GetSecretAsync(string secretName, CancellationToken cancellationToken)
+        public Task<string?> GetSecretAsync(string secretName, CancellationToken cancellationToken)
         {
-            return Task.FromResult(GetSecret(secretName));
+            var secret = _secrets.GetValueOrDefault(secretName);
+            return Task.FromResult(secret);
         }
 
-        public Task<string> GetSecretAsync(string secretName, string version, CancellationToken cancellationToken)
+        public Task<string?> GetSecretAsync(string secretName, string version, CancellationToken cancellationToken)
         {
-            throw new NotImplementedException();
+            // Version not supported in local secret manager
+            return GetSecretAsync(secretName, cancellationToken);
         }
 
         public Task<bool> SetSecretAsync(string secretName, string secretValue, CancellationToken cancellationToken)
         {
-            return Task.FromResult(SetSecret(secretName, secretValue));
+            _secrets[secretName] = secretValue;
+            SaveSecretsToFile();
+            _logger.LogInformation("Secret {SecretName} saved to local secret manager", secretName.SanitizeAndRemove());
+            return Task.FromResult(true);
         }
 
-        private string GetSecret(string secretKey)
+        public Task<bool> DeleteSecretAsync(string secretName, CancellationToken cancellationToken)
         {
-            return _secrets.TryGetValue(secretKey, out var secret) ? secret : null;
+            var removed = _secrets.Remove(secretName);
+            if (removed)
+            {
+                SaveSecretsToFile();
+            }
+            _logger.LogInformation("Secret {SecretName} {Result} from local secret manager", secretName.SanitizeAndRemove(), removed ? "deleted" : "not found");
+            return Task.FromResult(true);
         }
 
-        private bool SetSecret(string secretKey, string secretValue)
+        private void LoadSecretsFromFile()
         {
-            _secrets.TryGetValue(secretKey, out var secret);
-
-            if (secret is not null)
+            lock (_fileLock)
             {
-                _secrets[secretKey] = secretValue;
-            }
-            else
-            {
-                _secrets.Add(secretKey, secretValue);
-            }
+                try
+                {
+                    if (!File.Exists(_secretsFilePath))
+                    {
+                        _logger.LogInformation("No existing secrets file found, starting with empty secrets");
+                        return;
+                    }
 
-            return true;
+                    var encryptedContent = File.ReadAllText(_secretsFilePath);
+                    if (string.IsNullOrWhiteSpace(encryptedContent))
+                    {
+                        return;
+                    }
+
+                    var decryptedContent = _protector.Unprotect(encryptedContent);
+                    _secrets = JsonSerializer.Deserialize<Dictionary<string, string>>(decryptedContent) ?? [];
+
+                    _logger.LogInformation("Loaded {Count} secrets from encrypted file", _secrets.Count);
+                }
+                catch (CryptographicException ex)
+                {
+                    _logger.LogWarning(ex, "Failed to decrypt secrets file (encryption key may have changed). Starting with empty secrets.");
+                    _secrets = [];
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error loading secrets from file. Starting with empty secrets.");
+                    _secrets = [];
+                }
+            }
+        }
+
+        private void SaveSecretsToFile()
+        {
+            lock (_fileLock)
+            {
+                try
+                {
+                    var json = JsonSerializer.Serialize(_secrets, _jsonSerializerOptions);
+                    var encryptedContent = _protector.Protect(json);
+                    File.WriteAllText(_secretsFilePath, encryptedContent);
+                    _logger.LogDebug("Secrets persisted to encrypted file");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to save secrets to file");
+                    throw;
+                }
+            }
+        }
+
+        private void EnsureBearerKeyExists()
+        {
+            const string bearerKeyName = LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName;
+
+            if (_secrets.ContainsKey(bearerKeyName)) return;
+            
+            var key = GenerateRandomKey(64);
+            _secrets[bearerKeyName] = key;
+            
+            SaveSecretsToFile();
         }
 
         private static string GenerateRandomKey(int size)
         {
             using var rng = RandomNumberGenerator.Create();
-
             var randomNumber = new byte[size];
             rng.GetBytes(randomNumber);
             return Convert.ToBase64String(randomNumber);
