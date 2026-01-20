@@ -469,7 +469,7 @@ public class PatientDataService : IPatientDataService
                     }
 
                     //check if log is search and not census, if true,
-                    if ((fhirQuery.QueryType == FhirQueryType.Search || fhirQuery.QueryType == FhirQueryType.SearchPost)&& !log.IsCensus)
+                    if ((fhirQuery.QueryType == FhirQueryType.Search || fhirQuery.QueryType == FhirQueryType.SearchPost) && !log.IsCensus)
                     {
                         var idParams = fhirQuery.QueryParameters.Where(x => x.StartsWith("_id=", StringComparison.InvariantCultureIgnoreCase)).ToList();
                         if(idParams.Any())

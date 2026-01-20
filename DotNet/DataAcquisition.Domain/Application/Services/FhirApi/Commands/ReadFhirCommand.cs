@@ -1,13 +1,14 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Diagnostics;
 using System.Net.Http.Headers;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.Auth;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 
@@ -81,7 +82,19 @@ public class ReadFhirCommand : IReadFhirCommand
                 _ => $"{request.resourceType}/{request.resourceId}"
             };
 
+            //time and log http request
+            var stopwatch = Stopwatch.StartNew();
+            stopwatch.Start();
+
             var readResource = await fhirClient.ReadAsync<DomainResource>(location);
+
+            stopwatch.Stop();
+            _logger.LogDebug("Fhir Read Resource. FacilityId: {FacilityId}; ResourceType: {ResourceType}; ResourceId: {ResourceId}; Location: {Location}; ElapsedMilliseconds: {ElapsedMilliseconds}",
+                request.facilityId,
+                request.resourceType,
+                request.resourceId,
+                location,
+                stopwatch.ElapsedMilliseconds);
 
             if (readResource == null)
             {

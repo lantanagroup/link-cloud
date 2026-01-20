@@ -12,6 +12,7 @@ using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.Auth;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
+using System.Diagnostics;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 
@@ -88,8 +89,11 @@ public class SearchFhirCommand : ISearchFhirCommand
 
             Bundle? resultBundle = null;
 
+            var stopWatch = Stopwatch.StartNew();
             try
             {
+                
+
                 if (request.queryType == FhirQueryType.SearchPost)
                 {
                     resultBundle = await fhirClient.SearchUsingPostAsync(request.searchParams, request.resourceType.ToString(), cancellationToken);
@@ -98,10 +102,14 @@ public class SearchFhirCommand : ISearchFhirCommand
                 {
                     resultBundle = await fhirClient.SearchAsync(request.searchParams, request.resourceType.ToString(), cancellationToken);
                 }
+
+                stopWatch.Stop();
+                _logger.LogDebug("FHIR Search executed in {ElapsedMilliseconds} ms. ResourceType: {ResourceType}; FacilityId: {facilityId};", stopWatch.ElapsedMilliseconds, request.resourceType, request.facilityId.Sanitize());
             }
             catch(Exception ex)
             {
-                _logger.LogError(ex, "Error encountered while searching FHIR resources. ResourceType: {ResourceType}; FacilityId: {facilityId};", request.resourceType, request.facilityId.Sanitize());
+                stopWatch.Stop();
+                _logger.LogError(ex, "Error encountered while searching FHIR resources. ResourceType: {ResourceType}; FacilityId: {facilityId}; Elapsed Time: {elapsedTime}", request.resourceType, request.facilityId.Sanitize(), stopWatch.ElapsedMilliseconds);
                 throw;
             }
 
@@ -113,13 +121,19 @@ public class SearchFhirCommand : ISearchFhirCommand
             {
                 while (resultBundle.Link.Exists(x => x.Relation == "next"))
                 {
+                    stopWatch.Restart();
+
                     try
                     {
                         resultBundle = await fhirClient.ContinueAsync(resultBundle, ct: cancellationToken);
+                        
+                        stopWatch.Stop();
+                        _logger.LogDebug("FHIR Continue executed in {ElapsedMilliseconds} ms. ResourceType: {ResourceType}; FacilityId: {facilityId};", stopWatch.ElapsedMilliseconds, request.resourceType, request.facilityId.Sanitize());
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error encountered while searching FHIR resources. ResourceType: {ResourceType}; SearchParams: {SearchParams},\n\n\t{stack}\n\n\t{innerStack}", request.resourceType, request.searchParams, ex.StackTrace, ex.InnerException?.StackTrace);
+                        stopWatch.Stop();
+                        _logger.LogError(ex, "Error encountered while searching FHIR resources. ResourceType: {ResourceType}; SearchParams: {SearchParams}, ElapsedTime: {elapsedTime},\n\n\t{stack}\n\n\t{innerStack}", request.resourceType, request.searchParams, stopWatch.ElapsedMilliseconds, ex.StackTrace, ex.InnerException?.StackTrace);
                         throw;
                     }
 
