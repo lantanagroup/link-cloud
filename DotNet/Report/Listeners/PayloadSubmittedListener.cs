@@ -22,9 +22,7 @@ public class PayloadSubmittedListener(
     ITransientExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue> transientExceptionHandler,
     IDeadLetterExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue> deadLetterExceptionHandler,
     ILogger<PayloadSubmittedListener> logger,
-    IServiceScopeFactory serviceScopeFactory,
-    //TODO: TEST CODE ONLY! REMOVE AFTER TESTING
-    ReportManifestProducer reportManifestProducer)
+    IServiceScopeFactory serviceScopeFactory)
     : BackgroundService
 {
     private string Name => this.GetType().Name;
@@ -82,12 +80,6 @@ public class PayloadSubmittedListener(
                                 reportEntry.ModifyDate = DateTime.UtcNow;
                                 database.ReportEntryRepository.Update(reportEntry);
                                 await database.SaveChangesAsync();
-
-                                //TODO: START - TEST CODE ONLY! REMOVE AFTER TESTING
-                                var reportSchedule = await database.ReportScheduledRepository
-                                    .FirstAsync(x => x.Id == result.Message.Key.ReportScheduleId, consumeCancellationToken);
-                                reportManifestProducer.Produce(reportSchedule);
-                                //TODO: END - TEST CODE ONLY! REMOVE AFTER TESTING
                             }
                             else if (result.Message.Value.PayloadType == PayloadType.ReportSchedule)
                             {
