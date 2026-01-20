@@ -1,0 +1,123 @@
+<form [formGroup]="configForm" class="dialog-form">
+  <div class="form-input">
+    <mat-form-field appearance="outline" class="form-input">
+      <mat-label>Facility Id</mat-label>
+      <input matInput formControlName="facilityId" [disabled]="true" placeholder="Facility Id">
+    </mat-form-field>
+  </div>
+
+  <div class="host-port-row">
+    <mat-form-field appearance="outline" class="form-input host-field">
+      <mat-label>Host</mat-label>
+      <input matInput formControlName="host" [readonly]="viewOnly" placeholder="SFTP Server Host">
+      @if (hostControl.value && !viewOnly) {
+        <button matSuffix mat-icon-button aria-label="Clear" (click)="clearHost()">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+      @if (!viewOnly && hostControl.hasError('required')) {
+        <mat-error>Host is <strong>required</strong></mat-error>
+      }
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="form-input port-field">
+      <mat-label>Port</mat-label>
+      <input matInput type="number" formControlName="port" [readonly]="viewOnly" placeholder="22">
+      @if (!viewOnly && portControl.hasError('required')) {
+        <mat-error>Port is <strong>required</strong></mat-error>
+      }
+      @if (!viewOnly && (portControl.hasError('min') || portControl.hasError('max'))) {
+        <mat-error>Port must be between 1 and 65535</mat-error>
+      }
+    </mat-form-field>
+  </div>
+
+  <div class="form-input">
+    <mat-form-field appearance="outline" class="form-input">
+      <mat-label>Remote Directory</mat-label>
+      <input matInput formControlName="remoteDirectory" [readonly]="viewOnly" placeholder="/path/to/census/files">
+      @if (remoteDirectoryControl.value && !viewOnly) {
+        <button matSuffix mat-icon-button aria-label="Clear" (click)="clearRemoteDirectory()">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+      <mat-hint>Path to the directory containing census files (optional)</mat-hint>
+    </mat-form-field>
+  </div>
+
+  <div class="form-row">
+    <mat-form-field appearance="outline" class="form-input timeout-field">
+      <mat-label>Timeout</mat-label>
+      <input matInput formControlName="timeout" [readonly]="viewOnly" placeholder="00:01:00">
+      @if (!viewOnly && timeoutControl.hasError('required')) {
+        <mat-error>Timeout is <strong>required</strong></mat-error>
+      }
+      <mat-hint>Format: HH:MM:SS</mat-hint>
+    </mat-form-field>
+
+    <div class="toggle-container">
+      <mat-slide-toggle formControlName="removeAfterProcessing" [disabled]="viewOnly">
+        Remove files after processing
+      </mat-slide-toggle>
+    </div>
+  </div>
+
+  @if (!viewOnly) {
+    <div class="credentials-section">
+      <div class="credentials-header">
+        <h4>Credentials</h4>
+        @if (formMode === 2 && credentialStatus) {
+          <span class="credential-status">
+            @if (credentialStatus.hasCredentials) {
+              <mat-icon class="status-icon configured">check_circle</mat-icon>
+              <span>Credentials configured</span>
+            } @else {
+              <mat-icon class="status-icon not-configured">warning</mat-icon>
+              <span>No credentials configured</span>
+            }
+          </span>
+        }
+      </div>
+
+      @if (formMode === 2) {
+        <button mat-stroked-button type="button" (click)="toggleCredentialFields()">
+          <mat-icon>{{ showCredentialFields ? 'visibility_off' : 'edit' }}</mat-icon>
+          {{ showCredentialFields ? 'Hide Credential Fields' : 'Update Credentials' }}
+        </button>
+      }
+
+      @if (showCredentialFields) {
+        <div class="credential-fields">
+          <mat-form-field appearance="outline" class="form-input">
+            <mat-label>Username</mat-label>
+            <input matInput formControlName="username" placeholder="SFTP Username" autocomplete="off">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="form-input">
+            <mat-label>Password</mat-label>
+            <input matInput type="password" formControlName="password" placeholder="SFTP Password" autocomplete="new-password">
+          </mat-form-field>
+
+          <p class="credential-hint">
+            <mat-icon>info</mat-icon>
+            Credentials are stored securely and are never displayed after saving.
+          </p>
+        </div>
+      }
+    </div>
+  }
+
+  @if (viewOnly && credentialStatus) {
+    <div class="credentials-section readonly">
+      <h4>Credentials</h4>
+      <span class="credential-status">
+        @if (credentialStatus.hasCredentials) {
+          <mat-icon class="status-icon configured">check_circle</mat-icon>
+          <span>Credentials configured</span>
+        } @else {
+          <mat-icon class="status-icon not-configured">warning</mat-icon>
+          <span>No credentials configured</span>
+        }
+      </span>
+    </div>
+  }
+</form>

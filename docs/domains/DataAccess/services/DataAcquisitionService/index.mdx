@@ -35,7 +35,7 @@ badges:
 
 ## Overview
 
-The Data Acquisition service is responsible for connecting and querying a tenant's endpoint for FHIR resources that are needed to evaluate patients for a measure. For Epic installations, Link Cloud is utilizing the Epic FHIR STU3 Patient List resource to inform which patients are currently admitted in the facility. While this is the current solution to acquiring the patient census, there are other means of patient acquisition being investigated (ADT V2, Bulk FHIR) to provide universal support across multiple EHR vendors.
+The Data Acquisition service is responsible for connecting and querying a tenant's endpoint for FHIR resources that are needed to evaluate patients for a measure. For Epic installations, Link Cloud is utilizing the Epic FHIR STU3 Patient List resource to inform which patients are currently admitted in the facility. Additionally, facilities can configure SFTP-based census acquisition, allowing them to upload patient census files that Link will process. While FHIR List and SFTP are the current solutions for acquiring the patient census, other means of patient acquisition are being investigated (ADT V2, Bulk FHIR) to provide universal support across multiple EHR vendors.
 
 ## Nodes
 
@@ -60,7 +60,8 @@ The Data Acquisition service is responsible for connecting and querying a tenant
 ### Key Roles of Data Acquisition
 
 1. **Patient List Acquisition**:
- - Retrieves a FHIR List of patients from the EHR, if configured.
+ - Retrieves a FHIR List of patients from the EHR, if configured, OR processes census files from a configured SFTP server.
+ - A facility can use either FHIR List or SFTP for census acquisition, but not both.
  - Serves as the initial step for identifying patients relevant to quality measure evaluations.
 
 2. **Individual Patient Data Acquisition**:
@@ -75,7 +76,7 @@ The Data Acquisition service is responsible for connecting and querying a tenant
 Data acquisition plays a role in three distinct stages of the report generation pipeline:
 
 1. **Patient Identification**:
- - Acquiring a list of patients from the EHR to determine the cohort for evaluation.
+ - Acquiring a list of patients from the EHR (via FHIR List) or from census files (via SFTP) to determine the cohort for evaluation.
 
 2. **Initial Data Collection and Evaluation**:
  - Obtaining the primary dataset needed for evaluating quality measures.
@@ -129,7 +130,8 @@ Data acquisition is configurable per tenant, ensuring flexibility to accommodate
   - Such as client credentials (e.g., "client id").
 
 - **Patient Census Retrieval**:
-  - FHIR List "id" or Bulk FHIR "Group ID" used for identifying the patient cohort.
+  - FHIR List "id", Bulk FHIR "Group ID", or SFTP configuration used for identifying the patient cohort.
+  - See [SFTP Configuration](#sftp-configuration) for details on SFTP-based census acquisition.
 
 - **EHR Query Throttling/Limitations**:
   - Configurable settings to respect EHR query limitations (e.g., maximum queries per minute).
@@ -264,6 +266,128 @@ Data sources (where the FHIR server is located and how to authenticate) are conf
 
 TODO: Add details about how to authenticate against Epic, Cerner, Basic, and/or OAuth data sources.
 
+### SFTP Configuration
+
+As an alternative to FHIR List-based patient census acquisition, facilities can configure SFTP-based census acquisition. This allows facilities to upload patient census files to an SFTP server, which Link will poll and process to identify patients for quality measure evaluation.
+
+**Key Characteristics:**
+- A facility can only have **one** census acquisition method (either FHIR List OR SFTP, not both)
+- SFTP credentials are stored securely in a secret manager, for example Azure Key Vault, (or a local secret manager for development)
+- Credentials are never stored in the database or returned in API responses
+
+#### SFTP Configuration Properties
+
+| Property | Description | Required | Default |
+|----------|-------------|----------|---------|
+| Host | Hostname or IP address of the SFTP server | Yes | - |
+| Port | Port number for the SFTP connection | No | 22 |
+| RemoteDirectory | Path to the directory containing census files | No | (root) |
+| Timeout | Connection timeout duration | No | 00:01:00 |
+| RemoveAfterProcessing | Whether to delete files after successful processing | No | false |
+| AuthenticationProtocol | Authentication method (currently only "Basic" supported) | No | Basic |
+
+#### SFTP Credentials
+
+Credentials are managed separately from the configuration for security:
+- Credentials can be set during initial configuration creation
+- Credentials can be updated independently without modifying other settings
+- A credential status endpoint allows checking if credentials exist without exposing them
+- Credentials can be deleted without removing the SFTP configuration
+
+#### SFTP Configuration API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/data/{orgId}/sftp-configurations` | POST | Create SFTP configuration |
+| `/api/data/{orgId}/sftp-configurations` | GET | Get configuration by organization |
+| `/api/data/sftp-configurations/{id}` | GET | Get configuration by ID |
+| `/api/data/{orgId}/sftp-configurations/{configId}` | PUT | Update configuration |
+| `/api/data/{orgId}/sftp-configurations/{configId}` | DELETE | Delete configuration |
+| `/api/data/{orgId}/sftp-configurations/credentials` | PUT | Set/update credentials |
+| `/api/data/{orgId}/sftp-configurations/credentials/status` | GET | Check credential status |
+| `/api/data/{orgId}/sftp-configurations/credentials` | DELETE | Delete credentials only |
+
+All endpoints require LinkAdmin authorization.
+
+#### Example SFTP Configuration Request
+
+```json
+{
+  "host": "sftp.facility.example.com",
+  "port": 22,
+  "remoteDirectory": "/census/incoming",
+  "timeout": "00:02:00",
+  "removeAfterProcessing": true,
+  "credentials": {
+    "username": "link-service",
+    "password": "secure-password"
+  }
+}
+```
+
+### SFTP Acquisition Logs
+
+When census files are processed via SFTP, the system maintains acquisition logs to track processing history. These logs provide visibility into which files have been processed and the patient/encounter counts extracted.
+
+#### SFTP Acquisition Log Properties
+
+| Property | Description |
+|----------|-------------|
+| ExternalId | Unique identifier (GUID) for the log entry |
+| FacilityId | The facility/organization that owns the census file |
+| FileName | Name of the processed file |
+| PatientCount | Number of patients extracted from the file |
+| EncounterCount | Number of encounters extracted from the file |
+| ProcessDate | Timestamp when the file was processed |
+
+#### SFTP Log API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/data/sftp-logs` | GET | Search logs with filtering and pagination |
+| `/api/data/sftp-logs/{logId}` | GET | Get a specific log by external ID |
+| `/api/data/sftp-logs` | POST | Create a new log entry |
+| `/api/data/sftp-logs/{logId}` | PUT | Update log process date |
+
+All endpoints require LinkAdmin authorization.
+
+## Secret Management Configuration
+
+SFTP credentials and other sensitive data are stored using a configurable secret manager. The service supports Azure Key Vault for production environments and a local in-memory manager for development.
+
+| Property | Description | Required | Default Value | Secret? |
+|----------|-------------|----------|---------------|---------|
+| SecretManagement__Enabled | Enable/disable secret management | No | true | No |
+| SecretManagement__Manager | Secret manager type: "AzureKeyVault" or "Local" | No | Local | No |
+| SecretManagement__ManagerUri | Azure Key Vault URI (required for AzureKeyVault) | Conditional | - | No |
+| DataProtection__KeyRing | Key ring name for data protection | No | Link | No |
+
+**Azure Key Vault Configuration:**
+```json
+{
+  "SecretManagement": {
+    "Enabled": true,
+    "Manager": "AzureKeyVault",
+    "ManagerUri": "https://your-keyvault.vault.azure.net/"
+  },
+  "DataProtection": {
+    "KeyRing": "Link"
+  }
+}
+```
+
+**Local Development Configuration:**
+```json
+{
+  "SecretManagement": {
+    "Enabled": true,
+    "Manager": "Local"
+  },
+  "DataProtection": {
+    "KeyRing": "Link"
+  }
+}
+```
 
 ## Logging
 

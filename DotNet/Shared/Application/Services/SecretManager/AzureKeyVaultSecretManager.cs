@@ -2,6 +2,7 @@
 using Azure.Security.KeyVault.Secrets;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -20,13 +21,14 @@ namespace LantanaGroup.Link.Shared.Application.Services.SecretManager
             _logger.LogInformation("Azure Key Vault Secret Manager initialized");
         }
 
-        public async Task<string> GetSecretAsync(string secretName, CancellationToken cancellationToken)
+        public async Task<string?> GetSecretAsync(string secretName, CancellationToken cancellationToken)
         {
             var secret = await _secretClient.GetSecretAsync(secretName, cancellationToken: cancellationToken);
             return secret.Value.Value;
         }
 
-        public async Task<string> GetSecretAsync(string secretName, string version, CancellationToken cancellationToken)
+        public async Task<string?> GetSecretAsync(string secretName, string version,
+            CancellationToken cancellationToken)
         {
             var secret = await _secretClient.GetSecretAsync(secretName, version, cancellationToken);
             return secret.Value.Value;
@@ -36,6 +38,14 @@ namespace LantanaGroup.Link.Shared.Application.Services.SecretManager
         {
             var result = await _secretClient.SetSecretAsync(secretName, secretValue, cancellationToken);
             return result.Value != null;
+        }
+
+        public async Task<bool> DeleteSecretAsync(string secretName, CancellationToken cancellationToken)
+        {
+            var operation = await _secretClient.StartDeleteSecretAsync(secretName, cancellationToken);
+            await operation.WaitForCompletionAsync(cancellationToken);
+            _logger.LogInformation("Secret {SecretName} deleted from Azure Key Vault", secretName.SanitizeAndRemove());
+            return true;
         }
     }
 }

@@ -61,6 +61,8 @@ namespace IntegrationTests.DataAcquisition
                     services.AddScoped<IEntityRepository<QueryPlan>, EntityRepository<QueryPlan, DataAcquisitionDbContext>>();
                     services.AddTransient<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
                     services.AddTransient<IEntityRepository<ResourceReferenceType>, EntityRepository<ResourceReferenceType, DataAcquisitionDbContext>>();
+                    services.AddScoped<IEntityRepository<SftpAcquisitionLog>, EntityRepository<SftpAcquisitionLog, DataAcquisitionDbContext>>();
+                    services.AddScoped<IEntityRepository<SftpConfiguration>, EntityRepository<SftpConfiguration, DataAcquisitionDbContext>>();
 
                     // Register IDatabase implementation
                     services.AddScoped<LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase, LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Database>();

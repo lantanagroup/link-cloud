@@ -32,6 +32,7 @@ public class DataAcquisitionDbContext : DbContext
     public virtual DbSet<FhirQueryResourceType> FhirQueryResourceTypes { get; set; }
     public DbSet<DataAcquisitionLog> DataAcquisitionLogs { get; set; }
     public DbSet<SftpAcquisitionLog> SftpAcquisitionLogs { get; set; }
+    public DbSet<SftpConfiguration> SftpConfigurations { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -196,6 +197,23 @@ public class DataAcquisitionDbContext : DbContext
 
             entity.HasIndex(i => i.FacilityId)
                 .HasDatabaseName("IX_SftpAcquisitionLog_FacilityId");
+        });
+        
+        //-------------------SftpConfiguration-------------------
+        modelBuilder.Entity<SftpConfiguration>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.OrganizationId)
+                .IsRequired()
+                .HasMaxLength(DataAcquisitionConstants.DatabaseSettings.MaxFacilityIdLength);
+            
+            entity.Property(e => e.Host)
+                .IsRequired()
+                .HasMaxLength(256);
+
+            entity.Property(e => e.RemoteDirectory)
+                .HasMaxLength(4096);
         });
 
         // Prefix and schema can be passed as parameters

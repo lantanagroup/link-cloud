@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.SecretManagers
 {
+    //TODO: Review this vs the AzureKeyVaultSecretManager in Shared.Application.Services.SecretManager
     public class LinkAzureKeyVault : ISecretManager
     {
         private readonly ILogger<LinkAzureKeyVault> _logger;
@@ -17,13 +18,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.SecretManagers
             _secretClient = new SecretClient(new Uri(secretMangerConfig.Value.ManagerUri), new DefaultAzureCredential());
         }
 
-        public async Task<string> GetSecretAsync(string secretName, CancellationToken cancellationToken)
+        public async Task<string?> GetSecretAsync(string secretName, CancellationToken cancellationToken)
         {            
             var secret = await _secretClient.GetSecretAsync(secretName, cancellationToken: cancellationToken);
             return secret.Value.Value;
         }
 
-        public async Task<string> GetSecretAsync(string secretName, string version, CancellationToken cancellationToken)
+        public async Task<string?> GetSecretAsync(string secretName, string version,
+            CancellationToken cancellationToken)
         {
             var secret = await _secretClient.GetSecretAsync(secretName, version, cancellationToken);
             return secret.Value.Value;
@@ -33,6 +35,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.SecretManagers
         {
             var result = await _secretClient.SetSecretAsync(secretName, secretValue, cancellationToken);  
             return result.Value != null;
+        }
+
+        public Task<bool> DeleteSecretAsync(string secretName, CancellationToken cancellationToken)
+        {
+            throw new NotImplementedException();
         }
     }
 }

@@ -950,7 +950,7 @@ namespace DataAcquisition.Domain.Migrations
                         .HasMaxLength(250)
                         .HasColumnType("nvarchar(250)");
 
-                    b.Property<string>("FacilityName")
+                    b.Property<string>("FileName")
                         .IsRequired()
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
@@ -967,6 +967,44 @@ namespace DataAcquisition.Domain.Migrations
                         .HasDatabaseName("IX_SftpAcquisitionLog_FacilityId");
 
                     b.ToTable("SftpAcquisitionLog");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.SftpConfiguration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("NEWID()");
+
+                    b.Property<int>("AuthenticationProtocol")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Host")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("OrganizationId")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<int>("Port")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RemoteDirectory")
+                        .HasMaxLength(4096)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("RemoveAfterProcessing")
+                        .HasColumnType("bit");
+
+                    b.Property<TimeSpan>("Timeout")
+                        .HasColumnType("time");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SftpConfiguration");
                 });
 
             modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzBlobTrigger", b =>

@@ -6,6 +6,12 @@ import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-respon
 import { IEntityDeletedResponse } from 'src/app/interfaces/entity-deleted-response.interface';
 import { IDataAcquisitionQueryConfigModel } from 'src/app/interfaces/data-acquisition/data-acquisition-fhir-query-config-model.interface';
 import { IDataAcquisitionFhirListConfigModel } from 'src/app/interfaces/data-acquisition/data-acquisition-fhir-list-config-model.interface';
+import {
+  ICreateSftpConfigurationModel,
+  ISftpConfigurationModel,
+  ISftpCredentialsModel,
+  ISftpCredentialStatusModel
+} from 'src/app/interfaces/data-acquisition/sftp-config-model.interface';
 import { IDataAcquisitionAuthenticationConfigModel } from '../../../interfaces/data-acquisition/data-acquisition-auth-config-model.interface';
 import { AppConfigService } from '../../app-config.service';
 import {IQueryPlanModel} from "../../../interfaces/data-acquisition/query-plan-model.interface";
@@ -201,6 +207,86 @@ export class DataAcquisitionService {
         }),
         catchError((error) => {
           return this.errorHandler.handleError(error);
+        })
+      )
+  }
+
+  // SFTP Configuration Methods
+
+  getSftpConfiguration(facilityId: string): Observable<ISftpConfigurationModel> {
+    return this.http.get<ISftpConfigurationModel>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/sftp-configurations`)
+      .pipe(
+        tap(_ => console.log(`Fetched SFTP configuration.`)),
+        catchError((error) => {
+          return this.errorHandler.handleError(error, false);
+        })
+      )
+  }
+
+  createSftpConfiguration(facilityId: string, config: ICreateSftpConfigurationModel): Observable<IEntityCreatedResponse> {
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/sftp-configurations`, config)
+      .pipe(
+        tap(_ => console.log(`Request for SFTP configuration creation was sent.`)),
+        map((response: IEntityCreatedResponse) => {
+          return response;
+        }),
+        catchError((error) => {
+          return this.errorHandler.handleError(error);
+        })
+      )
+  }
+
+  updateSftpConfiguration(facilityId: string, configId: string, config: ISftpConfigurationModel): Observable<IEntityCreatedResponse> {
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/sftp-configurations/${configId}`, config)
+      .pipe(
+        tap(_ => console.log(`Request for SFTP configuration update was sent.`)),
+        map((response: IEntityCreatedResponse) => {
+          return response;
+        }),
+        catchError((error) => {
+          return this.errorHandler.handleError(error);
+        })
+      )
+  }
+
+  deleteSftpConfiguration(facilityId: string, configId: string): Observable<IEntityDeletedResponse> {
+    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/sftp-configurations/${configId}`)
+      .pipe(
+        tap(_ => console.log(`Request for SFTP configuration deletion was sent.`)),
+        catchError((error) => {
+          throw error;
+        })
+      )
+  }
+
+  // SFTP Credentials Methods
+
+  getSftpCredentialStatus(facilityId: string): Observable<ISftpCredentialStatusModel> {
+    return this.http.get<ISftpCredentialStatusModel>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/sftp-configurations/credentials/status`)
+      .pipe(
+        tap(_ => console.log(`Fetched SFTP credential status.`)),
+        catchError((error) => {
+          return this.errorHandler.handleError(error, false);
+        })
+      )
+  }
+
+  updateSftpCredentials(facilityId: string, credentials: ISftpCredentialsModel): Observable<void> {
+    return this.http.put<void>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/sftp-configurations/credentials`, credentials)
+      .pipe(
+        tap(_ => console.log(`Request for SFTP credentials update was sent.`)),
+        catchError((error) => {
+          return this.errorHandler.handleError(error);
+        })
+      )
+  }
+
+  deleteSftpCredentials(facilityId: string): Observable<void> {
+    return this.http.delete<void>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/sftp-configurations/credentials`)
+      .pipe(
+        tap(_ => console.log(`Request for SFTP credentials deletion was sent.`)),
+        catchError((error) => {
+          throw error;
         })
       )
   }
