@@ -325,6 +325,12 @@ public class PatientDataService : IPatientDataService
                     throw new ArgumentException($"Log with ID {request.logId} does not exist.");
                 }
 
+                var now = DateTime.UtcNow;
+                if(log.ExecutionDate >  DateTime.UtcNow)
+                {
+                    throw new ProcessingDelayException(@$"Log Exection Date {log.ExecutionDate} indicates a future processing time.");
+                }
+
                 //check to ensure that facilityId matches
                 if (!log.FacilityId.Equals(request.facilityId, StringComparison.InvariantCultureIgnoreCase))
                 {
@@ -545,6 +551,28 @@ public class PatientDataService : IPatientDataService
                     Status = log.Status,
                 }, cancellationToken);
             }
+            catch(ProcessingDelayException ex)
+            {
+                log!.Notes ??= new List<string>();
+
+                log.RetryAttempts ??= 0;
+
+                log.Status = RequestStatus.Pending;
+                log.Notes.Add(ex.Message);
+
+                await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                {
+                    Id = log.Id,
+                    RetryAttempts = log.RetryAttempts,
+                    ExecutionDate = log.ExecutionDate,
+                    Status = log.Status,
+                    Notes = log.Notes,
+                    ResourceAcquiredIds = log.ResourceAcquiredIds,
+                    CompletionDate = log.CompletionDate,
+                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                    TraceId = log.TraceId
+                }, cancellationToken);
+            }
             catch (TooManyRequestsException ex)
             {
                 _logger.LogWarning(ex, "Throttled by 429 for facility {FacilityId}", log.FacilityId.Sanitize());
@@ -570,6 +598,7 @@ public class PatientDataService : IPatientDataService
                     TraceId = log.TraceId
                 }, cancellationToken);
 
+                await _dataAcquisitionLogManager.ThrottleFacilityAcquisitions(log.FacilityId, log.ExecutionDate.Value, cancellationToken);
             }
             catch (Exception ex)
             {

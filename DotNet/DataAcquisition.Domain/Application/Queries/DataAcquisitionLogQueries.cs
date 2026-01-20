@@ -67,7 +67,7 @@ public interface IDataAcquisitionLogQueries
 
     Task<List<string>> GetFacilitiesWithPendingAndRetryableFailedRequests(CancellationToken cancellationToken = default);
 
-    Task<List<DataAcquisitionLogModel>> GetNextEligibleBatchForFacility(string facilityId, long? lastId, int batchSize, CancellationToken cancellationToken = default);
+    Task<List<DataAcquisitionLogModel>> GetNextEligibleBatchForFacility(string facilityId, long? lastId, int batchSize, List<RequestStatus> statuses, DateTime? designagtedExecutionTime = null, CancellationToken cancellationToken = default);
 
     Task<List<string>> GetResourceIdsForReportPatient(string correlationId, string facilityId, string resourceType, CancellationToken cancellationToken = default);
 }
@@ -566,15 +566,15 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<List<DataAcquisitionLogModel>> GetNextEligibleBatchForFacility(string facilityId, long? lastId, int batchSize, CancellationToken cancellationToken = default)
+    public async Task<List<DataAcquisitionLogModel>> GetNextEligibleBatchForFacility(string facilityId, long? lastId, int batchSize, List<RequestStatus> statuses, DateTime? designagtedExecutionTime = null, CancellationToken cancellationToken = default)
     {
-        var date = DateTime.UtcNow;
+        designagtedExecutionTime ??= DateTime.UtcNow;
 
         var query = from log in _dbContext.DataAcquisitionLogs
                     where log.FacilityId == facilityId
                         && (lastId == null || log.Id > lastId)
-                        && (log.ExecutionDate == null || log.ExecutionDate <= date)
-                        && (log.Status == RequestStatus.Pending || log.Status == RequestStatus.Failed)
+                        && (log.ExecutionDate == null || log.ExecutionDate <= designagtedExecutionTime)
+                        && (log.Status == null || statuses.Contains(log.Status.Value))
                     orderby log.Priority ascending, 
                     log.ExecutionDate ascending, 
                     log.Id ascending
@@ -626,5 +626,10 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         var property = Expression.Property(parameter, sortKey);
         var converted = Expression.Convert(property, typeof(object));
         return Expression.Lambda<Func<T, object>>(converted, parameter);
+    }
+
+    public Task<List<DataAcquisitionLogModel>> GetNextBatchForFacility(string facilityId, long? lastId, int batchSize, CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
     }
 }

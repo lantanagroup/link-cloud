@@ -917,8 +917,9 @@ public class PatientDataServiceTests
         new() { Id = 5, Priority = AcquisitionPriority.Critical, ExecutionDate = DateTime.UtcNow.AddMinutes(-3), Status = RequestStatus.Failed, RetryAttempts = 6 }   // Exceeded max retries, but still included
     };
 
+        var dateTimeNow = DateTime.UtcNow;
         _mockLogQueries
-            .Setup(q => q.GetNextEligibleBatchForFacility(facilityId, lastId, batchSize, cancellationToken))
+            .Setup(q => q.GetNextEligibleBatchForFacility(facilityId, lastId, batchSize, new() { RequestStatus.Pending, RequestStatus.Failed }, dateTimeNow, cancellationToken))
             .ReturnsAsync(logs
                 .Where(l => l.Status == RequestStatus.Pending || l.Status == RequestStatus.Failed)
                 .OrderBy(l => l.Priority)  // Ascending: Critical (0), High (1), Normal (2)
@@ -928,7 +929,7 @@ public class PatientDataServiceTests
                 .ToList());
 
         // Act
-        var result = await _mockLogQueries.Object.GetNextEligibleBatchForFacility(facilityId, lastId, batchSize, cancellationToken);
+        var result = await _mockLogQueries.Object.GetNextEligibleBatchForFacility(facilityId, lastId, batchSize, new() { RequestStatus.Pending, RequestStatus.Failed }, dateTimeNow, cancellationToken);
 
         // Assert: All Pending and Failed included, ordered correctly (Critical/High first, then by date; includes exceeded retries)
         Assert.Equal(4, result.Count);  // Batch size (original 5 matching, take 4)

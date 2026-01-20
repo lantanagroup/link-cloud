@@ -1,13 +1,13 @@
-using System.Diagnostics;
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
-using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
@@ -17,17 +17,20 @@ public interface IDataAcquisitionLogManager
     Task<DataAcquisitionLogModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default);
     Task DeleteAsync(long id, CancellationToken cancellationToken = default);
     Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(List<long> logIds, string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default);
+    Task ThrottleFacilityAcquisitions(string facilityId, DateTime executionDate, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 {
     public readonly ILogger<DataAcquisitionLogManager> _logger;
     public readonly IDatabase _database;
+    private readonly IDataAcquisitionLogQueries _logQueries;
 
-    public DataAcquisitionLogManager(ILogger<DataAcquisitionLogManager> logger, IDatabase database)
+    public DataAcquisitionLogManager(ILogger<DataAcquisitionLogManager> logger, IDatabase database, IDataAcquisitionLogQueries logQueries)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _database = database ?? throw new ArgumentNullException(nameof(database));
+        _logQueries = logQueries;
     }
 
     public async Task<DataAcquisitionLogModel> CreateAsync(CreateDataAcquisitionLogModel model, CancellationToken cancellationToken = default)
@@ -199,6 +202,30 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             entity.ModifyDate = DateTime.UtcNow;
             entity.Notes ??= new();
             entity.Notes.Add("Tail Message Sent");
+            await _database.DataAcquisitionLogRepository.SaveChangesAsync();
+        }
+    }
+
+    public async Task ThrottleFacilityAcquisitions(string facilityId, DateTime executionDate, CancellationToken cancellationToken = default)
+    {
+        var lastId = 0;
+        var batchSize = 1000;
+        while (true)
+        {
+            // Get All Active Logs For Batch
+            var toThrottle = await _logQueries.GetNextEligibleBatchForFacility(facilityId, lastId, batchSize, [RequestStatus.Failed, RequestStatus.Ready, RequestStatus.Pending], executionDate, cancellationToken);
+
+            if(toThrottle.Count == 0)
+            {
+                break;
+            }
+
+            //Update their next processing time
+            foreach (var log in toThrottle)
+            {
+                log.ExecutionDate = executionDate;
+            }
+
             await _database.DataAcquisitionLogRepository.SaveChangesAsync();
         }
     }
