@@ -575,9 +575,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         && (lastId == null || log.Id > lastId)
                         && (log.ExecutionDate == null || log.ExecutionDate <= designagtedExecutionTime)
                         && (log.Status == null || statuses.Contains(log.Status.Value))
-                    orderby log.Priority ascending, 
-                    log.ExecutionDate ascending, 
-                    log.Id ascending
+                    orderby log.Id
                     select new DataAcquisitionLogModel
                     {
                         Id = log.Id,

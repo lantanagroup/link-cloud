@@ -208,7 +208,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task ThrottleFacilityAcquisitions(string facilityId, DateTime executionDate, CancellationToken cancellationToken = default)
     {
-        var lastId = 0;
+        long? lastId = null;
         var batchSize = 1000;
         while (true)
         {
@@ -227,6 +227,8 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             }
 
             await _database.DataAcquisitionLogRepository.SaveChangesAsync();
+
+            lastId = toThrottle.Max(l => l.Id);
         }
     }
 }

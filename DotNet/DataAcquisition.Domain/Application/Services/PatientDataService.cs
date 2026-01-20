@@ -227,8 +227,7 @@ public class PatientDataService : IPatientDataService
             {
                 if (request.QueryPlanType == QueryPlanType.Initial)
                 {
-                    var priority = schedReport.ReportTypes?.Any(t => t.Equals("Daily", StringComparison.OrdinalIgnoreCase)) == true
-                        ? AcquisitionPriority.High : AcquisitionPriority.Normal;
+                    var priority = schedReport.Frequency == Frequency.Daily ? AcquisitionPriority.High : AcquisitionPriority.Normal;
 
                     try
                     {
@@ -325,8 +324,7 @@ public class PatientDataService : IPatientDataService
                     throw new ArgumentException($"Log with ID {request.logId} does not exist.");
                 }
 
-                var now = DateTime.UtcNow;
-                if(log.ExecutionDate >  DateTime.UtcNow)
+                if(log.ExecutionDate > DateTime.UtcNow)
                 {
                     throw new ProcessingDelayException(@$"Log Exection Date {log.ExecutionDate} indicates a future processing time.");
                 }
