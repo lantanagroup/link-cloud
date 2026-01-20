@@ -208,8 +208,8 @@ public class PatientDataService : IPatientDataService
 
         if (queryPlan != null)
         {
-            var initialQueries = queryPlan.InitialQueries.OrderBy(x => x.Key);
-            var supplementalQueries = queryPlan.SupplementalQueries.OrderBy(x => x.Key);
+            var initialQueries = queryPlan.InitialQueries.OrderBy(x => int.TryParse(x.Key, out int num) ? num : int.MaxValue);
+            var supplementalQueries = queryPlan.SupplementalQueries.OrderBy(x => int.TryParse(x.Key, out int num) ? num : int.MaxValue);
 
             var referenceStrTypes = queryPlan.InitialQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList();
             referenceStrTypes.AddRange(queryPlan.SupplementalQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList());
