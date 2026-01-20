@@ -1,10 +1,8 @@
 package com.lantanagroup.link.measureeval.services;
 
-import ca.uhn.fhir.context.FhirContext;
 import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
 import com.lantanagroup.link.measureeval.entities.QueryType;
 import com.lantanagroup.link.measureeval.entities.Resource;
-import com.lantanagroup.link.measureeval.models.MeasureReportGenerated;
 import com.lantanagroup.link.measureeval.records.AbstractResourceRecord;
 import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
@@ -50,7 +48,6 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     private final KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate;
     private final EvaluateMeasureService evaluateMeasureService;
     private final PatientStatusBundler patientStatusBundler;
-    private final MeasureReportGeneratedProducer measureReportGeneratedProducer;
     private final BlobStorageService blobStorageService;
 
     public AbstractResourceConsumer (
@@ -61,7 +58,6 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate,
             EvaluateMeasureService evaluateMeasureService,
             PatientStatusBundler patientStatusBundler,
-            MeasureReportGeneratedProducer measureReportGeneratedProducer,
             BlobStorageService blobStorageService,
             ConsumerRecordRecoverer recoverer) {
         super(recoverer);
@@ -73,7 +69,6 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         this.dataAcquisitionRequestedTemplate = dataAcquisitionRequestedTemplate;
         this.evaluateMeasureService = evaluateMeasureService;
         this.patientStatusBundler = patientStatusBundler;
-        this.measureReportGeneratedProducer = measureReportGeneratedProducer;
         this.blobStorageService = blobStorageService;
     }
 
@@ -146,6 +141,8 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                 patientStatusCache.put(correlationId, patientStatus);
             }
 
+            // If we've acquired/consumed all the resources for the patient, evaluate the patient's data against the measures;
+            // otherwise this instance of ResourceNormalized is intended to just persist the resource defined in the record within the database
             if (value.isAcquisitionComplete()) {
                 logger.trace("Beginning measure evaluation");
 
@@ -156,15 +153,14 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                 taskStopWatch.start("evaluateMeasures");
                 evaluateMeasures(value, patientStatus, bundle);
                 taskStopWatch.stop();
+            } else {
+                logger.trace("Beginning resource update");
 
-                return;
+                taskStopWatch.start("upsertResource");
+                upsertResource(facilityId, correlationId, value);
+                taskStopWatch.stop();
             }
 
-            logger.trace("Beginning resource update");
-
-            taskStopWatch.start("upsertResource");
-            upsertResource(facilityId, correlationId, value);
-            taskStopWatch.stop();
         } finally {
             totalStopWatch.stop();
             for (StopWatch.TaskInfo task : taskStopWatch.getTaskInfo()) {
@@ -175,7 +171,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         }
     }
 
-    private Resource upsertResource (String facilityId, String correlationId, T value) {
+    private void upsertResource(String facilityId, String correlationId, T value) {
         logger.trace("Upserting resource in database");
         Resource resource = new Resource();
         resource.setFacilityId(facilityId);
@@ -184,7 +180,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         resource.setResourceType(value.getResourceType());
         resource.setResourceId(value.getResourceId());
         resource.setResource(value.getResource());
-        return resourceRepository.upsert(resource);
+        resourceRepository.upsert(resource);
     }
 
     private PatientReportingEvaluationStatus retrievePatientStatus (String facilityId, String correlationId) {
@@ -216,7 +212,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
 
     private void evaluateMeasures (T value, PatientReportingEvaluationStatus patientStatus, Bundle bundle) {
         logger.debug("Evaluating measures");
-        FhirContext ctx = FhirContext.forR4();
+
         for (PatientReportingEvaluationStatus.Report report : patientStatus.getReports()) {
             MeasureReport measureReport = evaluateMeasureService.evaluateMeasure(value.getQueryType().toString(), patientStatus, report, bundle);
 
@@ -227,9 +223,8 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             switch (value.getQueryType()) {
                 case INITIAL -> {
                     updateReportability(patientStatus, report, measureReport);
-                    produceMeasureReportGenerated(patientStatus, report, measureReport, ctx);
                 }
-                case SUPPLEMENTAL -> produceMeasureReportGenerated(patientStatus, report, measureReport, ctx);
+                case SUPPLEMENTAL -> blobStorageService.storePatientInBlobStorage(patientStatus, measureReport);
                 default -> throw new IllegalStateException(String.format("Unexpected query type: %s", value.getQueryType()));
             }
         }
@@ -242,29 +237,6 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         if (value.getQueryType() == QueryType.INITIAL && reportablePatient) {
             produceDataAcquisitionRequestedRecord(value, patientStatus);
         }
-    }
-
-    private void produceMeasureReportGenerated(
-            PatientReportingEvaluationStatus patientStatus,
-            PatientReportingEvaluationStatus.Report report,
-            MeasureReport measureReport,
-            FhirContext ctx) {
-
-        String fileName = String.format("%s-%s.json", patientStatus.getPatientId(), measureReport.getIdPart());
-        String content = ctx.newJsonParser().encodeResourceToString(measureReport);
-        String uri = blobStorageService.uploadPayload(fileName, content);
-
-        MeasureReportGenerated.Value measureReportGenerated = new MeasureReportGenerated.Value();
-        measureReportGenerated.setMeasureReportId(measureReport.getIdPart());
-        measureReportGenerated.setFacilityId(patientStatus.getFacilityId());
-        measureReportGenerated.setPatientId(patientStatus.getPatientId());
-        measureReportGenerated.setReportType(report.getReportType());
-        measureReportGenerated.setIsReportable(report.getReportable());
-        measureReportGenerated.setReportTrackingId(report.getReportTrackingId());
-        measureReportGenerated.setMeasureReportURI(uri);
-        measureReportGenerated.setMeasureReportFileName(fileName);
-
-        measureReportGeneratedProducer.produce(patientStatus.getCorrelationId(), measureReportGenerated);
     }
 
     private void updatePatientMetrics (T value, PatientReportingEvaluationStatus patientStatus, boolean reportablePatient) {

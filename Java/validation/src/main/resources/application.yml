@@ -111,11 +111,8 @@ link:
           - facilityId={facilityId}
           - patientId={patientId}
           - reportScheduleId={reportId}
-      report-schedule-summary-model:
-        path: /api/Report/schedule
-        query:
-            - facilityId={facilityId}
-            - reportScheduleId={reportId}
+      report-schedules:
+        path: /api/schedules/{reportId}
 
 internal-blob-storage:
   connection-string: ''

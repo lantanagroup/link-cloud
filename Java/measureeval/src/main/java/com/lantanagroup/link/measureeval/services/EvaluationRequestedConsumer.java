@@ -3,7 +3,6 @@ package com.lantanagroup.link.measureeval.services;
 import ca.uhn.fhir.context.FhirContext;
 import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
 import com.lantanagroup.link.measureeval.entities.ReportableEvent;
-import com.lantanagroup.link.measureeval.models.MeasureReportGenerated;
 import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.records.EvaluationRequested;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
@@ -109,38 +108,13 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
                 measureReport.setId(UUID.randomUUID().toString());
             }
 
-            produceMeasureReportGenerated(newPatientStatus, r, measureReport, fhirContext);
+            blobStorageService.storePatientInBlobStorage(patientStatus, measureReport);
         });
 
         boolean reportablePatient = patientStatus.getReports().stream().anyMatch(PatientReportingEvaluationStatus.Report::getReportable);
+
         // if at least one reportable measure, increment the reportable patient counter otherwise increment the non-reportable patient counter
         updatePatientMetrics(value, patientStatus, reportablePatient);
-    }
-
-    private void produceMeasureReportGenerated(
-            PatientReportingEvaluationStatus patientStatus,
-            PatientReportingEvaluationStatus.Report report,
-            MeasureReport measureReport,
-            FhirContext ctx) {
-        if (measureReport.getIdPart() == null) {
-            throw new RuntimeException("MeasureReport ID is null");
-        }
-
-        String fileName = String.format("%s-%s.json", patientStatus.getPatientId(), measureReport.getIdPart());
-        String content = ctx.newJsonParser().encodeResourceToString(measureReport);
-        String uri = blobStorageService.uploadPayload(fileName, content);
-
-        MeasureReportGenerated.Value measureReportGenerated = new MeasureReportGenerated.Value();
-        measureReportGenerated.setMeasureReportId(measureReport.getIdPart());
-        measureReportGenerated.setFacilityId(patientStatus.getFacilityId());
-        measureReportGenerated.setPatientId(patientStatus.getPatientId());
-        measureReportGenerated.setReportType(report.getReportType());
-        measureReportGenerated.setIsReportable(report.getReportable());
-        measureReportGenerated.setReportTrackingId(report.getReportTrackingId());
-        measureReportGenerated.setMeasureReportURI(uri);
-        measureReportGenerated.setMeasureReportFileName(fileName);
-
-        measureReportGeneratedProducer.produce(patientStatus.getCorrelationId(), measureReportGenerated);
     }
 
     private void updatePatientMetrics (EvaluationRequested value, PatientReportingEvaluationStatus patientStatus, boolean reportablePatient) {

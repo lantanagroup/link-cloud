@@ -21,7 +21,6 @@ public class ResourceAcquiredErrorConsumer extends AbstractResourceConsumer<Reso
             KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate,
             EvaluateMeasureService evaluateMeasureService,
             PatientStatusBundler patientStatusBundler,
-            MeasureReportGeneratedProducer measureReportGeneratedProducer,
             BlobStorageService blobStorageService,
             ConsumerRecordRecoverer recoverer){
         super(
@@ -32,7 +31,6 @@ public class ResourceAcquiredErrorConsumer extends AbstractResourceConsumer<Reso
                 dataAcquisitionRequestedTemplate,
                 evaluateMeasureService,
                 patientStatusBundler,
-                measureReportGeneratedProducer,
                 blobStorageService,
                 recoverer);
     }

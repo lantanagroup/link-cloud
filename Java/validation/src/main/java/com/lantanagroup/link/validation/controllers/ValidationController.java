@@ -1,7 +1,7 @@
 package com.lantanagroup.link.validation.controllers;
 
 import ca.uhn.fhir.context.FhirContext;
-import com.lantanagroup.link.shared.entities.ReportScheduleSummaryModel;
+import com.lantanagroup.link.shared.entities.ReportScheduleModel;
 import com.lantanagroup.link.shared.services.ReportClient;
 import com.lantanagroup.link.shared.utils.IssueSeverityUtils;
 import com.lantanagroup.link.shared.utils.LogUtils;
@@ -155,9 +155,9 @@ public class ValidationController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Report ID is required");
         }
 
-        ReportScheduleSummaryModel reportSummary;
+        ReportScheduleModel reportSummary;
         try {
-            reportSummary = reportClient.getReportScheduleSummaryModel(facilityId, reportId);
+            reportSummary = reportClient.getReportSchedule(reportId);
         } catch (Exception ex) {
             _logger.error("Unexpected error while retrieving report schedule summary model from report service: {}", ex.getMessage(), ex);
             throw ex;

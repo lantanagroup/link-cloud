@@ -1,6 +1,6 @@
 package com.lantanagroup.link.validation.entities;
 
-import com.lantanagroup.link.shared.entities.ReportScheduleSummaryModel;
+import com.lantanagroup.link.shared.entities.ReportScheduleModel;
 import lombok.Getter;
 import lombok.Setter;
 import org.hl7.fhir.r4.model.Device;
@@ -18,7 +18,7 @@ public class PreQualSummary {
     private List<Result> results = new ArrayList<>();
     private List<Category> categories = new ArrayList<>();
 
-    public PreQualSummary(ReportScheduleSummaryModel reportSummary) {
+    public PreQualSummary(ReportScheduleModel reportSummary) {
 
         if(reportSummary == null) {
             throw new IllegalArgumentException("ReportSummary cannot be null");

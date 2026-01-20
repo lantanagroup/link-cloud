@@ -83,6 +83,18 @@ link:
   reportability-predicate: com.lantanagroup.link.measureeval.reportability.IsInInitialPopulation
   cql-debug: false
 
+  report:
+    base-url: http://localhost:5110
+    routes:
+      submission-model:
+        path: /api/Report/Bundle/Patient
+        query:
+          - facilityId={facilityId}
+          - patientId={patientId}
+          - reportScheduleId={reportId}
+      report-schedules:
+        path: /api/schedules/{reportId}
+
 secret-management:
   key-vault-uri: ''
 

@@ -16,7 +16,7 @@ import java.util.TimeZone;
 
 @SpringBootApplication
 @EnableMongoAuditing
-@ComponentScan(basePackages = {"com.lantanagroup.link.measureeval", "com.lantanagroup.link.shared.logging", "com.lantanagroup.link.shared.health", "com.lantanagroup.link.shared.auth"} )
+@ComponentScan(basePackages = {"com.lantanagroup.link.measureeval", "com.lantanagroup.link.shared.logging", "com.lantanagroup.link.shared.health", "com.lantanagroup.link.shared.auth", "com.lantanagroup.link.shared.services"} )
 @ConfigurationPropertiesScan("com.lantanagroup.link.shared.config")
 public class MeasureEvalApplication {
     public static void main(String[] args) {
