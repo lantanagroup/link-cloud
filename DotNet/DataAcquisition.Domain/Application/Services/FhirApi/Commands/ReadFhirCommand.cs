@@ -3,11 +3,13 @@ using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
+using System.Net;
 using System.Net.Http.Headers;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
@@ -19,12 +21,13 @@ public record ReadFhirCommandRequest(
     string baseUrl,
     FhirQueryConfigurationModel fhirQueryConfiguration);
 
-public interface IReadFhirCommand 
-{     
+public interface IReadFhirCommand
+{
     Task<DomainResource> ExecuteAsync(
         ReadFhirCommandRequest request,
         CancellationToken cancellationToken = default);
 }
+
 public class ReadFhirCommand : IReadFhirCommand
 {
     private readonly ILogger<ReadFhirCommand> _logger;
@@ -49,21 +52,23 @@ public class ReadFhirCommand : IReadFhirCommand
 
     public async Task<DomainResource> ExecuteAsync(ReadFhirCommandRequest request, CancellationToken cancellationToken = default)
     {
-
         if (string.IsNullOrWhiteSpace(request.resourceId))
             throw new ArgumentNullException(nameof(request.resourceId), "Resource ID cannot be null or empty.");
 
         if (string.IsNullOrWhiteSpace(request.baseUrl))
             throw new ArgumentNullException(nameof(request.baseUrl), "FhirClient Endpoint cannot be null.");
 
-
         if (request.fhirQueryConfiguration == null)
             throw new ArgumentNullException(nameof(request.fhirQueryConfiguration), "FhirQueryConfiguration cannot be null.");
 
-
         using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.fhirQueryConfiguration.MaxConcurrentRequests.GetValueOrDefault(1), _distributedLockSettings.Expiration, cancellationToken))
         {
-            var fhirClient = new FhirClient(request.baseUrl.Trim('/'), _httpClient, new FhirClientSettings
+            // Create a new handler chain using a DelegatingHandler around a base HttpClientHandler
+            var innerHandler = new HttpClientHandler();
+            var headerCapturingHandler = new HeaderCapturingHandler { InnerHandler = innerHandler };
+            var httpClientWithHandler = new HttpClient(headerCapturingHandler);
+
+            var fhirClient = new FhirClient(request.baseUrl.Trim('/'), httpClientWithHandler, new FhirClientSettings
             {
                 PreferredFormat = ResourceFormat.Json
             });
@@ -73,7 +78,6 @@ public class ReadFhirCommand : IReadFhirCommand
             {
                 fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
             }
-
 
             string location = request.resourceType switch
             {
@@ -86,7 +90,24 @@ public class ReadFhirCommand : IReadFhirCommand
             var stopwatch = Stopwatch.StartNew();
             stopwatch.Start();
 
-            var readResource = await fhirClient.ReadAsync<DomainResource>(location);
+            DomainResource readResource;
+            try
+            {
+                readResource = await fhirClient.ReadAsync<DomainResource>(location);
+            }
+            catch (FhirOperationException ex) when (ex.Status == HttpStatusCode.TooManyRequests)
+            {
+				stopwatch.Stop();
+                _logger.LogDebug("Fhir Read Resource. FacilityId: {FacilityId}; ResourceType: {ResourceType}; ResourceId: {ResourceId}; Location: {Location}; ElapsedMilliseconds: {ElapsedMilliseconds}",
+					request.facilityId,
+					request.resourceType,
+					request.resourceId,
+					location,
+					stopwatch.ElapsedMilliseconds);
+					
+                var retryAfter = FhirCommandUtils.ParseRetryAfter(headerCapturingHandler.LastResponseHeaders);
+                throw new TooManyRequestsException($"Too many requests for {location}", retryAfter);
+            }
 
             stopwatch.Stop();
             _logger.LogDebug("Fhir Read Resource. FacilityId: {FacilityId}; ResourceType: {ResourceType}; ResourceId: {ResourceId}; Location: {Location}; ElapsedMilliseconds: {ElapsedMilliseconds}",

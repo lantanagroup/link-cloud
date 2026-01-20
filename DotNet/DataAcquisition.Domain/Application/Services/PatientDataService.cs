@@ -227,6 +227,8 @@ public class PatientDataService : IPatientDataService
             {
                 if (request.QueryPlanType == QueryPlanType.Initial)
                 {
+                    var priority = schedReport.Frequency == Frequency.Daily ? AcquisitionPriority.High : AcquisitionPriority.Normal;
+
                     try
                     {
                         await _dataAcquisitionLogManager.CreateAsync(
@@ -235,8 +237,8 @@ public class PatientDataService : IPatientDataService
                                 FacilityId = request.FacilityId,
                                 CorrelationId = request.CorrelationId,
                                 PatientId = request.ConsumeResult.Message.Value.PatientId,
+                                Priority = priority,
                                 ExecutionDate = System.DateTime.UtcNow,
-                                Priority = AcquisitionPriority.Normal,
                                 ReportableEvent = request.ConsumeResult.Message.Value.ReportableEvent,
                                 Status = RequestStatus.Pending,
                                 FhirVersion = "R4",
@@ -320,6 +322,11 @@ public class PatientDataService : IPatientDataService
                 if (log == null)
                 {
                     throw new ArgumentException($"Log with ID {request.logId} does not exist.");
+                }
+
+                if(log.ExecutionDate > DateTime.UtcNow)
+                {
+                    throw new ProcessingDelayException(@$"Log Exection Date {log.ExecutionDate} indicates a future processing time.");
                 }
 
                 //check to ensure that facilityId matches
@@ -413,7 +420,8 @@ public class PatientDataService : IPatientDataService
                             ResourceAcquiredIds = log.ResourceAcquiredIds,
                             RetryAttempts = log.RetryAttempts,
                             CompletionDate = log.CompletionDate,
-                            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
+                            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                            TraceId = log.TraceId,
                             ExecutionDate = log.ExecutionDate,
                             Notes = log.Notes,
                             Status = log.Status,
@@ -436,7 +444,8 @@ public class PatientDataService : IPatientDataService
                     ResourceAcquiredIds = log.ResourceAcquiredIds,
                     RetryAttempts = log.RetryAttempts,
                     CompletionDate = log.CompletionDate,
-                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
+                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                    TraceId = log.TraceId,
                     ExecutionDate = log.ExecutionDate,
                     Notes = log.Notes,
                     Status = log.Status,
@@ -459,11 +468,11 @@ public class PatientDataService : IPatientDataService
                 var resourceIds = new HashSet<string>();
 
                 bool skipFetch = false;
-                
+
                 //4. call api
                 foreach (var fhirQuery in log.FhirQuery.ToList())
                 {
-                    if(skipFetch)
+                    if (skipFetch)
                     {
                         break;
                     }
@@ -472,10 +481,10 @@ public class PatientDataService : IPatientDataService
                     if ((fhirQuery.QueryType == FhirQueryType.Search || fhirQuery.QueryType == FhirQueryType.SearchPost) && !log.IsCensus)
                     {
                         var idParams = fhirQuery.QueryParameters.Where(x => x.StartsWith("_id=", StringComparison.InvariantCultureIgnoreCase)).ToList();
-                        if(idParams.Any())
+                        if (idParams.Any())
                         {
                             var ids = new List<string>();
-                            foreach(var idParam in idParams)
+                            foreach (var idParam in idParams)
                             {
                                 var splitIds = idParam.Substring(4).Trim().Split(',');
                                 ids.AddRange(splitIds);
@@ -515,7 +524,7 @@ public class PatientDataService : IPatientDataService
                             {
                                 throw new NotSupportedException("Bulk Data is currently not supported.");
                             }
-                        } 
+                        }
                     }
                 }
 
@@ -533,11 +542,61 @@ public class PatientDataService : IPatientDataService
                     RetryAttempts = log.RetryAttempts,
                     ResourceAcquiredIds = log.ResourceAcquiredIds,
                     CompletionDate = log.CompletionDate,
-                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
+                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                    TraceId = log.TraceId,
                     ExecutionDate = log.ExecutionDate,
                     Notes = log.Notes,
                     Status = log.Status,
                 }, cancellationToken);
+            }
+            catch(ProcessingDelayException ex)
+            {
+                log!.Notes ??= new List<string>();
+
+                log.RetryAttempts ??= 0;
+
+                log.Status = RequestStatus.Pending;
+                log.Notes.Add(ex.Message);
+
+                await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                {
+                    Id = log.Id,
+                    RetryAttempts = log.RetryAttempts,
+                    ExecutionDate = log.ExecutionDate,
+                    Status = log.Status,
+                    Notes = log.Notes,
+                    ResourceAcquiredIds = log.ResourceAcquiredIds,
+                    CompletionDate = log.CompletionDate,
+                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                    TraceId = log.TraceId
+                }, cancellationToken);
+            }
+            catch (TooManyRequestsException ex)
+            {
+                _logger.LogWarning(ex, "Throttled by 429 for facility {FacilityId}", log.FacilityId.Sanitize());
+
+                log.Notes ??= new List<string>();
+
+                log.RetryAttempts ??= 0;
+
+                log.ExecutionDate = DateTime.UtcNow.Add(ex.RetryAfter);
+                log.Status = RequestStatus.Pending; //Don't count this as a failure
+                log.Notes.Add($"[{DateTime.UtcNow}] Throttled (429): Retrying after {ex.RetryAfter.TotalSeconds}s. Attempt {log.RetryAttempts}.");
+
+                await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                {
+                    Id = log.Id,
+                    RetryAttempts = log.RetryAttempts,
+                    ExecutionDate = log.ExecutionDate,
+                    Status = log.Status,
+                    Notes = log.Notes,
+                    ResourceAcquiredIds = log.ResourceAcquiredIds,
+                    CompletionDate = log.CompletionDate,
+                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                    TraceId = log.TraceId
+                }, cancellationToken);
+
+                await _dataAcquisitionLogManager.ThrottleFacilityAcquisitions(log.FacilityId, log.ExecutionDate.Value, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -553,7 +612,8 @@ public class PatientDataService : IPatientDataService
                     ResourceAcquiredIds = log.ResourceAcquiredIds,
                     RetryAttempts = log.RetryAttempts,
                     CompletionDate = log.CompletionDate,
-                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
+                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                    TraceId = log.TraceId,
                     ExecutionDate = log.ExecutionDate,
                     Notes = log.Notes,
                     Status = log.Status,
@@ -581,4 +641,3 @@ public class PatientDataService : IPatientDataService
         return true;
     }
 }
-
