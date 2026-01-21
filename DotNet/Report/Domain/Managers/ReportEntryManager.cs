@@ -82,7 +82,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             EvaluatedMeasureReport measureReportEntry = reportEntry.MeasureReportList.First(x => x.ReportType == consumerValue.ReportType);
 
             measureReportEntry.MeasureReportId = consumerValue.MeasureReportId;
-            measureReportEntry.MeasureReportFileName = consumerValue.MeasureReportFileName;
+            measureReportEntry.MeasureReportFileName = consumerValue.MeasureReportBlobName;
             measureReportEntry.MeasureReportUri = consumerValue.MeasureReportURI;
 
             if (consumerValue.IsReportable)

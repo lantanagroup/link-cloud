@@ -8,7 +8,7 @@
         public string ReportType { get; set; } = string.Empty;
         public string MeasureReportId { get; set; }
         public string MeasureReportURI { get; set; } = string.Empty;
-        public string MeasureReportFileName { get; set; } = string.Empty;
+        public string MeasureReportBlobName { get; set; } = string.Empty;
         public bool IsReportable { get; set; }
     }
 }
