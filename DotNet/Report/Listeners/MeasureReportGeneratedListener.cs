@@ -229,7 +229,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             try
             {
-                await _readyForValidationProducer.Produce(schedule.Id, schedule.ReportTypes, schedule.FacilityId, result.Message.Value.PatientId, aggregateResult.Uri.AbsolutePath, correlationId);
+                await _readyForValidationProducer.Produce(schedule.Id, schedule.ReportTypes, schedule.FacilityId, result.Message.Value.PatientId, aggregateResult.Uri.AbsoluteUri, correlationId);
             }
             catch (Exception ex)
             {
