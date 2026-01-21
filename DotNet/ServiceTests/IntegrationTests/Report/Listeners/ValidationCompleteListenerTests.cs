@@ -32,6 +32,7 @@ namespace IntegrationTests.Report
     [Trait("Category", "IntegrationTests")]
     public class ValidationCompleteListenerTests
     {
+        //TODO: To be worked on in LNK-4722
         //private readonly ReportIntegrationTestFixture _fixture;
         //private readonly ITestOutputHelper _output;
 

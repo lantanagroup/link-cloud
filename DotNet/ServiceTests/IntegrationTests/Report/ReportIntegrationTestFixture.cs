@@ -43,6 +43,7 @@ namespace IntegrationTests.Report
         private readonly AzuriteContainer _azuriteContainer;
         private readonly MongoDbContainer _mongoContainer;
 
+        //TODO: To be worked on in LNK-4722
         //// Public static mocks
         //public static Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> SubmitPayloadProducerMock { get; private set; }
         //public static Mock<IProducer<ReadyForValidationKey, ReadyForValidationValue>> ReadyForValidationProducerMock { get; private set; }

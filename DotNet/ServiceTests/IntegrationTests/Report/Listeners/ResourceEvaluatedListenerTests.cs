@@ -34,6 +34,7 @@ namespace IntegrationTests.Report
     [Trait("Category", "IntegrationTests")]
     public class ResourceEvaluatedListenerTests
     {
+        //TODO: To be worked on in LNK-4722
         //private readonly ReportIntegrationTestFixture _fixture;
         //private readonly ITestOutputHelper _output;
 
@@ -340,7 +341,7 @@ namespace IntegrationTests.Report
         //    var consumeResult = CreateConsumeResult(facilityId, schedule.Id, patientId, "TestReport", CreateResourceJson(measureReport), false);
 
         //    await listener.ProcessMessageAsync(consumeResult, default);
- 
+
         //    var queries = scope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
 
         //    var data = await queries.GetPatientReportData(facilityId, schedule.Id, patientId, entry.Id);
