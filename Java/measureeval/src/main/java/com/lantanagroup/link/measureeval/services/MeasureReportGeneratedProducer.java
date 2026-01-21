@@ -27,7 +27,8 @@ public class MeasureReportGeneratedProducer {
             PatientReportingEvaluationStatus patientStatus,
             PatientReportingEvaluationStatus.Report report,
             MeasureReport measureReport,
-            String payloadUri) {
+            String payloadUri,
+            String blobName) {
 
         if (patientStatus == null || report == null || report.getReportTrackingId() == null || measureReport == null || payloadUri == null) {
             throw new IllegalArgumentException("All parameters are required");
@@ -45,7 +46,6 @@ public class MeasureReportGeneratedProducer {
         }
 
         String reportUri = payloadUri.substring(0, lastSlashIndex);
-        String fileName = payloadUri.substring(lastSlashIndex + 1);
 
         MeasureReportGenerated value = new MeasureReportGenerated(
                 measureReport.getIdPart(),
@@ -54,7 +54,7 @@ public class MeasureReportGeneratedProducer {
                 patientStatus.getPatientId(),
                 report.getReportType(),
                 reportUri,
-                fileName,
+                blobName,
                 report.getReportable()
         );
 

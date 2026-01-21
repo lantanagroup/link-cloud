@@ -45,7 +45,7 @@ public class BlobStorageService {
         containerClient = serviceClient.getBlobContainerClient(blobContainerName);
     }
 
-    public void upload(String blobName, String content) {
+    public String upload(String blobName, String content) {
         // If it specifies protocol/host/port, then strip it down to just the path
         if (blobName.contains("://")) {
             URI uri = URI.create(blobName);
@@ -61,6 +61,8 @@ public class BlobStorageService {
 
         BlobClient client = containerClient.getBlobClient(blobName);
         client.upload(BinaryData.fromString(content), true);
+
+        return blobName;
     }
 
     public void storePatientInBlobStorage(PatientReportingEvaluationStatus status, MeasureReport measureReport) {
@@ -83,14 +85,16 @@ public class BlobStorageService {
             List<Resource> resources = this.normalize(measureReport);
 
             for (Resource resource : resources) {
-                String idLine = resource.getResourceType() + "/" + resource.getId();
+                String idLine = resource.getResourceType().toString() + "/" + resource.getIdPart();       // i.e. Condition/A
                 sb.append(idLine).append("\n");
                 sb.append(jsonParser.encodeResourceToString(resource)).append("\n");
             }
 
+            String blobName;
+
             try {
                 // Upload to ABS
-                this.upload(patientPayloadUri, sb.toString());
+                blobName = this.upload(patientPayloadUri, sb.toString());
                 logger.info("Uploaded patient {} payload for report {} to blob storage: {}", status.getPatientId(), report.getReportTrackingId(), patientPayloadUri);
             } catch (Exception ex) {
                 logger.error("Failed to upload patient payload to blob storage: {}", ex.getMessage(), ex);
@@ -98,7 +102,7 @@ public class BlobStorageService {
             }
 
             // Produce MeasureReportGenerated event
-            this.measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(status, report, measureReport, patientPayloadUri);
+            this.measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(status, report, measureReport, patientPayloadUri, blobName);
         }
     }
 

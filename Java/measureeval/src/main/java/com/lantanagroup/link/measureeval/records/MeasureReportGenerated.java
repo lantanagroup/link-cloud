@@ -21,6 +21,6 @@ public class MeasureReportGenerated {
 
     private String reportType;
     private String measureReportURI;
-    private String measureReportFileName;
+    private String measureReportBlobName;
     private boolean isReportable;
 }
