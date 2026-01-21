@@ -26,12 +26,10 @@ public class PreQualSummary {
 
         this.facilityId = reportSummary.getFacilityId();
         this.report = new Report();
-        this.report.setId(reportSummary.getReportId());
-        this.report.setMeasures(reportSummary.getMeasures());
-        this.report.setPeriodStart(reportSummary.getStartDate() != null ?
-                reportSummary.getStartDate().toString() : null);
-        this.report.setPeriodEnd(reportSummary.getEndDate() != null ?
-                reportSummary.getEndDate().toString() : null);
+        this.report.setId(reportSummary.getId());
+        this.report.setMeasures(reportSummary.getReportTypes());
+        this.report.setPeriodStart(reportSummary.getReportStartDate() != null ? reportSummary.getReportStartDate().toString() : null);
+        this.report.setPeriodEnd(reportSummary.getReportEndDate() != null ? reportSummary.getReportEndDate().toString() : null);
         this.report.setSubmittedTime(reportSummary.getSubmitReportDateTime());
     }
 }
