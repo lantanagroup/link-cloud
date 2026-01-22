@@ -33,6 +33,24 @@ public class QueryPlanManager : IQueryPlanManager
         _validator = validator ?? throw new ArgumentNullException(nameof(validator));
     }
 
+    /// <summary>
+    /// Returns a sanitized version of a value that is safe to include in log messages.
+    /// Removes newline characters to help prevent log forging.
+    /// </summary>
+    /// <param name="value">The original value.</param>
+    /// <returns>A logging-safe value.</returns>
+    private static string? SanitizeForLog(string? value)
+    {
+        if (value == null)
+        {
+            return null;
+        }
+
+        // Remove carriage return and line feed characters that can break log structure.
+        return value.Replace("\r", string.Empty)
+                    .Replace("\n", string.Empty);
+    }
+
     public async Task<QueryPlanModel> AddAsync(CreateQueryPlanModel model, CancellationToken cancellationToken = default)
     {
         if (model == null)
@@ -43,10 +61,12 @@ public class QueryPlanManager : IQueryPlanManager
         // Perform comprehensive validation
         var validationResult = _validator.ValidateQueryPlan(model.InitialQueries, model.SupplementalQueries);
 
+        var safeFacilityId = SanitizeForLog(model.FacilityId);
+
         if (!validationResult.IsValid)
         {
             _logger.LogError("Query Plan validation failed for facility {FacilityId}: {Errors}",
-                model.FacilityId,
+                safeFacilityId,
                 string.Join("; ", validationResult.Errors));
 
             throw new BadRequestException($"Query Plan validation failed: {validationResult.GetErrorMessage()}");
@@ -56,7 +76,7 @@ public class QueryPlanManager : IQueryPlanManager
         if (validationResult.Warnings.Any())
         {
             _logger.LogWarning("Query Plan validation warnings for facility {FacilityId}: {Warnings}",
-                model.FacilityId,
+                safeFacilityId,
                 string.Join("; ", validationResult.Warnings));
         }
 
@@ -79,7 +99,7 @@ public class QueryPlanManager : IQueryPlanManager
         await _database.QueryPlanRepository.SaveChangesAsync();
 
         _logger.LogInformation("Successfully created Query Plan for facility {FacilityId} with type {Type}",
-            model.FacilityId,
+            SanitizeForLog(model.FacilityId),
             model.Type);
 
         return QueryPlanModel.FromDomain(entity);
