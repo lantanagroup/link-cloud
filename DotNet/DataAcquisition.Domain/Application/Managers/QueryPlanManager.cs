@@ -145,7 +145,7 @@ public class QueryPlanManager : IQueryPlanManager
         {
             _logger.LogError("Query Plan validation failed for facility {FacilityId}: {Errors}",
                 SanitizeForLog(model.FacilityId),
-                string.Join("; ", validationResult.Errors));
+                string.Join("; ", SanitizeLogMessages(validationResult.Errors)));
 
             throw new BadRequestException($"Query Plan validation failed: {validationResult.GetErrorMessage()}");
         }
@@ -155,7 +155,7 @@ public class QueryPlanManager : IQueryPlanManager
         {
             _logger.LogWarning("Query Plan validation warnings for facility {FacilityId}: {Warnings}",
                 SanitizeForLog(model.FacilityId),
-                string.Join("; ", validationResult.Warnings));
+                string.Join("; ", SanitizeLogMessages(validationResult.Warnings)));
         }
 
         var existingQueryPlan = await _database.QueryPlanRepository.FirstOrDefaultAsync(
