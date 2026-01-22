@@ -9,7 +9,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Attributes;
 /// Validates that a dictionary of IQueryConfig contains valid entries with proper structure
 /// </summary>
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = false)]
-public class ValidateQueryConfigDictionaryAttribute : ValidationAttribute
+public class ValidateQueryPlanConfigDictionaryAttribute : ValidationAttribute
 {
     public override bool RequiresValidationContext => true;
 
@@ -123,8 +123,8 @@ public class ValidateQueryConfigDictionaryAttribute : ValidationAttribute
                         errors.Add($"Key '{key}': ResourceIdsParameter at index {i} must have a Resource.");
                     if (string.IsNullOrWhiteSpace(resourceIds.Paged))
                         errors.Add($"Key '{key}': ResourceIdsParameter at index {i} must have a Paged value.");
-                    else if (!string.IsNullOrWhiteSpace(resourceIds.Paged) && !int.TryParse(resourceIds.Paged, out _))
-                        errors.Add($"Key '{key}': ResourceIdsParameter at index {i} has invalid Paged value (must be 'true' or 'false').");
+                    else if (!int.TryParse(resourceIds.Paged, out _))
+                        errors.Add($"Key '{key}': ResourceIdsParameter at index {i} has invalid Paged value (must be a valid integer).");
                     break;
             }
         }

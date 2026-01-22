@@ -3,6 +3,7 @@ using DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -33,7 +34,8 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
     {
         var logger = new Mock<ILogger<QueryPlanManager>>().Object;
         var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
-        return new QueryPlanManager(database, logger);
+        IQueryPlanValidator validator = new Mock<QueryPlanValidator>().Object;
+        return new QueryPlanManager(database, logger, validator);
     }
 
     [Fact]
@@ -91,7 +93,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         var model = CreateInvalidOrderCreateQueryPlanModel(initialInvalid: true, supplementalInvalid: false);
 
         // Act & Assert
-        var ex = await Assert.ThrowsAsync<IncorrectQueryPlanOrderException>(() => manager.AddAsync(model));
+        var ex = await Assert.ThrowsAsync<BadRequestException>(() => manager.AddAsync(model));
         Assert.Contains("InitialQueries", ex.Message);
     }
 
@@ -104,7 +106,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         var model = CreateInvalidOrderCreateQueryPlanModel(initialInvalid: false, supplementalInvalid: true);
 
         // Act & Assert
-        var ex = await Assert.ThrowsAsync<IncorrectQueryPlanOrderException>(() => manager.AddAsync(model));
+        var ex = await Assert.ThrowsAsync<BadRequestException>(() => manager.AddAsync(model));
         Assert.Contains("SupplementalQueries", ex.Message);
     }
 
@@ -143,7 +145,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
     }
 
     [Fact]
-    public async Task AddAsync_EmptyQueries_Valid()
+    public async Task AddAsync_EmptyInitialAndSupplementalQueries_ThrowsBadRequestException()
     {
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
@@ -152,13 +154,11 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         model.InitialQueries = new Dictionary<string, IQueryConfig>();
         model.SupplementalQueries = new Dictionary<string, IQueryConfig>();
 
-        // Act
-        var result = await manager.AddAsync(model);
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<BadRequestException>(() => manager.AddAsync(model));
 
-        // Assert
-        Assert.NotNull(result);
-        Assert.Empty(result.InitialQueries);
-        Assert.Empty(result.SupplementalQueries);
+        Assert.Contains("InitialQueries cannot be null or empty", ex.Message);
+        Assert.Contains("SupplementalQueries cannot be null or empty", ex.Message);
     }
 
     [Fact]
@@ -171,8 +171,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         model.InitialQueries = null;
 
         // Act & Assert
-        var ex = await Assert.ThrowsAsync<DbUpdateException>(() => manager.AddAsync(model));
-        Assert.Contains("NOT NULL constraint failed: queryPlan.InitialQueries", ex.InnerException.Message);
+        var ex = await Assert.ThrowsAsync<BadRequestException>(() => manager.AddAsync(model));
     }
 
     [Fact]
@@ -185,8 +184,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         model.SupplementalQueries = null;
 
         // Act & Assert
-        var ex = await Assert.ThrowsAsync<DbUpdateException>(() => manager.AddAsync(model));
-        Assert.Contains("NOT NULL constraint failed: queryPlan.SupplementalQueries", ex.InnerException.Message);
+        var ex = await Assert.ThrowsAsync<BadRequestException>(() => manager.AddAsync(model));
     }
 
     [Fact]
@@ -260,7 +258,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         var model = CreateInvalidOrderUpdateQueryPlanModel(initialInvalid: true, supplementalInvalid: false);
 
         // Act & Assert
-        var ex = await Assert.ThrowsAsync<IncorrectQueryPlanOrderException>(() => manager.UpdateAsync(model));
+        var ex = await Assert.ThrowsAsync<BadRequestException>(() => manager.UpdateAsync(model));
         Assert.Contains("InitialQueries", ex.Message);
     }
 
@@ -273,7 +271,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         var model = CreateInvalidOrderUpdateQueryPlanModel(initialInvalid: false, supplementalInvalid: true);
 
         // Act & Assert
-        var ex = await Assert.ThrowsAsync<IncorrectQueryPlanOrderException>(() => manager.UpdateAsync(model));
+        var ex = await Assert.ThrowsAsync<BadRequestException>(() => manager.UpdateAsync(model));
         Assert.Contains("SupplementalQueries", ex.Message);
     }
 
@@ -291,7 +289,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         var model = CreateValidUpdateQueryPlanModel();
 
         // Act & Assert
-        await Assert.ThrowsAsync<NotFoundException>(() => manager.UpdateAsync(model));
+        await Assert.ThrowsAsync<BadRequestException>(() => manager.UpdateAsync(model));
     }
 
     [Fact]
@@ -367,7 +365,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
     }
 
     [Fact]
-    public async Task UpdateAsync_EmptyQueries_Valid()
+    public async Task UpdateAsync_EmptyQueries_Invalid()
     {
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
@@ -396,12 +394,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         model.SupplementalQueries = new Dictionary<string, IQueryConfig>();
 
         // Act
-        var result = await manager.UpdateAsync(model);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Empty(result.InitialQueries);
-        Assert.Empty(result.SupplementalQueries);
+        var ex = await Assert.ThrowsAsync<BadRequestException>(() => manager.UpdateAsync(model));
     }
 
     [Fact]
@@ -433,8 +426,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         model.InitialQueries = null;
 
         // Act & Assert
-        var ex = await Assert.ThrowsAsync<DbUpdateException>(() => manager.UpdateAsync(model));
-        Assert.Contains("NOT NULL constraint failed: queryPlan.InitialQueries", ex.InnerException.Message);
+        var ex = await Assert.ThrowsAsync<BadRequestException>(() => manager.UpdateAsync(model));
     }
 
     [Fact]
@@ -466,8 +458,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         model.SupplementalQueries = null;
 
         // Act & Assert
-        var ex = await Assert.ThrowsAsync<DbUpdateException>(() => manager.UpdateAsync(model));
-        Assert.Contains("NOT NULL constraint failed: queryPlan.SupplementalQueries", ex.InnerException.Message);
+        var ex = await Assert.ThrowsAsync<BadRequestException>(() => manager.UpdateAsync(model));
     }
 
     [Fact]
@@ -666,8 +657,37 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         var model = CreateValidCreateQueryPlanModel();
         model.InitialQueries = new Dictionary<string, IQueryConfig>
         {
-            { "1", new ParameterQueryConfig { ResourceType = "Patient", Parameters = new List<IParameter> { new LiteralParameter { Name = "id", Literal = "123" } } } },
-            { "2", new ParameterQueryConfig { ResourceType = "Encounter", Parameters = new List<IParameter> { new ResourceIdsParameter { Name = "patient", Resource = "Patient" } } } }
+            { 
+                "1", 
+                new ParameterQueryConfig 
+                { 
+                    ResourceType = "Patient", 
+                    Parameters = new List<IParameter> 
+                    { 
+                        new LiteralParameter 
+                        { 
+                            Name = "id", 
+                            Literal = "123"
+                        } 
+                    } 
+                } 
+            },
+            { 
+                "2", 
+                new ParameterQueryConfig 
+                { 
+                    ResourceType = "Encounter", 
+                    Parameters = new List<IParameter> 
+                    { 
+                        new ResourceIdsParameter 
+                        { 
+                            Name = "patient", 
+                            Resource = "Patient",
+                            Paged = "50"
+                        } 
+                    } 
+                } 
+            }
         };
         return model;
     }
@@ -731,7 +751,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         model.InitialQueries = new Dictionary<string, IQueryConfig>
         {
             { "1", new ParameterQueryConfig { ResourceType = "Patient", Parameters = new List<IParameter> { new LiteralParameter { Name = "id", Literal = "123" } } } },
-            { "2", new ParameterQueryConfig { ResourceType = "Encounter", Parameters = new List<IParameter> { new ResourceIdsParameter { Name = "patient", Resource = "Patient" } } } }
+            { "2", new ParameterQueryConfig { ResourceType = "Encounter", Parameters = new List<IParameter> { new ResourceIdsParameter { Name = "patient", Resource = "Patient", Paged = "50" } } } }
         };
         return model;
     }

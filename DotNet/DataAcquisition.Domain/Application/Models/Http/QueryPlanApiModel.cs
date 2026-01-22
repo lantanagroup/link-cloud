@@ -35,13 +35,13 @@ public class QueryPlanApiModel : IValidatableObject
     [DataMember]
     [Required(ErrorMessage = "InitialQueries is required.")]
     [MinDictionaryCount(1, ErrorMessage = "InitialQueries must contain at least one query configuration.")]
-    [ValidateQueryConfigDictionary]
+    [ValidateQueryPlanConfigDictionary]
     public Dictionary<string, IQueryConfig> InitialQueries { get; set; } = new();
 
     [DataMember]
     [Required(ErrorMessage = "SupplementalQueries is required.")]
     [MinDictionaryCount(1, ErrorMessage = "SupplementalQueries must contain at least one query configuration.")]
-    [ValidateQueryConfigDictionary]
+    [ValidateQueryPlanConfigDictionary]
     public Dictionary<string, IQueryConfig> SupplementalQueries { get; set; } = new();
 
     [IgnoreDataMember, JsonIgnore]

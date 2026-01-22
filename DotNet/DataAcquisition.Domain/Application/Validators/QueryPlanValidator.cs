@@ -345,13 +345,20 @@ public class QueryPlanValidator : IQueryPlanValidator
             result.Errors.Add($"{prefix}: Resource value '{parameter.Resource}' is not a valid FHIR ResourceType.");
         }
 
-
+        if (!string.IsNullOrWhiteSpace(parameter.Paged))
+        {
             if (!int.TryParse(parameter.Paged, out int pagedVal))
             {
                 result.IsValid = false;
                 result.Errors.Add($"{prefix}: Paged value '{parameter.Paged}' is not a valid int.");
             }
-        
+            else if (pagedVal < 0)
+            {
+                result.IsValid = false;
+                result.Errors.Add($"{prefix}: Paged value cannot be negative.");
+            }
+        }
+
     }
 
     private void ValidateParameterName(
@@ -417,6 +424,7 @@ public class QueryPlanValidator : IQueryPlanValidator
             result.IsValid = false;
             result.Errors.Add($"{prefix}: OperationType value '{config.OperationType}' is not a valid OperationType enum value.");
         }
+
 
         // Validate Paged value
         if (config.Paged < 0)
