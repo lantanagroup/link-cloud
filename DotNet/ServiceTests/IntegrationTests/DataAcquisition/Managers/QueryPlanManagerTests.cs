@@ -289,7 +289,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         var model = CreateValidUpdateQueryPlanModel();
 
         // Act & Assert
-        await Assert.ThrowsAsync<BadRequestException>(() => manager.UpdateAsync(model));
+        await Assert.ThrowsAsync<NotFoundException>(() => manager.UpdateAsync(model));
     }
 
     [Fact]

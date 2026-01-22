@@ -4,6 +4,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
@@ -64,7 +65,7 @@ namespace IntegrationTests.DataAcquisition
 
                     // Register IDatabase implementation
                     services.AddScoped<LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase, LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Database>();
-
+                    services.AddScoped<IQueryPlanValidator, QueryPlanValidator>();
                     services.AddTransient<IDataAcquisitionLogService, DataAcquisitionLogService>();
 
                     // Register managers                    
@@ -84,7 +85,6 @@ namespace IntegrationTests.DataAcquisition
                     // Mock Kafka producers for integration tests
                     services.AddSingleton<IProducer<long, ReadyToAcquire>>(ReadyToAcquireProducerMock.Object);
                     services.AddSingleton<IProducer<string, ResourceAcquired>>(ResourceAcquiredProducerMock.Object);
-
 
                     services.Configure<ServiceRegistry>(options =>
                     {
