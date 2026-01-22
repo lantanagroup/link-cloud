@@ -236,7 +236,7 @@
         <div class="form-input">
           <mat-form-field appearance="outline" class="subject-input form-input ">
             <mat-label>Password</mat-label>
-            <input matInput formControlName="password" [readonly]="viewOnly" placeholder="Password">
+            <input matInput formControlName="password" type="password" [readonly]="viewOnly" placeholder="Password">
             @if (passwordControl.value && !viewOnly) {
               <button matSuffix mat-icon-button aria-label="Clear" (click)="clearPassword()">
                 <mat-icon>close</mat-icon>

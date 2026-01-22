@@ -104,6 +104,9 @@
       </mat-paginator>
     </div>
   }
+  @else {
+    <ng-container *ngTemplateOutlet="noResultsFoundTemplate"></ng-container>
+  }
   <ng-template #noResultsFoundTemplate>
     <div class="no-results">
       <h2 class="no-results-title">No Reports Found</h2>
