@@ -51,6 +51,32 @@ public class QueryPlanManager : IQueryPlanManager
                     .Replace("\n", string.Empty);
     }
 
+    /// <summary>
+    /// Sanitizes log messages derived from user input to prevent log forging by removing line breaks.
+    /// </summary>
+    /// <param name="messages">The collection of messages to sanitize.</param>
+    /// <returns>An enumerable of sanitized messages.</returns>
+    private static IEnumerable<string> SanitizeLogMessages(IEnumerable<string> messages)
+    {
+        if (messages == null)
+        {
+            yield break;
+        }
+
+        foreach (var message in messages)
+        {
+            if (message == null)
+            {
+                continue;
+            }
+
+            // Replace carriage returns and newlines with spaces to keep each log entry on a single line.
+            yield return message
+                .Replace("\r", " ")
+                .Replace("\n", " ");
+        }
+    }
+
     public async Task<QueryPlanModel> AddAsync(CreateQueryPlanModel model, CancellationToken cancellationToken = default)
     {
         if (model == null)
@@ -67,7 +93,7 @@ public class QueryPlanManager : IQueryPlanManager
         {
             _logger.LogError("Query Plan validation failed for facility {FacilityId}: {Errors}",
                 safeFacilityId,
-                string.Join("; ", validationResult.Errors));
+                string.Join("; ", SanitizeLogMessages(validationResult.Errors)));
 
             throw new BadRequestException($"Query Plan validation failed: {validationResult.GetErrorMessage()}");
         }
@@ -77,7 +103,7 @@ public class QueryPlanManager : IQueryPlanManager
         {
             _logger.LogWarning("Query Plan validation warnings for facility {FacilityId}: {Warnings}",
                 safeFacilityId,
-                string.Join("; ", validationResult.Warnings));
+                string.Join("; ", SanitizeLogMessages(validationResult.Warnings)));
         }
 
         var date = DateTime.UtcNow;
@@ -118,7 +144,7 @@ public class QueryPlanManager : IQueryPlanManager
         if (!validationResult.IsValid)
         {
             _logger.LogError("Query Plan validation failed for facility {FacilityId}: {Errors}",
-                model.FacilityId,
+                SanitizeForLog(model.FacilityId),
                 string.Join("; ", validationResult.Errors));
 
             throw new BadRequestException($"Query Plan validation failed: {validationResult.GetErrorMessage()}");
@@ -128,7 +154,7 @@ public class QueryPlanManager : IQueryPlanManager
         if (validationResult.Warnings.Any())
         {
             _logger.LogWarning("Query Plan validation warnings for facility {FacilityId}: {Warnings}",
-                model.FacilityId,
+                SanitizeForLog(model.FacilityId),
                 string.Join("; ", validationResult.Warnings));
         }
 
@@ -150,7 +176,7 @@ public class QueryPlanManager : IQueryPlanManager
         await _database.QueryPlanRepository.SaveChangesAsync();
 
         _logger.LogInformation("Successfully updated Query Plan for facility {FacilityId} with type {Type}",
-            model.FacilityId,
+            SanitizeForLog(model.FacilityId),
             model.Type);
 
         return QueryPlanModel.FromDomain(existingQueryPlan);
@@ -170,7 +196,7 @@ public class QueryPlanManager : IQueryPlanManager
         await _database.QueryPlanRepository.SaveChangesAsync();
 
         _logger.LogInformation("Successfully deleted Query Plan for facility {FacilityId} with type {Type}",
-            facilityId,
+            SanitizeForLog(facilityId),
             type);
     }
 
@@ -189,11 +215,11 @@ public class QueryPlanManager : IQueryPlanManager
             await _database.QueryPlanRepository.SaveChangesAsync(cancellationToken);
             _logger.LogInformation("Successfully deleted {Count} Query Plans for facility {FacilityId}",
                 facilityPlans.Count,
-                facilityId);
+                SanitizeForLog(facilityId));
         }
         else
         {
-            _logger.LogInformation("No Query Plans found to delete for facility {FacilityId}", facilityId);
+            _logger.LogInformation("No Query Plans found to delete for facility {FacilityId}", SanitizeForLog(facilityId));
         }
     }
 }
