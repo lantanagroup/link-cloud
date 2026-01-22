@@ -184,7 +184,7 @@ namespace LantanaGroup.Link.Report.Listeners
             var correlationId = Encoding.UTF8.GetString(headerValue);
 
             var reportEntry = await reportEntryManager.UpdateAsyncWithConsumerResult(result.Message.Value);
-            var readyForValidation = reportEntry.MeasureReportList.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable || x.Status == Domain.Enums.MeasureReportStatus.ReadyForValidation);
+            var readyForAggregation = reportEntry.MeasureReportList.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable || x.Status == Domain.Enums.MeasureReportStatus.ReadyForValidation);
 
 
             var schedule = await reportScheduledManager.GetReportSchedule(result.Message.Value.FacilityId, result.Message.Value.ReportTrackingId, cancellationToken);
@@ -194,7 +194,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 throw new DeadLetterException($"{Name}: No scheduled report record was found (ReportId = {result.Message.Value.ReportTrackingId}, FacilityId = {result.Message.Value.FacilityId}).");
             }
 
-            if (!readyForValidation)
+            if (!readyForAggregation)
             {
                 await _reportManifestProducer.Produce(schedule, correlationId);
                 return;
@@ -225,6 +225,11 @@ namespace LantanaGroup.Link.Report.Listeners
                 }
 
                 await reportPopulationManager.UpdateAsyncWithAggregateResult(populationModel, aggregateMeasureReport, cancellationToken);
+            }
+
+            if (reportEntry.MeasureReportList.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable)) {
+                await reportEntryManager.UpdateAsyncNotReportableEntry(reportEntry, cancellationToken);
+                return;
             }
 
             try

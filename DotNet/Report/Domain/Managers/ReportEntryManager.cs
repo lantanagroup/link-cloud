@@ -31,6 +31,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         Task<ReportEntry> UpdateAsyncWithConsumerResult(MeasureReportGeneratedValue consumerValue);
 
         Task<ReportEntry> UpdateAsyncWithAggregateResult(ReportEntry entry, AggregateResult aggregateResult, CancellationToken cancellationToken = default);
+        Task<ReportEntry> UpdateAsyncNotReportableEntry(ReportEntry entry, CancellationToken cancellationToken = default);
     }
 
     public class ReportEntryManager : IReportEntryManager
@@ -110,6 +111,18 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             {
                 entry.MeasureReportList.First(x => x.ReportType == measureReportResult.ReportType).ResourceCount = measureReportResult.ResourceCount;
             }
+
+            _database.ReportEntryRepository.Update(entry);
+            await _database.SaveChangesAsync();
+
+            return entry;
+        }
+
+        public async Task<ReportEntry> UpdateAsyncNotReportableEntry(ReportEntry entry, CancellationToken cancellationToken = default) 
+        {
+            entry.ReportingStatus = ReportingStatus.NotReportable;
+            entry.SubmissionStatus = SubmissionStatus.NotEligable;
+            entry.ModifyDate = DateTime.UtcNow;
 
             _database.ReportEntryRepository.Update(entry);
             await _database.SaveChangesAsync();
