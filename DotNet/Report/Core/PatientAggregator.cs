@@ -80,7 +80,7 @@ namespace LantanaGroup.Link.Report.Core
             using (Stream write_stream = await writeBlobClient.OpenWriteAsync(true))
             using (StreamWriter writer = new StreamWriter(write_stream))
             {
-                foreach (var measureReportEntry in entry.MeasureReportList)
+                foreach (var measureReportEntry in entry.MeasureReportList.Where(x => x.Status == MeasureReportStatus.ReadyForValidation))
                 {
                     BlockBlobClient readBlobClient = _containerClient.GetBlockBlobClient(measureReportEntry.MeasureReportFileName);
                     var aggregateMeasureReport = new AggregateMeasureReportResult() { ReportType = measureReportEntry.ReportType };
