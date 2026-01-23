@@ -357,6 +357,7 @@ public class QueryPlanValidator : IQueryPlanValidator
                 result.IsValid = false;
                 result.Errors.Add($"{prefix}: Paged value cannot be negative.");
             }
+            pagedCount++;
         }
 
     }
