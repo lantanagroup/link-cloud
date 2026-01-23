@@ -28,6 +28,20 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
     {
         using var activity = Activity.Current?.Source.StartActivity();
         activity?.AddTag(DiagnosticNames.FacilityId, model.FacilityId);
+        
+        if (string.IsNullOrEmpty(model.FacilityId))
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "FacilityId cannot be empty or null");
+            logger.LogError("Sftp Acquisition Log FacilityId cannot be empty or null");
+            throw new MissingFacilityIdException($"A facility must be specified in order to create a SFTP Acquisition Log: Missing {nameof(model.FacilityId)}");
+        }
+        
+        if(string.IsNullOrEmpty(model.FileName))
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "FileName cannot be empty or null");
+            logger.LogError("Sftp Acquisition Log FileName cannot be empty or null");
+            throw new ArgumentException("FileName cannot be empty or null", nameof(model.FileName));
+        }
 
         // Ensure the process date is set sometime in the future
         if (model.ProcessDate.ToUniversalTime() <= DateTime.UtcNow)
@@ -35,6 +49,18 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
             activity?.SetStatus(ActivityStatusCode.Error, "ProcessDate cannot be in the past.");
             activity?.AddTag("sftp.acquisition.log", JsonSerializer.Serialize(model, LinkFhirSerializerOptions.ActivityTagging));
             throw new ArgumentException("ProcessDate cannot be in the past.");
+        }
+        
+        // Ensure no existing log for the same facility, filename, and process date
+        var existingLog = await database.SftpAcquisitionLogRepository
+            .FirstOrDefaultAsync(x => x.FacilityId == model.FacilityId &&
+                                       x.FileName == model.FileName &&
+                                       x.ProcessDate == model.ProcessDate.ToUniversalTime(), cancellationToken);  
+        
+        if (existingLog is not null)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "SFTP Acquisition log already exists for the given FacilityId, FileName, and ProcessDate.");
+            throw new ArgumentException("SFTP Acquisition log already exists for the given FacilityId, FileName, and ProcessDate.");
         }
 
         try
@@ -81,6 +107,13 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
             logger.LogError("Sftp Acquisition Log FacilityId cannot be empty or null");
             throw new MissingFacilityIdException(nameof(model.FacilityId));
         }
+        
+        if(string.IsNullOrEmpty(model.FileName))
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "FileName cannot be empty or null");
+            logger.LogError("Sftp Acquisition Log FileName cannot be empty or null");
+            throw new ArgumentException("FileName cannot be empty or null", nameof(model.FileName));
+        }
 
         var existingLog = await database.SftpAcquisitionLogRepository.FirstOrDefaultAsync(x => x.ExternalId == model.ExternalId, cancellationToken);
         
@@ -101,6 +134,7 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
         try
         {
             // Update existing log entry
+            existingLog.FileName = model.FileName;
             existingLog.EncounterCount = model.EncounterCount;
             existingLog.PatientCount = model.PatientCount;
             existingLog.ProcessDate = model.ProcessDate.ToUniversalTime();
