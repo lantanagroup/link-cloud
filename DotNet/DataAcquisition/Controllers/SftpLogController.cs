@@ -1,9 +1,11 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
+using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
@@ -20,15 +22,17 @@ public class SftpLogController : ControllerBase
     private readonly ILogger<SftpLogController> _logger;
     private readonly ISftpAcquisitionLogManager _manager;
     private readonly ISftpAcquisitionLogQueries _queries;
+    private readonly ITenantApiService _tenantApiService;
 
     private const int DefaultLogPageSize = 20;
     private const string DefaultSortBy = "ProcessDate";
     
-    public SftpLogController(ILogger<SftpLogController> logger, ISftpAcquisitionLogManager manager, ISftpAcquisitionLogQueries queries)
+    public SftpLogController(ILogger<SftpLogController> logger, ISftpAcquisitionLogManager manager, ISftpAcquisitionLogQueries queries, ITenantApiService tenantApiService)
     {
         _logger = logger;
         _manager = manager;
         _queries = queries;
+        _tenantApiService = tenantApiService;
     }
     
     /// <summary>
@@ -88,7 +92,7 @@ public class SftpLogController : ControllerBase
         // Validate log ID
         if (string.IsNullOrWhiteSpace(logId) || !Guid.TryParse(logId, out var id))
         {
-            return BadRequest("Invalid log ID.");
+            return BadRequest("Invalid SFTP Acquisition log ID.");
         }
         
         // Store httpContext so that it is not lost during processing
@@ -128,13 +132,30 @@ public class SftpLogController : ControllerBase
     {
         // Store httpContext so that it is not lost during processing
         var httpContext = HttpContext;
+        
+        // validate user access to organization before proceeding - future enhancement
 
         try
         {
+            // Sanitize organizationId
+            var organizationId = req.FacilityId.SanitizeAndRemove();
+
+            // Verify that the facility/organization exists
+            var facilityExists = await _tenantApiService.CheckFacilityExists(organizationId, cancellationToken);
+
+            if (!facilityExists)
+            {
+                return BadRequest($"No facility found for organizationId: {organizationId}");
+            }
+
             var createdLog = await _manager.CreateAsync(req.ToModel(), cancellationToken);
 
             return Created($"/api/data/sftp-logs/{createdLog.ExternalId}", createdLog);
 
+        }
+        catch (MissingFacilityIdException ex)
+        {
+            return BadRequest(ex.Message);
         }
         catch (ArgumentException ex)
         {
@@ -173,6 +194,11 @@ public class SftpLogController : ControllerBase
             return BadRequest("Invalid log ID.");
         }
         
+        if (id == Guid.Empty)
+        {
+            return BadRequest("Invalid SFTP Acquisition Log Id.");
+        }
+        
         // Validate the request model id matches the id in the url
         if (req.ExternalId != id)
         {
@@ -182,6 +208,8 @@ public class SftpLogController : ControllerBase
         
         // Store httpContext so that it is not lost during processing
         var httpContext = HttpContext;
+        
+        // validate user access to organization before proceeding - future enhancement
 
         try
         {
@@ -190,6 +218,10 @@ public class SftpLogController : ControllerBase
             return Accepted(updatedLog);
         }
         catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (MissingFacilityIdException ex)
         {
             return BadRequest(ex.Message);
         }
