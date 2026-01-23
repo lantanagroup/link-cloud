@@ -34,4 +34,10 @@ public class FhirQueryConfigurationModel
             ModifyDate = entity.ModifyDate
         };
     }
+
+    public int GetMaxConcurrentRequestsOrDefault()
+    {
+        int value = MaxConcurrentRequests.GetValueOrDefault();
+        return value < 1 ? 1 : value;
+    }
 }
