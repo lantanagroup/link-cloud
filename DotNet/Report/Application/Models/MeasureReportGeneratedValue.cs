@@ -9,6 +9,6 @@
         public string MeasureReportId { get; set; }
         public string MeasureReportURI { get; set; } = string.Empty;
         public string MeasureReportBlobName { get; set; } = string.Empty;
-        public bool IsReportable { get; set; }
+        public bool Reportable { get; set; }
     }
 }

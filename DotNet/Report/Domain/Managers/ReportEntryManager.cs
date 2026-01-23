@@ -86,7 +86,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             measureReportEntry.MeasureReportFileName = consumerValue.MeasureReportBlobName;
             measureReportEntry.MeasureReportUri = consumerValue.MeasureReportURI;
 
-            if (consumerValue.IsReportable)
+            if (consumerValue.Reportable)
             {
                 measureReportEntry.Status = MeasureReportStatus.ReadyForValidation;
             }
