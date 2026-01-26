@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY --chown=mvn:mvn pom.xml ./
 COPY --chown=mvn:mvn shared/pom.xml shared/
+COPY --chown=mvn:mvn hapi/pom.xml hapi/
 COPY --chown=mvn:mvn measureeval/pom.xml measureeval/
 COPY --chown=mvn:mvn validation/pom.xml validation/
 RUN mvn -pl validation -am dependency:go-offline

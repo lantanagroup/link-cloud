@@ -1,7 +1,8 @@
-using System.Text;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.AspNetCore.Mvc.Formatters;
+using System.Text;
 
 namespace LantanaGroup.Link.Terminology.Application.Formatters;
 
@@ -59,10 +60,7 @@ public class FhirOutputFormatter : TextOutputFormatter
         
         if (resource == null) return;
         
-        var serializerOptions = new System.Text.Json.JsonSerializerOptions()
-            .ForFhir()
-            .UsingMode(DeserializerModes.Ostrich); 
-        await System.Text.Json.JsonSerializer.SerializeAsync(response.Body, resource, serializerOptions);
+        await System.Text.Json.JsonSerializer.SerializeAsync(response.Body, resource, LinkFhirSerializerOptions.ForFhirLenientSerialization);
 
         await response.Body.FlushAsync();
     }

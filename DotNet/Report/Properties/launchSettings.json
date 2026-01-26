@@ -1,14 +1,5 @@
 {
   "profiles": {
-    "Docker": {
-      "commandName": "Docker",
-      "launchUrl": "{Scheme}://{ServiceHost}:{ServicePort}",
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      },
-      "publishAllPorts": true,
-      "useSSL": true
-    },
     "ConsoleApp": {
       "commandName": "Project",
       "environmentVariables": {
@@ -17,20 +8,22 @@
       "applicationUrl": "http://localhost:5110;https://localhost:7110",
       "dotnetRunMessages": true
     },
-    "IISExpress": {
-      "commandName": "IISExpress",
+    "http-docker": {
+      "commandName": "Project",
+      "launchBrowser": false,
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Docker",
+        "KafkaConnection__BootstrapServers__0": "localhost:9094",
+        "MongoDB__ConnectionString": "mongodb://localhost:17017",
+        "ConnectionStrings__Redis": "localhost:6379",
+        "InternalBlobStorage__ConnectionString": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://localhost:10000/devstoreaccount1",
+        "Serilog__WriteTo__0__Args__uri": "http://localhost:3100",
+        "Telemetry__OtelCollectorEndpoint": "http://localhost:4317",
+        "ServiceRegistry__TenantService__TenantServiceUrl": "http://localhost:8074",
+        "ServiceRegistry__CensusServiceUrl": "http://localhost:8064"
       },
-      "ancmHostingModel": "OutOfProcess"
-    }
-  },
-  "iisSettings": {
-    "windowsAuthentication": false,
-    "anonymousAuthentication": true,
-    "iisExpress": {
-      "applicationUrl": "http://localhost:5110",
-      "sslPort": 0
+      "dotnetRunMessages": true,
+      "applicationUrl": "http://localhost:8072"
     }
   }
 }

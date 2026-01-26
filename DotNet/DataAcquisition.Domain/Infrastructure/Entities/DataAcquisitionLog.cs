@@ -9,7 +9,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 [Table("DataAcquisitionLog")]
 public class DataAcquisitionLog
 {
-    public const int MaxRetryAttempts = 1;
+    public const int MaxRetryAttempts = 5;
 
     [Required]
     public string FacilityId { get; set; }

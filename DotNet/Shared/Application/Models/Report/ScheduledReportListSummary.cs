@@ -12,10 +12,13 @@ public class ScheduledReportListSummary
     public DateTime? SubmitDate { get; set; }
     public List<string> ReportTypes { get; set; } = [];
     public Frequency Frequency { get; set; }
+    
+    public AdHocType? AdHocType { get; set; }
     public int CensusCount { get; set; }
     public int InitialPopulationCount { get; set; }
     public ScheduledReportMetrics? ReportMetrics { get; set; }
     public string? PayloadRootUri { get; set; }
+    public DateTime? CreatedDate { get; set; }
 }
 
 public class ScheduledReportMetrics

@@ -1,5 +1,5 @@
 import {Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges} from '@angular/core';
-import {CommonModule, NgForOf, NgIf} from '@angular/common';
+
 import {
   AbstractControlOptions,
   FormControl,
@@ -41,10 +41,8 @@ import {MatCheckboxModule} from "@angular/material/checkbox";
     MatToolbarModule,
     MatSelectModule,
     FormsModule,
-    MatCheckboxModule,
-    NgForOf,
-    NgIf
-  ],
+    MatCheckboxModule
+],
   templateUrl: './data-acquisition-fhir-query-config-form.component.html',
   styleUrls: ['./data-acquisition-fhir-query-config-form.component.scss']
 })

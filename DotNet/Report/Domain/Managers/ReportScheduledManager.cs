@@ -25,8 +25,6 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         Task<ReportSchedule?> SingleOrDefaultAsync(
             Expression<Func<ReportSchedule, bool>> predicate,
             CancellationToken cancellationToken = default);
-        
-        Task<(List<ReportSchedule>, PaginationMetadata metadata)> SearchAsync(Expression<Func<ReportSchedule, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
 
         Task<PagedConfigModel<ScheduledReportListSummary>> GetScheduledReportSummaries(
             Expression<Func<ReportSchedule, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber,
@@ -57,14 +55,6 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         public async Task<ReportSchedule?> SingleOrDefaultAsync(Expression<Func<ReportSchedule, bool>> predicate, CancellationToken cancellationToken = default)
         {
             return await _database.ReportScheduledRepository.SingleOrDefaultAsync(predicate, cancellationToken);
-        }
-
-        public async Task<(List<ReportSchedule>, PaginationMetadata metadata)> SearchAsync(Expression<Func<ReportSchedule, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageNumber, int pageSize,
-            CancellationToken cancellationToken = default)
-        {
-            var searchResults = await _database.ReportScheduledRepository.SearchAsync(predicate, sortBy, sortOrder, pageNumber, pageSize, cancellationToken);
-            
-            return searchResults;
         }
 
         public async Task<List<ReportSchedule>> FindAsync(Expression<Func<ReportSchedule, bool>> predicate, CancellationToken cancellationToken = default)

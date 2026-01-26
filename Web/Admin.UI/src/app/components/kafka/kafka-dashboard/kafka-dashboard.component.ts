@@ -1,10 +1,10 @@
 import { Component, OnInit } from '@angular/core';
 import { AppConfigService } from '../../../services/app-config.service';
-import { CommonModule } from '@angular/common';
+
 
 @Component({
   selector: 'app-kafka-dashboard',
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './kafka-dashboard.component.html',
   styleUrl: './kafka-dashboard.component.scss'
 })
