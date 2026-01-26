@@ -1,3 +1,4 @@
+using FluentValidation;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
@@ -23,16 +24,26 @@ public class SftpLogController : ControllerBase
     private readonly ISftpAcquisitionLogManager _manager;
     private readonly ISftpAcquisitionLogQueries _queries;
     private readonly ITenantApiService _tenantApiService;
+    private readonly IValidator<CreateSftpLogRequest> _createValidator;
+    private readonly IValidator<UpdateSftpLogRequest> _updateValidator;
 
     private const int DefaultLogPageSize = 20;
     private const string DefaultSortBy = "ProcessDate";
-    
-    public SftpLogController(ILogger<SftpLogController> logger, ISftpAcquisitionLogManager manager, ISftpAcquisitionLogQueries queries, ITenantApiService tenantApiService)
+
+    public SftpLogController(
+        ILogger<SftpLogController> logger,
+        ISftpAcquisitionLogManager manager,
+        ISftpAcquisitionLogQueries queries,
+        ITenantApiService tenantApiService,
+        IValidator<CreateSftpLogRequest> createValidator,
+        IValidator<UpdateSftpLogRequest> updateValidator)
     {
         _logger = logger;
         _manager = manager;
         _queries = queries;
         _tenantApiService = tenantApiService;
+        _createValidator = createValidator;
+        _updateValidator = updateValidator;
     }
     
     /// <summary>
@@ -132,7 +143,18 @@ public class SftpLogController : ControllerBase
     {
         // Store httpContext so that it is not lost during processing
         var httpContext = HttpContext;
-        
+
+        // Validate the request
+        var validationResult = await _createValidator.ValidateAsync(req, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            foreach (var error in validationResult.Errors)
+            {
+                ModelState.AddModelError(error.PropertyName, error.ErrorMessage);
+            }
+            return BadRequest(ModelState);
+        }
+
         // validate user access to organization before proceeding - future enhancement
 
         try
@@ -199,16 +221,27 @@ public class SftpLogController : ControllerBase
             return BadRequest("Invalid SFTP Acquisition Log Id.");
         }
         
+        // Validate the request
+        var validationResult = await _updateValidator.ValidateAsync(req, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            foreach (var error in validationResult.Errors)
+            {
+                ModelState.AddModelError(error.PropertyName, error.ErrorMessage);
+            }
+            return BadRequest(ModelState);
+        }
+
         // Validate the request model id matches the id in the url
-        if (req.ExternalId != id)
+        if (!string.Equals(req.ExternalId, id.ToString(), StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogWarning("Sftp Log id in the request body ({RequestExternalId}) does not match the id in the url ({ExternalId}).", req.ExternalId, logId.Sanitize());
-            return BadRequest("The ids in the request body and url do not match.");
+            return BadRequest("The sftp log ids in the request body and url do not match.");
         }
-        
+
         // Store httpContext so that it is not lost during processing
         var httpContext = HttpContext;
-        
+
         // validate user access to organization before proceeding - future enhancement
 
         try
