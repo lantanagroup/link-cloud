@@ -1,0 +1,95 @@
+---
+
+id: TerminologyService
+name: Terminology Service
+version: 0.3.0
+
+summary: A service that exposes a limited FHIR Terminology interface (CodeSystem, ValueSet) to support code validation and ValueSet expansion for Link Cloud based on artifacts loaded from the local file system.
+
+owners:
+  - arch_team
+
+receives:
+  - id: ValidateValueSetCode
+  - id: ValidateCodeSystemCode
+
+specifications:
+  openapiPath: openapi.yml
+
+badges:
+  - content: ".NET"
+    backgroundColor: yellow
+    textColor: black
+  - content: '8076:8076'
+    backgroundColor: gray
+    textColor: white
+
+---
+
+## Overview
+
+The Terminology Service provides a focused subset of FHIR Terminology capabilities to other Link Cloud services (primarily the Validation Service):
+
+- Hosts read and operation endpoints for ValueSet and CodeSystem resources
+- Supports $validate-code on both ValueSet and CodeSystem
+- Supports $expand for ValueSets, with limited support for query parameters. `filter`, `include`, `exclude`, and `inactive` are not supported.
+- Publishes a CapabilityStatement at /api/terminology/fhir/metadata
+
+On startup, the service loads configured ValueSets and CodeSystems from the local file system into an in-memory cache; runtime requests operate exclusively against this cache for predictable, fast responses and no external dependencies.
+
+## Nodes
+  
+<NodeGraph />
+
+## Common Configurations
+
+- [Swagger](/docs/custom/config/dotnet#swagger)
+- [Azure App Configuration](/docs/custom/config/dotnet#azure-app-config-environment-variables)
+- [Service Authentication](/docs/custom/config/dotnet#service-authentication)
+- [CORS Configuration](/docs/custom/config/dotnet#cors)
+- [Telemetry](/docs/custom/config/dotnet#telemetry)
+
+## Custom Configurations
+
+| Property Name    | Description                                                                                                                               | Secret? |
+|------------------|-------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| terminology.path | The path on the local file system where terminology folders and artifacts are located that are loaded into memory when the service starts | No      |
+
+Notes:
+- The path should contain one folder per artifact. Each folder must include a JSON file for the FHIR artifact (ValueSet or CodeSystem) and a CSV with codes to load. See repository samples for expected formats.
+- In a deployed environment, the path should be configured as an Azure App Configuration setting that is mounted as a volume to an Azure Storage Account File Share.
+- Updates on disk are not auto-watched; call `POST /api/terminology/config/$reload-cache` (or restart the service) to pick up changes.
+
+Example folder structure:
+```
+  /data/terminology/
+    /ValueSet-us-core-race/
+      ValueSet-us-core-race.json
+      ValueSet-us-core-race.csv
+    /CodeSystem-iso-3166/
+      CodeSystem-iso-3166.json
+      CodeSystem-iso-3166.csv
+```
+
+## Features and Functionality
+
+- In-memory caching: all artifacts and their codes are kept in memory for fast lookups.
+- ValueSet expansion: expansions are constructed from the cached codes; no external terminology server is contacted.
+- Code validation: validates membership within CodeSystems/ValueSets loaded into the cache, including optional display matching.
+
+### Display Matching
+
+1. **Case Sensitivity**: The comparison is case-sensitive
+- Example: "Test Code" ≠ "test code"
+
+2. **Culture/Locale**: Comparison is culture-invariant
+- No special handling of accents or other cultural variations
+- Example: "café" ≠ "cafe"
+
+3. **Whitespace Handling**: No trimming is performed
+- Leading and trailing spaces are significant
+- Example: " Test" ≠ "Test"
+
+4. **Exact Matching**: Only exact matches are accepted
+- No partial or substring matches
+- Example: "Test Code" ≠ "Test Code (Legacy)"

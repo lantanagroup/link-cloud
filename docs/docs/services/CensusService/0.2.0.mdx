@@ -1,0 +1,575 @@
+---
+id: CensusService
+name: Census Service
+version: 0.2.0
+
+summary: |
+  Service that contains Census related information and functionality
+
+owners:
+  - arch_team
+
+receives:
+  - id: PatientListsAcquired
+
+sends:
+  - id: PatientCensusScheduled
+  - id: AuditableEventOccurred   
+  - id: PatientEvent
+
+specifications:
+  openapiPath: openapi.yml
+
+badges:
+  - content: ".NET"
+    backgroundColor: yellow
+    textColor: black
+  - content: MSSQL
+    backgroundColor: red
+    textColor: white
+  - content: '8064:8080'
+    backgroundColor: gray
+    textColor: white
+
+---
+
+## Overview
+
+The Census service is primarily responsible for maintaining a tenants admit and discharge patient information needed to determine when a patient is ready for reporting. To accomplish this, the Census service has functionality in place to request an updated FHIR List of recently admitted patients. The frequency that the request is made is based on a Tenant configuration made in the Census service.
+
+The system routinely gathers census data by leveraging multiple methods compatible with hospital EHRs. This document provides an overview of each acquisition method, the data elements tracked, and future considerations for expanding data persistence.
+
+## Nodes
+
+<NodeGraph />
+
+## Event Sourcing Workflow
+
+The Census service consumes `PatientListsAcquired` events from Kafka. When a new event is received, the `PatientListsAcquiredListener` processes the payload, updating census records for the specified facility. This enables downstream reporting and data acquisition.
+
+**Workflow Steps:**
+1. **Scheduling:** A scheduled job (per tenant configuration) triggers a request for updated patient lists.
+2. **Data Acquisition:** The system sends a `DataAcquisitionRequested` event, prompting the acquisition of FHIR patient lists.
+3. **Event Production:** Upon successful acquisition, a `PatientListsAcquired` event is produced, containing the list of patient FHIR IDs.
+4. **Census Update:** The Census service consumes the event and updates its records accordingly.
+
+## Event Payload Structures
+
+### PatientCensusScheduled Event
+
+```json
+{ 
+  "facilityId": "string", 
+  "scheduledTime": "string" 
+}
+```
+
+- **facilityId**: Facility identifier.
+- **scheduledTime**: Scheduled time for census acquisition.
+
+### FHIRListAdmitPayload Event
+
+```json
+{
+  "patientId": "string",
+  "admitDate": "string (ISO 8601 datetime)"
+}
+```
+
+- **patientId**: The unique FHIR ID of the patient being admitted.
+- **admitDate**: The datetime when the patient was admitted.
+- **payloadType**: Automatically set to "FHIRListAdmit" (not included in JSON).
+
+This event is used to track patient admissions detected through FHIR list processing. When processed, it creates a new PatientEncounter record in the system with the admission date and patient identifier.
+
+### FHIRListDischargePayload Event
+
+```json
+{
+  "patientId": "string",
+  "dischargeDate": "string (ISO 8601 datetime)"
+}
+```
+
+- **patientId**: The unique FHIR ID of the patient being discharged.
+- **dischargeDate**: The datetime when the patient was discharged.
+- **payloadType**: Automatically set to "FHIRListDischarge" (not included in JSON).
+
+This event is used to track patient discharges detected through FHIR list processing. When processed, it updates an existing PatientEncounter record with the discharge date, indicating the patient's encounter has concluded.
+
+Both FHIR list payloads are critical components of the patient census tracking system, enabling the service to maintain accurate patient encounter records as patients enter and exit the healthcare facility. These events, along with other event types, help build a complete picture of patient movement for reporting purposes.
+
+
+### PatientListsAcquired Event
+
+```json
+{ 
+  "reportTrackingId": "string", 
+  "patientLists": [
+    {
+      "listType": "string" // Acceptable values: "Admit", "Discharge",
+      "timeFrame": "string" // Acceptable values: "LessThan24Hours", "Between24To48Hours", "MoreThan48Hours",
+      "patientIds": ["string"]
+    }
+  ]
+}
+```
+
+- **facilityId**: The unique identifier for the facility.
+- **patientIds**: Array of FHIR patient IDs.
+- **acquisitionTimestamp**: ISO 8601 timestamp of acquisition.
+
+### PatientCensusScheduled Event
+
+```json
+{ 
+  "facilityId": "string", 
+  "scheduledTime": "string" 
+}
+```
+
+- **facilityId**: Facility identifier.
+- **scheduledTime**: Scheduled time for census acquisition.
+
+## API Documentation
+
+### Census Configuration Controller
+
+The Census service exposes REST endpoints to manage tenant-specific census configuration.
+
+#### GET /census/config/\{facilityId\}
+
+Retrieves the census configuration for a specific facility.
+
+**Parameters:**
+- `facilityId` (path, required): The unique identifier of the facility.
+
+**Response:**
+- `200 OK`: Returns the census configuration.
+- `404 Not Found`: If no configuration exists for the specified facilityId.
+
+**Response Model:**
+```json
+{
+  "facilityId": "string",
+  "scheduledTrigger": "string",
+  "enabled": boolean
+}
+```
+
+#### POST /census/config
+
+Creates a new census configuration.
+
+**Request Body:**
+```json
+{
+  "facilityId": "string",
+  "scheduledTrigger": "string",
+  "enabled": boolean
+}
+```
+
+- `facilityId` (required): The unique identifier of the facility.
+- `scheduledTrigger` (required): A CRON expression defining the schedule for census acquisition.
+- `enabled` (optional, default: true): Whether the census acquisition is enabled.
+
+**Response:**
+- `201 Created`: Configuration created successfully.
+- `400 Bad Request`: If the request is invalid.
+
+**Response Model:**
+```json
+{
+  "id": "string"
+}
+```
+
+#### PUT /census/config/\{facilityId\}
+
+Updates an existing census configuration.
+
+**Parameters:**
+- `facilityId` (path, required): The unique identifier of the facility.
+
+**Request Body:**
+```json
+{
+  "facilityId": "string",
+  "scheduledTrigger": "string",
+  "enabled": boolean
+}
+```
+
+**Response:**
+- `200 OK`: Configuration updated successfully.
+- `404 Not Found`: If no configuration exists for the specified facilityId.
+
+#### DELETE /census/config/\{facilityId\}
+
+Deletes a census configuration.
+
+**Parameters:**
+- `facilityId` (path, required): The unique identifier of the facility.
+
+**Response:**
+- `200 OK`: Configuration deleted successfully.
+- `404 Not Found`: If no configuration exists for the specified facilityId.
+
+### Census Controller
+
+Endpoints for retrieving patient census data and patient lists.
+
+#### GET /api/census/\{facilityId\}/history/admitted
+
+Gets the admitted patients for a facility within a date range. Returns a FHIR List resource containing patient references.
+
+**Parameters:**
+- `facilityId` (path, required): The unique identifier of the facility.
+- `startDate` (query, required): Start date for the date range filter.
+- `endDate` (query, required): End date for the date range filter.
+
+**Response:**
+- `200 OK`: Returns a FHIR List resource with admitted patients.
+- `404 Not Found`: If no patients found for the specified facility.
+- `400 Bad Request`: If invalid arguments are provided.
+- `500 Internal Server Error`: If an error occurs during processing.
+
+**Response Model:**
+Returns a FHIR List resource with the following structure:
+- `status`: Current
+- `mode`: Snapshot
+- `extension`: Contains applicable period with start and end dates
+- `entry[]`: Array of patient references in format "Patient/\{patientId\}"
+
+### Patient Encounters Controller
+
+Endpoints for managing and retrieving patient encounter materialized views.
+
+#### GET /api/census/patient-encounters/current
+
+Returns the current materialized view state for patient encounters for a given facility.
+
+**Parameters:**
+- `facilityId` (query, required): The unique identifier for the facility.
+- `correlationId` (query, optional): Optional correlation ID to filter patient encounters.
+- `sortBy` (query, optional): Field to sort by (e.g., "CorrelationId", "AdmitDate").
+- `sortOrder` (query, optional): Sort order (Ascending or Descending).
+- `pageSize` (query, optional): Number of records per page (default: 10).
+- `pageNumber` (query, optional): Page number to retrieve (default: 1).
+
+**Response:**
+- `200 OK`: Returns a paged list of current patient encounters.
+- `400 Bad Request`: If facilityId is not provided.
+- `500 Internal Server Error`: If an error occurs during processing.
+
+**Response Model:**
+```json
+{
+  "records": [
+    {
+      "id": "string",
+      "correlationId": "string",
+      "facilityId": "string",
+      "medicalRecordNumber": "string",
+      "admitDate": "datetime",
+      "dischargeDate": "datetime",
+      "encounterType": "string",
+      "encounterStatus": "string",
+      "encounterClass": "string",
+      "createDate": "datetime",
+      "modifyDate": "datetime",
+      "patientVisitIdentifiers": [],
+      "patientIdentifiers": []
+    }
+  ],
+  "pageNumber": 1,
+  "pageSize": 10,
+  "totalCount": 100
+}
+```
+
+#### GET /api/census/patient-encounters/historical
+
+Returns an ad hoc generated materialized view state for patient encounters for a given facility as of a specific date.
+
+**Parameters:**
+- `facilityId` (query, required): The unique identifier for the facility.
+- `correlationId` (query, optional): Optional correlation ID to filter patient encounters.
+- `dateThreshold` (query, required): The date as of which to generate the historical view.
+- `sortBy` (query, optional): Field to sort by (e.g., "CorrelationId", "AdmitDate").
+- `sortOrder` (query, optional): Sort order (Ascending or Descending).
+- `pageSize` (query, optional): Number of records per page (default: 10).
+- `pageNumber` (query, optional): Page number to retrieve (default: 1).
+
+**Response:**
+- `200 OK`: Returns a paged list of patient encounters as of the specified date.
+- `400 Bad Request`: If facilityId or dateThreshold is not provided.
+- `500 Internal Server Error`: If an error occurs during processing.
+
+**Response Model:** Same as current patient encounters endpoint.
+
+#### POST /api/census/patient-encounters/rebuild
+
+Deletes and rebuilds the materialized view records for a given facility.
+
+**Parameters:**
+- `facilityId` (query, required): The unique identifier for the facility.
+- `correlationId` (query, optional): Optional correlation ID to filter which materialized view to rebuild.
+
+**Response:**
+- `202 Accepted`: If the rebuild is successful.
+- `400 Bad Request`: If facilityId is not provided.
+- `500 Internal Server Error`: If an error occurs during processing.
+
+### Patient Events Controller
+
+Endpoints for managing and retrieving patient events.
+
+#### GET /api/census/patient-events
+
+Returns all events stored in the patient events data store for the given facility.
+
+**Parameters:**
+- `facilityId` (query, required): The unique identifier for the facility.
+- `correlationId` (query, optional): Optional correlation ID to filter events.
+- `startDate` (query, optional): Optional start date to filter events.
+- `endDate` (query, optional): Optional end date to filter events.
+- `sortBy` (query, optional): Field to sort by.
+- `sortOrder` (query, optional): Sort order (Ascending or Descending).
+- `pageSize` (query, optional): Number of records per page (default: 10).
+- `pageNumber` (query, optional): Page number to retrieve (default: 1).
+
+**Response:**
+- `200 OK`: Returns a paged list of patient events.
+- `404 Not Found`: If no patient events found for the facility.
+- `400 Bad Request`: If facilityId is not provided.
+- `500 Internal Server Error`: If an error occurs during processing.
+
+**Response Model:**
+```json
+{
+  "records": [
+    {
+      "id": "string",
+      "facilityId": "string",
+      "correlationId": "string",
+      "sourcePatientId": "string",
+      "sourceVisitId": "string",
+      "medicalRecordNumber": "string",
+      "eventType": "string",
+      "payload": {},
+      "sourceType": "string"
+    }
+  ],
+  "pageNumber": 1,
+  "pageSize": 10,
+  "totalCount": 100
+}
+```
+
+#### DELETE /api/census/patient-events/\{id\}
+
+Soft deletes a patient event and rebuilds the materialized view for the related correlation id.
+
+**Parameters:**
+- `id` (path, required): The unique identifier of the patient event to delete.
+
+**Response:**
+- `202 Accepted`: If deletion is successful.
+- `400 Bad Request`: If patient event ID is not provided.
+- `500 Internal Server Error`: If an error occurs during processing.
+
+#### DELETE /api/census/patient-events/visit/\{correlationId\}
+
+Soft deletes the patient event store for the given correlation id and removes the corresponding materialized view.
+
+**Parameters:**
+- `correlationId` (path, required): The correlation ID for the visit to delete.
+
+**Response:**
+- `202 Accepted`: If deletion is successful.
+- `400 Bad Request`: If correlation ID is not provided.
+- `500 Internal Server Error`: If an error occurs during processing.
+
+
+## Technical Implementation
+
+The Census service is implemented as a .NET 8.0 web application with the following key components:
+
+### Core Technologies
+
+- **Framework**: .NET 8.0
+- **Database**: Microsoft SQL Server via Entity Framework Core 8.0.3
+- **Messaging**: Kafka (Confluent.Kafka 2.*)
+- **Scheduling**: Quartz.NET 3.*
+- **API Documentation**: Swagger/OpenAPI
+- **Logging**: Serilog with Grafana Loki integration
+
+### Database Schema
+
+The Census service uses Entity Framework Core with SQL Server for data persistence. The database schema includes:
+
+1. **CensusConfiguration**: Stores facility-specific census configurations
+   - Primary Key: FacilityId (string)
+   - ScheduledTrigger (string): CRON expression for scheduling
+   - Enabled (bool): Flag to enable/disable census acquisition
+
+2. **PatientCensus**: Tracks patient census information
+   - Primary Key: Id (Guid)
+   - FacilityId (string): Facility identifier
+   - PatientId (string): FHIR patient identifier
+   - AdmissionDate (DateTime?): Optional admission date
+   - DischargeDate (DateTime?): Optional discharge date
+   - LastUpdated (DateTime): Timestamp of last update
+
+### Scheduled Jobs
+
+The Census service uses Quartz.NET with ADO Job Stores for scheduling the census acquisition jobs based on tenant configurations. Each job:
+
+1. Reads the facility-specific configuration
+2. Triggers the census acquisition process
+3. Emits the appropriate events
+4. Updates the database with the results
+
+### Event Processing
+
+The Census service processes incoming Kafka events via dedicated listeners and produces events when census data is acquired or scheduled.
+
+## Common Configurations
+
+* [Swagger](/docs/custom/config/dotnet#swagger)
+* [Azure App Configuration](/docs/custom/config/dotnet#azure-app-config-environment-variables)
+* [Kafka Configuration](/docs/custom/config/dotnet#kafka)
+* [Kafka Consumer Retry Configuration](/docs/custom/config/dotnet#kafka-consumer-settings)
+* [Service Registry Configuration](/docs/custom/config/dotnet#service-registry)
+* [CORS Configuration](/docs/custom/config/dotnet#cors)
+* [Token Service Configuration](/docs/custom/config/dotnet#token-service-settings)
+* [Service Authentication](/docs/custom/config/dotnet#service-authentication)
+* [SQL Server Database Configuration](/docs/custom/config/dotnet#sql-server-database)
+
+## Application Settings
+
+The Census service uses the following configuration settings:
+
+```json
+{
+  "ServiceInformation": {
+    "Name": "Census",
+    "Version": "0.2.0"
+  },
+  "ConnectionStrings": {
+    "CensusDatabase": "[connection-string]"
+  },
+  "Kafka": {
+    "bootstrap.servers": "localhost:9092",
+    "group.id": "census-service",
+    "auto.offset.reset": "earliest"
+  },
+  "KafkaTopics": {
+    "PatientListsAcquired": "patient-lists-acquired",
+    "PatientCensusScheduled": "patient-census-scheduled",
+    "AuditableEventOccurred": "audit-events",
+    "PatientEvent": "patient-events"
+  },
+  "Quartz": {
+    "quartz.scheduler.instanceName": "Census-Scheduler"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "Serilog": {
+    "Using": [
+      "Serilog.Sinks.Console",
+      "Serilog.Sinks.Grafana.Loki"
+    ],
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {
+        "Microsoft": "Warning",
+        "System": "Warning"
+      }
+    },
+    "WriteTo": [
+      {
+        "Name": "Console"
+      },
+      {
+        "Name": "GrafanaLoki",
+        "Args": {
+          "uri": "[loki-url]",
+          "labels": [
+            {
+              "key": "app",
+              "value": "census-service"
+            }
+          ]
+        }
+      }
+    ],
+    "Enrich": [
+      "FromLogContext",
+      "WithMachineName",
+      "WithThreadId",
+      "WithSpan"
+    ]
+  }
+}
+```
+
+## Features and Functionality
+
+Link includes a **Census Management** module designed to acquire, evaluate, and maintain a real-time census of patients actively or recently treated within a hospital system. This module supports the submission of required patient data to governing bodies (such as NHSN) per established reporting criteria.
+
+The system routinely gathers census data by leveraging multiple methods compatible with hospital EHRs. This document provides an overview of each acquisition method, the data elements tracked, and future considerations for expanding data persistence.
+
+### Census Data Acquisition Methods
+
+#### 1. FHIR Standard - List Resource
+
+The **FHIR List Resource** method is one of the primary approaches for acquiring patient lists from hospital EHR systems. In systems like Epic, patient lists are generated through proprietary queries within the EHR, associated with the FHIR List resource for access through FHIR integrations.
+
+- **Endpoint**: `GET /List/<listId>`
+- **Functionality**: Queries the EHR for patient lists identified by a `listId`.
+- **Tenant Configurability**: The `listId` is configurable per tenant within Link, allowing each institution to define the patient population that constitutes their census.
+- **Applicability**: This method supports census management for any EHR that utilizes FHIR Lists representing relevant patient groups.
+- **Rules**: The following rules are enforced by Census when processing FHIR List resources:
+  - Admission lists are processed before discharge lists.
+  - If a patient appears on a discharge lists with no corresponding admit event, an admission event is created and then the patient is discharged.
+  - If a patient is admitted and then disappears off of all incoming lists, the patient is discharged.
+
+#### 2. FHIR Standard - Bulk FHIR Implementation Guide
+
+The **Bulk FHIR** method allows Link to acquire patient data via batch processing, useful for large patient groups in systems that support flexible querying.
+
+- **Endpoint**: Bulk FHIR `$export` request with `groupId`
+- **Process**:
+  - Link initiates a `$export` request for patient data by `groupId`.
+  - The export process is monitored and polled routinely until completion.
+  - Upon completion, patient resources are retrieved, and the FHIR ID of each patient is extracted and stored.
+- **Tenant Configurability**: Each tenant configures a unique `groupId` corresponding to their desired patient group.
+
+#### 3. ADT Feeds (Under Exploration)
+
+Link is evaluating the feasibility of using **ADT feeds**—specifically for admission, discharge, and cancellation events—to dynamically manage census data. This approach would offer real-time census updates and potentially enhance the accuracy and responsiveness of the census.
+
+### Scheduling and Frequency
+
+Both the FHIR List and Bulk FHIR methods utilize a configurable scheduling system, allowing each tenant to define query intervals. The scheduling system is based on CRON patterns, ensuring Link can automatically query the EHR at specified times to maintain an updated census.
+
+Census uses Quartz with ADO Job Stores to manage jobs across multiple instances of the service, primarily for scheduling Patient List retrieval and Retry events.
+
+### Data Persistence and Tracking
+
+Currently, Link persists only the **FHIR ID** of each patient. This identifier allows Link to accurately track patients across census updates without storing additional demographic information.
+
+#### Future Considerations
+
+In the interest of enhancing the user interface, Link is considering storing additional data elements, such as the **patient name** associated with each FHIR ID. This would provide users with meaningful patient identifiers, facilitating easier navigation and record management within the Link UI.
+
+## Build and Deployment
+
+The Census service is containerized using Docker with Linux as the target OS. It is designed to be deployed as part of a larger microservices architecture, with dependencies on other Link services for complete functionality.

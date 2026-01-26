@@ -1,0 +1,64 @@
+# Lantana Consulting Group EventCatalog Documentation
+
+> This internal platform provides a comprehensive view of our event-driven architecture across all systems. Use this portal to discover existing domains, explore services and their dependencies, and understand the message contracts that connect our infrastructure
+
+## Events
+- [Patient Census Scheduled - PatientCensusScheduled - 0.2.0 ](https://lantanagroup.github.io/docs/events/PatientCensusScheduled/0.2.0.mdx) - Schedules retrieval of the current inpatient list.- [Patient Lists Acquired - PatientListsAcquired - 0.2.0 ](https://lantanagroup.github.io/docs/events/PatientListsAcquired/0.2.0.mdx) - Provides a list of patient identifiers retrieved from a facility.- [Ready for Validation - ReadyForValidation - 0.2.0 ](https://lantanagroup.github.io/docs/events/ReadyForValidation/0.2.0.mdx) - Notifies that a patient’s submission bundle is ready to be validated.- [Ready to Acquire - ReadyToAcquire - 0.2.0 ](https://lantanagroup.github.io/docs/events/ReadyToAcquire/0.2.0.mdx) - Indicates when a data acquisition log is ready to be processed- [Measure Evaluated - MeasureEvaluated - 0.2.0 ](https://lantanagroup.github.io/docs/events/MeasureEvaluated/0.2.0.mdx) - Marks completion of all evaluations for a patient.- [Auditable Event Occurred - AuditableEventOccurred - 0.2.0 ](https://lantanagroup.github.io/docs/events/AuditableEventOccurred/0.2.0.mdx) - Captures an auditable action for security or compliance tracking.- [Payload Submitted - PayloadSubmitted - 0.2.0 ](https://lantanagroup.github.io/docs/events/PayloadSubmitted/0.2.0.mdx) - Confirms that a payload has been created and stored.- [Patient Event - PatientEvent - 0.2.0 ](https://lantanagroup.github.io/docs/events/PatientEvent/0.2.0.mdx) - Indicates that a patient admission or discharge has occurred.- [Report Scheduled - ReportScheduled - 0.2.0 ](https://lantanagroup.github.io/docs/events/ReportScheduled/0.2.0.mdx) - Announces that a reporting period has started for a tenant.- [Resource Acquired - ResourceAcquired - 0.2.0 ](https://lantanagroup.github.io/docs/events/ResourceAcquired/0.2.0.mdx) - Represents a single FHIR resource retrieved from a facility.- [Resource Evaluated - ResourceEvaluated - 0.2.0 ](https://lantanagroup.github.io/docs/events/ResourceEvaluated/0.2.0.mdx) - Contains a FHIR resource that has been evaluated for measures.- [Resource Normalized - ResourceNormalized - 0.2.0 ](https://lantanagroup.github.io/docs/events/ResourceNormalized/0.2.0.mdx) - Indicates that a FHIR resource has been standardized.- [Validation Complete - ValidationComplete - 0.2.0 ](https://lantanagroup.github.io/docs/events/ValidationComplete/0.2.0.mdx) - Conveys the result of validating a patient’s submission bundle.
+
+## Commands
+- [Submit Report - SubmitReport - 0.2.0 ](https://lantanagroup.github.io/docs/commands/SubmitReport/0.2.0.mdx) - Instructs that a completed report be packaged for submission.- [Evaluation Requested - EvaluationRequested - 0.2.0 ](https://lantanagroup.github.io/docs/commands/EvaluationRequested/0.2.0.mdx) - Indicates that patient data is ready to be evaluated.- [Data Acquisition Requested - DataAcquisitionRequested - 0.2.0 ](https://lantanagroup.github.io/docs/commands/DataAcquisitionRequested/0.2.0.mdx) - Signals that FHIR resources should be fetched for a patient.- [Validate CodeSystem Code - ValidateCodeSystemCode - 0.3.0 ](https://lantanagroup.github.io/docs/commands/ValidateCodeSystemCode/0.3.0.mdx) - Validate a code against a code system.- [Generate Report Requested - GenerateReportRequested - 0.2.0 ](https://lantanagroup.github.io/docs/commands/GenerateReportRequested/0.2.0.mdx) - Requests that a report be generated or regenerated outside the normal schedule.- [Validate ValueSet Code - ValidateValueSetCode - 0.3.0 ](https://lantanagroup.github.io/docs/commands/ValidateValueSetCode/0.3.0.mdx) - Validate a code against a value set.
+
+## Queries
+
+
+## Services
+- [Audit Service - AuditService - 0.2.0 ](https://lantanagroup.github.io/docs/services/AuditService/0.2.0.mdx) - Service that contains Audit related information and functionality
+- [Account Service - AccountService - 0.2.0 ](https://lantanagroup.github.io/docs/services/AccountService/0.2.0.mdx) - Service that contains Account related information and functionality
+- [Admin Backend-for-Frontend - AdminBFF - 0.2.0 ](https://lantanagroup.github.io/docs/services/AdminBFF/0.2.0.mdx) - The administrative backend service that provides functionality for the front-end- [Validation Service - ValidationService - 0.2.0 ](https://lantanagroup.github.io/docs/services/ValidationService/0.2.0.mdx) - Service that provides functionality for validating clinical data in the system.
+- [Admin UI (front-end) - AdminUI - 0.2.0 ](https://lantanagroup.github.io/docs/services/AdminUI/0.2.0.mdx) - The administrative front-end UI service- [Terminology Service - TerminologyService - 0.3.0 ](https://lantanagroup.github.io/docs/services/TerminologyService/0.3.0.mdx) - A service that exposes a limited FHIR Terminology interface (CodeSystem, ValueSet) to support code validation and ValueSet expansion for Link Cloud based on artifacts loaded from the local file system.- [Data Acquisition Service - DataAcquisitionService - 0.2.0 ](https://lantanagroup.github.io/docs/services/DataAcquisitionService/0.2.0.mdx) - Service that acquires data based on reporting requirements- [Data Acquisition Worker Service - DataAcquisitionWorkerService - 0.2.0 ](https://lantanagroup.github.io/docs/services/DataAcquisitionWorkerService/0.2.0.mdx) - The Data Acquisition Worker is a .NET background service that listens on the ReadyToAcquire Kafka topic and processes queued data acquisition logs to fetch FHIR resources for a facility.- [Tenant Service - TenantService - 0.2.0 ](https://lantanagroup.github.io/docs/services/TenantService/0.2.0.mdx) - Service that provides functionality for the management of Tenants in the system
+- [Census Service - CensusService - 0.2.0 ](https://lantanagroup.github.io/docs/services/CensusService/0.2.0.mdx) - Service that contains Census related information and functionality
+- [Measure Evaluation Service - MeasureEvalService - 0.2.0 ](https://lantanagroup.github.io/docs/services/MeasureEvalService/0.2.0.mdx) - [Normalization Service - NormalizationService - 0.2.0 ](https://lantanagroup.github.io/docs/services/NormalizationService/0.2.0.mdx) - Service that performs normalization operations according to a tenant's configuration on data for the tenant.- [Submission Service - SubmissionService - 0.2.0 ](https://lantanagroup.github.io/docs/services/SubmissionService/0.2.0.mdx) - Service that provides functionality for submitting report data
+- [Query Dispatch Service - QueryDispatchService - 0.2.0 ](https://lantanagroup.github.io/docs/services/QueryDispatchService/0.2.0.mdx) - The Query Dispatch service is a .NET Core microservice that controls how long Link Cloud waits after a patient’s 
+discharge before requesting FHIR resources from a facility.
+- [Report Service - ReportService - 0.2.0 ](https://lantanagroup.github.io/docs/services/ReportService/0.2.0.mdx) - Service that contains Report related information and functionality
+
+
+## Domains
+- [Report - Report - 0.2.0 ](https://lantanagroup.github.io/docs/domains/Report/0.2.0.mdx) - Report related information and function- [Knowledge Artifact Management - KnowledgeArtifactManagement - 0.2.0 ](https://lantanagroup.github.io/docs/domains/KnowledgeArtifactManagement/0.2.0.mdx) - Domain that contains knowledge artifacts that support the function of Link including FHIR IGs, Profiles, dQMs, and Terminology.- [Compliance - Compliance - 0.2.0 ](https://lantanagroup.github.io/docs/domains/Compliance/0.2.0.mdx) - Compliance Domain- [Data Access - DataAccess - 0.2.0 ](https://lantanagroup.github.io/docs/domains/DataAccess/0.2.0.mdx) - Data Access Domain- [Tenant - Tenant - 0.2.0 ](https://lantanagroup.github.io/docs/domains/Tenant/0.2.0.mdx) - Tenant related information and function
+
+## Flows
+
+
+## Channels
+
+
+## Containers (Databases, External Systems)
+
+
+## Entities
+
+
+## Teams
+- [arch_team](https://lantanagroup.github.io/docs/teams/arch_team.mdx) - Arch Team
+
+## Users
+- [daniel_vargas](https://lantanagroup.github.io/docs/users/daniel_vargas.mdx) - Daniel A. Vargas
+- [andrew_laing](https://lantanagroup.github.io/docs/users/andrew_laing.mdx) - Andrew Laing
+- [sean_mcilvenna](https://lantanagroup.github.io/docs/users/sean_mcilvenna.mdx) - Sean McIlvenna
+
+## Custom Docs
+- [Dual Scheduler Architecture](https://lantanagroup.github.io/docs/custom/arch/dual_scheduler_architecture.mdx) - Implementation of MongoDB-backed persistent job scheduling for Report service with in-memory scheduling for other services
+- [Retry Topics](https://lantanagroup.github.io/docs/custom/arch/retry_topics.mdx) - Kafka retry topic pattern
+- [Security](https://lantanagroup.github.io/docs/custom/arch/security.mdx) - Overview of security
+- [Telemetry](https://lantanagroup.github.io/docs/custom/arch/telemetry.mdx) - Overview of observability and telemetry
+- [Persistence](https://lantanagroup.github.io/docs/custom/arch/persistence.mdx) - Persistence strategy across services
+- [Auth Flow](https://lantanagroup.github.io/docs/custom/arch/auth_flow.mdx) - Describes the various authentication flows supported by the system
+- [Configuring Java Services](https://lantanagroup.github.io/docs/custom/config/java.mdx) - Configuring Java services in the Link platform
+- [Tenant Management](https://lantanagroup.github.io/docs/custom/user/tenant_management.mdx) - Critical components of tenant management
+- [Configuring .NET Services](https://lantanagroup.github.io/docs/custom/config/dotnet.mdx) - Configuring .NET services in the Link platform
+- [API Guidance](https://lantanagroup.github.io/docs/custom/dev/api_guidance.mdx) - Guidance for developing APIs
+- [Authorization Policies](https://lantanagroup.github.io/docs/custom/dev/auth_policies.mdx) - Information on authorization policies and patterns
+- [Kafka DeadLetter/Retry Scenarios](https://lantanagroup.github.io/docs/custom/dev/error_retry_scenarios.mdx) - Guidance on using Kafka DeadLetter and Retry Scenarios within the Link platform
+- [Open Telemetry](https://lantanagroup.github.io/docs/custom/dev/otel.mdx) - Guidance on using Open Telemetry within the Link platform
+- [Testing](https://lantanagroup.github.io/docs/custom/dev/testing.mdx) - Instructions on how to perform tests to ensure the Link platform is working correctly
+- [Logging & Error Handling](https://lantanagroup.github.io/docs/custom/dev/logging_error_handling.mdx) - Information on patterns used for logging and error handling

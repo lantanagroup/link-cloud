@@ -1,0 +1,93 @@
+{
+  "$ref": "#/definitions/changelogs",
+  "definitions": {
+    "changelogs": {
+      "type": "object",
+      "properties": {
+        "createdAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "string",
+              "format": "date"
+            },
+            {
+              "type": "integer",
+              "format": "unix-time"
+            }
+          ]
+        },
+        "badges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "content": {
+                "type": "string"
+              },
+              "backgroundColor": {
+                "type": "string"
+              },
+              "textColor": {
+                "type": "string"
+              },
+              "icon": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "content",
+              "backgroundColor",
+              "textColor"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "version": {
+          "type": "string"
+        },
+        "versions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "latestVersion": {
+          "type": "string"
+        },
+        "catalog": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "filePath": {
+              "type": "string"
+            },
+            "publicPath": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "filePath",
+            "publicPath",
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        "$schema": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
