@@ -1,0 +1,578 @@
+{
+  "$ref": "#/definitions/services",
+  "definitions": {
+    "services": {
+      "type": "object",
+      "properties": {
+        "sends": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string",
+                "default": "latest"
+              },
+              "to": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "string",
+                      "default": "latest"
+                    },
+                    "delivery_mode": {
+                      "type": "string",
+                      "enum": [
+                        "push",
+                        "pull",
+                        "push-pull"
+                      ],
+                      "default": "push"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "receives": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string",
+                "default": "latest"
+              },
+              "from": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "parameters": {
+                      "$ref": "#/definitions/services/properties/sends/items/properties/to/items/properties/parameters"
+                    },
+                    "id": {
+                      "$ref": "#/definitions/services/properties/sends/items/properties/to/items/properties/id"
+                    },
+                    "version": {
+                      "$ref": "#/definitions/services/properties/sends/items/properties/to/items/properties/version"
+                    },
+                    "delivery_mode": {
+                      "type": "string",
+                      "enum": [
+                        "push",
+                        "pull",
+                        "push-pull"
+                      ],
+                      "default": "push"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "entities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/definitions/services/properties/sends/items/properties/to/items/properties/id"
+              },
+              "version": {
+                "$ref": "#/definitions/services/properties/sends/items/properties/to/items/properties/version"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "writesTo": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/services/properties/entities/items"
+          }
+        },
+        "readsFrom": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/services/properties/entities/items"
+          }
+        },
+        "flows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/services/properties/entities/items"
+          }
+        },
+        "detailsPanel": {
+          "type": "object",
+          "properties": {
+            "domains": {
+              "type": "object",
+              "properties": {
+                "visible": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "messages": {
+              "$ref": "#/definitions/services/properties/detailsPanel/properties/domains"
+            },
+            "versions": {
+              "$ref": "#/definitions/services/properties/detailsPanel/properties/domains"
+            },
+            "specifications": {
+              "$ref": "#/definitions/services/properties/detailsPanel/properties/domains"
+            },
+            "entities": {
+              "$ref": "#/definitions/services/properties/detailsPanel/properties/domains"
+            },
+            "repository": {
+              "$ref": "#/definitions/services/properties/detailsPanel/properties/domains"
+            },
+            "owners": {
+              "$ref": "#/definitions/services/properties/detailsPanel/properties/domains"
+            },
+            "changelog": {
+              "$ref": "#/definitions/services/properties/detailsPanel/properties/domains"
+            },
+            "containers": {
+              "$ref": "#/definitions/services/properties/detailsPanel/properties/domains"
+            }
+          },
+          "additionalProperties": false
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "draft": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "message"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "badges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "content": {
+                "type": "string"
+              },
+              "backgroundColor": {
+                "type": "string"
+              },
+              "textColor": {
+                "type": "string"
+              },
+              "icon": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "content",
+              "backgroundColor",
+              "textColor"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "owners": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "collection": {
+                    "type": "string",
+                    "enum": [
+                      "users",
+                      "teams"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "collection"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "schemaPath": {
+          "type": "string"
+        },
+        "sidebar": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "badge": {
+              "type": "string"
+            },
+            "color": {
+              "type": "string"
+            },
+            "backgroundColor": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "repository": {
+          "type": "object",
+          "properties": {
+            "language": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "specifications": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "openapiPath": {
+                  "type": "string"
+                },
+                "asyncapiPath": {
+                  "type": "string"
+                },
+                "graphqlPath": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "openapi",
+                      "asyncapi",
+                      "graphql"
+                    ]
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "path"
+                ],
+                "additionalProperties": false
+              }
+            }
+          ]
+        },
+        "hidden": {
+          "type": "boolean"
+        },
+        "editUrl": {
+          "type": "string"
+        },
+        "resourceGroups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "string",
+                      "default": "latest"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "service",
+                        "event",
+                        "command",
+                        "query",
+                        "flow",
+                        "channel",
+                        "domain",
+                        "user",
+                        "team",
+                        "container"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "type"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "limit": {
+                "type": "number",
+                "default": 10
+              },
+              "sidebar": {
+                "type": "boolean",
+                "default": true
+              }
+            },
+            "required": [
+              "items"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "styles": {
+          "type": "object",
+          "properties": {
+            "icon": {
+              "type": "string"
+            },
+            "node": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "deprecated": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string"
+                },
+                "date": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "string",
+                          "format": "date"
+                        },
+                        {
+                          "type": "integer",
+                          "format": "unix-time"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "anyOf": [
+                {
+                  "not": {}
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            }
+          ]
+        },
+        "visualiser": {
+          "type": "boolean"
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uri"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "icon": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "url"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "diagrams": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/services/properties/entities/items"
+          }
+        },
+        "versions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "latestVersion": {
+          "type": "string"
+        },
+        "catalog": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "filePath": {
+              "type": "string"
+            },
+            "publicPath": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "filePath",
+            "publicPath",
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        "$schema": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "version"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
