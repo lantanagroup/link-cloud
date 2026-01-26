@@ -10,7 +10,7 @@ public class FhirQueryConfigurationModel
     public string FacilityId { get; set; }
     public string FhirServerBaseUrl { get; set; }
     public AuthenticationConfigurationModel? Authentication { get; set; }
-    public int? MaxConcurrentRequests { get; set; } = 8;
+    public int? MaxConcurrentRequests { get; set; } = 1;
     public TimeSpan? MinAcquisitionPullTime { get; set; }
     public TimeSpan? MaxAcquisitionPullTime { get; set; }
     public DateTime? CreateDate { get; set; }

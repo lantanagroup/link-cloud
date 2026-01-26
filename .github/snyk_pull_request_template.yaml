@@ -1,0 +1,13 @@
+﻿title: "SNYK: {{ snyk_pull_request_type }} for {{ package_name }}"
+description: |
+  {{ #is_upgrade_pr }}
+  This PR has been opened by Snyk to make sure our repositories are kept up-to-date.
+  It updates **{{ package_name }}** from version {{ package_from }} to version {{ package_to }}.
+  Review relevant docs for possible breaking changes.
+  {{ /is_upgrade_pr }}
+  
+  {{ #is_fix_pr }}
+  This PR applies a fix for a vulnerability in **{{ package_name }}**.
+  {{ /is_fix_pr }}
+
+  **Issues Fixed:** {{ issue_count }}

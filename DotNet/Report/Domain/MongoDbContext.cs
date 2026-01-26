@@ -1,6 +1,7 @@
 ﻿using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Services;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.EntityFrameworkCore;
 using MongoDB.Driver;
 using MongoDB.EntityFrameworkCore.Extensions;
@@ -44,20 +45,18 @@ public class MongoDbContext : DbContext
         modelBuilder.Entity<PatientSubmissionEntryResourceMap>()
             .ToCollection("patientSubmissionEntryResourceMap");
 
-        // Configure FHIR Resource properties with value converters for JSON serialization
-        var fhirJsonOptions = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector, new FhirJsonPocoDeserializerSettings { Validator = null });
 
         modelBuilder.Entity<FhirResource>()
             .Property(p => p.Resource)
             .HasConversion(
-                v => JsonSerializer.Serialize(v, fhirJsonOptions),
-                v => JsonSerializer.Deserialize<Resource>(v, fhirJsonOptions)!);
+                v => JsonSerializer.Serialize(v, LinkFhirSerializerOptions.ForFhirLenientSerialization),
+                v => JsonSerializer.Deserialize<Resource>(v, LinkFhirSerializerOptions.ForFhirLenientSerialization)!);
 
         modelBuilder.Entity<PatientSubmissionEntry>()
             .Property(e => e.MeasureReport)
             .HasConversion(
-                v => JsonSerializer.Serialize(v, fhirJsonOptions),
-                v => JsonSerializer.Deserialize<MeasureReport>(v, fhirJsonOptions));
+                v => JsonSerializer.Serialize(v, LinkFhirSerializerOptions.ForFhirLenientSerialization),
+                v => JsonSerializer.Deserialize<MeasureReport>(v, LinkFhirSerializerOptions.ForFhirLenientSerialization));
 
         // Indexes for ReportSchedule
         modelBuilder.Entity<ReportSchedule>()

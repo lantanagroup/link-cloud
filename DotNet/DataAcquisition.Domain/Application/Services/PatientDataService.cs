@@ -200,10 +200,16 @@ public class PatientDataService : IPatientDataService
         Patient patient = null;
         var patientId = TEMPORARYPatientIdPart(dataAcqRequested.PatientId);
 
+        var traceId = Activity.Current?.TraceId.ToHexString();
+        var spanId = Activity.Current?.SpanId.ToHexString();
+        var traceAndSpanDelimited = (traceId != null && spanId != null)
+            ? $"{traceId}|{spanId}"
+            : null;
+
         if (queryPlan != null)
         {
-            var initialQueries = queryPlan.InitialQueries.OrderBy(x => x.Key);
-            var supplementalQueries = queryPlan.SupplementalQueries.OrderBy(x => x.Key);
+            var initialQueries = queryPlan.InitialQueries.OrderBy(x => int.TryParse(x.Key, out int num) ? num : int.MaxValue);
+            var supplementalQueries = queryPlan.SupplementalQueries.OrderBy(x => int.TryParse(x.Key, out int num) ? num : int.MaxValue);
 
             var referenceStrTypes = queryPlan.InitialQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList();
             referenceStrTypes.AddRange(queryPlan.SupplementalQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList());
@@ -221,6 +227,8 @@ public class PatientDataService : IPatientDataService
             {
                 if (request.QueryPlanType == QueryPlanType.Initial)
                 {
+                    var priority = schedReport.Frequency == Frequency.Daily ? AcquisitionPriority.High : AcquisitionPriority.Normal;
+
                     try
                     {
                         await _dataAcquisitionLogManager.CreateAsync(
@@ -229,15 +237,15 @@ public class PatientDataService : IPatientDataService
                                 FacilityId = request.FacilityId,
                                 CorrelationId = request.CorrelationId,
                                 PatientId = request.ConsumeResult.Message.Value.PatientId,
+                                Priority = priority,
                                 ExecutionDate = System.DateTime.UtcNow,
-                                Priority = AcquisitionPriority.Normal,
                                 ReportableEvent = request.ConsumeResult.Message.Value.ReportableEvent,
                                 Status = RequestStatus.Pending,
                                 FhirVersion = "R4",
                                 QueryType = FhirQueryType.Read,
                                 QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),
                                 ScheduledReport = schedReport,
-                                TraceId = Activity.Current?.TraceId.ToHexString(),
+                                TraceId = traceAndSpanDelimited,
                                 FhirQuery = new List<CreateFhirQueryModel>
                                 {
                                         new CreateFhirQueryModel
@@ -316,6 +324,11 @@ public class PatientDataService : IPatientDataService
                     throw new ArgumentException($"Log with ID {request.logId} does not exist.");
                 }
 
+                if(log.ExecutionDate > DateTime.UtcNow)
+                {
+                    throw new ProcessingDelayException(@$"Log Exection Date {log.ExecutionDate} indicates a future processing time.");
+                }
+
                 //check to ensure that facilityId matches
                 if (!log.FacilityId.Equals(request.facilityId, StringComparison.InvariantCultureIgnoreCase))
                 {
@@ -349,18 +362,32 @@ public class PatientDataService : IPatientDataService
 
                 ActivityContext parentContext = default;
 
-                if (!string.IsNullOrWhiteSpace(log.TraceId) && log.TraceId.Length == 32 && IsValidHex(log.TraceId))
+                if (!string.IsNullOrWhiteSpace(log.TraceId))
                 {
-                    try
+                    var parts = log.TraceId.Split('|');  // Or whatever delimiter you choose
+                    if (parts.Length == 2 &&
+                        parts[0].Length == 32 && IsValidHex(parts[0]) &&
+                        parts[1].Length == 16 && IsValidHex(parts[1]))
                     {
-                        var traceId = ActivityTraceId.CreateFromString(log.TraceId.AsSpan());
-                        parentContext = new ActivityContext(traceId, default, ActivityTraceFlags.None);
+                        try
+                        {
+                            var traceId = ActivityTraceId.CreateFromString(parts[0].AsSpan());
+                            var spanId = ActivitySpanId.CreateFromString(parts[1].AsSpan());
+                            var traceFlags = ActivityTraceFlags.Recorded;
+
+                            parentContext = new ActivityContext(traceId, spanId, traceFlags);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to parse combined TraceId/SpanId {TraceId} for log {LogId}", log.TraceId.Sanitize(), log.Id);
+                        }
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        _logger.LogWarning(ex, "Failed to create ActivityTraceId from TraceId {TraceId} for log {LogId}", log.TraceId.Sanitize(), log.Id);
+                        _logger.LogWarning("Invalid combined TraceId format (expected 32-16 hex chars) for log {LogId}", log.Id);
                     }
                 }
+
 
                 using var activity = ServiceActivitySource.Instance.StartActivity(
                     "PatientDataService.ExecuteLogRequest",
@@ -378,39 +405,23 @@ public class PatientDataService : IPatientDataService
                 {
                     var nonReferenceLogsCnt = await _dataAcquisitionLogQueries.GetCountOfNonRefLogsIncompleteAsync(
                         log.FacilityId,
-                        log.CorrelationId,
                         log.ReportTrackingId,
+                        log.CorrelationId,
                         cancellationToken);
 
-                    if (nonReferenceLogsCnt > 0 && (log.RetryAttempts ?? 0) < DataAcquisitionLog.MaxRetryAttempts)
-                    {
-                        log.Status = RequestStatus.Pending;
-                        log.RetryAttempts = (log.RetryAttempts ?? 0) + 1;
-                        await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
-                        {
-                            Id = log.Id,
-                            ResourceAcquiredIds = log.ResourceAcquiredIds,
-                            RetryAttempts = log.RetryAttempts,
-                            CompletionDate = log.CompletionDate,
-                            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
-                            ExecutionDate = log.ExecutionDate,
-                            Notes = log.Notes,
-                            Status = log.Status,
-                        }, cancellationToken);
-                        return;
-                    }
-                    else if ((log.RetryAttempts ?? 0) >= DataAcquisitionLog.MaxRetryAttempts)
+                    if (nonReferenceLogsCnt > 0)
                     {
                         log.Notes ??= new List<string>();
-                        log.Status = RequestStatus.Failed;
-                        log.Notes.Add($"[{DateTime.UtcNow}] Log with ID {log.Id} has exceeded the maximum retry attempts. Not all Non-reference resource queries are completed. Marking as Failed.");
+                        log.Status = RequestStatus.Pending;
+                        log.Notes.Add($"[{DateTime.UtcNow}] Deferring log with ID {log.Id} due to {nonReferenceLogsCnt} incomplete non-reference log(s).");
                         await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                         {
                             Id = log.Id,
                             ResourceAcquiredIds = log.ResourceAcquiredIds,
                             RetryAttempts = log.RetryAttempts,
                             CompletionDate = log.CompletionDate,
-                            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
+                            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                            TraceId = log.TraceId,
                             ExecutionDate = log.ExecutionDate,
                             Notes = log.Notes,
                             Status = log.Status,
@@ -433,7 +444,8 @@ public class PatientDataService : IPatientDataService
                     ResourceAcquiredIds = log.ResourceAcquiredIds,
                     RetryAttempts = log.RetryAttempts,
                     CompletionDate = log.CompletionDate,
-                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
+                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                    TraceId = log.TraceId,
                     ExecutionDate = log.ExecutionDate,
                     Notes = log.Notes,
                     Status = log.Status,
@@ -456,23 +468,23 @@ public class PatientDataService : IPatientDataService
                 var resourceIds = new HashSet<string>();
 
                 bool skipFetch = false;
-                
+
                 //4. call api
                 foreach (var fhirQuery in log.FhirQuery.ToList())
                 {
-                    if(skipFetch)
+                    if (skipFetch)
                     {
                         break;
                     }
 
                     //check if log is search and not census, if true,
-                    if ((fhirQuery.QueryType == FhirQueryType.Search || fhirQuery.QueryType == FhirQueryType.SearchPost)&& !log.IsCensus)
+                    if ((fhirQuery.QueryType == FhirQueryType.Search || fhirQuery.QueryType == FhirQueryType.SearchPost) && !log.IsCensus)
                     {
                         var idParams = fhirQuery.QueryParameters.Where(x => x.StartsWith("_id=", StringComparison.InvariantCultureIgnoreCase)).ToList();
-                        if(idParams.Any())
+                        if (idParams.Any())
                         {
                             var ids = new List<string>();
-                            foreach(var idParam in idParams)
+                            foreach (var idParam in idParams)
                             {
                                 var splitIds = idParam.Substring(4).Trim().Split(',');
                                 ids.AddRange(splitIds);
@@ -512,7 +524,7 @@ public class PatientDataService : IPatientDataService
                             {
                                 throw new NotSupportedException("Bulk Data is currently not supported.");
                             }
-                        } 
+                        }
                     }
                 }
 
@@ -530,11 +542,61 @@ public class PatientDataService : IPatientDataService
                     RetryAttempts = log.RetryAttempts,
                     ResourceAcquiredIds = log.ResourceAcquiredIds,
                     CompletionDate = log.CompletionDate,
-                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
+                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                    TraceId = log.TraceId,
                     ExecutionDate = log.ExecutionDate,
                     Notes = log.Notes,
                     Status = log.Status,
                 }, cancellationToken);
+            }
+            catch(ProcessingDelayException ex)
+            {
+                log!.Notes ??= new List<string>();
+
+                log.RetryAttempts ??= 0;
+
+                log.Status = RequestStatus.Pending;
+                log.Notes.Add(ex.Message);
+
+                await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                {
+                    Id = log.Id,
+                    RetryAttempts = log.RetryAttempts,
+                    ExecutionDate = log.ExecutionDate,
+                    Status = log.Status,
+                    Notes = log.Notes,
+                    ResourceAcquiredIds = log.ResourceAcquiredIds,
+                    CompletionDate = log.CompletionDate,
+                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                    TraceId = log.TraceId
+                }, cancellationToken);
+            }
+            catch (TooManyRequestsException ex)
+            {
+                _logger.LogWarning(ex, "Throttled by 429 for facility {FacilityId}", log.FacilityId.Sanitize());
+
+                log.Notes ??= new List<string>();
+
+                log.RetryAttempts ??= 0;
+
+                log.ExecutionDate = DateTime.UtcNow.Add(ex.RetryAfter);
+                log.Status = RequestStatus.Pending; //Don't count this as a failure
+                log.Notes.Add($"[{DateTime.UtcNow}] Throttled (429): Retrying after {ex.RetryAfter.TotalSeconds}s. Attempt {log.RetryAttempts}.");
+
+                await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                {
+                    Id = log.Id,
+                    RetryAttempts = log.RetryAttempts,
+                    ExecutionDate = log.ExecutionDate,
+                    Status = log.Status,
+                    Notes = log.Notes,
+                    ResourceAcquiredIds = log.ResourceAcquiredIds,
+                    CompletionDate = log.CompletionDate,
+                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                    TraceId = log.TraceId
+                }, cancellationToken);
+
+                await _dataAcquisitionLogManager.ThrottleFacilityAcquisitions(log.FacilityId, log.ExecutionDate.Value, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -550,7 +612,8 @@ public class PatientDataService : IPatientDataService
                     ResourceAcquiredIds = log.ResourceAcquiredIds,
                     RetryAttempts = log.RetryAttempts,
                     CompletionDate = log.CompletionDate,
-                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
+                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                    TraceId = log.TraceId,
                     ExecutionDate = log.ExecutionDate,
                     Notes = log.Notes,
                     Status = log.Status,
@@ -578,4 +641,3 @@ public class PatientDataService : IPatientDataService
         return true;
     }
 }
-

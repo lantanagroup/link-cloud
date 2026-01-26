@@ -53,6 +53,7 @@ using StackExchange.Redis.Extensions.System.Text.Json;
 using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddStandardEnvironmentConfiguration();
 
 RegisterServices(builder);
 var app = builder.Build();
@@ -121,8 +122,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         var client = sp.GetRequiredService<IMongoClient>();
         var mongoSettings = sp.GetRequiredService<IOptions<MongoConnection>>().Value;
-        options.UseMongoDB(client, mongoSettings.DatabaseName);
+
+        options.UseMongoDB(client, mongoSettings.DatabaseName);      
     });
+
+    builder.Services.AddHostedService<MongoIndexCreationService>();
 
     // Add services to the container
     builder.Services.AddHttpClient();
@@ -242,7 +246,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddQuartz(q =>
     {
         q.UseJobFactory<QuartzJobFactory>();
-        q.UseMicrosoftDependencyInjectionJobFactory();
     });
 
     builder.Services.AddKeyedSingleton<ISchedulerFactory>("MongoScheduler", (provider, key) =>

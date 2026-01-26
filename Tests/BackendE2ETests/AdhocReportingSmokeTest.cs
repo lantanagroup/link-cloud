@@ -1,12 +1,13 @@
-﻿using Xunit.Abstractions;
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
+using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests;
 using Newtonsoft.Json.Linq;
 using RestSharp;
+using System.Diagnostics;
 using System.Net;
 using Xunit;
+using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
-using LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests;
-using System.Diagnostics;
 
 namespace LantanaGroup.Link.Tests.E2ETests;
 
@@ -97,7 +98,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     [Fact]
     [Trait("Category", "AdHocSingleMeasureSmokeTest")]
     public async Task SmokeTest_GenerateSingleMeasureAdHocReport()
-    {        
+    {
         TestConfig.AdhocReportingSmokeTestConfig.RemoveFacilityConfig = true;
         AdHocReportApiRequests apiE2E = new AdHocReportApiRequests(output);
         SubmissionZipReader submissionReportZip = new SubmissionZipReader(output);
@@ -106,46 +107,38 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
         Stopwatch stopwatch = new Stopwatch();
         stopwatch.Start();
-        output.WriteLine($"Stopwatch start {DateTime.UtcNow.ToString()}");
+        output.WriteLine($"Stopwatch start {DateTime.UtcNow}");
 
-        await measureLoader.LoadAsync();
-        apiE2E.Create_SingleMeasureAdHocTestFacility();
-        apiE2E.Create_SingleMeasureCensusConfiguration_AdHoc();
-        apiE2E.Create_SingleMeasureQueryDispatchConfig_AdHoc();
-        apiE2E.Create_SingleMeasure_FHIRQueryConfigByFacility_AdHoc();
-        apiE2E.Create_SingleMeasure_MontlhyQueryPlanByFacility_AdHoc();
-        apiE2E.Create_SingleMeasure_DischargeQueryPlanByFacility_AdHoc();
-        apiE2E.Create_SingleMeasureFHIRQueryListByFacility_AdHoc();
-        apiE2E.GenerateSingleMeasureAdHocReport_ACH();
+            await measureLoader.LoadAsync();
+            apiE2E.Create_SingleMeasureAdHocTestFacility();
+            apiE2E.Create_SingleMeasureCensusConfiguration_AdHoc();
+            apiE2E.Create_SingleMeasureQueryDispatchConfig_AdHoc();
+            apiE2E.Create_SingleMeasure_FHIRQueryConfigByFacility_AdHoc();
+            apiE2E.Create_SingleMeasure_MontlhyQueryPlanByFacility_AdHoc();
+            apiE2E.Create_SingleMeasure_DischargeQueryPlanByFacility_AdHoc();
+            apiE2E.Create_SingleMeasureFHIRQueryListByFacility_AdHoc();
+            apiE2E.GenerateSingleMeasureAdHocReport_ACH();
 
-        await submissionReportZip.WaitForSingleMeasureZipContentsAsync();
-        var failures = new List<string>();
         try
         {
-            await submissionReportZip.DownloadAndExtractSingleMeasureZipAsync(true);
-            TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateFilesAppear, failures);
-            TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.SingleMeasureAdHocValidateFilesDoNotAppear, failures);
-            TestConfig.ValidationHelper.TryRunValidation(() => submissionReportZip.ValidateSpecificPatientFileContents(3, 2000), failures);
-            TestConfig.ValidationHelper.TryRunValidation(submissionReportZip.ValidateSingleMeasureAdHocAggregateACHMFile, failures);
+            await submissionReportZip.WaitForSingleMeasureZipContentsAsync();
+            await submissionReportZip.DownloadAndExtractSingleMeasureZipAsync(save: true);
+
+            submissionReportZip.SingleMeasureAdHocValidateFilesAppear();
+            submissionReportZip.SingleMeasureAdHocValidateFilesDoNotAppear();
+            submissionReportZip.ValidateSingleMeasureAdHocAggregateACHMFile();
+            submissionReportZip.ValidateAllPatientsWithConfigurableSeverity();
+
             apiE2E.GETSingleMeasureAdHocFacilityValidationResultsForReport();
+
+            output.WriteLine("[PASS] Smoke test completed with all verifications passing.");
         }
         finally
         {
-            if (failures.Any())
-            {
-                output.WriteLine("🔴 ================= TEST RESULT SUMMARY =================🔴 ");
-                foreach (var fail in failures)
-                    output.WriteLine(fail);
-                Xunit.Assert.Fail($"{failures.Count} verification(s) failed. See console output below.");
-            }
-            else
-                output.WriteLine("[PASS] Smoke test completed with all verifications passing.");
-
             stopwatch.Stop();
-            output.WriteLine($"Stopwatch stop {DateTime.UtcNow.ToString()} - Total Time: {stopwatch.Elapsed}");
-        }      
+            output.WriteLine($"Stopwatch stop {DateTime.UtcNow} - Total Time: {stopwatch.Elapsed}");
+        }
     }
-
     private async Task GenerateReport(string? measureId)
     {
         if (measureId == null)
@@ -181,15 +174,11 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
         var downloadedResources = await this.DownloadReport(reportId);
 
-        // Confirm that there is a file called "manifest.ndjson"
         Assert.True(downloadedResources.ContainsKey("manifest.ndjson"), $"Expected report to include manifest.ndjson but it was not");
-        // TODO: Validate that it is correct
 
-        // Confirm that there is a file called "patient-{patientId}.ndjson"
         foreach (var patientId in TestConfig.AdhocReportingSmokeTestConfig.PatientIds)
         {
             Assert.True(downloadedResources.ContainsKey($"patient-{patientId}.ndjson"), $"Expected report to include patient-{patientId}.ndjson but it was not");
-            // TODO: Validate that it is correct
         }
 
         output.WriteLine("Done generating and validating report.");
@@ -216,7 +205,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
         using var zipStream = new MemoryStream(response.RawBytes ?? []);
         using var archive = new System.IO.Compression.ZipArchive(zipStream, System.IO.Compression.ZipArchiveMode.Read);
-        var jsonParser = new Hl7.Fhir.Serialization.FhirJsonParser();
+        var jsonParser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
 
         foreach (var entry in archive.Entries)
         {
@@ -296,7 +285,6 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         output.WriteLine("Creating normalization config...");
         var request = new RestRequest("normalization/Operations", Method.Post);
 
-        // Construct the request body with dynamic facilityId
         var body = new
         {
             ResourceTypes = new[] { "Location" },

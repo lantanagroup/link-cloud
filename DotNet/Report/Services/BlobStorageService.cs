@@ -2,10 +2,10 @@
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Options;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
@@ -14,9 +14,6 @@ namespace LantanaGroup.Link.Report.Services
 {
     public class BlobStorageService
     {
-        private static readonly JsonSerializerOptions lenientJsonOptions =
-            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector).UsingMode(DeserializerModes.Ostrich);
-
         private readonly BlobStorageSettings _settings;
         private readonly BlobContainerClient? _containerClient;
 
@@ -85,7 +82,7 @@ namespace LantanaGroup.Link.Report.Services
             ReadOnlyMemory<byte> lineFeed = new([0x0a]);
             foreach (Bundle.EntryComponent entry in patientSubmission.Bundle.Entry)
             {
-                await JsonSerializer.SerializeAsync(stream, entry.Resource, lenientJsonOptions, cancellationToken);
+                await JsonSerializer.SerializeAsync(stream, entry.Resource, LinkFhirSerializerOptions.ForFhirLenientSerialization, cancellationToken);
                 await stream.WriteAsync(lineFeed, cancellationToken);
             }
             return blobClient.Uri;
@@ -113,7 +110,7 @@ namespace LantanaGroup.Link.Report.Services
 
             foreach (var resource in resources)
             {
-                await JsonSerializer.SerializeAsync(stream, resource, lenientJsonOptions, cancellationToken);
+                await JsonSerializer.SerializeAsync(stream, resource, LinkFhirSerializerOptions.ForFhirLenientSerialization, cancellationToken);
                 await stream.WriteAsync(lineFeed, cancellationToken);
             }
 

@@ -14,6 +14,7 @@ using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Mo
 using Task = System.Threading.Tasks.Task;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using Grpc.Core;
 
 namespace LantanaGroup.Link.DataAcquisition.Jobs;
 
@@ -77,6 +78,9 @@ public class AcquisitionProcessingJob : IJob
 
             var config = await fhirQueryConfigurationQueries.GetByFacilityIdAsync(facilityId, cancellationToken);
 
+            List<RequestStatus> statuses = [RequestStatus.Failed, RequestStatus.Pending];
+            var dateTimeNow = DateTime.UtcNow;
+
             if (config == null)
             {
                 _logger.LogCritical("Request FAILED due to missing FhirQueryConfiguration. FacilityId: {facilityId}", facilityId.Sanitize());
@@ -85,7 +89,7 @@ public class AcquisitionProcessingJob : IJob
                 while (true)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var requests = await dataAcquisitionLogQueries.GetNextEligibleBatchForFacility(facilityId, lastMissingConfigId, BatchSize, cancellationToken);
+                    var requests = await dataAcquisitionLogQueries.GetNextEligibleBatchForFacility(facilityId, lastMissingConfigId, BatchSize, statuses, dateTimeNow, cancellationToken);
                     if (!requests.Any()) break;
 
                     foreach (var log in requests)
@@ -115,7 +119,7 @@ public class AcquisitionProcessingJob : IJob
 
             if (!IsWithinAcquisitionWindow(config.MinAcquisitionPullTime, config.MaxAcquisitionPullTime))
             {
-                _logger.LogInformation("Current time {currentTime} is outside the acquisition window for facility {facilityId}.", DateTime.UtcNow.TimeOfDay, facilityId);
+                _logger.LogInformation("Current time {currentTime} is outside the acquisition window for facility {facilityId}.", dateTimeNow.TimeOfDay, facilityId);
                 return;
             }
 
@@ -124,7 +128,7 @@ public class AcquisitionProcessingJob : IJob
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 _logger.LogInformation("Fetching batch after Id {lastId} for facility {facilityId}", lastId?.ToString() ?? "null", facilityId);
-                var requests = await dataAcquisitionLogQueries.GetNextEligibleBatchForFacility(facilityId, lastId, BatchSize, cancellationToken);
+                var requests = await dataAcquisitionLogQueries.GetNextEligibleBatchForFacility(facilityId, lastId, BatchSize, statuses, dateTimeNow, cancellationToken);
                 if (!requests.Any())
                 {
                     _logger.LogInformation("No more logs to process for facility {facilityId}", facilityId);

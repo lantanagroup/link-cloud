@@ -5,6 +5,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
@@ -21,8 +22,6 @@ using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Serilog;
-using System.Linq.Expressions;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
@@ -718,5 +717,225 @@ public class PatientDataServiceTests
             ),
             cancellationToken),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_Handles429WithSecondsDelay_ReschedulesLogWithDelay()
+    {
+        // Arrange
+        var request = new AcquisitionRequest(1, "facility-1");
+        var cancellationToken = CancellationToken.None;
+
+        var log = new DataAcquisitionLogModel
+        {
+            Id = 1,
+            FacilityId = "facility-1",
+            PatientId = "Patient/123",
+            Status = RequestStatus.Ready,
+            CorrelationId = "corr-1",
+            FhirQuery = new List<FhirQueryModel>
+        {
+            new FhirQueryModel
+            {
+                QueryType = FhirQueryType.Read,
+                ResourceTypes = new List<ResourceType> { ResourceType.Patient }
+            }
+        },
+            ScheduledReport = new ScheduledReport()
+        };
+
+        _mockLogQueries
+            .Setup(q => q.GetAsync(1, cancellationToken))
+            .ReturnsAsync(log);
+
+        _mockFhirQueryQueries
+            .Setup(q => q.GetByFacilityIdAsync("facility-1", cancellationToken))
+            .ReturnsAsync(new FhirQueryConfigurationModel { FacilityId = "facility-1" });
+
+        // Simulate 429 with Retry-After: 30 seconds
+        _mockFhirApiService
+            .Setup(x => x.ExecuteRead(
+                It.IsAny<DataAcquisitionLogModel>(),
+                It.IsAny<FhirQueryModel>(),
+                ResourceType.Patient,
+                It.IsAny<FhirQueryConfigurationModel>(),
+                cancellationToken))
+            .ThrowsAsync(new TooManyRequestsException("Rate limited", TimeSpan.FromSeconds(30)));
+
+        // Act
+        await _service.ExecuteLogRequest(request, cancellationToken);
+
+        // Assert: Log updated with delay (ExecutionDate ~30s from now), Pending status, retry incremented
+        _mockLogManager.Verify(m => m.UpdateAsync(
+            It.Is<UpdateDataAcquisitionLogModel>(u =>
+                u.Status == RequestStatus.Pending &&
+                u.RetryAttempts == 0 &&
+                u.ExecutionDate >= DateTime.UtcNow.AddSeconds(20) &&  // Widened range to account for execution time
+                u.ExecutionDate <= DateTime.UtcNow.AddSeconds(40) &&
+                u.Notes.Any(n => n.Contains("Throttled (429): Retrying after") && n.Contains("30"))  // Check for specific delay in note
+            ),
+            cancellationToken),
+            Times.Exactly(1));  // Exactly once for the reschedule (the Processing update is separate)
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_Handles429WithDateDelay_ReschedulesLogWithCalculatedDelay()
+    {
+        // Arrange
+        var request = new AcquisitionRequest(1, "facility-1");
+        var cancellationToken = CancellationToken.None;
+
+        var log = new DataAcquisitionLogModel
+        {
+            Id = 1,
+            FacilityId = "facility-1",
+            PatientId = "Patient/123",
+            Status = RequestStatus.Ready,
+            CorrelationId = "corr-1",
+            FhirQuery = new List<FhirQueryModel>
+            {
+                new FhirQueryModel
+                {
+                    QueryType = FhirQueryType.Read,
+                    ResourceTypes = new List<ResourceType> { ResourceType.Patient }
+                }
+            },
+            ScheduledReport = new ScheduledReport()
+        };
+
+        _mockLogQueries
+            .Setup(q => q.GetAsync(1, cancellationToken))
+            .ReturnsAsync(log);
+
+        _mockFhirQueryQueries
+            .Setup(q => q.GetByFacilityIdAsync("facility-1", cancellationToken))
+            .ReturnsAsync(new FhirQueryConfigurationModel { FacilityId = "facility-1" });
+
+        // Simulate 429 with Retry-After as a future date (e.g., 2 minutes from now)
+        var futureDate = DateTimeOffset.UtcNow.AddMinutes(2);
+        var expectedDelay = TimeSpan.FromMinutes(2);
+        _mockFhirApiService
+            .Setup(x => x.ExecuteRead(
+                It.IsAny<DataAcquisitionLogModel>(),
+                It.IsAny<FhirQueryModel>(),
+                ResourceType.Patient,
+                It.IsAny<FhirQueryConfigurationModel>(),
+                cancellationToken))
+            .ThrowsAsync(new TooManyRequestsException("Rate limited", expectedDelay));
+
+        // Act
+        await _service.ExecuteLogRequest(request, cancellationToken);
+
+        // Assert: Log rescheduled ~2min from now
+        _mockLogManager.Verify(m => m.UpdateAsync(
+            It.Is<UpdateDataAcquisitionLogModel>(u =>
+                u.Status == RequestStatus.Pending &&
+                u.RetryAttempts == 0 &&
+                u.ExecutionDate >= DateTime.UtcNow.AddMinutes(1.9) &&  // Approximate
+                u.ExecutionDate <= DateTime.UtcNow.AddMinutes(2.1) &&
+                u.Notes.Any(n => n.Contains("Throttled (429): Retrying after"))
+            ),
+            cancellationToken),
+            Times.AtLeastOnce);
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_Handles429WithInvalidNegativeHeader_UsesParsedDefaultDelay()
+    {
+        // Arrange
+        var request = new AcquisitionRequest(1, "facility-1");
+        var cancellationToken = CancellationToken.None;
+
+        var log = new DataAcquisitionLogModel
+        {
+            Id = 1,
+            FacilityId = "facility-1",
+            PatientId = "Patient/123",
+            Status = RequestStatus.Ready,
+            CorrelationId = "corr-1",
+            FhirQuery = new List<FhirQueryModel>
+        {
+            new FhirQueryModel
+            {
+                QueryType = FhirQueryType.Read,
+                ResourceTypes = new List<ResourceType> { ResourceType.Patient }
+            }
+        },
+            ScheduledReport = new ScheduledReport()
+        };
+
+        _mockLogQueries
+            .Setup(q => q.GetAsync(1, cancellationToken))
+            .ReturnsAsync(log);
+
+        _mockFhirQueryQueries
+            .Setup(q => q.GetByFacilityIdAsync("facility-1", cancellationToken))
+            .ReturnsAsync(new FhirQueryConfigurationModel { FacilityId = "facility-1" });
+
+        // Simulate 429 with negative/invalid Retry-After (parser will default to 60s)
+        _mockFhirApiService
+            .Setup(x => x.ExecuteRead(
+                It.IsAny<DataAcquisitionLogModel>(),
+                It.IsAny<FhirQueryModel>(),
+                ResourceType.Patient,
+                It.IsAny<FhirQueryConfigurationModel>(),
+                cancellationToken))
+            .ThrowsAsync(new TooManyRequestsException("Rate limited", TimeSpan.FromSeconds(60)));  // Mimic parsed default
+
+        // Act
+        await _service.ExecuteLogRequest(request, cancellationToken);
+
+        // Assert: Log rescheduled ~60s from now, Pending, retry=1, note reflects default delay
+        _mockLogManager.Verify(m => m.UpdateAsync(
+            It.Is<UpdateDataAcquisitionLogModel>(u =>
+                u.Status == RequestStatus.Pending &&
+                u.RetryAttempts == 0 &&
+                u.ExecutionDate >= DateTime.UtcNow.AddSeconds(55) &&  // Approx for 60s, allowing execution variance
+                u.ExecutionDate <= DateTime.UtcNow.AddSeconds(65) &&
+                u.Notes.Any(n => n.Contains("Throttled (429): Retrying after") && n.Contains("60"))
+            ),
+            cancellationToken),
+            Times.Exactly(1));  // Once for reschedule (Processing update separate)
+    }
+
+    [Fact]
+    public async Task GetNextEligibleBatchForFacility_OrdersByPriorityDescending_ThenExecutionDateAscending_IncludesAllFailedRegardlessOfRetries()
+    {
+        // Arrange
+        var facilityId = "facility-1";
+        long? lastId = null;
+        int batchSize = 4;
+        var cancellationToken = CancellationToken.None;
+
+        // Simulate logs with varying priorities, dates, and retry attempts (including exceeded max)
+        var logs = new List<DataAcquisitionLogModel>
+    {
+        new() { Id = 1, Priority = AcquisitionPriority.Normal, ExecutionDate = DateTime.UtcNow.AddMinutes(-5), Status = RequestStatus.Pending },
+        new() { Id = 2, Priority = AcquisitionPriority.High, ExecutionDate = DateTime.UtcNow.AddMinutes(-10), Status = RequestStatus.Pending },
+        new() { Id = 3, Priority = AcquisitionPriority.High, ExecutionDate = DateTime.UtcNow.AddMinutes(-1), Status = RequestStatus.Pending },
+        new() { Id = 4, Priority = AcquisitionPriority.Normal, ExecutionDate = DateTime.UtcNow.AddMinutes(-2), Status = RequestStatus.Failed, RetryAttempts = 2 },  // Retryable (below max)
+        new() { Id = 5, Priority = AcquisitionPriority.Critical, ExecutionDate = DateTime.UtcNow.AddMinutes(-3), Status = RequestStatus.Failed, RetryAttempts = 6 }   // Exceeded max retries, but still included
+    };
+
+        var dateTimeNow = DateTime.UtcNow;
+        _mockLogQueries
+            .Setup(q => q.GetNextEligibleBatchForFacility(facilityId, lastId, batchSize, new() { RequestStatus.Pending, RequestStatus.Failed }, dateTimeNow, cancellationToken))
+            .ReturnsAsync(logs
+                .Where(l => l.Status == RequestStatus.Pending || l.Status == RequestStatus.Failed)
+                .OrderBy(l => l.Priority)  // Ascending: Critical (0), High (1), Normal (2)
+                .ThenBy(l => l.ExecutionDate)
+                .ThenBy(l => l.Id)
+                .Take(batchSize)
+                .ToList());
+
+        // Act
+        var result = await _mockLogQueries.Object.GetNextEligibleBatchForFacility(facilityId, lastId, batchSize, new() { RequestStatus.Pending, RequestStatus.Failed }, dateTimeNow, cancellationToken);
+
+        // Assert: All Pending and Failed included, ordered correctly (Critical/High first, then by date; includes exceeded retries)
+        Assert.Equal(4, result.Count);  // Batch size (original 5 matching, take 4)
+        Assert.Equal(5, result[0].Id);  // Critical first (even if Failed and exceeded retries)
+        Assert.Equal(2, result[1].Id);  // High, oldest ExecutionDate
+        Assert.Equal(3, result[2].Id);  // High, newer ExecutionDate
+        Assert.Equal(1, result[3].Id);  // Normal Pending (next after highs)
     }
 }

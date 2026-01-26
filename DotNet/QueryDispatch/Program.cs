@@ -50,6 +50,7 @@ using System.Reflection;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddStandardEnvironmentConfiguration();
 
 // load external configuration source (if specified)
 builder.AddExternalConfiguration(QueryDispatchConstants.ServiceName);
