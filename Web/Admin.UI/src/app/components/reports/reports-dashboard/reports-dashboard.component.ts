@@ -6,7 +6,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatPaginatorModule, MatPaginator, PageEvent } from '@angular/material/paginator';
-import { MatSortModule, MatSort } from '@angular/material/sort';
+import { MatSortModule, MatSort, Sort } from '@angular/material/sort';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { forkJoin, Subscription } from 'rxjs';
 import { TenantService } from '../../../services/gateway/tenant/tenant.service';
@@ -52,6 +52,9 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
   displayedColumns: string[] = ['id', 'facilityId', 'reportStartDate', 'frequency', 'reportTypes', 'patientsInCensus', 'patientsInIP', 'status', 'action'];
   dataSource = new MatTableDataSource<IReportSchedule>([]);
   reportSchedules: IReportSchedule[] = [];
+  
+  currentSortBy: string = 'CreateDate';
+  currentSortOrder: number = 1; // 1 = Descending, 0 = Ascending
 
   constructor(
     private route: ActivatedRoute,
@@ -85,8 +88,8 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
       undefined,
       undefined,
       undefined,
-      'CreateDate',
-      1, // Descending
+      this.currentSortBy,
+      this.currentSortOrder,
       this.paginationMetadata.pageSize,
       this.paginationMetadata.pageNumber + 1 // API expects 1-based indexing
     ).subscribe({
@@ -107,6 +110,30 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
   onPageChange(event: PageEvent): void {
     this.paginationMetadata.pageSize = event.pageSize;
     this.paginationMetadata.pageNumber = event.pageIndex;
+    this.loadReportSchedules();
+  }
+
+  onSortChange(sort: Sort): void {
+    if (sort.active && sort.direction) {
+      // Map UI column names to API field names
+      const sortFieldMap: { [key: string]: string } = {
+        'id': 'Id',
+        'facilityId': 'FacilityId',
+        'reportStartDate': 'ReportStartDate',
+        'frequency': 'Frequency',
+        'status': 'Status'
+      };
+      
+      this.currentSortBy = sortFieldMap[sort.active] || 'CreateDate';
+      this.currentSortOrder = sort.direction === 'desc' ? 1 : 0;
+    } else {
+      // Reset to default sort
+      this.currentSortBy = 'CreateDate';
+      this.currentSortOrder = 1;
+    }
+    
+    // Reset to first page when sorting changes
+    this.paginationMetadata.pageNumber = 0;
     this.loadReportSchedules();
   }
 
