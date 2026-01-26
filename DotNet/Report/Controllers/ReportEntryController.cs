@@ -1,11 +1,15 @@
 ﻿using LantanaGroup.Link.Report.Domain;
+using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.Report.Controllers
 {
@@ -139,6 +143,70 @@ namespace LantanaGroup.Link.Report.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(new EventId(ReportConstants.LoggingIds.GetItem, "GetByPatientId"), ex, "An exception occurred while attempting to get a Report Entry record for Patient Id {id}", HtmlInputSanitizer.Sanitize(patientId));
+
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Returns paged report entries with optional filters
+        /// </summary>
+        /// <param name="facilityId">Optional facility ID filter</param>
+        /// <param name="patientId">Optional patient ID filter</param>
+        /// <param name="reportScheduleId">Optional report schedule ID filter</param>
+        /// <param name="reportingStatus">Optional reporting status filter</param>
+        /// <param name="submissionStatus">Optional submission status filter</param>
+        /// <param name="reportType">Optional report type filter</param>
+        /// <param name="sortBy">Optional sort field (e.g., "CreateDate", "PatientId")</param>
+        /// <param name="sortOrder">Optional sort order (Ascending or Descending)</param>
+        /// <param name="pageSize">Number of records per page (default: 10)</param>
+        /// <param name="pageNumber">Page number (default: 1)</param>
+        [HttpGet("search")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<ReportEntry>))]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<PagedConfigModel<ReportEntry>>> Search(
+            string? facilityId = null,
+            string? patientId = null,
+            string? reportScheduleId = null,
+            ReportingStatus? reportingStatus = null,
+            SubmissionStatus? submissionStatus = null,
+            string? reportType = null,
+            string? sortBy = null,
+            SortOrder? sortOrder = null,
+            int pageSize = 10,
+            int pageNumber = 1)
+        {
+            try
+            {
+                if (pageSize < 1 || pageSize > 100)
+                {
+                    pageSize = 10;
+                }
+
+                if (pageNumber < 1)
+                {
+                    pageNumber = 1;
+                }
+
+                var result = await _reportEntryManager.SearchAsync(
+                    facilityId,
+                    patientId,
+                    reportScheduleId,
+                    reportingStatus,
+                    submissionStatus,
+                    reportType,
+                    sortBy,
+                    sortOrder,
+                    pageSize,
+                    pageNumber);
+
+                Response.Headers.Append("X-Pagination", JsonSerializer.Serialize(result.Metadata));
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(new EventId(ReportConstants.LoggingIds.SearchPerformed, "Search"), ex, "An exception occurred while attempting to search Report Entry records");
 
                 throw;
             }

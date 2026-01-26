@@ -13,9 +13,9 @@ namespace LantanaGroup.Link.Report.Entities
         public string ReportScheduleId { get; set; } = string.Empty;
         public string PatientId { get; set; } = string.Empty;
         [BsonRepresentation(MongoDB.Bson.BsonType.String)]
-        public ReportingStatus ReportingStatus = ReportingStatus.PatientIdentified;
+        public ReportingStatus ReportingStatus { get; set; } = ReportingStatus.PatientIdentified;
         [BsonRepresentation(MongoDB.Bson.BsonType.String)]
-        public SubmissionStatus? SubmissionStatus = null;
+        public SubmissionStatus? SubmissionStatus { get; set; } = null;
         public string AggregateReportUri { get; set; } = string.Empty;
         public string AggregateReportBlobName { get; set; } = string.Empty;
         public List<EvaluatedMeasureReport> MeasureReportList { get; set; } = new List<EvaluatedMeasureReport>();

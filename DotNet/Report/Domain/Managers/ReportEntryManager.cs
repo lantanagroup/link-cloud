@@ -1,14 +1,15 @@
 ﻿using AngleSharp.Dom;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Factory;
+using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
-using LantanaGroup.Link.Shared.Application.Enums;
+using LinqKit;
 using System.Linq.Expressions;
 using System.Threading;
-using LantanaGroup.Link.Report.Application.Models;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
 {
@@ -32,6 +33,19 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         Task<ReportEntry> UpdateAsyncWithAggregateResult(ReportEntry entry, AggregateResult aggregateResult, CancellationToken cancellationToken = default);
         Task<ReportEntry> UpdateAsyncNotReportableEntry(ReportEntry entry, CancellationToken cancellationToken = default);
+
+        Task<PagedConfigModel<ReportEntry>> SearchAsync(
+            string? facilityId,
+            string? patientId,
+            string? reportScheduleId,
+            ReportingStatus? reportingStatus,
+            SubmissionStatus? submissionStatus,
+            string? reportType,
+            string? sortBy,
+            SortOrder? sortOrder,
+            int pageSize,
+            int pageNumber,
+            CancellationToken cancellationToken = default);
     }
 
     public class ReportEntryManager : IReportEntryManager
@@ -128,6 +142,62 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             await _database.SaveChangesAsync();
 
             return entry;
+        }
+
+        public async Task<PagedConfigModel<ReportEntry>> SearchAsync(
+            string? facilityId,
+            string? patientId,
+            string? reportScheduleId,
+            ReportingStatus? reportingStatus,
+            SubmissionStatus? submissionStatus,
+            string? reportType,
+            string? sortBy,
+            SortOrder? sortOrder,
+            int pageSize,
+            int pageNumber,
+            CancellationToken cancellationToken = default)
+        {
+            Expression<Func<ReportEntry, bool>> predicate = x => true;
+
+            if (!string.IsNullOrWhiteSpace(facilityId))
+            {
+                predicate = predicate.And(q => q.FacilityId == facilityId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(patientId))
+            {
+                predicate = predicate.And(q => q.PatientId == patientId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(reportScheduleId))
+            {
+                predicate = predicate.And(q => q.ReportScheduleId == reportScheduleId);
+            }
+
+            if (reportingStatus.HasValue)
+            {
+                predicate = predicate.And(q => q.ReportingStatus == reportingStatus.Value);
+            }
+
+            if (submissionStatus.HasValue)
+            {
+                predicate = predicate.And(q => q.SubmissionStatus == submissionStatus.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(reportType))
+            {
+                predicate = predicate.And(q => q.MeasureReportList.Any(a => a.ReportType == reportType));
+            }
+
+            var (results, metadata) = await _database.ReportEntryRepository.SearchAsync(
+                predicate,
+                sortBy,
+                sortOrder,
+                pageSize,
+                pageNumber,
+                cancellationToken);
+
+            return new PagedConfigModel<ReportEntry>(results, metadata);
         }
     }
 }
