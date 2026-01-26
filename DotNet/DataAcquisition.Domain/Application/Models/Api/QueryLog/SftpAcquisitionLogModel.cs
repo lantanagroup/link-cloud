@@ -20,7 +20,7 @@ public record PagedSftpAcquisitionLogModel : IPagedModel<SftpAcquisitionLogModel
 
 public record CreateSftpLogRequest(string FacilityId, string FileName, DateTime ProcessDate);
 
-public record UpdateSftpLogRequest(Guid ExternalId, string FileName, DateTime ProcessDate);
+public record UpdateSftpLogRequest(string ExternalId, string FileName, DateTime ProcessDate);
 
 public static class SftpAcquisitionLogModelExtensions
 {
@@ -54,7 +54,7 @@ public static class SftpAcquisitionLogModelExtensions
     );
 
     public static SftpAcquisitionLogModel ToModel(this UpdateSftpLogRequest req) => new(
-        ExternalId: req.ExternalId,
+        ExternalId: new Guid(req.ExternalId),
         FacilityId: string.Empty,
         FileName: req.FileName,
         PatientCount: 0,

@@ -1,3 +1,4 @@
+using FluentValidation;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -26,18 +27,25 @@ public class SftpConfigurationController : Controller
     private readonly ISftpConfigurationQueries _sftpConfigurationQueries;
     private readonly ISftpCredentialService _sftpCredentialService;
     private readonly ITenantApiService _tenantApiService;
+    private readonly IValidator<CreateSftpConfigurationModel> _createValidator;
+    private readonly IValidator<SftpConfigurationModel> _updateValidator;
 
     public SftpConfigurationController(
         ILogger<SftpConfigurationController> logger,
         ISftpConfigurationManager sftpConfigurationManager,
         ISftpConfigurationQueries sftpConfigurationQueries,
-        ISftpCredentialService sftpCredentialService, ITenantApiService tenantApiService)
+        ISftpCredentialService sftpCredentialService,
+        ITenantApiService tenantApiService,
+        IValidator<CreateSftpConfigurationModel> createValidator,
+        IValidator<SftpConfigurationModel> updateValidator)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _sftpConfigurationManager = sftpConfigurationManager ?? throw new ArgumentNullException(nameof(sftpConfigurationManager));
         _sftpConfigurationQueries = sftpConfigurationQueries ?? throw new ArgumentNullException(nameof(sftpConfigurationQueries));
         _sftpCredentialService = sftpCredentialService ?? throw new ArgumentNullException(nameof(sftpCredentialService));
         _tenantApiService = tenantApiService ?? throw new ArgumentNullException(nameof(tenantApiService));
+        _createValidator = createValidator ?? throw new ArgumentNullException(nameof(createValidator));
+        _updateValidator = updateValidator ?? throw new ArgumentNullException(nameof(updateValidator));
     }
 
     /// <summary>
@@ -159,12 +167,12 @@ public class SftpConfigurationController : Controller
     public async Task<ActionResult<SftpConfigurationModel>> CreateSftpConfiguration(string organizationId, CreateSftpConfigurationModel? sftpConfiguration, CancellationToken cancellationToken)
     {
         var httpContext = HttpContext;
-        
+
         // validate user access to organization before proceeding - future enhancement
-        
+
         // Sanitize organizationId
         organizationId = organizationId.SanitizeAndRemove();
-        
+
         try
         {
             if (sftpConfiguration is null)
@@ -176,7 +184,18 @@ public class SftpConfigurationController : Controller
             {
                 return BadRequest("OrganizationId is null or empty.");
             }
-            
+
+            // Validate the request
+            var validationResult = await _createValidator.ValidateAsync(sftpConfiguration, cancellationToken);
+            if (!validationResult.IsValid)
+            {
+                foreach (var error in validationResult.Errors)
+                {
+                    ModelState.AddModelError(error.PropertyName, error.ErrorMessage);
+                }
+                return BadRequest(ModelState);
+            }
+
             // Verify that the facility/organization exists
             var facilityExists = await _tenantApiService.CheckFacilityExists(organizationId, cancellationToken);
             
@@ -293,8 +312,19 @@ public class SftpConfigurationController : Controller
                 return BadRequest("The Id in the request does not match the Id in the SftpConfiguration model.");
             }
 
+            // Validate the request
+            var validationResult = await _updateValidator.ValidateAsync(sftpConfiguration, cancellationToken);
+            if (!validationResult.IsValid)
+            {
+                foreach (var error in validationResult.Errors)
+                {
+                    ModelState.AddModelError(error.PropertyName, error.ErrorMessage);
+                }
+                return BadRequest(ModelState);
+            }
+
             organizationId = organizationId.SanitizeAndRemove();
-            
+
             var result = await _sftpConfigurationManager.UpdateAsync(organizationId, sftpConfiguration, cancellationToken);
 
             if (result is null)
