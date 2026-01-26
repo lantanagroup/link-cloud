@@ -1,8 +1,9 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { environment } from 'src/environments/environment';
 import { ErrorHandlingService } from '../../error-handling.service';
 import { IReportConfigModel } from 'src/app/interfaces/report/report-config-model.interface';
+import { IPagedReportSchedule } from 'src/app/interfaces/report/report-schedule.interface';
 import { Observable, catchError, map, tap } from 'rxjs';
 import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
 import { IEntityDeletedResponse } from 'src/app/interfaces/entity-deleted-response.interface';
@@ -13,7 +14,6 @@ import { AppConfigService } from '../../app-config.service';
 })
 export class ReportService {
   constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
-
 
   createReportConfiguration(facilityId: string, reportType: string, bundlingType: string): Observable<IEntityCreatedResponse> {
     let report: IReportConfigModel = {
@@ -78,4 +78,55 @@ export class ReportService {
       )
   }
 
+  searchReportSchedules(
+    facilityId?: string,
+    frequency?: string,
+    reportType?: string,
+    reportStartDate?: Date,
+    reportEndDate?: Date,
+    status?: string,
+    endOfReportPeriodJobHasRun?: boolean,
+    sortBy?: string,
+    sortOrder?: number,
+    pageSize: number = 10,
+    pageNumber: number = 1
+  ): Observable<IPagedReportSchedule> {
+    let params = new HttpParams()
+      .set('pageSize', pageSize.toString())
+      .set('pageNumber', pageNumber.toString());
+
+    if (facilityId) {
+      params = params.set('facilityId', facilityId);
+    }
+    if (frequency) {
+      params = params.set('frequency', frequency);
+    }
+    if (reportType) {
+      params = params.set('reportType', reportType);
+    }
+    if (reportStartDate) {
+      params = params.set('reportStartDate', reportStartDate.toISOString());
+    }
+    if (reportEndDate) {
+      params = params.set('reportEndDate', reportEndDate.toISOString());
+    }
+    if (status) {
+      params = params.set('status', status);
+    }
+    if (endOfReportPeriodJobHasRun !== undefined) {
+      params = params.set('endOfReportPeriodJobHasRun', endOfReportPeriodJobHasRun.toString());
+    }
+    if (sortBy) {
+      params = params.set('sortBy', sortBy);
+    }
+    if (sortOrder !== undefined) {
+      params = params.set('sortOrder', sortOrder.toString());
+    }
+
+    return this.http.get<IPagedReportSchedule>(`${this.appConfigService.config?.baseApiUrl}/schedules/search`, { params })
+      .pipe(
+        tap(_ => console.log('Fetched report schedules.')),
+        catchError((error) => this.errorHandler.handleError(error))
+      );
+  }
 }

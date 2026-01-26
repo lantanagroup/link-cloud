@@ -59,9 +59,25 @@
   color: #000;
 }
 
-.status-pending {
+.status-new {
   background-color: #eef2ff;
   color: #4338ca;
+  box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2);
+  padding: 6px 6px;
+  border-radius: 0.375rem;
+}
+
+.status-scheduled {
+  background-color: #eef2ff;
+  color: #007D74;
+  box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2);
+  padding: 6px 6px;
+  border-radius: 0.375rem;
+}
+
+.status-endOfPeriod {
+  background-color: #eef2ff;
+  color: #5f6672;
   box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2);
   padding: 6px 6px;
   border-radius: 0.375rem;
