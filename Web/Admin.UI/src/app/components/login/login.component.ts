@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { AuthenticationService } from '../../services/security/authentication.service';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
-import { CommonModule } from '@angular/common';
+
 import {AppConfigService} from "../../services/app-config.service";
 
 @Component({
@@ -11,10 +11,9 @@ import {AppConfigService} from "../../services/app-config.service";
   templateUrl: './login.component.html',
   standalone: true,
   imports: [
-    CommonModule,
     MatCardModule,
     MatButtonModule
-  ],
+],
   styleUrls: ['./login.component.scss']
 })
 export class LoginComponent implements OnInit {
