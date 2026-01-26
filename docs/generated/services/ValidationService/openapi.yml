@@ -1,0 +1,866 @@
+﻿openapi: 3.0.1
+info:
+  version: 0.3.0
+  title: Validation Service
+paths:
+  /api/validation/category/{id}:
+    get:
+      tags:
+      - category-controller
+      summary: Gets a category
+      operationId: getCategory
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Category'
+      security:
+      - bearer-key: []
+    put:
+      tags:
+      - category-controller
+      summary: Creates or updates a category
+      operationId: saveCategory
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Category'
+        required: true
+      responses:
+        "200":
+          description: OK
+      security:
+      - bearer-key: []
+    delete:
+      tags:
+      - category-controller
+      summary: Deletes a category
+      operationId: deleteCategory
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+      security:
+      - bearer-key: []
+  /api/validation/category/{id}/rule:
+    get:
+      tags:
+      - category-controller
+      summary: Gets the latest rule for a category
+      description: Returns the rule that has the most recent `timestamp`.
+      operationId: getLatestCategoryRule
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CategoryRule'
+      security:
+      - bearer-key: []
+    put:
+      tags:
+      - category-controller
+      summary: Creates a rule for a category
+      description: Creating a rule for a category automatically makes it the `latest` rule.
+      operationId: saveCategoryRule
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - $ref: '#/components/schemas/CompositeMatcher'
+              - $ref: '#/components/schemas/RegexMatcher'
+        required: true
+      responses:
+        "200":
+          description: OK
+      security:
+      - bearer-key: []
+  /api/validation/artifact/{type}/{name}:
+    get:
+      tags:
+      - artifact-controller
+      summary: Gets an artifact
+      operationId: getArtifact
+      parameters:
+      - name: type
+        in: path
+        required: true
+        schema:
+          type: string
+          enum:
+          - PACKAGE
+          - RESOURCE
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Artifact_Detail'
+      security:
+      - bearer-key: []
+    put:
+      tags:
+      - artifact-controller
+      summary: Creates or updates an artifact
+      operationId: saveArtifact
+      parameters:
+      - name: type
+        in: path
+        required: true
+        schema:
+          type: string
+          enum:
+          - PACKAGE
+          - RESOURCE
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+              format: byte
+        required: true
+      responses:
+        "200":
+          description: OK
+      security:
+      - bearer-key: []
+    delete:
+      tags:
+      - artifact-controller
+      summary: Deletes an artifact
+      operationId: deleteArtifact
+      parameters:
+      - name: type
+        in: path
+        required: true
+        schema:
+          type: string
+          enum:
+          - PACKAGE
+          - RESOURCE
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+      security:
+      - bearer-key: []
+  /api/validation/category/$initialize:
+    post:
+      tags:
+      - category-controller
+      summary: Creates or updates categories using classpath resources
+      operationId: initializeCategories
+      responses:
+        "200":
+          description: OK
+      security:
+      - bearer-key: []
+  /api/validation/category/$bulk-import:
+    post:
+      tags:
+      - category-controller
+      summary: Imports categories and rules
+      operationId: bulkImportCategories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/CategorySnapshot'
+        required: true
+      responses:
+        "200":
+          description: OK
+      security:
+      - bearer-key: []
+  /api/validation/artifact/$initialize:
+    post:
+      tags:
+      - artifact-controller
+      summary: Creates or updates artifacts using classpath resources
+      operationId: initializeArtifacts
+      responses:
+        "200":
+          description: OK
+      security:
+      - bearer-key: []
+  /api/validation/$validate:
+    post:
+      tags:
+      - validation-controller
+      summary: Validates a FHIR resource
+      operationId: validate
+      parameters:
+      - name: categorize
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+      - name: summarize
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  type: object
+      security:
+      - bearer-key: []
+  /api/validation/$categorize:
+    post:
+      tags:
+      - validation-controller
+      summary: Categorizes validation results using latest rules
+      operationId: categorize_1
+      parameters:
+      - name: summarize
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              required:
+              - categories
+              - results
+              type: object
+              properties:
+                results:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Result'
+                categories:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/CategorySnapshot'
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/Result'
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  type: object
+      security:
+      - bearer-key: []
+  /api/validation/result/{facilityId}/{reportId}:
+    get:
+      tags:
+      - result-controller
+      summary: Gets results for a facility and report; optionally filters by a minimum severity
+      operationId: getReportResults
+      parameters:
+      - name: facilityId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: reportId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: severity
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - FATAL
+          - ERROR
+          - WARNING
+          - INFORMATION
+          - "NULL"
+          default: INFORMATION
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Result'
+      security:
+      - bearer-key: []
+  /api/validation/result/{facilityId}/{reportId}/{patientId}:
+    get:
+      tags:
+      - result-controller
+      summary: Gets results for a facility, report, and patient; optionally filters by a minimum severity
+      operationId: getReportPatientResults
+      parameters:
+      - name: facilityId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: reportId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: patientId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: severity
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - FATAL
+          - ERROR
+          - WARNING
+          - INFORMATION
+          - "NULL"
+          default: INFORMATION
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Result'
+      security:
+      - bearer-key: []
+  /api/validation/result/{facilityId}/{reportId}/category:
+    get:
+      tags:
+      - result-controller
+      summary: Gets categories that have issues associated with them for a facility and report
+      operationId: getReportCategories
+      parameters:
+      - name: facilityId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: reportId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CategorySummaryModel'
+      security:
+      - bearer-key: []
+  /api/validation/result/{facilityId}/{reportId}/category/{categoryId}/issue:
+    get:
+      tags:
+      - result-controller
+      summary: Gets issues associated with a specific category for a facility and report
+      operationId: getCategoryIssues
+      parameters:
+      - name: facilityId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: reportId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: categoryId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CategoryIssueModel'
+      security:
+      - bearer-key: []
+  /api/validation/pre-qual/{facilityId}/{reportId}:
+    get:
+      tags:
+      - validation-controller
+      summary: Download a pre-qual validation report
+      operationId: getPreQualValidationReport
+      parameters:
+      - name: facilityId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: reportId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: severity
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - FATAL
+          - ERROR
+          - WARNING
+          - INFORMATION
+          - "NULL"
+          default: INFORMATION
+      responses:
+        "200":
+          description: OK
+          content:
+            text/html:
+              schema:
+                type: object
+      security:
+      - bearer-key: []
+  /api/validation/info:
+    get:
+      tags:
+      - api-info-controller
+      operationId: info
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ServiceInformationConfig'
+  /api/validation/category:
+    get:
+      tags:
+      - category-controller
+      summary: Gets all categories
+      operationId: getCategories
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+      security:
+      - bearer-key: []
+  /api/validation/category/{id}/rule/history:
+    get:
+      tags:
+      - category-controller
+      summary: Gets all historical rules for a category
+      description: The rule with the most recent timestamp is the considered the "latest" rule.
+      operationId: getCategoryRules
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CategoryRule'
+      security:
+      - bearer-key: []
+  /api/validation/category/$bulk-export:
+    get:
+      tags:
+      - category-controller
+      summary: Exports categories and rules
+      operationId: bulkExportCategories
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CategorySnapshot'
+      security:
+      - bearer-key: []
+  /api/validation/artifact:
+    get:
+      tags:
+      - artifact-controller
+      summary: Gets all artifacts
+      operationId: getArtifacts
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Artifact_Summary'
+      security:
+      - bearer-key: []
+  /api/validation/artifact/{type}/{name}/content:
+    get:
+      tags:
+      - artifact-controller
+      summary: Gets the content of an artifact
+      operationId: getArtifactContent
+      parameters:
+      - name: type
+        in: path
+        required: true
+        schema:
+          type: string
+          enum:
+          - PACKAGE
+          - RESOURCE
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: byte
+      security:
+      - bearer-key: []
+  /api/validation/category/{ruleId}:
+    delete:
+      tags:
+      - category-controller
+      summary: Deletes a category rule
+      description: This should primarily be used to delete a rule that was entered in error. The `ruleId` may be the latest or it could be a historical rule. The primary use-case is to delete the latest, which was entered in error.
+      operationId: deleteCategoryRule
+      parameters:
+      - name: ruleId
+        in: path
+        description: The internal auto-incrementing id of the category's rule. This id can be found in the results of "Gets the latest rule for a category"
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+      security:
+      - bearer-key: []
+components:
+  schemas:
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        severity:
+          type: string
+          enum:
+          - ERROR
+          - WARNING
+          - INFORMATION
+        acceptable:
+          type: boolean
+        guidance:
+          type: string
+    CompositeMatcher:
+      type: object
+      allOf:
+      - $ref: '#/components/schemas/Matcher'
+      - type: object
+        properties:
+          inverted:
+            type: boolean
+            description: If true, the rule is considered a match when it does NOT match the input (logical negation).
+          children:
+            type: array
+            description: A list of rules (Matcher interface implementations) that should be executed.
+            items:
+              $ref: '#/components/schemas/Matcher'
+          requiresAllChildren:
+            type: boolean
+            description: Whether to require that all children be a match in order for this category to be associated with a validation rule.
+    Matcher:
+      type: object
+    RegexMatcher:
+      type: object
+      allOf:
+      - $ref: '#/components/schemas/Matcher'
+      - type: object
+        properties:
+          inverted:
+            type: boolean
+            description: If true, the rule is considered a match when it does NOT match the input (logical negation).
+          field:
+            type: string
+            description: The field in the validation result that the regex should be matched against
+            enum:
+            - SEVERITY
+            - CODE
+            - MESSAGE
+            - EXPRESSION
+          regex:
+            type: string
+            description: The regex to execute that determines if the rule matches the validation result
+    CategorySnapshot:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        severity:
+          type: string
+          enum:
+          - ERROR
+          - WARNING
+          - INFORMATION
+        acceptable:
+          type: boolean
+        guidance:
+          type: string
+        matcher:
+          oneOf:
+          - $ref: '#/components/schemas/CompositeMatcher'
+          - $ref: '#/components/schemas/RegexMatcher'
+    Result:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        facilityId:
+          type: string
+        reportId:
+          type: string
+        patientId:
+          type: string
+        severity:
+          type: string
+          enum:
+          - FATAL
+          - ERROR
+          - WARNING
+          - INFORMATION
+          - "NULL"
+        code:
+          type: string
+          enum:
+          - INVALID
+          - STRUCTURE
+          - REQUIRED
+          - VALUE
+          - INVARIANT
+          - SECURITY
+          - LOGIN
+          - UNKNOWN
+          - EXPIRED
+          - FORBIDDEN
+          - SUPPRESSED
+          - PROCESSING
+          - NOTSUPPORTED
+          - DUPLICATE
+          - MULTIPLEMATCHES
+          - NOTFOUND
+          - DELETED
+          - TOOLONG
+          - CODEINVALID
+          - EXTENSION
+          - TOOCOSTLY
+          - BUSINESSRULE
+          - CONFLICT
+          - TRANSIENT
+          - LOCKERROR
+          - NOSTORE
+          - EXCEPTION
+          - TIMEOUT
+          - INCOMPLETE
+          - THROTTLED
+          - INFORMATIONAL
+          - "NULL"
+        message:
+          type: string
+        location:
+          type: string
+        expression:
+          type: string
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/Category'
+    CategorySummaryModel:
+      type: object
+      properties:
+        categoryId:
+          type: string
+        issues:
+          type: integer
+          format: int32
+        acceptable:
+          type: boolean
+    CategoryIssueModel:
+      type: object
+      properties:
+        location:
+          type: string
+        message:
+          type: string
+        code:
+          type: string
+        expression:
+          type: string
+        patientId:
+          type: string
+    ServiceInformationConfig:
+      type: object
+      properties:
+        serviceName:
+          type: string
+        version:
+          type: string
+        productVersion:
+          type: string
+        build:
+          type: string
+    CategoryRule:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        matcher:
+          oneOf:
+          - $ref: '#/components/schemas/CompositeMatcher'
+          - $ref: '#/components/schemas/RegexMatcher'
+        timestamp:
+          type: string
+          format: date-time
+    Artifact_Summary:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        type:
+          type: string
+          enum:
+          - PACKAGE
+          - RESOURCE
+        name:
+          type: string
+    Artifact_Detail:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        type:
+          type: string
+          enum:
+          - PACKAGE
+          - RESOURCE
+        name:
+          type: string
+        content:
+          type: string
+          format: byte
+  securitySchemes:
+    bearer-key:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+

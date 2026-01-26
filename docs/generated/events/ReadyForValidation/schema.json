@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "properties": {
+    "patientId": { "type": "string" },
+    "reportTypes": { "type": "array", "items": { "type": "string" } },
+    "reportTrackingId": { "type": "string" }
+  },
+  "required": ["patientId","reportTypes","reportTrackingId"]
+}
