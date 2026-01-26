@@ -2,6 +2,9 @@
 using LantanaGroup.Link.Report.Entities;
 using System.Diagnostics;
 using System.Linq.Expressions;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Shared.Application.Enums;
+using LinqKit;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
 {
@@ -20,6 +23,19 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         Task<ReportResource?> SingleOrDefaultAsync(
             Expression<Func<ReportResource, bool>> predicate,
+            CancellationToken cancellationToken = default);
+
+        Task<PagedConfigModel<ReportResource>> SearchAsync(
+            string? facilityId,
+            string? reportScheduleId,
+            string? patientId,
+            string? measureReportId,
+            string? resourceType,
+            string? resourceId,
+            string? sortBy,
+            SortOrder? sortOrder,
+            int pageSize,
+            int pageNumber,
             CancellationToken cancellationToken = default);
     }
 
@@ -81,6 +97,62 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             await _database.SaveChangesAsync();
 
             return entry;
+        }
+
+        public async Task<PagedConfigModel<ReportResource>> SearchAsync(
+            string? facilityId,
+            string? reportScheduleId,
+            string? patientId,
+            string? measureReportId,
+            string? resourceType,
+            string? resourceId,
+            string? sortBy,
+            SortOrder? sortOrder,
+            int pageSize,
+            int pageNumber,
+            CancellationToken cancellationToken = default)
+        {
+            Expression<Func<ReportResource, bool>> predicate = x => true;
+
+            if (!string.IsNullOrWhiteSpace(facilityId))
+            {
+                predicate = predicate.And(q => q.FacilityId == facilityId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(reportScheduleId))
+            {
+                predicate = predicate.And(q => q.ReportScheduledId == reportScheduleId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(patientId))
+            {
+                predicate = predicate.And(q => q.PatientId == patientId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(measureReportId))
+            {
+                predicate = predicate.And(q => q.MeasureReportId == measureReportId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(resourceType))
+            {
+                predicate = predicate.And(q => q.ResourceType == resourceType);
+            }
+
+            if (!string.IsNullOrWhiteSpace(resourceId))
+            {
+                predicate = predicate.And(q => q.ResourceId == resourceId);
+            }
+
+            var (results, metadata) = await _database.ReportResourceRepository.SearchAsync(
+                predicate,
+                sortBy,
+                sortOrder,
+                pageSize,
+                pageNumber,
+                cancellationToken);
+
+            return new PagedConfigModel<ReportResource>(results, metadata);
         }
     }
 }

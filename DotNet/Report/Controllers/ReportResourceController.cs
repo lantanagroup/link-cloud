@@ -6,6 +6,9 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Shared.Application.Enums;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.Report.Controllers
 {
@@ -137,6 +140,70 @@ namespace LantanaGroup.Link.Report.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(new EventId(ReportConstants.LoggingIds.GetItem, "GetByPatientId"), ex, "An exception occurred while attempting to get a Report Resource record for Patient Id {id}", HtmlInputSanitizer.Sanitize(patientId));
+
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Returns paged report resources with optional filters
+        /// </summary>
+        /// <param name="facilityId">Optional facility ID filter</param>
+        /// <param name="reportScheduleId">Optional report schedule ID filter</param>
+        /// <param name="patientId">Optional patient ID filter</param>
+        /// <param name="measureReportId">Optional measure report ID filter</param>
+        /// <param name="resourceType">Optional resource type filter</param>
+        /// <param name="resourceId">Optional resource ID filter</param>
+        /// <param name="sortBy">Optional sort field (e.g., "CreateDate", "ResourceType")</param>
+        /// <param name="sortOrder">Optional sort order (Ascending or Descending)</param>
+        /// <param name="pageSize">Number of records per page (default: 10)</param>
+        /// <param name="pageNumber">Page number (default: 1)</param>
+        [HttpGet("search")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<ReportResource>))]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<PagedConfigModel<ReportResource>>> Search(
+            string? facilityId = null,
+            string? reportScheduleId = null,
+            string? patientId = null,
+            string? measureReportId = null,
+            string? resourceType = null,
+            string? resourceId = null,
+            string? sortBy = null,
+            SortOrder? sortOrder = null,
+            int pageSize = 10,
+            int pageNumber = 1)
+        {
+            try
+            {
+                if (pageSize < 1 || pageSize > 100)
+                {
+                    pageSize = 10;
+                }
+
+                if (pageNumber < 1)
+                {
+                    pageNumber = 1;
+                }
+
+                var result = await _reportResourceManager.SearchAsync(
+                    facilityId,
+                    reportScheduleId,
+                    patientId,
+                    measureReportId,
+                    resourceType,
+                    resourceId,
+                    sortBy,
+                    sortOrder,
+                    pageSize,
+                    pageNumber);
+
+                Response.Headers.Append("X-Pagination", JsonSerializer.Serialize(result.Metadata));
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(new EventId(ReportConstants.LoggingIds.SearchPerformed, "Search"), ex, "An exception occurred while attempting to search Report Resource records");
 
                 throw;
             }
