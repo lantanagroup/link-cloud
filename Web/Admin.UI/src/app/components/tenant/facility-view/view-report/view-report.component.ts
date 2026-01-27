@@ -89,7 +89,7 @@ export class ViewReportComponent implements OnInit {
   sortOrder: 'ascending' | 'descending' | null = null;
   measureReports: IMeasureReportSummary[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
-  displayedColumns: string[] = ['id', 'measure', 'resourceCount', 'reportingStatus', 'submissionStatus'];
+  displayedColumns: string[] = ['id', 'measure', 'resourceCount', 'reportingStatus', 'submissionStatus', 'action'];
   dataSource = new MatTableDataSource<IReportEntry>([]);
 
   //filters
@@ -187,7 +187,7 @@ export class ViewReportComponent implements OnInit {
     });
   }
 
-  onSelectReport(measureReport: IMeasureReportSummary): void {
+  onSelectReport(measureReport: IReportEntry): void {
 
     const dialogConfig = new MatDialogConfig();
     dialogConfig.minWidth = '90vw';
@@ -278,15 +278,15 @@ export class ViewReportComponent implements OnInit {
   }
 
   onViewQueryAnalysis() {
-    //this.loadingService.show();
+    this.loadingService.show();
     this.acquisitionLogService.getAcquisitionLogStatistics(this.reportId).subscribe({
       next: (response: IDataAcquisitionLogStatistics) => {
         this.dataAcquisitionLogStatistics = response;
-        //this.loadingService.hide();
+        this.loadingService.hide();
       },
       error: (error) => {
         console.error('Error loading acquisition log statistics:', error);
-        //this.loadingService.hide();
+        this.loadingService.hide();
       }
     });
   }
