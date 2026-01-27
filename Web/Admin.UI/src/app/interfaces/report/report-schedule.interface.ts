@@ -13,6 +13,7 @@ export interface IReportSchedule {
   frequency: string;
   payloadRootUri?: string;
   status: string;
+  IsDeleted?: boolean;
 }
 
 export interface IPagedReportSchedule {

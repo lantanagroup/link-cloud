@@ -20,6 +20,8 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faRotate } from '@fortawesome/free-solid-svg-icons';
 import { IReportSchedule } from '../../../interfaces/report/report-schedule.interface';
 import { ReportService } from '../../../services/gateway/report/report.service';
+import {FormsModule} from "@angular/forms";
+import {MatCheckbox} from "@angular/material/checkbox";
 
 @Component({
   selector: 'app-reports-dashboard',
@@ -34,7 +36,9 @@ import { ReportService } from '../../../services/gateway/report/report.service';
     MatSortModule,
     MatTooltipModule,
     RouterLink,
-    FontAwesomeModule
+    FontAwesomeModule,
+    FormsModule,
+    MatCheckbox
   ],
   templateUrl: './reports-dashboard.component.html',
   styleUrls: ['./reports-dashboard.component.scss']
@@ -48,11 +52,11 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
   defaultPageSize: number = 10;
   paginationMetadata: PaginationMetadata = new PaginationMetadata();
   faRotate = faRotate;
+  showDeleted = false;
 
-  displayedColumns: string[] = ['id', 'facilityId', 'reportStartDate', 'frequency', 'reportTypes', 'patientsInCensus', 'patientsInIP', 'status', 'action'];
   dataSource = new MatTableDataSource<IReportSchedule>([]);
   reportSchedules: IReportSchedule[] = [];
-  
+
   currentSortBy: string = 'CreateDate';
   currentSortOrder: number = 1; // 1 = Descending, 0 = Ascending
 
@@ -60,7 +64,6 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     private reportService: ReportService,
-    private facilityViewService: FacilityViewService,
     private loadingService: LoadingService,
     private dialog: MatDialog,
     private tenantService: TenantService,) {
@@ -78,6 +81,12 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
     }
   }
 
+  getColumns(): string[] {
+    const cols = ['id', 'facilityId', 'reportStartDate', 'frequency', 'reportTypes', 'patientsInCensus', 'patientsInIP', 'status', 'action'];
+    if (this.showDeleted) cols.push('isDeleted');
+    return cols;
+  }
+
   loadReportSchedules(): void {
     this.loadingService.isLoading.next(true);
     this.reportService.searchReportSchedules(
@@ -88,6 +97,7 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
       undefined,
       undefined,
       undefined,
+      this.showDeleted,
       this.currentSortBy,
       this.currentSortOrder,
       this.paginationMetadata.pageSize,
@@ -107,6 +117,11 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  onShowDeletedChange(): void {
+    this.paginationMetadata.pageNumber = 0;
+    this.loadReportSchedules();
+  }
+
   onPageChange(event: PageEvent): void {
     this.paginationMetadata.pageSize = event.pageSize;
     this.paginationMetadata.pageNumber = event.pageIndex;
@@ -123,7 +138,7 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
         'frequency': 'Frequency',
         'status': 'Status'
       };
-      
+
       this.currentSortBy = sortFieldMap[sort.active] || 'CreateDate';
       this.currentSortOrder = sort.direction === 'desc' ? 1 : 0;
     } else {
@@ -131,7 +146,7 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
       this.currentSortBy = 'CreateDate';
       this.currentSortOrder = 1;
     }
-    
+
     // Reset to first page when sorting changes
     this.paginationMetadata.pageNumber = 0;
     this.loadReportSchedules();
