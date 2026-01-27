@@ -1,4 +1,5 @@
 using LantanaGroup.Link.Report.Core;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -22,8 +23,7 @@ public class MeasureReportAggregatorTests
         string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
         string path = Path.Combine(assemblyLocation, "Resources", "indMeasureReport.json");
         string text = File.ReadAllText(path);
-        FhirJsonParser parser = new FhirJsonParser();
-        return parser.Parse<MeasureReport>(text);
+        return LinkFhirSerializerOptions.FhirJsonParserPermissive.Parse<MeasureReport>(text);
     }
 
     [Fact]
