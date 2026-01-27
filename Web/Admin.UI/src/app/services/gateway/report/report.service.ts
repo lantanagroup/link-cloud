@@ -78,6 +78,16 @@ export class ReportService {
       )
   }
 
+  deleteReports(facilityId: string): Observable<void> {
+    return this.http.patch<void>(
+      `${this.appConfigService.config?.baseApiUrl}/schedules/facility/${facilityId}/status?deleted=true`,
+      {}
+    ).pipe(
+      tap(_ => console.log(`Request to disable report configuration was sent.`)),
+      catchError(error => this.errorHandler.handleError(error))
+    );
+  }
+
   searchReportSchedules(
     facilityId?: string,
     frequency?: string,
@@ -86,6 +96,7 @@ export class ReportService {
     reportEndDate?: Date,
     status?: string,
     endOfReportPeriodJobHasRun?: boolean,
+    includeDeleted?: boolean,
     sortBy?: string,
     sortOrder?: number,
     pageSize: number = 10,
@@ -115,6 +126,9 @@ export class ReportService {
     }
     if (endOfReportPeriodJobHasRun !== undefined) {
       params = params.set('endOfReportPeriodJobHasRun', endOfReportPeriodJobHasRun.toString());
+    }
+    if (includeDeleted !== undefined) {
+      params = params.set('includeDeleted', includeDeleted.toString());
     }
     if (sortBy) {
       params = params.set('sortBy', sortBy);

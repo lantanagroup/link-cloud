@@ -2,9 +2,9 @@
   <div class="link-card">
     <div class="link-card-header">
       <div class="split-container" style="margin-bottom: 0;">
-        <div class="left-pane">
-          <p class="title">{{ facilityConfig?.facilityName }}
-            <p>
+            <div class="left-pane">
+               <p class="title">{{ facilityConfig?.facilityName }}
+              <p>
             </div>
             <div class="right-pane">
               <div class="link-button-group">
@@ -78,7 +78,14 @@
               <p>
               </div>
             </div>
-          </div>
+        <div class="right-pane">
+          <label style="margin-left: 1em; font-weight: normal; cursor: pointer;">
+            <input type="checkbox" [(ngModel)]="showDeleted" (change)="onShowDeletedChange()" />
+            Show Deleted
+          </label>
+        </div>
+
+      </div>
           @if (reportListSummary.length > 0) {
             <div class="table-container no-border">
               <table class="link-table">
@@ -93,11 +100,14 @@
                     <th class="header-column">Patients in IP</th>
                     <th class="header-column">Status</th>
                     <th class="header-column">Action</th>
+                    <th class="header-column">Deleted</th>
                   </tr>
                 </thead>
                 <tbody class="table-body">
                   @for (report of reportListSummary; track report) {
-                    <tr [class.highlighted]="report.id === highlightedRowId">
+                    <tr [class.highlighted]="report.id === highlightedRowId"
+                        [class.deleted-row]="report.isDeleted"
+                    >
                       <td class="table-cell">
                         <div class="link-button-wrapper" style="display: flex; align-items: center; gap: 8px;">
                           <a [routerLink]="['/tenant/facility', facilityId, 'report', report.id]">
@@ -106,8 +116,8 @@
                         </div>
                       </td>
                       <td class="table-cell">
-                        <span class="report-period-col"><label>Start</label>: {{ report.reportStartDate }}</span>
-                        <span class="report-period-col"><label>End</label>: &nbsp;&nbsp;{{ report.reportEndDate }}</span>
+                        <span class="report-period-col"><label>Start</label>: {{ report.reportStartDate | date:'short'}}</span>
+                        <span class="report-period-col"><label>End</label>: &nbsp;&nbsp;{{ report.reportEndDate | date:'short'}}</span>
                       </td>
                       <td class="table-cell">TODO</td>
                       <td class="table-cell">
@@ -127,23 +137,17 @@
                           }
                         </ul>
                       </td>
-                      <td class="table-cell">{{ report.censusCount }}</td>
-                      <td class="table-cell">{{ report.initialPopulationCount }}</td>
+                      <td class="table-cell">TBD</td>
+                      <td class="table-cell">TBD</td>
                       <td class="table-cell">
-                        <span
-                  [ngClass]="{
-                        'status-pending': report.submitted == false,
-                        'status-submitted': report.submitted == true
-                    }"
-                        >{{ report.submitted ? 'Submitted' : 'Pending' }}</span>
-                        @if (report.submitted) {
-                          <span style="display: block; margin-top: 1em;"
-                          >{{ report.submitDate }}</span>
-                        }
-                        @else if (report.createdDate) {
-                          <span style="display: block; margin-top: 1em;"
-                          >{{ report.createdDate }}</span>
-                        }
+                        <div>
+                          <span *ngIf="report.status == 0" class="status-new">New</span>
+                          <span *ngIf="report.status == 100" class="status-scheduled">Scheduled</span>
+                          <span *ngIf="report.status == 200" class="status-endOfPeriod">End of Period</span>
+                          <span *ngIf="report.status == 500" class="status-submitted">Submitted</span>
+                        </div>
+                        <div style="margin-top:5px" *ngIf="report.modifyDate">{{report.modifyDate | date:'short'}}</div>
+                        <div style="margin-top:5px" *ngIf="!report.modifyDate">{{report.createDate | date:'short'}}</div>
                       </td>
                       <td>
                         <button
@@ -154,6 +158,12 @@
                           Resubmit...
                         </button>
                       </td>
+
+                      <!-- Deleted Column -->
+                      <td class="table-cell">
+                        {{ report.isDeleted ?? false ? 'Yes' : 'No' }}
+                      </td>
+
                     </tr>
                   }
                 </tbody>
