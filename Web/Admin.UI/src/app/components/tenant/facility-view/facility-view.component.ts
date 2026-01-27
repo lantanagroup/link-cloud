@@ -18,6 +18,9 @@ import {LoadingService} from 'src/app/services/loading.service';
 import {forkJoin, Subscription} from 'rxjs';
 import {ResubmitDialogComponent} from "./resubmit-dialog.component";
 import {MatDialog} from "@angular/material/dialog";
+import {IPagedReportSchedule, IReportSchedule} from "../../../interfaces/report/report-schedule.interface";
+import {MatCell, MatCellDef} from "@angular/material/table";
+import {FormsModule} from "@angular/forms";
 
 @Component({
   selector: 'app-facility-view',
@@ -29,7 +32,8 @@ import {MatDialog} from "@angular/material/dialog";
     MatIconModule,
     MatPaginatorModule,
     RouterLink,
-    MatCardModule
+    MatCardModule,
+    FormsModule
   ],
   templateUrl: './facility-view.component.html',
   styleUrl: './facility-view.component.scss'
@@ -47,10 +51,12 @@ export class FacilityViewComponent implements OnInit {
 
   defaultPageNumber: number = 0
   defaultPageSize: number = 10;
-  reportListSummary: IReportListSummary[] = [];
+  reportListSummary: IReportSchedule[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
 
   highlightedRowId: string | null = null;
+
+  showDeleted: boolean = false;
 
   constructor(
     private location: Location,
@@ -71,7 +77,7 @@ export class FacilityViewComponent implements OnInit {
 
       forkJoin([
         this.tenantService.getFacilityConfiguration(this.facilityId),
-        this.facilityViewService.getReportSummaryList(this.facilityId, this.defaultPageNumber, this.defaultPageSize)
+        this.facilityViewService.getReportSummaryList(this.facilityId, this.defaultPageNumber, this.defaultPageSize, this.showDeleted)
       ]).subscribe({
         next: (response) => {
           this.facilityConfig = response[0];
@@ -101,6 +107,10 @@ export class FacilityViewComponent implements OnInit {
     }
   }
 
+  onShowDeletedChange() {
+    this.loadReportSummaryList(this.defaultPageNumber, this.defaultPageSize);
+  }
+
   loadFacilityConfig(): void {
     this.tenantService.getFacilityConfiguration(this.facilityId).subscribe({
       next: (response: IFacilityConfigModel) => {
@@ -119,8 +129,8 @@ export class FacilityViewComponent implements OnInit {
   }
 
   loadReportSummaryList(pageNumber: number, pageSize: number): void {
-    this.facilityViewService.getReportSummaryList(this.facilityId, pageNumber, pageSize).subscribe({
-      next: (response: IPagedReportListSummary) => {
+    this.facilityViewService.getReportSummaryList(this.facilityId, pageNumber, pageSize, this.showDeleted).subscribe({
+      next: (response: IPagedReportSchedule) => {
         this.reportListSummary = response.records;
         this.paginationMetadata = response.metadata;
       },
