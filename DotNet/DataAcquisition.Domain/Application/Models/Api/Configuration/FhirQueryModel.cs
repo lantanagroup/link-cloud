@@ -30,6 +30,7 @@ public class FhirQueryModel
             return QueryType switch
             {
                 FhirQueryType.Search => $"{ResourceTypes[0]}?{string.Join("&", QueryParameters)}",
+                FhirQueryType.SearchPost => $"{ResourceTypes[0]}/_search [{string.Join(",", QueryParameters)}]",
                 FhirQueryType.Read => $"{ResourceTypes[0]}/{string.Join("&", QueryParameters)}",
                 FhirQueryType.BulkDataRequest => "BulkDataRequest", // add logic when bulk fhir is implemented
                 FhirQueryType.BulkDataPoll => string.Join("&", QueryParameters),
