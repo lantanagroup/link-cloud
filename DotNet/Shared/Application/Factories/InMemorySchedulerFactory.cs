@@ -2,8 +2,6 @@
 using Quartz;
 using Quartz.Impl;
 using System.Collections.Specialized;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace LantanaGroup.Link.Shared.Application.Factory; 
 public class InMemorySchedulerFactory : ISchedulerFactory

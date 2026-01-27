@@ -12,16 +12,21 @@ using LantanaGroup.Link.DataAcquisition.Listeners;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Factory;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using Quartz;
 using System.Reflection;
 using System.Text.Json.Serialization;
 
@@ -71,10 +76,15 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     if (!consumerSettings?.DisableRetryConsumer ?? true)
     {
-        // TODO: Retry consumer services temporarily disabled for LNK-4038
-        //builder.Services.AddSingleton(new RetryListenerSettings(DataAcquisitionConstants.ServiceName, [KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue(), KafkaTopic.PatientCensusScheduledRetry.GetStringValue()]));
-        //builder.Services.AddHostedService<RetryListener>();
-        //builder.Services.AddHostedService<RetryScheduleService>();
+        builder.Services.AddSingleton<ISchedulerFactory>(provider => provider.GetRequiredService<InMemorySchedulerFactory>());
+        builder.Services.AddKeyedSingleton<ISchedulerFactory>(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
+        
+
+        var serviceInformation = builder.Configuration.GetRequiredSection(nameof(ServiceInformation)).Get<ServiceInformation>();
+
+        builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation!.ServiceName, [KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue(), KafkaTopic.PatientCensusScheduledRetry.GetStringValue()]));
+        builder.Services.AddHostedService<RetryListener>();
+        builder.Services.AddHostedService<RetryScheduleService>();
     }
 
     // Add Link Security

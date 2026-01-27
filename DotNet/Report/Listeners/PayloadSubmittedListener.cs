@@ -20,7 +20,8 @@ public class PayloadSubmittedListener(
     ITransientExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue> transientExceptionHandler,
     IDeadLetterExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue> deadLetterExceptionHandler,
     ILogger<PayloadSubmittedListener> logger,
-    IServiceScopeFactory serviceScopeFactory)
+    IServiceScopeFactory serviceScopeFactory,
+    ServiceInformation serviceInformation)
     : BackgroundService
 {
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -32,7 +33,7 @@ public class PayloadSubmittedListener(
     {
         var config = new ConsumerConfig()
         {
-            GroupId = ReportConstants.ServiceName,
+            GroupId = serviceInformation.ServiceConfigName,
             EnableAutoCommit = false
         };
 

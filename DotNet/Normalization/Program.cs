@@ -58,12 +58,13 @@ static void RegisterServices(WebApplicationBuilder builder)
     // load external configuration source (if specified)
     builder.AddExternalConfiguration(NormalizationConstants.ServiceName);
 
-    IConfigurationSection serviceInformationSection = builder.Configuration.GetRequiredSection(NormalizationConstants.AppSettingsSectionNames.ServiceInformation);
-    builder.Services.Configure<ServiceInformation>(serviceInformationSection);
-    var serviceInformation = serviceInformationSection.Get<ServiceInformation>();
+    var serviceInformation = builder.Configuration.GetRequiredSection(ServiceInformation.SectionName).Get<ServiceInformation>();
+
     if (serviceInformation != null)
     {
-        ServiceActivitySource.Initialize(serviceInformation);;
+        serviceInformation!.ServiceConfigName = NormalizationConstants.ServiceName;
+        builder.Services.AddSingleton<ServiceInformation>(serviceInformation);
+        ServiceActivitySource.Initialize(serviceInformation);
     }
     else
     {
@@ -212,7 +213,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
     {
-        builder.Services.AddSingleton(new RetryListenerSettings(NormalizationConstants.ServiceName, [KafkaTopic.ResourceAcquiredRetry.GetStringValue()]));
+        builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceName, [KafkaTopic.ResourceAcquiredRetry.GetStringValue()]));
         builder.Services.AddHostedService<RetryListener>();
         builder.Services.AddHostedService<RetryScheduleService>();
     }

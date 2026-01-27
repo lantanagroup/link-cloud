@@ -1,15 +1,13 @@
-﻿using System.Diagnostics;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Exceptions;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Logging;
-using System.Text;
 using OpenTelemetry.Trace;
+using System.Diagnostics;
+using System.Text;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 {
@@ -18,16 +16,21 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
     {
         protected readonly ILogger<TransientExceptionHandler<K, V>> Logger;
         protected readonly IKafkaProducerFactory<K, V> ProducerFactory;
+        protected readonly ServiceInformation ServiceInformation;
 
         public string Topic { get; set; } = string.Empty;
 
-        public string ServiceName { get; set; } = string.Empty;
+        protected string ServiceName { get; set; } = string.Empty;
 
         public TransientExceptionHandler(ILogger<TransientExceptionHandler<K, V>> logger,
-            IKafkaProducerFactory<K, V> producerFactory)
+            IKafkaProducerFactory<K, V> producerFactory,
+            ServiceInformation serviceInformation)
         {
             Logger = logger;
             ProducerFactory = producerFactory;
+            ServiceInformation = serviceInformation;
+
+            ServiceName = ServiceInformation.ServiceConfigName ?? throw new ArgumentNullException("ServiceName must be populated");
         }
 
         public virtual void HandleException(Exception ex, V messageBody, string facilityId, string message = "")
@@ -116,14 +119,19 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                 headers.Add(KafkaConstants.HeaderConstants.ExceptionService, Encoding.UTF8.GetBytes(ServiceName));
             }
 
-
+            //Exception Message
             if (headers.TryGetLastBytes(KafkaConstants.HeaderConstants.RetryExceptionMessage, out var exceptionValue))
             {
                 headers.Remove(KafkaConstants.HeaderConstants.RetryExceptionMessage);
             }
 
             headers.Add(KafkaConstants.HeaderConstants.RetryExceptionMessage, Encoding.UTF8.GetBytes(message + Environment.NewLine + stackTrace));
-            
+
+            //Retry Count
+            if (!headers.TryGetLastBytes(KafkaConstants.HeaderConstants.RetryCount, out var retryValue))
+            {
+                headers.Add(KafkaConstants.HeaderConstants.RetryCount, Encoding.UTF8.GetBytes(1.ToString()));                
+            }
 
             if (!string.IsNullOrEmpty(facilityId) && !headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionFacilityId, out var topicValue))
             {

@@ -34,11 +34,9 @@ namespace LantanaGroup.Link.Audit.Listeners
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentNullException(nameof(transientExceptionHandler));
 
             //configure deadletter exception handlers
-            _deadLetterExceptionHandler.ServiceName = AuditConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.AuditableEventOccurred) + "-Error";
 
             //configure transient exception handler
-            _transientExceptionHandler.ServiceName = AuditConstants.ServiceName;
             _transientExceptionHandler.Topic = nameof(KafkaTopic.AuditableEventOccurred) + "-Retry";            
         }
 

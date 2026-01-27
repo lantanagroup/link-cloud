@@ -13,8 +13,10 @@ using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Listeners;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Services.ResourceMerger.Strategies;
+using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
@@ -116,6 +118,16 @@ namespace IntegrationTests.Report
             _host = Host.CreateDefaultBuilder()
                 .ConfigureServices((context, services) =>
                 {
+                    var serviceInformation = new ServiceInformation()
+                    {
+                        ServiceConfigName = ReportConstants.ServiceName,
+                        ServiceName = ReportConstants.ServiceName,
+                        Version = "1.0.0-test",
+                        ProductVersion = "1.0.0-test",
+                    };
+
+                    services.AddSingleton<ServiceInformation>(serviceInformation);
+
                     services.AddLogging(builder => builder.AddConsole());
                     services.AddTransient<ILogger<ValidationCompleteListener>>(sp => Mock.Of<ILogger<ValidationCompleteListener>>());
                     services.AddTransient<ILogger<ResourceEvaluatedListener>>(sp => Mock.Of<ILogger<ResourceEvaluatedListener>>());
@@ -165,7 +177,7 @@ namespace IntegrationTests.Report
                     services.AddTransient<ReadyForValidationProducer>(sp =>
                         new ReadyForValidationProducer(ReadyForValidationProducerMock.Object, sp.GetRequiredService<IServiceScopeFactory>()));
                     services.AddTransient<AuditableEventOccurredProducer>(sp =>
-                        new AuditableEventOccurredProducer(sp.GetRequiredService<ILogger<AuditableEventOccurredProducer>>(), AuditableEventOccurredProducerMock.Object));
+                        new AuditableEventOccurredProducer(sp.GetRequiredService<ILogger<AuditableEventOccurredProducer>>(), AuditableEventOccurredProducerMock.Object, serviceInformation));
 
                     services.AddSingleton(Options.Create(blobSettings));
                     services.AddSingleton<BlobStorageService>(BlobStorageMock.Object);

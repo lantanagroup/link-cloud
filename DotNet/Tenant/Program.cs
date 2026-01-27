@@ -75,9 +75,12 @@ namespace Tenant
                 options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
             });
 
-            var serviceInformation = builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
+            var serviceInformation = builder.Configuration.GetRequiredSection(ServiceInformation.SectionName).Get<ServiceInformation>();
+
             if (serviceInformation != null)
             {
+                serviceInformation!.ServiceConfigName = TenantConstants.ServiceName;
+                builder.Services.AddSingleton<ServiceInformation>(serviceInformation);
                 ServiceActivitySource.Initialize(serviceInformation);
             }
             else

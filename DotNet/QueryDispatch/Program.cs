@@ -1,4 +1,3 @@
-using Azure.Identity;
 using HealthChecks.UI.Client;
 using LanatanGroup.Link.QueryDispatch.Jobs;
 using LantanaGroup.Link.QueryDispatch.Application.Factory;
@@ -12,7 +11,6 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
-using LantanaGroup.Link.Shared.Application.Factory;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
@@ -28,7 +26,6 @@ using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.OpenApi.Models;
 using Quartz;
 using Quartz.Impl;
@@ -40,7 +37,6 @@ using QueryDispatch.Application.Settings;
 using QueryDispatch.Domain;
 using QueryDispatch.Domain.Context;
 using QueryDispatch.Domain.Managers;
-using QueryDispatch.Persistence.Retry;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
@@ -55,10 +51,13 @@ builder.Configuration.AddStandardEnvironmentConfiguration();
 // load external configuration source (if specified)
 builder.AddExternalConfiguration(QueryDispatchConstants.ServiceName);
 
-var serviceInformation = builder.Configuration.GetRequiredSection(QueryDispatchConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
+var serviceInformation = builder.Configuration.GetRequiredSection(ServiceInformation.SectionName).Get<ServiceInformation>();
+
 if (serviceInformation != null)
 {
-    ServiceActivitySource.Initialize(serviceInformation);    
+    serviceInformation!.ServiceConfigName = QueryDispatchConstants.ServiceName;
+    builder.Services.AddSingleton<ServiceInformation>(serviceInformation);
+    ServiceActivitySource.Initialize(serviceInformation);
 }
 else
 {
@@ -160,7 +159,7 @@ builder.Services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzP
 if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
 {
     builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
-    builder.Services.AddSingleton(new RetryListenerSettings(QueryDispatchConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.PatientEventRetry.GetStringValue()]));
+    builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.PatientEventRetry.GetStringValue()]));
     builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<RetryScheduleService>();
     builder.Services.AddSingleton<RetryJob>();

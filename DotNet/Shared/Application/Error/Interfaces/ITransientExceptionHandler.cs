@@ -10,11 +10,6 @@ namespace LantanaGroup.Link.Shared.Application.Error.Interfaces
         /// </summary>
         public string Topic { get; set; }
 
-        /// <summary>
-        /// The name of the service that is consuming the ITransientExceptionHandler.
-        /// </summary>
-        public string ServiceName { get; set; }
-
         void HandleException(ConsumeResult<K, V> consumeResult, string facilityId, string message = "");
         void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, string facilityId);
         void HandleException(ConsumeResult<K, V> consumeResult, TransientException ex, string facilityId);

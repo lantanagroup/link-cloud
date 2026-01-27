@@ -25,6 +25,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IDeadLetterExceptionHandler<string, ReportScheduledValue> _deadLetterExceptionHandler;
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly IServiceScopeFactory _serviceScopeFactory;
+        private readonly ServiceInformation _serviceInformation;
         private readonly BlobStorageService _blobStorageService;
 
         private string Name => this.GetType().Name;
@@ -34,12 +35,14 @@ namespace LantanaGroup.Link.Report.Listeners
             ITransientExceptionHandler<string, ReportScheduledValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<string, ReportScheduledValue> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory,
-            BlobStorageService blobStorageService)
+            BlobStorageService blobStorageService,
+            ServiceInformation serviceInformation)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _schedulerFactory = schedulerFactory ?? throw new ArgumentException(nameof(schedulerFactory));
             _serviceScopeFactory = serviceScopeFactory;
+            _serviceInformation = serviceInformation;
 
             _transientExceptionHandler = transientExceptionHandler ??
                                                throw new ArgumentException(nameof(_deadLetterExceptionHandler));
@@ -47,10 +50,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _deadLetterExceptionHandler = deadLetterExceptionHandler ??
                                                throw new ArgumentException(nameof(_deadLetterExceptionHandler));
 
-            _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _transientExceptionHandler.Topic = nameof(KafkaTopic.ReportScheduled) + "-Retry";
-
-            _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ReportScheduled) + "-Error";
 
             _blobStorageService = blobStorageService;
@@ -66,7 +66,7 @@ namespace LantanaGroup.Link.Report.Listeners
         {
             var config = new ConsumerConfig()
             {
-                GroupId = ReportConstants.ServiceName,
+                GroupId = _serviceInformation.ServiceConfigName,
                 EnableAutoCommit = false
             };
 

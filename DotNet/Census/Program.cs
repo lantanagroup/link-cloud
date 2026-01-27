@@ -62,9 +62,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     // load external configuration source (if specified)
     builder.AddExternalConfiguration(CensusConstants.ServiceName);
 
-    var serviceInformation = builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.ServiceInformation).Get<ServiceInformation>();
+    var serviceInformation = builder.Configuration.GetRequiredSection(ServiceInformation.SectionName).Get<ServiceInformation>();
+
     if (serviceInformation != null)
     {
+        serviceInformation!.ServiceConfigName = CensusConstants.ServiceName;
+        builder.Services.AddSingleton<ServiceInformation>(serviceInformation);
         ServiceActivitySource.Initialize(serviceInformation);
     }
     else
@@ -205,7 +208,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
     {
         builder.Services.AddHostedService<ScheduleService>();
-        builder.Services.AddSingleton(new RetryListenerSettings(CensusConstants.ServiceName, [KafkaTopic.PatientListsAcquiredRetry.GetStringValue()]));
+        builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceName, [KafkaTopic.PatientListsAcquiredRetry.GetStringValue()]));
         builder.Services.AddHostedService<RetryListener>();
     }
 
@@ -293,7 +296,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
     {
         builder.Services.AddHostedService<ScheduleService>();
-        builder.Services.AddSingleton(new RetryListenerSettings(CensusConstants.ServiceName, [KafkaTopic.PatientListsAcquiredRetry.GetStringValue()]));
+        builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceName, [KafkaTopic.PatientListsAcquiredRetry.GetStringValue()]));
         builder.Services.AddHostedService<RetryListener>();
     }
 

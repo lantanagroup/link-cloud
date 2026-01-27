@@ -58,9 +58,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     // load external configuration source (if specified)
     builder.AddExternalConfiguration(AuditConstants.ServiceName);
 
-    var serviceInformation = builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
+    var serviceInformation = builder.Configuration.GetRequiredSection(ServiceInformation.SectionName).Get<ServiceInformation>();
+
     if (serviceInformation != null)
     {
+        serviceInformation!.ServiceConfigName = AuditConstants.ServiceName;
+        builder.Services.AddSingleton<ServiceInformation>(serviceInformation);
         ServiceActivitySource.Initialize(serviceInformation);
     }
     else
@@ -174,7 +177,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         builder.Services.AddTransient<IJobFactory, QuartzJobFactory>();
         builder.Services.AddTransient<RetryJob>();
 
-        builder.Services.AddSingleton(new RetryListenerSettings(AuditConstants.ServiceName, [KafkaTopic.AuditableEventOccurredRetry.GetStringValue()]));
+        builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceName, [KafkaTopic.AuditableEventOccurredRetry.GetStringValue()]));
         builder.Services.AddHostedService<RetryListener>();
         builder.Services.AddHostedService<RetryScheduleService>();
     }

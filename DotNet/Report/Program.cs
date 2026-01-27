@@ -63,17 +63,12 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
-    // load external configuration source (if specified)
-    builder.AddExternalConfiguration(ReportConstants.ServiceName);
-
-    builder.WebHost.ConfigureKestrel(options =>
-    {
-        options.Limits.MaxRequestBodySize = 200 * 1024 * 1024; // Set limit to 200 MB
-    });
-
-    var serviceInformation = builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
+    var serviceInformation = builder.Configuration.GetRequiredSection(ServiceInformation.SectionName).Get<ServiceInformation>();
+    
     if (serviceInformation != null)
     {
+        serviceInformation!.ServiceConfigName = ReportConstants.ServiceName;
+        builder.Services.AddSingleton<ServiceInformation>(serviceInformation);
         ServiceActivitySource.Initialize(serviceInformation);
     }
     else
@@ -81,11 +76,19 @@ static void RegisterServices(WebApplicationBuilder builder)
         throw new NullReferenceException("Service Information was null.");
     }
 
+    // load external configuration source (if specified)
+    builder.AddExternalConfiguration(serviceInformation.ServiceConfigName);
+
+    builder.WebHost.ConfigureKestrel(options =>
+    {
+        options.Limits.MaxRequestBodySize = 200 * 1024 * 1024; // Set limit to 200 MB
+    });
+
     // Add problem details
     builder.Services.AddProblemDetailsService(options =>
     {
         options.Environment = builder.Environment;
-        options.ServiceName = ReportConstants.ServiceName;
+        options.ServiceName = serviceInformation.ServiceConfigName;
         options.IncludeExceptionDetails = builder.Configuration.GetValue<bool>("ProblemDetails:IncludeExceptionDetails");
     });
 
@@ -191,7 +194,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     // Add health checks
-    var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, ReportConstants.ServiceName).GetHealthCheckOptions();
+    var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, serviceInformation.ServiceConfigName).GetHealthCheckOptions();
     builder.Services.AddHealthChecks()
         .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
@@ -268,12 +271,15 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<MeasureReportScheduleService>();
 
     // Register listeners
-    builder.Services.AddSingleton(new RetryListenerSettings(ReportConstants.ServiceName, [
-        KafkaTopic.ReportScheduledRetry.GetStringValue(),
-        KafkaTopic.ResourceEvaluatedRetry.GetStringValue(),
-        KafkaTopic.PatientListsAcquiredRetry.GetStringValue(),
-        KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()
-    ]));
+    builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceConfigName, [
+            KafkaTopic.ReportScheduledRetry.GetStringValue(),
+            KafkaTopic.ResourceEvaluatedRetry.GetStringValue(),
+            KafkaTopic.PatientListsAcquiredRetry.GetStringValue(),
+            KafkaTopic.GenerateReportRequestedRetry.GetStringValue(),
+            KafkaTopic.PayloadSubmittedRetry.GetStringValue(),
+            KafkaTopic.ValidationCompleteRetry.GetStringValue(),
+        ]));
+
     builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<GenerateReportListener>();
     builder.Services.AddHostedService<ResourceEvaluatedListener>();
@@ -281,12 +287,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<PatientListsAcquiredListener>();
     builder.Services.AddHostedService<ValidationCompleteListener>();
     builder.Services.AddHostedService<PayloadSubmittedListener>();
-
-    builder.Services.AddSingleton(new RetryListenerSettings(ReportConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.ResourceEvaluatedRetry.GetStringValue(), KafkaTopic.PatientListsAcquiredRetry.GetStringValue(), KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()]));
-    builder.Services.AddHostedService<RetryListener>();
-
-    builder.Services.AddHostedService<RetryScheduleService>();
-    builder.Services.AddHostedService<MeasureReportScheduleService>();
 
     builder.Services.AddTransient<PatientReportSubmissionBundler>();
     builder.Services.AddTransient<MeasureReportAggregator>();
@@ -340,7 +340,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {
         options.Environment = builder.Environment;
-        options.ServiceName = ReportConstants.ServiceName;
+        options.ServiceName = serviceInformation.ServiceConfigName;
         options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
     });
 

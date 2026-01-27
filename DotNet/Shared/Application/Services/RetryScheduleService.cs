@@ -86,10 +86,4 @@ public class RetryScheduleService : BackgroundService
         JobKey jobKey = new JobKey(model.JobId);
         await scheduler.DeleteJob(jobKey);
     }
-
-    public static async Task RescheduleJob(RetryModel model, IScheduler scheduler)
-    {
-        await DeleteJob(model, scheduler);
-        await CreateJobAndTrigger(model, scheduler);
-    }
 }

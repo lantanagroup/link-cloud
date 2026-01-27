@@ -60,12 +60,27 @@ static void RegisterServices(WebApplicationBuilder builder)
 {
     // load external configuration source (if specified)
     builder.AddExternalConfiguration(AccountConstants.ServiceName);
-    
-    //Initialize activity source
-    var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+
+    var serviceInfo = builder.Configuration.GetRequiredSection(ServiceInformation.SectionName).Get<ServiceInformation>();
+
+    if (serviceInfo != null)
+    {
+        serviceInfo!.ServiceConfigName = AccountConstants.ServiceName;
+        builder.Services.AddSingleton<ServiceInformation>(serviceInfo);
+
+        //Initialize activity source
+        var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+        ServiceActivitySource.Initialize(assemblyVersion, serviceInfo);
+        Log.Information("ServiceActivitySource initialized with name: {ServiceName}, version: {Version}",
+        ServiceActivitySource.ServiceName,
+        serviceInfo.Version);
+    }
+    else
+    {
+        throw new NullReferenceException("Service Information was null.");
+    }
+
     var serviceInfoConfigSection = builder.Configuration.GetRequiredSection(ServiceInformation.SectionName);
-    var serviceInfo = ServiceInformation.GetServiceInformation(Assembly.GetExecutingAssembly(), builder.Configuration);
-    ServiceActivitySource.Initialize(assemblyVersion, serviceInfo);
 
     //Add problem details
     builder.Services.AddProblemDetailsService(options =>

@@ -37,10 +37,6 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
         //configure error handlers topic names
         DeadLetterConsumerHandler.Topic = $"{this.TopicName}-Error";
         TransientExceptionHandler.Topic = $"{this.TopicName}-Retry";
-
-        //configure error handlers service names
-        DeadLetterConsumerHandler.ServiceName = ServiceInformation.Value.ServiceName;
-        TransientExceptionHandler.ServiceName = ServiceInformation.Value.ServiceName;
         
     }
 

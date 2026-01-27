@@ -46,6 +46,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly DataAcquisitionRequestedProducer _dataAcqProducer;
         private readonly IProducer<string, EvaluationRequestedValue> _evaluationProducer;
         private readonly BlobStorageService _blobStorageService;
+        private readonly ServiceInformation _serviceInformation;
 
         private string Name => this.GetType().Name;
 
@@ -61,6 +62,7 @@ namespace LantanaGroup.Link.Report.Listeners
             DataAcquisitionRequestedProducer dataAcqProducer,
             IProducer<string, EvaluationRequestedValue> evaluationProducer,
             BlobStorageService blobStorageService,
+            ServiceInformation serviceInformation,
             IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -73,10 +75,8 @@ namespace LantanaGroup.Link.Report.Listeners
             _deadLetterExceptionHandler = deadLetterExceptionHandler ??
                                                throw new ArgumentException(nameof(_deadLetterExceptionHandler));
 
-            _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
-            _transientExceptionHandler.Topic = nameof(KafkaTopic.GenerateReportRequested) + "-Retry";
 
-            _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
+            _transientExceptionHandler.Topic = nameof(KafkaTopic.GenerateReportRequested) + "-Retry";
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.GenerateReportRequested) + "-Error";
             _httpClientFactory = httpClientFactory;
             _linkTokenServiceConfig = linkTokenService;
@@ -85,6 +85,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _dataAcqProducer = dataAcqProducer;
             _evaluationProducer = evaluationProducer;
             _blobStorageService = blobStorageService;
+            _serviceInformation = serviceInformation;
             _linkBearerServiceOptions = linkBearerServiceOptions;
         }
 
@@ -98,7 +99,7 @@ namespace LantanaGroup.Link.Report.Listeners
         {
             var config = new ConsumerConfig()
             {
-                GroupId = ReportConstants.ServiceName,
+                GroupId = _serviceInformation.ServiceConfigName,
                 EnableAutoCommit = false,
                 AutoOffsetReset = AutoOffsetReset.Earliest,
                 SessionTimeoutMs = 10000,
@@ -138,6 +139,8 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var reportId = value.ReportId ?? Guid.NewGuid().ToString();
 
                                 facilityId = key;
+
+                                throw new TransientException("TEST TRANSIENT EXCEPTION RETRIES");
 
                                 if (string.IsNullOrWhiteSpace(facilityId))
                                 {

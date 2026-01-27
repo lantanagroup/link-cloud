@@ -28,9 +28,19 @@ static void RegisterServices(WebApplicationBuilder builder)
 {
     // load external configuration source (if specified)
     builder.AddExternalConfiguration(TerminologyConstants.ServiceName);
-    
-    var serviceInformation = builder.Configuration.GetRequiredSection(TerminologyConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-    
+
+    var serviceInformation = builder.Configuration.GetRequiredSection(ServiceInformation.SectionName).Get<ServiceInformation>();
+
+    if (serviceInformation != null)
+    {
+        serviceInformation!.ServiceConfigName = TerminologyConstants.ServiceName;
+        builder.Services.AddSingleton<ServiceInformation>(serviceInformation);
+    }
+    else
+    {
+        throw new NullReferenceException("Service Information was null.");
+    }
+
     builder.Services.AddHttpClient();
 
     // Add Link Security

@@ -1,4 +1,3 @@
-using Azure.Identity;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
@@ -19,6 +18,7 @@ using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Submission.Application.Config;
+using LantanaGroup.Link.Submission.Application.HealthChecks;
 using LantanaGroup.Link.Submission.Application.Interfaces;
 using LantanaGroup.Link.Submission.Application.Middleware;
 using LantanaGroup.Link.Submission.Application.Services;
@@ -27,8 +27,6 @@ using LantanaGroup.Link.Submission.Listeners;
 using LantanaGroup.Link.Submission.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.OpenApi.Models;
 using Quartz;
 using Serilog;
@@ -37,7 +35,6 @@ using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
 using Submission.Data;
 using System.Reflection;
-using LantanaGroup.Link.Submission.Application.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
@@ -73,10 +70,12 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.Limits.MaxRequestBodySize = 200 * 1024 * 1024; // Set limit to 200 MB
     });
 
-    // Add service information
-    var serviceInformation = builder.Configuration.GetSection(ConfigurationConstants.AppSettings.ServiceInformation).Get<ServiceInformation>();
+    var serviceInformation = builder.Configuration.GetRequiredSection(ServiceInformation.SectionName).Get<ServiceInformation>();
+
     if (serviceInformation != null)
     {
+        serviceInformation!.ServiceConfigName = SubmissionConstants.ServiceName;
+        builder.Services.AddSingleton<ServiceInformation>(serviceInformation);
         ServiceActivitySource.Initialize(serviceInformation);
     }
     else
@@ -159,7 +158,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add hosted services
     builder.Services.AddHostedService<SubmitPayloadListener>();
-    builder.Services.AddSingleton(new RetryListenerSettings(SubmissionConstants.ServiceName, [KafkaTopic.SubmitPayloadRetry.GetStringValue()]));
+    builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceName, [KafkaTopic.SubmitPayloadRetry.GetStringValue()]));
     builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<RetryScheduleService>();
     builder.Services.AddSingleton<BlobStorageService>();

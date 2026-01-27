@@ -1,7 +1,6 @@
 ﻿using Azure.Identity;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 

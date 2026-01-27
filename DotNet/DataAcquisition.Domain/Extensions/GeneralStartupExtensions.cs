@@ -54,8 +54,25 @@ public static class GeneralStartupExtensions
         string serviceName,
         bool? configureRedis = false)
     {
+        var serviceInformation = builder.Configuration.GetRequiredSection(ServiceInformation.SectionName).Get<ServiceInformation>();
+
+        if (serviceInformation != null)
+        {
+            serviceInformation!.ServiceConfigName = serviceName;
+            builder.Services.AddSingleton<ServiceInformation>(serviceInformation);
+
+            ServiceActivitySource.Initialize(serviceInformation);
+            Log.Information("ServiceActivitySource initialized with name: {ServiceName}, version: {Version}",
+            ServiceActivitySource.ServiceName,
+            serviceInformation.Version);
+        }
+        else
+        {
+            throw new NullReferenceException("Service Information was null.");
+        }
+
         // load external configuration source (if specified)
-        builder.AddExternalConfiguration(serviceName);
+        builder.AddExternalConfiguration(serviceInformation.ServiceConfigName);
         
         builder.Configuration.RegisterMonitoring(builder.Logging, builder.Services);
         builder.Services.RegisterConfigs(builder.Configuration);
@@ -74,7 +91,7 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterManagers();
         builder.Services.RegisterServices();
         builder.Services.RegisterFactories(builder.Configuration);
-        builder.Services.RegisterTelemetry(builder.Configuration, builder.Environment, serviceName);
+        builder.Services.RegisterTelemetry(builder.Configuration, builder.Environment, serviceInformation.ServiceConfigName);
         builder.Services.RegisterProblemDetails((IHostingEnvironment)builder.Environment);
     }
 
@@ -110,21 +127,6 @@ public static class GeneralStartupExtensions
         // Clear defaults and use Serilog everywhere
         logging.ClearProviders();
         logging.AddSerilog(Log.Logger, dispose: true);
-
-        var serviceInformation = configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-        services.Configure<ServiceInformation>(configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation));
-
-        if (serviceInformation != null)
-        {
-            ServiceActivitySource.Initialize(serviceInformation);
-            Log.Information("ServiceActivitySource initialized with name: {ServiceName}, version: {Version}",
-            ServiceActivitySource.ServiceName,
-            serviceInformation.Version);
-        }
-        else
-        {
-            throw new NullReferenceException("Service Information was null.");
-        }
     }
 
     public static void RegisterConfigs(this IServiceCollection services, IConfigurationManager configuration)

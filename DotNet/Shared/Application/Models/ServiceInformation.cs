@@ -1,5 +1,4 @@
-﻿using System.Net;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Reflection;
 using System.Text.Json;
@@ -8,10 +7,9 @@ namespace LantanaGroup.Link.Shared.Application.Models;
 
 public class ServiceInformation
 {
-    private static readonly ILogger _logger;
-
     public static string SectionName = "ServiceInformation";
     public string ServiceName { get; init; } = string.Empty;
+    public string? ServiceConfigName { get; set; } = default;
     public string Version { get; set; } = string.Empty;
     public string ProductVersion { get; init; } = string.Empty;
     public string Commit { get; init; } = string.Empty;
