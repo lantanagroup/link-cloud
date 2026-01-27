@@ -23,7 +23,7 @@ public class MeasureReportScheduleService : BackgroundService
     public MeasureReportScheduleService(
         ILogger<MeasureReportScheduleService> logger,
         IJobFactory jobFactory,
-        [FromKeyedServices("MongoScheduler")] ISchedulerFactory schedulerFactory,
+        ISchedulerFactory schedulerFactory,
         IServiceScopeFactory serviceScopeFactory)
     {
         _logger = logger;

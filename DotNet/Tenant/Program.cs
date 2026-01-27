@@ -75,18 +75,9 @@ namespace Tenant
                 options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
             });
 
-            var serviceInformation = builder.Configuration.GetRequiredSection(ServiceInformation.SectionName).Get<ServiceInformation>();
+            var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
 
-            if (serviceInformation != null)
-            {
-                serviceInformation!.ServiceConfigName = TenantConstants.ServiceName;
-                builder.Services.AddSingleton<ServiceInformation>(serviceInformation);
-                ServiceActivitySource.Initialize(serviceInformation);
-            }
-            else
-            {
-                throw new NullReferenceException("Service Information was null.");
-            }
+            var serviceInformation = builder.SetupServiceInformation(TenantConstants.ServiceName, assemblyVersion);
 
             // Add services to the container.
             builder.Services.AddSingleton<ScheduleService>();

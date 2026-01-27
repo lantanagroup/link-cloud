@@ -28,19 +28,20 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
         IDeadLetterExceptionHandler<long, ReadyToAcquire> deadLetterConsumerHandler,
         IDeadLetterExceptionHandler<string, string> deadLetterConsumerErrorHandler,
         ITransientExceptionHandler<long, ReadyToAcquire> transientExceptionHandler,
-        IOptions<ServiceInformation> serviceInformation,
+        ServiceInformation serviceInformation,
         IServiceScopeFactory serviceScopeFactory)
         : base(logger, kafkaConsumerFactory, deadLetterConsumerHandler, deadLetterConsumerErrorHandler, transientExceptionHandler, serviceInformation)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _serviceScopeFactory = serviceScopeFactory;
     }
+
     protected override ConsumerConfig CreateConsumerConfig()
     {
         var settings = new ConsumerConfig
         {
             EnableAutoCommit = false,
-            GroupId = ServiceActivitySource.ServiceName
+            GroupId = ServiceInformation.ServiceConfigName,
         };
         return settings;
     }

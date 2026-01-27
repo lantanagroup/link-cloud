@@ -20,7 +20,6 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
-using LantanaGroup.Link.Shared.Application.Factory;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
@@ -63,18 +62,12 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
-    var serviceInformation = builder.Configuration.GetRequiredSection(ServiceInformation.SectionName).Get<ServiceInformation>();
-    
-    if (serviceInformation != null)
-    {
-        serviceInformation!.ServiceConfigName = ReportConstants.ServiceName;
-        builder.Services.AddSingleton<ServiceInformation>(serviceInformation);
-        ServiceActivitySource.Initialize(serviceInformation);
-    }
-    else
-    {
-        throw new NullReferenceException("Service Information was null.");
-    }
+    // Bind MongoConnection settings from configuration (e.g., appsettings.json)
+    builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.Mongo));
+    var mongoSettings = builder.Services.BuildServiceProvider().GetRequiredService<IOptions<MongoConnection>>().Value;
+    var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+
+    var serviceInformation = builder.SetupServiceInformation(ReportConstants.ServiceName, assemblyVersion, mongoSettings.ConnectionString);
 
     // load external configuration source (if specified)
     builder.AddExternalConfiguration(serviceInformation.ServiceConfigName);
@@ -108,7 +101,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Register IMongoClient as a singleton using the configured connection string
     builder.Services.AddSingleton<IMongoClient>(sp =>
     {
-        var mongoSettings = sp.GetRequiredService<IOptions<MongoConnection>>().Value;
         return new MongoClient(mongoSettings.ConnectionString);
     });
 
@@ -251,7 +243,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         q.UseJobFactory<QuartzJobFactory>();
     });
 
-    builder.Services.AddKeyedSingleton<ISchedulerFactory>("MongoScheduler", (provider, key) =>
+    builder.Services.AddSingleton<ISchedulerFactory>((provider) =>
     {
         var logger = provider.GetRequiredService<ILogger<ReportMongoSchedulerFactory>>();
         var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
@@ -259,8 +251,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     // 2. In-memory scheduler for RetryJob
-    builder.Services.AddSingleton<InMemorySchedulerFactory>();
-    builder.Services.AddKeyedSingleton<ISchedulerFactory>("RetryScheduler", (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
+    //builder.Services.AddSingleton<SqlPersistentScheduleFactory>();
+    //builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
+    //builder.Services.AddSingleton<ISchedulerFactory>(provider => provider.GetRequiredService<SqlPersistentScheduleFactory>());
 
     // Register job factory and jobs
     builder.Services.AddSingleton<IJobFactory, QuartzJobFactory>();

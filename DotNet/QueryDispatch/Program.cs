@@ -51,21 +51,9 @@ builder.Configuration.AddStandardEnvironmentConfiguration();
 // load external configuration source (if specified)
 builder.AddExternalConfiguration(QueryDispatchConstants.ServiceName);
 
-var serviceInformation = builder.Configuration.GetRequiredSection(ServiceInformation.SectionName).Get<ServiceInformation>();
+var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
 
-if (serviceInformation != null)
-{
-    serviceInformation!.ServiceConfigName = QueryDispatchConstants.ServiceName;
-    builder.Services.AddSingleton<ServiceInformation>(serviceInformation);
-    ServiceActivitySource.Initialize(serviceInformation);
-}
-else
-{
-    throw new NullReferenceException("Service Information was null.");
-}
-
-// Additional configuration is required to successfully run gRPC on macOS.
-// For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
+var serviceInformation = builder.SetupServiceInformation(QueryDispatchConstants.ServiceName, assemblyVersion);
 
 var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
 builder.Services.AddSingleton<KafkaConnection>(kafkaConnection);

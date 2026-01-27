@@ -1,6 +1,4 @@
-﻿using System.Diagnostics;
-using System.Net;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Queries;
 using FluentValidation;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.ParameterFactories;
@@ -44,6 +42,9 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Settings.Configuration;
 using Serilog.Sinks.SystemConsole.Themes;
+using System.Diagnostics;
+using System.Net;
+using System.Reflection;
 using IHostingEnvironment = Microsoft.Extensions.Hosting.IHostingEnvironment;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
@@ -54,22 +55,9 @@ public static class GeneralStartupExtensions
         string serviceName,
         bool? configureRedis = false)
     {
-        var serviceInformation = builder.Configuration.GetRequiredSection(ServiceInformation.SectionName).Get<ServiceInformation>();
+        var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
 
-        if (serviceInformation != null)
-        {
-            serviceInformation!.ServiceConfigName = serviceName;
-            builder.Services.AddSingleton<ServiceInformation>(serviceInformation);
-
-            ServiceActivitySource.Initialize(serviceInformation);
-            Log.Information("ServiceActivitySource initialized with name: {ServiceName}, version: {Version}",
-            ServiceActivitySource.ServiceName,
-            serviceInformation.Version);
-        }
-        else
-        {
-            throw new NullReferenceException("Service Information was null.");
-        }
+        var serviceInformation = builder.SetupServiceInformation(serviceName, assemblyVersion);
 
         // load external configuration source (if specified)
         builder.AddExternalConfiguration(serviceInformation.ServiceConfigName);

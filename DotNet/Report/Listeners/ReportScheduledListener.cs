@@ -3,7 +3,6 @@ using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Services;
-using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -28,10 +27,8 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ServiceInformation _serviceInformation;
         private readonly BlobStorageService _blobStorageService;
 
-        private string Name => this.GetType().Name;
-
         public ReportScheduledListener(ILogger<ReportScheduledListener> logger, IKafkaConsumerFactory<string, ReportScheduledValue> kafkaConsumerFactory,
-            [FromKeyedServices("MongoScheduler")] ISchedulerFactory schedulerFactory,
+            ISchedulerFactory schedulerFactory,
             ITransientExceptionHandler<string, ReportScheduledValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<string, ReportScheduledValue> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory,

@@ -70,18 +70,9 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.Limits.MaxRequestBodySize = 200 * 1024 * 1024; // Set limit to 200 MB
     });
 
-    var serviceInformation = builder.Configuration.GetRequiredSection(ServiceInformation.SectionName).Get<ServiceInformation>();
+    var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
 
-    if (serviceInformation != null)
-    {
-        serviceInformation!.ServiceConfigName = SubmissionConstants.ServiceName;
-        builder.Services.AddSingleton<ServiceInformation>(serviceInformation);
-        ServiceActivitySource.Initialize(serviceInformation);
-    }
-    else
-    {
-        throw new NullReferenceException("Service Information was null.");
-    }
+    var serviceInformation = builder.SetupServiceInformation(SubmissionConstants.ServiceName, assemblyVersion);
 
     //Add problem details
     builder.Services.AddProblemDetails();
