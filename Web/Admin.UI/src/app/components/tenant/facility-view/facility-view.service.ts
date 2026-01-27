@@ -5,7 +5,6 @@ import { AppConfigService } from "src/app/services/app-config.service";
 import { IPagedMeasureReportSummary, IPagedReportListSummary, IPagedResourceSummary, IValidationIssue, IValidationIssueCategorySummary, IValidationIssuesSummary, IReportListSummary } from "./report-view.interface";
 import { ErrorHandlingService } from "src/app/services/error-handling.service";
 import { IApiResponse } from "src/app/interfaces/api-response.interface";
-import {IPagedEntrySummary} from "../../../interfaces/report/report-entry.interface";
 import {IPagedReportSchedule} from "../../../interfaces/report/report-schedule.interface";
 
 
