@@ -2,12 +2,14 @@ using FluentValidation;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Renci.SshNet;
 using System.Net;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
@@ -612,6 +614,115 @@ public class SftpConfigurationController : Controller
         {
             var message = $"An unexpected error occurred while attempting to delete SFTP credentials for organizationId: {organizationId}. Trace Id: {httpContext.TraceIdentifier}";
             _logger.LogError(new EventId(LoggingIds.DeleteItem, "DeleteSftpCredentials"), ex, "An exception occurred while attempting to delete SFTP credentials for organizationId: {OrganizationId}", organizationId);
+            return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    #endregion
+
+    #region Connection Test
+
+    /// <summary>
+    /// Tests the SFTP connection for an organization's configuration.
+    /// Verifies connectivity to the SFTP server and optionally checks if the remote directory is accessible.
+    /// </summary>
+    /// <param name="organizationId">The organization identifier.</param>
+    /// <param name="cancellationToken"></param>
+    /// <returns>
+    ///     Success: 200
+    ///     Bad Request: 400
+    ///     Not Found: 404
+    ///     Server Error: 500
+    /// </returns>
+    [HttpPost("{organizationId}/sftp-configurations/test-connection")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(SftpConnectionTestResult))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<SftpConnectionTestResult>> TestSftpConnection(string organizationId, CancellationToken cancellationToken)
+    {
+        var httpContext = HttpContext;
+
+        // Sanitize organizationId
+        organizationId = organizationId.SanitizeAndRemove();
+
+        try
+        {
+            if (string.IsNullOrWhiteSpace(organizationId))
+            {
+                return BadRequest("OrganizationId is null or empty.");
+            }
+
+            // Get the SFTP configuration
+            var config = await _sftpConfigurationQueries.GetByOrganizationIdAsync(organizationId, cancellationToken);
+            if (config is null)
+            {
+                return NotFound($"No {nameof(SftpConfiguration)} found for organization: {organizationId}");
+            }
+
+            // Get credentials, assume there will never be an anonymous connection for SFTP
+            var credentials = await _sftpCredentialService.GetCredentialsAsync(organizationId, cancellationToken);
+            if (credentials is null || string.IsNullOrWhiteSpace(credentials.Username) || string.IsNullOrWhiteSpace(credentials.Password))
+            {
+                return BadRequest("No credentials configured for this SFTP configuration. Please set credentials before testing the connection.");
+            }
+
+            // Test the connection
+            try
+            {
+                using var client = new SftpClient(config.Host, config.Port, credentials.Username, credentials.Password);
+                client.ConnectionInfo.Timeout = config.Timeout;
+
+                await client.ConnectAsync(cancellationToken);
+
+                var result = new SftpConnectionTestResult
+                {
+                    Success = client.IsConnected,
+                    Message = "Successfully connected to SFTP server."
+                };
+
+                // Verify directory access if configured
+                if (client.IsConnected && !string.IsNullOrWhiteSpace(config.RemoteDirectory))
+                {
+                    if (await client.ExistsAsync(config.RemoteDirectory, cancellationToken))
+                    {
+                        result.Message += $" Remote directory '{config.RemoteDirectory}' is accessible.";
+                    }
+                    else
+                    {
+                        result.Success = false;
+                        result.Message = $"Connected to SFTP server but remote directory '{config.RemoteDirectory}' does not exist or is not accessible.";
+                    }
+                }
+
+                client.Disconnect();
+
+                _logger.LogInformation(
+                    new EventId(LoggingIds.GetItem, "TestSftpConnection"),
+                    "SFTP connection test for organizationId: {OrganizationId} - Success: {Success}",
+                    organizationId, result.Success);
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    new EventId(LoggingIds.GetItem, "TestSftpConnection"),
+                    ex,
+                    "SFTP connection test failed for organizationId: {OrganizationId}",
+                    organizationId);
+
+                return Ok(new SftpConnectionTestResult
+                {
+                    Success = false,
+                    Message = $"Connection failed: {ex.Message}"
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            var message = $"An unexpected error occurred while testing SFTP connection for organizationId: {organizationId}. Trace Id: {httpContext.TraceIdentifier}";
+            _logger.LogError(new EventId(LoggingIds.GetItem, "TestSftpConnection"), ex, "An exception occurred while testing SFTP connection for organizationId: {OrganizationId}", organizationId);
             return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
