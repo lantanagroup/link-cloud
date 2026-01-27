@@ -36,11 +36,18 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             DateTime? reportEndDate,
             ScheduleStatus? status,
             bool? endOfReportPeriodJobHasRun,
+            bool includeDeleted,
             string? sortBy,
             SortOrder? sortOrder,
             int pageSize,
             int pageNumber,
             CancellationToken cancellationToken = default);
+        
+        Task UpdateReportsDeletedStatusForFacility(
+            string facilityId,
+            bool deleted,  
+            CancellationToken cancellationToken = default);
+
     }
 
 
@@ -49,26 +56,33 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         private readonly IDatabase _database;
         private readonly ScheduledReportFactory _scheduledReportFactory;
         private readonly IServiceScopeFactory _serviceScopeFactory;
+        private readonly MongoDbContext _context;
 
-        public ReportScheduledManager(IDatabase database, ScheduledReportFactory scheduledReportFactory, IServiceScopeFactory serviceScopeFactory)
+        public ReportScheduledManager(MongoDbContext context, IDatabase database,
+            ScheduledReportFactory scheduledReportFactory, IServiceScopeFactory serviceScopeFactory)
         {
+            _context = context;
             _database = database;
             _scheduledReportFactory = scheduledReportFactory;
             _serviceScopeFactory = serviceScopeFactory;
         }
 
-        public async Task<ReportSchedule?> GetReportSchedule(string facilityid, string reportId, CancellationToken cancellationToken = default)
+        public async Task<ReportSchedule?> GetReportSchedule(string facilityid, string reportId,
+            CancellationToken cancellationToken = default)
         {
             // find existing report scheduled for this facility, report type, and date range
-            return (await _database.ReportScheduledRepository.FindAsync(r => r.FacilityId == facilityid && r.Id == reportId, cancellationToken))?.SingleOrDefault();
+            return (await _database.ReportScheduledRepository.FindAsync(
+                r => r.FacilityId == facilityid && r.Id == reportId, cancellationToken))?.SingleOrDefault();
         }
 
-        public async Task<ReportSchedule?> SingleOrDefaultAsync(Expression<Func<ReportSchedule, bool>> predicate, CancellationToken cancellationToken = default)
+        public async Task<ReportSchedule?> SingleOrDefaultAsync(Expression<Func<ReportSchedule, bool>> predicate,
+            CancellationToken cancellationToken = default)
         {
             return await _database.ReportScheduledRepository.SingleOrDefaultAsync(predicate, cancellationToken);
         }
 
-        public async Task<List<ReportSchedule>> FindAsync(Expression<Func<ReportSchedule, bool>> predicate, CancellationToken cancellationToken = default)
+        public async Task<List<ReportSchedule>> FindAsync(Expression<Func<ReportSchedule, bool>> predicate,
+            CancellationToken cancellationToken = default)
         {
             return await _database.ReportScheduledRepository.FindAsync(predicate, cancellationToken);
         }
@@ -86,6 +100,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             await _database.SaveChangesAsync();
             return entity;
         }
+        
 
         public async Task<PagedConfigModel<ReportSchedule>> SearchAsync(
             string? facilityId,
@@ -95,6 +110,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             DateTime? reportEndDate,
             ScheduleStatus? status,
             bool? endOfReportPeriodJobHasRun,
+            bool includeDeleted,
             string? sortBy,
             SortOrder? sortOrder,
             int pageSize,
@@ -137,6 +153,11 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             {
                 predicate = predicate.And(q => q.EndOfReportPeriodJobHasRun == endOfReportPeriodJobHasRun.Value);
             }
+            
+            if (!includeDeleted)
+            {
+                predicate = predicate.And(q => !q.IsDeleted.HasValue || q.IsDeleted == false);
+            }
 
             var (results, metadata) = await _database.ReportScheduledRepository.SearchAsync(
                 predicate,
@@ -147,6 +168,29 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 cancellationToken);
 
             return new PagedConfigModel<ReportSchedule>(results, metadata);
+        }
+        
+        public async Task UpdateReportsDeletedStatusForFacility(
+            string facilityId,
+            bool deleted,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(facilityId))
+                throw new ArgumentException("facilityId is required", nameof(facilityId));
+
+            var reports = await _database.ReportScheduledRepository
+                .FindAsync(r => r.FacilityId == facilityId, cancellationToken);
+
+            var now = DateTime.UtcNow;
+
+            foreach (var r in reports)
+            {
+                r.IsDeleted = deleted;
+                r.ModifyDate = now;
+            }
+
+            _context.ReportSchedules.UpdateRange(reports);
+            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 }
