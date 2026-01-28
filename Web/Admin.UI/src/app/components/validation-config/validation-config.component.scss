@@ -6,6 +6,17 @@
   padding: 24px;
 }
 
+.info-note {
+  max-width: 700px;
+  margin: 16px auto 0;
+  padding: 12px 24px;
+  background-color: #e3f2fd;
+  color: #0d47a1;
+  border-radius: 4px;
+  font-size: 14px;
+  border-left: 4px solid #2196f3;
+}
+
 .form-layout {
   display: flex;
   flex-wrap: wrap;
