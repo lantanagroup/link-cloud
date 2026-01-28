@@ -6,6 +6,8 @@ import com.lantanagroup.link.validation.entities.ArtifactType;
 import com.lantanagroup.link.validation.repositories.ArtifactRepository;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.hl7.fhir.r4.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
@@ -13,6 +15,9 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 @Service
 public class ArtifactService {
@@ -78,5 +83,62 @@ public class ArtifactService {
             }
         }
         return validationSupport;
+    }
+
+    public Set<String> getTerminologyDependencies() throws IOException {
+        ArtifactValidationSupport support = getValidationSupport();
+        List<IBaseResource> resources = support.fetchAllStructureDefinitions();
+        Set<String> dependencies = new HashSet<>();
+        if (resources == null) {
+            return dependencies;
+        }
+        for (IBaseResource resource : resources) {
+            if (resource instanceof StructureDefinition sd) {
+                if (sd.hasSnapshot()) {
+                    for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+                        addBindingDependencies(ed, dependencies);
+                        addFixedPatternDependencies(ed, dependencies);
+                    }
+                }
+                if (sd.hasDifferential()) {
+                    for (ElementDefinition ed : sd.getDifferential().getElement()) {
+                        addBindingDependencies(ed, dependencies);
+                        addFixedPatternDependencies(ed, dependencies);
+                    }
+                }
+            }
+        }
+        return dependencies;
+    }
+
+    private void addBindingDependencies(ElementDefinition ed, Set<String> dependencies) {
+        if (ed.hasBinding() && ed.getBinding().hasValueSet()) {
+            dependencies.add(ed.getBinding().getValueSet());
+        }
+    }
+
+    private void addFixedPatternDependencies(ElementDefinition ed, Set<String> dependencies) {
+        if (ed.hasFixed()) {
+            addTypeDependencies(ed.getFixed(), dependencies);
+        }
+        if (ed.hasPattern()) {
+            addTypeDependencies(ed.getPattern(), dependencies);
+        }
+    }
+
+    private void addTypeDependencies(Type type, Set<String> dependencies) {
+        if (type instanceof Coding coding) {
+            if (coding.hasSystem()) {
+                String dependency = coding.getSystem();
+                if (coding.hasVersion()) {
+                    dependency += "|" + coding.getVersion();
+                }
+                dependencies.add(dependency);
+            }
+        } else if (type instanceof CodeableConcept codeableConcept) {
+            for (Coding coding : codeableConcept.getCoding()) {
+                addTypeDependencies(coding, dependencies);
+            }
+        }
     }
 }
