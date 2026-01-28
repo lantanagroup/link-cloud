@@ -199,6 +199,28 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             return response;
         }
 
+        public async Task<HttpResponseMessage> GetReportScheduleById(
+            ClaimsPrincipal user,
+            CancellationToken cancellationToken,
+            string reportScheduleId)
+        {
+            // HTTP GET
+            if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
+            {
+                var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
+
+                //create a bearer token for the system account
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var relativeUrl = $"api/schedules/{reportScheduleId}";
+
+            var response = await _client.GetAsync(relativeUrl, cancellationToken);
+
+            return response;
+        }
+
         private void InitHttpClient()
         {
             //check if the service uri is set

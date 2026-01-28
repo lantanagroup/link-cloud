@@ -197,7 +197,7 @@ export class ReportService {
 
   getReportSchedule(reportScheduleId: string): Observable<IReportSchedule> {
     const headers = new HttpHeaders({ 'X-Skip-Loading': 'true' });
-    return this.http.get<IReportSchedule>(`${this.appConfigService.config?.baseApiUrl}/schedules/${reportScheduleId}`, { headers })
+    return this.http.get<IReportSchedule>(`${this.appConfigService.config?.baseApiUrl}/aggregate/reports/summaries/${reportScheduleId}`, { headers })
       .pipe(
         tap(_ => console.log('Fetched report schedule.')),
         catchError((error) => this.errorHandler.handleError(error))
