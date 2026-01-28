@@ -17,6 +17,8 @@ import { forkJoin, Subscription } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatTableDataSource, MatTableModule } from '@angular/material/table';
+import { MatSortModule, Sort } from '@angular/material/sort';
 
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import {
@@ -36,6 +38,9 @@ import { ViewReportTableCommandComponent } from './table-command/view-report-tab
 import { AcquisitionLogService } from '../../acquisition-log/acquisition-log.service';
 import { IDataAcquisitionLogStatistics } from 'src/app/interfaces/data-acquisition/data-acquisition-log-statistics.interface';
 import { ReportAnalysisComponent } from './report-analysis/report-analysis.component';
+import { IReportSchedule } from '../../../../interfaces/report/report-schedule.interface';
+import { ReportService } from '../../../../services/gateway/report/report.service';
+import { IReportEntry, ReportingStatus, SubmissionStatus } from '../../../../interfaces/report/report-entry.interface';
 
 @Component({
   selector: 'app-view-report',
@@ -50,12 +55,14 @@ import { ReportAnalysisComponent } from './report-analysis/report-analysis.compo
     MatTabsModule,
     MatButtonModule,
     MatTooltipModule,
+    MatTableModule,
+    MatSortModule,
     RouterLink,
     RouterLinkActive,
     ViewReportTableCommandComponent,
     ReportAnalysisComponent,
     DonutChartComponent
-],
+  ],
   templateUrl: './view-report.component.html',
   styleUrl: './view-report.component.scss'
 })
@@ -68,12 +75,12 @@ export class ViewReportComponent implements OnInit {
   faSort = faSort;
   faSortUp = faSortUp;
   faSortDown = faSortDown;
+  faGears = faGears;
 
-  private subscription: Subscription | undefined;
   facilityId: string = '';
   reportId: string = '';
 
-  reportSummary: IReportListSummary | undefined;
+  reportSummary: IReportSchedule | undefined;
   dataAcquisitionLogStatistics: IDataAcquisitionLogStatistics | undefined;
 
   defaultPageNumber: number = 0
@@ -82,16 +89,18 @@ export class ViewReportComponent implements OnInit {
   sortOrder: 'ascending' | 'descending' | null = null;
   measureReports: IMeasureReportSummary[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
+  displayedColumns: string[] = ['id', 'measure', 'resourceCount', 'reportingStatus', 'submissionStatus', 'action'];
+  dataSource = new MatTableDataSource<IReportEntry>([]);
 
   //filters
   patientFilter: string = '';
   reportFilter: string = '';
   selectedMeasureFilter: string = 'any';
-  selectedReportStatusFilter: string = 'any';
-  selectedValidationStatusFilter: string = 'any';
+  selectedReportStatusFilter: ReportingStatus|string = 'any';
+  selectedValidationStatusFilter: SubmissionStatus|string = 'any';
   measures: string[] = [];
-  reportStatuses: string[] = [];
-  validationStatuses: string[] = [];
+  reportStatuses: ReportingStatus[] = [];
+  validationStatuses: SubmissionStatus[] = [];
 
   constructor(
     private location: Location,
@@ -100,80 +109,85 @@ export class ViewReportComponent implements OnInit {
     private dialog: MatDialog,
     private facilityViewService: FacilityViewService,
     private acquisitionLogService: AcquisitionLogService,
-    private loadingService: LoadingService) { }
+    private loadingService: LoadingService,
+    private reportService: ReportService) { }
 
   ngOnInit(): void {
-    this.subscription = this.route.params.subscribe(params => {
-      this.facilityId = params['facilityId'];
-      this.reportId = params['reportId'];
-
-      this.loadingService.show();
-
-      forkJoin([
-          this.facilityViewService.getReportSummary(this.facilityId, this.reportId),
-          this.facilityViewService.getMeasureReportSummaryList(this.facilityId, this.reportId, null, null, null, null, null, null, null, this.defaultPageNumber, this.defaultPageSize),
-          this.facilityViewService.getReportSubmissionStatuses(),
-          this.facilityViewService.getReportValidationStatuses()
-        ]).subscribe({
-          next: (response) => {
-            this.reportSummary = response[0];
-            this.measureReports = response[1].records;
-            this.paginationMetadata = response[1].metadata;
-            this.measures = this.reportSummary.reportTypes;
-            this.reportStatuses = response[2];
-            this.validationStatuses = response[3];
-            this.loadingService.hide();
-          },
-          error: (error) => {
-            console.error('Error loading report summary:', error);
-            this.loadingService.hide();
-          }
-        });
-    });
+    this.facilityId = this.route.snapshot.paramMap.get('facilityId') || '';
+    this.reportId = this.route.snapshot.paramMap.get('reportId') || '';
+    this.loadReportSchedule();
+    this.loadReportEntries();
   }
 
   ngOnDestroy(): void {
-    if (this.subscription) {
-        this.subscription.unsubscribe();
-    }
+
   }
 
-  loadReportSummary(): void {
-    this.facilityViewService.getReportSummary(this.facilityId, this.reportId).subscribe({
-      next: (response) => {
-        this.reportSummary = response;
+  loadReportSchedule(): void {
+    this.loadingService.show();
+    this.reportService.getReportSchedule(this.reportId)
+      .subscribe({
+        next: (data) => {
+          this.reportSummary = data;
+          // Populate measures from report types
+          if (data.reportTypes && data.reportTypes.length > 0) {
+            this.measures = data.reportTypes;
+          }
+          this.loadingService.hide();
+        },
+        error: (error) => {
+          console.error('Error loading report schedule:', error);
+          this.loadingService.hide();
+        }
+      });
+  }
+
+  loadReportEntries(): void {
+    this.loadingService.show();
+
+    // Build filter parameters
+    const patientId = this.patientFilter || undefined;
+    const reportScheduleId = this.reportFilter || this.reportId;
+    const reportingStatus = this.selectedReportStatusFilter !== 'any'
+      ? this.selectedReportStatusFilter as ReportingStatus
+      : undefined;
+    const submissionStatus = this.selectedValidationStatusFilter !== 'any'
+      ? this.selectedValidationStatusFilter as SubmissionStatus
+      : undefined;
+    const reportType = this.selectedMeasureFilter !== 'any'
+      ? this.selectedMeasureFilter
+      : undefined;
+
+    this.reportService.searchReportEntries(
+      this.facilityId,
+      patientId,
+      reportScheduleId,
+      reportingStatus,
+      submissionStatus,
+      reportType,
+      this.sortBy || undefined,
+      this.sortOrder || undefined,
+      this.paginationMetadata.pageSize || this.defaultPageSize,
+      (this.paginationMetadata.pageNumber || this.defaultPageNumber) + 1 // API uses 1-based indexing
+    ).subscribe({
+      next: (data) => {
+        this.dataSource.data = data.records;
+        this.paginationMetadata = {
+          pageSize: data.metadata.pageSize,
+          pageNumber: data.metadata.pageNumber - 1, // Convert to 0-based for mat-paginator
+          totalCount: data.metadata.totalCount,
+          totalPages: data.metadata.totalPages
+        };
+        this.loadingService.hide();
       },
       error: (error) => {
-        console.error('Error loading report summary:', error);
+        console.error('Error loading report entries:', error);
+        this.loadingService.hide();
       }
     });
   }
 
-  loadMeasureReports(pageNumber: number, pageSize: number): void {
-
-    this.facilityViewService.getMeasureReportSummaryList(
-        this.facilityId,
-        this.reportId,
-        this.patientFilter.length > 0 ? this.patientFilter : null,
-        this.reportFilter.length > 0 ? this.reportFilter : null,
-        this.selectedMeasureFilter === 'any' ? null : this.selectedMeasureFilter,
-        this.selectedReportStatusFilter === 'any' ? null : this.selectedReportStatusFilter,
-        this.selectedValidationStatusFilter === 'any' ? null : this.selectedValidationStatusFilter,
-        this.sortBy,
-        this.sortOrder,
-        pageNumber,
-        pageSize).subscribe({
-      next: (response) => {
-        this.measureReports = response.records;
-        this.paginationMetadata = response.metadata;
-      },
-      error: (error) => {
-        console.error('Error loading measure reports:', error);
-      }
-    });
-  }
-
-  onSelectReport(measureReport: IMeasureReportSummary): void {
+  onSelectReport(measureReport: IReportEntry): void {
 
     const dialogConfig = new MatDialogConfig();
     dialogConfig.minWidth = '90vw';
@@ -186,37 +200,11 @@ export class ViewReportComponent implements OnInit {
       measureReport: measureReport
     };
 
-      this.dialog.open(ViewMeasureReportComponent, dialogConfig);
-    }
-
-  pagedEvent(event: PageEvent) {
-    this.paginationMetadata.pageSize = event.pageSize;
-    this.paginationMetadata.pageNumber = event.pageIndex;
-    this.loadMeasureReports(event.pageIndex, event.pageSize);
+    this.dialog.open(ViewMeasureReportComponent, dialogConfig);
   }
 
   onDownload() {
     this.facilityViewService.downloadReport(this.facilityId, this.reportId);
-  }
-
-  onPatientIdChange(): void {
-    this.loadMeasureReports(this.defaultPageNumber, this.defaultPageSize);
-  }
-
-  onReportIdChange(): void {
-    this.loadMeasureReports(this.defaultPageNumber, this.defaultPageSize);
-  }
-
-  onMeasureFilterChange(event: Event): void {
-    this.loadMeasureReports(this.defaultPageNumber, this.defaultPageSize);
-  }
-
-  onReportStatusFilterChange(event: Event): void {
-    this.loadMeasureReports(this.defaultPageNumber, this.defaultPageSize);
-  }
-
-  onValidationStatusFilterChange(event: Event): void {
-    this.loadMeasureReports(this.defaultPageNumber, this.defaultPageSize);
   }
 
   clearFilters(): void {
@@ -225,35 +213,57 @@ export class ViewReportComponent implements OnInit {
     this.selectedMeasureFilter = 'any';
     this.selectedReportStatusFilter = 'any';
     this.selectedValidationStatusFilter = 'any';
-    this.loadMeasureReports(this.defaultPageNumber, this.defaultPageSize);
-  }
-
-  onSort(column: string): void {
-    if (this.sortBy !== column) {
-      this.sortBy = column;
-      this.sortOrder = 'ascending';
-    } else if (this.sortOrder === 'ascending') {
-      this.sortOrder = 'descending';
-    } else if (this.sortOrder === 'descending') {
-      this.sortBy = null;
-      this.sortOrder = null;
-    } else {
-      this.sortOrder = 'ascending';
-    }
-
-    this.loadMeasureReports(this.defaultPageNumber, this.defaultPageSize);
-  }
-
-  getSortIcon(column: string) {
-    if (this.sortBy !== column) return this.faSort;
-    if (this.sortOrder === 'ascending') return this.faSortUp;
-    if (this.sortOrder === 'descending') return this.faSortDown;
-
-    return this.faSort;
+    this.paginationMetadata.pageNumber = 0;
+    this.sortBy = null;
+    this.sortOrder = null;
+    this.loadReportEntries();
   }
 
   onRefresh(): void {
-    this.loadMeasureReports(this.defaultPageNumber, this.defaultPageSize);
+    this.loadReportSchedule();
+    this.loadReportEntries();
+  }
+
+  onPatientIdChange(): void {
+    this.paginationMetadata.pageNumber = 0;
+    this.loadReportEntries();
+  }
+
+  onReportIdChange(): void {
+    this.paginationMetadata.pageNumber = 0;
+    this.loadReportEntries();
+  }
+
+  onReportStatusFilterChange(event: any): void {
+    this.paginationMetadata.pageNumber = 0;
+    this.loadReportEntries();
+  }
+
+  onValidationStatusFilterChange(event: any): void {
+    this.paginationMetadata.pageNumber = 0;
+    this.loadReportEntries();
+  }
+
+  onMeasureFilterChange(event: any): void {
+    this.paginationMetadata.pageNumber = 0;
+    this.loadReportEntries();
+  }
+
+  onPageChange(event: PageEvent): void {
+    this.paginationMetadata.pageSize = event.pageSize;
+    this.paginationMetadata.pageNumber = event.pageIndex;
+    this.loadReportEntries();
+  }
+
+  onSortChange(sort: Sort): void {
+    if (sort.direction) {
+      this.sortBy = sort.active;
+      this.sortOrder = sort.direction === 'asc' ? 'ascending' : 'descending';
+    } else {
+      this.sortBy = null;
+      this.sortOrder = null;
+    }
+    this.loadReportEntries();
   }
 
   onViewAcquisitionLog() {
@@ -279,7 +289,6 @@ export class ViewReportComponent implements OnInit {
         this.loadingService.hide();
       }
     });
-
   }
 
   onTabSelected(event: any): void {
@@ -288,9 +297,89 @@ export class ViewReportComponent implements OnInit {
     }
   }
 
+  getTotalResourceCount(measureReports: any[]): number {
+    if (!measureReports || measureReports.length === 0) {
+      return 0;
+    }
+
+    return measureReports.reduce((total, report) => {
+      if (report.resourceCount) {
+        const resourceCount = Object.values(report.resourceCount).reduce((sum: number, count) => sum + (count as number), 0);
+        return total + resourceCount;
+      }
+      return total;
+    }, 0);
+  }
+
+  getReportingStatusClass(status: ReportingStatus): string {
+    switch (status) {
+      case ReportingStatus.PatientIdentified:
+        return 'status-processing';
+      case ReportingStatus.NotReportable:
+        return 'status-not-reportable';
+      case ReportingStatus.PendingValidation:
+        return 'status-pending';
+      case ReportingStatus.PassedValidation:
+        return 'status-passed';
+      case ReportingStatus.FailedValidation:
+        return 'status-failed';
+      default:
+        return '';
+    }
+  }
+
+  getSubmissionStatusClass(status: SubmissionStatus): string {
+    switch (status) {
+      case SubmissionStatus.PendingValidation:
+        return 'status-pending';
+      case SubmissionStatus.Submitting:
+        return 'status-processing';
+      case SubmissionStatus.Submitted:
+        return 'status-submitted';
+      case SubmissionStatus.FailedSubmission:
+        return 'status-failed';
+      case SubmissionStatus.NotEligable:
+        return 'status-not-reportable';
+      default:
+        return '';
+    }
+  }
+
+  getReportingStatusText(status: ReportingStatus): string {
+    switch (status) {
+      case ReportingStatus.PatientIdentified:
+        return 'Patient Identified';
+      case ReportingStatus.NotReportable:
+        return 'Not Reportable';
+      case ReportingStatus.PendingValidation:
+        return 'Pending Validation';
+      case ReportingStatus.PassedValidation:
+        return 'Passed Validation';
+      case ReportingStatus.FailedValidation:
+        return 'Failed Validation';
+      default:
+        return '';
+    }
+  }
+
+  getSubmissionStatusText(status: SubmissionStatus): string {
+    switch (status) {
+      case SubmissionStatus.PendingValidation:
+        return 'Pending Validation';
+      case SubmissionStatus.Submitting:
+        return 'Submitting';
+      case SubmissionStatus.Submitted:
+        return 'Submitted';
+      case SubmissionStatus.FailedSubmission:
+        return 'Failed Submission';
+      case SubmissionStatus.NotEligable:
+        return 'Not Eligible';
+      default:
+        return '';
+    }
+  }
+
   navBack(): void {
     this.location.back();
   }
-
-  protected readonly faGears = faGears;
 }

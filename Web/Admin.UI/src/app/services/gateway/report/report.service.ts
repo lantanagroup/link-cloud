@@ -1,13 +1,14 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { environment } from 'src/environments/environment';
 import { ErrorHandlingService } from '../../error-handling.service';
 import { IReportConfigModel } from 'src/app/interfaces/report/report-config-model.interface';
-import { IPagedReportSchedule } from 'src/app/interfaces/report/report-schedule.interface';
+import { IPagedReportSchedule, IReportSchedule } from 'src/app/interfaces/report/report-schedule.interface';
 import { Observable, catchError, map, tap } from 'rxjs';
 import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
 import { IEntityDeletedResponse } from 'src/app/interfaces/entity-deleted-response.interface';
 import { AppConfigService } from '../../app-config.service';
+import { IPagedReportEntry, ReportingStatus, SubmissionStatus } from 'src/app/interfaces/report/report-entry.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -140,6 +141,65 @@ export class ReportService {
     return this.http.get<IPagedReportSchedule>(`${this.appConfigService.config?.baseApiUrl}/schedules/search`, { params })
       .pipe(
         tap(_ => console.log('Fetched report schedules.')),
+        catchError((error) => this.errorHandler.handleError(error))
+      );
+  }
+
+  searchReportEntries(
+    facilityId?: string,
+    patientId?: string,
+    reportScheduleId?: string,
+    reportingStatus?: ReportingStatus,
+    submissionStatus?: SubmissionStatus,
+    reportType?: string,
+    sortBy?: string,
+    sortOrder?: 'ascending' | 'descending',
+    pageSize: number = 10,
+    pageNumber: number = 1
+  ): Observable<IPagedReportEntry> {
+    let params = new HttpParams()
+      .set('pageSize', pageSize.toString())
+      .set('pageNumber', pageNumber.toString());
+
+    if (facilityId) {
+      params = params.set('facilityId', facilityId);
+    }
+    if (patientId) {
+      params = params.set('patientId', patientId);
+    }
+    if (reportScheduleId) {
+      params = params.set('reportScheduleId', reportScheduleId);
+    }
+    if (reportingStatus) {
+      params = params.set('reportingStatus', reportingStatus);
+    }
+    if (submissionStatus) {
+      params = params.set('submissionStatus', submissionStatus);
+    }
+    if (reportType) {
+      params = params.set('reportType', reportType);
+    }
+    if (sortBy) {
+      params = params.set('sortBy', sortBy);
+    }
+    if (sortOrder) {
+      // Convert to backend enum value (0 = Ascending, 1 = Descending)
+      const sortOrderValue = sortOrder === 'ascending' ? '0' : '1';
+      params = params.set('sortOrder', sortOrderValue);
+    }
+
+    return this.http.get<IPagedReportEntry>(`${this.appConfigService.config?.baseApiUrl}/entries/search`, { params })
+      .pipe(
+        tap(_ => console.log('Fetched report entries.')),
+        catchError((error) => this.errorHandler.handleError(error))
+      );
+  }
+
+  getReportSchedule(reportScheduleId: string): Observable<IReportSchedule> {
+    const headers = new HttpHeaders({ 'X-Skip-Loading': 'true' });
+    return this.http.get<IReportSchedule>(`${this.appConfigService.config?.baseApiUrl}/schedules/${reportScheduleId}`, { headers })
+      .pipe(
+        tap(_ => console.log('Fetched report schedule.')),
         catchError((error) => this.errorHandler.handleError(error))
       );
   }
