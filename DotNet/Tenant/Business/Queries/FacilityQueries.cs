@@ -21,7 +21,7 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
         Task<List<FacilityModel>> SearchAsync(FacilitySearchModel model, CancellationToken cancellationToken = default);
 
         Task<PagedConfigModel<FacilityModel>> PagedSearchAsync(FacilitySearchModel model,
-            string sortBy = "FacilityName", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10,
+            string sortBy = "FacilityId", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10,
             int pageNumber = 1, bool includeDeleted = false, CancellationToken cancellationToken = default);
     }
 
