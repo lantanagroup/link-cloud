@@ -1,8 +1,8 @@
 {
   "production": false,
   "allowAlphaNumericFacilityId":  true,
-  "authRequired": true,
-  "baseApiUrl": "/api",
+  "authRequired": false,
+  "baseApiUrl": "http://localhost:8063/api",
   "oauth2": {
     "enabled": false,
     "scope": "openid profile email",

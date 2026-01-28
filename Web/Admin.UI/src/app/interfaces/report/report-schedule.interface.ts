@@ -14,6 +14,8 @@ export interface IReportSchedule {
   payloadRootUri?: string;
   status: string;
   IsDeleted?: boolean;
+  censusCount: number;
+  initialPopulationCount: number;
 }
 
 export interface IPagedReportSchedule {

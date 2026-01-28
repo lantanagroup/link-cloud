@@ -23,6 +23,9 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         Task<ReportPopulation?> SingleOrDefaultAsync(
             Expression<Func<ReportPopulation, bool>> predicate,
             CancellationToken cancellationToken = default);
+
+        Task<int> CountNumberOfMeasureReportPopulationsInIP(string reportScheduleId,
+            CancellationToken cancellationToken = default);
     }
 
     public class ReportPopulationManager : IReportPopulationManager
@@ -133,6 +136,21 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             await _database.SaveChangesAsync();
 
             return entry;
+        }
+
+        public async Task<int> CountNumberOfMeasureReportPopulationsInIP(string reportScheduleId, CancellationToken cancellationToken = default)
+        {
+            var reportPopulations = await _database.ReportPopulationRepository.FindAsync(
+                x => x.ReportScheduleId == reportScheduleId, 
+                cancellationToken);
+
+            var count = reportPopulations
+                .SelectMany(rp => rp.GroupPopulations)
+                .Where(gp => gp.PopulationId == "initial-population")
+                .SelectMany(gp => gp.MeasureReportPopulations)
+                .Count();
+
+            return count;
         }
     }
 }

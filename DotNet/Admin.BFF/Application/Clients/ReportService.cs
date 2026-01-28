@@ -1,14 +1,18 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
+﻿using Hl7.Fhir.Model;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
+using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Microsoft.AspNetCore.WebUtilities;
+using System.Threading;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
 {
@@ -57,7 +61,22 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             }
         }
         
-        public async Task<HttpResponseMessage> ReportSummaryList(ClaimsPrincipal user, string? facilityId, int pageNumber, int pageSize, CancellationToken cancellationToken)
+        public async Task<HttpResponseMessage> ReportSummaryList(
+            ClaimsPrincipal user,
+            CancellationToken cancellationToken,
+            string? facilityId = null,
+            Frequency? frequency = null,
+            string? reportType = null,
+            DateTime? reportStartDate = null,
+            DateTime? reportEndDate = null,
+            ScheduleStatus? status = null,
+            bool? endOfReportPeriodJobHasRun = null,
+            bool includeDeleted = false,
+            string? sortBy = null,
+            SortOrder? sortOrder = null,
+            int pageNumber = 1,
+            int pageSize = 10
+            )
         {
             // HTTP GET
             if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
@@ -84,7 +103,96 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 queryParams["facilityId"] = facilityId;
             }
 
-            var relativeUrl = QueryHelpers.AddQueryString("api/Report/summaries", queryParams);
+            if (frequency.HasValue)
+            {
+                queryParams["frequency"] = frequency.Value.ToString();
+            }
+
+            if (!string.IsNullOrWhiteSpace(reportType))
+            {
+                queryParams["reportType"] = reportType;
+            }
+
+            if (reportStartDate.HasValue)
+            {
+                queryParams["reportStartDate"] = reportStartDate.Value.ToString("o");
+            }
+
+            if (reportEndDate.HasValue)
+            {
+                queryParams["reportEndDate"] = reportEndDate.Value.ToString("o");
+            }
+
+            if (status.HasValue)
+            {
+                queryParams["status"] = status.Value.ToString();
+            }
+
+            if (endOfReportPeriodJobHasRun.HasValue)
+            {
+                queryParams["endOfReportPeriodJobHasRun"] = endOfReportPeriodJobHasRun.Value.ToString();
+            }
+
+            if (includeDeleted)
+            {
+                queryParams["includeDeleted"] = includeDeleted.ToString();
+            }
+
+            if (!string.IsNullOrWhiteSpace(sortBy))
+            {
+                queryParams["sortBy"] = sortBy;
+            }
+
+            if (sortOrder.HasValue)
+            {
+                queryParams["sortOrder"] = sortOrder.Value.ToString();
+            }
+
+            var relativeUrl = QueryHelpers.AddQueryString("api/schedules/search", queryParams);
+
+            var response = await _client.GetAsync(relativeUrl, cancellationToken);
+
+            return response;
+        }
+
+        public async Task<HttpResponseMessage> GetPatientInCensusCount(
+            ClaimsPrincipal user,
+            CancellationToken cancellationToken,
+            string reportScheduleId)
+        {
+            // HTTP GET
+            if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
+            {
+                var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
+
+                //create a bearer token for the system account
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var relativeUrl = $"api/entries/schedules/{reportScheduleId}/count";
+
+            var response = await _client.GetAsync(relativeUrl, cancellationToken);
+
+            return response;
+        }
+
+        public async Task<HttpResponseMessage> GetReportPopulationsByReportScheduleId(
+            ClaimsPrincipal user,
+            CancellationToken cancellationToken,
+            string reportScheduleId)
+        {
+            // HTTP GET
+            if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
+            {
+                var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
+
+                //create a bearer token for the system account
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var relativeUrl = $"api/populations/schedules/{reportScheduleId}/initial-population-count";
 
             var response = await _client.GetAsync(relativeUrl, cancellationToken);
 

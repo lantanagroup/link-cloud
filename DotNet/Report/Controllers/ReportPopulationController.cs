@@ -92,5 +92,29 @@ namespace LantanaGroup.Link.Report.Controllers
                 throw;
             }
         }
+
+        /// <summary>
+        /// Returns the count of MeasureReportPopulations in the initial population for the given report schedule Id
+        /// </summary>
+        /// <param name="reportScheduleId"></param>
+        /// <param name="cancellationToken"></param>
+        [HttpGet("schedules/{reportScheduleId}/initial-population-count")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(int))]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<int>> GetInitialPopulationCount(string reportScheduleId, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var count = await _reportPopulationManager.CountNumberOfMeasureReportPopulationsInIP(reportScheduleId, cancellationToken);
+
+                return Ok(count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(new EventId(ReportConstants.LoggingIds.GetItem, "GetInitialPopulationCount"), ex, "An exception occurred while attempting to count MeasureReportPopulations in initial population for Report Schedule Id {id}", HtmlInputSanitizer.Sanitize(reportScheduleId));
+
+                throw;
+            }
+        }
     }
 }

@@ -120,6 +120,29 @@ namespace LantanaGroup.Link.Report.Controllers
         }
 
         /// <summary>
+        /// Returns the count of report entries for the given report schedule Id.
+        /// </summary>
+        /// <param name="reportScheduleId"></param>
+        [HttpGet("schedules/{reportScheduleId}/count")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(int))]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<int>> GetCountByReportScheduleId(string reportScheduleId)
+        {
+            try
+            {
+                var count = await _reportEntryManager.CountAsync(x => x.ReportScheduleId == reportScheduleId);
+
+                return Ok(count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(new EventId(ReportConstants.LoggingIds.GetItem, "GetCountByReportScheduleId"), ex, "An exception occurred while attempting to get the count of Report Entry records for Report Schedule Id {id}", HtmlInputSanitizer.Sanitize(reportScheduleId));
+
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Returns report entry records for the given patient Id. 
         /// </summary>
         /// <param name="patientId"></param>

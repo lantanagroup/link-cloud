@@ -21,7 +21,7 @@ public class ScheduledReportFactory
             Frequency = reportScheduleModel.Frequency,
             AdHocType = reportScheduleModel.AdHocType,
             PayloadRootUri = reportScheduleModel.PayloadRootUri,
-            CreatedDate = reportScheduleModel.CreateDate
+            CreateDate = reportScheduleModel.CreateDate
         };
     }
 }

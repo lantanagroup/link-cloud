@@ -138,7 +138,7 @@ export class ReportService {
       params = params.set('sortOrder', sortOrder.toString());
     }
 
-    return this.http.get<IPagedReportSchedule>(`${this.appConfigService.config?.baseApiUrl}/schedules/search`, { params })
+    return this.http.get<IPagedReportSchedule>(`${this.appConfigService.config?.baseApiUrl}/aggregate/reports/summaries`, { params })
       .pipe(
         tap(_ => console.log('Fetched report schedules.')),
         catchError((error) => this.errorHandler.handleError(error))

@@ -69,13 +69,13 @@
         <!-- Patients in Census Column -->
         <ng-container matColumnDef="patientsInCensus">
           <th mat-header-cell *matHeaderCellDef>Patients in Census</th>
-          <td mat-cell *matCellDef="let element">TODO PIC</td>
+          <td mat-cell *matCellDef="let element" style="text-align: center;">{{element.censusCount}}</td>
         </ng-container>
 
         <!-- Patients in IP Column -->
         <ng-container matColumnDef="patientsInIP">
           <th mat-header-cell *matHeaderCellDef>Patients in IP</th>
-          <td mat-cell *matCellDef="let element">TODO PIP</td>
+          <td mat-cell *matCellDef="let element" style="text-align: center;">{{element.initialPopulationCount}}</td>
         </ng-container>
 
         <!-- Status Column -->
@@ -88,8 +88,8 @@
               <span *ngIf="element.status == 200" class="status-endOfPeriod">End of Period</span>
               <span *ngIf="element.status == 500" class="status-submitted">Submitted</span>
             </div>
-            <div style="margin-top:5px" *ngIf="element.modifyDate">{{element.modifyDate | date:'short'}}</div>
-            <div style="margin-top:5px" *ngIf="!element.modifyDate">{{element.createDate | date:'short'}}</div>
+            <div style="margin-top:5px" *ngIf="element.submitDate">{{element.submitDate | date:'short'}}</div>
+            <div style="margin-top:5px" *ngIf="!element.submitDate">{{element.createDate | date:'short'}}</div>
           </td>
         </ng-container>
 

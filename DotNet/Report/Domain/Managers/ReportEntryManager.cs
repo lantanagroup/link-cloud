@@ -8,8 +8,10 @@ using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LinqKit;
+using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 using System.Threading;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
 {
@@ -46,16 +48,20 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             int pageSize,
             int pageNumber,
             CancellationToken cancellationToken = default);
+
+        Task<int> CountAsync(Expression<Func<ReportEntry, bool>> predicate, CancellationToken cancellationToken = default);
     }
 
     public class ReportEntryManager : IReportEntryManager
     {
         private readonly IDatabase _database;
+        private readonly MongoDbContext _dbContext;
         private readonly MeasureReportSummaryFactory _measureReportSummaryFactory;
 
-        public ReportEntryManager(IDatabase database, MeasureReportSummaryFactory measureReportSummaryFactory)
+        public ReportEntryManager(IDatabase database, MongoDbContext dbContext, MeasureReportSummaryFactory measureReportSummaryFactory)
         {
             _database = database;
+            _dbContext = dbContext;
             _measureReportSummaryFactory = measureReportSummaryFactory;
         }
 
@@ -142,6 +148,11 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             await _database.SaveChangesAsync();
 
             return entry;
+        }
+
+        public async Task<int> CountAsync(Expression<Func<ReportEntry, bool>> predicate, CancellationToken cancellationToken = default)
+        {
+            return await Task.Run(() => _dbContext.ReportEntries.Count(predicate), cancellationToken);
         }
 
         public async Task<PagedConfigModel<ReportEntry>> SearchAsync(
