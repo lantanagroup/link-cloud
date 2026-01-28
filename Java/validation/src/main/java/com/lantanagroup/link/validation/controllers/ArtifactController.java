@@ -6,6 +6,7 @@ import com.lantanagroup.link.validation.entities.Artifact;
 import com.lantanagroup.link.validation.entities.ArtifactType;
 import com.lantanagroup.link.validation.repositories.ArtifactRepository;
 import com.lantanagroup.link.validation.services.ArtifactService;
+import com.lantanagroup.link.validation.models.TerminologyDependency;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.http.HttpStatus;
@@ -41,11 +42,24 @@ public class ArtifactController {
 
     @Operation(summary = "Gets terminology dependencies from all artifacts")
     @GetMapping("/tx-dependencies")
-    public Set<String> getTerminologyDependencies() {
+    public List<TerminologyDependency> getTerminologyDependencies() {
         try {
             return artifactService.getTerminologyDependencies();
         } catch (IOException e) {
             throw new ServerErrorException("Failed to get terminology dependencies", e);
+        }
+    }
+
+    @Operation(summary = "Gets terminology dependencies from a specific package")
+    @GetMapping("/PACKAGE/{packageId}/tx-dependencies")
+    public List<TerminologyDependency> getTerminologyDependencies(@PathVariable String packageId) {
+        if (artifactRepository.findByTypeAndName(ArtifactType.PACKAGE, packageId).isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Package not found");
+        }
+        try {
+            return artifactService.getTerminologyDependencies(packageId);
+        } catch (IOException e) {
+            throw new ServerErrorException("Failed to get terminology dependencies for package: " + packageId, e);
         }
     }
 

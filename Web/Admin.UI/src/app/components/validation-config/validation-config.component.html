@@ -33,11 +33,16 @@
 <!-- IG Names -->
 <mat-card class="upload-card">
   <mat-card-content>
-    <mat-card-title>Uploaded Implementation Guides</mat-card-title>
+    <mat-card-title>Validation Packages</mat-card-title>
     <mat-list>
       @for (ig of implementationGuides; track ig) {
         <mat-list-item>
-          {{ ig.name }}
+          @if (ig.type === 'PACKAGE') {
+            <a (click)="openTxDependencies(ig.name)">{{ ig.name }}</a>
+          }
+          @else {
+            <span>{{ig.name}}</span>
+          }
         </mat-list-item>
       }
     </mat-list>
