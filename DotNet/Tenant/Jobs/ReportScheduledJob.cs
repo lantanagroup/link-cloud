@@ -101,7 +101,8 @@ namespace LantanaGroup.Link.Tenant.Jobs
                         ReportTypes = reportTypes,
                         Frequency = frequency,
                         StartDate = startDate,                       
-                        EndDate = endDate
+                        EndDate = endDate,
+                        ReportTrackingId = correlationId
                     },
                 };
 
