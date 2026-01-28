@@ -15,7 +15,7 @@ public class ServiceInformation
     public string Commit { get; init; } = string.Empty;
     public string Build { get; init; } = string.Empty;
     public string SwaggerUrl { get; set; } = string.Empty;
-    public string ConnectionString { get; set; } = string.Empty;
+    public string? ConnectionString { get; set; }
 
     public static ServiceInformation GetServiceInformation(Assembly assembly, IConfiguration configuration)
     {

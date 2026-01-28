@@ -49,21 +49,11 @@ public static class ExternalConfigurationExtension
     {
         var connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
 
-        if (string.IsNullOrEmpty(connectionString))
-        {
-            throw new NullReferenceException("Database Connection String is required.");
-        }
-
         return SetupServiceInformation(builder, serviceName, assemblyVersion, connectionString);
     }
 
-    public static ServiceInformation SetupServiceInformation(this WebApplicationBuilder builder, string serviceName, string assemblyVersion, string connectionString)
+    public static ServiceInformation SetupServiceInformation(this WebApplicationBuilder builder, string serviceName, string assemblyVersion, string? connectionString)
     {
-        if (string.IsNullOrEmpty(connectionString))
-        {
-            throw new NullReferenceException("Database Connection String is required.");
-        }
-
         if (string.IsNullOrEmpty(serviceName))
         {
             throw new NullReferenceException("Service Name is required.");

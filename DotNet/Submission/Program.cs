@@ -52,6 +52,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     // load external configuration source (if specified)
     builder.AddExternalConfiguration(SubmissionConstants.ServiceName);
 
+    var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+
+    var serviceInformation = builder.SetupServiceInformation(SubmissionConstants.ServiceName, assemblyVersion);
+
     //Add Data Layer
     builder.Services.AddSubmissionDataServices(builder.Configuration);
 
@@ -69,10 +73,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.Limits.MaxRequestBodySize = 200 * 1024 * 1024; // Set limit to 200 MB
     });
-
-    var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
-
-    var serviceInformation = builder.SetupServiceInformation(SubmissionConstants.ServiceName, assemblyVersion);
 
     //Add problem details
     builder.Services.AddProblemDetails();
