@@ -60,7 +60,7 @@ public class ReadFhirCommand : IReadFhirCommand
         if (request.fhirQueryConfiguration == null)
             throw new ArgumentNullException(nameof(request.fhirQueryConfiguration), "FhirQueryConfiguration cannot be null.");
 
-        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.fhirQueryConfiguration.MaxConcurrentRequests.GetValueOrDefault(1), _distributedLockSettings.Expiration, cancellationToken))
+        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.fhirQueryConfiguration.GetMaxConcurrentRequestsOrDefault(), _distributedLockSettings.Expiration, cancellationToken))
         {
             // Create a new handler chain using a DelegatingHandler around a base HttpClientHandler
             var innerHandler = new HttpClientHandler();
