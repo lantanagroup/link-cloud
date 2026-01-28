@@ -1,0 +1,75 @@
+---
+id: DataAccess
+name: Data Access
+summary: Data Access Domain
+version: 0.2.0
+owners:
+  - arch_team
+
+services:
+  - id: DataAcquisitionService
+
+---
+
+# Data Access Domain
+
+Domain is responsible for storing and managing data (whether it be raw or normalized). It serves as a central repository for all data collected from various sources, providing a foundation for downstream data processing and analysis.
+
+## Key Concepts
+
+* **Scalability:** Ability to handle large volumes of data.
+* **Flexibility:** Support for diverse data types and formats.
+* **Data Governance:** Policies and controls for managing data.
+
+## Responsibilities
+
+* Ingesting data from various sources.
+* Storing data in a scalable and cost-effective manner.
+* Maintaining data integrity and availability.
+* Providing access to raw data for downstream processing.
+
+## Requirements for Future Consideration
+
+### User Persona: Data Producer
+
+* As a Data Producer, I want to write a new dataset to an Iceberg table so that it becomes available for downstream consumption with its associated metadata, including schema and provenance.
+* As a Data Producer, I want to append new data to an existing Iceberg table so that the table reflects the latest information without disrupting ongoing queries.
+* As a Data Producer, I want to overwrite existing data in an Iceberg table with a new version so that I can correct errors or update the dataset.
+* As a Data Producer, I want to update specific records in an Iceberg table so that I can modify individual data points efficiently.
+* As a Data Producer, I want to delete specific records from an Iceberg table so that I can remove outdated or incorrect information.
+* As a Data Producer, I want to evolve the schema of an Iceberg table (e.g., add a new column) so that I can accommodate new data requirements without causing compatibility issues for existing data or consumers.
+* As a Data Producer, I want to partition my data when writing to an Iceberg table based on specific columns so that queries can efficiently filter relevant data.
+* As a Data Producer, I want to control the data file format (e.g., Parquet, ORC) used when writing to an Iceberg table so that I can optimize for performance and storage efficiency.
+* As a Data Producer, I want to specify compression settings for the data files written to Iceberg so that I can balance storage costs and I/O performance.
+* As a Data Producer, I want to track the lineage or provenance of the data I write to Iceberg so that consumers can understand its origin and transformations.
+* As a Data Producer, I want to manage access control policies for the Iceberg tables I create so that only authorized users can write to them.
+* As a Data Producer, I want to monitor the data writing process to Iceberg so that I can identify and resolve any issues.
+* As a Data Producer, I want to rollback to a previous version of the table if a data writing operation introduces errors.
+
+### User Persona: Data Consumer (Analyst, Data Scientist, Application)
+
+* As a Data Consumer, I want to query the current version of an Iceberg table so that I can access the latest and most accurate data for analysis or application use.
+* As a Data Consumer, I want to query a specific historical version (snapshot) of an Iceberg table (time travel) so that I can analyze data as it existed at a particular point in time for auditing or reproducibility.
+* As a Data Consumer, I want to filter data in an Iceberg table based on specific criteria so that I can focus on the relevant subset of information.
+* As a Data Consumer, I want to join data from multiple Iceberg tables so that I can perform more complex analysis and gain deeper insights.
+* As a Data Consumer, I want to understand the schema of an Iceberg table so that I can correctly interpret the data.
+* As a Data Consumer, I want to discover available Iceberg tables and their descriptions so that I can find the data I need.
+* As a Data Consumer, I want to understand the partitioning scheme of an Iceberg table so that I can optimize my queries.
+* As a Data Consumer, I want to understand the data quality or validation rules associated with an Iceberg table so that I can assess the reliability of the data.
+* As a Data Consumer, I want to be notified when an Iceberg table I'm interested in is updated so that I can react to new information.
+* As a Data Consumer, I want to access the lineage or provenance information of an Iceberg table so that I can understand the data's journey.
+* As a Data Consumer, I want to understand the access control policies on an Iceberg table so that I know what data I am authorized to access.
+
+### User Persona: Data Administrator/Engineer
+
+* As a Data Administrator/Engineer, I want to create new Iceberg tables and define their initial schema and partitioning.
+* As a Data Administrator/Engineer, I want to manage the metadata store (catalog) for Iceberg tables, ensuring its availability and integrity.
+* As a Data Administrator/Engineer, I want to configure and manage data retention policies for Iceberg tables so that storage costs are optimized and compliance requirements are met.
+* As a Data Administrator/Engineer, I want to perform compaction operations on Iceberg tables to optimize query performance and reduce the number of small files.
+* As a Data Administrator/Engineer, I want to manage access control policies for Iceberg tables, granting and revoking permissions to different users and roles.
+* As a Data Administrator/Engineer, I want to monitor the health and performance of Iceberg tables and the associated infrastructure.
+* As a Data Administrator/Engineer, I want to perform data migration or upgrades of Iceberg tables as needed.
+* As a Data Administrator/Engineer, I want to define and enforce data quality rules for Iceberg tables.
+* As a Data Administrator/Engineer, I want to configure and manage data skipping strategies for Iceberg tables to improve query efficiency.
+* As a Data Administrator/Engineer, I want to integrate Iceberg with various compute engines and data processing frameworks.
+* As a Data Administrator/Engineer, I want to implement backup and recovery strategies for Iceberg metadata and data.

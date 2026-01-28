@@ -1,0 +1,35 @@
+---
+id: ResourceEvaluated
+name: Resource Evaluated
+version: 0.2.0
+summary: Contains a FHIR resource that has been evaluated for measures.
+
+---
+
+## Overview
+
+Generated once evaluation is complete so the evaluated resource or MeasureReport can be stored for later submission.
+
+<NodeGraph />
+
+## Event Schema
+
+### Key
+
+```json
+{
+  "facilityId": "string",
+  "startDate": "date-time",
+  "endDate": "date-time"
+}
+```
+
+### Headers
+
+| Header Name      | Description                                                                                        |
+|------------------|----------------------------------------------------------------------------------------------------|
+| X-Correlation-Id | The correlation ID associated with the event that should be used in logs produced during the event |
+
+### Payload
+
+<SchemaViewer file="schema.json" />
