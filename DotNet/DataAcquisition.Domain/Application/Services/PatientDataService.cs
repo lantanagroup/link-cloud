@@ -431,9 +431,9 @@ public class PatientDataService : IPatientDataService
                 }
 
                 //check if log is not in ready state
-                if (!request.ignoreStatusConstraint && log.Status != RequestStatus.Ready)
+                if (!request.ignoreStatusConstraint && log.Status != RequestStatus.Queued)
                 {
-                    throw new ArgumentException($"Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
+                    throw new ArgumentException($"Log with ID {log.Id} is not in a queued state. Current status: {log.Status}");
                 }
 
                 //2. set to "Processing"

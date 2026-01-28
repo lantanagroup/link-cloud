@@ -226,7 +226,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
 
         //Database
-        services.AddTransient<IDatabase, Database>();
+        services.AddScoped<IDatabase, Database>();
     }
 
     public static void RegisterManagers(this IServiceCollection services)

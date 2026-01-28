@@ -7,6 +7,8 @@ public enum RequestStatus
     Pending,
     [StringValue("Ready")]
     Ready,
+    [StringValue("Queued")]
+    Queued,
     [StringValue("Processing")]
     Processing,
     [StringValue("Completed")]

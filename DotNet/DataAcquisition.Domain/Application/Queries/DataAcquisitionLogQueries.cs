@@ -70,6 +70,7 @@ public interface IDataAcquisitionLogQueries
     Task<List<DataAcquisitionLogModel>> GetNextEligibleBatchForFacility(string facilityId, long? lastId, int batchSize, List<RequestStatus> statuses, DateTime? designagtedExecutionTime = null, CancellationToken cancellationToken = default);
 
     Task<List<string>> GetResourceIdsForReportPatient(string correlationId, string facilityId, string resourceType, CancellationToken cancellationToken = default);
+    Task<bool> TrySetLogToQueuedAsync(long logId, CancellationToken cancellationToken);
 }
 
 public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
@@ -122,70 +123,15 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
     public async Task<DataAcquisitionLogModel?> GetAsync(long id, CancellationToken cancellationToken = default)
     {
-        var log = await (from l in _dbContext.DataAcquisitionLogs
-                         where l.Id == id
-                         select new DataAcquisitionLogModel
-                         {
-                             Id = l.Id,
-                             Priority = l.Priority,
-                             FacilityId = l.FacilityId,
-                             IsCensus = l.IsCensus,
-                             PatientId = l.PatientId,
-                             ReportableEvent = l.ReportableEvent,
-                             ReportTrackingId = l.ReportTrackingId,
-                             CorrelationId = l.CorrelationId,
-                             FhirVersion = l.FhirVersion,
-                             QueryType = l.QueryType,
-                             QueryPhase = l.QueryPhase,
-                             FhirQuery = l.FhirQueries != null ? l.FhirQueries.Select(q =>
-                             new FhirQueryModel
-                             {
-                                 Id = q.Id,
-                                 FacilityId = q.FacilityId,
-                                 MeasureId = q.MeasureId,
-                                 IdQueryParameterValues = q.IdQueryParameterValues.ToList(),
-                                 IsReference = q.IsReference,
-                                 QueryType = q.QueryType,
-                                 ResourceTypes = q.FhirQueryResourceTypes.Select(r => r.ResourceType).ToList(),
-                                 QueryParameters = q.QueryParameters,
-                                 Paged = q.Paged,
-                                 DataAcquisitionLogId = q.DataAcquisitionLogId,
-                                 CensusListId = q.CensusListId,
-                                 CensusPatientStatus = q.CensusPatientStatus,
-                                 CensusTimeFrame = q.CensusTimeFrame,
-                                 ResourceReferenceTypes = q.ResourceReferenceTypes != null ? q.ResourceReferenceTypes.Select(rt => new ResourceReferenceTypeModel
-                                 {
-                                     Id = rt.Id,
-                                     FacilityId = rt.FacilityId,
-                                     QueryPhase = rt.QueryPhase,
-                                     ResourceType = rt.ResourceType,
-                                     FhirQueryId = rt.FhirQueryId,
-                                     CreateDate = rt.CreateDate,
-                                     ModifyDate = rt.ModifyDate,
-                                 }).ToList() : new()
-                             }).ToList() : new(),
-                             Status = l.Status,
-                             ExecutionDate = l.ExecutionDate,
-                             TraceId = l.TraceId,
-                             RetryAttempts = l.RetryAttempts,
-                             CompletionDate = l.CompletionDate,
-                             CompletionTimeMilliseconds = l.CompletionTimeMilliseconds,
-                             ResourceAcquiredIds = l.ResourceAcquiredIds,
-                             ReferenceResources = l.ReferenceResources.Select(r => new ReferenceResourceModel
-                             {
-                                 Id = r.Id,
-                                 FacilityId = r.FacilityId,
-                                 ResourceId = r.ResourceId,
-                                 ResourceType = r.ResourceType,
-                                 ReferenceResource = r.ReferenceResource,
-                                 QueryPhase = r.QueryPhase,
-                                 DataAcquisitionLogId = r.DataAcquisitionLogId
-                             }).ToList(),
-                             Notes = l.Notes,
-                             ScheduledReport = l.ScheduledReport
-                         }).SingleOrDefaultAsync();
+        var entity = await _dbContext.DataAcquisitionLogs
+            .Include(l => l.FhirQueries)
+                .ThenInclude(q => q.FhirQueryResourceTypes)
+            .Include(l => l.FhirQueries)
+                .ThenInclude(q => q.ResourceReferenceTypes)
+            .Include(l => l.ReferenceResources)
+            .SingleOrDefaultAsync(l => l.Id == id, cancellationToken);
 
-        return log;
+        return entity == null ? null : DataAcquisitionLogModel.FromDomain(entity);
     }
 
     public async Task<int> GetCountOfNonRefLogsIncompleteAsync(string facilityId, string reportTrackingId, string correlationId, CancellationToken cancellationToken = default)
@@ -277,6 +223,24 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             Records = result.Records.Select(QueryLogSummaryModel.FromDomain).ToList(),
             Metadata = new PaginationMetadata(request.PageSize, request.PageNumber, result.Metadata.TotalCount)
         };
+    }
+
+    // In your Repository or Database layer
+    public async Task<bool> TrySetLogToQueuedAsync(long logId, CancellationToken cancellationToken)
+    {
+        // This translates to: 
+        // UPDATE DataAcquisitionLogs SET Status = 'Queued' 
+        // WHERE Id = @id AND Status IN ('Ready', 'Pending')
+
+        int rowsAffected = await _dbContext.DataAcquisitionLogs
+            .Where(l => l.Id == logId &&
+                       (l.Status == RequestStatus.Ready || l.Status == RequestStatus.Pending))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(l => l.Status, RequestStatus.Queued)
+                .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                cancellationToken);
+
+        return rowsAffected > 0;
     }
 
     public async Task<PagedConfigModel<DataAcquisitionLogModel>> SearchAsync(SearchDataAcquisitionLogRequest model, CancellationToken cancellationToken = default)
