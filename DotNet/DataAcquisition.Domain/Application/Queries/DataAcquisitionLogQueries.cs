@@ -149,7 +149,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                       where l.FacilityId == facilityId
                             && l.ReportTrackingId == reportTrackingId
                             && l.CorrelationId == correlationId
-                             && l.Status != RequestStatus.Completed
+                             && !(l.Status == RequestStatus.Completed || l.Status == RequestStatus.MaxRetriesReached)
                              && !l.TailSent
                              && l.FhirQueries.Any(fq => fq.IsReference == false)
                       select l).CountAsync();           
