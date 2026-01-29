@@ -1,6 +1,3 @@
-using System.Collections.Specialized;
-using System.Diagnostics;
-using System.Reflection;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Extensions;
@@ -30,13 +27,14 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Quartz;
-using Quartz.Impl;
 using Quartz.Spi;
 using Serilog;
 using Serilog.Debugging;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
+using System.Diagnostics;
+using System.Reflection;
 
 namespace Tenant
 {
@@ -192,26 +190,11 @@ namespace Tenant
 
             SelfLog.Enable(Console.Error);
 
+            //Add Quartz scheduler with SQL persistence
+            builder.Services.AddQuartz();
+            builder.Services.AddSingleton<SqlPersistentScheduleFactory>();
+            builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
             builder.Services.AddSingleton<IJobFactory, QuartzJobFactory>();
-
-            var quartzProps = new NameValueCollection
-            {
-                ["quartz.scheduler.instanceName"] = "TenantScheduler",
-                ["quartz.scheduler.instanceId"] = "AUTO",
-                ["quartz.jobStore.clustered"] = "true",
-                ["quartz.jobStore.type"] = "Quartz.Impl.AdoJobStore.JobStoreTX, Quartz",
-                ["quartz.jobStore.driverDelegateType"] = "Quartz.Impl.AdoJobStore.SqlServerDelegate, Quartz",
-                ["quartz.jobStore.tablePrefix"] = "quartz.QRTZ_",
-                ["quartz.jobStore.dataSource"] = "default",
-                ["quartz.dataSource.default.connectionString"] = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection),
-                ["quartz.dataSource.default.provider"] = "SqlServer",
-                ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
-                ["quartz.threadPool.threadCount"] = "5",
-                ["quartz.jobStore.useProperties"] = "false",
-                ["quartz.serializer.type"] = "json"
-            };
-
-            builder.Services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
 
             builder.Services.AddSingleton<ReportScheduledJob>();
             builder.Services.AddSingleton<RetentionCheckScheduledJob>();

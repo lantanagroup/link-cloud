@@ -13,7 +13,6 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
-using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
 

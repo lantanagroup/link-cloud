@@ -176,10 +176,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
 
-    builder.Services.AddTransient<IJobFactory, QuartzJobFactory>();
+    //Add Quartz scheduler with SQL persistence
+    builder.Services.AddQuartz();
     builder.Services.AddSingleton<SqlPersistentScheduleFactory>();
     builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
-    builder.Services.AddSingleton<ISchedulerFactory>(provider => provider.GetRequiredService<SqlPersistentScheduleFactory>());
     builder.Services.AddTransient<RetryJob>();
 
     builder.Services.AddSingleton<CopyPropertyOperationService>();

@@ -32,7 +32,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
 
         public RetryListener(ILogger<RetryListener> logger,
             IKafkaConsumerFactory<string, string> kafkaConsumerFactory,
-            ISchedulerFactory schedulerFactory,
+            [FromKeyedServices(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton)] ISchedulerFactory schedulerFactory,
             IOptions<ConsumerSettings> consumerSettings,
             IRetryModelFactory retryEntityFactory,
             IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler,
@@ -99,7 +99,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                                     int countValue = int.Parse(Encoding.UTF8.GetString(retryCount));
 
                                     //Dead letter if the retry count exceeds the configured retry duration count
-                                    if (countValue >= _consumerSettings.Value.ConsumerRetryDuration.Count())
+                                    if (countValue > _consumerSettings.Value.ConsumerRetryDuration.Count())
                                     {
                                         throw new DeadLetterException($"Retry count exceeded for message with key: {consumeResult.Message.Key}");
                                     }

@@ -1,14 +1,12 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
-using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
@@ -139,8 +137,6 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var reportId = value.ReportId ?? Guid.NewGuid().ToString();
 
                                 facilityId = key;
-
-                                throw new TransientException("TEST TRANSIENT EXCEPTION RETRIES");
 
                                 if (string.IsNullOrWhiteSpace(facilityId))
                                 {

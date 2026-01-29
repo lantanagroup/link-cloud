@@ -26,7 +26,7 @@ namespace LantanaGroup.Link.Report.Jobs
 
         public EndOfReportPeriodJob(
             ILogger<EndOfReportPeriodJob> logger,
-            [FromKeyedServices("MongoScheduler")] ISchedulerFactory schedulerFactory,
+            ISchedulerFactory schedulerFactory,
             IServiceScopeFactory serviceScopeFactory,
             DataAcquisitionRequestedProducer dataAcqProducer,
             ReadyForValidationProducer readyForValidationProducer,

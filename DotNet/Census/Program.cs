@@ -38,12 +38,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.OpenApi.Models;
 using Quartz;
-using Quartz.Impl;
 using Quartz.Spi;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
-using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Reflection;
 using PatientEvent = LantanaGroup.Link.Census.Domain.Entities.POI.PatientEvent;
@@ -143,7 +141,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IPatientEncounterQueries, PatientEncounterQueries>();
     builder.Services.AddTransient<IPatientEncounterManager, PatientEncounterManager>();
 
-
     //Services
     builder.Services.AddScoped<IPatientListService, PatientListService>();
     builder.Services.AddTransient<IEventProducerService<LantanaGroup.Link.Census.Application.Models.Messages.PatientEvent>, EventProducerService<LantanaGroup.Link.Census.Application.Models.Messages.PatientEvent>>();
@@ -155,18 +152,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITransientExceptionHandler<string, string>, TransientExceptionHandler<string, string>>();
     builder.Services.AddTransient<ITransientExceptionHandler<string, PatientListMessage>, TransientExceptionHandler<string, PatientListMessage>>();
 
-    // Quartz
+    //Add Quartz scheduler with SQL persistence
+    builder.Services.AddQuartz();
     builder.Services.AddSingleton<SqlPersistentScheduleFactory>();
     builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
-    builder.Services.AddSingleton<ISchedulerFactory>(provider => provider.GetRequiredService<SqlPersistentScheduleFactory>());
 
-    // Add Quartz schedulers
-    builder.Services.AddQuartz(q =>
-    {
-
-        q.UseMicrosoftDependencyInjectionJobFactory();
-    });
-	
     builder.Services.AddSingleton<IJobFactory, JobFactory>();
     builder.Services.AddTransient<SchedulePatientListRetrieval>();
     builder.Services.AddTransient<RetryJob>();

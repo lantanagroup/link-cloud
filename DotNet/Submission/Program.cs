@@ -59,13 +59,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add Data Layer
     builder.Services.AddSubmissionDataServices(builder.Configuration);
 
-    builder.Services.AddQuartz();
-
-    builder.Services.AddQuartzHostedService(options =>
-    {
-        options.WaitForJobsToComplete = true;
-    });
-
     builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
     builder.Services.AddTransient<RetryJob>();
 
@@ -146,6 +139,16 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add controllers
     builder.Services.AddControllers();
+
+    //Add Quartz scheduler with SQL persistence
+    builder.Services.AddQuartz();
+    builder.Services.AddSingleton<SqlPersistentScheduleFactory>();
+    builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
+
+    builder.Services.AddQuartzHostedService(options =>
+    {
+        options.WaitForJobsToComplete = true;
+    });
 
     // Add hosted services
     builder.Services.AddHostedService<SubmitPayloadListener>();
@@ -276,3 +279,4 @@ static void SetupMiddleware(WebApplication app)
 }
 
 #endregion
+

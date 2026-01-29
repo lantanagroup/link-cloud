@@ -1,11 +1,7 @@
-using System.Collections.Specialized;
-using System.Reflection;
-using System.Text;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Services;
 using LantanaGroup.Link.Audit.Domain.Managers;
-using LantanaGroup.Link.Audit.Infrastructure;
 using LantanaGroup.Link.Audit.Infrastructure.Health;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
@@ -19,7 +15,6 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
-using LantanaGroup.Link.Shared.Application.Factory;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
@@ -41,6 +36,9 @@ using Quartz.Spi;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Settings.Configuration;
+using System.Collections.Specialized;
+using System.Reflection;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
@@ -90,9 +88,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IAuditEventProcessor, AuditEventProcessor>();
 
     //Add factories
+    //Add Quartz scheduler with SQL persistence
+    builder.Services.AddQuartz();
     builder.Services.AddSingleton<SqlPersistentScheduleFactory>();
     builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
-    builder.Services.AddSingleton<ISchedulerFactory>(provider => provider.GetRequiredService<SqlPersistentScheduleFactory>());
 
     builder.Services.AddTransient<IKafkaConsumerFactory<string, AuditEventMessage>, KafkaConsumerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();

@@ -39,6 +39,9 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Serializers;
 using MongoDB.Driver;
 using Quartz;
 using Quartz.Spi;
@@ -62,6 +65,20 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
+    var objectSerializer = new ObjectSerializer(type =>
+        ObjectSerializer.DefaultAllowedTypes(type) || // Keep defaults (primitives, safe types, etc.)
+        type.FullName?.StartsWith("LantanaGroup.Link.Shared") == true || // Your shared assembly/namespace
+        type.FullName?.StartsWith("LantanaGroup.Link.Report") == true);   // Add report-specific if needed
+
+    BsonClassMap.RegisterClassMap<RetryModel>(cm =>
+    {
+        cm.AutoMap();
+        cm.SetIgnoreExtraElements(true);
+        cm.GetMemberMap(c => c.Id).SetSerializer(new GuidSerializer(GuidRepresentation.Standard));
+    });
+
+    BsonSerializer.RegisterSerializer(objectSerializer);
+
     // Bind MongoConnection settings from configuration (e.g., appsettings.json)
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.Mongo));
     var mongoSettings = builder.Services.BuildServiceProvider().GetRequiredService<IOptions<MongoConnection>>().Value;
@@ -237,23 +254,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddStackExchangeRedisExtensions<SystemTextJsonSerializer>(new[] { redisConfiguration });
 
     // Add Quartz schedulers
-    // 1. MongoDB scheduler for EndOfReportPeriodJob
-    builder.Services.AddQuartz(q =>
-    {
-        q.UseJobFactory<QuartzJobFactory>();
-    });
-
-    builder.Services.AddSingleton<ISchedulerFactory>((provider) =>
-    {
-        var logger = provider.GetRequiredService<ILogger<ReportMongoSchedulerFactory>>();
-        var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
-        return new ReportMongoSchedulerFactory(scopeFactory, logger);
-    });
-
-    // 2. In-memory scheduler for RetryJob
-    //builder.Services.AddSingleton<SqlPersistentScheduleFactory>();
-    //builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
-    //builder.Services.AddSingleton<ISchedulerFactory>(provider => provider.GetRequiredService<SqlPersistentScheduleFactory>());
+    // 1. MongoDB scheduler
+    builder.Services.AddQuartz();
+    builder.Services.AddSingleton<ReportMongoSchedulerFactory>();
+    builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
 
     // Register job factory and jobs
     builder.Services.AddSingleton<IJobFactory, QuartzJobFactory>();

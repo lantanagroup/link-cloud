@@ -38,6 +38,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Quartz;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Settings.Configuration;
@@ -58,6 +59,11 @@ public static class GeneralStartupExtensions
         var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
 
         var serviceInformation = builder.SetupServiceInformation(serviceName, assemblyVersion);
+
+        //Add Quartz scheduler with SQL persistence
+        builder.Services.AddQuartz();
+        builder.Services.AddSingleton<SqlPersistentScheduleFactory>();
+        builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
 
         // load external configuration source (if specified)
         builder.AddExternalConfiguration(serviceInformation.ServiceConfigName);

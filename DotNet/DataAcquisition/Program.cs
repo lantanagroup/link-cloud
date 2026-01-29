@@ -12,7 +12,6 @@ using LantanaGroup.Link.DataAcquisition.Listeners;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
-using LantanaGroup.Link.Shared.Application.Factory;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
@@ -49,8 +48,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
 
-    builder.RegisterQuartzAcquisitionJob(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection));
-
     // Add services to the container.
     // Additional configuration is required to successfully run gRPC on macOS.
     // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
@@ -68,23 +65,18 @@ static void RegisterServices(WebApplicationBuilder builder)
     }); 
 
     //Add Hosted Services
-    if (!consumerSettings?.DisableConsumer ?? true)
+    if (!(consumerSettings?.DisableConsumer ?? false))
     {
         builder.Services.AddHostedService<DataAcquisitionRequestedListener>();
         builder.Services.AddHostedService<PatientCensusScheduledListener>();
     }
 
-    if (!consumerSettings?.DisableRetryConsumer ?? true)
+    if (!(consumerSettings?.DisableRetryConsumer ?? false))
     {
-        builder.Services.AddSingleton<SqlPersistentScheduleFactory>();
-        builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
-        builder.Services.AddSingleton<ISchedulerFactory>(provider => provider.GetRequiredService<SqlPersistentScheduleFactory>());
-
-        var serviceInformation = builder.Configuration.GetRequiredSection(nameof(ServiceInformation)).Get<ServiceInformation>();
-
-        builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation!.ServiceName, [KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue(), KafkaTopic.PatientCensusScheduledRetry.GetStringValue()]));
+        builder.Services.AddSingleton(new RetryListenerSettings(DataAcquisitionConstants.ServiceName, [KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue(), KafkaTopic.PatientCensusScheduledRetry.GetStringValue()]));
         builder.Services.AddHostedService<RetryListener>();
         builder.Services.AddHostedService<RetryScheduleService>();
+        builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
     }
 
     // Add Link Security
