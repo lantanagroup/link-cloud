@@ -171,6 +171,10 @@
               </button>
             }
             @if (!showNoSftpConfigAlert) {
+              <button mat-mini-fab aria-label="Test SFTP connection" matTooltip="Test SFTP connection"
+                (click)="onTestSftpConnection()">
+                <mat-icon>wifi_tethering</mat-icon>
+              </button>
               <button mat-mini-fab aria-label="Edit SFTP configuration" matTooltip="Edit SFTP configuration"
                 (click)="showSftpConfigDialog()">
                 <mat-icon>edit</mat-icon>
