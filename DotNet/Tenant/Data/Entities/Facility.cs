@@ -5,7 +5,7 @@ using LantanaGroup.Link.Tenant.Data.Entities;
 
 namespace LantanaGroup.Link.Tenant.Entities;
 
-public partial class Facility
+public class Facility
 {
     [Key]
     public Guid Id { get; set; }
@@ -17,6 +17,8 @@ public partial class Facility
 
     [Required]
     public string TimeZone { get; set; }
+
+    public bool IsDeleted { get; set; } 
 
     public DateTime CreateDate { get; set; }
 
