@@ -10,7 +10,8 @@ import {
   ICreateSftpConfigurationModel,
   ISftpConfigurationModel,
   ISftpCredentialsModel,
-  ISftpCredentialStatusModel
+  ISftpCredentialStatusModel,
+  ISftpConnectionTestResult
 } from 'src/app/interfaces/data-acquisition/sftp-config-model.interface';
 import { IDataAcquisitionAuthenticationConfigModel } from '../../../interfaces/data-acquisition/data-acquisition-auth-config-model.interface';
 import { AppConfigService } from '../../app-config.service';
@@ -287,6 +288,16 @@ export class DataAcquisitionService {
         tap(_ => console.log(`Request for SFTP credentials deletion was sent.`)),
         catchError((error) => {
           throw error;
+        })
+      )
+  }
+
+  testSftpConnection(facilityId: string): Observable<ISftpConnectionTestResult> {
+    return this.http.post<ISftpConnectionTestResult>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/sftp-configurations/test-connection`, {})
+      .pipe(
+        tap(_ => console.log(`SFTP connection test request was sent.`)),
+        catchError((error) => {
+          return this.errorHandler.handleError(error);
         })
       )
   }

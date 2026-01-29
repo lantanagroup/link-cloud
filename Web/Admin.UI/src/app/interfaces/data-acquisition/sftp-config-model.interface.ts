@@ -22,3 +22,8 @@ export interface ISftpCredentialStatusModel {
 export interface ICreateSftpConfigurationModel extends ISftpConfigurationModel {
   credentials?: ISftpCredentialsModel;
 }
+
+export interface ISftpConnectionTestResult {
+  success: boolean;
+  message: string;
+}

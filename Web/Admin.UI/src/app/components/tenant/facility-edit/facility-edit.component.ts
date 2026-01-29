@@ -47,6 +47,10 @@ import {
 import {
   SftpConfigFormComponent
 } from '../../data-acquisition/sftp-config-form/sftp-config-form.component';
+import {
+  SftpConnectionTestDialogComponent,
+  SftpConnectionTestDialogData
+} from '../../data-acquisition/sftp-connection-test-dialog/sftp-connection-test-dialog.component';
 import { ISftpConfigurationModel } from '../../../interfaces/data-acquisition/sftp-config-model.interface';
 import {IQueryPlanModel} from "../../../interfaces/data-acquisition/query-plan-model.interface";
 import {
@@ -599,6 +603,29 @@ export class FacilityEditComponent implements OnInit {
             });
           }
         });
+      }
+    });
+  }
+
+  onTestSftpConnection(): void {
+    const dialogData: SftpConnectionTestDialogData = {
+      isLoading: true
+    };
+
+    const dialogRef = this.dialog.open(SftpConnectionTestDialogComponent, {
+      width: '400px',
+      data: dialogData,
+      disableClose: true
+    });
+
+    this.dataAcquisitionService.testSftpConnection(this.facilityId).subscribe({
+      next: (result) => {
+        dialogData.isLoading = false;
+        dialogData.result = result;
+      },
+      error: (error) => {
+        dialogData.isLoading = false;
+        dialogData.error = error?.message || 'An unexpected error occurred while testing the connection.';
       }
     });
   }
