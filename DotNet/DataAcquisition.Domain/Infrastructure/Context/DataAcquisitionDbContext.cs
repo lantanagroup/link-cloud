@@ -191,9 +191,6 @@ public class DataAcquisitionDbContext : DbContext
             entity.Property(e => e.FacilityId)
                 .IsRequired()
                 .HasMaxLength(DataAcquisitionConstants.DatabaseSettings.MaxFacilityIdLength);
-            
-            entity.Property(e => e.FileName)
-                .HasMaxLength(DataAcquisitionConstants.DatabaseSettings.MaxFacilityNameLength);
 
             entity.HasIndex(i => i.FacilityId)
                 .HasDatabaseName("IX_SftpAcquisitionLog_FacilityId");
