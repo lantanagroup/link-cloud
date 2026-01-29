@@ -1,13 +1,14 @@
-import { IValidationIssueCategory, IValidationRule } from 'src/app/components/tenant/facility-view/report-view.interface';
-import { Observable, catchError, map, tap } from 'rxjs';
+import {IValidationIssueCategory, IValidationRule} from 'src/app/components/tenant/facility-view/report-view.interface';
+import {catchError, map, Observable, tap} from 'rxjs';
 
-import { AppConfigService } from '../../app-config.service';
-import { Artifact } from "../../../interfaces/validation/artifact.interface";
-import { ErrorHandlingService } from '../../error-handling.service';
-import { HttpClient } from '@angular/common/http';
-import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
-import { IValidationConfiguration } from "../../../interfaces/validation/validation-configuration.interface";
-import { Injectable } from '@angular/core';
+import {AppConfigService} from '../../app-config.service';
+import {Artifact} from "../../../interfaces/validation/artifact.interface";
+import {ITerminologyDependency} from "../../../interfaces/validation/terminology-dependency.interface";
+import {ErrorHandlingService} from '../../error-handling.service';
+import {HttpClient} from '@angular/common/http';
+import {IEntityCreatedResponse} from 'src/app/interfaces/entity-created-response.model';
+import {IValidationConfiguration} from "../../../interfaces/validation/validation-configuration.interface";
+import {Injectable} from '@angular/core';
 
 @Injectable({
   providedIn: 'root'
@@ -49,6 +50,15 @@ export class ValidationService {
 
     return this.http.get<IValidationIssueCategory[]>(`${this.appConfigService.config?.baseApiUrl}/validation/category`).pipe(
       tap(_ => console.log(`Fetched categories.`)),
+      catchError((error) => this.errorHandler.handleError(error))
+    )
+  }
+
+  getTxDependencies(packageName: string): Observable<ITerminologyDependency[]> {
+
+    const sanitizedPackage = encodeURIComponent(packageName);
+    return this.http.get<ITerminologyDependency[]>(`${this.appConfigService.config?.baseApiUrl}/validation/artifact/PACKAGE/${sanitizedPackage}/tx-dependencies`).pipe(
+      tap(_ => console.log(`Fetched TX dependencies.`)),
       catchError((error) => this.errorHandler.handleError(error))
     )
   }
