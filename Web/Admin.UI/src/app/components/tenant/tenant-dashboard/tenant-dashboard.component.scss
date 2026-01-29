@@ -30,4 +30,15 @@ button[color="warn"] {
   display: inline-block;
 }
 
+.deleted-row {
+  opacity: 0.5;
+}
+
+.no-data-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  padding: 16px;
+}
 
