@@ -91,13 +91,23 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
             TraceId = log.TraceId
         });
 
-        await processor.EnqueueAsync(new AcquisitionWorkItem(
-            LogId: logId,
-            FacilityId: value.FacilityId
-        ), cancellationToken);
-
-        _logger.LogInformation("Queued LogId {LogId} for facility {FacilityId}", logId, value.FacilityId);
-
+        try
+        {
+            await processor.EnqueueAsync(new AcquisitionWorkItem(
+                LogId: logId,
+                FacilityId: value.FacilityId
+            ), cancellationToken);
+            _logger.LogInformation("Queued LogId {LogId} for facility {FacilityId}", logId, value.FacilityId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to enqueue work item for LogId {LogId}. Attempting to revert status.", logId);
+            // Minimally invasive: set back to Pending so the next trigger can try again
+            log.Status = RequestStatus.Pending;
+            log.Notes.Add($"[{DateTime.UtcNow:O}] Enqueue failed, reverting to Pending.");
+            await logManager.UpdateAsync(new UpdateDataAcquisitionLogModel { Id = log.Id, Status = log.Status, Notes = log.Notes });
+            throw new DeadLetterException("Failed to enqueue work item", ex); // Re-throw to let Kafka handle the retry/DLQ logic
+        }
         // Method ends → offset committed quickly by base class
     }
 

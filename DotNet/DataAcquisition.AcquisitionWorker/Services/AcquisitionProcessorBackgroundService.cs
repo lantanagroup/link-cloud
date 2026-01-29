@@ -49,11 +49,26 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
             });
     }
 
-    // Called by the listener to enqueue work
     public async ValueTask EnqueueAsync(AcquisitionWorkItem item, CancellationToken ct = default)
     {
-        await _workChannel.Writer.WriteAsync(item, ct);
-        _logger.LogDebug("Enqueued acquisition work for LogId {LogId}", item.LogId);
+        // Wait up to 5 seconds for space to become available
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(5));
+
+        try
+        {
+            if (await _workChannel.Writer.WaitToWriteAsync(cts.Token))
+            {
+                await _workChannel.Writer.WriteAsync(item, ct);
+                _logger.LogDebug("Enqueued acquisition work for LogId {LogId}", item.LogId);
+                return;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("Channel full. Timed out enqueuing LogId {LogId}.", item.LogId);
+            throw new Exception($"Internal queue capacity reached for LogId {item.LogId}");
+        }
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -126,7 +141,8 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
             if (log != null)
             {
                 log.Notes ??= new List<string>();
-                log.Notes.Add($"[{DateTime.UtcNow}] Processing failed: {ex.Message}\n{ex.StackTrace}");
+                var safeMessage = $"[{DateTime.UtcNow:O}] Processing failed: {ex.GetType().Name} - {ex.Message}";
+                log.Notes.Add(safeMessage);
                 log.Status = RequestStatus.Failed;
 
                 await logManager.UpdateAsync(new UpdateDataAcquisitionLogModel
@@ -141,28 +157,6 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                     TraceId = log.TraceId,
                     ExecutionDate = log.ExecutionDate
                 }, ct);
-
-                // Optional: re-produce ReadyToAcquire for retry
-                try
-                {
-                    using var producer = producerFactory.CreateProducer(new ProducerConfig { CompressionType = CompressionType.Zstd });
-                    await producer.ProduceAsync(
-                        typeof(ReadyToAcquire).Name,
-                        new Message<long, ReadyToAcquire>
-                        {
-                            Key = 0,  // or use log.Id if appropriate
-                            Value = new ReadyToAcquire
-                            {
-                                LogId = log.Id,
-                                FacilityId = item.FacilityId,
-                                ReportTrackingId = log.ReportTrackingId ?? ""
-                            }
-                        }, ct);
-                }
-                catch (Exception prodEx)
-                {
-                    _logger.LogError(prodEx, "Failed to re-produce ReadyToAcquire for LogId {LogId}", log.Id);
-                }
             }
         }
     }

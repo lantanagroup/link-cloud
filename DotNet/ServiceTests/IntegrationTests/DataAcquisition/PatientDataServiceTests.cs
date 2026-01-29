@@ -312,7 +312,7 @@ public class PatientDataServiceTests
         {
             Id = 1,
             FacilityId = "facilityId",
-            Status = RequestStatus.Ready,
+            Status = RequestStatus.Queued,
             FhirQueries = new List<FhirQuery>
         {
             new FhirQuery
@@ -392,7 +392,7 @@ public class PatientDataServiceTests
         {
             Id = logId,
             FacilityId = facilityId,
-            Status = RequestStatus.Ready,
+            Status = RequestStatus.Queued,
             IsCensus = false,
             Notes = new List<string>(),
             FhirQueries = new List<FhirQuery>
@@ -511,7 +511,7 @@ public class PatientDataServiceTests
         {
             Id = logId,
             FacilityId = facilityId,
-            Status = RequestStatus.Ready,
+            Status = RequestStatus.Queued,
             IsCensus = false,
             Notes = new List<string>(),
             FhirQueries = new List<FhirQuery>
@@ -620,7 +620,7 @@ public class PatientDataServiceTests
             Id = 1,
             FacilityId = "facility-1",
             PatientId = "Patient/123",
-            Status = RequestStatus.Ready,
+            Status = RequestStatus.Queued,
             CorrelationId = "corr-1",
             FhirQueries = new List<FhirQuery>
     {
@@ -731,7 +731,7 @@ public class PatientDataServiceTests
             Id = 1,
             FacilityId = "facility-1",
             PatientId = "Patient/123",
-            Status = RequestStatus.Ready,
+            Status = RequestStatus.Queued,
             CorrelationId = "corr-1",
             FhirQuery = new List<FhirQueryModel>
         {
@@ -790,7 +790,7 @@ public class PatientDataServiceTests
             Id = 1,
             FacilityId = "facility-1",
             PatientId = "Patient/123",
-            Status = RequestStatus.Ready,
+            Status = RequestStatus.Queued,
             CorrelationId = "corr-1",
             FhirQuery = new List<FhirQueryModel>
             {
@@ -851,7 +851,7 @@ public class PatientDataServiceTests
             Id = 1,
             FacilityId = "facility-1",
             PatientId = "Patient/123",
-            Status = RequestStatus.Ready,
+            Status = RequestStatus.Queued,
             CorrelationId = "corr-1",
             FhirQuery = new List<FhirQueryModel>
         {
