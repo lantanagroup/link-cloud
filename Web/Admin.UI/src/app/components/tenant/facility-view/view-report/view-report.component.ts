@@ -40,7 +40,7 @@ import { IDataAcquisitionLogStatistics } from 'src/app/interfaces/data-acquisiti
 import { ReportAnalysisComponent } from './report-analysis/report-analysis.component';
 import { IReportSchedule } from '../../../../interfaces/report/report-schedule.interface';
 import { ReportService } from '../../../../services/gateway/report/report.service';
-import { IReportEntry, ReportingStatus, SubmissionStatus } from '../../../../interfaces/report/report-entry.interface';
+import { IReportEntry, IReportEntrySummary, ReportingStatus, SubmissionStatus } from '../../../../interfaces/report/report-entry.interface';
 
 @Component({
   selector: 'app-view-report',
@@ -83,6 +83,12 @@ export class ViewReportComponent implements OnInit {
   reportSummary: IReportSchedule | undefined;
   dataAcquisitionLogStatistics: IDataAcquisitionLogStatistics | undefined;
 
+  // Add summary data for donut charts
+  reportEntrySummary: IReportEntrySummary | undefined;
+  measureIpCountsData: Record<string, number> = {};
+  reportStatusData: Record<string, number> = {};
+  validationStatusData: Record<string, number> = {};
+
   defaultPageNumber: number = 0
   defaultPageSize: number = 10;
   sortBy: string | null = null;
@@ -99,8 +105,20 @@ export class ViewReportComponent implements OnInit {
   selectedReportStatusFilter: ReportingStatus|string = 'any';
   selectedValidationStatusFilter: SubmissionStatus|string = 'any';
   measures: string[] = [];
-  reportStatuses: ReportingStatus[] = [];
-  validationStatuses: SubmissionStatus[] = [];
+  reportStatuses: ReportingStatus[] = [
+    ReportingStatus.PatientIdentified,
+    ReportingStatus.NotReportable,
+    ReportingStatus.PendingValidation,
+    ReportingStatus.PassedValidation,
+    ReportingStatus.FailedValidation
+  ];
+  validationStatuses: SubmissionStatus[] = [
+    SubmissionStatus.PendingValidation,
+    SubmissionStatus.Submitting,
+    SubmissionStatus.Submitted,
+    SubmissionStatus.FailedSubmission,
+    SubmissionStatus.NotEligable
+  ];
 
   constructor(
     private location: Location,
@@ -117,6 +135,7 @@ export class ViewReportComponent implements OnInit {
     this.reportId = this.route.snapshot.paramMap.get('reportId') || '';
     this.loadReportSchedule();
     this.loadReportEntries();
+    this.loadReportEntrySummary();
   }
 
   ngOnDestroy(): void {
@@ -187,6 +206,21 @@ export class ViewReportComponent implements OnInit {
     });
   }
 
+  loadReportEntrySummary(): void {
+    this.reportService.getReportEntrySummary(this.reportId)
+      .subscribe({
+        next: (data) => {
+          this.reportEntrySummary = data;
+          this.measureIpCountsData = data.reportTypeCounts;
+          this.reportStatusData = data.reportingStatusCounts;
+          this.validationStatusData = data.submissionStatusCounts;
+        },
+        error: (error) => {
+          console.error('Error loading report entry summary:', error);
+        }
+      });
+  }
+
   onSelectReport(measureReport: IReportEntry): void {
 
     const dialogConfig = new MatDialogConfig();
@@ -222,6 +256,7 @@ export class ViewReportComponent implements OnInit {
   onRefresh(): void {
     this.loadReportSchedule();
     this.loadReportEntries();
+    this.loadReportEntrySummary();
   }
 
   onPatientIdChange(): void {

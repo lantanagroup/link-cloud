@@ -50,6 +50,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             CancellationToken cancellationToken = default);
 
         Task<int> CountAsync(Expression<Func<ReportEntry, bool>> predicate, CancellationToken cancellationToken = default);
+
+        Task<ReportEntrySummary> GetSummaryByReportScheduleIdAsync(string reportScheduleId, CancellationToken cancellationToken = default);
     }
 
     public class ReportEntryManager : IReportEntryManager
@@ -209,6 +211,58 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 cancellationToken);
 
             return new PagedConfigModel<ReportEntry>(results, metadata);
+        }
+
+        public async Task<ReportEntrySummary> GetSummaryByReportScheduleIdAsync(string reportScheduleId, CancellationToken cancellationToken = default)
+        {
+            var entries = await _database.ReportEntryRepository.FindAsync(
+                x => x.ReportScheduleId == reportScheduleId,
+                cancellationToken);
+
+            var summary = new ReportEntrySummary();
+
+            foreach (var entry in entries)
+            {
+                var reportingStatusKey = entry.ReportingStatus.ToString();
+                if (summary.ReportingStatusCounts.ContainsKey(reportingStatusKey))
+                {
+                    summary.ReportingStatusCounts[reportingStatusKey]++;
+                }
+                else
+                {
+                    summary.ReportingStatusCounts[reportingStatusKey] = 1;
+                }
+
+                if (entry.SubmissionStatus.HasValue)
+                {
+                    var submissionStatusKey = entry.SubmissionStatus.Value.ToString();
+                    if (summary.SubmissionStatusCounts.ContainsKey(submissionStatusKey))
+                    {
+                        summary.SubmissionStatusCounts[submissionStatusKey]++;
+                    }
+                    else
+                    {
+                        summary.SubmissionStatusCounts[submissionStatusKey] = 1;
+                    }
+                }
+
+                if (entry.SubmissionStatus != SubmissionStatus.NotEligable)
+                {
+                    foreach (var measureReport in entry.MeasureReportList)
+                    {
+                        if (summary.ReportTypeCounts.ContainsKey(measureReport.ReportType))
+                        {
+                            summary.ReportTypeCounts[measureReport.ReportType]++;
+                        }
+                        else
+                        {
+                            summary.ReportTypeCounts[measureReport.ReportType] = 1;
+                        }
+                    }
+                }
+            }
+
+            return summary;
         }
     }
 }

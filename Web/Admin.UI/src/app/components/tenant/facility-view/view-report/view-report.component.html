@@ -115,17 +115,17 @@
         </div>
       </div>
     </div>
-    <!--<div style="display: flex; justify-content: flex-start;">
+    <div style="display: flex; justify-content: flex-start;">
       <div style="flex: 1; min-height: 400px;">
-        <app-donut-chart [data]="reportSummary?.reportMetrics.measureIpCounts"></app-donut-chart>
+        <app-donut-chart [data]="measureIpCountsData"></app-donut-chart>
       </div>
       <div style="flex: 1; min-height: 400px;">
-        <app-donut-chart [data]="reportSummary?.reportMetrics.reportStatusCounts"></app-donut-chart>
+        <app-donut-chart [data]="validationStatusData"></app-donut-chart>
       </div>
       <div style="flex: 1; min-height: 400px; display: block;">
-        <app-donut-chart [data]="reportSummary?.reportMetrics.validationStatusCounts"></app-donut-chart>
+        <app-donut-chart [data]="reportStatusData"></app-donut-chart>
       </div>
-    </div>-->
+    </div>
   </div>
 
   <mat-tab-group (selectedIndexChange)="onTabSelected($event)">
@@ -227,7 +227,7 @@
 
             <!-- Reporting Status Column -->
             <ng-container matColumnDef="reportingStatus">
-              <th mat-header-cell *matHeaderCellDef mat-sort-header>Reporting Status</th>
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Validation</th>
               <td mat-cell *matCellDef="let element">
                 <span [ngClass]="getReportingStatusClass(element.reportingStatus)">
                   {{getReportingStatusText(element.reportingStatus)}}
@@ -237,7 +237,7 @@
 
             <!-- Submission Status Column -->
             <ng-container matColumnDef="submissionStatus">
-              <th mat-header-cell *matHeaderCellDef mat-sort-header>Submission Status</th>
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Report Status</th>
               <td mat-cell *matCellDef="let element">
                 <span *ngIf="element.submissionStatus" [ngClass]="getSubmissionStatusClass(element.submissionStatus)">
                   {{getSubmissionStatusText(element.submissionStatus)}}

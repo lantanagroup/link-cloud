@@ -8,7 +8,7 @@ import { Observable, catchError, map, tap } from 'rxjs';
 import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
 import { IEntityDeletedResponse } from 'src/app/interfaces/entity-deleted-response.interface';
 import { AppConfigService } from '../../app-config.service';
-import { IPagedReportEntry, ReportingStatus, SubmissionStatus } from 'src/app/interfaces/report/report-entry.interface';
+import { IPagedReportEntry, IReportEntrySummary, ReportingStatus, SubmissionStatus } from 'src/app/interfaces/report/report-entry.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -200,6 +200,15 @@ export class ReportService {
     return this.http.get<IReportSchedule>(`${this.appConfigService.config?.baseApiUrl}/aggregate/reports/summaries/${reportScheduleId}`, { headers })
       .pipe(
         tap(_ => console.log('Fetched report schedule.')),
+        catchError((error) => this.errorHandler.handleError(error))
+      );
+  }
+
+  getReportEntrySummary(reportScheduleId: string): Observable<IReportEntrySummary> {
+    const headers = new HttpHeaders({ 'X-Skip-Loading': 'true' });
+    return this.http.get<IReportEntrySummary>(`${this.appConfigService.config?.baseApiUrl}/entries/schedules/${reportScheduleId}/summary`, { headers })
+      .pipe(
+        tap(_ => console.log('Fetched report entry summary.')),
         catchError((error) => this.errorHandler.handleError(error))
       );
   }

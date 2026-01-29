@@ -31,6 +31,12 @@ export interface IPagedReportEntry {
   };
 }
 
+export interface IReportEntrySummary {
+  reportTypeCounts: Record<string, number>;
+  reportingStatusCounts: Record<string, number>;
+  submissionStatusCounts: Record<string, number>;
+}
+
 export enum ReportingStatus {
   PatientIdentified,
   NotReportable,

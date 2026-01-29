@@ -3,6 +3,7 @@ using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -137,6 +138,29 @@ namespace LantanaGroup.Link.Report.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(new EventId(ReportConstants.LoggingIds.GetItem, "GetCountByReportScheduleId"), ex, "An exception occurred while attempting to get the count of Report Entry records for Report Schedule Id {id}", HtmlInputSanitizer.Sanitize(reportScheduleId));
+
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Returns a summary count of report types, reporting statuses, and submission statuses for the given report schedule Id.
+        /// </summary>
+        /// <param name="reportScheduleId"></param>
+        [HttpGet("schedules/{reportScheduleId}/summary")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ReportEntrySummary))]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<ReportEntrySummary>> GetSummaryByReportScheduleId(string reportScheduleId)
+        {
+            try
+            {
+                var summary = await _reportEntryManager.GetSummaryByReportScheduleIdAsync(reportScheduleId);
+
+                return Ok(summary);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(new EventId(ReportConstants.LoggingIds.GetItem, "GetSummaryByReportScheduleId"), ex, "An exception occurred while attempting to get the summary of Report Entry records for Report Schedule Id {id}", HtmlInputSanitizer.Sanitize(reportScheduleId));
 
                 throw;
             }
