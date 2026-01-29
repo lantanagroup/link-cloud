@@ -59,12 +59,12 @@
       </div>
 
       @if (reportSummary?.adHocType) {
-        <div>
-          <div class="data-label">
-            AdHoc Source
-            <span class="data-value">{{reportSummary?.adHocType}}</span>
-          </div>
+      <div>
+        <div class="data-label">
+          AdHoc Source
+          <span class="data-value">{{reportSummary?.adHocType}}</span>
         </div>
+      </div>
       }
       <div>
         <div class="data-label">
@@ -140,36 +140,12 @@
               </label>
               <input id="patientId" type="text" [(ngModel)]="patientFilter" (keydown.enter)="onPatientIdChange()" placeholder="Enter Patient Id">
             </div>
-            <div class="filter-bar-item">
+            <!--<div class="filter-bar-item">
               <label>
                 Report Id
               </label>
               <input id="reportId" type="text" [(ngModel)]="reportFilter" (keydown.enter)="onReportIdChange()" placeholder="Enter report Id">
-            </div>
-          </div>
-
-          <div class="filter-bar-col">
-            <div class="filter-bar-item">
-              <label>
-                Report Status
-              </label>
-              <select id="reportStatusFilter" [(ngModel)]="selectedReportStatusFilter" (change)="onReportStatusFilterChange($event)">
-                <option value="any">Any</option>
-                <option *ngFor="let status of reportStatuses" [value]="status">{{status}}</option>
-              </select>
-            </div>
-            <div class="filter-bar-item">
-              <label>
-                Validation Status
-              </label>
-              <select id="validationStatusFilter" [(ngModel)]="selectedValidationStatusFilter" (change)="onValidationStatusFilterChange($event)">
-                <option value="any">Any</option>
-                <option *ngFor="let status of validationStatuses" [value]="status">{{status}}</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="filter-bar-col">
+            </div>-->
             <div class="filter-bar-item">
               <label>
                 Measure
@@ -177,6 +153,27 @@
               <select id="measureFilter" [(ngModel)]="selectedMeasureFilter" (change)="onMeasureFilterChange($event)">
                 <option value="any">Any</option>
                 <option *ngFor="let measure of measures" [value]="measure">{{measure}}</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="filter-bar-col">
+            <div class="filter-bar-item">
+              <label>
+                Validation Status
+              </label>
+              <select id="reportStatusFilter" [(ngModel)]="selectedReportStatusFilter" (change)="onReportStatusFilterChange($event)">
+                <option value="any">Any</option>
+                <option *ngFor="let status of reportStatuses" [value]="status">{{getReportingStatusText(status)}}</option>
+              </select>
+            </div>
+            <div class="filter-bar-item">
+              <label>
+                Report Status
+              </label>
+              <select id="validationStatusFilter" [(ngModel)]="selectedValidationStatusFilter" (change)="onValidationStatusFilterChange($event)">
+                <option value="any">Any</option>
+                <option *ngFor="let status of validationStatuses" [value]="status">{{getSubmissionStatusText(status)}}</option>
               </select>
             </div>
           </div>
@@ -196,84 +193,84 @@
         </div>
       </div>
       <div class="link-card" style="margin-top: 2em;">
-          <table mat-table [dataSource]="dataSource" matSort (matSortChange)="onSortChange($event)" style="width: 100%; background-color: transparent">
+        <table mat-table [dataSource]="dataSource" matSort (matSortChange)="onSortChange($event)" style="width: 100%; background-color: transparent">
 
-            <!-- Patient ID Column -->
-            <ng-container matColumnDef="id">
-              <th mat-header-cell *matHeaderCellDef mat-sort-header>Patient ID</th>
-              <td mat-cell *matCellDef="let element">{{element.patientId}}</td>
-            </ng-container>
+          <!-- Patient ID Column -->
+          <ng-container matColumnDef="id">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Patient ID</th>
+            <td mat-cell *matCellDef="let element">{{element.patientId}}</td>
+          </ng-container>
 
-            <!-- Measure Column -->
-            <ng-container matColumnDef="measure">
-              <th mat-header-cell *matHeaderCellDef>Measure</th>
-              <td mat-cell *matCellDef="let element">
-                <span *ngFor="let report of element.measureReportList; let last = last">
-                  {{report.reportType}}<span *ngIf="!last">, </span>
-                </span>
-              </td>
-            </ng-container>
+          <!-- Measure Column -->
+          <ng-container matColumnDef="measure">
+            <th mat-header-cell *matHeaderCellDef>Measure</th>
+            <td mat-cell *matCellDef="let element">
+              <span *ngFor="let report of element.measureReportList; let last = last">
+                {{report.reportType}}<span *ngIf="!last">, </span>
+              </span>
+            </td>
+          </ng-container>
 
-            <!-- Number of Resources Column -->
-            <ng-container matColumnDef="resourceCount">
-              <th mat-header-cell *matHeaderCellDef>Number of Resources</th>
-              <td mat-cell *matCellDef="let element">
-                <span *ngIf="element.measureReportList && element.measureReportList.length > 0">
-                  {{getTotalResourceCount(element.measureReportList)}}
-                </span>
-                <span *ngIf="!element.measureReportList || element.measureReportList.length === 0">0</span>
-              </td>
-            </ng-container>
+          <!-- Number of Resources Column -->
+          <ng-container matColumnDef="resourceCount">
+            <th mat-header-cell *matHeaderCellDef>Number of Resources</th>
+            <td mat-cell *matCellDef="let element">
+              <span *ngIf="element.measureReportList && element.measureReportList.length > 0">
+                {{getTotalResourceCount(element.measureReportList)}}
+              </span>
+              <span *ngIf="!element.measureReportList || element.measureReportList.length === 0">0</span>
+            </td>
+          </ng-container>
 
-            <!-- Reporting Status Column -->
-            <ng-container matColumnDef="reportingStatus">
-              <th mat-header-cell *matHeaderCellDef mat-sort-header>Validation</th>
-              <td mat-cell *matCellDef="let element">
-                <span [ngClass]="getReportingStatusClass(element.reportingStatus)">
-                  {{getReportingStatusText(element.reportingStatus)}}
-                </span>
-              </td>
-            </ng-container>
+          <!-- Reporting Status Column -->
+          <ng-container matColumnDef="reportingStatus">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Validation</th>
+            <td mat-cell *matCellDef="let element">
+              <span [ngClass]="getReportingStatusClass(element.reportingStatus)">
+                {{getReportingStatusText(element.reportingStatus)}}
+              </span>
+            </td>
+          </ng-container>
 
-            <!-- Submission Status Column -->
-            <ng-container matColumnDef="submissionStatus">
-              <th mat-header-cell *matHeaderCellDef mat-sort-header>Report Status</th>
-              <td mat-cell *matCellDef="let element">
-                <span *ngIf="element.submissionStatus" [ngClass]="getSubmissionStatusClass(element.submissionStatus)">
-                  {{getSubmissionStatusText(element.submissionStatus)}}
-                </span>
-                <span *ngIf="!element.submissionStatus">-</span>
-              </td>
-            </ng-container>
+          <!-- Submission Status Column -->
+          <ng-container matColumnDef="submissionStatus">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Report Status</th>
+            <td mat-cell *matCellDef="let element">
+              <span *ngIf="element.submissionStatus" [ngClass]="getSubmissionStatusClass(element.submissionStatus)">
+                {{getSubmissionStatusText(element.submissionStatus)}}
+              </span>
+              <span *ngIf="!element.submissionStatus">-</span>
+            </td>
+          </ng-container>
 
-            <!-- Action Column -->
-            <ng-container matColumnDef="action">
-              <th mat-header-cell *matHeaderCellDef>Action</th>
-              <td mat-cell *matCellDef="let element">
-                <app-view-report-table-command [measureReport]="element"
-                                               (viewDetails)="onSelectReport($event)">
-                </app-view-report-table-command>
-              </td>
-            </ng-container>
+          <!-- Action Column -->
+          <ng-container matColumnDef="action">
+            <th mat-header-cell *matHeaderCellDef>Action</th>
+            <td mat-cell *matCellDef="let element">
+              <app-view-report-table-command [measureReport]="element"
+                                             (viewDetails)="onSelectReport($event)">
+              </app-view-report-table-command>
+            </td>
+          </ng-container>
 
-            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-            <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
 
-            <!-- No data row -->
-            <tr class="mat-row" *matNoDataRow>
-              <td class="mat-cell" [attr.colspan]="displayedColumns.length">
-                <ng-container *ngTemplateOutlet="noResultsFoundTemplate"></ng-container>
-              </td>
-            </tr>
-          </table>
+          <!-- No data row -->
+          <tr class="mat-row" *matNoDataRow>
+            <td class="mat-cell" [attr.colspan]="displayedColumns.length">
+              <ng-container *ngTemplateOutlet="noResultsFoundTemplate"></ng-container>
+            </td>
+          </tr>
+        </table>
 
-          <mat-paginator [length]="paginationMetadata.totalCount"
-                         [pageSize]="paginationMetadata.pageSize"
-                         [pageIndex]="paginationMetadata.pageNumber"
-                         [pageSizeOptions]="[5, 10, 25, 50]"
-                         (page)="onPageChange($event)"
-                         aria-label="Select page">
-          </mat-paginator>
+        <mat-paginator [length]="paginationMetadata.totalCount"
+                       [pageSize]="paginationMetadata.pageSize"
+                       [pageIndex]="paginationMetadata.pageNumber"
+                       [pageSizeOptions]="[5, 10, 25, 50]"
+                       (page)="onPageChange($event)"
+                       aria-label="Select page">
+        </mat-paginator>
       </div>
 
     </mat-tab>
@@ -296,6 +293,7 @@
     <span>No report entries found</span>
   </div>
 </ng-template>
+
 
 
 
