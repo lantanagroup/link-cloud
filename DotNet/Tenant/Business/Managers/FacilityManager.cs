@@ -25,6 +25,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
         Task CreateAsync(Facility newFacility, CancellationToken cancellationToken = default);
         Task<string> UpdateAsync(System.Guid id, Facility newFacility, CancellationToken cancellationToken = default);
         Task<string> DeleteAsync(string facilityId, CancellationToken cancellationToken = default);
+        Task<string> SoftDeleteAsync(string facilityId, CancellationToken cancellationToken = default); // new
         Task MeasureDefinitionExists(string reportType);
     }
 
@@ -52,19 +53,22 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             IOptions<MeasureConfig> measureConfig,
             IOptions<LinkTokenServiceSettings> linkTokenServiceConfig,
             ICreateSystemToken createSystemToken,
-            IOptions<LinkBearerServiceOptions> linkBearerServiceOptions, 
+            IOptions<LinkBearerServiceOptions> linkBearerServiceOptions,
             FacilityIdSettings facilityIdSettings)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _repository = repository ?? throw new ArgumentNullException(nameof(repository));
             _queries = queries ?? throw new ArgumentNullException(nameof(queries));
-            _createAuditEventCommand = createAuditEventCommand ?? throw new ArgumentNullException(nameof(createAuditEventCommand));
+            _createAuditEventCommand = createAuditEventCommand ??
+                                       throw new ArgumentNullException(nameof(createAuditEventCommand));
             _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
             _measureConfig = measureConfig ?? throw new ArgumentNullException(nameof(measureConfig));
-            _linkTokenServiceConfig = linkTokenServiceConfig ?? throw new ArgumentNullException(nameof(linkTokenServiceConfig));
+            _linkTokenServiceConfig =
+                linkTokenServiceConfig ?? throw new ArgumentNullException(nameof(linkTokenServiceConfig));
             _createSystemToken = createSystemToken ?? throw new ArgumentNullException(nameof(createSystemToken));
-            _linkBearerServiceOptions = linkBearerServiceOptions ?? throw new ArgumentNullException(nameof(linkBearerServiceOptions));
+            _linkBearerServiceOptions = linkBearerServiceOptions ??
+                                        throw new ArgumentNullException(nameof(linkBearerServiceOptions));
             _facilityIdSettings = facilityIdSettings ?? throw new ArgumentNullException(nameof(facilityIdSettings));
         }
 
@@ -80,12 +84,15 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             {
                 ValidateFacility(newFacility);
 
-                var facility = await _repository.FirstOrDefaultAsync(f => f.FacilityId == newFacility.FacilityId, cancellationToken);
+                var facility =
+                    await _repository.FirstOrDefaultAsync(f => f.FacilityId == newFacility.FacilityId,
+                        cancellationToken);
 
                 // validates facility 
                 if (facility is not null)
                 {
-                    _logger.LogError("Facility {FacilityId} already exists", HtmlInputSanitizer.Sanitize(newFacility.FacilityId));
+                    _logger.LogError("Facility {FacilityId} already exists",
+                        HtmlInputSanitizer.Sanitize(newFacility.FacilityId));
 
                     throw new ApplicationException($"Facility {newFacility.FacilityId} already exists");
                 }
@@ -98,7 +105,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
                 using (ServiceActivitySource.Instance.StartActivity("Create the Facility Configuration Command"))
                 {
                     newFacility.CreateDate = DateTime.UtcNow;
-                    if(newFacility.Id == default) 
+                    if (newFacility.Id == default)
                         newFacility.Id = Guid.NewGuid();
 
                     await _repository.AddAsync(newFacility, cancellationToken);
@@ -108,8 +115,9 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex, new TagList {
-                    { "service.name",TenantConstants.ServiceName },
+                Activity.Current?.RecordException(ex, new TagList
+                {
+                    { "service.name", TenantConstants.ServiceName },
                     { "facility", newFacility.FacilityId },
                     { "action", AuditEventType.Create },
                     { "resource", newFacility }
@@ -120,11 +128,12 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
 
             // send audit event
             AuditEventMessage auditMessageEvent = Helper.CreateFacilityAuditEvent(newFacility);
-            _ = Task.Run(() => _createAuditEventCommand.Execute(newFacility.FacilityId, auditMessageEvent, cancellationToken));
-
+            _ = Task.Run(() =>
+                _createAuditEventCommand.Execute(newFacility.FacilityId, auditMessageEvent, cancellationToken));
         }
 
-        public async Task<string> UpdateAsync(Guid id, Facility newFacility, CancellationToken cancellationToken = default)
+        public async Task<string> UpdateAsync(Guid id, Facility newFacility,
+            CancellationToken cancellationToken = default)
         {
             Facility? existingFacility;
 
@@ -141,13 +150,17 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
 
                 ValidateFacility(newFacility);
 
-                var foundFacility = await _repository.FirstOrDefaultAsync(f => f.FacilityId == newFacility.FacilityId, cancellationToken);
+                var foundFacility =
+                    await _repository.FirstOrDefaultAsync(f => f.FacilityId == newFacility.FacilityId,
+                        cancellationToken);
 
                 if (foundFacility != null && foundFacility.Id != id)
                 {
-                    _logger.LogError("Facility {FacilityId} already exists", HtmlInputSanitizer.Sanitize(newFacility.FacilityId));
+                    _logger.LogError("Facility {FacilityId} already exists",
+                        HtmlInputSanitizer.Sanitize(newFacility.FacilityId));
 
-                    throw new ApplicationException($"Facility {newFacility.FacilityId} already exists under another ID: {foundFacility.Id}");
+                    throw new ApplicationException(
+                        $"Facility {newFacility.FacilityId} already exists under another ID: {foundFacility.Id}");
                 }
 
                 await ValidateSchedules(newFacility);
@@ -166,6 +179,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
                         {
                             throw new ApplicationException("Cannot change the FacilityId of a facility.");
                         }
+
                         existingFacility.FacilityName = newFacility.FacilityName;
                         existingFacility.TimeZone = newFacility.TimeZone;
                         existingFacility.ScheduledReports.Daily = newFacility.ScheduledReports.Daily;
@@ -183,8 +197,9 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex, new TagList {
-                    { "service.name",TenantConstants.ServiceName },
+                Activity.Current?.RecordException(ex, new TagList
+                {
+                    { "service.name", TenantConstants.ServiceName },
                     { "facility", newFacility.FacilityId },
                     { "action", AuditEventType.Update },
                     { "resource", newFacility }
@@ -193,7 +208,8 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             }
 
             // audit update facility event          
-            _ = Task.Run(() => _createAuditEventCommand.Execute(newFacility.FacilityId, auditMessageEvent, cancellationToken));
+            _ = Task.Run(() =>
+                _createAuditEventCommand.Execute(newFacility.FacilityId, auditMessageEvent, cancellationToken));
             return id.ToString();
         }
 
@@ -210,11 +226,13 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             // validate facility exists
             using (ServiceActivitySource.Instance.StartActivity("Validate the Facility Configuration"))
             {
-                existingFacility = await _repository.FirstOrDefaultAsync(f => f.FacilityId == facilityId, cancellationToken);
+                existingFacility =
+                    await _repository.FirstOrDefaultAsync(f => f.FacilityId == facilityId, cancellationToken);
 
                 if (existingFacility is null)
                 {
-                    _logger.LogError("Facility with Id: {FacilityId} Not Found", HtmlInputSanitizer.Sanitize(facilityId));
+                    _logger.LogError("Facility with Id: {FacilityId} Not Found",
+                        HtmlInputSanitizer.Sanitize(facilityId));
                     throw new ApplicationException($"Facility with Id: {facilityId} Not Found");
                 }
             }
@@ -230,8 +248,9 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex, new TagList {
-                    { "service.name",TenantConstants.ServiceName },
+                Activity.Current?.RecordException(ex, new TagList
+                {
+                    { "service.name", TenantConstants.ServiceName },
                     { "facility", facilityId },
                     { "action", AuditEventType.Delete },
                     { "resource", existingFacility }
@@ -241,7 +260,8 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
 
             // audit delete facility event
             AuditEventMessage auditMessageEvent = Helper.DeleteFacilityAuditEvent(existingFacility);
-            _ = Task.Run(() => _createAuditEventCommand.Execute(existingFacility.FacilityId, auditMessageEvent, cancellationToken));
+            _ = Task.Run(() =>
+                _createAuditEventCommand.Execute(existingFacility.FacilityId, auditMessageEvent, cancellationToken));
 
             return facilityId;
         }
@@ -251,16 +271,19 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             if (_measureConfig.Value.CheckIfMeasureExists)
             {
                 if (String.IsNullOrEmpty(_serviceRegistry.Value.MeasureServiceUrl))
-                    throw new ApplicationException($"MeasureEval service configuration from \"ServiceRegistry.MeasureServiceUrl\" is missing");
+                    throw new ApplicationException(
+                        $"MeasureEval service configuration from \"ServiceRegistry.MeasureServiceUrl\" is missing");
 
 
-                var requestUrl = new Uri(new Uri(_serviceRegistry.Value.MeasureServiceUrl), $"api/measureeval/measure-definition/{HtmlInputSanitizer.SanitizeAndRemove(reportType)}");
+                var requestUrl = new Uri(new Uri(_serviceRegistry.Value.MeasureServiceUrl),
+                    $"api/measureeval/measure-definition/{HtmlInputSanitizer.SanitizeAndRemove(reportType)}");
 
                 //get link token
                 if (!_linkBearerServiceOptions.Value.AllowAnonymous)
                 {
                     //TODO: add method to get key that includes looking at redis for future use case
-                    if (_linkTokenServiceConfig.Value.SigningKey is null) throw new Exception("Link Token Service Signing Key is missing.");
+                    if (_linkTokenServiceConfig.Value.SigningKey is null)
+                        throw new Exception("Link Token Service Signing Key is missing.");
 
                     var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2);
                     _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -275,6 +298,55 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
                 }
             }
         }
+
+        public async Task<string> SoftDeleteAsync(string facilityId, CancellationToken cancellationToken = default)
+        {
+            Facility? existingFacility;
+
+            using Activity? activity =
+                ServiceActivitySource.Instance.StartActivity("Soft Delete Facility Configuration");
+            var currentActivity = Activity.Current;
+            currentActivity?.AddTag("facility.id", facilityId);
+
+            // Validate the facility exists
+            using (ServiceActivitySource.Instance.StartActivity("Validate the Facility Configuration"))
+            {
+                existingFacility =
+                    await _repository.FirstOrDefaultAsync(f => f.FacilityId == facilityId, cancellationToken);
+                if (existingFacility is null)
+                {
+                    _logger.LogError("Facility with Id: {FacilityId} Not Found",
+                        HtmlInputSanitizer.Sanitize(facilityId));
+                    throw new ApplicationException($"Facility with Id: {facilityId} Not Found");
+                }
+            }
+
+            try
+            {
+                using (ServiceActivitySource.Instance.StartActivity("Mark Facility as Soft Deleted"))
+                {
+                    existingFacility.IsDeleted = true;
+                    existingFacility.ModifyDate = DateTime.UtcNow; // optional: track deletion timestamp
+                    _repository.Update(existingFacility);
+                    await _repository.SaveChangesAsync(cancellationToken);
+                }
+            }
+            catch (Exception ex)
+            {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.RecordException(ex, new TagList
+                {
+                    { "service.name", TenantConstants.ServiceName },
+                    { "facility", facilityId },
+                    { "action", AuditEventType.Delete },
+                    { "resource", existingFacility }
+                });
+
+                throw new ApplicationException($"Facility {facilityId} failed to soft delete. " + ex.Message);
+            }
+            return facilityId;
+        }
+
 
         private void ValidateFacility(Facility facility)
         {
@@ -325,8 +397,11 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
                 // verify the id of the time zone is IANA format
                 if (!timeZoneInfo.HasIanaId)
                 {
-                    _logger.LogError("Incorrect Timezone format: {TimeZone} (Time zones should be in IANA format for example: America/Chicago)", facility.TimeZone);
-                    throw new ApplicationException("Incorrect Timezone format: " + facility.TimeZone + " (Time zones should be in IANA format for example: America/Chicago)");
+                    _logger.LogError(
+                        "Incorrect Timezone format: {TimeZone} (Time zones should be in IANA format for example: America/Chicago)",
+                        facility.TimeZone);
+                    throw new ApplicationException("Incorrect Timezone format: " + facility.TimeZone +
+                                                   " (Time zones should be in IANA format for example: America/Chicago)");
                 }
             }
             catch (TimeZoneNotFoundException)
@@ -374,6 +449,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
                     duplicates.Add(item);
                 }
             }
+
             return duplicates;
         }
     }

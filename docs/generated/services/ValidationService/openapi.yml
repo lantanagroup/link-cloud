@@ -1,6 +1,6 @@
 ﻿openapi: 3.0.1
 info:
-  version: 0.3.0
+  version: 0.4.1
   title: Validation Service
 paths:
   /api/validation/category/{id}:
@@ -816,6 +816,12 @@ components:
           type: string
         build:
           type: string
+        commit:
+          type: string
+        swaggerUrl:
+          type: string
+        swaggerUiEnabled:
+          type: boolean
     CategoryRule:
       type: object
       properties:

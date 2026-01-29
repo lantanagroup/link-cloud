@@ -3,10 +3,12 @@ package com.lantanagroup.link.measureeval.controllers;
 import ca.uhn.fhir.context.FhirContext;
 import com.fasterxml.jackson.annotation.JsonView;
 import com.lantanagroup.link.measureeval.entities.MeasureDefinition;
+import com.lantanagroup.link.measureeval.models.RelatedArtifactInfo;
 import com.lantanagroup.link.measureeval.repositories.MeasureDefinitionRepository;
 import com.lantanagroup.link.measureeval.services.MeasureDefinitionBundleValidator;
 import com.lantanagroup.link.measureeval.services.MeasureEvaluator;
 import com.lantanagroup.link.measureeval.services.MeasureEvaluatorCache;
+import com.lantanagroup.link.measureeval.services.MeasureValidationService;
 import com.lantanagroup.link.measureeval.utils.CqlUtils;
 import com.lantanagroup.link.shared.auth.PrincipalUser;
 import com.lantanagroup.link.shared.serdes.Views;
@@ -38,6 +40,7 @@ public class MeasureDefinitionController {
     private final MeasureDefinitionRepository repository;
     private final MeasureDefinitionBundleValidator bundleValidator;
     private final MeasureEvaluatorCache evaluatorCache;
+    private final MeasureValidationService validationService;
 
     final String[] DISALLOWED_FIELDS = new String[]{};
     @InitBinder
@@ -48,10 +51,12 @@ public class MeasureDefinitionController {
     public MeasureDefinitionController(
             MeasureDefinitionRepository repository,
             MeasureDefinitionBundleValidator bundleValidator,
-            MeasureEvaluatorCache evaluatorCache){
+            MeasureEvaluatorCache evaluatorCache,
+            MeasureValidationService validationService){
         this.repository = repository;
         this.bundleValidator = bundleValidator;
         this.evaluatorCache = evaluatorCache;
+        this.validationService = validationService;
     }
 
     @GetMapping
@@ -157,5 +162,12 @@ public class MeasureDefinitionController {
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
         }
+    }
+
+    @GetMapping("/{id}/relatedArtifact")
+    @Operation(summary = "Get related artifacts for a measure definition", tags = {"Measure Definitions"})
+    @Parameter(name = "id", description = "The ID of the measure definition", required = true)
+    public List<RelatedArtifactInfo> getRelatedArtifacts(@PathVariable String id) {
+        return validationService.getRelatedArtifacts(id);
     }
 }

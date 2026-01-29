@@ -1,10 +1,10 @@
-
 import {Component, OnInit} from '@angular/core';
 import {FormBuilder, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
 import {MatChipsModule} from '@angular/material/chips';
 import {MatExpansionModule} from '@angular/material/expansion';
 import {MatFormFieldModule} from '@angular/material/form-field';
 import {MatIconModule} from '@angular/material/icon';
+import {MatDialog, MatDialogModule} from '@angular/material/dialog';
 import {MatInputModule} from '@angular/material/input';
 import {MatProgressSpinnerModule} from '@angular/material/progress-spinner';
 import {MatSelectModule} from '@angular/material/select';
@@ -18,6 +18,7 @@ import {Artifact} from "../../interfaces/validation/artifact.interface";
 import {MatCard, MatCardActions, MatCardContent, MatCardTitle} from "@angular/material/card";
 import {MatList, MatListItem} from "@angular/material/list";
 import {FileUploadComponent} from '../core/file-upload/file-upload.component';
+import {TxDependenciesDialogComponent} from "./tx-dependencies/tx-dependencies-dialog/tx-dependencies-dialog.component";
 
 import {MatButtonModule} from "@angular/material/button";
 
@@ -46,7 +47,8 @@ import {MatButtonModule} from "@angular/material/button";
     MatCardContent,
     MatCardTitle,
     MatListItem,
-    MatFormFieldModule
+    MatFormFieldModule,
+    MatDialogModule
 ],
   templateUrl: './validation-config.component.html',
   styleUrls: ['./validation-config.component.scss']
@@ -58,7 +60,7 @@ export class ValidationConfigComponent implements OnInit {
   errorMessage: string = '';
   implementationGuides: Artifact[] = [];
 
-  constructor(private formBuilder: FormBuilder, private validationService: ValidationService, private snackBar: MatSnackBar) {
+  constructor(private formBuilder: FormBuilder, private validationService: ValidationService, private snackBar: MatSnackBar, private dialog: MatDialog) {
 
     this.configForm = this.formBuilder.group(
       {
@@ -158,5 +160,17 @@ export class ValidationConfigComponent implements OnInit {
         verticalPosition: 'top'
       });
     }
+  }
+
+  openTxDependencies(packageName: string): void {
+    if (!packageName) {
+      return;
+    }
+
+    this.dialog.open(TxDependenciesDialogComponent, {
+      width: '75%',
+      maxWidth: '900px',
+      data: { package: packageName }
+    });
   }
 }

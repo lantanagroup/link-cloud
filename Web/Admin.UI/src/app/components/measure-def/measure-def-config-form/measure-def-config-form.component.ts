@@ -1,5 +1,4 @@
-
-import {Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges} from '@angular/core';
+import {Component, OnInit} from '@angular/core';
 import {FormBuilder, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
 import {MatChipsModule} from '@angular/material/chips';
 import {MatExpansionModule} from '@angular/material/expansion';
@@ -22,7 +21,8 @@ import {UrlOrBundleValidator} from '../../validators/UrlOrBundleValidator';
 import {MatButtonModule} from "@angular/material/button";
 import {MatCard, MatCardActions, MatCardContent, MatCardTitle} from "@angular/material/card";
 import {MatTableModule} from "@angular/material/table";
-
+import {MatDialog, MatDialogModule} from "@angular/material/dialog";
+import {RelatedArtifactsModalComponent} from "../related-artifacts-modal/related-artifacts-modal.component";
 
 @Component({
   selector: 'app-measure-def-config-form',
@@ -51,7 +51,8 @@ import {MatTableModule} from "@angular/material/table";
     MatCardActions,
     MatCardContent,
     MatCardTitle,
-    MatTableModule
+    MatTableModule,
+    MatDialogModule
 ],
   templateUrl: './measure-def-config-form.component.html',
   styleUrls: ['./measure-def-config-form.component.scss']
@@ -64,7 +65,7 @@ export class MeasureDefinitionFormComponent implements OnInit {
   measureDefinitions: IMeasureDefinitionConfigModel[] = [];
   displayedColumns: string[] = ['id', 'version'];
 
-  constructor(private formBuilder: FormBuilder, private measureDefinitionService: MeasureDefinitionService, private bundleIdValidator: BundleIdValidator, private snackBar: MatSnackBar) {
+  constructor(private formBuilder: FormBuilder, private measureDefinitionService: MeasureDefinitionService, private bundleIdValidator: BundleIdValidator, private snackBar: MatSnackBar, private dialog: MatDialog) {
 
     this.configForm = this.formBuilder.group(
       {
@@ -93,6 +94,15 @@ export class MeasureDefinitionFormComponent implements OnInit {
   loadMeasureDefinitions(): void {
     this.measureDefinitionService.getMeasureDefinitionConfigurations().subscribe((measureDefinitions: IMeasureDefinitionConfigModel[]) => {
       this.measureDefinitions = measureDefinitions;
+    });
+  }
+
+  openRelatedArtifactsModal(measureDef: IMeasureDefinitionConfigModel): void {
+    this.dialog.open(RelatedArtifactsModalComponent, {
+      data: { id: measureDef.id },
+      width: '95vw',
+      maxWidth: '95vw',
+      height: '90vh'
     });
   }
 
