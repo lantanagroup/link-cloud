@@ -87,8 +87,7 @@ public class FhirQueryManager : IFhirQueryManager
         if (model.IsReference.HasValue)
             query.IsReference = model.IsReference.Value;
 
-        if (model.QueryType != default(FhirQueryType))
-            query.QueryType = model.QueryType;
+       query.QueryType = model.QueryType;
 
         if (model.Paged.HasValue)
             query.Paged = model.Paged.Value;

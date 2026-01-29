@@ -35,7 +35,6 @@ builder.Services.AddTransient<IDataAcquisitionServiceMetrics, DataAcquisitionSer
 builder.Services.AddTransient<ICreateSystemToken, CreateSystemToken>();
 builder.Services.AddSingleton(TimeProvider.System);
 
-// In Program.cs, replace both lines with:
 builder.Services.AddSingleton<AcquisitionProcessorBackgroundService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<AcquisitionProcessorBackgroundService>());
 
