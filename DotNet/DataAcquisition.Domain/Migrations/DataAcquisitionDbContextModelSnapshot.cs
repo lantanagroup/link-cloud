@@ -17,7 +17,7 @@ namespace DataAcquisition.Domain.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.22")
+                .HasAnnotation("ProductVersion", "8.0.23")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -939,7 +939,7 @@ namespace DataAcquisition.Domain.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
-                    b.Property<int>("EncounterCount")
+                    b.Property<int>("AcquisitionType")
                         .HasColumnType("int");
 
                     b.Property<Guid>("ExternalId")
@@ -950,16 +950,27 @@ namespace DataAcquisition.Domain.Migrations
                         .HasMaxLength(250)
                         .HasColumnType("nvarchar(250)");
 
-                    b.Property<string>("FileName")
+                    b.Property<string>("FileNames")
                         .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
+                        .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("PatientCount")
-                        .HasColumnType("int");
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime>("ProcessDate")
+                    b.Property<string>("OriginatingSpanId")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("OriginatingTraceId")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTime?>("ProcessDate")
                         .HasColumnType("datetime2");
+
+                    b.Property<int?>("RetryAttempts")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
