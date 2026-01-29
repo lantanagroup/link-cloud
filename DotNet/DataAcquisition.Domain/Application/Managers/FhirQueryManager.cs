@@ -75,10 +75,10 @@ public class FhirQueryManager : IFhirQueryManager
         }
 
         // Scalar fields: update only if provided (non-null / non-default)
-        if (model.QueryParameters != null)
+        if (model.QueryParameters?.Any() == true)
             query.QueryParameters = model.QueryParameters.ToList();
 
-        if (model.IdQueryParameterValues != null)
+        if (model.IdQueryParameterValues?.Any() == true)
             query.IdQueryParameterValues = model.IdQueryParameterValues.ToList();
 
         if (model.MeasureId != null)
