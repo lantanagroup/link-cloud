@@ -6,7 +6,7 @@
   @if (!viewOnly) {
     <button mat-raised-button color="primary" [disabled]="formIsInvalid" (click)="submitConfiguration()">
       <mat-icon>{{ formMode == FormMode.Create ? 'save' : 'save_as' }}</mat-icon>
-      {{ formMode == FormMode.Create ? 'Create' : 'Update' }}Query Plan Configuration
+      {{ formMode == FormMode.Create ? 'Create' : 'Update' }} Query Plan
     </button>
   }
   <button mat-raised-button mat-dialog-close>Close</button>
