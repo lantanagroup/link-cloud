@@ -38,9 +38,9 @@ export class SubPreQualReportMetaComponent implements OnInit, OnChanges {
     class: string;
   }> = {
     [ScheduleStatus.New]: {
-      icon: 'new-status.svg',
-      label: 'New',
-      class: 'neutral',
+      icon: 'failed-status.svg',
+      label: 'Not Submitted',
+      class: 'error',
     },
     [ScheduleStatus.Scheduled]: {
       icon: 'scheduled-status.svg',
