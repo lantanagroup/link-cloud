@@ -39,7 +39,7 @@ export class FacilityViewService {
   }
 
   getReportSummary(facilityId: string, reportId: string): Observable<IReportListSummary> {
-    return this.http.get<IReportListSummary>(`${this.appConfigService.config?.baseApiUrl}/report/summaries/${facilityId}?reportId=${reportId}`)
+    return this.http.get<IReportListSummary>(`${this.appConfigService.config?.baseApiUrl}/schedules/${reportId}`)
       .pipe(
         map((response: IReportListSummary) => {
           return response;

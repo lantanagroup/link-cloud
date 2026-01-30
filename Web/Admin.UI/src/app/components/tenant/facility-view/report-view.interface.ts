@@ -5,8 +5,8 @@ export interface IReportListSummary {
   facilityId: string;
   reportStartDate: Date;
   reportEndDate: Date;
-  submitted: boolean
-  submitDate: Date;
+  status: ScheduleStatus
+  submitReportDateTime: Date;
   reportTypes: string[];
   frequency: string;
   adhocType: string;
@@ -14,6 +14,13 @@ export interface IReportListSummary {
   initialPopulationCount: number;
   reportMetrics: IScheduledReportMetrics;
   createdDate: Date;
+}
+
+export enum ScheduleStatus {
+  New = 'New',
+  Scheduled = 'Scheduled',
+  EndOfPeriod = 'EndOfPeriod',
+  Submitted = 'Submitted'
 }
 
 export interface ICensusCount {
