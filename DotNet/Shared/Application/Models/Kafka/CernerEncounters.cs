@@ -6,7 +6,11 @@ using System.Threading.Tasks;
 
 namespace LantanaGroup.Link.Shared.Application.Models.Kafka
 {
-    public class CernerPatientsAcquiredValue
+    public class CernerPatientsAcquired 
+    {
+        public List<CernerEncounters> PatientEncounters { get; set; }
+    }
+    public class CernerEncounters
     {
         public string PatientId { get; set; }
         public string EncounterId { get; set; }

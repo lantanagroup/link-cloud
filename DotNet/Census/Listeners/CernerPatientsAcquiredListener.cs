@@ -18,16 +18,16 @@ namespace LantanaGroup.Link.Census.Listeners
 {
     public class CernerPatientsAcquiredListener : BackgroundService
     {
-        private readonly IKafkaConsumerFactory<string, List<CernerPatientsAcquiredValue>> _kafkaConsumerFactory;
+        private readonly IKafkaConsumerFactory<string, CernerPatientsAcquired> _kafkaConsumerFactory;
         private readonly ILogger<PatientListsAcquiredListener> _logger;
-        private readonly IDeadLetterExceptionHandler<string, List<CernerPatientsAcquiredValue>> _deadLetterExceptionHandler;
-        private readonly ITransientExceptionHandler<string, List<CernerPatientsAcquiredValue>> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<string, CernerPatientsAcquired> _deadLetterExceptionHandler;
+        private readonly ITransientExceptionHandler<string, CernerPatientsAcquired> _transientExceptionHandler;
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly IEventProducerService<PatientEvent> _eventProducerService;
 
         private string ClassName => this.GetType().Name;
 
-        public CernerPatientsAcquiredListener(IKafkaConsumerFactory<string, List<CernerPatientsAcquiredValue>> kafkaConsumerFactory, ILogger<PatientListsAcquiredListener> logger, IDeadLetterExceptionHandler<string, List<CernerPatientsAcquiredValue>> deadLetterExceptionHandler, ITransientExceptionHandler<string, List<CernerPatientsAcquiredValue>> transientExceptionHandler, IServiceScopeFactory scopeFactory, IEventProducerService<PatientEvent> eventProducerService)
+        public CernerPatientsAcquiredListener(IKafkaConsumerFactory<string, CernerPatientsAcquired> kafkaConsumerFactory, ILogger<PatientListsAcquiredListener> logger, IDeadLetterExceptionHandler<string, CernerPatientsAcquired> deadLetterExceptionHandler, ITransientExceptionHandler<string, CernerPatientsAcquired> transientExceptionHandler, IServiceScopeFactory scopeFactory, IEventProducerService<PatientEvent> eventProducerService)
         {
             _kafkaConsumerFactory = kafkaConsumerFactory;
             _logger = logger;
@@ -120,7 +120,7 @@ namespace LantanaGroup.Link.Census.Listeners
             }
         }
 
-        public async Task ProcessMessageAsync(ConsumeResult<string, List<CernerPatientsAcquiredValue>> result, CancellationToken cancellationToken)
+        public async Task ProcessMessageAsync(ConsumeResult<string, CernerPatientsAcquired> result, CancellationToken cancellationToken)
         {
             if (result.Message.Value == null)
             {
@@ -130,7 +130,7 @@ namespace LantanaGroup.Link.Census.Listeners
             using var scope = _scopeFactory.CreateScope();
             var cernerListService = scope.ServiceProvider.GetRequiredService<ICernerListService>();
 
-            cernerListService.ProcessList(result.Message.Key, result.Message.Value, cancellationToken);
+            await cernerListService.ProcessList(result.Message.Key, result.Message.Value, cancellationToken);
         }
     }
 }

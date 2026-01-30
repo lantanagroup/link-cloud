@@ -17,7 +17,7 @@ namespace LantanaGroup.Link.Census.Application.Services
 {
     public interface ICernerListService 
     {
-        Task<List<IBaseResponse>> ProcessList(string facilityId, List<CernerPatientsAcquiredValue> cernerEventValue, CancellationToken cancellationToken);
+        Task<List<IBaseResponse>> ProcessList(string facilityId, CernerPatientsAcquired cernerEventValue, CancellationToken cancellationToken);
     }
     public class CernerListService : ICernerListService
     {
@@ -31,29 +31,31 @@ namespace LantanaGroup.Link.Census.Application.Services
 
         public CernerListService(ILogger<PatientListService> logger, ICensusServiceMetrics metrics, IPatientEventManager patientEventManager, IPatientEventQueries patientEventQueries, IPatientEncounterQueries patientEncounterQueries, IPatientEncounterManager patientEncounterManager, ICensusConfigManager censusConfigManager)
         {
-            _logger = logger;
-            _metrics = metrics;
-            _patientEventManager = patientEventManager;
-            _patientEventQueries = patientEventQueries;
-            _patientEncounterQueries = patientEncounterQueries;
-            _patientEncounterManager = patientEncounterManager;
-            _censusConfigManager = censusConfigManager;
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
+            _patientEventQueries = patientEventQueries ?? throw new ArgumentNullException(nameof(patientEventQueries));
+            _patientEventManager = patientEventManager ?? throw new ArgumentNullException(nameof(patientEventManager));
+            _patientEncounterQueries =
+                patientEncounterQueries ?? throw new ArgumentNullException(nameof(patientEncounterQueries));
+            _patientEncounterManager =
+                patientEncounterManager ?? throw new ArgumentNullException(nameof(patientEncounterManager));
+            _censusConfigManager = censusConfigManager ?? throw new ArgumentNullException(nameof(censusConfigManager));
         }
 
-        public async Task<List<IBaseResponse>> ProcessList(string facilityId, List<CernerPatientsAcquiredValue> cernerEventValue, CancellationToken cancellationToken)
+        public async Task<List<IBaseResponse>> ProcessList(string facilityId, CernerPatientsAcquired cernerEventValue, CancellationToken cancellationToken)
         {
             List<IBaseResponse> messages = new List<IBaseResponse>();
-            foreach (var cernerPatient in cernerEventValue) 
+            foreach (var encounter in cernerEventValue.PatientEncounters) 
             {
                 await using var transaction = await _patientEventQueries.StartTransaction(cancellationToken);
 
                 try
                 {
-                    var existingEvent = await _patientEventQueries.GetLatestEventByFacilityAndPatientId(facilityId, cernerPatient.PatientId, cancellationToken);
+                    var existingEvent = await _patientEventQueries.GetLatestEventByFacilityAndPatientId(facilityId, encounter.PatientId, cancellationToken);
 
                     var correlationId = Guid.NewGuid().ToString();
 
-                    var admitPayload = new CernerListAdmitPayload(cernerPatient.PatientId, DateTime.UtcNow, cernerPatient.EncounterId, cernerPatient.FinNumber, cernerPatient.MRN, cernerPatient.EncounterStatus, cernerPatient.EncounterType);
+                    var admitPayload = new CernerListAdmitPayload(encounter.PatientId, DateTime.UtcNow, encounter.EncounterId, encounter.FinNumber, encounter.MRN, encounter.EncounterStatus, encounter.EncounterType);
                     var patientEvent = admitPayload.CreatePatientEvent(facilityId, correlationId);
 
                     await _patientEventManager.AddPatientEvent(patientEvent, cancellationToken);

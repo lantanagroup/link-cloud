@@ -1,9 +1,13 @@
-﻿using System.Text;
+﻿using System.Numerics;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Hl7.Fhir.Model;
 using LantanaGroup.Link.Census.Application.Interfaces;
+using LantanaGroup.Link.Census.Application.Models.Payloads.Cerner;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
+using static Hl7.Fhir.Model.Encounter;
 
 public class PayloadJsonConverter : JsonConverter<IPayload>
 {
@@ -90,7 +94,7 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
 
 
 
-
+    //TODO: Daniel - Wondering if this is needed.
     public override void Write(Utf8JsonWriter writer, IPayload value, JsonSerializerOptions options)
     {
         if (value == null)
@@ -104,7 +108,7 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
     
         // Write the payload type
         writer.WriteString("payloadType", value.GetType().Name.Replace("Payload", ""));
-    
+
         // Handle specific payload types
         if (value is FHIRListAdmitPayload admitPayload)
         {
@@ -116,8 +120,18 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
             writer.WriteString("patientId", dischargePayload.PatientId);
             writer.WriteString("dischargeDate", dischargePayload.DischargeDate.ToString("o"));
         }
-    
-        // End the JSON object
-        writer.WriteEndObject();
+        else if (value is CernerListAdmitPayload cernerAdmitPayload) 
+        {
+            writer.WriteString("patientId", cernerAdmitPayload.PatientId);
+            writer.WriteString("admitDate", cernerAdmitPayload.AdmitDate.ToString("o"));
+            writer.WriteString("encounterId", cernerAdmitPayload.EncounterId);
+            writer.WriteString("finNumber", cernerAdmitPayload.FinNumber);
+            writer.WriteString("medicalRecordNumber", cernerAdmitPayload.MedicalRecordNumber);
+            writer.WriteString("encounterStatus", cernerAdmitPayload.EncounterStatus);
+            writer.WriteString("encounterType", cernerAdmitPayload.EncounterType);
+        }
+
+            // End the JSON object
+            writer.WriteEndObject();
     }
  }
