@@ -1,1280 +1,832 @@
-﻿openapi: 3.0.4
+﻿swagger: "2.0"
 info:
-  version: 0.3.0
+  version: 0.4.1
   title: Normalization
 paths:
   /api/normalization/info:
     get:
       tags:
       - Normalization
+      produces:
+      - application/json
       responses:
         "200":
           description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ServiceInformation'
+          schema:
+            $ref: '#/definitions/ServiceInformation'
   /api/normalization/Operations:
     get:
       tags:
       - Operations
+      produces:
+      - text/plain
+      - application/json
+      - text/json
       parameters:
-      - name: facilityId
-        in: query
-        schema:
-          type: string
-      - name: operationType
-        in: query
-        schema:
-          type: string
-      - name: resourceType
-        in: query
-        schema:
-          type: string
-      - name: operationId
-        in: query
-        schema:
-          type: string
-          format: uuid
-      - name: includeDisabled
-        in: query
-        schema:
-          type: boolean
-          default: false
-      - name: vendorId
-        in: query
-        schema:
-          type: string
-          format: uuid
-      - name: sortBy
-        in: query
-        schema:
-          type: string
-          default: CreateDate
-      - name: sortOrder
-        in: query
-        schema:
-          $ref: '#/components/schemas/SortOrder'
-      - name: pageSize
-        in: query
-        schema:
-          type: integer
-          format: int32
-          default: 10
-      - name: pageNumber
-        in: query
-        schema:
-          type: integer
-          format: int32
-          default: 1
+      - in: query
+        name: facilityId
+        type: string
+      - in: query
+        name: operationType
+        type: string
+      - in: query
+        name: resourceType
+        type: string
+      - in: query
+        name: operationId
+        type: string
+        format: uuid
+      - in: query
+        name: includeDisabled
+        type: boolean
+        default: false
+      - in: query
+        name: vendorId
+        type: string
+        format: uuid
+      - in: query
+        name: sortBy
+        type: string
+        default: CreateDate
+      - in: query
+        name: sortOrder
+      - in: query
+        name: pageSize
+        type: integer
+        format: int32
+        default: 10
+      - in: query
+        name: pageNumber
+        type: integer
+        format: int32
+        default: 1
       responses:
         "200":
           description: OK
-          content:
-            text/plain:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/OperationModel'
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/OperationModel'
-            text/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/OperationModel'
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/OperationModel'
         "400":
           description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "404":
           description: Not Found
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "500":
           description: Internal Server Error
     post:
       tags:
       - Operations
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PostOperationModel'
-          text/json:
-            schema:
-              $ref: '#/components/schemas/PostOperationModel'
-          application/*+json:
-            schema:
-              $ref: '#/components/schemas/PostOperationModel'
+      consumes:
+      - application/json
+      - text/json
+      - application/*+json
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: body
+        name: body
+        schema:
+          $ref: '#/definitions/PostOperationModel'
       responses:
         "201":
           description: Created
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/OperationModel'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OperationModel'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/OperationModel'
+          schema:
+            $ref: '#/definitions/OperationModel'
         "400":
           description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "422":
           description: Unprocessable Content
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "500":
           description: Internal Server Error
     put:
       tags:
       - Operations
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PutOperationModel'
-          text/json:
-            schema:
-              $ref: '#/components/schemas/PutOperationModel'
-          application/*+json:
-            schema:
-              $ref: '#/components/schemas/PutOperationModel'
+      consumes:
+      - application/json
+      - text/json
+      - application/*+json
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: body
+        name: body
+        schema:
+          $ref: '#/definitions/PutOperationModel'
       responses:
         "202":
           description: Accepted
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/OperationModel'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OperationModel'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/OperationModel'
+          schema:
+            $ref: '#/definitions/OperationModel'
         "400":
           description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "422":
           description: Unprocessable Content
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "500":
           description: Internal Server Error
   /api/normalization/Operations/facility/{facilityId}:
     get:
       tags:
       - Operations
+      produces:
+      - text/plain
+      - application/json
+      - text/json
       parameters:
-      - name: facilityId
-        in: path
+      - in: path
+        name: facilityId
         required: true
-        schema:
-          type: string
-      - name: operationType
-        in: query
-        schema:
-          type: string
-      - name: resourceType
-        in: query
-        schema:
-          type: string
-      - name: operationId
-        in: query
-        schema:
-          type: string
-          format: uuid
-      - name: includeDisabled
-        in: query
-        schema:
-          type: boolean
-          default: false
-      - name: vendorId
-        in: query
-        schema:
-          type: string
-          format: uuid
-      - name: sortBy
-        in: query
-        schema:
-          type: string
-          default: Id
-      - name: sortOrder
-        in: query
-        schema:
-          $ref: '#/components/schemas/SortOrder'
-      - name: pageSize
-        in: query
-        schema:
-          type: integer
-          format: int32
-          default: 10
-      - name: pageNumber
-        in: query
-        schema:
-          type: integer
-          format: int32
-          default: 1
+        type: string
+      - in: query
+        name: operationType
+        type: string
+      - in: query
+        name: resourceType
+        type: string
+      - in: query
+        name: operationId
+        type: string
+        format: uuid
+      - in: query
+        name: includeDisabled
+        type: boolean
+        default: false
+      - in: query
+        name: vendorId
+        type: string
+        format: uuid
+      - in: query
+        name: sortBy
+        type: string
+        default: Id
+      - in: query
+        name: sortOrder
+      - in: query
+        name: pageSize
+        type: integer
+        format: int32
+        default: 10
+      - in: query
+        name: pageNumber
+        type: integer
+        format: int32
+        default: 1
       responses:
         "200":
           description: OK
-          content:
-            text/plain:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/OperationModel'
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/OperationModel'
-            text/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/OperationModel'
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/OperationModel'
         "400":
           description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "404":
           description: Not Found
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "500":
           description: Internal Server Error
     delete:
       tags:
       - Operations
+      produces:
+      - text/plain
+      - application/json
+      - text/json
       parameters:
-      - name: facilityId
-        in: path
+      - in: path
+        name: facilityId
         required: true
-        schema:
-          type: string
-      - name: operationId
-        in: query
-        schema:
-          type: string
-          format: uuid
-      - name: resourceType
-        in: query
-        schema:
-          type: string
+        type: string
+      - in: query
+        name: operationId
+        type: string
+        format: uuid
+      - in: query
+        name: resourceType
+        type: string
       responses:
         "204":
           description: No Content
         "404":
           description: Not Found
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "400":
           description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "500":
           description: Internal Server Error
   /api/normalization/Operations/vendor/{vendor}:
     get:
       tags:
       - Operations
+      produces:
+      - text/plain
+      - application/json
+      - text/json
       parameters:
-      - name: vendor
-        in: path
+      - in: path
+        name: vendor
         required: true
-        schema:
-          type: string
-      - name: operationType
-        in: query
-        schema:
-          type: string
-      - name: resourceType
-        in: query
-        schema:
-          type: string
-      - name: operationId
-        in: query
-        schema:
-          type: string
-          format: uuid
-      - name: includeDisabled
-        in: query
-        schema:
-          type: boolean
-          default: false
-      - name: sortBy
-        in: query
-        schema:
-          type: string
-          default: Id
-      - name: sortOrder
-        in: query
-        schema:
-          $ref: '#/components/schemas/SortOrder'
-      - name: pageSize
-        in: query
-        schema:
-          type: integer
-          format: int32
-          default: 10
-      - name: pageNumber
-        in: query
-        schema:
-          type: integer
-          format: int32
-          default: 1
+        type: string
+      - in: query
+        name: operationType
+        type: string
+      - in: query
+        name: resourceType
+        type: string
+      - in: query
+        name: operationId
+        type: string
+        format: uuid
+      - in: query
+        name: includeDisabled
+        type: boolean
+        default: false
+      - in: query
+        name: sortBy
+        type: string
+        default: Id
+      - in: query
+        name: sortOrder
+      - in: query
+        name: pageSize
+        type: integer
+        format: int32
+        default: 10
+      - in: query
+        name: pageNumber
+        type: integer
+        format: int32
+        default: 1
       responses:
         "200":
           description: OK
-          content:
-            text/plain:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/OperationModel'
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/OperationModel'
-            text/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/OperationModel'
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/OperationModel'
         "400":
           description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "404":
           description: Not Found
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "500":
           description: Internal Server Error
     delete:
       tags:
       - Operations
+      produces:
+      - text/plain
+      - application/json
+      - text/json
       parameters:
-      - name: vendor
-        in: path
+      - in: path
+        name: vendor
         required: true
-        schema:
-          type: string
-      - name: operationId
-        in: query
-        schema:
-          type: string
-          format: uuid
-      - name: resourceType
-        in: query
-        schema:
-          type: string
+        type: string
+      - in: query
+        name: operationId
+        type: string
+        format: uuid
+      - in: query
+        name: resourceType
+        type: string
       responses:
         "204":
           description: No Content
         "404":
           description: Not Found
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "400":
           description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "500":
           description: Internal Server Error
   /api/normalization/Operations/test:
     post:
       tags:
       - Operations
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TestOperationModel'
-          text/json:
-            schema:
-              $ref: '#/components/schemas/TestOperationModel'
-          application/*+json:
-            schema:
-              $ref: '#/components/schemas/TestOperationModel'
+      consumes:
+      - application/json
+      - text/json
+      - application/*+json
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: body
+        name: body
+        schema:
+          $ref: '#/definitions/TestOperationModel'
       responses:
         "200":
           description: OK
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/OperationResult'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OperationResult'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/OperationResult'
+          schema:
+            $ref: '#/definitions/OperationResult'
         "400":
           description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "500":
           description: Internal Server Error
   /api/normalization/Operations/{id}/test:
     post:
       tags:
       - Operations
+      consumes:
+      - application/json
+      - text/json
+      - application/*+json
+      produces:
+      - text/plain
+      - application/json
+      - text/json
       parameters:
-      - name: id
-        in: path
+      - in: path
+        name: id
         required: true
+        type: string
+        format: uuid
+      - in: query
+        name: facilityId
+        type: string
+      - in: body
+        name: body
         schema:
-          type: string
-          format: uuid
-      - name: facilityId
-        in: query
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: {}
-          text/json:
-            schema:
-              type: object
-              additionalProperties: {}
-          application/*+json:
-            schema:
-              type: object
-              additionalProperties: {}
+          type: object
+          additionalProperties: {}
       responses:
         "200":
           description: OK
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/OperationResult'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OperationResult'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/OperationResult'
+          schema:
+            $ref: '#/definitions/OperationResult'
         "204":
           description: No Content
         "400":
           description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "500":
           description: Internal Server Error
   /api/Normalization/OperationSequence:
     get:
       tags:
       - OperationSequence
+      produces:
+      - text/plain
+      - application/json
+      - text/json
       parameters:
-      - name: facilityId
-        in: query
-        schema:
-          type: string
-      - name: resourceType
-        in: query
-        schema:
-          type: string
-      - name: resourceTypeId
-        in: query
-        schema:
-          type: string
-          format: uuid
+      - in: query
+        name: facilityId
+        type: string
+      - in: query
+        name: resourceType
+        type: string
+      - in: query
+        name: resourceTypeId
+        type: string
+        format: uuid
       responses:
         "200":
           description: OK
-          content:
-            text/plain:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/OperationSequenceModel'
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/OperationSequenceModel'
-            text/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/OperationSequenceModel'
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/OperationSequenceModel'
         "400":
           description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "500":
           description: Internal Server Error
     post:
       tags:
       - OperationSequence
+      consumes:
+      - application/json
+      - text/json
+      - application/*+json
+      produces:
+      - text/plain
+      - application/json
+      - text/json
       parameters:
-      - name: facilityId
-        in: query
+      - in: query
+        name: facilityId
+        type: string
+      - in: query
+        name: resourceType
+        type: string
+      - in: body
+        name: body
         schema:
-          type: string
-      - name: resourceType
-        in: query
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: array
-              items:
-                $ref: '#/components/schemas/PostOperationSequence'
-          text/json:
-            schema:
-              type: array
-              items:
-                $ref: '#/components/schemas/PostOperationSequence'
-          application/*+json:
-            schema:
-              type: array
-              items:
-                $ref: '#/components/schemas/PostOperationSequence'
+          type: array
+          items:
+            $ref: '#/definitions/PostOperationSequence'
       responses:
         "201":
           description: Created
-          content:
-            text/plain:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/OperationSequenceModel'
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/OperationSequenceModel'
-            text/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/OperationSequenceModel'
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/OperationSequenceModel'
         "400":
           description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "500":
           description: Internal Server Error
     delete:
       tags:
       - OperationSequence
+      produces:
+      - text/plain
+      - application/json
+      - text/json
       parameters:
-      - name: facilityId
-        in: query
-        schema:
-          type: string
-      - name: resourceType
-        in: query
-        schema:
-          type: string
+      - in: query
+        name: facilityId
+        type: string
+      - in: query
+        name: resourceType
+        type: string
       responses:
         "204":
           description: No Content
         "404":
           description: Not Found
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "400":
           description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "500":
           description: Internal Server Error
   /api/normalization/Resource/{resource}:
     get:
       tags:
       - Resource
+      produces:
+      - text/plain
+      - application/json
+      - text/json
       parameters:
-      - name: resource
-        in: path
+      - in: path
+        name: resource
         required: true
-        schema:
-          type: string
+        type: string
       responses:
         "200":
           description: OK
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ResourceModel'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ResourceModel'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ResourceModel'
+          schema:
+            $ref: '#/definitions/ResourceModel'
         "204":
           description: No Content
         "400":
           description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "500":
           description: Internal Server Error
     post:
       tags:
       - Resource
+      produces:
+      - text/plain
+      - application/json
+      - text/json
       parameters:
-      - name: resource
-        in: path
+      - in: path
+        name: resource
         required: true
-        schema:
-          type: string
+        type: string
       responses:
         "201":
           description: Created
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ResourceModel'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ResourceModel'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ResourceModel'
+          schema:
+            $ref: '#/definitions/ResourceModel'
         "400":
           description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "409":
           description: Conflict
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "500":
           description: Internal Server Error
     delete:
       tags:
       - Resource
+      produces:
+      - text/plain
+      - application/json
+      - text/json
       parameters:
-      - name: resource
-        in: path
+      - in: path
+        name: resource
         required: true
-        schema:
-          type: string
+        type: string
       responses:
         "202":
           description: Accepted
         "400":
           description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "500":
           description: Internal Server Error
   /api/normalization/Resource/resources:
     get:
       tags:
       - Resource
+      produces:
+      - text/plain
+      - application/json
+      - text/json
       responses:
         "200":
           description: OK
-          content:
-            text/plain:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ResourceModel'
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ResourceModel'
-            text/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ResourceModel'
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/ResourceModel'
         "400":
           description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "500":
           description: Internal Server Error
   /api/normalization/Resource/initialize:
     post:
       tags:
       - Resource
+      produces:
+      - text/plain
+      - application/json
+      - text/json
       responses:
         "200":
           description: OK
-          content:
-            text/plain:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ResourceModel'
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ResourceModel'
-            text/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ResourceModel'
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/ResourceModel'
         "500":
           description: Internal Server Error
   /api/normalization/Resource/{resource}/bypass:
     post:
       tags:
       - Resource
+      produces:
+      - text/plain
+      - application/json
+      - text/json
       parameters:
-      - name: resource
-        in: path
+      - in: path
+        name: resource
         required: true
-        schema:
-          type: string
+        type: string
       responses:
         "201":
           description: Created
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ResourceModel'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ResourceModel'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ResourceModel'
+          schema:
+            $ref: '#/definitions/ResourceModel'
         "400":
           description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "500":
           description: Internal Server Error
   /api/normalization/Vendor/{vendor}:
     get:
       tags:
       - Vendor
+      produces:
+      - text/plain
+      - application/json
+      - text/json
       parameters:
-      - name: vendor
-        in: path
+      - in: path
+        name: vendor
         required: true
-        schema:
-          type: string
+        type: string
       responses:
         "200":
           description: OK
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/VendorModel'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VendorModel'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/VendorModel'
+          schema:
+            $ref: '#/definitions/VendorModel'
         "400":
           description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "500":
           description: Internal Server Error
     post:
       tags:
       - Vendor
+      produces:
+      - text/plain
+      - application/json
+      - text/json
       parameters:
-      - name: vendor
-        in: path
+      - in: path
+        name: vendor
         required: true
-        schema:
-          type: string
+        type: string
       responses:
         "201":
           description: Created
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/VendorModel'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VendorModel'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/VendorModel'
+          schema:
+            $ref: '#/definitions/VendorModel'
         "400":
           description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "409":
           description: Conflict
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "500":
           description: Internal Server Error
     delete:
       tags:
       - Vendor
+      produces:
+      - text/plain
+      - application/json
+      - text/json
       parameters:
-      - name: vendor
-        in: path
+      - in: path
+        name: vendor
         required: true
-        schema:
-          type: string
+        type: string
       responses:
         "204":
           description: No Content
         "400":
           description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "500":
           description: Internal Server Error
   /api/normalization/Vendor/vendors:
     get:
       tags:
       - Vendor
+      produces:
+      - text/plain
+      - application/json
+      - text/json
       responses:
         "200":
           description: OK
-          content:
-            text/plain:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/VendorModel'
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/VendorModel'
-            text/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/VendorModel'
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/VendorModel'
         "500":
           description: Internal Server Error
   /api/normalization/Vendor/presets/{vendor}:
     get:
       tags:
       - Vendor
+      produces:
+      - text/plain
+      - application/json
+      - text/json
       parameters:
-      - name: vendor
-        in: path
+      - in: path
+        name: vendor
         required: true
-        schema:
-          type: string
-      - name: resource
-        in: query
-        schema:
-          type: string
+        type: string
+      - in: query
+        name: resource
+        type: string
       responses:
         "200":
           description: OK
-          content:
-            text/plain:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/VendorVersionOperationPresetModel'
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/VendorVersionOperationPresetModel'
-            text/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/VendorVersionOperationPresetModel'
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/VendorVersionOperationPresetModel'
         "400":
           description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "500":
           description: Internal Server Error
   /api/normalization/Vendor/presets/{vendor}/{presetId}:
     get:
       tags:
       - Vendor
+      produces:
+      - text/plain
+      - application/json
+      - text/json
       parameters:
-      - name: vendor
-        in: path
+      - in: path
+        name: vendor
         required: true
-        schema:
-          type: string
-      - name: presetId
-        in: path
+        type: string
+      - in: path
+        name: presetId
         required: true
-        schema:
-          type: string
-          format: uuid
+        type: string
+        format: uuid
       responses:
         "200":
           description: OK
-          content:
-            text/plain:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/VendorVersionOperationPresetModel'
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/VendorVersionOperationPresetModel'
-            text/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/VendorVersionOperationPresetModel'
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/VendorVersionOperationPresetModel'
         "400":
           description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "500":
           description: Internal Server Error
     delete:
       tags:
       - Vendor
+      produces:
+      - text/plain
+      - application/json
+      - text/json
       parameters:
-      - name: vendor
-        in: path
+      - in: path
+        name: vendor
         required: true
-        schema:
-          type: string
-      - name: presetId
-        in: path
+        type: string
+      - in: path
+        name: presetId
         required: true
-        schema:
-          type: string
-          format: uuid
+        type: string
+        format: uuid
       responses:
         "204":
           description: No Content
         "400":
           description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "500":
           description: Internal Server Error
   /api/normalization/Vendor/presets:
     post:
       tags:
       - Vendor
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/VendorVersionOperationPresetPostModel'
-          text/json:
-            schema:
-              $ref: '#/components/schemas/VendorVersionOperationPresetPostModel'
-          application/*+json:
-            schema:
-              $ref: '#/components/schemas/VendorVersionOperationPresetPostModel'
+      consumes:
+      - application/json
+      - text/json
+      - application/*+json
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: body
+        name: body
+        schema:
+          $ref: '#/definitions/VendorVersionOperationPresetPostModel'
       responses:
         "201":
           description: Created
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/VendorVersionOperationPresetModel'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VendorVersionOperationPresetModel'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/VendorVersionOperationPresetModel'
+          schema:
+            $ref: '#/definitions/VendorVersionOperationPresetModel'
         "400":
           description: Bad Request
-          content:
-            text/plain:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-            text/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+          schema:
+            $ref: '#/definitions/ProblemDetails'
         "500":
           description: Internal Server Error
   /health:
@@ -1283,415 +835,380 @@ paths:
       - Health
       summary: Health check endpoint
       description: Returns the health status of the service and its dependencies
+      produces:
+      - application/json
       responses:
         "200":
           description: Healthy
-          content:
-            application/json:
-              schema:
+          schema:
+            type: object
+            properties:
+              status:
+                description: Overall health status
+                type: string
+              totalDuration:
+                description: Total duration of health checks
+                type: string
+              entries:
                 type: object
                 properties:
-                  status:
-                    type: string
-                    description: Overall health status
-                  totalDuration:
-                    type: string
-                    description: Total duration of health checks
-                  entries:
+                  Database:
                     type: object
                     properties:
-                      Database:
+                      status:
+                        type: string
+                      description:
+                        type: string
+                      duration:
+                        type: string
+                      data:
                         type: object
-                        properties:
-                          status:
-                            type: string
-                          description:
-                            type: string
-                          duration:
-                            type: string
-                          data:
-                            type: object
-                      Kafka:
+                  Kafka:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                      description:
+                        type: string
+                      duration:
+                        type: string
+                      data:
                         type: object
-                        properties:
-                          status:
-                            type: string
-                          description:
-                            type: string
-                          duration:
-                            type: string
-                          data:
-                            type: object
         "503":
           description: Unhealthy
-          content:
-            application/json:
-              schema:
+          schema:
+            type: object
+            properties:
+              status:
+                description: Overall health status
+                type: string
+              totalDuration:
+                description: Total duration of health checks
+                type: string
+              entries:
                 type: object
                 properties:
-                  status:
-                    type: string
-                    description: Overall health status
-                  totalDuration:
-                    type: string
-                    description: Total duration of health checks
-                  entries:
+                  Database:
                     type: object
                     properties:
-                      Database:
+                      status:
+                        type: string
+                      description:
+                        type: string
+                      duration:
+                        type: string
+                      data:
                         type: object
-                        properties:
-                          status:
-                            type: string
-                          description:
-                            type: string
-                          duration:
-                            type: string
-                          data:
-                            type: object
-                      Kafka:
+                  Kafka:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                      description:
+                        type: string
+                      duration:
+                        type: string
+                      data:
                         type: object
-                        properties:
-                          status:
-                            type: string
-                          description:
-                            type: string
-                          duration:
-                            type: string
-                          data:
-                            type: object
-components:
-  schemas:
-    IOperation:
-      type: object
-      properties:
-        operationType:
-          $ref: '#/components/schemas/OperationType'
-        name:
+definitions:
+  IOperation:
+    type: object
+    properties:
+      operationType:
+        $ref: '#/definitions/OperationType'
+      name:
+        type: string
+      description:
+        type: string
+    additionalProperties: false
+  OperationModel:
+    type: object
+    properties:
+      id:
+        format: uuid
+        type: string
+      facilityId:
+        type: string
+      operationJson:
+        type: string
+      operationType:
+        type: string
+      name:
+        type: string
+      description:
+        type: string
+      isDisabled:
+        type: boolean
+      createDate:
+        format: date-time
+        type: string
+      modifyDate:
+        format: date-time
+        type: string
+      vendorPresets:
+        type: array
+        items:
+          $ref: '#/definitions/VendorVersionOperationPresetModel'
+      operationResourceTypes:
+        type: array
+        items:
+          $ref: '#/definitions/OperationResourceTypeModel'
+    additionalProperties: false
+  OperationResourceTypeModel:
+    type: object
+    properties:
+      id:
+        format: uuid
+        type: string
+      operationId:
+        format: uuid
+        type: string
+      resourceTypeId:
+        format: uuid
+        type: string
+      operation:
+        $ref: '#/definitions/OperationModel'
+      resource:
+        $ref: '#/definitions/ResourceModel'
+    additionalProperties: false
+  OperationResult:
+    description: Result of a copy operation, including status, error message, and modified resource.
+    type: object
+    properties:
+      successCode:
+        $ref: '#/definitions/OperationStatus'
+      result:
+        type: string
+        readOnly: true
+      errorMessage:
+        type: string
+      resource:
+        type: object
+        additionalProperties: {}
+    additionalProperties: false
+  OperationSequenceModel:
+    type: object
+    properties:
+      id:
+        format: uuid
+        type: string
+      facilityId:
+        type: string
+      sequence:
+        format: int32
+        type: integer
+      createDate:
+        format: date-time
+        type: string
+      modifyDate:
+        format: date-time
+        type: string
+      operationResourceType:
+        $ref: '#/definitions/OperationResourceTypeModel'
+      vendorPresets:
+        type: array
+        items:
+          $ref: '#/definitions/VendorVersionOperationPresetModel'
+    additionalProperties: false
+  OperationStatus:
+    format: int32
+    description: Status of a copy operation.
+    enum:
+    - 0
+    - 1
+    - 2
+    type: integer
+  OperationType:
+    format: int32
+    enum:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+    type: integer
+  PostOperationModel:
+    required:
+    - operation
+    - resourceTypes
+    type: object
+    properties:
+      resourceTypes:
+        type: array
+        items:
           type: string
-          nullable: true
-        description:
-          type: string
-          nullable: true
-      additionalProperties: false
-    OperationModel:
-      type: object
-      properties:
-        id:
-          type: string
+      operation:
+        $ref: '#/definitions/IOperation'
+      facilityId:
+        type: string
+      vendorIds:
+        type: array
+        items:
           format: uuid
-        facilityId:
           type: string
-          nullable: true
-        operationJson:
+    additionalProperties: false
+  PostOperationSequence:
+    required:
+    - operationId
+    - sequence
+    type: object
+    properties:
+      operationId:
+        format: uuid
+        type: string
+      sequence:
+        format: int32
+        maximum: 2147483647
+        minimum: 1
+        type: integer
+    additionalProperties: false
+  ProblemDetails:
+    type: object
+    properties:
+      type:
+        type: string
+      title:
+        type: string
+      status:
+        format: int32
+        type: integer
+      detail:
+        type: string
+      instance:
+        type: string
+    additionalProperties: {}
+  PutOperationModel:
+    required:
+    - id
+    - operation
+    - resourceTypes
+    type: object
+    properties:
+      id:
+        format: uuid
+        type: string
+      resourceTypes:
+        type: array
+        items:
           type: string
-          nullable: true
-        operationType:
-          type: string
-          nullable: true
-        name:
-          type: string
-          nullable: true
-        description:
-          type: string
-          nullable: true
-        isDisabled:
-          type: boolean
-        createDate:
-          type: string
-          format: date-time
-        modifyDate:
-          type: string
-          format: date-time
-          nullable: true
-        vendorPresets:
-          type: array
-          items:
-            $ref: '#/components/schemas/VendorVersionOperationPresetModel'
-          nullable: true
-        operationResourceTypes:
-          type: array
-          items:
-            $ref: '#/components/schemas/OperationResourceTypeModel'
-          nullable: true
-      additionalProperties: false
-    OperationResourceTypeModel:
-      type: object
-      properties:
-        id:
-          type: string
+      operation:
+        $ref: '#/definitions/IOperation'
+      isDisabled:
+        type: boolean
+      facilityId:
+        type: string
+      vendorIds:
+        type: array
+        items:
           format: uuid
-        operationId:
           type: string
-          format: uuid
-        resourceTypeId:
-          type: string
-          format: uuid
-        operation:
-          $ref: '#/components/schemas/OperationModel'
-        resource:
-          $ref: '#/components/schemas/ResourceModel'
-      additionalProperties: false
-    OperationResult:
-      type: object
-      properties:
-        successCode:
-          $ref: '#/components/schemas/OperationStatus'
-        result:
-          type: string
-          nullable: true
-          readOnly: true
-        errorMessage:
-          type: string
-          nullable: true
-        resource:
-          type: object
-          additionalProperties: {}
-          nullable: true
-      additionalProperties: false
-      description: Result of a copy operation, including status, error message, and modified resource.
-    OperationSequenceModel:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        facilityId:
-          type: string
-          nullable: true
-        sequence:
-          type: integer
-          format: int32
-        createDate:
-          type: string
-          format: date-time
-        modifyDate:
-          type: string
-          format: date-time
-          nullable: true
-        operationResourceType:
-          $ref: '#/components/schemas/OperationResourceTypeModel'
-        vendorPresets:
-          type: array
-          items:
-            $ref: '#/components/schemas/VendorVersionOperationPresetModel'
-          nullable: true
-      additionalProperties: false
-    OperationStatus:
-      enum:
-      - 0
-      - 1
-      - 2
-      type: integer
-      description: Status of a copy operation.
-      format: int32
-    OperationType:
-      enum:
-      - 0
-      - 1
-      - 2
-      - 3
-      - 4
-      type: integer
-      format: int32
-    PostOperationModel:
-      required:
-      - operation
-      - resourceTypes
-      type: object
-      properties:
-        resourceTypes:
-          type: array
-          items:
-            type: string
-        operation:
-          $ref: '#/components/schemas/IOperation'
-        facilityId:
-          type: string
-          nullable: true
-        vendorIds:
-          type: array
-          items:
-            type: string
-            format: uuid
-          nullable: true
-      additionalProperties: false
-    PostOperationSequence:
-      required:
-      - operationId
-      - sequence
-      type: object
-      properties:
-        operationId:
-          type: string
-          format: uuid
-        sequence:
-          maximum: 2147483647
-          minimum: 1
-          type: integer
-          format: int32
-      additionalProperties: false
-    ProblemDetails:
-      type: object
-      properties:
-        type:
-          type: string
-          nullable: true
-        title:
-          type: string
-          nullable: true
-        status:
-          type: integer
-          format: int32
-          nullable: true
-        detail:
-          type: string
-          nullable: true
-        instance:
-          type: string
-          nullable: true
-      additionalProperties: {}
-    PutOperationModel:
-      required:
-      - id
-      - operation
-      - resourceTypes
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        resourceTypes:
-          type: array
-          items:
-            type: string
-        operation:
-          $ref: '#/components/schemas/IOperation'
-        isDisabled:
-          type: boolean
-        facilityId:
-          type: string
-          nullable: true
-        vendorIds:
-          type: array
-          items:
-            type: string
-            format: uuid
-          nullable: true
-      additionalProperties: false
-    ResourceModel:
-      type: object
-      properties:
-        resourceTypeId:
-          type: string
-          format: uuid
-        resourceName:
-          type: string
-          nullable: true
-      additionalProperties: false
-    ServiceInformation:
-      type: object
-      properties:
-        serviceName:
-          type: string
-          nullable: true
-        version:
-          type: string
-          nullable: true
-        productVersion:
-          type: string
-          nullable: true
-        commit:
-          type: string
-          nullable: true
-        build:
-          type: string
-          nullable: true
-      additionalProperties: false
-    SortOrder:
-      enum:
-      - 0
-      - 1
-      type: integer
-      format: int32
-    TestOperationModel:
-      required:
-      - operation
-      - resource
-      type: object
-      properties:
-        operation:
-          $ref: '#/components/schemas/IOperation'
-        resource:
-          type: object
-          additionalProperties: {}
-      additionalProperties: false
-    VendorModel:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-          nullable: true
-        versions:
-          type: array
-          items:
-            $ref: '#/components/schemas/VendorVersionModel'
-          nullable: true
-      additionalProperties: false
-    VendorVersionModel:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        vendorId:
-          type: string
-          format: uuid
-        version:
-          type: string
-          nullable: true
-        vendor:
-          $ref: '#/components/schemas/VendorModel'
-      additionalProperties: false
-    VendorVersionOperationPresetModel:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        createDate:
-          type: string
-          format: date-time
-        modifyDate:
-          type: string
-          format: date-time
-          nullable: true
-        vendorVersionId:
-          type: string
-          format: uuid
-          readOnly: true
-        operationResourceTypeId:
-          type: string
-          format: uuid
-          readOnly: true
-        operationResourceType:
-          $ref: '#/components/schemas/OperationResourceTypeModel'
-        vendorVersion:
-          $ref: '#/components/schemas/VendorVersionModel'
-      additionalProperties: false
-    VendorVersionOperationPresetPostModel:
-      required:
-      - operationResourceTypeId
-      - vendorId
-      type: object
-      properties:
-        vendorId:
-          type: string
-          format: uuid
-        operationResourceTypeId:
-          type: string
-          format: uuid
-      additionalProperties: false
+    additionalProperties: false
+  ResourceModel:
+    type: object
+    properties:
+      resourceTypeId:
+        format: uuid
+        type: string
+      resourceName:
+        type: string
+    additionalProperties: false
+  ServiceInformation:
+    type: object
+    properties:
+      serviceName:
+        type: string
+      version:
+        type: string
+      productVersion:
+        type: string
+      commit:
+        type: string
+      build:
+        type: string
+      swaggerUrl:
+        type: string
+    additionalProperties: false
+  SortOrder:
+    format: int32
+    enum:
+    - 0
+    - 1
+    type: integer
+  TestOperationModel:
+    required:
+    - operation
+    - resource
+    type: object
+    properties:
+      operation:
+        $ref: '#/definitions/IOperation'
+      resource:
+        type: object
+        additionalProperties: {}
+    additionalProperties: false
+  VendorModel:
+    type: object
+    properties:
+      id:
+        format: uuid
+        type: string
+      name:
+        type: string
+      versions:
+        type: array
+        items:
+          $ref: '#/definitions/VendorVersionModel'
+    additionalProperties: false
+  VendorVersionModel:
+    type: object
+    properties:
+      id:
+        format: uuid
+        type: string
+      vendorId:
+        format: uuid
+        type: string
+      version:
+        type: string
+      vendor:
+        $ref: '#/definitions/VendorModel'
+    additionalProperties: false
+  VendorVersionOperationPresetModel:
+    type: object
+    properties:
+      id:
+        format: uuid
+        type: string
+      createDate:
+        format: date-time
+        type: string
+      modifyDate:
+        format: date-time
+        type: string
+      vendorVersionId:
+        format: uuid
+        type: string
+        readOnly: true
+      operationResourceTypeId:
+        format: uuid
+        type: string
+        readOnly: true
+      operationResourceType:
+        $ref: '#/definitions/OperationResourceTypeModel'
+      vendorVersion:
+        $ref: '#/definitions/VendorVersionModel'
+    additionalProperties: false
+  VendorVersionOperationPresetPostModel:
+    required:
+    - operationResourceTypeId
+    - vendorId
+    type: object
+    properties:
+      vendorId:
+        format: uuid
+        type: string
+      operationResourceTypeId:
+        format: uuid
+        type: string
+    additionalProperties: false
+
