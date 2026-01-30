@@ -3,6 +3,7 @@ using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Cerner;
+using LantanaGroup.Link.Census.Application.Models.Payloads.CernerList;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Census.Domain.Managers;
@@ -12,12 +13,14 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.DataAcq;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using System.Diagnostics.Metrics;
 
 namespace LantanaGroup.Link.Census.Application.Services
 {
     public interface ICernerListService 
     {
         Task<List<IBaseResponse>> ProcessList(string facilityId, CernerPatientsAcquired cernerEventValue, CancellationToken cancellationToken);
+        Task<List<IBaseResponse>> ProcessDischarges(string facilityId, CernerPatientsAcquired cernerEventValue, CancellationToken cancellationToken);
     }
     public class CernerListService : ICernerListService
     {
@@ -42,23 +45,80 @@ namespace LantanaGroup.Link.Census.Application.Services
             _censusConfigManager = censusConfigManager ?? throw new ArgumentNullException(nameof(censusConfigManager));
         }
 
+        public async Task<List<IBaseResponse>> ProcessDischarges(string facilityId, CernerPatientsAcquired cernerEventValue, CancellationToken cancellationToken)
+        {
+            var admittedPatients = await _patientEncounterQueries.GetAdmittedPatientsByFacility(facilityId, cancellationToken);
+
+            if (admittedPatients.Count() == 0) {
+                return new List<IBaseResponse>();
+            }
+
+            await using var transaction = await _patientEventQueries.StartTransaction(cancellationToken);
+
+            foreach (var admitPatient in admittedPatients) 
+            {
+                string admitPatientIdentifier = admitPatient.GetIdentifierByType(SourceType.SFTP).Identifier;
+
+                if (cernerEventValue.PatientEncounters.Any(x => x.PatientId == admitPatientIdentifier)) 
+                {
+                    continue;
+                }
+
+                var dischargePayload = new CernerListDischargePayload(admitPatientIdentifier, DateTime.UtcNow);
+                var patientEvent = dischargePayload.CreatePatientEvent(facilityId, admitPatient.CorrelationId);
+                
+                await _patientEventManager.AddPatientEvent(patientEvent, cancellationToken);
+                await _patientEventQueries.CommitTransaction(transaction, cancellationToken);
+            }
+
+            //TODO: Daniel - Fix 
+            return new List<IBaseResponse>();
+        }
         public async Task<List<IBaseResponse>> ProcessList(string facilityId, CernerPatientsAcquired cernerEventValue, CancellationToken cancellationToken)
         {
             List<IBaseResponse> messages = new List<IBaseResponse>();
-            foreach (var encounter in cernerEventValue.PatientEncounters) 
+            var admittedPatients = await _patientEncounterQueries.GetAdmittedPatientsByFacility(facilityId, cancellationToken);
+
+            foreach (var eventEncounter in cernerEventValue.PatientEncounters)
             {
                 await using var transaction = await _patientEventQueries.StartTransaction(cancellationToken);
-
                 try
                 {
-                    var existingEvent = await _patientEventQueries.GetLatestEventByFacilityAndPatientId(facilityId, encounter.PatientId, cancellationToken);
+                    //var latestEvent = await _patientEventQueries.GetLatestEventByFacilityAndPatientId(facilityId, eventEncounter.PatientId, cancellationToken);
 
-                    var correlationId = Guid.NewGuid().ToString();
+                    var foundEncounter = admittedPatients.FirstOrDefault(x => x.MedicalRecordNumber == eventEncounter.MRN);
 
-                    var admitPayload = new CernerListAdmitPayload(encounter.PatientId, DateTime.UtcNow, encounter.EncounterId, encounter.FinNumber, encounter.MRN, encounter.EncounterStatus, encounter.EncounterType);
-                    var patientEvent = admitPayload.CreatePatientEvent(facilityId, correlationId);
+                    if (foundEncounter != null && foundEncounter.EncounterStatus == eventEncounter.EncounterStatus && foundEncounter.EncounterType == eventEncounter.EncounterType && foundEncounter.MedicalRecordNumber == eventEncounter.MRN) 
+                    {
+                        continue;
+                    }
 
-                    await _patientEventManager.AddPatientEvent(patientEvent, cancellationToken);
+                    if (foundEncounter != null)
+                    {
+                        var updatePayload = new CernerListUpdatePayload(eventEncounter.PatientId, eventEncounter.EncounterId, eventEncounter.FinNumber, eventEncounter.MRN, eventEncounter.EncounterStatus, eventEncounter.EncounterType);
+                        var patientEvent = updatePayload.CreatePatientEvent(facilityId, foundEncounter.CorrelationId);
+
+                        await _patientEventManager.AddPatientEvent(patientEvent, cancellationToken);
+                    }
+                    else 
+                    {
+                        var correlationId = Guid.NewGuid().ToString();
+                        var admitPayload = new CernerListAdmitPayload(eventEncounter.PatientId, DateTime.UtcNow, eventEncounter.EncounterId, eventEncounter.FinNumber, eventEncounter.MRN, eventEncounter.EncounterStatus, eventEncounter.EncounterType);
+
+
+                        var patientEvent = admitPayload.CreatePatientEvent(facilityId, correlationId);
+
+                        await _patientEventManager.AddPatientEvent(patientEvent, cancellationToken);
+
+                        PatientEncounter encounter = await _patientEncounterQueries.GetPatientEncounterByCorrelationIdAsync(correlationId, cancellationToken);
+
+                        if (encounter == null)
+                        {
+                            var patientEncounter = admitPayload.CreatePatientEncounter(facilityId, correlationId);
+                            encounter = await _patientEncounterManager.AddPatientEncounterAsync(patientEncounter,
+                                cancellationToken);
+                        }
+                    }
 
                     await _patientEventQueries.CommitTransaction(transaction, cancellationToken);
                 }

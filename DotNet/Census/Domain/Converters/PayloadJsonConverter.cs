@@ -5,8 +5,10 @@ using System.Text.Json.Serialization;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Cerner;
+using LantanaGroup.Link.Census.Application.Models.Payloads.CernerList;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
+//using Newtonsoft.Json;
 using static Hl7.Fhir.Model.Encounter;
 
 public class PayloadJsonConverter : JsonConverter<IPayload>
@@ -35,7 +37,7 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
         string jsonString = rootElement.GetRawText();
 
         // Try to extract payload type for discriminator-based deserialization
-        if (rootElement.TryGetProperty("payloadType", out var payloadTypeElement) && 
+        if (rootElement.TryGetProperty("PayloadType", out var payloadTypeElement) && 
             payloadTypeElement.ValueKind == JsonValueKind.String)
         {
             string payloadType = payloadTypeElement.GetString();
@@ -53,6 +55,7 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
             // Now deserialize with the appropriate type based on payloadType
             switch (payloadType)
             {
+                //TODO: Daniel - Can FHIRList cases be simplified similar to CernerListAdmit logic below
                 case "FHIRListAdmit":
                     string patientId = null;
                     DateTime admitDate = DateTime.MinValue;
@@ -83,6 +86,12 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
                     }
                 
                     return new FHIRListDischargePayload(patientId, dischargeDate);
+                case "CernerListAdmit":
+                    return JsonSerializer.Deserialize<CernerListAdmitPayload>(document);
+                case "CernerListDischarge":
+                    return JsonSerializer.Deserialize<CernerListDischargePayload>(document);
+                case "CernerListUpdate":
+                    return JsonSerializer.Deserialize<CernerListUpdatePayload>(document);
                 default:
                     return null;
             }
@@ -91,10 +100,6 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
         return null;
     }
 
-
-
-
-    //TODO: Daniel - Wondering if this is needed.
     public override void Write(Utf8JsonWriter writer, IPayload value, JsonSerializerOptions options)
     {
         if (value == null)
@@ -102,36 +107,36 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
             writer.WriteNullValue();
             return;
         }
-    
-        // Start a new JSON object
-        writer.WriteStartObject();
-    
-        // Write the payload type
-        writer.WriteString("payloadType", value.GetType().Name.Replace("Payload", ""));
 
         // Handle specific payload types
         if (value is FHIRListAdmitPayload admitPayload)
         {
+            //TODO: Daniel - Do we need to build the FHIR List payloads? Or can we do something similar to the CernerListAdmitPayload logic below
+            writer.WriteStartObject();
+            writer.WriteString("payloadType", value.GetType().Name.Replace("Payload", ""));
             writer.WriteString("patientId", admitPayload.PatientId);
             writer.WriteString("admitDate", admitPayload.AdmitDate.ToString("o"));
+            writer.WriteEndObject();
         }
         else if (value is FHIRListDischargePayload dischargePayload)
         {
+            writer.WriteStartObject();
+            writer.WriteString("payloadType", value.GetType().Name.Replace("Payload", ""));
             writer.WriteString("patientId", dischargePayload.PatientId);
             writer.WriteString("dischargeDate", dischargePayload.DischargeDate.ToString("o"));
-        }
-        else if (value is CernerListAdmitPayload cernerAdmitPayload) 
-        {
-            writer.WriteString("patientId", cernerAdmitPayload.PatientId);
-            writer.WriteString("admitDate", cernerAdmitPayload.AdmitDate.ToString("o"));
-            writer.WriteString("encounterId", cernerAdmitPayload.EncounterId);
-            writer.WriteString("finNumber", cernerAdmitPayload.FinNumber);
-            writer.WriteString("medicalRecordNumber", cernerAdmitPayload.MedicalRecordNumber);
-            writer.WriteString("encounterStatus", cernerAdmitPayload.EncounterStatus);
-            writer.WriteString("encounterType", cernerAdmitPayload.EncounterType);
-        }
-
-            // End the JSON object
             writer.WriteEndObject();
+        }
+        else if (value is CernerListAdmitPayload cernerAdmitPayload)
+        {
+            writer.WriteRawValue(JsonSerializer.Serialize(cernerAdmitPayload));
+        }
+        else if (value is CernerListUpdatePayload cernerUpdatePayload) 
+        {
+            writer.WriteRawValue(JsonSerializer.Serialize(cernerUpdatePayload));
+        }
+        else if (value is CernerListDischargePayload cernerDischargePayload)
+        {
+            writer.WriteRawValue(JsonSerializer.Serialize(cernerDischargePayload));
+        }
     }
  }
