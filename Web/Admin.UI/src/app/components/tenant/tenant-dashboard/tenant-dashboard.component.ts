@@ -215,7 +215,7 @@ export class TenantDashboardComponent implements OnInit {
       // Build sequential deletion sequence
       concat(
         safeDelete(this.tenantService.softDeleteFacilityConfiguration(facilityId)),
-        safeDelete(this.reportService.deleteReports(facilityId)),
+       // safeDelete(this.reportService.deleteReports(facilityId)),
       ).subscribe({
         next: () => {},
         complete: () => {

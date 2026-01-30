@@ -16,136 +16,156 @@
               formControlName="facilityInput"
               [matAutocomplete]="auto"
               (blur)="onFacilityInputBlur()"
-            >
-            <button *ngIf="facilityInputControl.value" matSuffix mat-icon-button matTooltip="Clear" aria-label="Clear"
-                    (click)="clearSearchInput()" class="clear-btn">
-              <mat-icon>close</mat-icon>
-            </button>
-            <mat-autocomplete #auto="matAutocomplete"
-                              (optionSelected)="onFacilitySelected($event.option.value)">
-              <mat-option *ngFor="let fac of filteredFacilities | async" [value]="fac.facilityId">
-                {{ fac.facilityId }}
-              </mat-option>
-            </mat-autocomplete>
-          </mat-form-field>
-          <!-- Facility error messages -->
-          <div class="facility-errors-container">
-            <div *ngIf="facilityIdControl.touched && facilityIdControl.hasError('required')"
-                 class="facility-error">
-              Facility is <strong>required</strong>
-            </div>
-            <div *ngIf="facilityIdControl.touched && facilityIdControl.hasError('notFound')"
-                 class="facility-error">
-              Facility <strong>not found</strong>
+              >
+              @if (facilityInputControl.value) {
+                <button matSuffix mat-icon-button matTooltip="Clear" aria-label="Clear"
+                  (click)="clearSearchInput()" class="clear-btn">
+                  <mat-icon>close</mat-icon>
+                </button>
+              }
+              <mat-autocomplete #auto="matAutocomplete"
+                (optionSelected)="onFacilitySelected($event.option.value)">
+                @for (fac of filteredFacilities | async; track fac) {
+                  <mat-option [value]="fac.facilityId">
+                    {{ fac.facilityId }}
+                  </mat-option>
+                }
+              </mat-autocomplete>
+            </mat-form-field>
+            <!-- Facility error messages -->
+            <div class="facility-errors-container">
+              @if (facilityIdControl.touched && facilityIdControl.hasError('required')) {
+                <div
+                  class="facility-error">
+                  Facility is <strong>required</strong>
+                </div>
+              }
+              @if (facilityIdControl.touched && facilityIdControl.hasError('notFound')) {
+                <div
+                  class="facility-error">
+                  Facility <strong>not found</strong>
+                </div>
+              }
             </div>
           </div>
-        </div>
-        @if (isLoading) {
-          <div class="spinner-container">
-            <mat-progress-spinner
+          @if (isLoading) {
+            <div class="spinner-container">
+              <mat-progress-spinner
+                color="primary"
+                mode="indeterminate"
+                diameter="50">
+              </mat-progress-spinner>
+            </div>
+          } @else {
+            <button mat-raised-button
               color="primary"
-              mode="indeterminate"
-              diameter="50">
-            </mat-progress-spinner>
-          </div>
-        } @else {
-          <button mat-raised-button
-                  color="primary"
-                  (click)="onToggleTest()"
-                  [disabled]="isLoading || eventForm.invalid">
-            {{ isTestRunning ? 'Stop Test' : 'Start Test' }}
-          </button>
-        }
-      </mat-card-content>
-    </mat-card>
+              (click)="onToggleTest()"
+              [disabled]="isLoading || eventForm.invalid">
+              {{ isTestRunning ? 'Stop Test' : 'Start Test' }}
+            </button>
+          }
+        </mat-card-content>
+      </mat-card>
 
-    @if (isTestRunning && consumersDataOutput.size > 0) {
-      <mat-card class="resource-card">
-        <mat-card-content>
-          <div class="table-container">
-            <table class="table" border="1" cellspacing="0" cellpadding="4">
-              <thead>
-              <tr>
-                <th>Topic</th>
-                <th>Correlation ID</th>
-                <th>Patient ID</th>
-                <th *ngIf="hasAnyError(displayedEntries)">Trace ID</th>
-                <th *ngIf="hasAnyError(displayedEntries)">Error Message</th>
-              </tr>
-              </thead>
-              <tbody>
-              <ng-container *ngFor="let entry of displayedEntries">
-                <ng-container *ngIf="entry[1]?.length > 0; else noItems">
-                  <tr *ngFor="let item of entry[1]; let i = index">
-                    <!-- Topic column rowspan -->
-                    <td *ngIf="i === 0" [attr.rowspan]="entry[1].length"
-                        [style.color]="hasErrorInTopic(entry[0]) ? 'red' : 'black'">
-                      {{ entry[0] }}
-                    </td>
-
-                    <!-- Correlation ID always -->
-                    <td>{{ item.CorrelationId }}</td>
-
-                    <!-- Patient ID always -->
-                    <td>{{ item.PatientId }}</td>
-
-                    <!-- Trace ID only if error exists -->
-                    <td *ngIf="item.ErrorMessage">{{ item.TraceId }}</td>
-
-                    <!-- Error Message only if present -->
-                    <td *ngIf="item.ErrorMessage" class="error-message">
-                      <mat-expansion-panel class="error-panel"
-                                           [expanded]="isPanelOpen(item.CorrelationId)"
-                                           (opened)="togglePanel(item.CorrelationId, true)"
-                                           (closed)="togglePanel(item.CorrelationId, false)">
-                        <mat-expansion-panel-header>
-                          <mat-panel-title class="error-text">
-                            {{ item.ErrorMessage | slice:0:100 }}
-                            <span *ngIf="item.ErrorMessage.length > 100">...</span>
-                          </mat-panel-title>
-                        </mat-expansion-panel-header>
-                        <p class="error-text">{{ item.ErrorMessage }}</p>
-                      </mat-expansion-panel>
-                    </td>
-                  </tr>
-                </ng-container>
-
-                <!-- Topic row when no items -->
-                <ng-template #noItems>
+      @if (isTestRunning && consumersDataOutput.size > 0) {
+        <mat-card class="resource-card">
+          <mat-card-content>
+            <div class="table-container">
+              <table class="table" border="1" cellspacing="0" cellpadding="4">
+                <thead>
                   <tr>
-                    <td [style.color]="hasErrorInTopic(entry[0]) ? 'red' : 'black'">{{ entry[0] }}</td>
-                    <td></td> <!-- Correlation ID blank -->
-                    <td></td> <!-- Patient blank -->
-                    <td *ngIf="hasAnyError(displayedEntries)"></td>
-                    <td *ngIf="hasAnyError(displayedEntries)"></td>
+                    <th>Topic</th>
+                    <th>Correlation ID</th>
+                    <th>Patient ID</th>
+                    @if (hasAnyError(displayedEntries)) {
+                      <th>Trace ID</th>
+                    }
+                    @if (hasAnyError(displayedEntries)) {
+                      <th>Error Message</th>
+                    }
                   </tr>
-                </ng-template>
-              </ng-container>
-              </tbody>
-            </table>
-          </div>
-        </mat-card-content>
-      </mat-card>
-    }
+                </thead>
+                <tbody>
+                  @for (entry of displayedEntries; track entry) {
+                    @if (entry[1]?.length > 0) {
+                      @for (item of entry[1]; track item; let i = $index) {
+                        <tr>
+                          <!-- Topic column rowspan -->
+                          @if (i === 0) {
+                            <td [attr.rowspan]="entry[1].length"
+                              [style.color]="hasErrorInTopic(entry[0]) ? 'red' : 'black'">
+                              {{ entry[0] }}
+                            </td>
+                          }
+                          <!-- Correlation ID always -->
+                          <td>{{ item.CorrelationId }}</td>
+                          <!-- Patient ID always -->
+                          <td>{{ item.PatientId }}</td>
+                          <!-- Trace ID only if error exists -->
+                          @if (item.ErrorMessage) {
+                            <td>{{ item.TraceId }}</td>
+                          }
+                          <!-- Error Message only if present -->
+                          @if (item.ErrorMessage) {
+                            <td class="error-message">
+                              <mat-expansion-panel class="error-panel"
+                                [expanded]="isPanelOpen(item.CorrelationId)"
+                                (opened)="togglePanel(item.CorrelationId, true)"
+                                (closed)="togglePanel(item.CorrelationId, false)">
+                                <mat-expansion-panel-header>
+                                  <mat-panel-title class="error-text">
+                                    {{ item.ErrorMessage | slice:0:100 }}
+                                    @if (item.ErrorMessage.length > 100) {
+                                      <span>...</span>
+                                    }
+                                  </mat-panel-title>
+                                </mat-expansion-panel-header>
+                                <p class="error-text">{{ item.ErrorMessage }}</p>
+                              </mat-expansion-panel>
+                            </td>
+                          }
+                        </tr>
+                      }
+                    } @else {
+                      <tr>
+                        <td [style.color]="hasErrorInTopic(entry[0]) ? 'red' : 'black'">{{ entry[0] }}</td>
+                        <td></td> <!-- Correlation ID blank -->
+                        <td></td> <!-- Patient blank -->
+                        @if (hasAnyError(displayedEntries)) {
+                          <td></td>
+                        }
+                        @if (hasAnyError(displayedEntries)) {
+                          <td></td>
+                        }
+                      </tr>
+                    }
+                    <!-- Topic row when no items -->
+                  }
+                </tbody>
+              </table>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      }
 
 
-    @if (isTestRunning && consumersDataOutput.size > 0) {
-      <mat-card class="resource-card">
-        <mat-card-content>
-          <!-- Event Forms -->
-          @if (showReportScheduledForm) {
-            <app-report-scheduled-form [facilityId]="facilityId" [reportTrackingId]="reportTrackingId"
-                                       (eventGenerated)="onEventGenerated($event)"
-            ></app-report-scheduled-form>
-          }
-          @if (showPatientsAcquiredForm) {
-            <app-patient-lists [facilityId]="facilityId" [reportTrackingId]="reportTrackingId"
-                               (eventGenerated)="onEventGenerated($event)"
-            ></app-patient-lists>
-          }
-        </mat-card-content>
-      </mat-card>
-    }
+      @if (isTestRunning && consumersDataOutput.size > 0) {
+        <mat-card class="resource-card">
+          <mat-card-content>
+            <!-- Event Forms -->
+            @if (showReportScheduledForm) {
+              <app-report-scheduled-form [facilityId]="facilityId" [reportTrackingId]="reportTrackingId"
+                (eventGenerated)="onEventGenerated($event)"
+              ></app-report-scheduled-form>
+            }
+            @if (showPatientsAcquiredForm) {
+              <app-patient-lists [facilityId]="facilityId" [reportTrackingId]="reportTrackingId"
+                (eventGenerated)="onEventGenerated($event)"
+              ></app-patient-lists>
+            }
+          </mat-card-content>
+        </mat-card>
+      }
 
-  </div>
-</form>
+    </div>
+  </form>

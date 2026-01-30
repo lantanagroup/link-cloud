@@ -1,11 +1,12 @@
 package com.lantanagroup.link.validation.controllers;
 
 import com.fasterxml.jackson.annotation.JsonView;
+import com.lantanagroup.link.shared.serdes.Views;
 import com.lantanagroup.link.validation.entities.Artifact;
 import com.lantanagroup.link.validation.entities.ArtifactType;
 import com.lantanagroup.link.validation.repositories.ArtifactRepository;
-import com.lantanagroup.link.shared.serdes.Views;
 import com.lantanagroup.link.validation.services.ArtifactService;
+import com.lantanagroup.link.validation.models.TerminologyDependency;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.http.HttpStatus;
@@ -13,7 +14,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerErrorException;
 
+import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/validation/artifact")
@@ -34,6 +37,29 @@ public class ArtifactController {
             artifactService.initializeArtifacts();
         } catch (Exception e) {
             throw new ServerErrorException("Failed to initialize artifacts", e);
+        }
+    }
+
+    @Operation(summary = "Gets terminology dependencies from all artifacts")
+    @GetMapping("/tx-dependencies")
+    public List<TerminologyDependency> getTerminologyDependencies() {
+        try {
+            return artifactService.getTerminologyDependencies();
+        } catch (IOException e) {
+            throw new ServerErrorException("Failed to get terminology dependencies", e);
+        }
+    }
+
+    @Operation(summary = "Gets terminology dependencies from a specific package")
+    @GetMapping("/PACKAGE/{packageId}/tx-dependencies")
+    public List<TerminologyDependency> getTerminologyDependencies(@PathVariable String packageId) {
+        if (artifactRepository.findByTypeAndName(ArtifactType.PACKAGE, packageId).isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Package not found");
+        }
+        try {
+            return artifactService.getTerminologyDependencies(packageId);
+        } catch (IOException e) {
+            throw new ServerErrorException("Failed to get terminology dependencies for package: " + packageId, e);
         }
     }
 
