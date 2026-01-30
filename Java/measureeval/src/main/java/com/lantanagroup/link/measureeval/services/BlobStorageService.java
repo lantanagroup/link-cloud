@@ -5,7 +5,6 @@ import ca.uhn.fhir.parser.IParser;
 import com.azure.core.util.BinaryData;
 import com.azure.storage.blob.BlobClient;
 import com.azure.storage.blob.BlobContainerClient;
-import com.azure.storage.blob.BlobServiceClient;
 import com.azure.storage.blob.BlobServiceClientBuilder;
 import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
 import com.lantanagroup.link.shared.entities.ReportScheduleModel;
@@ -35,14 +34,18 @@ public class BlobStorageService {
     private final String blobContainerName;
 
     public BlobStorageService(String connectionString, String blobContainerName, FhirContext fhirContext, ReportClient reportClient, MeasureReportGeneratedProducer measureReportGeneratedProducer) {
+        this(new BlobServiceClientBuilder()
+                .connectionString(connectionString)
+                .buildClient()
+                .getBlobContainerClient(blobContainerName), blobContainerName, fhirContext, reportClient, measureReportGeneratedProducer);
+    }
+
+    public BlobStorageService(BlobContainerClient containerClient, String blobContainerName, FhirContext fhirContext, ReportClient reportClient, MeasureReportGeneratedProducer measureReportGeneratedProducer) {
+        this.containerClient = containerClient;
+        this.blobContainerName = blobContainerName;
         this.fhirContext = fhirContext;
         this.reportClient = reportClient;
         this.measureReportGeneratedProducer = measureReportGeneratedProducer;
-        this.blobContainerName = blobContainerName;
-        BlobServiceClient serviceClient = new BlobServiceClientBuilder()
-                .connectionString(connectionString)
-                .buildClient();
-        containerClient = serviceClient.getBlobContainerClient(blobContainerName);
     }
 
     public String upload(String blobName, String content) {
@@ -78,8 +81,9 @@ public class BlobStorageService {
                 throw new ValidationException("Payload URI for report " + report.getReportTrackingId() + " is null");
             }
 
-            String patientIdPart = "patient-" + status.getPatientId();
-            String patientPayloadUri = payloadUri.endsWith("/") ? payloadUri + patientIdPart : payloadUri + "/" + patientIdPart + ".mr";
+            String patientIdPart = "patient-" + report.getReportType() + "-" + status.getPatientId();
+            String fileName = patientIdPart + ".mr";
+            String patientPayloadUri = payloadUri.endsWith("/") ? payloadUri + fileName : payloadUri + "/" + fileName;
 
             StringBuilder sb = new StringBuilder();
             List<Resource> resources = this.normalize(measureReport);
