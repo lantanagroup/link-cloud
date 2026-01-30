@@ -225,7 +225,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         };
     }
 
-    // In your Repository or Database layer
     public async Task<bool> TrySetLogToQueuedAsync(long logId, CancellationToken cancellationToken)
     {
         // This translates to: 

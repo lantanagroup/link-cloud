@@ -64,11 +64,13 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                 return;
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
             _logger.LogWarning("Channel full. Timed out enqueuing LogId {LogId}.", item.LogId);
             throw new Exception($"Internal queue capacity reached for LogId {item.LogId}");
         }
+
+        throw new Exception($"Failed to enqueue work item for LogId {item.LogId}");
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

@@ -73,8 +73,7 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
             return;
         }
 
-        // Now we must add the Note (since ExecuteUpdate doesn't handle the Notes list easily)
-        // We can do this as a secondary update because we've already "locked" the record status
+        // getting the log in case the enqueue fails and we need to revert the status
         var log = await logQueries.GetAsync(logId, cancellationToken);
         log.Notes ??= new List<string>();
         log.Notes.Add($"[{DateTime.UtcNow:O}] Queued for background acquisition processing");
