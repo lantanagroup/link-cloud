@@ -13,7 +13,7 @@ export interface IReportListSummary {
   censusCount: number;
   initialPopulationCount: number;
   reportMetrics: IScheduledReportMetrics;
-  createdDate: Date;
+  createDate: Date;
 }
 
 export enum ScheduleStatus {

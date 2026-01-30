@@ -71,10 +71,10 @@ export class SubPreQualReportMetaComponent implements OnInit, OnChanges {
       // ensure status is a valid ScheduleStatus
       this.status = this.reportSummary.status ?? ScheduleStatus.New;
       this.statusMeta = this.STATUS_META[this.status] ?? this.STATUS_META[ScheduleStatus.New];
-
+      console.log(this.reportSummary);
       this.reportStartDate = this.reportSummary.reportStartDate;
       this.reportEndDate = this.reportSummary.reportEndDate;
-      this.timestamp = this.reportSummary.submitReportDateTime;
+      this.timestamp = this.reportSummary.createDate;
     }
   }
 }
