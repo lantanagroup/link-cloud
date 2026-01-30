@@ -29,7 +29,10 @@ namespace LantanaGroup.Link.Census.Application.Models.Payloads.Cerner
 
         public PatientEncounter UpdatePatientEncounter(PatientEncounter patientEncounter)
         {
-            throw new NotImplementedException();
+            patientEncounter.ModifyDate = DateTime.Now;
+            patientEncounter.DischargeDate = DischargeDate;
+
+            return patientEncounter;
         }
     }
 }

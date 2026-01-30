@@ -37,7 +37,11 @@ namespace LantanaGroup.Link.Census.Application.Models.Payloads.CernerList
 
         public PatientEncounter UpdatePatientEncounter(PatientEncounter patientEncounter)
         {
-            throw new NotImplementedException();
+            patientEncounter.EncounterStatus = EncounterStatus;
+            patientEncounter.EncounterType = EncounterType;
+            patientEncounter.MedicalRecordNumber = MedicalRecordNumber;
+
+            return patientEncounter;
         }
     }
 }

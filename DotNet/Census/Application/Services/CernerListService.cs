@@ -66,8 +66,11 @@ namespace LantanaGroup.Link.Census.Application.Services
 
                 var dischargePayload = new CernerListDischargePayload(admitPatientIdentifier, DateTime.UtcNow);
                 var patientEvent = dischargePayload.CreatePatientEvent(facilityId, admitPatient.CorrelationId);
+
+                dischargePayload.UpdatePatientEncounter(admitPatient);
                 
                 await _patientEventManager.AddPatientEvent(patientEvent, cancellationToken);
+                await _patientEncounterManager.UpdatePatientEncounterAsync(admitPatient, cancellationToken);
                 await _patientEventQueries.CommitTransaction(transaction, cancellationToken);
             }
 
@@ -86,19 +89,26 @@ namespace LantanaGroup.Link.Census.Application.Services
                 {
                     //var latestEvent = await _patientEventQueries.GetLatestEventByFacilityAndPatientId(facilityId, eventEncounter.PatientId, cancellationToken);
 
-                    var foundEncounter = admittedPatients.FirstOrDefault(x => x.MedicalRecordNumber == eventEncounter.MRN);
+                    var foundPatientEncounter = admittedPatients.FirstOrDefault(
+                        x => x.MedicalRecordNumber == eventEncounter.MRN && 
+                        x.PatientIdentifiers.Any(
+                            y => y.Identifier == eventEncounter.PatientId && 
+                            y.SourceType == SourceType.SFTP.ToString()));
 
-                    if (foundEncounter != null && foundEncounter.EncounterStatus == eventEncounter.EncounterStatus && foundEncounter.EncounterType == eventEncounter.EncounterType && foundEncounter.MedicalRecordNumber == eventEncounter.MRN) 
+                    if (foundPatientEncounter != null && foundPatientEncounter.EncounterStatus == eventEncounter.EncounterStatus && foundPatientEncounter.EncounterType == eventEncounter.EncounterType && foundPatientEncounter.MedicalRecordNumber == eventEncounter.MRN) 
                     {
                         continue;
                     }
 
-                    if (foundEncounter != null)
+                    if (foundPatientEncounter != null)
                     {
                         var updatePayload = new CernerListUpdatePayload(eventEncounter.PatientId, eventEncounter.EncounterId, eventEncounter.FinNumber, eventEncounter.MRN, eventEncounter.EncounterStatus, eventEncounter.EncounterType);
-                        var patientEvent = updatePayload.CreatePatientEvent(facilityId, foundEncounter.CorrelationId);
+                        var patientEvent = updatePayload.CreatePatientEvent(facilityId, foundPatientEncounter.CorrelationId);
+
+                        updatePayload.UpdatePatientEncounter(foundPatientEncounter);
 
                         await _patientEventManager.AddPatientEvent(patientEvent, cancellationToken);
+                        await _patientEncounterManager.UpdatePatientEncounterAsync(foundPatientEncounter, cancellationToken);
                     }
                     else 
                     {
