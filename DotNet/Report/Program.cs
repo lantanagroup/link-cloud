@@ -256,7 +256,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     // 1. MongoDB scheduler
     builder.Services.AddQuartz();
     builder.Services.AddSingleton<ReportMongoSchedulerFactory>();
-    builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
+    builder.Services.AddSingleton<ISchedulerFactory>(sp => sp.GetRequiredService<ReportMongoSchedulerFactory>());
 
     // Register job factory and jobsS
     builder.Services.AddSingleton<RetryJob>();

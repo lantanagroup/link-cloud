@@ -4,7 +4,6 @@ using LantanaGroup.Link.Census.Application.Jobs;
 using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Settings;
 using Quartz;
 using Quartz.Impl.Matchers;
 using Quartz.Spi;
@@ -21,7 +20,7 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
     public CensusSchedulingRepository(
         ILogger<CensusSchedulingRepository> logger,
         IJobFactory jobFactory,
-        [FromKeyedServices(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton)] ISchedulerFactory schedulerFactory)
+        ISchedulerFactory schedulerFactory)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _jobFactory = jobFactory ?? throw new ArgumentNullException(nameof(jobFactory));
