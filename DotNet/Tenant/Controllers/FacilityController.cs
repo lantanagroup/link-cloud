@@ -16,7 +16,6 @@ using LantanaGroup.Link.Tenant.Data.Entities;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Services;
-using LantanaGroup.Link.Tenant.Utils;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -213,6 +212,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             }
             catch (ApplicationException ex)
             {
+                throw;
                 return BadRequest(ex.Message);
             }
             catch (Exception ex)

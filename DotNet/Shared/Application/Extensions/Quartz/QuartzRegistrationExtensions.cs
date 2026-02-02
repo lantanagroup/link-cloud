@@ -1,14 +1,12 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.EntityFrameworkCore.SqlServer.Infrastructure.Internal;
+using Microsoft.Extensions.DependencyInjection;
 using Quartz;
 using Quartz.Impl.AdoJobStore;
-using System.Text.Json.Serialization;
-using Quartz.Impl;
-using Quartz.Spi;
 
 namespace LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 public static class QuartzRegistrationExtensions
 {
-    public static void RegisterQuartzDatabase(this IServiceCollection collection, string connectionString) {
+    public static void RegisterQuartzDatabase(this IServiceCollection collection, string? connectionString) {
 
         if(string.IsNullOrEmpty(connectionString))
         {
@@ -24,11 +22,34 @@ public static class QuartzRegistrationExtensions
                 {
                     sqlServerOptions.UseDriverDelegate<SqlServerDelegate>();
                     sqlServerOptions.ConnectionString = connectionString;
-                    sqlServerOptions.TablePrefix = "QRTZ_";
+                    sqlServerOptions.TablePrefix = "quartz.QRTZ_";
                 });
                 c.UseSystemTextJsonSerializer();
             });
         });
-        //collection.AddQuartzHostedService(x => { x.AwaitApplicationStarted = true; x.WaitForJobsToComplete = true; });
+    }
+}
+
+public static class JobDataExtensions
+{
+    public static T GetJobDataValue<T>(this IJobExecutionContext context, string key)
+    {
+        if (context == null)
+        {
+            throw new ArgumentNullException(nameof(context));
+        }
+        if (string.IsNullOrEmpty(key))
+        {
+            throw new ArgumentNullException(nameof(key));
+        }
+        JobDataMap dataMap = context.JobDetail.JobDataMap;
+        if (dataMap.ContainsKey(key))
+        {
+            return (T)dataMap.Get(key);
+        }
+        else
+        {
+            throw new KeyNotFoundException($"The key '{key}' was not found in the JobDataMap.");
+        }
     }
 }

@@ -2,11 +2,13 @@
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Jobs;
 using LantanaGroup.Link.Census.Application.Settings;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Settings;
 using Quartz;
 using Quartz.Impl.Matchers;
 using Quartz.Spi;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.Census.Application.Repositories.Scheduling;
 
@@ -39,8 +41,8 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
     public IJobDetail CreateJob(CensusConfigEntity facility)
     {
         JobDataMap jobDataMap = new JobDataMap();
-        jobDataMap.Put(CensusConstants.Scheduler.Facility, facility);
-        jobDataMap.Put(CensusConstants.Scheduler.ReportType, KafkaTopic.PatientCensusScheduled.ToString());
+        jobDataMap.PutObject(CensusConstants.Scheduler.Facility, JsonSerializer.Serialize(facility));
+        jobDataMap.PutObject(CensusConstants.Scheduler.ReportType, KafkaTopic.PatientCensusScheduled.ToString());
 
         string jobName = $"{facility.FacilityID}-{KafkaTopic.PatientCensusScheduled.ToString()}";
 
@@ -65,7 +67,7 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
     public ITrigger CreateTrigger(string scheduledTrigger, JobKey jobKey)
     {
         JobDataMap jobDataMap = new JobDataMap();
-        jobDataMap.Put(CensusConstants.Scheduler.JobTrigger, scheduledTrigger);
+        jobDataMap.PutObject(CensusConstants.Scheduler.JobTrigger, scheduledTrigger);
 
         return TriggerBuilder
             .Create()

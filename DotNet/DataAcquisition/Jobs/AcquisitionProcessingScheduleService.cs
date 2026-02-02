@@ -1,9 +1,8 @@
-﻿using Quartz.Spi;
+﻿using LantanaGroup.Link.Shared.Application.Models;
 using Quartz;
-using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Jobs;
-public class ScheduleService : IHostedService
+public class AcquisitionProcessingScheduleService : IHostedService
 {
 
     public const string MONTHLY = "Monthly";
@@ -11,41 +10,24 @@ public class ScheduleService : IHostedService
     public const string DAILY = "Daily";
 
     private readonly ISchedulerFactory _schedulerFactory;
-    private readonly Quartz.Spi.IJobFactory _jobFactory;
-    private readonly IServiceScopeFactory _scopeFactory;
-    private readonly ILogger<ScheduleService> _logger;
 
-    public ScheduleService(
-       ILogger<ScheduleService> logger,
-       ISchedulerFactory schedulerFactory,
-       IServiceScopeFactory serviceScopeFactory,
-       IJobFactory jobFactory)
+    public AcquisitionProcessingScheduleService(ISchedulerFactory schedulerFactory)
     {
         _schedulerFactory = schedulerFactory;
-        _jobFactory = jobFactory;
-        _scopeFactory = serviceScopeFactory;
-        _logger = logger;
     }
-
-    public IScheduler Scheduler { get; set; }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        Scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
+        var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
 
-        Scheduler.JobFactory = _jobFactory;
-
-        // adding 1 job to run
-        JobDataMap jobDataMap = new JobDataMap();
         var job = JobBuilder
             .Create(typeof(AcquisitionProcessingJob))
             .StoreDurably()
             .WithIdentity("Acquisition Processing Job", nameof(KafkaTopic.ReadyToAcquire))
             .WithDescription("Acquisition Processing Job")
-            .UsingJobData(jobDataMap)
             .Build();
 
-        await Scheduler.AddJob(job, true);
+        await scheduler.AddJob(job, true);
 
         var trigger = TriggerBuilder
             .Create()
@@ -55,13 +37,18 @@ public class ScheduleService : IHostedService
             .WithDescription("Acquisition Processing Trigger")
             .Build();
 
-        await Scheduler.ScheduleJob(trigger);
+        await scheduler.ScheduleJob(trigger);
 
-        await Scheduler.Start(cancellationToken);
+        await scheduler.Start(cancellationToken);
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        await Scheduler?.Shutdown(cancellationToken);
+        var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
+
+        if (scheduler != null)
+        {
+            await scheduler.Shutdown(cancellationToken);
+        }
     }
 }

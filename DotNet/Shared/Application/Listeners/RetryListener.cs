@@ -32,7 +32,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
 
         public RetryListener(ILogger<RetryListener> logger,
             IKafkaConsumerFactory<string, string> kafkaConsumerFactory,
-            [FromKeyedServices(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton)] ISchedulerFactory schedulerFactory,
+            ISchedulerFactory schedulerFactory,
             IOptions<ConsumerSettings> consumerSettings,
             IRetryModelFactory retryEntityFactory,
             IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler,

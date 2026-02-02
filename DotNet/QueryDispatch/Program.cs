@@ -29,7 +29,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Quartz;
 using Quartz.Impl;
-using Quartz.Spi;
 using QueryDispatch.Application.Extensions;
 using QueryDispatch.Application.Interfaces;
 using QueryDispatch.Application.Services;
@@ -153,7 +152,6 @@ if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
     builder.Services.AddSingleton<RetryJob>();
 }
 
-builder.Services.AddSingleton<IJobFactory, QuartzJobFactory>();
 builder.Services.AddSingleton<QueryDispatchJob>();
 
 

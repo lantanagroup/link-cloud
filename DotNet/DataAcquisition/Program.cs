@@ -23,9 +23,7 @@ using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
-using Quartz;
 using System.Reflection;
 using System.Text.Json.Serialization;
 
@@ -65,6 +63,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     }); 
 
     //Add Hosted Services
+    builder.Services.AddHostedService<AcquisitionProcessingScheduleService>();
+
     if (!(consumerSettings?.DisableConsumer ?? false))
     {
         builder.Services.AddHostedService<DataAcquisitionRequestedListener>();

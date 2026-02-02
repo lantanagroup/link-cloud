@@ -44,7 +44,6 @@ using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Serializers;
 using MongoDB.Driver;
 using Quartz;
-using Quartz.Spi;
 using Reddoxx.Quartz.MongoDbJobStore.Locking;
 using Reddoxx.Quartz.MongoDbJobStore.Redlock;
 using Serilog;
@@ -259,8 +258,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<ReportMongoSchedulerFactory>();
     builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
 
-    // Register job factory and jobs
-    builder.Services.AddSingleton<IJobFactory, QuartzJobFactory>();
+    // Register job factory and jobsS
     builder.Services.AddSingleton<RetryJob>();
     builder.Services.AddSingleton<EndOfReportPeriodJob>();
 

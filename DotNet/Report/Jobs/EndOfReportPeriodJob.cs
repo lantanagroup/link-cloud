@@ -7,6 +7,7 @@ using LantanaGroup.Link.Report.Entities.Enums;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Quartz;
 using static LantanaGroup.Link.Report.KafkaProducers.ReadyForValidationProducer;
@@ -46,13 +47,13 @@ namespace LantanaGroup.Link.Report.Jobs
             try
             {
                 // Get the schedule ID from the job data map
-                JobDataMap jobDataMap = context.JobDetail.JobDataMap;
-                string? scheduleId = jobDataMap.GetString("ReportScheduleId");
+                var jobDataMap = context.JobDetail.JobDataMap;
+                string? scheduleId = jobDataMap.GetObject<string>("ReportScheduleId");
 
                 if (string.IsNullOrEmpty(scheduleId))
                 {
                     // Fallback: try to get from trigger data map
-                    scheduleId = context.Trigger.JobDataMap?.GetString("ReportScheduleId");
+                    scheduleId = context.Trigger.JobDataMap?.GetObject<string>("ReportScheduleId");
                 }
 
                 if (string.IsNullOrEmpty(scheduleId))

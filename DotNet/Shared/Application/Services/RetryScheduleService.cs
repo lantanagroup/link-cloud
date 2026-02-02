@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Shared.Application.Models;
+﻿using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Jobs;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -51,7 +52,7 @@ public class RetryScheduleService : BackgroundService
     public static IJobDetail CreateJob(RetryModel model)
     {
         JobDataMap jobDataMap = new JobDataMap();
-        jobDataMap.Put("RetryModel", model);
+        jobDataMap.PutObject<RetryModel>("RetryModel", model);
 
         return JobBuilder
             .Create(typeof(RetryJob))
@@ -65,7 +66,7 @@ public class RetryScheduleService : BackgroundService
     private static ITrigger CreateTrigger(RetryModel model, JobKey jobKey)
     {
         JobDataMap jobDataMap = new JobDataMap();
-        jobDataMap.Put("RetryModel", model);
+        jobDataMap.PutObject("RetryModel", model);
 
         var offset = DateBuilder.DateOf(model.ScheduledTrigger.Hour, model.ScheduledTrigger.Minute, model.ScheduledTrigger.Second);
 

@@ -21,6 +21,7 @@ using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Caching;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -61,9 +62,7 @@ public static class GeneralStartupExtensions
         var serviceInformation = builder.SetupServiceInformation(serviceName, assemblyVersion);
 
         //Add Quartz scheduler with SQL persistence
-        builder.Services.AddQuartz();
-        builder.Services.AddSingleton<SqlPersistentScheduleFactory>();
-        builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
+        builder.Services.RegisterQuartzDatabase(serviceInformation.ConnectionString);
 
         // load external configuration source (if specified)
         builder.AddExternalConfiguration(serviceInformation.ServiceConfigName);

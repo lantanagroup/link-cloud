@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Shared.Application.Models;
+﻿using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Entities;
@@ -167,7 +168,7 @@ namespace LantanaGroup.Link.Tenant.Services
         {
             string jobName = $"{facility.FacilityId}-{frequency}";
             JobKey jobKey = new JobKey(jobName, nameof(KafkaTopic.ReportScheduled));
-
+            
             IJobDetail? job = await _scheduler.GetJobDetail(jobKey, cancellationToken);
 
             if (job == null)
@@ -197,9 +198,8 @@ namespace LantanaGroup.Link.Tenant.Services
         private IJobDetail CreateJob(Facility facility, string frequency)
         {
             JobDataMap jobDataMap = new JobDataMap();
-
-            jobDataMap.Put(TenantConstants.Scheduler.Facility, facility);
-            jobDataMap.Put(TenantConstants.Scheduler.Frequency, frequency);
+            jobDataMap.PutObject<Facility>(TenantConstants.Scheduler.Facility, facility);
+            jobDataMap.PutObject<string>(TenantConstants.Scheduler.Frequency, frequency);
 
             string jobName = $"{facility.FacilityId}-{frequency}";
 
@@ -237,7 +237,7 @@ namespace LantanaGroup.Link.Tenant.Services
             // Set the cron trigger based on timezone
             TimeZoneInfo timeZone = TimeZoneInfo.FindSystemTimeZoneById(facility.TimeZone);
 
-            jobDataMap.Put(TenantConstants.Scheduler.JobTrigger, scheduledTrigger);
+            jobDataMap.PutObject(TenantConstants.Scheduler.JobTrigger, scheduledTrigger);
 
             return TriggerBuilder
                 .Create()

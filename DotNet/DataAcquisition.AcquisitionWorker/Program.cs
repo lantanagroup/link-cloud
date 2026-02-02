@@ -7,7 +7,6 @@ using LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
-using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
@@ -25,7 +24,6 @@ var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerS
 
 builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName, true);
 
-builder.Services.RegisterQuartzDatabase(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection));
 builder.Services.AddTransient<IDataAcquisitionServiceMetrics, DataAcquisitionServiceMetrics>();
 builder.Services.AddTransient<ICreateSystemToken, CreateSystemToken>();
 builder.Services.AddSingleton(TimeProvider.System);

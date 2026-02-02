@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
@@ -7,9 +8,8 @@ using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Interfaces;
 using LantanaGroup.Link.Tenant.Models.Messages;
 using LantanaGroup.Link.Tenant.Services;
-using MongoDB.Driver.Linq;
 using Quartz;
-using System.Text.Json;
+using static LantanaGroup.Link.Tenant.Services.ScheduleService;
 
 namespace LantanaGroup.Link.Tenant.Jobs
 {
@@ -36,13 +36,13 @@ namespace LantanaGroup.Link.Tenant.Jobs
 
                 JobDataMap triggerMap = context.Trigger.JobDataMap!;
 
-                String[] reportTypes = [];
+                string[] reportTypes = [];
 
                 string trigger = (string)triggerMap[TenantConstants.Scheduler.JobTrigger];
 
-                Facility facility = (Facility)dataMap[TenantConstants.Scheduler.Facility];
+                var facility = dataMap.GetObject<Facility>(TenantConstants.Scheduler.Facility);
 
-                string frequency = (string)dataMap[TenantConstants.Scheduler.Frequency];
+                string frequency = dataMap.GetObject<string>(TenantConstants.Scheduler.Frequency);
 
                 TimeZoneInfo timeZone = TimeZoneInfo.FindSystemTimeZoneById(facility.TimeZone); // based on location
 

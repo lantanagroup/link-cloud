@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Tenant.Config;
@@ -28,9 +29,9 @@ namespace LantanaGroup.Link.Tenant.Jobs
 
                 JobDataMap triggerMap = context.Trigger.JobDataMap!;
 
-                string trigger = (string)triggerMap[TenantConstants.Scheduler.JobTrigger];
+                string trigger = triggerMap.GetObject<string>(TenantConstants.Scheduler.JobTrigger);
 
-                string tenant = (string)dataMap[TenantConstants.Scheduler.JobName];
+                string tenant = dataMap.GetObject<string>(TenantConstants.Scheduler.JobName);
 
                 _logger.LogInformation(" RetentionCheckScheduledJob -  Produce event for:  {Tenant} and crontrigger: {Trigger}", tenant, trigger);
 

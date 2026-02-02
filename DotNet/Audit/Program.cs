@@ -13,6 +13,7 @@ using LantanaGroup.Link.Audit.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Health;
@@ -89,9 +90,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Add factories
     //Add Quartz scheduler with SQL persistence
-    builder.Services.AddQuartz();
-    builder.Services.AddSingleton<SqlPersistentScheduleFactory>();
-    builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
+    builder.Services.RegisterQuartzDatabase(serviceInformation.ConnectionString);
 
     builder.Services.AddTransient<IKafkaConsumerFactory<string, AuditEventMessage>, KafkaConsumerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
@@ -141,31 +140,9 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     var consumerSettings = builder.Configuration.GetSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
 
-    var quartzProps = new NameValueCollection
-    {
-        ["quartz.scheduler.instanceName"] = "AuditScheduler",
-        ["quartz.scheduler.instanceId"] = "AUTO",
-        ["quartz.jobStore.clustered"] = "true",
-        ["quartz.jobStore.type"] = "Quartz.Impl.AdoJobStore.JobStoreTX, Quartz",
-        ["quartz.jobStore.driverDelegateType"] = "Quartz.Impl.AdoJobStore.SqlServerDelegate, Quartz",
-        ["quartz.jobStore.tablePrefix"] = "quartz.QRTZ_",
-        ["quartz.jobStore.dataSource"] = "default",
-        ["quartz.dataSource.default.connectionString"] = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection),
-        ["quartz.dataSource.default.provider"] = "SqlServer",
-        ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
-        ["quartz.threadPool.threadCount"] = "5",
-        ["quartz.jobStore.useProperties"] = "false",
-        ["quartz.serializer.type"] = "json"
-    };
-
-    // Register main persistent scheduler factory
-    builder.Services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
-    builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
-
     if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
     {
         builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
-        builder.Services.AddTransient<IJobFactory, QuartzJobFactory>();
         builder.Services.AddTransient<RetryJob>();
 
         builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceName, [KafkaTopic.AuditableEventOccurredRetry.GetStringValue()]));

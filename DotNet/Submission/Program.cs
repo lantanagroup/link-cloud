@@ -3,6 +3,7 @@ using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Health;
@@ -28,7 +29,6 @@ using LantanaGroup.Link.Submission.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.OpenApi.Models;
-using Quartz;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
@@ -141,14 +141,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddControllers();
 
     //Add Quartz scheduler with SQL persistence
-    builder.Services.AddQuartz();
-    builder.Services.AddSingleton<SqlPersistentScheduleFactory>();
-    builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
-
-    builder.Services.AddQuartzHostedService(options =>
-    {
-        options.WaitForJobsToComplete = true;
-    });
+    builder.Services.RegisterQuartzDatabase(serviceInformation.ConnectionString);
 
     // Add hosted services
     builder.Services.AddHostedService<SubmitPayloadListener>();

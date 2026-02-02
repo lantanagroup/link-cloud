@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services;
@@ -30,8 +31,8 @@ public class RetryJob : IJob
     {
         try
         {
-            var triggerMap = context.Trigger.JobDataMap;
-            var retryModel = (RetryModel)triggerMap["RetryModel"];
+            var dataMap = context.Trigger.JobDataMap;
+            var retryModel = dataMap.GetObject<RetryModel>("RetryModel");
 
             _logger.LogInformation("Executing RetryJob for {Topic}-{Id}", retryModel.Topic, retryModel.Id);
 

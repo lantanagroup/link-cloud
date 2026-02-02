@@ -138,6 +138,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 facilityId = key;
 
+                                throw new TransientException("Simulated exception for testing purposes.");
+
                                 if (string.IsNullOrWhiteSpace(facilityId))
                                 {
                                     throw new DeadLetterException(
