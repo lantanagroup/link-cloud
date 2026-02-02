@@ -1,0 +1,1967 @@
+﻿swagger: "2.0"
+info:
+  version: 0.4.1
+  title: DataAcquisition
+paths:
+  /api/data/{facilityId}/{queryConfigurationTypePathParameter}/authentication:
+    get:
+      tags:
+      - AuthenticationConfig
+      summary: Gets authentication settings for a given facilityId and config type.
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: path
+        name: facilityId
+        description: ""
+        required: true
+        type: string
+      - in: path
+        name: queryConfigurationTypePathParameter
+        description: ""
+        required: true
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/AuthenticationConfiguration'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+    post:
+      tags:
+      - AuthenticationConfig
+      summary: |-
+        Creates a AuthenticationSettings for a facility.
+        Supported Authentication Types: Basic, Epic
+      consumes:
+      - application/json
+      - text/json
+      - application/*+json
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: path
+        name: facilityId
+        description: ""
+        required: true
+        type: string
+      - in: path
+        name: queryConfigurationTypePathParameter
+        description: ""
+        required: true
+      - in: body
+        name: body
+        description: ""
+        schema:
+          $ref: '#/definitions/AuthenticationConfigurationModel'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/AuthenticationConfiguration'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+    put:
+      tags:
+      - AuthenticationConfig
+      summary: |-
+        Updates a AuthenticationSettings for a facility.
+        Supported Authentication Types: Basic, Epic
+      consumes:
+      - application/json
+      - text/json
+      - application/*+json
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: path
+        name: facilityId
+        description: ""
+        required: true
+        type: string
+      - in: path
+        name: queryConfigurationTypePathParameter
+        description: ""
+        required: true
+      - in: body
+        name: body
+        description: ""
+        schema:
+          $ref: '#/definitions/AuthenticationConfigurationModel'
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/AuthenticationConfigurationModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+    delete:
+      tags:
+      - AuthenticationConfig
+      summary: ""
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: path
+        name: facilityId
+        description: ""
+        required: true
+        type: string
+      - in: path
+        name: queryConfigurationTypePathParameter
+        description: ""
+        required: true
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/data/connectionValidation/{facilityId}/$validate:
+    get:
+      tags:
+      - ConnectionValidation
+      summary: Validates the connection between the facility and the Link.
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: path
+        name: facilityId
+        description: ""
+        required: true
+        type: string
+      - in: query
+        name: patientId
+        description: ""
+        type: string
+      - in: query
+        name: patientIdentifier
+        description: ""
+        type: string
+      - in: query
+        name: measureId
+        description: ""
+        type: string
+      - in: query
+        name: start
+        description: ""
+        type: string
+        format: date-time
+      - in: query
+        name: end
+        description: ""
+        type: string
+        format: date-time
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/FacilityConnectionResult'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "424":
+          description: Failed Dependency
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/data/info:
+    get:
+      tags:
+      - DataAcquisition
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/ServiceInformation'
+  /api/data/{facilityId}/FhirQueries:
+    get:
+      tags:
+      - FhirQueries
+      summary: Get query results for a correlation Id
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: path
+        name: facilityId
+        description: ""
+        required: true
+        type: string
+      - in: query
+        name: correlationId
+        description: ""
+        type: string
+      - in: query
+        name: patientId
+        description: ""
+        type: string
+      - in: query
+        name: resourceType
+        description: ""
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/QueryResultsModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/data/acquisition-logs:
+    get:
+      tags:
+      - Log
+      summary: Get a list of data acquisition logs.
+      description: This endpoint retrieves a list of data acquisition logs.
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: query
+        name: FacilityId
+        type: string
+      - in: query
+        name: PatientId
+        type: string
+      - in: query
+        name: ReportId
+        type: string
+      - in: query
+        name: ResourceId
+        type: string
+      - in: query
+        name: QueryPhase
+      - in: query
+        name: QueryType
+      - in: query
+        name: Status
+      - in: query
+        name: Priority
+      - in: query
+        name: PageNumber
+        type: integer
+        format: int32
+        maximum: 2147483647
+        minimum: 1
+      - in: query
+        name: PageSize
+        type: integer
+        format: int32
+        maximum: 100
+        minimum: 1
+      - in: query
+        name: SortBy
+        type: string
+      - in: query
+        name: SortOrder
+      responses:
+        "200":
+          description: Returns a list of data acquisition logs.
+          schema:
+            $ref: '#/definitions/QueryLogSummaryModelIPagedModel'
+        "400":
+          description: If the request is invalid.
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "404":
+          description: If no data acquisition logs are found.
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: If there is an internal server error.
+  /api/data/acquisition-logs/{id}:
+    get:
+      tags:
+      - Log
+      summary: Get a data acquisition log entry.
+      description: This endpoint retrieves a list of data acquisition logs.
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: path
+        name: id
+        description: The ID of the log entry to retrieve.
+        required: true
+        type: integer
+        format: int64
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/DataAcquisitionLogModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+    put:
+      tags:
+      - Log
+      summary: Update a data acquisition log entry.
+      description: This endpoint updates a data acquisition log entry.
+      consumes:
+      - application/json
+      - text/json
+      - application/*+json
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: path
+        name: id
+        description: The ID of the log entry to update.
+        required: true
+        type: string
+      - in: body
+        name: body
+        description: The model containing the updated data acquisition log entry.
+        schema:
+          $ref: '#/definitions/UpdateDataAcquisitionLogModel'
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: If the ID is null or empty.
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "404":
+          description: If the data acquisition log entry is not found.
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: If there is an internal server error.
+        "202":
+          description: Returns the updated data acquisition log entry.
+    delete:
+      tags:
+      - Log
+      summary: Delete a data acquisition log entry.
+      description: This endpoint deletes a data acquisition log entry by its ID.
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: path
+        name: id
+        description: The ID of the log entry to delete.
+        required: true
+        type: integer
+        format: int64
+      responses:
+        "204":
+          description: If the log entry was successfully deleted.
+        "400":
+          description: If the ID is null or empty.
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "404":
+          description: If the log entry is not found.
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: If there is an internal server error.
+  /api/data/acquisition-logs/facility/{facilityId}:
+    get:
+      tags:
+      - Log
+      summary: Get a list of data acquisition logs for a facility.
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: path
+        name: facilityId
+        description: ""
+        required: true
+        type: string
+      - in: query
+        name: PageNumber
+        type: integer
+        format: int32
+        maximum: 2147483647
+        minimum: 1
+      - in: query
+        name: PageSize
+        type: integer
+        format: int32
+        maximum: 100
+        minimum: 1
+      - in: query
+        name: SortBy
+        type: string
+      - in: query
+        name: SortOrder
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/QueryLogSummaryModelIPagedModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/data/acquisition-logs/facility/{facilityId}/patient/{patientId}:
+    get:
+      tags:
+      - Log
+      summary: Get a list of data acquisition logs for a patient.
+      description: This endpoint retrieves a list of data acquisition logs.
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: path
+        name: facilityId
+        description: ""
+        required: true
+        type: string
+      - in: path
+        name: patientId
+        description: ""
+        required: true
+        type: string
+      - in: query
+        name: PageNumber
+        type: integer
+        format: int32
+        maximum: 2147483647
+        minimum: 1
+      - in: query
+        name: PageSize
+        type: integer
+        format: int32
+        maximum: 100
+        minimum: 1
+      - in: query
+        name: SortBy
+        type: string
+      - in: query
+        name: SortOrder
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/QueryLogSummaryModelIPagedModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/data/acquisition-logs/report/{reportId}/statistics:
+    get:
+      tags:
+      - Log
+      summary: Get data acquisition log statistics for a report.
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: path
+        name: reportId
+        description: ""
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/DataAcquisitionLogStatistics'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/data/acquisition-logs/{id}/process:
+    post:
+      tags:
+      - Log
+      summary: Process a data acquisition log entry.
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: path
+        name: id
+        required: true
+        type: integer
+        format: int64
+      responses:
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/data/{facilityId}/fhirQueryConfiguration:
+    get:
+      tags:
+      - QueryConfig
+      summary: Gets a FhirQueryConfiguration record for a given facilityId.
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: path
+        name: facilityId
+        description: ""
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/ApiResultFhirQueryConfigurationModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+    delete:
+      tags:
+      - QueryConfig
+      summary: Hard deletes a FhirQueryConfiguration record for a given facilityId.
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: path
+        name: facilityId
+        description: ""
+        required: true
+        type: string
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/data/fhirQueryConfiguration:
+    post:
+      tags:
+      - QueryConfig
+      summary: |-
+        Creates a FhirQueryConfiguration record for a facility. Should only be used for initial configuration.
+        Supported Authentication Types: Basic, Epic
+      consumes:
+      - application/json
+      - text/json
+      - application/*+json
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: body
+        name: body
+        description: ""
+        schema:
+          $ref: '#/definitions/ApiCreateFhirQueryConfigurationModel'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/ApiResultFhirQueryConfigurationModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+    put:
+      tags:
+      - QueryConfig
+      summary: |-
+        Updates a FhirQueryConfiguration record for a facility. This update will do a clean replace of the existing record and will not update the delta between the 2 records.
+        Supported Authentication Types: Basic, Epic
+      consumes:
+      - application/json
+      - text/json
+      - application/*+json
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: body
+        name: body
+        description: ""
+        schema:
+          $ref: '#/definitions/ApiUpdateFhirQueryConfigurationModel'
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/ApiResultFhirQueryConfigurationModel'
+        "304":
+          description: Not Modified
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/data/{facilityId}/fhirQueryList:
+    get:
+      tags:
+      - QueryList
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: path
+        name: facilityId
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/FhirListConfigurationModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+    delete:
+      tags:
+      - QueryList
+      summary: |-
+        Deletes a FhirQueryConfiguration record for a given facilityId.
+        Supported Authentication Types: Basic, Epic
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: path
+        name: facilityId
+        description: ""
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: boolean
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/data/fhirQueryList:
+    post:
+      tags:
+      - QueryList
+      summary: |-
+        Creates a FhirQueryConfiguration record for a given facilityId.
+        Supported Authentication Types: Basic, Epic
+      consumes:
+      - application/json
+      - text/json
+      - application/*+json
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: body
+        name: body
+        description: ""
+        schema:
+          $ref: '#/definitions/FhirListConfigurationModel'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/FhirListConfigurationModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+    put:
+      tags:
+      - QueryList
+      summary: |-
+        Updates a FhirQueryConfiguration record for a given facilityId.
+        Supported Authentication Types: Basic, Epic
+      consumes:
+      - application/json
+      - text/json
+      - application/*+json
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: body
+        name: body
+        description: ""
+        schema:
+          $ref: '#/definitions/FhirListConfigurationModel'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/FhirListConfigurationModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/data/{facilityId}/QueryPlan:
+    get:
+      tags:
+      - QueryPlanConfig
+      summary: Gets a QueryPlanConfig record for a given facilityId.
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: path
+        name: facilityId
+        description: ""
+        required: true
+        type: string
+      - in: query
+        name: Type
+        required: true
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/QueryPlan'
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+    post:
+      tags:
+      - QueryPlanConfig
+      summary: Creates a QueryPlanConfig for a facility
+      consumes:
+      - application/json
+      - text/json
+      - application/*+json
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: path
+        name: facilityId
+        description: ""
+        required: true
+        type: string
+      - in: body
+        name: body
+        description: ""
+        schema:
+          $ref: '#/definitions/QueryPlanApiModel'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/QueryPlanModel'
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "409":
+          description: Conflict
+        "500":
+          description: Internal Server Error
+    put:
+      tags:
+      - QueryPlanConfig
+      summary: Updates a QueryPlanConfig record for a facilityId, queryPlanType, and queryPlan.
+      consumes:
+      - application/json
+      - text/json
+      - application/*+json
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: path
+        name: facilityId
+        description: ""
+        required: true
+        type: string
+      - in: body
+        name: body
+        description: ""
+        schema:
+          $ref: '#/definitions/QueryPlanApiModel'
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/QueryPlanModel'
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+    delete:
+      tags:
+      - QueryPlanConfig
+      summary: Hard deletes a QueryPlanConfig for a given facilityId and queryPlanType.
+      parameters:
+      - in: path
+        name: facilityId
+        description: ""
+        required: true
+        type: string
+      - in: query
+        name: Type
+        required: true
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+  /api/data/{facilityId}/QueryPlan/All:
+    delete:
+      tags:
+      - QueryPlanConfig
+      summary: Hard deletes all QueryPlanConfigs for a given facilityId.
+      parameters:
+      - in: path
+        name: facilityId
+        description: The ID of the facility whose query plans will be deleted.
+        required: true
+        type: string
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+  /health:
+    get:
+      tags:
+      - Health
+      summary: Health check endpoint
+      description: Returns the health status of the service and its dependencies
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Healthy
+          schema:
+            type: object
+            properties:
+              status:
+                description: Overall health status
+                type: string
+              totalDuration:
+                description: Total duration of health checks
+                type: string
+              entries:
+                type: object
+                properties:
+                  Database:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                      description:
+                        type: string
+                      duration:
+                        type: string
+                      data:
+                        type: object
+                  Kafka:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                      description:
+                        type: string
+                      duration:
+                        type: string
+                      data:
+                        type: object
+        "503":
+          description: Unhealthy
+          schema:
+            type: object
+            properties:
+              status:
+                description: Overall health status
+                type: string
+              totalDuration:
+                description: Total duration of health checks
+                type: string
+              entries:
+                type: object
+                properties:
+                  Database:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                      description:
+                        type: string
+                      duration:
+                        type: string
+                      data:
+                        type: object
+                  Kafka:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                      description:
+                        type: string
+                      duration:
+                        type: string
+                      data:
+                        type: object
+definitions:
+  AcquisitionPriority:
+    enum:
+    - Critical
+    - High
+    - Normal
+    type: string
+  ApiCreateFhirQueryConfigurationModel:
+    type: object
+    properties:
+      facilityId:
+        type: string
+      fhirServerBaseUrl:
+        type: string
+      authentication:
+        $ref: '#/definitions/AuthenticationConfigurationModel'
+      maxConcurrentRequests:
+        format: int32
+        type: integer
+      minAcquisitionPullTime:
+        format: date-span
+        type: string
+      maxAcquisitionPullTime:
+        format: date-span
+        type: string
+      timeZone:
+        type: string
+    additionalProperties: false
+  ApiResultFhirQueryConfigurationModel:
+    required:
+    - facilityId
+    - fhirServerBaseUrl
+    - id
+    type: object
+    properties:
+      id:
+        type: string
+      facilityId:
+        type: string
+      fhirServerBaseUrl:
+        type: string
+      authentication:
+        $ref: '#/definitions/AuthenticationConfigurationModel'
+      maxConcurrentRequests:
+        format: int32
+        type: integer
+      minAcquisitionPullTime:
+        format: date-span
+        type: string
+      maxAcquisitionPullTime:
+        format: date-span
+        type: string
+    additionalProperties: false
+  ApiUpdateFhirQueryConfigurationModel:
+    type: object
+    properties:
+      id:
+        type: string
+      facilityId:
+        type: string
+      fhirServerBaseUrl:
+        type: string
+      authentication:
+        $ref: '#/definitions/AuthenticationConfigurationModel'
+      maxConcurrentRequests:
+        format: int32
+        type: integer
+      minAcquisitionPullTime:
+        format: date-span
+        type: string
+      maxAcquisitionPullTime:
+        format: date-span
+        type: string
+      timeZone:
+        type: string
+    additionalProperties: false
+  AuthenticationConfiguration:
+    type: object
+    properties:
+      authType:
+        type: string
+      key:
+        type: string
+      tokenUrl:
+        type: string
+      audience:
+        type: string
+      clientId:
+        type: string
+      userName:
+        type: string
+      password:
+        type: string
+    additionalProperties: false
+  AuthenticationConfigurationModel:
+    type: object
+    properties:
+      authType:
+        type: string
+      key:
+        type: string
+      tokenUrl:
+        type: string
+      audience:
+        type: string
+      clientId:
+        type: string
+      userName:
+        type: string
+      password:
+        type: string
+    additionalProperties: false
+  DataAcquisitionLogModel:
+    type: object
+    properties:
+      id:
+        format: int64
+        type: integer
+      facilityId:
+        type: string
+      isCensus:
+        type: boolean
+      priority:
+        $ref: '#/definitions/AcquisitionPriority'
+      patientId:
+        type: string
+      resourceId:
+        type: string
+      correlationId:
+        type: string
+      reportTrackingId:
+        type: string
+      fhirVersion:
+        type: string
+      reportableEvent:
+        $ref: '#/definitions/ReportableEvent'
+      queryType:
+        $ref: '#/definitions/FhirQueryType'
+      queryPhase:
+        $ref: '#/definitions/QueryPhase'
+      fhirQuery:
+        type: array
+        items:
+          $ref: '#/definitions/FhirQueryModel'
+      status:
+        $ref: '#/definitions/RequestStatus'
+      executionDate:
+        format: date-time
+        type: string
+      traceId:
+        maxLength: 64
+        type: string
+      retryAttempts:
+        format: int32
+        type: integer
+      completionDate:
+        format: date-time
+        type: string
+      completionTimeMilliseconds:
+        format: int64
+        type: integer
+      resourceAcquiredIds:
+        type: array
+        items:
+          type: string
+      referenceResources:
+        type: array
+        items:
+          $ref: '#/definitions/ReferenceResourceModel'
+      notes:
+        type: array
+        items:
+          type: string
+      scheduledReport:
+        $ref: '#/definitions/ScheduledReport'
+    additionalProperties: false
+  DataAcquisitionLogStatistics:
+    type: object
+    properties:
+      queryTypeCounts:
+        type: object
+        properties:
+          Read:
+            format: int32
+            type: integer
+          Search:
+            format: int32
+            type: integer
+          SearchPost:
+            format: int32
+            type: integer
+          BulkDataRequest:
+            format: int32
+            type: integer
+          BulkDataPoll:
+            format: int32
+            type: integer
+        additionalProperties: false
+      queryPhaseCounts:
+        type: object
+        properties:
+          Initial:
+            format: int32
+            type: integer
+          Supplemental:
+            format: int32
+            type: integer
+          Referential:
+            format: int32
+            type: integer
+          Polling:
+            format: int32
+            type: integer
+          Monitoring:
+            format: int32
+            type: integer
+        additionalProperties: false
+      requestStatusCounts:
+        type: object
+        properties:
+          Pending:
+            format: int32
+            type: integer
+          Ready:
+            format: int32
+            type: integer
+          Processing:
+            format: int32
+            type: integer
+          Completed:
+            format: int32
+            type: integer
+          Failed:
+            format: int32
+            type: integer
+          MaxRetriesReached:
+            format: int32
+            type: integer
+          Skipped:
+            format: int32
+            type: integer
+        additionalProperties: false
+      resourceTypeCounts:
+        type: object
+        additionalProperties:
+          format: int32
+          type: integer
+      resourceTypeCompletionTimeMilliseconds:
+        type: object
+        additionalProperties:
+          format: int64
+          type: integer
+      totalLogs:
+        format: int32
+        type: integer
+      totalPatients:
+        format: int32
+        type: integer
+      totalResourcesAcquired:
+        format: int32
+        type: integer
+      totalRetryAttempts:
+        format: int32
+        type: integer
+      fastestCompletionTimeMilliseconds:
+        $ref: '#/definitions/ResourceCompletionTime'
+      slowestCompletionTimeMilliseconds:
+        $ref: '#/definitions/ResourceCompletionTime'
+      totalCompletionTimeMilliseconds:
+        format: int64
+        type: integer
+      averageCompletionTimeMilliseconds:
+        format: int64
+        type: integer
+        readOnly: true
+    additionalProperties: false
+  EhrPatientListModel:
+    required:
+    - fhirId
+    - status
+    - timeFrame
+    type: object
+    properties:
+      status:
+        $ref: '#/definitions/ListType'
+      timeFrame:
+        $ref: '#/definitions/TimeFrame'
+      internalId:
+        type: string
+      fhirId:
+        minLength: 1
+        type: string
+    additionalProperties: false
+  FacilityConnectionResult:
+    type: object
+    properties:
+      isConnected:
+        type: boolean
+      isPatientFound:
+        type: boolean
+      errorMessage:
+        type: string
+      results:
+        type: array
+        items:
+          type: object
+          additionalProperties: {}
+    additionalProperties: false
+  FhirListConfigurationModel:
+    required:
+    - ehrPatientLists
+    - facilityId
+    - fhirBaseServerUrl
+    type: object
+    properties:
+      id:
+        type: string
+      facilityId:
+        minLength: 1
+        type: string
+      fhirBaseServerUrl:
+        minLength: 1
+        type: string
+      authentication:
+        $ref: '#/definitions/AuthenticationConfigurationModel'
+      ehrPatientLists:
+        type: array
+        items:
+          $ref: '#/definitions/EhrPatientListModel'
+      createDate:
+        format: date-time
+        type: string
+      modifyDate:
+        format: date-time
+        type: string
+    additionalProperties: false
+  FhirQueryModel:
+    type: object
+    properties:
+      id:
+        format: uuid
+        type: string
+      facilityId:
+        type: string
+      isReference:
+        type: boolean
+      queryType:
+        $ref: '#/definitions/FhirQueryType'
+      resourceTypes:
+        type: array
+        items:
+          $ref: '#/definitions/ResourceType'
+      queryParameters:
+        type: array
+        items:
+          type: string
+      resourceReferenceTypes:
+        type: array
+        items:
+          $ref: '#/definitions/ResourceReferenceTypeModel'
+      paged:
+        format: int32
+        type: integer
+      dataAcquisitionLogId:
+        format: int64
+        type: integer
+      measureId:
+        type: string
+      idQueryParameterValues:
+        type: array
+        items:
+          type: string
+      censusTimeFrame:
+        $ref: '#/definitions/TimeFrame'
+      censusPatientStatus:
+        $ref: '#/definitions/ListType'
+      censusListId:
+        type: string
+      query:
+        type: string
+        readOnly: true
+    additionalProperties: false
+  FhirQueryType:
+    enum:
+    - Read
+    - Search
+    - SearchPost
+    - BulkDataRequest
+    - BulkDataPoll
+    type: string
+  Frequency:
+    enum:
+    - Discharge
+    - Daily
+    - Weekly
+    - Monthly
+    - Adhoc
+    type: string
+  IQueryConfig:
+    type: object
+    properties:
+      queryConfigType:
+        $ref: '#/definitions/QueryConfigType'
+    additionalProperties: false
+  ListType:
+    enum:
+    - Admit
+    - Discharge
+    type: string
+  PaginationMetadata:
+    type: object
+    properties:
+      pageSize:
+        format: int32
+        type: integer
+      pageNumber:
+        format: int32
+        type: integer
+      totalCount:
+        format: int64
+        type: integer
+      totalPages:
+        format: int64
+        type: integer
+    additionalProperties: false
+  ProblemDetails:
+    type: object
+    properties:
+      type:
+        type: string
+      title:
+        type: string
+      status:
+        format: int32
+        type: integer
+      detail:
+        type: string
+      instance:
+        type: string
+    additionalProperties: {}
+  QueryConfigType:
+    enum:
+    - Parameter
+    - Reference
+    type: string
+  QueryConfigurationTypePathParameter:
+    enum:
+    - fhirQueryConfiguration
+    - fhirQueryListConfiguration
+    type: string
+  QueryLogSummaryModel:
+    type: object
+    properties:
+      id:
+        format: int64
+        type: integer
+      priority:
+        $ref: '#/definitions/AcquisitionPriority'
+      facilityId:
+        type: string
+      patientId:
+        type: string
+      resourceTypes:
+        type: array
+        items:
+          type: string
+      resourceId:
+        type: string
+      fhirVersion:
+        type: string
+      queryType:
+        $ref: '#/definitions/FhirQueryType'
+      queryPhase:
+        $ref: '#/definitions/QueryPhase'
+      executionDate:
+        format: date-time
+        type: string
+      status:
+        $ref: '#/definitions/RequestStatus'
+    additionalProperties: false
+  QueryLogSummaryModelIPagedModel:
+    type: object
+    properties:
+      records:
+        type: array
+        items:
+          $ref: '#/definitions/QueryLogSummaryModel'
+      metadata:
+        $ref: '#/definitions/PaginationMetadata'
+    additionalProperties: false
+  QueryPhase:
+    enum:
+    - Initial
+    - Supplemental
+    - Referential
+    - Polling
+    - Monitoring
+    type: string
+  QueryPlan:
+    type: object
+    properties:
+      id:
+        format: uuid
+        type: string
+      planName:
+        type: string
+      facilityId:
+        type: string
+      ehrDescription:
+        type: string
+      lookBack:
+        type: string
+      initialQueries:
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/IQueryConfig'
+      supplementalQueries:
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/IQueryConfig'
+      createDate:
+        format: date-time
+        type: string
+      modifyDate:
+        format: date-time
+        type: string
+      type:
+        $ref: '#/definitions/Frequency'
+    additionalProperties: false
+  QueryPlanApiModel:
+    required:
+    - facilityId
+    - initialQueries
+    - supplementalQueries
+    - type
+    type: object
+    properties:
+      planName:
+        type: string
+      type:
+        $ref: '#/definitions/Frequency'
+      facilityId:
+        minLength: 1
+        type: string
+      ehrDescription:
+        type: string
+      lookBack:
+        type: string
+      initialQueries:
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/IQueryConfig'
+      supplementalQueries:
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/IQueryConfig'
+    additionalProperties: false
+  QueryPlanModel:
+    type: object
+    properties:
+      id:
+        format: uuid
+        type: string
+      planName:
+        type: string
+      facilityId:
+        type: string
+      ehrDescription:
+        type: string
+      lookBack:
+        type: string
+      initialQueries:
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/IQueryConfig'
+      supplementalQueries:
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/IQueryConfig'
+      createDate:
+        format: date-time
+        type: string
+      modifyDate:
+        format: date-time
+        type: string
+      type:
+        $ref: '#/definitions/Frequency'
+    additionalProperties: false
+  QueryResult:
+    type: object
+    properties:
+      resourceId:
+        type: string
+      resourceType:
+        type: string
+      queryType:
+        type: string
+      isSuccessful:
+        type: boolean
+    additionalProperties: false
+  QueryResultsModel:
+    type: object
+    properties:
+      patientId:
+        type: string
+      queryResults:
+        type: array
+        items:
+          $ref: '#/definitions/QueryResult'
+    additionalProperties: false
+  ReferenceResourceModel:
+    type: object
+    properties:
+      id:
+        format: uuid
+        type: string
+      facilityId:
+        type: string
+      resourceId:
+        type: string
+      resourceType:
+        type: string
+      referenceResource:
+        type: string
+      queryPhase:
+        $ref: '#/definitions/QueryPhase'
+      dataAcquisitionLogId:
+        format: int64
+        type: integer
+    additionalProperties: false
+  ReportableEvent:
+    enum:
+    - Discharge
+    - EOM
+    - EOW
+    - EOD
+    - Adhoc
+    type: string
+  RequestStatus:
+    enum:
+    - Pending
+    - Ready
+    - Processing
+    - Completed
+    - Failed
+    - MaxRetriesReached
+    - Skipped
+    type: string
+  ResourceCompletionTime:
+    type: object
+    properties:
+      resourceType:
+        type: string
+      completionTimeMilliseconds:
+        format: int64
+        type: integer
+    additionalProperties: false
+  ResourceReferenceTypeModel:
+    type: object
+    properties:
+      id:
+        format: uuid
+        type: string
+      facilityId:
+        type: string
+      queryPhase:
+        $ref: '#/definitions/QueryPhase'
+      resourceType:
+        type: string
+      fhirQueryId:
+        format: uuid
+        type: string
+      createDate:
+        format: date-time
+        type: string
+      modifyDate:
+        format: date-time
+        type: string
+    additionalProperties: false
+  ResourceType:
+    enum:
+    - Account
+    - ActivityDefinition
+    - AdverseEvent
+    - AllergyIntolerance
+    - Appointment
+    - AppointmentResponse
+    - AuditEvent
+    - Basic
+    - Binary
+    - BiologicallyDerivedProduct
+    - BodyStructure
+    - Bundle
+    - CapabilityStatement
+    - CarePlan
+    - CareTeam
+    - CatalogEntry
+    - ChargeItem
+    - ChargeItemDefinition
+    - Claim
+    - ClaimResponse
+    - ClinicalImpression
+    - CodeSystem
+    - Communication
+    - CommunicationRequest
+    - CompartmentDefinition
+    - Composition
+    - ConceptMap
+    - Condition
+    - Consent
+    - Contract
+    - Coverage
+    - CoverageEligibilityRequest
+    - CoverageEligibilityResponse
+    - DetectedIssue
+    - Device
+    - DeviceDefinition
+    - DeviceMetric
+    - DeviceRequest
+    - DeviceUseStatement
+    - DiagnosticReport
+    - DocumentManifest
+    - DocumentReference
+    - DomainResource
+    - EffectEvidenceSynthesis
+    - Encounter
+    - Endpoint
+    - EnrollmentRequest
+    - EnrollmentResponse
+    - EpisodeOfCare
+    - EventDefinition
+    - Evidence
+    - EvidenceVariable
+    - ExampleScenario
+    - ExplanationOfBenefit
+    - FamilyMemberHistory
+    - Flag
+    - Goal
+    - GraphDefinition
+    - Group
+    - GuidanceResponse
+    - HealthcareService
+    - ImagingStudy
+    - Immunization
+    - ImmunizationEvaluation
+    - ImmunizationRecommendation
+    - ImplementationGuide
+    - InsurancePlan
+    - Invoice
+    - Library
+    - Linkage
+    - List
+    - Location
+    - Measure
+    - MeasureReport
+    - Media
+    - Medication
+    - MedicationAdministration
+    - MedicationDispense
+    - MedicationKnowledge
+    - MedicationRequest
+    - MedicationStatement
+    - MedicinalProduct
+    - MedicinalProductAuthorization
+    - MedicinalProductContraindication
+    - MedicinalProductIndication
+    - MedicinalProductIngredient
+    - MedicinalProductInteraction
+    - MedicinalProductManufactured
+    - MedicinalProductPackaged
+    - MedicinalProductPharmaceutical
+    - MedicinalProductUndesirableEffect
+    - MessageDefinition
+    - MessageHeader
+    - MolecularSequence
+    - NamingSystem
+    - NutritionOrder
+    - Observation
+    - ObservationDefinition
+    - OperationDefinition
+    - OperationOutcome
+    - Organization
+    - OrganizationAffiliation
+    - Parameters
+    - Patient
+    - PaymentNotice
+    - PaymentReconciliation
+    - Person
+    - PlanDefinition
+    - Practitioner
+    - PractitionerRole
+    - Procedure
+    - Provenance
+    - Questionnaire
+    - QuestionnaireResponse
+    - RelatedPerson
+    - RequestGroup
+    - ResearchDefinition
+    - ResearchElementDefinition
+    - ResearchStudy
+    - ResearchSubject
+    - Resource
+    - RiskAssessment
+    - RiskEvidenceSynthesis
+    - Schedule
+    - SearchParameter
+    - ServiceRequest
+    - Slot
+    - Specimen
+    - SpecimenDefinition
+    - StructureDefinition
+    - StructureMap
+    - Subscription
+    - Substance
+    - SubstanceNucleicAcid
+    - SubstancePolymer
+    - SubstanceProtein
+    - SubstanceReferenceInformation
+    - SubstanceSourceMaterial
+    - SubstanceSpecification
+    - SupplyDelivery
+    - SupplyRequest
+    - Task
+    - TerminologyCapabilities
+    - TestReport
+    - TestScript
+    - ValueSet
+    - VerificationResult
+    - VisionPrescription
+    type: string
+  ScheduledReport:
+    type: object
+    properties:
+      reportTypes:
+        type: array
+        items:
+          type: string
+      frequency:
+        $ref: '#/definitions/Frequency'
+      startDate:
+        format: date-time
+        type: string
+      endDate:
+        format: date-time
+        type: string
+      reportTrackingId:
+        type: string
+    additionalProperties: false
+  ServiceInformation:
+    type: object
+    properties:
+      serviceName:
+        type: string
+      version:
+        type: string
+      productVersion:
+        type: string
+      commit:
+        type: string
+      build:
+        type: string
+      swaggerUrl:
+        type: string
+    additionalProperties: false
+  SortOrder:
+    enum:
+    - Ascending
+    - Descending
+    type: string
+  TimeFrame:
+    enum:
+    - LessThan24Hours
+    - Between24To48Hours
+    - MoreThan48Hours
+    type: string
+  UpdateDataAcquisitionLogModel:
+    required:
+    - id
+    type: object
+    properties:
+      id:
+        format: int64
+        type: integer
+      status:
+        $ref: '#/definitions/RequestStatus'
+      retryAttempts:
+        format: int32
+        type: integer
+      notes:
+        type: array
+        items:
+          type: string
+      executionDate:
+        format: date-time
+        type: string
+      completionDate:
+        format: date-time
+        type: string
+      completionTimeMilliseconds:
+        format: int64
+        type: integer
+      traceId:
+        type: string
+      resourceAcquiredIds:
+        type: array
+        items:
+          type: string
+    additionalProperties: false
+

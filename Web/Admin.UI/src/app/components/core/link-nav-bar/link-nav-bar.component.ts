@@ -1,5 +1,5 @@
 import { IsActiveMatchOptions, Router, RouterLink, RouterLinkActive } from '@angular/router';
-import { NgFor, NgIf } from '@angular/common';
+
 
 import { Component } from '@angular/core';
 import { VdIconComponent } from "../vd-icon/vd-icon.component";
@@ -16,10 +16,8 @@ export interface SubnavItem {
   imports: [
     RouterLink,
     RouterLinkActive,
-    VdIconComponent,
-    NgFor,
-    NgIf
-  ],
+    VdIconComponent
+],
   templateUrl: './link-nav-bar.component.html',
   styleUrls: ['./link-nav-bar.component.scss'],
   standalone: true,

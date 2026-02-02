@@ -29,6 +29,7 @@
         <module>shared</module>
         <module>measureeval</module>
         <module>validation</module>
+        <module>hapi</module>
     </modules>
 
     <dependencyManagement>

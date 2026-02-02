@@ -1,0 +1,31 @@
+[
+  {
+    "facilityId": "{{tenant-name}}",
+    "operation": {
+      "OperationType": "CopyLocation"
+    }
+  },
+  {
+    "facilityId": "{{tenant-name}}",
+    "ResourceTypes": [
+      "Location"
+    ],
+    "operation": {
+      "OperationType": "CodeMap",
+      "Name": "Map Location Type",
+      "FhirPath": "type[0].coding[0]",
+      "CodeSystemMaps": [
+        {
+          "SourceSystem": "http://snomed.info/sct",
+          "TargetSystem": "http://example.org/codes",
+          "CodeMaps": {
+            "5": {
+              "Code": "ambulatory",
+              "Display": "Ambulatory Care"
+            }
+          }
+        }
+      ]
+    }
+  }
+]
