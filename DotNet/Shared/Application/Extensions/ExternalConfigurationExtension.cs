@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace LantanaGroup.Link.Shared.Application.Extensions;
 
@@ -45,14 +46,14 @@ public static class ExternalConfigurationExtension
         return builder;
     }
 
-    public static ServiceInformation SetupServiceInformation(this WebApplicationBuilder builder, string serviceName, string assemblyVersion)
+    public static ServiceInformation SetupServiceInformation(this IHostApplicationBuilder builder, string serviceName, string assemblyVersion)
     {
         var connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
 
         return SetupServiceInformation(builder, serviceName, assemblyVersion, connectionString);
     }
 
-    public static ServiceInformation SetupServiceInformation(this WebApplicationBuilder builder, string serviceName, string assemblyVersion, string? connectionString)
+    public static ServiceInformation SetupServiceInformation(this IHostApplicationBuilder builder, string serviceName, string assemblyVersion, string? connectionString)
     {
         if (string.IsNullOrEmpty(serviceName))
         {

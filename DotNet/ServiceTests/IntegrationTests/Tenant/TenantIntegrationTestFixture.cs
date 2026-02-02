@@ -1,5 +1,7 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Account.Persistence.Interceptors;
+using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -10,6 +12,7 @@ using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Queries;
 using LantanaGroup.Link.Tenant.Commands;
+using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Data.Entities;
 using LantanaGroup.Link.Tenant.Data.Repository;
 using LantanaGroup.Link.Tenant.Entities;
@@ -42,131 +45,136 @@ namespace IntegrationTests.Tenant
     {
         public IServiceProvider ServiceProvider { get; private set; }
         private readonly IHost _host;
+        private readonly string _inMemoryDatabaseName = "TenantDatabase";
 
         public TenantIntegrationTestFixture()
         {
-            _host = Host.CreateDefaultBuilder()
-                .ConfigureServices((context, services) =>
-                {
-                    // Add in-memory database with warning suppression
-                    services.AddSingleton<UpdateBaseEntityInterceptor>();
-                    services.AddDbContext<TenantDbContext>((sp, options) =>
-                    {
-                        var updateBaseEntityInterceptor = sp.GetRequiredService<UpdateBaseEntityInterceptor>();
-                        options.UseInMemoryDatabase("TenantDatabase");
-                        options.ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning));
-                        options.AddInterceptors(updateBaseEntityInterceptor);
-                    });
+            var builder = Host.CreateApplicationBuilder();
 
-                    // Register repositories
-                    services.AddScoped<IEntityRepository<Facility>, FacilityRepository>();
+            var assemblyVersion = Assembly.GetExecutingAssembly()
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
 
-                    // Register the service
-                    services.AddScoped<IFacilityQueries, FacilityQueries>();
-                    services.AddScoped<IFacilityManager, FacilityManager>();
+            // Register ServiceInformation using the extension method
+           var serviceInformation = builder.SetupServiceInformation(TenantConstants.ServiceName, assemblyVersion, _inMemoryDatabaseName);
 
-                    // Add IHttpClientFactory
-                    services.AddHttpClient();
+            // Add in-memory database with warning suppression
+            builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
+            builder.Services.AddDbContext<TenantDbContext>((sp, options) =>
+            {
+                var updateBaseEntityInterceptor = sp.GetRequiredService<UpdateBaseEntityInterceptor>();
+                options.UseInMemoryDatabase(_inMemoryDatabaseName);
+                options.ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning));
+                options.AddInterceptors(updateBaseEntityInterceptor);
+            });
 
-                    // Add HttpClient as singleton with stub handler
-                    var stubHandler = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK));
-                    var stubClient = new HttpClient(stubHandler);
-                    services.AddSingleton<HttpClient>(stubClient);
+            // Register repositories
+            builder.Services.AddScoped<IEntityRepository<Facility>, FacilityRepository>();
 
-                    // Configure IOptions<ServiceRegistry>
-                    services.Configure<ServiceRegistry>(options =>
-                    {
-                        options.MeasureServiceUrl = "http://test-measure-service";
-                        options.ReportServiceUrl = "http://test-report-service";
-                    });
+            // Register the service
+            builder.Services.AddScoped<IFacilityQueries, FacilityQueries>();
+            builder.Services.AddScoped<IFacilityManager, FacilityManager>();
 
-                    // Configure IOptions<MeasureConfig> (disable external measure check for simplicity)
-                    services.Configure<MeasureConfig>(options =>
-                    {
-                        options.CheckIfMeasureExists = false;
-                    });
+            // Add IHttpClientFactory
+            builder.Services.AddHttpClient();
 
-                    // Configure IOptions<LinkTokenServiceSettings> (dummy values)
-                    services.Configure<LinkTokenServiceSettings>(options =>
-                    {
-                        options.SigningKey = "dummy-signing-key";
-                    });
+            // Add HttpClient as singleton with stub handler
+            var stubHandler = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK));
+            var stubClient = new HttpClient(stubHandler);
+            builder.Services.AddSingleton<HttpClient>(stubClient);
 
-                    // Stub ICreateSystemToken (returns a dummy token)
-                    services.AddSingleton<ICreateSystemToken, StubCreateSystemToken>();
+            // Configure IOptions<ServiceRegistry>
+            builder.Services.Configure<ServiceRegistry>(options =>
+            {
+                options.MeasureServiceUrl = "http://test-measure-service";
+                options.ReportServiceUrl = "http://test-report-service";
+            });
 
-                    // Configure IOptions<LinkBearerServiceOptions> (dummy values)
-                    services.Configure<LinkBearerServiceOptions>(options =>
-                    {
-                        options.AllowAnonymous = true;
-                    });
+            // Configure IOptions<MeasureConfig> (disable external measure check for simplicity)
+            builder.Services.Configure<MeasureConfig>(options =>
+            {
+                options.CheckIfMeasureExists = false;
+            });
 
-                    services.Configure<FacilityIdSettings>(options =>
-                    {
-                        options.NumericOnlyFacilityId = false;
-                    });
+            // Configure IOptions<LinkTokenServiceSettings> (dummy values)
+            builder.Services.Configure<LinkTokenServiceSettings>(options =>
+            {
+                options.SigningKey = "dummy-signing-key";
+            });
 
-                    services.AddSingleton(sp => sp.GetRequiredService<IOptions<FacilityIdSettings>>().Value);
+            // Stub ICreateSystemToken (returns a dummy token)
+            builder.Services.AddSingleton<ICreateSystemToken, StubCreateSystemToken>();
 
-                    // Stub producer for AuditEventCommand
-                    services.AddSingleton<IProducer<string, AuditEventMessage>>(new StubProducer<string, AuditEventMessage>());
+            // Configure IOptions<LinkBearerServiceOptions> (dummy values)
+            builder.Services.Configure<LinkBearerServiceOptions>(options =>
+            {
+                options.AllowAnonymous = true;
+            });
 
-                    // Add the real CreateAuditEventCommand
-                    services.AddSingleton<CreateAuditEventCommand>();
+            builder.Services.Configure<FacilityIdSettings>(options =>
+            {
+                options.NumericOnlyFacilityId = false;
+            });
 
-                    // Add logging
-                    services.AddLogging();
+            builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<FacilityIdSettings>>().Value);
 
-                    // Add job classes
-                    services.AddTransient<ReportScheduledJob>();
-                    services.AddTransient<RetentionCheckScheduledJob>();
+            // Stub producer for AuditEventCommand
+            builder.Services.AddSingleton<IProducer<string, AuditEventMessage>>(new StubProducer<string, AuditEventMessage>());
 
-                    // Add ScheduleService
-                    services.AddScoped<ScheduleService>();
-                    // DO NOT register ScheduleService as scoped
-                    // Only register as hosted service
-                    // services.AddScoped<ScheduleService>();  // REMOVED
+            // Add the real CreateAuditEventCommand
+            builder.Services.AddSingleton<CreateAuditEventCommand>();
 
-                    // Add job classes
-                    services.AddTransient<ReportScheduledJob>();
-                    services.AddTransient<RetentionCheckScheduledJob>();
+            // Add logging
+            builder.Services.AddLogging();
 
-                    // Add test job factory
-                    services.AddSingleton<IJobFactory, TestJobFactory>();
+            // Add job classes
+            builder.Services.AddTransient<ReportScheduledJob>();
+            builder.Services.AddTransient<RetentionCheckScheduledJob>();
 
-                    // Configure Quartz with RAMJobStore
-                    var quartzProps = new NameValueCollection
-                    {
-                        ["quartz.scheduler.instanceName"] = "TestScheduler",
-                        ["quartz.scheduler.instanceId"] = "AUTO",
-                        ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
-                        ["quartz.threadPool.threadCount"] = "1",
-                        ["quartz.jobStore.type"] = "Quartz.Simpl.RAMJobStore, Quartz",
-                        ["quartz.serializer.type"] = "json"
-                    };
+            // Add ScheduleService
+            builder.Services.AddScoped<ScheduleService>();
 
-                    var schedulerFactory = new StdSchedulerFactory(quartzProps);
-                    services.AddSingleton<ISchedulerFactory>(schedulerFactory);
+            // Add job classes
+            builder.Services.AddTransient<ReportScheduledJob>();
+            builder.Services.AddTransient<RetentionCheckScheduledJob>();
 
-                    services.AddSingleton<ScheduleService>();
-                    //services.AddHostedService(sp => sp.GetRequiredService<ScheduleService>());
+            // Add test job factory
+            builder.Services.AddSingleton<IJobFactory, TestJobFactory>();
 
-                    // Add Kafka producer factory for GenerateReportValue
-                    services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, StubKafkaProducerFactory<string, GenerateReportValue>>();
+            // Configure Quartz with RAMJobStore
+            builder.Services.RegisterQuartzDatabase(serviceInformation.ConnectionString);
 
-                    // Add AutoMapper
-                    services.AddAutoMapper(cfg =>
-                    {
-                        cfg.CreateMap<Facility, FacilityModel>();
-                        cfg.CreateMap<PagedConfigModel<Facility>, PagedFacilityConfigDto>();
-                        cfg.CreateMap<ScheduledReportModel, TenantScheduledReportConfig>();
+            var quartzProps = new NameValueCollection
+            {
+                ["quartz.scheduler.instanceName"] = "TestScheduler",
+                ["quartz.scheduler.instanceId"] = "AUTO",
+                ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
+                ["quartz.threadPool.threadCount"] = "1",
+                ["quartz.jobStore.type"] = "Quartz.Simpl.RAMJobStore, Quartz",
+                ["quartz.serializer.type"] = "json"
+            };
 
-                        cfg.CreateMap<FacilityModel, Facility>();
-                        cfg.CreateMap<PagedFacilityConfigDto, PagedConfigModel<Facility>>();
-                        cfg.CreateMap<TenantScheduledReportConfig, ScheduledReportModel>();
-                    });
-                })
-                .Build();
+            var schedulerFactory = new StdSchedulerFactory(quartzProps);
+            builder.Services.AddSingleton<ISchedulerFactory>(schedulerFactory);
+
+            builder.Services.AddSingleton<ScheduleService>();
+            //builder.Services.AddHostedService(sp => sp.GetRequiredService<ScheduleService>());
+
+            // Add Kafka producer factory for GenerateReportValue
+            builder.Services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, StubKafkaProducerFactory<string, GenerateReportValue>>();
+
+            // Add AutoMapper
+            builder.Services.AddAutoMapper(cfg =>
+            {
+                cfg.CreateMap<Facility, FacilityModel>();
+                cfg.CreateMap<PagedConfigModel<Facility>, PagedFacilityConfigDto>();
+                cfg.CreateMap<ScheduledReportModel, TenantScheduledReportConfig>();
+
+                cfg.CreateMap<FacilityModel, Facility>();
+                cfg.CreateMap<PagedFacilityConfigDto, PagedConfigModel<Facility>>();
+                cfg.CreateMap<TenantScheduledReportConfig, ScheduledReportModel>();
+            });
+
+            _host = builder.Build();
 
             // Start the host
             _host.StartAsync().GetAwaiter().GetResult();

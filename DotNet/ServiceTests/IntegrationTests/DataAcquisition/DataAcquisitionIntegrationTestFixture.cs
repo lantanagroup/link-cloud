@@ -6,6 +6,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -19,6 +20,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Moq;
 using OpenTelemetry.Trace;
+using System.Reflection;
 
 namespace IntegrationTests.DataAcquisition
 {
@@ -43,70 +45,79 @@ namespace IntegrationTests.DataAcquisition
             ResourceAcquiredProducerMock = new Mock<IProducer<string, ResourceAcquired>>();
 
             _dbPath = Path.Combine(Path.GetTempPath(), $"testdb_{Guid.NewGuid()}.db");
+            var sqliteConnectionString = $"Data Source={_dbPath};";
 
-            _host = Host.CreateDefaultBuilder()
-                .ConfigureServices((context, services) =>
+            var builder = Host.CreateApplicationBuilder();
+
+            // Get assembly version for ServiceInformation
+            var assemblyVersion = Assembly.GetExecutingAssembly()
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+
+            // Setup ServiceInformation with the correct connection string
+            var serviceInformation = builder.SetupServiceInformation(
+                "DataAcquisitionService", // Replace with your actual service name constant if available
+                assemblyVersion,
+                sqliteConnectionString
+            );
+
+            builder.Services.AddDbContext<DataAcquisitionDbContext>(options =>
+            {
+                options.UseSqlite(sqliteConnectionString);
+            });
+
+            // Register generic repositories for all required entities
+            builder.Services.AddScoped<IEntityRepository<DataAcquisitionLog>, EntityRepository<DataAcquisitionLog, DataAcquisitionDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<FhirQueryConfiguration>, EntityRepository<FhirQueryConfiguration, DataAcquisitionDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<FhirListConfiguration>, EntityRepository<FhirListConfiguration, DataAcquisitionDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<FhirQuery>, EntityRepository<FhirQuery, DataAcquisitionDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<ReferenceResources>, EntityRepository<ReferenceResources, DataAcquisitionDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<QueryPlan>, EntityRepository<QueryPlan, DataAcquisitionDbContext>>();
+            builder.Services.AddTransient<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
+            builder.Services.AddTransient<IEntityRepository<ResourceReferenceType>, EntityRepository<ResourceReferenceType, DataAcquisitionDbContext>>();
+
+            // Register IDatabase implementation
+            builder.Services.AddScoped<LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase, LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Database>();
+
+            builder.Services.AddTransient<IDataAcquisitionLogService, DataAcquisitionLogService>();
+
+            // Register managers                    
+            builder.Services.AddScoped<IQueryPlanManager, QueryPlanManager>();
+            builder.Services.AddScoped<IFhirListQueryConfigurationManager, FhirListQueryConfigurationManager>();
+            builder.Services.AddScoped<IDataAcquisitionLogManager, DataAcquisitionLogManager>();
+            builder.Services.AddScoped<IFhirQueryConfigurationManager, FhirQueryConfigurationManager>();
+
+            // Register queries
+            builder.Services.AddScoped<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();
+            builder.Services.AddScoped<IFhirQueryQueries, FhirQueryQueries>();
+            builder.Services.AddScoped<IFhirQueryConfigurationQueries, FhirQueryConfigurationQueries>();
+            builder.Services.AddScoped<IFhirQueryListConfigurationQueries, FhirQueryListConfigurationQueries>();
+            builder.Services.AddScoped<IQueryPlanQueries, QueryPlanQueries>();
+            builder.Services.AddTransient<IReferenceResourcesQueries, ReferenceResourcesQueries>();
+
+            // Mock Kafka producers for integration tests
+            builder.Services.AddSingleton<IProducer<long, ReadyToAcquire>>(ReadyToAcquireProducerMock.Object);
+            builder.Services.AddSingleton<IProducer<string, ResourceAcquired>>(ResourceAcquiredProducerMock.Object);
+
+            builder.Services.Configure<ServiceRegistry>(options =>
+            {
+                options.TenantService = new TenantServiceRegistration
                 {
-                    // Add SQLite database without shared connection
-                    services.AddDbContext<DataAcquisitionDbContext>(options =>
-                    {
-                        options.UseSqlite($"Data Source={_dbPath};");
-                    });
+                    CheckIfTenantExists = false
+                };
+            });
 
-                    // Register generic repositories for all required entities
-                    services.AddScoped<IEntityRepository<DataAcquisitionLog>, EntityRepository<DataAcquisitionLog, DataAcquisitionDbContext>>();
-                    services.AddScoped<IEntityRepository<FhirQueryConfiguration>, EntityRepository<FhirQueryConfiguration, DataAcquisitionDbContext>>();
-                    services.AddScoped<IEntityRepository<FhirListConfiguration>, EntityRepository<FhirListConfiguration, DataAcquisitionDbContext>>();
-                    services.AddScoped<IEntityRepository<FhirQuery>, EntityRepository<FhirQuery, DataAcquisitionDbContext>>();
-                    services.AddScoped<IEntityRepository<ReferenceResources>, EntityRepository<ReferenceResources, DataAcquisitionDbContext>>();
-                    services.AddScoped<IEntityRepository<QueryPlan>, EntityRepository<QueryPlan, DataAcquisitionDbContext>>();
-                    services.AddTransient<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
-                    services.AddTransient<IEntityRepository<ResourceReferenceType>, EntityRepository<ResourceReferenceType, DataAcquisitionDbContext>>();
+            builder.Services.AddTransient<ICreateSystemToken, CreateSystemToken>();
+            builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
-                    // Register IDatabase implementation
-                    services.AddScoped<LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase, LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Database>();
+            builder.Services.AddHttpClient();
 
-                    services.AddTransient<IDataAcquisitionLogService, DataAcquisitionLogService>();
+            builder.Services.AddOpenTelemetry()
+                .WithTracing(tracerBuilder => tracerBuilder
+                    .AddSource(ServiceActivitySource.ServiceName)
+                    .SetSampler(new AlwaysOnSampler())
+                    .AddConsoleExporter());
 
-                    // Register managers                    
-                    services.AddScoped<IQueryPlanManager, QueryPlanManager>();
-                    services.AddScoped<IFhirListQueryConfigurationManager, FhirListQueryConfigurationManager>();
-                    services.AddScoped<IDataAcquisitionLogManager, DataAcquisitionLogManager>();
-                    services.AddScoped<IFhirQueryConfigurationManager, FhirQueryConfigurationManager>();
-
-                    // Register queries
-                    services.AddScoped<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();
-                    services.AddScoped<IFhirQueryQueries, FhirQueryQueries>();
-                    services.AddScoped<IFhirQueryConfigurationQueries, FhirQueryConfigurationQueries>();
-                    services.AddScoped<IFhirQueryListConfigurationQueries, FhirQueryListConfigurationQueries>();
-                    services.AddScoped<IQueryPlanQueries, QueryPlanQueries>();
-                    services.AddTransient<IReferenceResourcesQueries, ReferenceResourcesQueries>();
-
-                    // Mock Kafka producers for integration tests
-                    services.AddSingleton<IProducer<long, ReadyToAcquire>>(ReadyToAcquireProducerMock.Object);
-                    services.AddSingleton<IProducer<string, ResourceAcquired>>(ResourceAcquiredProducerMock.Object);
-
-
-                    services.Configure<ServiceRegistry>(options =>
-                    {
-                        options.TenantService = new TenantServiceRegistration
-                        {
-                            CheckIfTenantExists = false
-                        };
-                    });
-
-                    services.AddTransient<ICreateSystemToken, CreateSystemToken>();
-                    services.AddTransient<ITenantApiService, TenantApiService>();
-
-                    services.AddHttpClient();
-
-                    services.AddOpenTelemetry()
-                        .WithTracing(builder => builder
-                            .AddSource(ServiceActivitySource.ServiceName)
-                            .SetSampler(new AlwaysOnSampler())  // Add this to force sampling every trace
-                            .AddConsoleExporter());
-                })
-                .Build();
+            _host = builder.Build();
 
             // Start the host
             _host.StartAsync().GetAwaiter().GetResult();
