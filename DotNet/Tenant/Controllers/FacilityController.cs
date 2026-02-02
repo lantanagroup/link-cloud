@@ -98,13 +98,15 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="sortOrder"></param>
         /// <param name="pageSize"></param>
         /// <param name="pageNumber"></param>
+        /// <param name="includeDeleted"></param>
         /// <returns></returns>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<FacilityModel>))]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet(Name = "GetFacilities")]
         public async Task<ActionResult<PagedConfigModel<FacilityModel>>> GetFacilities(string? facilityId,
-            string? facilityName, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1,
+            string? facilityName, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1, 
+            bool includeDeleted = false,
             CancellationToken cancellationToken = default)
         {
             facilityId = facilityId?.Sanitize();
@@ -126,7 +128,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities");
 
             var searchModel = new FacilitySearchModel { FacilityId = facilityId, FacilityName = facilityName };
-            var pagedFacilityConfigModelDto = await _facilityQueries.PagedSearchAsync(searchModel, sortBy, sortOrder.Value, pageSize, pageNumber, cancellationToken);
+            var pagedFacilityConfigModelDto = await _facilityQueries.PagedSearchAsync(searchModel, sortBy, sortOrder.Value, pageSize, pageNumber, includeDeleted, cancellationToken);
 
             if (pagedFacilityConfigModelDto.Records.Count == 0)
             {
@@ -144,7 +146,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("list")]
-        public async Task<IActionResult> GetFacilityList([FromQuery] string? search)
+        public async Task<IActionResult> GetFacilityList([FromQuery] string? search, bool includeDeleted = false)
         {
             try
             {
@@ -153,6 +155,10 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 {
                     searchModel.FacilityName = search;
                     searchModel.FacilityNameContains = true;
+                    if (!includeDeleted)
+                    {
+                        searchModel.IsDeleted = false;
+                    }
                 }
 
                 var facilities = await _facilityQueries.SearchAsync(searchModel, HttpContext.RequestAborted);
@@ -377,9 +383,45 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             return NoContent();
         }
+        
+        [HttpDelete("soft/{facilityId}")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> SoftDeleteFacility(string facilityId, CancellationToken cancellationToken)
+        {
+            facilityId = facilityId?.Sanitize();
+
+            var existingModel = await _facilityQueries.GetAsync(facilityId, null, cancellationToken);
+            if (existingModel == null)
+                return BadRequest($"Facility with Id: {facilityId} Not Found");
+
+            try
+            {
+                await _facilityManager.SoftDeleteAsync(facilityId, cancellationToken);
+            }
+            catch (ApplicationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Exception encountered in FacilityController.SoftDeleteFacility");
+                return Problem("An error occurred while soft deleting the facility", null, 500);
+            }
+
+            using (ServiceActivitySource.Instance.StartActivity("Soft Delete Jobs for Facility"))
+            {
+                // Optional: you might want to disable scheduled jobs instead of deleting
+                await _scheduleService.DeleteJobsForFacility(facilityId, cancellationToken: cancellationToken);
+            }
+
+            return NoContent();
+        }
 
         /// <summary>
-        /// Generat
+        /// Generate
         /// </summary>
         /// <param name="facilityId"></param>
         /// <param name="request"></param>

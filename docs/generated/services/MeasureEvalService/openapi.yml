@@ -1,6 +1,6 @@
 ﻿openapi: 3.0.1
 info:
-  version: 0.3.0
+  version: 0.4.1
   title: Measure Evaluation Service
 paths:
   /api/measureeval/measure-definition:
@@ -138,6 +138,28 @@ paths:
             '*/*':
               schema:
                 type: string
+  /api/measureeval/measure-definition/{id}/relatedArtifact:
+    get:
+      tags:
+      - Measure Definitions
+      summary: Get related artifacts for a measure definition
+      operationId: getRelatedArtifacts
+      parameters:
+      - name: id
+        in: path
+        description: The ID of the measure definition
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RelatedArtifactInfo'
   /api/measureeval/info:
     get:
       tags:
@@ -173,26 +195,26 @@ components:
           type: boolean
         booleanPrimitive:
           type: boolean
-        valueAsString:
-          type: string
         value:
           type: boolean
+        valueAsString:
+          type: string
         empty:
           type: boolean
         primitive:
           type: boolean
-        extensionFirstRep:
-          $ref: '#/components/schemas/Extension'
-        idBase:
-          type: string
         idElement:
           $ref: '#/components/schemas/StringType'
-        xhtml:
-          $ref: '#/components/schemas/XhtmlNode'
-        dateTime:
-          type: boolean
+        idBase:
+          type: string
+        extensionFirstRep:
+          $ref: '#/components/schemas/Extension'
         resource:
           type: boolean
+        dateTime:
+          type: boolean
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
     CanonicalType:
       type: object
       properties:
@@ -212,28 +234,28 @@ components:
             $ref: '#/components/schemas/Extension'
         disallowExtensions:
           type: boolean
-        valueAsString:
-          type: string
         primitive:
           type: boolean
         value:
           type: string
         empty:
           type: boolean
-        extensionFirstRep:
-          $ref: '#/components/schemas/Extension'
-        idBase:
+        valueAsString:
           type: string
         idElement:
           $ref: '#/components/schemas/StringType'
-        xhtml:
-          $ref: '#/components/schemas/XhtmlNode'
-        booleanPrimitive:
+        idBase:
+          type: string
+        extensionFirstRep:
+          $ref: '#/components/schemas/Extension'
+        resource:
           type: boolean
         dateTime:
           type: boolean
-        resource:
+        booleanPrimitive:
           type: boolean
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
     CodeType:
       type: object
       properties:
@@ -255,15 +277,13 @@ components:
           type: boolean
         system:
           type: string
-        display:
+        version:
           type: string
         code:
           type: string
-        version:
+        display:
           type: string
         valueNotNull:
-          type: string
-        valueAsString:
           type: string
         primitive:
           type: boolean
@@ -271,20 +291,22 @@ components:
           type: string
         empty:
           type: boolean
-        extensionFirstRep:
-          $ref: '#/components/schemas/Extension'
-        idBase:
+        valueAsString:
           type: string
         idElement:
           $ref: '#/components/schemas/StringType'
-        xhtml:
-          $ref: '#/components/schemas/XhtmlNode'
-        booleanPrimitive:
+        idBase:
+          type: string
+        extensionFirstRep:
+          $ref: '#/components/schemas/Extension'
+        resource:
           type: boolean
         dateTime:
           type: boolean
-        resource:
+        booleanPrimitive:
           type: boolean
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
     Coding:
       type: object
       properties:
@@ -314,34 +336,34 @@ components:
           type: string
         userSelected:
           type: boolean
-        versionElement:
-          $ref: '#/components/schemas/StringType'
-        userSelectedElement:
-          $ref: '#/components/schemas/BooleanType'
+        empty:
+          type: boolean
         displayElement:
           $ref: '#/components/schemas/StringType'
         systemElement:
           $ref: '#/components/schemas/UriType'
         codeElement:
           $ref: '#/components/schemas/CodeType'
-        empty:
-          type: boolean
-        extensionFirstRep:
-          $ref: '#/components/schemas/Extension'
-        idBase:
-          type: string
+        userSelectedElement:
+          $ref: '#/components/schemas/BooleanType'
+        versionElement:
+          $ref: '#/components/schemas/StringType'
         idElement:
           $ref: '#/components/schemas/StringType'
-        xhtml:
-          $ref: '#/components/schemas/XhtmlNode'
-        booleanPrimitive:
-          type: boolean
-        dateTime:
-          type: boolean
+        idBase:
+          type: string
+        extensionFirstRep:
+          $ref: '#/components/schemas/Extension'
         primitive:
           type: boolean
         resource:
           type: boolean
+        dateTime:
+          type: boolean
+        booleanPrimitive:
+          type: boolean
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
     Extension:
       type: object
       properties:
@@ -365,35 +387,37 @@ components:
           type: string
         value:
           $ref: '#/components/schemas/Type'
-        urlElement:
-          $ref: '#/components/schemas/UriType'
         empty:
           type: boolean
+        urlElement:
+          $ref: '#/components/schemas/UriType'
         valueAsPrimitive:
           $ref: '#/components/schemas/IPrimitiveTypeObject'
-        extensionFirstRep:
-          $ref: '#/components/schemas/Extension'
-        idBase:
-          type: string
         idElement:
           $ref: '#/components/schemas/StringType'
-        xhtml:
-          $ref: '#/components/schemas/XhtmlNode'
-        booleanPrimitive:
-          type: boolean
-        dateTime:
-          type: boolean
+        idBase:
+          type: string
+        extensionFirstRep:
+          $ref: '#/components/schemas/Extension'
         primitive:
           type: boolean
         resource:
           type: boolean
+        dateTime:
+          type: boolean
+        booleanPrimitive:
+          type: boolean
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
     IPrimitiveTypeObject:
       type: object
       properties:
-        valueAsString:
-          type: string
         value:
           type: object
+        valueAsString:
+          type: string
+        empty:
+          type: boolean
         formatCommentsPre:
           type: array
           items:
@@ -402,8 +426,6 @@ components:
           type: array
           items:
             type: string
-        empty:
-          type: boolean
     IdType:
       type: object
       properties:
@@ -423,32 +445,6 @@ components:
             $ref: '#/components/schemas/Extension'
         disallowExtensions:
           type: boolean
-        idPartAsBigDecimal:
-          type: number
-        urn:
-          type: boolean
-        idPartAsLong:
-          type: integer
-          format: int64
-        versionIdPart:
-          type: string
-        versionIdPartAsLong:
-          type: integer
-          format: int64
-        versionIdPartValidLong:
-          type: boolean
-        idPartValid:
-          type: boolean
-        idPartValidLong:
-          type: boolean
-        valueAsString:
-          type: string
-        baseUrl:
-          type: string
-        idPart:
-          type: string
-        resourceType:
-          type: string
         local:
           type: boolean
         value:
@@ -457,22 +453,50 @@ components:
           type: boolean
         absolute:
           type: boolean
+        resourceType:
+          type: string
+        valueAsString:
+          type: string
+        idPart:
+          type: string
+        idPartAsLong:
+          type: integer
+          format: int64
+        idPartValidLong:
+          type: boolean
+        idPartValid:
+          type: boolean
+        versionIdPart:
+          type: string
+        baseUrl:
+          type: string
+        versionIdPartAsLong:
+          type: integer
+          format: int64
+        versionIdPartValidLong:
+          type: boolean
+        idPartAsBigDecimal:
+          type: number
+        urn:
+          type: boolean
+        uuid:
+          type: boolean
         primitive:
           type: boolean
-        extensionFirstRep:
-          $ref: '#/components/schemas/Extension'
-        idBase:
-          type: string
         idElement:
           $ref: '#/components/schemas/StringType'
-        xhtml:
-          $ref: '#/components/schemas/XhtmlNode'
-        booleanPrimitive:
+        idBase:
+          type: string
+        extensionFirstRep:
+          $ref: '#/components/schemas/Extension'
+        resource:
           type: boolean
         dateTime:
           type: boolean
-        resource:
+        booleanPrimitive:
           type: boolean
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
     InstantType:
       type: object
       properties:
@@ -492,6 +516,9 @@ components:
             $ref: '#/components/schemas/Extension'
         disallowExtensions:
           type: boolean
+        value:
+          type: string
+          format: date-time
         precision:
           type: string
           enum:
@@ -501,20 +528,7 @@ components:
           - MINUTE
           - SECOND
           - MILLI
-        valueAsV3String:
-          type: string
-          writeOnly: true
-        secondsMilli:
-          type: number
-          format: float
-        valueAsCalendar:
-          type: string
-          format: date-time
-        timeZoneZulu:
-          type: boolean
-        today:
-          type: boolean
-        day:
+        year:
           type: integer
           format: int32
         hour:
@@ -524,19 +538,6 @@ components:
           type: integer
           format: int32
         second:
-          type: integer
-          format: int32
-        valueAsString:
-          type: string
-        dateTime:
-          type: boolean
-        nanos:
-          type: integer
-          format: int64
-        value:
-          type: string
-          format: date-time
-        year:
           type: integer
           format: int32
         timeZone:
@@ -558,22 +559,45 @@ components:
         millis:
           type: integer
           format: int32
+        day:
+          type: integer
+          format: int32
+        nanos:
+          type: integer
+          format: int64
+        valueAsV3String:
+          type: string
+          writeOnly: true
+        timeZoneZulu:
+          type: boolean
+        secondsMilli:
+          type: number
+          format: float
+        valueAsCalendar:
+          type: string
+          format: date-time
+        today:
+          type: boolean
+        dateTime:
+          type: boolean
+        valueAsString:
+          type: string
         primitive:
           type: boolean
         empty:
           type: boolean
-        extensionFirstRep:
-          $ref: '#/components/schemas/Extension'
-        idBase:
-          type: string
         idElement:
           $ref: '#/components/schemas/StringType'
-        xhtml:
-          $ref: '#/components/schemas/XhtmlNode'
-        booleanPrimitive:
-          type: boolean
+        idBase:
+          type: string
+        extensionFirstRep:
+          $ref: '#/components/schemas/Extension'
         resource:
           type: boolean
+        booleanPrimitive:
+          type: boolean
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
     Location:
       type: object
       properties:
@@ -621,34 +645,34 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Coding'
-        versionIdElement:
-          $ref: '#/components/schemas/IdType'
+        empty:
+          type: boolean
         lastUpdatedElement:
           $ref: '#/components/schemas/InstantType'
+        versionIdElement:
+          $ref: '#/components/schemas/IdType'
         securityFirstRep:
+          $ref: '#/components/schemas/Coding'
+        tagFirstRep:
           $ref: '#/components/schemas/Coding'
         sourceElement:
           $ref: '#/components/schemas/UriType'
-        tagFirstRep:
-          $ref: '#/components/schemas/Coding'
-        empty:
-          type: boolean
-        extensionFirstRep:
-          $ref: '#/components/schemas/Extension'
-        idBase:
-          type: string
         idElement:
           $ref: '#/components/schemas/StringType'
-        xhtml:
-          $ref: '#/components/schemas/XhtmlNode'
-        booleanPrimitive:
-          type: boolean
-        dateTime:
-          type: boolean
+        idBase:
+          type: string
+        extensionFirstRep:
+          $ref: '#/components/schemas/Extension'
         primitive:
           type: boolean
         resource:
           type: boolean
+        dateTime:
+          type: boolean
+        booleanPrimitive:
+          type: boolean
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
     Parameters:
       type: object
       properties:
@@ -674,6 +698,8 @@ components:
             $ref: '#/components/schemas/ParametersParameterComponent'
         parameterFirstRep:
           $ref: '#/components/schemas/ParametersParameterComponent'
+        empty:
+          type: boolean
         resourceType:
           type: string
           enum:
@@ -823,8 +849,8 @@ components:
           - ValueSet
           - VerificationResult
           - VisionPrescription
-        empty:
-          type: boolean
+        idElement:
+          $ref: '#/components/schemas/IdType'
         structureFhirVersionEnum:
           type: string
           enum:
@@ -837,26 +863,24 @@ components:
           - R5
         deleted:
           type: boolean
-        idElement:
-          $ref: '#/components/schemas/IdType'
-        languageElement:
-          $ref: '#/components/schemas/CodeType'
+        idPart:
+          type: string
         implicitRulesElement:
           $ref: '#/components/schemas/UriType'
+        languageElement:
+          $ref: '#/components/schemas/CodeType'
         idBase:
-          type: string
-        idPart:
           type: string
         resource:
           type: boolean
-        xhtml:
-          $ref: '#/components/schemas/XhtmlNode'
-        booleanPrimitive:
+        primitive:
           type: boolean
         dateTime:
           type: boolean
-        primitive:
+        booleanPrimitive:
           type: boolean
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
       description: The parameters to use in the evaluation
     ParametersParameterComponent:
       type: object
@@ -891,28 +915,28 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ParametersParameterComponent'
+        empty:
+          type: boolean
         partFirstRep:
           $ref: '#/components/schemas/ParametersParameterComponent'
         nameElement:
           $ref: '#/components/schemas/StringType'
-        empty:
-          type: boolean
         modifierExtensionFirstRep:
           $ref: '#/components/schemas/Extension'
-        extensionFirstRep:
-          $ref: '#/components/schemas/Extension'
-        idBase:
-          type: string
         idElement:
           $ref: '#/components/schemas/StringType'
-        xhtml:
-          $ref: '#/components/schemas/XhtmlNode'
-        booleanPrimitive:
+        idBase:
+          type: string
+        extensionFirstRep:
+          $ref: '#/components/schemas/Extension'
+        primitive:
           type: boolean
         dateTime:
           type: boolean
-        primitive:
+        booleanPrimitive:
           type: boolean
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
     Resource:
       type: object
       properties:
@@ -932,16 +956,8 @@ components:
           type: string
         language:
           type: string
-        languageElement:
-          $ref: '#/components/schemas/CodeType'
-        implicitRulesElement:
-          $ref: '#/components/schemas/UriType'
-        idBase:
-          type: string
-        idPart:
-          type: string
-        idElement:
-          $ref: '#/components/schemas/IdType'
+        empty:
+          type: boolean
         resourceType:
           type: string
           enum:
@@ -1091,8 +1107,16 @@ components:
           - ValueSet
           - VerificationResult
           - VisionPrescription
-        empty:
-          type: boolean
+        idElement:
+          $ref: '#/components/schemas/IdType'
+        idPart:
+          type: string
+        implicitRulesElement:
+          $ref: '#/components/schemas/UriType'
+        languageElement:
+          $ref: '#/components/schemas/CodeType'
+        idBase:
+          type: string
         structureFhirVersionEnum:
           type: string
           enum:
@@ -1107,14 +1131,14 @@ components:
           type: boolean
         resource:
           type: boolean
-        xhtml:
-          $ref: '#/components/schemas/XhtmlNode'
-        booleanPrimitive:
+        primitive:
           type: boolean
         dateTime:
           type: boolean
-        primitive:
+        booleanPrimitive:
           type: boolean
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
     StringType:
       type: object
       properties:
@@ -1132,28 +1156,28 @@ components:
           type: boolean
         valueNotNull:
           type: string
-        valueAsString:
-          type: string
         primitive:
           type: boolean
         value:
           type: string
         empty:
           type: boolean
-        extensionFirstRep:
-          $ref: '#/components/schemas/Extension'
-        idBase:
+        valueAsString:
           type: string
         idElement:
           $ref: '#/components/schemas/StringType'
-        xhtml:
-          $ref: '#/components/schemas/XhtmlNode'
-        booleanPrimitive:
+        idBase:
+          type: string
+        extensionFirstRep:
+          $ref: '#/components/schemas/Extension'
+        resource:
           type: boolean
         dateTime:
           type: boolean
-        resource:
+        booleanPrimitive:
           type: boolean
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
     Type:
       type: object
       properties:
@@ -1175,22 +1199,22 @@ components:
           type: boolean
         empty:
           type: boolean
-        extensionFirstRep:
-          $ref: '#/components/schemas/Extension'
-        idBase:
-          type: string
         idElement:
           $ref: '#/components/schemas/StringType'
-        xhtml:
-          $ref: '#/components/schemas/XhtmlNode'
-        booleanPrimitive:
-          type: boolean
-        dateTime:
-          type: boolean
+        idBase:
+          type: string
+        extensionFirstRep:
+          $ref: '#/components/schemas/Extension'
         primitive:
           type: boolean
         resource:
           type: boolean
+        dateTime:
+          type: boolean
+        booleanPrimitive:
+          type: boolean
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
     UriType:
       type: object
       properties:
@@ -1206,31 +1230,33 @@ components:
           type: string
         disallowExtensions:
           type: boolean
-        valueAsString:
-          type: string
         primitive:
           type: boolean
         value:
           type: string
         empty:
           type: boolean
-        extensionFirstRep:
-          $ref: '#/components/schemas/Extension'
-        idBase:
+        valueAsString:
           type: string
         idElement:
           $ref: '#/components/schemas/StringType'
-        xhtml:
-          $ref: '#/components/schemas/XhtmlNode'
-        booleanPrimitive:
+        idBase:
+          type: string
+        extensionFirstRep:
+          $ref: '#/components/schemas/Extension'
+        resource:
           type: boolean
         dateTime:
           type: boolean
-        resource:
+        booleanPrimitive:
           type: boolean
+        xhtml:
+          $ref: '#/components/schemas/XhtmlNode'
     XhtmlNode:
       type: object
       properties:
+        checkParaTree:
+          type: boolean
         location:
           $ref: '#/components/schemas/Location'
         nodeType:
@@ -1263,16 +1289,20 @@ components:
           type: string
         emptyExpanded:
           type: boolean
-        valueAsString:
+        value:
           type: string
+        empty:
+          type: boolean
         firstElement:
           $ref: '#/components/schemas/XhtmlNode'
         nsDecl:
           type: string
-        noPretty:
-          type: boolean
         para:
           type: boolean
+        noPretty:
+          type: boolean
+        valueAsString:
+          type: string
         formatCommentsPre:
           type: array
           items:
@@ -1281,10 +1311,6 @@ components:
           type: array
           items:
             type: string
-        value:
-          type: string
-        empty:
-          type: boolean
     MeasureDefinition_Summary:
       type: object
       properties:
@@ -1299,6 +1325,21 @@ components:
         modifiedDate:
           type: string
           format: date-time
+    RelatedArtifactInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        url:
+          type: string
+        found:
+          type: boolean
+        libraries:
+          type: object
+          additionalProperties:
+            type: string
+        version:
+          type: string
     ServiceInformationConfig:
       type: object
       properties:
@@ -1310,6 +1351,12 @@ components:
           type: string
         build:
           type: string
+        commit:
+          type: string
+        swaggerUrl:
+          type: string
+        swaggerUiEnabled:
+          type: boolean
   securitySchemes:
     bearer-key:
       type: http
