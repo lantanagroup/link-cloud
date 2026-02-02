@@ -141,7 +141,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     catch (OperationCanceledException oce)
                     {
                         Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                        Activity.Current?.RecordException(oce);
+                        Activity.Current?.AddException(oce);
 
                         _logger.LogError(oce, "Operation Canceled: {OceMessage}", oce.Message);
                         consumer.Close();
@@ -157,7 +157,7 @@ namespace LantanaGroup.Link.Report.Listeners
             catch (OperationCanceledException oce)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(oce);
+                Activity.Current?.AddException(oce);
 
                 _logger.LogError(oce, "Operation Canceled: {OceMessage}", oce.Message);
                 consumer.Close();

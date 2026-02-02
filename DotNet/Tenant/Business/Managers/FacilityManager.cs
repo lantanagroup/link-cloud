@@ -195,7 +195,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex, new TagList
+                Activity.Current?.AddException(ex, new TagList
                 {
                     { "service.name", TenantConstants.ServiceName },
                     { "facility", newFacility.FacilityId },
@@ -246,7 +246,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex, new TagList
+                Activity.Current?.AddException(ex, new TagList
                 {
                     { "service.name", TenantConstants.ServiceName },
                     { "facility", facilityId },
@@ -332,7 +332,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex, new TagList
+                Activity.Current?.AddException(ex, new TagList
                 {
                     { "service.name", TenantConstants.ServiceName },
                     { "facility", facilityId },

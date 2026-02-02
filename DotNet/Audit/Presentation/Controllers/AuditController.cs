@@ -102,7 +102,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 AuditSearchFilterRecord searchFilter = new(searchText, facility, correlationId, service, action, user, sortBy, sortOrder, pageSize, pageNumber);
                 _logger.LogAuditEventListQueryException(ex.Message, searchFilter);
                 throw;
@@ -154,7 +154,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 ex.Data.Add("audit-log.id", auditId);
                 _logger.LogGetAuditEventByIdException(auditId.ToString(), ex.Message);
                 throw;
@@ -217,7 +217,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 _logger.LogGetFacilityAuditEventsQueryException(facilityId, ex.Message);
                 throw;
             }

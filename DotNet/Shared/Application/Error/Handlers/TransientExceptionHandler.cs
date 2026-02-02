@@ -44,7 +44,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             try
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 
                 Logger.LogError(ex, "{Name}: Failed to process {S} Event.", GetType().Name, ServiceName);
 

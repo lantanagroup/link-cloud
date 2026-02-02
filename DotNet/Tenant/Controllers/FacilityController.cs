@@ -177,7 +177,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 _logger.LogError(ex, "Exception Encountered in FacilityController.GetFacilityList");
                 return Problem("An error occurred while getting all facilities", null, 500);
             }
