@@ -13,12 +13,13 @@ $specMap = @{
     "http://localhost:8064/swagger/v1/swagger.json" = "docs/domains/Tenant/services/CensusService/openapi.yml"
     "http://localhost:8065/swagger/v1/swagger.json" = "docs/domains/DataAccess/services/DataAcquisitionService/openapi.yml"
     "http://localhost:8078/swagger/v1/swagger.json" = "docs/domains/DataAccess/services/DataAcquisitionWorkerService/openapi.yml"
-    "http://localhost:8067/v3/api-docs" = "docs/domains/Report/services/MeasureEvalService/openapi.yml"
+    "http://localhost:8067/v3/api-docs"             = "docs/domains/Report/services/MeasureEvalService/openapi.yml"
     "http://localhost:8068/swagger/v1/swagger.json" = "docs/domains/Report/services/NormalizationService/openapi.yml"
     "http://localhost:8072/swagger/v1/swagger.json" = "docs/domains/Report/services/ReportService/openapi.yml"
     "http://localhost:8073/swagger/v1/swagger.json" = "docs/domains/Report/services/SubmissionService/openapi.yml"
     "http://localhost:8074/swagger/v1/swagger.json" = "docs/domains/Tenant/services/TenantService/openapi.yml"
-    "http://localhost:8075/v3/api-docs" = "docs/domains/Compliance/services/ValidationService/openapi.yml"
+    "http://localhost:8075/v3/api-docs"             = "docs/domains/Compliance/services/ValidationService/openapi.yml"
+    "http://localhost:8076/swagger/v1/swagger.json" = "docs/domains/KnowledgeArtifactManagement/services/TerminologyService/openapi.yml"
 }
 
 foreach ($url in $specMap.Keys) {

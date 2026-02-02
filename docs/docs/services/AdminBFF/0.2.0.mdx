@@ -1,0 +1,43 @@
+---
+
+id: AdminBFF
+name: Admin Backend-for-Frontend
+version: 0.2.0
+
+summary: The administrative backend service that provides functionality for the front-end
+
+owners:
+  - arch_tea
+
+specifications:
+  openapiPath: openapi.yml
+
+badges:
+  - content: ".NET"
+    backgroundColor: yellow
+    textColor: black
+  - content: '8063:8080'
+    backgroundColor: gray
+    textColor: white
+
+---
+
+## Overview
+
+The AdminBFF (Backend-for-Frontend) service is the administrative gateway that bridges the Angular-based front-end application with the internal service ecosystem. It serves as the single public-facing backend entry point for all administrative operations, providing a tightly controlled interface that enforces security, authorization, and request routing policies.
+
+* **API Gateway for Front-End**: Acts as the dedicated backend interface for the admin UI, simplifying and consolidating access to internal services.
+* **Reverse Proxy via YARP**: Uses YARP (Yet Another Reverse Proxy) to intelligently route and proxy requests to internal backend services. This enables seamless service composition, service path rewriting, and centralized traffic control.
+* **Authorization Enforcement**: Validates that all incoming requests are made by authenticated users with the proper roles and scopes. It serves as the first and last line of defense before internal services are reached, ensuring that only authorized actions are executed.
+* **Facade for Backend Complexity**: Exposes a front-end-optimized API layer, reducing the need for the UI to manage low-level backend details or coordinate multiple service calls directly.
+* **Config File Serving for Admin UI**: AdminBFF also serves a runtime configuration file used by the Angular-based Admin UI service. This allows environment-specific values (e.g. API base URLs, feature flags) to be injected at deployment time.
+
+<Admonition type="warning">
+  The "Config File Serving for Admin UI" is only applicable when AdminBFF and AdminUI are deployed together as a single instance, such as in containerized deployments or bundled cloud environments.
+</Admonition>
+
+## Configuration
+
+| Property        | Type    | Description                                                                                      |
+|-----------------|---------|--------------------------------------------------------------------------------------------------|
+| `Redis:Enabled` | boolean | If enabled, Redis will be used to cache account information associated with authenticated users. |

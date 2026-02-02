@@ -19,7 +19,17 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
 
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faXmark, faRotate, faArrowLeft, faFileArrowDown, faFileInvoice, faSort, faSortUp, faSortDown } from '@fortawesome/free-solid-svg-icons';
+import {
+  faXmark,
+  faRotate,
+  faArrowLeft,
+  faFileArrowDown,
+  faFileInvoice,
+  faSort,
+  faSortUp,
+  faSortDown,
+  faGears
+} from '@fortawesome/free-solid-svg-icons';
 import { LoadingService } from 'src/app/services/loading.service';
 import { DonutChartComponent } from 'src/app/components/core/donut-chart/donut-chart.component';
 import { ViewReportTableCommandComponent } from './table-command/view-report-table-command.component';
@@ -119,7 +129,7 @@ export class ViewReportComponent implements OnInit {
             this.loadingService.hide();
           }
         });
-    });    
+    });
   }
 
   ngOnDestroy(): void {
@@ -139,19 +149,19 @@ export class ViewReportComponent implements OnInit {
     });
   }
 
-  loadMeasureReports(pageNumber: number, pageSize: number): void {  
+  loadMeasureReports(pageNumber: number, pageSize: number): void {
 
     this.facilityViewService.getMeasureReportSummaryList(
-        this.facilityId, 
-        this.reportId, 
-        this.patientFilter.length > 0 ? this.patientFilter : null, 
+        this.facilityId,
+        this.reportId,
+        this.patientFilter.length > 0 ? this.patientFilter : null,
         this.reportFilter.length > 0 ? this.reportFilter : null,
-        this.selectedMeasureFilter === 'any' ? null : this.selectedMeasureFilter, 
-        this.selectedReportStatusFilter === 'any' ? null : this.selectedReportStatusFilter, 
+        this.selectedMeasureFilter === 'any' ? null : this.selectedMeasureFilter,
+        this.selectedReportStatusFilter === 'any' ? null : this.selectedReportStatusFilter,
         this.selectedValidationStatusFilter === 'any' ? null : this.selectedValidationStatusFilter,
-        this.sortBy, 
+        this.sortBy,
         this.sortOrder,
-        pageNumber, 
+        pageNumber,
         pageSize).subscribe({
       next: (response) => {
         this.measureReports = response.records;
@@ -281,4 +291,6 @@ export class ViewReportComponent implements OnInit {
   navBack(): void {
     this.location.back();
   }
+
+  protected readonly faGears = faGears;
 }
