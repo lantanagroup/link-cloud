@@ -16,8 +16,9 @@ export class TerminologyService {
   ) { }
 
   getResources(): Observable<ITerminologyResource[]> {
-    const valueSets$ = this.http.get<any>(`${this.appConfigService.config?.baseApiUrl}/terminology/fhir/ValueSet?_summary=true`);
-    const codeSystems$ = this.http.get<any>(`${this.appConfigService.config?.baseApiUrl}/terminology/fhir/CodeSystem?_summary=true`);
+    const baseUrl = this.appConfigService.config?.baseApiUrl || '/api';
+    const valueSets$ = this.http.get<any>(`${baseUrl}/terminology/fhir/ValueSet?_summary=true`);
+    const codeSystems$ = this.http.get<any>(`${baseUrl}/terminology/fhir/CodeSystem?_summary=true`);
 
     return forkJoin([valueSets$, codeSystems$]).pipe(
       tap(_ => console.log('Fetched terminology resources')),
