@@ -1,0 +1,213 @@
+{
+  "PlanName": "ach",
+  "FacilityId": "{{tenant-name}}",
+  "EHRDescription": "Epic",
+  "LookBack": "P0D",
+  "Type": "Discharge",
+  "InitialQueries": {
+    "0": {
+      "ResourceType": "Encounter",
+      "QueryConfigType": "Parameter",
+      "Parameters": [
+        {
+          "ParameterType": "Variable",
+          "Name": "patient",
+          "Variable": 0,
+          "Format": null
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "date",
+          "Variable": 1,
+          "Format": "ge{0}"
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "date",
+          "Variable": 3,
+          "Format": "le{0}"
+        }
+      ]
+    },
+    "1": {
+      "QueryConfigType": "Reference",
+      "ResourceType": "Location",
+      "OperationType": 1,
+      "Paged": 100
+    }
+  },
+  "SupplementalQueries": {
+    "0": {
+      "QueryConfigType": "Parameter",
+      "ResourceType": "Condition",
+      "Parameters": [
+        {
+          "ParameterType": "Variable",
+          "Name": "patient",
+          "Variable": 0,
+          "Format": null
+        },
+        {
+          "ParameterType": "ResourceIds",
+          "Name": "encounter",
+          "Resource": "Encounter",
+          "Paged": "100"
+        }
+      ]
+    },
+    "1": {
+      "QueryConfigType": "Parameter",
+      "ResourceType": "Coverage",
+      "Parameters": [
+        {
+          "ParameterType": "Variable",
+          "Name": "patient",
+          "Variable": 0,
+          "Format": null
+        }
+      ]
+    },
+    "2": {
+      "QueryConfigType": "Parameter",
+      "ResourceType": "Observation",
+      "Parameters": [
+        {
+          "ParameterType": "Variable",
+          "Name": "patient",
+          "Variable": 0,
+          "Format": null
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "date",
+          "Variable": 1,
+          "Format": "ge{0}"
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "date",
+          "Variable": 3,
+          "Format": "le{0}"
+        },
+        {
+          "ParameterType": "Literal",
+          "Name": "category",
+          "Literal": "imaging,laboratory,social-history,vital-signs"
+        }
+      ]
+    },
+    "3": {
+      "QueryConfigType": "Parameter",
+      "ResourceType": "Procedure",
+      "Parameters": [
+        {
+          "ParameterType": "Variable",
+          "Name": "patient",
+          "Variable": 0,
+          "Format": null
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "date",
+          "Variable": 1,
+          "Format": "ge{0}"
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "date",
+          "Variable": 3,
+          "Format": "le{0}"
+        }
+      ]
+    },
+    "4": {
+      "QueryConfigType": "Parameter",
+      "ResourceType": "ServiceRequest",
+      "Parameters": [
+        {
+          "ParameterType": "Variable",
+          "Name": "patient",
+          "Variable": 0,
+          "Format": null
+        },
+        {
+          "ParameterType": "ResourceIds",
+          "Name": "encounter",
+          "Resource": "Encounter",
+          "Paged": "100"
+        }
+      ]
+    },
+    "5": {
+      "QueryConfigType": "Parameter",
+      "ResourceType": "DiagnosticReport",
+      "Parameters": [
+        {
+          "ParameterType": "Variable",
+          "Name": "patient",
+          "Variable": 0,
+          "Format": null
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "date",
+          "Variable": 1,
+          "Format": "ge{0}"
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "date",
+          "Variable": 3,
+          "Format": "le{0}"
+        }
+      ]
+    },
+    "6": {
+      "QueryConfigType": "Parameter",
+      "ResourceType": "MedicationRequest",
+      "Parameters": [
+        {
+          "ParameterType": "Variable",
+          "Name": "patient",
+          "Variable": 0,
+          "Format": null
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "authoredon",
+          "Variable": 1,
+          "Format": "ge{0}"
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "authoredon",
+          "Variable": 3,
+          "Format": "le{0}"
+        },
+        {
+          "ParameterType": "Literal",
+          "Name": "intent",
+          "Literal": "order"
+        }
+      ]
+    },
+    "7": {
+      "QueryConfigType": "Reference",
+      "ResourceType": "Medication",
+      "OperationType": 1,
+      "Paged": 100
+    },
+    "8": {
+      "QueryConfigType": "Reference",
+      "ResourceType": "Specimen",
+      "OperationType": 1,
+      "Paged": 100
+    },
+    "9": {
+      "QueryConfigType": "Reference",
+      "ResourceType": "Device",
+      "OperationType": 1,
+      "Paged": 100
+    }
+  }
+}

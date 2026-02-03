@@ -1,0 +1,138 @@
+{
+  "collections": [
+    {
+      "hasSchema": true,
+      "name": "changelogs"
+    },
+    {
+      "hasSchema": true,
+      "name": "channels"
+    },
+    {
+      "hasSchema": true,
+      "name": "commands"
+    },
+    {
+      "hasSchema": true,
+      "name": "containers"
+    },
+    {
+      "hasSchema": true,
+      "name": "customPages"
+    },
+    {
+      "hasSchema": true,
+      "name": "data-products"
+    },
+    {
+      "hasSchema": true,
+      "name": "designs"
+    },
+    {
+      "hasSchema": true,
+      "name": "diagrams"
+    },
+    {
+      "hasSchema": true,
+      "name": "domains"
+    },
+    {
+      "hasSchema": true,
+      "name": "entities"
+    },
+    {
+      "hasSchema": true,
+      "name": "events"
+    },
+    {
+      "hasSchema": true,
+      "name": "flows"
+    },
+    {
+      "hasSchema": true,
+      "name": "pages"
+    },
+    {
+      "hasSchema": true,
+      "name": "queries"
+    },
+    {
+      "hasSchema": true,
+      "name": "services"
+    },
+    {
+      "hasSchema": true,
+      "name": "teams"
+    },
+    {
+      "hasSchema": true,
+      "name": "ubiquitousLanguages"
+    },
+    {
+      "hasSchema": true,
+      "name": "users"
+    }
+  ],
+  "entries": {
+    "file:///d:/code/link-ec/node_modules/react-syntax-highlighter/node_modules/lowlight/changelog.md": "changelogs",
+    "file:///d:/code/link-ec/node_modules/zod-to-json-schema/changelog.md": "changelogs",
+    "file:///d:/code/link-ec/commands/dataacquisitionrequested/index.mdx": "commands",
+    "file:///d:/code/link-ec/commands/evaluationrequested/index.mdx": "commands",
+    "file:///d:/code/link-ec/commands/submitreport/index.mdx": "commands",
+    "file:///d:/code/link-ec/commands/generatereportrequested/index.mdx": "commands",
+    "file:///d:/code/link-ec/commands/validatevaluesetcode/index.mdx": "commands",
+    "file:///d:/code/link-ec/commands/validatecodesystemcode/index.mdx": "commands",
+    "file:///d:/code/link-ec/docs/arch/persistence.mdx": "customPages",
+    "file:///d:/code/link-ec/docs/arch/auth_flow.mdx": "customPages",
+    "file:///d:/code/link-ec/docs/arch/dual_scheduler_architecture.mdx": "customPages",
+    "file:///d:/code/link-ec/docs/arch/retry_topics.mdx": "customPages",
+    "file:///d:/code/link-ec/docs/config/dotnet.mdx": "customPages",
+    "file:///d:/code/link-ec/docs/arch/security.mdx": "customPages",
+    "file:///d:/code/link-ec/docs/arch/telemetry.mdx": "customPages",
+    "file:///d:/code/link-ec/docs/config/java.mdx": "customPages",
+    "file:///d:/code/link-ec/docs/dev/api_guidance.mdx": "customPages",
+    "file:///d:/code/link-ec/docs/dev/auth_policies.mdx": "customPages",
+    "file:///d:/code/link-ec/docs/dev/error_retry_scenarios.mdx": "customPages",
+    "file:///d:/code/link-ec/docs/user/tenant_management.mdx": "customPages",
+    "file:///d:/code/link-ec/docs/dev/testing.mdx": "customPages",
+    "file:///d:/code/link-ec/docs/dev/logging_error_handling.mdx": "customPages",
+    "file:///d:/code/link-ec/docs/dev/otel.mdx": "customPages",
+    "file:///d:/code/link-ec/domains/report/index.mdx": "domains",
+    "file:///d:/code/link-ec/domains/dataaccess/index.mdx": "domains",
+    "file:///d:/code/link-ec/domains/compliance/index.mdx": "domains",
+    "file:///d:/code/link-ec/domains/tenant/index.mdx": "domains",
+    "file:///d:/code/link-ec/domains/knowledgeartifactmanagement/index.mdx": "domains",
+    "file:///d:/code/link-ec/events/auditableeventoccurred/index.mdx": "events",
+    "file:///d:/code/link-ec/events/payloadsubmitted/index.mdx": "events",
+    "file:///d:/code/link-ec/events/patientcensusscheduled/index.mdx": "events",
+    "file:///d:/code/link-ec/events/patientidsacquired/index.mdx": "events",
+    "file:///d:/code/link-ec/events/measureevaluated/index.mdx": "events",
+    "file:///d:/code/link-ec/events/readytoacquire/index.mdx": "events",
+    "file:///d:/code/link-ec/events/patientevent/index.mdx": "events",
+    "file:///d:/code/link-ec/events/readyforvalidation/index.mdx": "events",
+    "file:///d:/code/link-ec/events/reportscheduled/index.mdx": "events",
+    "file:///d:/code/link-ec/events/resourceevaluated/index.mdx": "events",
+    "file:///d:/code/link-ec/events/resourceacquired/index.mdx": "events",
+    "file:///d:/code/link-ec/events/validationcomplete/index.mdx": "events",
+    "file:///d:/code/link-ec/events/resourcenormalized/index.mdx": "events",
+    "file:///d:/code/link-ec/services/adminui/index.mdx": "services",
+    "file:///d:/code/link-ec/domains/compliance/services/accountservice/index.mdx": "services",
+    "file:///d:/code/link-ec/services/adminbff/index.mdx": "services",
+    "file:///d:/code/link-ec/domains/knowledgeartifactmanagement/services/terminologyservice/index.mdx": "services",
+    "file:///d:/code/link-ec/domains/dataaccess/services/dataacquisitionservice/index.mdx": "services",
+    "file:///d:/code/link-ec/domains/compliance/services/auditservice/index.mdx": "services",
+    "file:///d:/code/link-ec/domains/compliance/services/validationservice/index.mdx": "services",
+    "file:///d:/code/link-ec/domains/report/services/normalizationservice/index.mdx": "services",
+    "file:///d:/code/link-ec/domains/report/services/measureevalservice/index.mdx": "services",
+    "file:///d:/code/link-ec/domains/dataaccess/services/dataacquisitionworkerservice/index.mdx": "services",
+    "file:///d:/code/link-ec/domains/report/services/querydispatchservice/index.mdx": "services",
+    "file:///d:/code/link-ec/domains/report/services/submissionservice/index.mdx": "services",
+    "file:///d:/code/link-ec/domains/report/services/reportservice/index.mdx": "services",
+    "file:///d:/code/link-ec/domains/tenant/services/tenantservice/index.mdx": "services",
+    "file:///d:/code/link-ec/domains/tenant/services/censusservice/index.mdx": "services",
+    "file:///d:/code/link-ec/teams/arch_team.mdx": "teams",
+    "file:///d:/code/link-ec/users/andrew_laing.mdx": "users",
+    "file:///d:/code/link-ec/users/daniel_vargas.mdx": "users",
+    "file:///d:/code/link-ec/users/sean_mcilvenna.mdx": "users"
+  }
+}

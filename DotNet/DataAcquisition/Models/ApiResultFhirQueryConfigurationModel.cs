@@ -14,7 +14,7 @@ namespace LantanaGroup.Link.DataAcquisition.Models
 
         public AuthenticationConfigurationModel? Authentication { get; set; }
 
-        public int? MaxConcurrentRequests { get; set; } = 8;
+        public int? MaxConcurrentRequests { get; set; } = 1;
 
         [JsonConverter(typeof(TimeSpanConverter))]
         public TimeSpan? MinAcquisitionPullTime { get; set; }
