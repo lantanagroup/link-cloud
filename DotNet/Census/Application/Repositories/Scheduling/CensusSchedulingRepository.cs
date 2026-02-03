@@ -40,7 +40,7 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
     public IJobDetail CreateJob(CensusConfigEntity facility)
     {
         JobDataMap jobDataMap = new JobDataMap();
-        jobDataMap.PutObject(CensusConstants.Scheduler.Facility, JsonSerializer.Serialize(facility));
+        jobDataMap.PutObject(CensusConstants.Scheduler.Facility, facility);
         jobDataMap.PutObject(CensusConstants.Scheduler.ReportType, KafkaTopic.PatientCensusScheduled.ToString());
 
         string jobName = $"{facility.FacilityID}-{KafkaTopic.PatientCensusScheduled.ToString()}";
