@@ -89,6 +89,7 @@ namespace IntegrationTests.Census
             var config = new CensusConfigEntity { FacilityID = facilityId, ScheduledTrigger = "0 0 * * *" };
             db.CensusConfigs.Add(config);
 
+            // Seed test data
             var patientEncounter = new PatientEncounter()
             {
                 CorrelationId = Guid.NewGuid().ToString(),
@@ -151,6 +152,7 @@ namespace IntegrationTests.Census
             var config = new CensusConfigEntity { FacilityID = facilityId, ScheduledTrigger = "0 0 * * *" };
             db.CensusConfigs.Add(config);
 
+            // Seed test data 
             var patientEncounter = new PatientEncounter()
             {
                 CorrelationId = Guid.NewGuid().ToString(),
