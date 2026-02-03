@@ -22,7 +22,9 @@ import java.util.Set;
 public class MeasureValidationService {
     private static final Logger logger = LoggerFactory.getLogger(MeasureValidationService.class);
     private static final List<String> IGNORED_ARTIFACT_URL_PREFIXES = List.of(
-            "http://fhir.org/guides/cqf/"
+            "http://fhir.org/guides/cqf/",
+            "http://terminology.hl7.org/CodeSystem/",
+            "http://terminology.hl7.org/ValueSet/"
     );
     private final MeasureDefinitionRepository repository;
 

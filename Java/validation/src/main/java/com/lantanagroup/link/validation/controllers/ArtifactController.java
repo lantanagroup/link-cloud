@@ -6,6 +6,7 @@ import com.lantanagroup.link.validation.entities.Artifact;
 import com.lantanagroup.link.validation.entities.ArtifactType;
 import com.lantanagroup.link.validation.repositories.ArtifactRepository;
 import com.lantanagroup.link.validation.services.ArtifactService;
+import com.lantanagroup.link.validation.models.PackageDetailsModel;
 import com.lantanagroup.link.validation.models.TerminologyDependency;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -62,6 +63,20 @@ public class ArtifactController {
             return artifactService.getTerminologyDependencies(packageId);
         } catch (IOException e) {
             throw new ServerErrorException("Failed to get terminology dependencies for package: " + packageId, e);
+        }
+    }
+
+    @Operation(summary = "Gets details of a specific package")
+    @GetMapping("/PACKAGE/{packageId}")
+    public PackageDetailsModel getPackageDetails(@PathVariable String packageId) {
+        try {
+            PackageDetailsModel model = artifactService.getPackageDetails(packageId);
+            if (model == null) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Package not found");
+            }
+            return model;
+        } catch (IOException e) {
+            throw new ServerErrorException("Failed to get package details for package: " + packageId, e);
         }
     }
 

@@ -19,6 +19,7 @@ import {MatCard, MatCardActions, MatCardContent, MatCardTitle} from "@angular/ma
 import {MatList, MatListItem} from "@angular/material/list";
 import {FileUploadComponent} from '../core/file-upload/file-upload.component';
 import {TxDependenciesDialogComponent} from "./tx-dependencies/tx-dependencies-dialog/tx-dependencies-dialog.component";
+import {PackageDetailsDialogComponent} from "./package-details-dialog/package-details-dialog.component";
 
 import {MatButtonModule} from "@angular/material/button";
 
@@ -166,6 +167,14 @@ export class ValidationConfigComponent implements OnInit {
     this.dialog.open(TxDependenciesDialogComponent, {
       width: '75%',
       maxWidth: '900px',
+      data: { package: packageName }
+    });
+  }
+
+  openPackageDetails(packageName: string): void {
+    this.dialog.open(PackageDetailsDialogComponent, {
+      width: '85%',
+      maxWidth: '1000px',
       data: { package: packageName }
     });
   }
