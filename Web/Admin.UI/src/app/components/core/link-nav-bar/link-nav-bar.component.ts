@@ -1,9 +1,9 @@
-import { IsActiveMatchOptions, Router, RouterLink, RouterLinkActive } from '@angular/router';
+import {Router, RouterLink, RouterLinkActive} from '@angular/router';
 
 
-import { Component } from '@angular/core';
-import { VdIconComponent } from "../vd-icon/vd-icon.component";
-import { AppConfigService } from "../../../services/app-config.service";
+import {Component} from '@angular/core';
+import {VdIconComponent} from "../vd-icon/vd-icon.component";
+import {AppConfigService} from "../../../services/app-config.service";
 
 export interface SubnavItem {
   label: string;
@@ -36,6 +36,7 @@ export class LinkNavBarComponent {
         { label: 'Measure Definitions', path: '/measure-def' },
         { label: 'Normalization Operations', path: '/tenant/operations' },
         { label: 'Query Plans', path: '/query-plans' },
+        { label: 'Terminology', path: '/terminology-config' },
         { label: 'Validation Categories', path: '/validation-config/validation-categories' },
         { label: 'Vendors', path: '/vendor' },
       ]
