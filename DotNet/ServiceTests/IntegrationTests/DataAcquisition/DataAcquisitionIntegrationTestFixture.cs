@@ -78,7 +78,7 @@ namespace IntegrationTests.DataAcquisition
 
             // Register IDatabase implementation
             builder.Services.AddScoped<LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase, LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Database>();
-
+            builder.Services.AddScoped<IQueryPlanValidator, QueryPlanValidator>();
             builder.Services.AddTransient<IDataAcquisitionLogService, DataAcquisitionLogService>();
 
             // Register managers                    
