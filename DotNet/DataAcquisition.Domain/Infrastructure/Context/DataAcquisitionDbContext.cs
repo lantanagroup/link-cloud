@@ -194,6 +194,11 @@ public class DataAcquisitionDbContext : DbContext
 
             entity.HasIndex(i => i.FacilityId)
                 .HasDatabaseName("IX_SftpAcquisitionLog_FacilityId");
+
+            entity.Property(e => e.Benchmarks)
+                .HasConversion(
+                    v => v != null ? JsonSerializer.Serialize(v, new JsonSerializerOptions()) : null,
+                    v => v != null ? JsonSerializer.Deserialize<List<SftpAcquisitionBenchmark>>(v, new JsonSerializerOptions()) : null);
         });
         
         //-------------------SftpConfiguration-------------------
