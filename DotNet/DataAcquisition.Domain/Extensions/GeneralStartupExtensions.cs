@@ -271,6 +271,7 @@ public static class GeneralStartupExtensions
 
         //Validation
         services.AddValidatorsFromAssemblyContaining<UpdateDataAcquisitionLogModelValidator>();
+        services.AddScoped<IQueryPlanValidator, QueryPlanValidator>();
 
         //Factories - Producer
         var kafkaConnection = configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>() ?? throw new Exception("Missing Kafka Connection Settings");

@@ -4,6 +4,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Application.Extensions;
@@ -77,7 +78,7 @@ namespace IntegrationTests.DataAcquisition
 
             // Register IDatabase implementation
             builder.Services.AddScoped<LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase, LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Database>();
-
+            builder.Services.AddScoped<IQueryPlanValidator, QueryPlanValidator>();
             builder.Services.AddTransient<IDataAcquisitionLogService, DataAcquisitionLogService>();
 
             // Register managers                    
@@ -108,6 +109,7 @@ namespace IntegrationTests.DataAcquisition
 
             builder.Services.AddTransient<ICreateSystemToken, CreateSystemToken>();
             builder.Services.AddTransient<ITenantApiService, TenantApiService>();
+
 
             builder.Services.AddHttpClient();
 
