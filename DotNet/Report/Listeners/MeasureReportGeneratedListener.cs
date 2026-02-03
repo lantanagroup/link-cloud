@@ -42,10 +42,8 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ITransientExceptionHandler<Null, MeasureReportGeneratedValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<Null, MeasureReportGeneratedValue> _deadLetterExceptionHandler;
 
-        private readonly PatientAggregator _patientAggregator;
         private readonly BlobStorageService _blobStorageService;
         private readonly ReadyForValidationProducer _readyForValidationProducer;
-        private readonly ReportManifestProducer _reportManifestProducer;
         private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
 
         private string Name => this.GetType().Name;
@@ -56,10 +54,8 @@ namespace LantanaGroup.Link.Report.Listeners
             ITransientExceptionHandler<Null, MeasureReportGeneratedValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<Null, MeasureReportGeneratedValue> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory,
-            PatientAggregator patientAggregator,
             BlobStorageService blobStorageService,
             ReadyForValidationProducer readyForValidationProducer,
-            ReportManifestProducer reportManifestProducer,
             AuditableEventOccurredProducer auditableEventOccurredProducer)
         {
 
@@ -76,10 +72,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
             _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.MeasureReportGenerated) + "-Error";
-            _patientAggregator = patientAggregator;
             _blobStorageService = blobStorageService;
             _readyForValidationProducer = readyForValidationProducer;
-            _reportManifestProducer = reportManifestProducer;
             _auditableEventOccurredProducer = auditableEventOccurredProducer;
         }
 
@@ -180,6 +174,8 @@ namespace LantanaGroup.Link.Report.Listeners
             var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
             var reportResourceManager = scope.ServiceProvider.GetRequiredService<IReportResourceManager>();
             var reportPopulationManager = scope.ServiceProvider.GetRequiredService<IReportPopulationManager>();
+            var patientAggregator = scope.ServiceProvider.GetRequiredService<PatientAggregator>();
+            var reportManifestProducer = scope.ServiceProvider.GetRequiredService<ReportManifestProducer>();
 
             var correlationId = Encoding.UTF8.GetString(headerValue);
 
@@ -196,7 +192,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             if (!readyForAggregation)
             {
-                await _reportManifestProducer.Produce(schedule, correlationId);
+                await reportManifestProducer.Produce(schedule, correlationId);
                 return;
             }
 
@@ -204,9 +200,9 @@ namespace LantanaGroup.Link.Report.Listeners
 
             try
             {
-                aggregateResult = await _patientAggregator.AggregateToABS(result.Message.Value.PatientId, schedule);
+                aggregateResult = await patientAggregator.AggregateToABS(result.Message.Value.PatientId, schedule);
             }
-            catch (Exception ex) 
+            catch (Exception ex)
             {
                 throw new DeadLetterException(ex.Message);
             }
