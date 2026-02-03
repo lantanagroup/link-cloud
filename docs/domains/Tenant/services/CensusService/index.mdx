@@ -54,6 +54,18 @@ The Census service consumes `PatientListsAcquired` and 'CernerPatientsAcquired' 
 3. **Event Production:** Upon successful acquisition, a `PatientListsAcquired` or `CernerPatientsAcquired` event is produced, containing the list of patients.
 4. **Census Update:** The Census service consumes the event and updates its records accordingly.
 
+## What is Event Sourcing?
+
+Event Sourcing is an architectural design pattern where changes that occur in a domain are immutably stored as events in an append-only log. This provides a business with richer data as each change that occurs within the domain is stored as a sequence of events which can be replayed in the order they occurred.
+
+## Event Sourcing Data Model
+
+The data model for the Census service will be broken into two main types:
+
+**Event Store:** The database table responsible for exclusively inserting any relevant census information that’s streamed from external sources (ADT, FHIR List, SFTP).  No updates or deletes should be performed on the records written to this table. The Event Store is considered the source of truth for patient census information. Each event store record must provide the source of the event (ADT, SFTP, etc) and include a payload of data related to the event type.
+
+**Materialized View:** A series of tables that represent the current state of a patient’s visit. As records are written to the Event Store, the Census service will update these tables to reflect any changes that were made for the patient. Materialized views are not considered the source of truth.
+
 ## Event Payload Structures
 
 ### FHIRListAdmitPayload Event
