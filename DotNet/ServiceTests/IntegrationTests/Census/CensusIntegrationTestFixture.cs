@@ -84,6 +84,7 @@ public sealed class CensusIntegrationTestFixture : IDisposable
                 services.AddScoped<IBaseEntityRepository<PatientVisitIdentifier>, CensusEntityRepository<PatientVisitIdentifier>>();
                 services.AddScoped<ICensusSchedulingRepository, CensusSchedulingRepository>();
                 services.AddScoped<IPatientListService, PatientListService>();
+                services.AddScoped<ICernerListService, CernerListService>();
 
                 services.AddSingleton<ICensusServiceMetrics, NullCensusServiceMetrics>();
                 services.AddSingleton<ITenantApiService, NullTenantApiService>();

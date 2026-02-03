@@ -1,5 +1,7 @@
 ﻿using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models.Enums;
+using LantanaGroup.Link.Census.Application.Models.Payloads.Cerner;
+using LantanaGroup.Link.Census.Application.Models.Payloads.CernerList;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 
@@ -24,12 +26,16 @@ public static class PatientEventFactory
         };
     }
 
+    //TODO: Daniel - I don't think we need this. The event date should be the date that we wrote the entry into the table. The payload should contain any relevant date info
     private static DateTime GetEventDate(IPayload payload)
     {
         return payload switch
         {
             FHIRListDischargePayload dischargePayload => dischargePayload.DischargeDate,
             FHIRListAdmitPayload admitPayload => admitPayload.AdmitDate,
+            CernerListAdmitPayload cernerAdmit => DateTime.UtcNow,
+            CernerListUpdatePayload cernerUpdate => DateTime.UtcNow,
+            CernerListDischargePayload cernerDischarge => DateTime.UtcNow,
             _ => throw new Exception("Unsupported payload type for event date extraction")
         };
     }
