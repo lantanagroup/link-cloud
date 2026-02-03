@@ -130,7 +130,13 @@ namespace LantanaGroup.Link.Census.Listeners
             using var scope = _scopeFactory.CreateScope();
             var cernerListService = scope.ServiceProvider.GetRequiredService<ICernerListService>();
 
-            await cernerListService.ProcessDischarges(result.Message.Key, result.Message.Value, cancellationToken);
+            var dischargeEvents = await cernerListService.ProcessDischarges(result.Message.Key, result.Message.Value, cancellationToken);
+
+            if (dischargeEvents.Count() > 0) 
+            {
+                await _eventProducerService.ProduceEventsAsync(result.Message.Key, dischargeEvents, cancellationToken);
+            }
+
             await cernerListService.ProcessList(result.Message.Key, result.Message.Value, cancellationToken);
         }
     }
