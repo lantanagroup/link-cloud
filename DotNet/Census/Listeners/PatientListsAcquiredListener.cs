@@ -43,9 +43,9 @@ public class PatientListsAcquiredListener : BackgroundService
 
 
         _transientExceptionHandler.ServiceName = CensusConstants.ServiceName;
-        _transientExceptionHandler.Topic = nameof(KafkaTopic.PatientListsAcquired) + "-Retry";
+        _transientExceptionHandler.Topic = nameof(KafkaTopic.CernerPatientsAcquired) + "-Retry";
         _nonTransientExceptionHandler.ServiceName = CensusConstants.ServiceName;
-        _nonTransientExceptionHandler.Topic = nameof(KafkaTopic.PatientListsAcquired) + "-Error";
+        _nonTransientExceptionHandler.Topic = nameof(KafkaTopic.CernerPatientsAcquired) + "-Error";
     }
 
     public override async Task StartAsync(CancellationToken cancellationToken)
