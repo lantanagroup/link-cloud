@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using System.Reflection;
 using System.Text.Json;
 
@@ -15,6 +16,9 @@ public class ServiceInformation
     public string Commit { get; init; } = string.Empty;
     public string Build { get; init; } = string.Empty;
     public string SwaggerUrl { get; set; } = string.Empty;
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    [Newtonsoft.Json.JsonIgnore]
     public string? ConnectionString { get; set; }
 
     public static ServiceInformation GetServiceInformation(Assembly assembly, IConfiguration configuration)
