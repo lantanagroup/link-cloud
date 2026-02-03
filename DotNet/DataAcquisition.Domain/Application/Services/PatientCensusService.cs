@@ -97,6 +97,8 @@ public class PatientCensusService : IPatientCensusService
                     ScheduledDate = null,  // null = census should process immediately, can be set later for retry if needed
                     ProcessDate = null,
                     Status = RequestStatus.Pending,
+                    OriginatingTraceId = Activity.Current?.TraceId.ToString(),
+                    OriginatingSpanId = Activity.Current?.SpanId.ToString(),
                     Notes = [$"[{DateTime.UtcNow:O}] SFTP {censusConfig.AcquisitionType} acquisition scheduled"]
                 };
 

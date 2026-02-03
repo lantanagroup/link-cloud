@@ -1,4 +1,4 @@
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp;
 
@@ -13,6 +13,6 @@ public interface ISftpClientService
     /// Dispose the session when done to disconnect.
     /// </summary>
     Task<ISftpSession> OpenSessionAsync(
-        SftpConfiguration sftpConfig,
+        SftpConfigurationModel sftpConfig,
         CancellationToken cancellationToken);
 }

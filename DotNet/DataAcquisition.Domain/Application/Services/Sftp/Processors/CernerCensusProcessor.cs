@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Text;
 using Confluent.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
@@ -14,25 +16,13 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Pro
 /// Handles SftpAcquisitionType.CernerCensus and produces CernerPatientsAcquired Kafka events.
 /// Produces one event per file.
 /// </summary>
-public class CernerCensusProcessor : ISftpAcquisitionProcessor
+public class CernerCensusProcessor(
+    ILogger<CernerCensusProcessor> logger,
+    ISftpClientService sftpClientService,
+    IFileParserFactory fileParserFactory,
+    IProducer<string, CernerPatientsAcquired> kafkaProducer)
+    : ISftpAcquisitionProcessor
 {
-    private readonly ILogger<CernerCensusProcessor> _logger;
-    private readonly ISftpClientService _sftpClientService;
-    private readonly IFileParserFactory _fileParserFactory;
-    private readonly IProducer<string, CernerPatientsAcquired> _kafkaProducer;
-
-    public CernerCensusProcessor(
-        ILogger<CernerCensusProcessor> logger,
-        ISftpClientService sftpClientService,
-        IFileParserFactory fileParserFactory,
-        IProducer<string, CernerPatientsAcquired> kafkaProducer)
-    {
-        _logger = logger;
-        _sftpClientService = sftpClientService;
-        _fileParserFactory = fileParserFactory;
-        _kafkaProducer = kafkaProducer;
-    }
-
     public bool CanProcess(SftpAcquisitionType acquisitionType)
     {
         return acquisitionType == SftpAcquisitionType.CernerCensus;
@@ -40,16 +30,18 @@ public class CernerCensusProcessor : ISftpAcquisitionProcessor
 
     public async Task<List<string>> ProcessAsync(
         SftpAcquisitionLog log,
-        SftpConfiguration sftpConfig,
+        SftpConfigurationModel sftpConfig,
         SftpAcquisitionTypeConfiguration acquisitionConfig,
         CancellationToken cancellationToken)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity();
+        
         var remoteDir = acquisitionConfig.RemoteDirectory ?? sftpConfig.RemoteDirectory ?? "/";
         var processedFiles = new List<string>();
         var totalEncounterCount = 0;
 
         // Open a single SFTP session for all operations
-        await using var session = await _sftpClientService.OpenSessionAsync(sftpConfig, cancellationToken);
+        await using var session = await sftpClientService.OpenSessionAsync(sftpConfig, cancellationToken);
 
         // List matching files
         var files = await session.ListFilesAsync(
@@ -59,13 +51,22 @@ public class CernerCensusProcessor : ISftpAcquisitionProcessor
 
         if (files.Count == 0)
         {
-            _logger.LogInformation(
+            activity?.AddEvent(new ActivityEvent(
+                "No Files Found",
+                tags: new ActivityTagsCollection
+                {
+                    { "FacilityId", log.FacilityId },
+                    { "AcquisitionType", log.AcquisitionType.ToString() },
+                    { "Pattern", acquisitionConfig.FileNamePattern ?? "(all files)" }
+                }));
+
+            logger.LogInformation(
                 "No files found for facility {FacilityId}, type {AcquisitionType}, pattern {Pattern}",
                 log.FacilityId, log.AcquisitionType, acquisitionConfig.FileNamePattern ?? "(all files)");
             return processedFiles;
         }
 
-        _logger.LogInformation(
+        logger.LogInformation(
             "Found {FileCount} files for facility {FacilityId}, type {AcquisitionType}",
             files.Count, log.FacilityId, log.AcquisitionType);
 
@@ -73,16 +74,16 @@ public class CernerCensusProcessor : ISftpAcquisitionProcessor
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            _logger.LogDebug("Processing file {FileName} for facility {FacilityId}", file.Name, log.FacilityId);
+            logger.LogDebug("Processing file {FileName} for facility {FacilityId}", file.Name, log.FacilityId);
 
             // Get appropriate parser for this file
             var fileExtension = Path.GetExtension(file.Name);
-            var parser = _fileParserFactory.GetParser<CernerEncounters>(
+            var parser = fileParserFactory.GetParser<CernerEncounters>(
                 log.AcquisitionType,
                 fileExtension,
                 acquisitionConfig.ParsingConfiguration);
 
-            // Download and parse file (same session/connection)
+            // Download and parse file
             using var fileStream = await session.DownloadFileAsync(file.FullName, cancellationToken);
 
             var fileEncounters = new List<CernerEncounters>();
@@ -92,7 +93,7 @@ public class CernerCensusProcessor : ISftpAcquisitionProcessor
                 fileEncounters.Add(encounter);
             }
 
-            // Produce Kafka event for THIS file
+            // Produce Kafka event for patients found in this file
             var kafkaMessage = new Message<string, CernerPatientsAcquired>
             {
                 Key = log.FacilityId,
@@ -106,10 +107,10 @@ public class CernerCensusProcessor : ISftpAcquisitionProcessor
                 }
             };
 
-            await _kafkaProducer.ProduceAsync(
+            await kafkaProducer.ProduceAsync(
                 KafkaTopic.CernerPatientsAcquired.ToString(), kafkaMessage, cancellationToken);
 
-            _logger.LogDebug(
+            logger.LogDebug(
                 "Produced CernerPatientsAcquired event for file {FileName} with {EncounterCount} encounters",
                 file.Name, fileEncounters.Count);
 
@@ -118,18 +119,18 @@ public class CernerCensusProcessor : ISftpAcquisitionProcessor
             {
                 // Move file to processed directory (preferred - allows audit/recovery)
                 await session.MoveFileAsync(file.FullName, acquisitionConfig.ProcessedDirectory, cancellationToken);
-                _logger.LogDebug("Moved file {FileName} to {ProcessedDirectory}", file.Name, acquisitionConfig.ProcessedDirectory);
+                logger.LogDebug("Moved file {FileName} to {ProcessedDirectory}", file.Name, acquisitionConfig.ProcessedDirectory);
             }
             else if (sftpConfig.RemoveAfterProcessing)
             {
                 // Delete file (legacy behavior)
                 await session.DeleteFileAsync(file.FullName, cancellationToken);
-                _logger.LogDebug("Deleted file {FileName} after processing", file.Name);
+                logger.LogDebug("Deleted file {FileName} after processing", file.Name);
             }
             else
             {
                 // File left in place - will be re-processed on next run
-                _logger.LogWarning(
+                logger.LogWarning(
                     "File {FileName} left in place. Configure ProcessedDirectory or enable RemoveAfterProcessing to avoid re-processing.",
                     file.Name);
             }
@@ -139,11 +140,11 @@ public class CernerCensusProcessor : ISftpAcquisitionProcessor
         }
 
         // Flush all produced messages
-        _kafkaProducer.Flush(cancellationToken);
+        kafkaProducer.Flush(cancellationToken);
 
         // Session auto-disconnects when disposed
 
-        _logger.LogInformation(
+        logger.LogInformation(
             "Successfully processed {FileCount} Cerner census files with {EncounterCount} total encounters for facility {FacilityId}",
             processedFiles.Count, totalEncounterCount, log.FacilityId);
 

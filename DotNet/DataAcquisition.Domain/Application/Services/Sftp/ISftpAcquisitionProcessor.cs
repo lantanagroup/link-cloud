@@ -1,3 +1,4 @@
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
@@ -22,7 +23,7 @@ public interface ISftpAcquisitionProcessor
     /// </summary>
     Task<List<string>> ProcessAsync(
         SftpAcquisitionLog log,
-        SftpConfiguration sftpConfig,
+        SftpConfigurationModel sftpConfig,
         SftpAcquisitionTypeConfiguration acquisitionConfig,
         CancellationToken cancellationToken);
 }
