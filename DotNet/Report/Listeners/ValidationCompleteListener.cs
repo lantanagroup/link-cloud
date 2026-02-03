@@ -32,9 +32,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ITransientExceptionHandler<string, ValidationCompleteValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, ValidationCompleteValue> _deadLetterExceptionHandler;
         private readonly SubmitPayloadProducer _submitPayloadProducer;
-        private readonly ReportManifestProducer _reportManifestProducer;
         private readonly BlobStorageService _blobStorageService;
-        private readonly PatientAggregator _patientAggregator;
         private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
 
         private string Name => this.GetType().Name;
@@ -47,8 +45,6 @@ namespace LantanaGroup.Link.Report.Listeners
             SubmitPayloadProducer submitPayloadProducer,
             IServiceScopeFactory serviceScopeFactory,
             BlobStorageService blobStorageService,
-            PatientAggregator patientAggregator,
-            ReportManifestProducer reportManifestProducer,
             AuditableEventOccurredProducer auditableEventOccurredProducer)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -56,10 +52,8 @@ namespace LantanaGroup.Link.Report.Listeners
             _serviceScopeFactory = serviceScopeFactory;
             _submitPayloadProducer = submitPayloadProducer;
             _blobStorageService = blobStorageService;
-            _patientAggregator = patientAggregator;
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
-            _reportManifestProducer = reportManifestProducer;
 
             _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _transientExceptionHandler.Topic = nameof(KafkaTopic.ValidationComplete) + "-Retry";
@@ -165,6 +159,8 @@ namespace LantanaGroup.Link.Report.Listeners
             using var scope = _serviceScopeFactory.CreateScope();
             var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
             var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+            var patientAggregator = scope.ServiceProvider.GetRequiredService<PatientAggregator>();
+            var reportManifestProducer = scope.ServiceProvider.GetRequiredService<ReportManifestProducer>();
 
             var facilityId = result.Message.Key;
             var value = result.Message.Value;
@@ -209,7 +205,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 try
                 {
-                    _patientAggregator.AppendResourceToBlob(reportEntry.AggregateReportBlobName, operationOutcome);
+                    patientAggregator.AppendResourceToBlob(reportEntry.AggregateReportBlobName, operationOutcome);
                 }
                 catch (Exception ex)
                 {
@@ -230,7 +226,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 throw new TransientException($"{Name}: An error was encountered when producing a Submit Payload event(ReportId = {schedule.Id}, FacilityId = {facilityId}, PatientId {value.PatientId}).", ex);
             }
 
-            await _reportManifestProducer.Produce(schedule, correlationIdStr);
+            await reportManifestProducer.Produce(schedule, correlationIdStr);
         }
 
         private static OperationOutcome GetOperationOutcome()
