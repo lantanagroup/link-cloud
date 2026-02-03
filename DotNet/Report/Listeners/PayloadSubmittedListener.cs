@@ -22,7 +22,8 @@ public class PayloadSubmittedListener(
     ITransientExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue> transientExceptionHandler,
     IDeadLetterExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue> deadLetterExceptionHandler,
     ILogger<PayloadSubmittedListener> logger,
-    IServiceScopeFactory serviceScopeFactory)
+    IServiceScopeFactory serviceScopeFactory,
+    ServiceInformation serviceInformation)
     : BackgroundService
 {
     private string Name => this.GetType().Name;
@@ -36,7 +37,7 @@ public class PayloadSubmittedListener(
     {
         var config = new ConsumerConfig()
         {
-            GroupId = ReportConstants.ServiceName,
+            GroupId = serviceInformation.ServiceConfigName,
             EnableAutoCommit = false
         };
 

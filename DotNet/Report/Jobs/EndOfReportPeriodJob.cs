@@ -6,6 +6,7 @@ using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Quartz;
 using Task = System.Threading.Tasks.Task;
@@ -23,7 +24,7 @@ namespace LantanaGroup.Link.Report.Jobs
 
         public EndOfReportPeriodJob(
             ILogger<EndOfReportPeriodJob> logger,
-            [FromKeyedServices("MongoScheduler")] ISchedulerFactory schedulerFactory,
+            ISchedulerFactory schedulerFactory,
             IServiceScopeFactory serviceScopeFactory,
             DataAcquisitionRequestedProducer dataAcqProducer,
             ReadyForValidationProducer readyForValidationProducer)
@@ -48,6 +49,22 @@ namespace LantanaGroup.Link.Report.Jobs
             ReportSchedule? schedule = null;
             try
             {
+                // Get the schedule ID from the job data map
+                var jobDataMap = context.JobDetail.JobDataMap;
+                string? scheduleId = jobDataMap.GetObject<string>("ReportScheduleId");
+
+                if (string.IsNullOrEmpty(scheduleId))
+                {
+                    // Fallback: try to get from trigger data map
+                    scheduleId = context.Trigger.JobDataMap?.GetObject<string>("ReportScheduleId");
+                }
+
+                if (string.IsNullOrEmpty(scheduleId))
+                {
+                    _logger.LogError("EndOfReportPeriodJob executed but no ReportScheduleId found in job data");
+                    return;
+                }
+
                 using var scope = _serviceScopeFactory.CreateScope();
                 var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
                 var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();

@@ -1,12 +1,13 @@
-﻿using System.Diagnostics;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Logging;
-using System.Text;
 using OpenTelemetry.Trace;
+using System.Diagnostics;
+using System.Text;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 {
@@ -16,18 +17,23 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
         protected readonly ILogger<DeadLetterExceptionHandler<K, V>> Logger;
         protected readonly IKafkaProducerFactory<K, V> ProducerFactory;
         protected readonly IKafkaProducerFactory<string, string> NullConsumeResultProducerFactory;
+        protected readonly ServiceInformation ServiceInformation;
 
         public string Topic { get; set; } = string.Empty;
 
-        public string ServiceName { get; set; } = string.Empty;
+        protected string ServiceName { get; set; } = string.Empty;
 
         public DeadLetterExceptionHandler(ILogger<DeadLetterExceptionHandler<K, V>> logger, 
             IKafkaProducerFactory<K, V> producerFactory,
-            IKafkaProducerFactory<string, string> nullConsumeResultProducerFactory)
+            IKafkaProducerFactory<string, string> nullConsumeResultProducerFactory,
+            ServiceInformation serviceInformation)
         {
             Logger = logger;
             ProducerFactory = producerFactory;
             NullConsumeResultProducerFactory = nullConsumeResultProducerFactory;
+            ServiceInformation = serviceInformation;
+
+            ServiceName = ServiceInformation.ServiceConfigName ?? throw new ArgumentNullException("ServiceName must be populated");
         }
 
         public void HandleException(ConsumeResult<K, V> consumeResult, string facilityId,string message = "")
@@ -56,7 +62,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             try
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
 
                 Logger.LogError(ex, "{Name}: Failed to process {S} Event. (Partition: {Partition} Offset: {Offset})", GetType().Name, ServiceName, consumeResult.Partition.Value, consumeResult.Offset.Value);
 
@@ -101,7 +107,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             try
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 
                 if (ex?.ConsumerRecord?.Message == null)
                 {

@@ -1,9 +1,7 @@
-using System.Collections.Specialized;
-using System.Diagnostics;
-using System.Reflection;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Health;
@@ -30,13 +28,13 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Quartz;
-using Quartz.Impl;
-using Quartz.Spi;
 using Serilog;
 using Serilog.Debugging;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
+using System.Diagnostics;
+using System.Reflection;
 
 namespace Tenant
 {
@@ -75,15 +73,9 @@ namespace Tenant
                 options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
             });
 
-            var serviceInformation = builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-            if (serviceInformation != null)
-            {
-                ServiceActivitySource.Initialize(serviceInformation);
-            }
-            else
-            {
-                throw new NullReferenceException("Service Information was null.");
-            }
+            var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+
+            var serviceInformation = builder.SetupServiceInformation(TenantConstants.ServiceName, assemblyVersion);
 
             // Add services to the container.
             builder.Services.AddSingleton<ScheduleService>();
@@ -198,29 +190,10 @@ namespace Tenant
 
             SelfLog.Enable(Console.Error);
 
-            builder.Services.AddSingleton<IJobFactory, QuartzJobFactory>();
-
-            var quartzProps = new NameValueCollection
-            {
-                ["quartz.scheduler.instanceName"] = "TenantScheduler",
-                ["quartz.scheduler.instanceId"] = "AUTO",
-                ["quartz.jobStore.clustered"] = "true",
-                ["quartz.jobStore.type"] = "Quartz.Impl.AdoJobStore.JobStoreTX, Quartz",
-                ["quartz.jobStore.driverDelegateType"] = "Quartz.Impl.AdoJobStore.SqlServerDelegate, Quartz",
-                ["quartz.jobStore.tablePrefix"] = "quartz.QRTZ_",
-                ["quartz.jobStore.dataSource"] = "default",
-                ["quartz.dataSource.default.connectionString"] = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection),
-                ["quartz.dataSource.default.provider"] = "SqlServer",
-                ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
-                ["quartz.threadPool.threadCount"] = "5",
-                ["quartz.jobStore.useProperties"] = "false",
-                ["quartz.serializer.type"] = "json"
-            };
-
-            builder.Services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
+            //Add Quartz scheduler with SQL persistence
+            builder.Services.RegisterQuartzDatabase(serviceInformation.ConnectionString);
 
             builder.Services.AddSingleton<ReportScheduledJob>();
-            builder.Services.AddSingleton<RetentionCheckScheduledJob>();
 
             //Add CORS
             builder.Services.AddLinkCorsService(options => {

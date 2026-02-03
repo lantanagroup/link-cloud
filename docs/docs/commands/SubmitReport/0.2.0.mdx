@@ -1,0 +1,37 @@
+---
+
+id: SubmitReport
+name: Submit Report
+version: 0.2.0
+
+summary: Instructs that a completed report be packaged for submission.
+
+---
+
+## Overview
+
+Sent when all patient data for a reporting period has been processed, prompting the packaging of the final submission bundle.
+
+<NodeGraph />
+
+## Command Schema
+
+### Key
+
+```json
+{
+  "facilityId": "string",
+  "startDate": "date-time",
+  "endDate": "date-time"
+}
+```
+
+### Headers
+
+| Header Name      | Description                                                                                        |
+|------------------|----------------------------------------------------------------------------------------------------|
+| X-Correlation-Id | The correlation ID associated with the event that should be used in logs produced during the event |
+
+### Payload
+
+<SchemaViewer file="schema.json" />

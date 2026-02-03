@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
@@ -7,9 +8,7 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using Microsoft.Extensions.Options;
 using System.Text;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 
 namespace LantanaGroup.Link.DataAcquisition.Listeners;
 
@@ -23,7 +22,7 @@ public class PatientCensusScheduledListener : BaseListener<PatientCensusSchedule
         IDeadLetterExceptionHandler<string, PatientCensusScheduled> deadLetterExceptionHandler,
         IDeadLetterExceptionHandler<string, string> deadLetterConsumerErrorHandler,
         IServiceScopeFactory serviceScopeFactory,
-        IOptions<ServiceInformation> serviceInformation) : base(logger, kafkaConsumerFactory, deadLetterExceptionHandler, deadLetterConsumerErrorHandler, transientExceptionHandler, serviceInformation)
+        ServiceInformation serviceInformation) : base(logger, kafkaConsumerFactory, deadLetterExceptionHandler, deadLetterConsumerErrorHandler, transientExceptionHandler, serviceInformation)
     {
         _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
     }

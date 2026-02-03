@@ -1,0 +1,968 @@
+﻿swagger: "2.0"
+info:
+  version: 0.4.1
+  title: Account
+paths:
+  /api/account/info:
+    get:
+      tags:
+      - Account
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/ServiceInformation'
+  /api/account/user/{id}/activate:
+    post:
+      tags:
+      - User
+      summary: Activate a user
+      description: Activates a user and makes them active
+      produces:
+      - application/problem+json
+      parameters:
+      - in: path
+        name: id
+        required: true
+        type: string
+        format: uuid
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+  /api/account/role:
+    post:
+      tags:
+      - Role
+      summary: Create user
+      description: Creates a new user
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      - application/problem+json
+      parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/LinkRoleModel'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/LinkRoleModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ValidationFailureResponse'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+    get:
+      tags:
+      - Role
+      summary: Get all roles
+      description: Retrieves all roles
+      produces:
+      - application/json
+      - application/problem+json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/ListRoleModel'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+  /api/account/user:
+    post:
+      tags:
+      - User
+      summary: Create user
+      description: Creates a new user
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      - application/problem+json
+      parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/LinkUserModel'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/LinkUserModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ValidationFailureResponse'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+  /api/account/user/{id}/deactivate:
+    post:
+      tags:
+      - User
+      summary: Deactivate a user
+      description: Deactivates a user and makes them inactive
+      produces:
+      - application/problem+json
+      parameters:
+      - in: path
+        name: id
+        required: true
+        type: string
+        format: uuid
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+  /api/account/role/{id}:
+    delete:
+      tags:
+      - Role
+      summary: Delete role
+      description: Deletes an existing role
+      produces:
+      - application/problem+json
+      parameters:
+      - in: path
+        name: id
+        required: true
+        type: string
+        format: uuid
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+    get:
+      tags:
+      - Role
+      summary: Get role by id
+      description: Retrieves information about a role with the id provided
+      produces:
+      - application/json
+      - application/problem+json
+      parameters:
+      - in: path
+        name: id
+        required: true
+        type: string
+        format: uuid
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/LinkRoleModel'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+    put:
+      tags:
+      - Role
+      summary: Update role
+      description: Updates an existing role
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      - application/problem+json
+      parameters:
+      - in: path
+        name: id
+        required: true
+        type: string
+        format: uuid
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/LinkRoleModel'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ValidationFailureResponse'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+  /api/account/user/{id}:
+    delete:
+      tags:
+      - User
+      summary: Delete user
+      description: Deletes an existing user from the system.
+      produces:
+      - application/problem+json
+      parameters:
+      - in: path
+        name: id
+        required: true
+        type: string
+        format: uuid
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+    get:
+      tags:
+      - User
+      summary: Get user by id
+      description: Retrieves information about a user with the id provided
+      produces:
+      - application/json
+      - application/problem+json
+      parameters:
+      - in: path
+        name: id
+        required: true
+        type: string
+        format: uuid
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/LinkUserModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ValidationFailureResponse'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+    put:
+      tags:
+      - User
+      summary: Update user
+      description: Updates an existing user
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      - application/problem+json
+      parameters:
+      - in: path
+        name: id
+        required: true
+        type: string
+        format: uuid
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/LinkUserModel'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ValidationFailureResponse'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+  /api/account/claims:
+    get:
+      tags:
+      - Claim
+      summary: Get all claims
+      description: Retrieves a list all claims that are assignable.
+      produces:
+      - application/json
+      - application/problem+json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/LinkClaimsModel'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+  /api/account/role/name/{name}:
+    get:
+      tags:
+      - Role
+      summary: Get role by name
+      description: Retrieves information about a role with the name provided
+      produces:
+      - application/json
+      - application/problem+json
+      parameters:
+      - in: path
+        name: name
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/LinkRoleModel'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+  /api/account/user/email/{email}:
+    get:
+      tags:
+      - User
+      summary: Get user by id
+      description: Retrieves information about a user with the email address provided
+      produces:
+      - application/json
+      - application/problem+json
+      parameters:
+      - in: path
+        name: email
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/LinkUserModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+  /api/account/user/facility/{id}:
+    get:
+      tags:
+      - User
+      summary: Get facility users
+      description: Retrieves users associated with the facility id provided
+      produces:
+      - application/json
+      - application/problem+json
+      parameters:
+      - in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/GroupedUserModel'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+  /api/account/user/role/{id}:
+    get:
+      tags:
+      - User
+      summary: Get users in role
+      description: Retrieves users assigned to the role provided
+      produces:
+      - application/json
+      - application/problem+json
+      parameters:
+      - in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/GroupedUserModel'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+  /api/account/user/{id}/recover:
+    post:
+      tags:
+      - User
+      summary: Recover a deleted user
+      description: Recovers a deleted user and makes them active
+      produces:
+      - application/json
+      - application/problem+json
+      parameters:
+      - in: path
+        name: id
+        required: true
+        type: string
+        format: uuid
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/LinkUserModel'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+  /api/account/users:
+    get:
+      tags:
+      - User
+      summary: Search for users
+      description: Searches for users with provided filters
+      produces:
+      - application/json
+      - application/problem+json
+      parameters:
+      - in: query
+        name: searchText
+        type: string
+      - in: query
+        name: filterFacilityBy
+        type: string
+      - in: query
+        name: filterRoleBy
+        type: string
+      - in: query
+        name: filterClaimBy
+        type: string
+      - in: query
+        name: includeDeactivatedUsers
+        type: boolean
+      - in: query
+        name: includeDeletedUsers
+        type: boolean
+      - in: query
+        name: sortBy
+        type: string
+      - in: query
+        name: sortOrder
+      - in: query
+        name: pageSize
+        type: integer
+        format: int32
+        default: 10
+      - in: query
+        name: pageNumber
+        type: integer
+        format: int32
+        default: 1
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/GroupedUserModel'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+  /api/account/role/{id}/claims:
+    put:
+      tags:
+      - Role
+      summary: Update role claims
+      description: Updates the claims for an existing role
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      - application/problem+json
+      parameters:
+      - in: path
+        name: id
+        required: true
+        type: string
+        format: uuid
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/LinkClaimsModel'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/LinkRoleModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ValidationFailureResponse'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+  /api/account/user/{id}/claims:
+    put:
+      tags:
+      - User
+      summary: Update user claims
+      description: Updates the claims for an existing user
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      - application/problem+json
+      parameters:
+      - in: path
+        name: id
+        required: true
+        type: string
+        format: uuid
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/LinkClaimsModel'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/LinkUserModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ValidationFailureResponse'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+  /health:
+    get:
+      tags:
+      - Health
+      summary: Health check endpoint
+      description: Returns the health status of the service and its dependencies
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Healthy
+          schema:
+            type: object
+            properties:
+              status:
+                description: Overall health status
+                type: string
+              totalDuration:
+                description: Total duration of health checks
+                type: string
+              entries:
+                type: object
+                properties:
+                  Database:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                      description:
+                        type: string
+                      duration:
+                        type: string
+                      data:
+                        type: object
+                  Cache:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                      description:
+                        type: string
+                      duration:
+                        type: string
+                      data:
+                        type: object
+                  Kafka:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                      description:
+                        type: string
+                      duration:
+                        type: string
+                      data:
+                        type: object
+        "503":
+          description: Unhealthy
+          schema:
+            type: object
+            properties:
+              status:
+                description: Overall health status
+                type: string
+              totalDuration:
+                description: Total duration of health checks
+                type: string
+              entries:
+                type: object
+                properties:
+                  Database:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                      description:
+                        type: string
+                      duration:
+                        type: string
+                      data:
+                        type: object
+                  Cache:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                      description:
+                        type: string
+                      duration:
+                        type: string
+                      data:
+                        type: object
+                  Kafka:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                      description:
+                        type: string
+                      duration:
+                        type: string
+                      data:
+                        type: object
+definitions:
+  GroupedUserModel:
+    type: object
+    properties:
+      id:
+        format: uuid
+        type: string
+      username:
+        type: string
+      email:
+        type: string
+      firstName:
+        type: string
+      lastName:
+        type: string
+      middleName:
+        type: string
+      roles:
+        type: array
+        items:
+          type: string
+      isDeleted:
+        type: boolean
+      isActive:
+        type: boolean
+    additionalProperties: false
+  LinkClaimsModel:
+    type: object
+    properties:
+      claims:
+        description: A list of claims to assign to the user or role
+        type: array
+        items:
+          type: string
+        example:
+        - CanViewLogs
+    additionalProperties: false
+  LinkRoleModel:
+    type: object
+    properties:
+      id:
+        format: uuid
+        description: The id of the role
+        type: string
+        example: 627c8762-de3c-4c92-a9f5-25483b6e7922
+      name:
+        description: The name of the role
+        type: string
+        example: LinkAdministrator
+      description:
+        description: The description of the role
+        type: string
+        example: Administrator for the Link application
+      claims:
+        description: The claims associated with the role
+        type: array
+        items:
+          type: string
+        example:
+        - CanViewLogs
+        - CanViewResources
+    additionalProperties: false
+  LinkUserModel:
+    type: object
+    properties:
+      id:
+        format: uuid
+        description: The unique identifier for the user
+        type: string
+        example: 5d7096b5-aa51-4f29-a840-6df98aaa9356
+      firstName:
+        description: The first name of the user
+        type: string
+        example: John
+      middleName:
+        description: The middle name of the user
+        type: string
+        example: Diddely
+      lastName:
+        description: The last name of the user
+        type: string
+        example: Doe
+      username:
+        description: The username of the user
+        type: string
+        example: john.doe
+      email:
+        description: The email address of the user
+        type: string
+        example: john.doe@gmail.com
+      roles:
+        description: The roles assigned to the user
+        type: array
+        items:
+          type: string
+        example:
+        - Admin
+        - User
+      userClaims:
+        description: The claims assigned to the user
+        type: array
+        items:
+          type: string
+        example:
+        - CanViewLogs
+      roleClaims:
+        description: The claims granted by roles assigned to the user
+        type: array
+        items:
+          type: string
+        example:
+        - CanViewLogs
+      isDeleted:
+        type: boolean
+      isActive:
+        type: boolean
+    additionalProperties: false
+  ListRoleModel:
+    type: object
+    properties:
+      id:
+        format: uuid
+        description: The id of the role
+        type: string
+        example: 627c8762-de3c-4c92-a9f5-25483b6e7922
+      name:
+        description: The name of the role
+        type: string
+        example: LinkAdministrator
+      description:
+        description: The description of the role
+        type: string
+        example: Administrator for the Link application
+    additionalProperties: false
+  ProblemDetails:
+    type: object
+    properties:
+      type:
+        type: string
+      title:
+        type: string
+      status:
+        format: int32
+        type: integer
+      detail:
+        type: string
+      instance:
+        type: string
+    additionalProperties: {}
+  ServiceInformation:
+    type: object
+    properties:
+      serviceName:
+        type: string
+      version:
+        type: string
+      productVersion:
+        type: string
+      commit:
+        type: string
+      build:
+        type: string
+      swaggerUrl:
+        type: string
+    additionalProperties: false
+  SortOrder:
+    format: int32
+    enum:
+    - 0
+    - 1
+    type: integer
+  ValidationFailureResponse:
+    type: object
+    properties:
+      errors:
+        type: array
+        items:
+          type: string
+    additionalProperties: false
+
