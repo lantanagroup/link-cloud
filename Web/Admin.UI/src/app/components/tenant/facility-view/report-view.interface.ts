@@ -9,6 +9,7 @@ export interface IReportListSummary {
   submitDate: Date;
   reportTypes: string[];
   frequency: string;
+  adhocType: string;
   censusCount: number;
   initialPopulationCount: number;
   reportMetrics: IScheduledReportMetrics;

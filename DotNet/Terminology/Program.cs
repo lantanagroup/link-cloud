@@ -1,9 +1,7 @@
-using System.Reflection;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Middleware;
-using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Terminology.Application.Formatters;
 using LantanaGroup.Link.Terminology.Application.Settings;
@@ -15,6 +13,7 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
+using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
@@ -28,9 +27,11 @@ static void RegisterServices(WebApplicationBuilder builder)
 {
     // load external configuration source (if specified)
     builder.AddExternalConfiguration(TerminologyConstants.ServiceName);
-    
-    var serviceInformation = builder.Configuration.GetRequiredSection(TerminologyConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-    
+
+    var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+
+    var serviceInformation = builder.SetupServiceInformation(TerminologyConstants.ServiceName, assemblyVersion);
+
     builder.Services.AddHttpClient();
 
     // Add Link Security

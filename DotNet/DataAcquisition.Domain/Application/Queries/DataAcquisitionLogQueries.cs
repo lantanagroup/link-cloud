@@ -1,3 +1,5 @@
+using System.Linq.Expressions;
+using System.Reflection;
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
@@ -15,12 +17,10 @@ using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using MongoDB.Driver;
-using System.Linq.Expressions;
-using System.Reflection;
 using Expression = System.Linq.Expressions.Expression;
 using IDatabase = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
+using ResourceType = Hl7.Fhir.Model.ResourceType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
@@ -67,7 +67,9 @@ public interface IDataAcquisitionLogQueries
 
     Task<List<string>> GetFacilitiesWithPendingAndRetryableFailedRequests(CancellationToken cancellationToken = default);
 
-    Task<List<DataAcquisitionLogModel>> GetNextEligibleBatchForFacility(string facilityId, long? lastId, int batchSize, CancellationToken cancellationToken = default);
+    Task<List<DataAcquisitionLogModel>> GetNextEligibleBatchForFacility(string facilityId, long? lastId, int batchSize, List<RequestStatus> statuses, DateTime? designagtedExecutionTime = null, CancellationToken cancellationToken = default);
+
+    Task<List<string>> GetResourceIdsForReportPatient(string correlationId, string facilityId, string resourceType, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
@@ -81,6 +83,41 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    public async Task<List<string>> GetResourceIdsForReportPatient(string correlationId, string facilityId, string resourceType, CancellationToken cancellationToken = default)
+    {
+        if (!Enum.TryParse<ResourceType>(resourceType, out var parsedResourceType))
+        {
+            _logger.LogError("Failed to parse resource type: {ResourceType}", resourceType);
+            return new List<string>();
+        }
+
+        var logsWithResources = await (from log in _dbContext.DataAcquisitionLogs
+                                     join query in _dbContext.FhirQueries on log.Id equals query.DataAcquisitionLogId
+                                     join resourceTypeEntry in _dbContext.FhirQueryResourceTypes on query.Id equals resourceTypeEntry.FhirQueryId
+                                     where query.FacilityId == facilityId
+                                           && log.CorrelationId == correlationId
+                                           && resourceTypeEntry.ResourceType == parsedResourceType
+                                     select log.ResourceAcquiredIds).ToListAsync(cancellationToken);
+
+        var result = new List<string>();
+        var resourceTypePrefix = $"{resourceType}/";
+
+        foreach (var resourceReferences in logsWithResources)
+        {
+            if (resourceReferences != null)
+            {
+                var filteredIds = resourceReferences
+                    .Where(r => r.StartsWith(resourceTypePrefix, StringComparison.OrdinalIgnoreCase))
+                    .Select(r => r.Substring(resourceTypePrefix.Length))
+                    .ToList();
+
+                result.AddRange(filteredIds);
+            }
+        }
+
+        return result;
     }
 
     public async Task<DataAcquisitionLogModel?> GetAsync(long id, CancellationToken cancellationToken = default)
@@ -166,7 +203,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                       where l.FacilityId == facilityId
                             && l.ReportTrackingId == reportTrackingId
                             && l.CorrelationId == correlationId
-                             && l.Status != RequestStatus.Completed
+                             && !(l.Status == RequestStatus.Completed || l.Status == RequestStatus.MaxRetriesReached)
                              && !l.TailSent
                              && l.FhirQueries.Any(fq => fq.IsReference == false)
                       select l).CountAsync();           
@@ -296,7 +333,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
         if (!string.IsNullOrEmpty(model.ResourceType))
         {
-            var resourceType = (Hl7.Fhir.Model.ResourceType)Enum.Parse(typeof(Hl7.Fhir.Model.ResourceType), model.ResourceType);    
+            var resourceType = (ResourceType)Enum.Parse(typeof(ResourceType), model.ResourceType);    
             query = (from l in query
                      join q in _dbContext.FhirQueries on l.Id equals q.DataAcquisitionLogId
                      where q.FhirQueryResourceTypes.Any(r => r.ResourceType == resourceType)
@@ -529,13 +566,16 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<List<DataAcquisitionLogModel>> GetNextEligibleBatchForFacility(string facilityId, long? lastId, int batchSize, CancellationToken cancellationToken = default)
+    public async Task<List<DataAcquisitionLogModel>> GetNextEligibleBatchForFacility(string facilityId, long? lastId, int batchSize, List<RequestStatus> statuses, DateTime? designagtedExecutionTime = null, CancellationToken cancellationToken = default)
     {
+        designagtedExecutionTime ??= DateTime.UtcNow;
+
         var query = from log in _dbContext.DataAcquisitionLogs
-                    orderby log.Id
                     where log.FacilityId == facilityId
                         && (lastId == null || log.Id > lastId)
-                        && (log.Status == RequestStatus.Pending || log.Status == RequestStatus.Failed)
+                        && (log.ExecutionDate == null || log.ExecutionDate <= designagtedExecutionTime)
+                        && (log.Status == null || statuses.Contains(log.Status.Value))
+                    orderby log.Id
                     select new DataAcquisitionLogModel
                     {
                         Id = log.Id,
@@ -584,5 +624,10 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         var property = Expression.Property(parameter, sortKey);
         var converted = Expression.Convert(property, typeof(object));
         return Expression.Lambda<Func<T, object>>(converted, parameter);
+    }
+
+    public Task<List<DataAcquisitionLogModel>> GetNextBatchForFacility(string facilityId, long? lastId, int batchSize, CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
     }
 }

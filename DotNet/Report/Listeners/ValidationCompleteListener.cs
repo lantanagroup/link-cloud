@@ -28,6 +28,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ILogger<ValidationCompleteListener> _logger;
         private readonly IKafkaConsumerFactory<string, ValidationCompleteValue> _kafkaConsumerFactory;
         private readonly IServiceScopeFactory _serviceScopeFactory;
+        private readonly ServiceInformation _serviceInformation;
         private readonly ITransientExceptionHandler<string, ValidationCompleteValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, ValidationCompleteValue> _deadLetterExceptionHandler;
         private readonly SubmitPayloadProducer _submitPayloadProducer;
@@ -45,6 +46,7 @@ namespace LantanaGroup.Link.Report.Listeners
             IDeadLetterExceptionHandler<string, ValidationCompleteValue> deadLetterExceptionHandler,
             SubmitPayloadProducer submitPayloadProducer,
             IServiceScopeFactory serviceScopeFactory,
+            ServiceInformation serviceInformation,
             BlobStorageService blobStorageService,
             PatientReportSubmissionBundler patientReportSubmissionBundler,
             ReportManifestProducer reportManifestProducer,
@@ -53,6 +55,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _serviceScopeFactory = serviceScopeFactory;
+            _serviceInformation = serviceInformation;
             _submitPayloadProducer = submitPayloadProducer;
             _blobStorageService = blobStorageService;
             _patientReportSubmissionBundler = patientReportSubmissionBundler;
@@ -60,9 +63,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
             _reportManifestProducer = reportManifestProducer;
 
-            _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _transientExceptionHandler.Topic = nameof(KafkaTopic.ValidationComplete) + "-Retry";
-            _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ValidationComplete) + "-Error";
             _auditableEventOccurredProducer = auditableEventOccurredProducer;
         }
@@ -76,7 +77,7 @@ namespace LantanaGroup.Link.Report.Listeners
         {
             var consumerConfig = new ConsumerConfig()
             {
-                GroupId = ReportConstants.ServiceName,
+                GroupId = _serviceInformation.ServiceConfigName,
                 EnableAutoCommit = false
             };
 

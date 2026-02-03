@@ -525,6 +525,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
                         EndDate = DateTime.UtcNow
                     }
                 };
+
                 dbContext.DataAcquisitionLogs.Add(log);
             }
 
@@ -547,6 +548,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
                         EndDate = DateTime.UtcNow
                     }
                 };
+
                 dbContext.DataAcquisitionLogs.Add(log);
             }
 

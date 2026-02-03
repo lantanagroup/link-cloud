@@ -22,6 +22,7 @@ using Quartz;
 using Quartz.Impl;
 using Quartz.Impl.Matchers;
 using Xunit.Abstractions;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report
@@ -115,14 +116,14 @@ namespace IntegrationTests.Report
             // Add JobDetail mock
             var jobDetailMock = new Mock<IJobDetail>();
             var jobDetailDataMap = new JobDataMap();
-            jobDetailDataMap.Put("ReportScheduleId", schedule.Id);
+            jobDetailDataMap.PutObject("ReportScheduleId", schedule.Id);
             jobDetailMock.Setup(j => j.JobDataMap).Returns(jobDetailDataMap);
             contextMock.Setup(c => c.JobDetail).Returns(jobDetailMock.Object);
 
             // Trigger mock (keep as fallback)
             var triggerMock = new Mock<ITrigger>();
             var triggerDataMap = new JobDataMap();
-            triggerDataMap.Put("ReportScheduleId", schedule.Id);
+            triggerDataMap.PutObject("ReportScheduleId", schedule.Id);
             triggerMock.Setup(t => t.JobDataMap).Returns(triggerDataMap);
             contextMock.Setup(c => c.Trigger).Returns(triggerMock.Object);
 
@@ -211,14 +212,14 @@ namespace IntegrationTests.Report
             // Add JobDetail mock
             var jobDetailMock = new Mock<IJobDetail>();
             var jobDetailDataMap = new JobDataMap();
-            jobDetailDataMap.Put("ReportScheduleId", schedule.Id);
+            jobDetailDataMap.PutObject("ReportScheduleId", schedule.Id);
             jobDetailMock.Setup(j => j.JobDataMap).Returns(jobDetailDataMap);
             contextMock.Setup(c => c.JobDetail).Returns(jobDetailMock.Object);
 
             // Trigger mock
             var triggerMock = new Mock<ITrigger>();
             var triggerDataMap = new JobDataMap();
-            triggerDataMap.Put("ReportScheduleId", schedule.Id);
+            triggerDataMap.PutObject("ReportScheduleId", schedule.Id);
             triggerMock.Setup(t => t.JobDataMap).Returns(triggerDataMap);
             contextMock.Setup(c => c.Trigger).Returns(triggerMock.Object);
 
@@ -307,14 +308,14 @@ namespace IntegrationTests.Report
             // Add JobDetail mock
             var jobDetailMock = new Mock<IJobDetail>();
             var jobDetailDataMap = new JobDataMap();
-            jobDetailDataMap.Put("ReportScheduleId", schedule.Id);
+            jobDetailDataMap.PutObject("ReportScheduleId", schedule.Id);
             jobDetailMock.Setup(j => j.JobDataMap).Returns(jobDetailDataMap);
             contextMock.Setup(c => c.JobDetail).Returns(jobDetailMock.Object);
 
             // Trigger mock (keep as fallback)
             var triggerMock = new Mock<ITrigger>();
             var triggerDataMap = new JobDataMap();
-            triggerDataMap.Put("ReportScheduleId", schedule.Id);
+            triggerDataMap.PutObject("ReportScheduleId", schedule.Id);
             triggerMock.Setup(t => t.JobDataMap).Returns(triggerDataMap);
             contextMock.Setup(c => c.Trigger).Returns(triggerMock.Object);
 
@@ -402,14 +403,14 @@ namespace IntegrationTests.Report
             // Add JobDetail mock
             var jobDetailMock = new Mock<IJobDetail>();
             var jobDetailDataMap = new JobDataMap();
-            jobDetailDataMap.Put("ReportScheduleId", schedule.Id);
+            jobDetailDataMap.PutObject("ReportScheduleId", schedule.Id);
             jobDetailMock.Setup(j => j.JobDataMap).Returns(jobDetailDataMap);
             contextMock.Setup(c => c.JobDetail).Returns(jobDetailMock.Object);
 
             // Trigger mock (keep as fallback)
             var triggerMock = new Mock<ITrigger>();
             var triggerDataMap = new JobDataMap();
-            triggerDataMap.Put("ReportScheduleId", schedule.Id);
+            triggerDataMap.PutObject("ReportScheduleId", schedule.Id);
             triggerMock.Setup(t => t.JobDataMap).Returns(triggerDataMap);
             contextMock.Setup(c => c.Trigger).Returns(triggerMock.Object);
 

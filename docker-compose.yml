@@ -57,14 +57,12 @@ services:
       - hapi.fhir.server_id_strategy=UUID
     volumes:
       - fhir_data:/data
-      - ./healthcheck-1.0.0.jar:/app/healthcheck.jar:ro
+      - ./Java/hapi/src/main/java/com/lantanagroup/link/hapi/HealthCheck.java:/app/HealthCheck.java
     networks:
       - link-nw
     healthcheck:
-      test: ["CMD", "java", "-jar", "/app/healthcheck.jar", "http://localhost:8080/fhir/metadata"]
-      interval: 3s
-      timeout: 3s
-      retries: 15
+      test: ["CMD", "java", "/app/HealthCheck.java", "http://localhost:8080/fhir/metadata"]
+      start_period: 60s
       
   ###########################################
   ### Redis Cache
@@ -205,7 +203,7 @@ services:
       - "8889:8889"   # Prometheus exporter metrics
       - "13133:13133" # health_check extension
       - "4317:4317"   # OTLP gRPC receiver
-      - "55679:55679" # zpages extension
+      - "55900:55679" # zpages extension
     networks:
       - link-nw
       

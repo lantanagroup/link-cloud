@@ -1,7 +1,6 @@
-﻿using LantanaGroup.Link.Shared.Application.Models;
+﻿using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Jobs;
-using LantanaGroup.Link.Shared.Settings;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Quartz;
@@ -18,7 +17,7 @@ public class RetryScheduleService : BackgroundService
     public RetryScheduleService(
         ILogger<RetryScheduleService> logger,
         IJobFactory jobFactory,
-        [FromKeyedServices(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton)] ISchedulerFactory schedulerFactory)
+        ISchedulerFactory schedulerFactory)
     {
         _logger = logger;
         _jobFactory = jobFactory;
@@ -53,7 +52,7 @@ public class RetryScheduleService : BackgroundService
     public static IJobDetail CreateJob(RetryModel model)
     {
         JobDataMap jobDataMap = new JobDataMap();
-        jobDataMap.Put("RetryModel", model);
+        jobDataMap.PutObject<RetryModel>("RetryModel", model);
 
         return JobBuilder
             .Create(typeof(RetryJob))
@@ -67,7 +66,7 @@ public class RetryScheduleService : BackgroundService
     private static ITrigger CreateTrigger(RetryModel model, JobKey jobKey)
     {
         JobDataMap jobDataMap = new JobDataMap();
-        jobDataMap.Put("RetryModel", model);
+        jobDataMap.PutObject("RetryModel", model);
 
         var offset = DateBuilder.DateOf(model.ScheduledTrigger.Hour, model.ScheduledTrigger.Minute, model.ScheduledTrigger.Second);
 
@@ -85,11 +84,5 @@ public class RetryScheduleService : BackgroundService
     {
         JobKey jobKey = new JobKey(model.JobId);
         await scheduler.DeleteJob(jobKey);
-    }
-
-    public static async Task RescheduleJob(RetryModel model, IScheduler scheduler)
-    {
-        await DeleteJob(model, scheduler);
-        await CreateJobAndTrigger(model, scheduler);
     }
 }

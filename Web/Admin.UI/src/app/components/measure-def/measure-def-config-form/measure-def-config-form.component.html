@@ -39,7 +39,9 @@
       <!-- ID Column -->
       <ng-container matColumnDef="id">
         <th mat-header-cell *matHeaderCellDef> ID</th>
-        <td mat-cell *matCellDef="let element"> {{ element.id }}</td>
+        <td mat-cell *matCellDef="let element">
+          <a mat-button color="primary" (click)="openRelatedArtifactsModal(element)">{{ element.id }}</a>
+        </td>
       </ng-container>
 
       <!-- Version Column -->

@@ -1,19 +1,15 @@
-using Xunit.Abstractions;
-
-namespace LantanaGroup.Link.Tests.E2ETests;
-
-using System.Reflection;
-using RestSharp;
-using System;
-using System.Threading.Tasks;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
-using System.Linq;
+using LantanaGroup.Link.Shared.Application.SerDes;
+using RestSharp;
+using System.Reflection;
+using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
 
+namespace LantanaGroup.Link.Tests.E2ETests;
 public class MeasureLoader(RestClient adminBffClient, ITestOutputHelper output)
 {
-    private readonly FhirJsonParser _parser = new FhirJsonParser();
+    private readonly FhirJsonParser _parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
     public string? MeasureId;
     private Bundle? _evaluationBundle;
     private Bundle? _validationBundle;

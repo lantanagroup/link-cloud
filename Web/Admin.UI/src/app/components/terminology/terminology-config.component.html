@@ -1,0 +1,87 @@
+<div class="terminology-config-container">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>Terminology Resources</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="filter-container">
+        <mat-form-field appearance="outline">
+          <mat-label>Resource Type</mat-label>
+          <mat-select [(ngModel)]="searchResourceType" (selectionChange)="applyFilter()">
+            <mat-option value="">All</mat-option>
+            <mat-option value="ValueSet">ValueSet</mat-option>
+            <mat-option value="CodeSystem">CodeSystem</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Search ID</mat-label>
+          <input matInput [(ngModel)]="searchId" (keyup)="applyFilter()" placeholder="Filter by ID">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Search URL</mat-label>
+          <input matInput [(ngModel)]="searchUrl" (keyup)="applyFilter()" placeholder="Filter by URL">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Search Version</mat-label>
+          <input matInput [(ngModel)]="searchVersion" (keyup)="applyFilter()" placeholder="Filter by Version">
+        </mat-form-field>
+      </div>
+
+      <div class="table-container mat-elevation-z8">
+        <table mat-table [dataSource]="dataSource" matSort>
+
+          <!-- Resource Type Column -->
+          <ng-container matColumnDef="resourceType">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> Resource Type </th>
+            <td mat-cell *matCellDef="let element"> {{element.resourceType}} </td>
+          </ng-container>
+
+          <!-- ID Column -->
+          <ng-container matColumnDef="id">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> ID </th>
+            <td mat-cell *matCellDef="let element"> {{element.id}} </td>
+          </ng-container>
+
+          <!-- URL Column -->
+          <ng-container matColumnDef="url">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> URL </th>
+            <td mat-cell *matCellDef="let element"> {{element.url}} </td>
+          </ng-container>
+
+          <!-- Version Column -->
+          <ng-container matColumnDef="version">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> Version </th>
+            <td mat-cell *matCellDef="let element"> {{element.version}} </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+
+          <!-- Row shown when there is no matching data. -->
+          <tr class="mat-row" *matNoDataRow>
+            <td class="mat-cell" colspan="4">No data matching the filter</td>
+          </tr>
+        </table>
+      </div>
+
+      <!--div class="upload-container">
+        <h3>Upload Terminology Package (Placeholder)</h3>
+        <p>Select a ZIP package containing directories for each ValueSet or CodeSystem.</p>
+
+        <input type="file" #fileInput style="display: none" (change)="onFileSelected($event)" accept=".zip">
+        <button mat-raised-button color="primary" (click)="fileInput.click()" [disabled]="isUploading">
+          <mat-icon>upload</mat-icon>
+          Upload Package
+        </button>
+
+        <div *ngIf="isUploading" class="upload-progress">
+          <p>{{uploadStatus}}</p>
+          <mat-progress-bar mode="determinate" [value]="uploadProgress"></mat-progress-bar>
+        </div>
+      </div-->
+    </mat-card-content>
+  </mat-card>
+</div>

@@ -259,4 +259,50 @@ public class QueryPlanConverterTests
         Assert.IsType<ParameterQueryConfig>(dict["0"]);
         Assert.IsType<ReferenceQueryConfig>(dict["1"]);
     }
+
+    [Fact]
+    public void OrderBy_DictionaryWithNumericStringKeys_ShouldSortNumerically()
+    {
+        var dict = new Dictionary<string, IQueryConfig>
+        {
+            ["2"] = new ParameterQueryConfig { ResourceType = "Patient", Parameters = new List<IParameter>() },
+            ["10"] = new ReferenceQueryConfig { ResourceType = "Location", OperationType = OperationType.Search, Paged = 100 },
+            ["1"] = new ParameterQueryConfig { ResourceType = "Encounter", Parameters = new List<IParameter>() },
+            ["20"] = new ReferenceQueryConfig { ResourceType = "Organization", OperationType = OperationType.Search, Paged = 50 }
+        };
+
+        var sorted = dict.OrderBy(x => int.Parse(x.Key)).ToList();
+
+        Assert.Equal("1", sorted[0].Key);
+        Assert.Equal("2", sorted[1].Key);
+        Assert.Equal("10", sorted[2].Key);
+        Assert.Equal("20", sorted[3].Key);
+    }
+
+    [Fact]
+    public void OrderBy_DictionaryWithNumericStringKeys_AlphabeticSortingIsIncorrect()
+    {
+        var dict = new Dictionary<string, IQueryConfig>
+        {
+            ["2"] = new ParameterQueryConfig { ResourceType = "Patient", Parameters = new List<IParameter>() },
+            ["10"] = new ReferenceQueryConfig { ResourceType = "Location", OperationType = OperationType.Search, Paged = 100 },
+            ["1"] = new ParameterQueryConfig { ResourceType = "Encounter", Parameters = new List<IParameter>() }
+        };
+
+        // Alphabetic sort (incorrect for numeric keys)
+        var alphabeticSort = dict.OrderBy(x => x.Key).ToList();
+
+        // This would give us "1", "10", "2" - wrong order
+        Assert.Equal("1", alphabeticSort[0].Key);
+        Assert.Equal("10", alphabeticSort[1].Key);
+        Assert.Equal("2", alphabeticSort[2].Key);
+
+        // Numeric sort (correct)
+        var numericSort = dict.OrderBy(x => int.Parse(x.Key)).ToList();
+
+        // This gives us "1", "2", "10" - correct order
+        Assert.Equal("1", numericSort[0].Key);
+        Assert.Equal("2", numericSort[1].Key);
+        Assert.Equal("10", numericSort[2].Key);
+    }
 }

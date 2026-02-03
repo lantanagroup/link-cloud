@@ -1,0 +1,32 @@
+---
+id: ResourceNormalized
+name: Resource Normalized
+version: 0.2.0
+
+summary: Indicates that a FHIR resource has been standardized.
+
+---
+
+## Overview
+
+Produced after the resource is transformed according to configured mappings so evaluation components can work with a 
+consistent format.
+
+<NodeGraph />
+
+## Event Schema
+
+### Key
+
+* type: string
+* value: facility id
+
+### Headers
+
+| Header Name      | Description                                                                                        |
+|------------------|----------------------------------------------------------------------------------------------------|
+| X-Correlation-Id | The correlation ID associated with the event that should be used in logs produced during the event |
+
+### Payload
+
+<SchemaViewer file="schema.json" />

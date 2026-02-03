@@ -13,12 +13,12 @@ using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Services.ResourceMerger;
 using LantanaGroup.Link.Report.Services.ResourceMerger.Strategies;
-using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Settings;
 using OpenTelemetry.Trace;
@@ -45,7 +45,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ReadyForValidationProducer _readyForValidationProducer;
         private readonly ReportManifestProducer _reportManifestProducer;
         private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
-
+        private readonly ServiceInformation _serviceInformation;
 
         private string Name => this.GetType().Name;
 
@@ -55,6 +55,7 @@ namespace LantanaGroup.Link.Report.Listeners
             ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory,
+            ServiceInformation serviceInformation,
             PatientReportSubmissionBundler patientReportSubmissionBundler,
             BlobStorageService blobStorageService,
             ReadyForValidationProducer readyForValidationProducer,
@@ -70,16 +71,15 @@ namespace LantanaGroup.Link.Report.Listeners
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
-            _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _transientExceptionHandler.Topic = nameof(KafkaTopic.ResourceEvaluated) + "-Retry";
 
-            _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ResourceEvaluated) + "-Error";
             _patientReportSubmissionBundler = patientReportSubmissionBundler;
             _blobStorageService = blobStorageService;
             _readyForValidationProducer = readyForValidationProducer;
             _reportManifestProducer = reportManifestProducer;
             _auditableEventOccurredProducer = auditableEventOccurredProducer;
+            _serviceInformation = serviceInformation;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -91,7 +91,7 @@ namespace LantanaGroup.Link.Report.Listeners
         {
             var consumerConfig = new ConsumerConfig()
             {
-                GroupId = ReportConstants.ServiceName,
+                GroupId = _serviceInformation.ServiceConfigName,
                 EnableAutoCommit = false
             };
 
@@ -141,7 +141,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     catch (OperationCanceledException oce)
                     {
                         Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                        Activity.Current?.RecordException(oce);
+                        Activity.Current?.AddException(oce);
 
                         _logger.LogError(oce, "Operation Canceled: {OceMessage}", oce.Message);
                         consumer.Close();
@@ -157,7 +157,7 @@ namespace LantanaGroup.Link.Report.Listeners
             catch (OperationCanceledException oce)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(oce);
+                Activity.Current?.AddException(oce);
 
                 _logger.LogError(oce, "Operation Canceled: {OceMessage}", oce.Message);
                 consumer.Close();
@@ -238,7 +238,7 @@ namespace LantanaGroup.Link.Report.Listeners
             Resource? resource = null;
             try
             {
-                resource = JsonSerializer.Deserialize<Resource>(value.Resource.ToString(), SerializerOptions.ForFhirLenientDeserialization) ?? throw new Exception($"{Name}: Unable to deserialize event resource");
+                resource = JsonSerializer.Deserialize<Resource>(value.Resource.ToString(), LinkFhirSerializerOptions.ForFhirLenientSerialization) ?? throw new Exception($"{Name}: Unable to deserialize event resource");
             }
             catch (Exception ex)
             {

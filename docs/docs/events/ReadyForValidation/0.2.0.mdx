@@ -1,0 +1,33 @@
+---
+
+id: ReadyForValidation
+name: Ready for Validation
+version: 0.2.0
+
+summary: Notifies that a patient’s submission bundle is ready to be validated.
+
+---
+
+## Overview
+
+Emitted after all patient resources have been stored, allowing the validation component to fetch the bundle and perform 
+checks.
+
+<NodeGraph />
+
+## Event Schema
+
+### Key
+
+* type: string
+* value: facility id
+
+### Headers
+
+| Header Name      | Description                                                                                        |
+|------------------|----------------------------------------------------------------------------------------------------|
+| X-Correlation-Id | The correlation ID associated with the event that should be used in logs produced during the event |
+
+### Payload
+
+<SchemaViewer file="schema.json" />

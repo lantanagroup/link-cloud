@@ -1,7 +1,6 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
@@ -16,8 +15,8 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Utilities;
-using Microsoft.Extensions.Options;
 using System.Text;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
@@ -35,6 +34,7 @@ public class ResourceAcquiredListener : BackgroundService
     private bool _cancelled = false;
     private readonly INormalizationServiceMetrics _metrics;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ServiceInformation _serviceInformation;
 
     private readonly CopyPropertyOperationService _copyPropertyOperationService;
     private readonly CodeMapOperationService _codeMapOperationService;
@@ -43,7 +43,7 @@ public class ResourceAcquiredListener : BackgroundService
 
     public ResourceAcquiredListener(
         ILogger<ResourceAcquiredListener> logger,
-        IOptions<ServiceInformation> serviceInformation,
+        ServiceInformation serviceInformation,
         IServiceScopeFactory scopeFactory,
         IKafkaConsumerFactory<string, ResourceAcquiredMessage> consumerFactory,
         IDeadLetterExceptionHandler<string, string> consumeExceptionHandler,
@@ -59,18 +59,20 @@ public class ResourceAcquiredListener : BackgroundService
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
         _consumeExceptionHandler = consumeExceptionHandler ?? throw new ArgumentNullException(nameof(consumeExceptionHandler));
-        _consumeExceptionHandler.ServiceName = serviceInformation.Value.ServiceName;
+
         _consumeExceptionHandler.Topic = $"{nameof(KafkaTopic.ResourceAcquired)}-Error";
         _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentNullException(nameof(deadLetterExceptionHandler));
-        _deadLetterExceptionHandler.ServiceName = serviceInformation.Value.ServiceName;
+
         _deadLetterExceptionHandler.Topic = $"{nameof(KafkaTopic.ResourceAcquired)}-Error";
         _transientExceptionHandler = transientExceptionHandler;
-        _transientExceptionHandler.ServiceName = serviceInformation.Value.ServiceName;
+
         _transientExceptionHandler.Topic = KafkaTopic.ResourceAcquiredRetry.GetStringValue();
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
 
         _scopeFactory = scopeFactory;
         _producer = producer ?? throw new ArgumentNullException(nameof(producer));
+
+        _serviceInformation = serviceInformation ?? throw new ArgumentNullException(nameof(serviceInformation));
 
         _copyPropertyOperationService = copyPropertyOperationService;
         _codeMapOperationService = codeMapOperationService ?? throw new ArgumentNullException(nameof(codeMapOperationService));
@@ -87,7 +89,7 @@ public class ResourceAcquiredListener : BackgroundService
     {
         using var kafkaConsumer = _consumerFactory.CreateConsumer(new ConsumerConfig
         {
-            GroupId = NormalizationConstants.ServiceName,
+            GroupId = _serviceInformation.ServiceConfigName,
             EnableAutoCommit = false
         });
 
@@ -273,7 +275,7 @@ public class ResourceAcquiredListener : BackgroundService
 
     private async Task ProduceResourceNormalizedMessage(ConsumeResult<string, ResourceAcquiredMessage>? message, string facilityId, string correlationId, DomainResource? resource = null)
     {
-        var serializedResource = JsonSerializer.SerializeToElement(resource, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
+        var serializedResource = JsonSerializer.SerializeToElement(resource, LinkFhirSerializerOptions.ForFhirLenientSerialization);
 
         var headers = new Headers
         {
@@ -319,7 +321,7 @@ public class ResourceAcquiredListener : BackgroundService
 
     private DomainResource DeserializeStringToResource(string json)
     {
-        return JsonSerializer.Deserialize<DomainResource>(json, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector, new FhirJsonPocoDeserializerSettings { Validator = null }));
+        return JsonSerializer.Deserialize<DomainResource>(json, LinkFhirSerializerOptions.ForFhirLenientSerialization);
     }
 
     private DomainResource DeserializeResource(object resource)

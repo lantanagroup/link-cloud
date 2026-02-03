@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 
 import { ActivatedRoute, RouterLink, RouterLinkActive } from '@angular/router';
-import { CommonModule } from '@angular/common';
+
 import { FacilityViewService } from '../tenant/facility-view/facility-view.service';
 import { IValidationIssue, IValidationIssueCategorySummary, IReportListSummary } from '../tenant/facility-view/report-view.interface';
 import { SubPreQualReportCategoriesTableComponent } from './sub-pre-qual-report-categories-table/sub-pre-qual-report-categories-table.component';
@@ -19,7 +19,6 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 @Component({
   selector: 'app-sub-pre-qual-report',
   imports: [
-    CommonModule,
     SubPreQualReportMetaComponent,
     SubPreQualReportSummaryComponent,
     SubPreQualReportCategoriesTableComponent,
@@ -28,7 +27,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
     RouterLink,
     RouterLinkActive,
     MatProgressSpinnerModule
-  ],
+],
   templateUrl: './sub-pre-qual-report.component.html',
   styleUrls: ['./sub-pre-qual-report.component.scss'],
   standalone: true
