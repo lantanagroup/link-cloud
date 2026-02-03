@@ -1,13 +1,13 @@
 package com.lantanagroup.link.validation.services;
 
 import ca.uhn.fhir.context.FhirContext;
-import com.lantanagroup.link.validation.entities.Artifact;
-import com.lantanagroup.link.validation.entities.ArtifactType;
-import com.lantanagroup.link.validation.repositories.ArtifactRepository;
 import ca.uhn.fhir.rest.api.SummaryEnum;
 import ca.uhn.fhir.rest.client.api.IGenericClient;
 import com.lantanagroup.link.validation.configs.LinkConfig;
+import com.lantanagroup.link.validation.entities.Artifact;
+import com.lantanagroup.link.validation.entities.ArtifactType;
 import com.lantanagroup.link.validation.models.TerminologyDependency;
+import com.lantanagroup.link.validation.repositories.ArtifactRepository;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IBaseResource;
@@ -140,8 +140,10 @@ public class ArtifactService {
         Map<String, Set<String>> existingResources = new HashMap<>();
         String remoteUrl = getTerminologyBaseUrl();
         if (StringUtils.isNotEmpty(remoteUrl)) {
+            logger.debug("Fetching terminology from remote server: {}", remoteUrl);
             fetchRemoteTerminology(remoteUrl, existingResources);
         } else {
+            logger.debug("Fetching terminology from local server");
             fetchLocalTerminology(support, existingResources);
         }
 
@@ -178,22 +180,26 @@ public class ArtifactService {
     private void fetchRemoteTerminology(String baseUrl, Map<String, Set<String>> existingResources) {
         IGenericClient client = fhirContext.newRestfulGenericClient(baseUrl);
         try {
+            logger.debug("Fetching ValueSets and CodeSystems from remote terminology service");
             Bundle vsBundle = client.search()
                     .forResource(ValueSet.class)
                     .summaryMode(SummaryEnum.TRUE)
                     .returnBundle(Bundle.class)
                     .execute();
+            logger.debug("Fetched {} ValueSets from remote terminology service", vsBundle.getTotal());
             processBundle(vsBundle, existingResources, client);
         } catch (Exception e) {
             logger.error("Failed to fetch ValueSets from remote terminology service", e);
         }
 
         try {
+            logger.debug("Fetching CodeSystems from remote terminology service");
             Bundle csBundle = client.search()
                     .forResource(CodeSystem.class)
                     .summaryMode(SummaryEnum.TRUE)
                     .returnBundle(Bundle.class)
                     .execute();
+            logger.debug("Fetched {} CodeSystems from remote terminology service", csBundle.getTotal());
             processBundle(csBundle, existingResources, client);
         } catch (Exception e) {
             logger.error("Failed to fetch CodeSystems from remote terminology service", e);
@@ -227,6 +233,7 @@ public class ArtifactService {
 
     private void fetchLocalTerminology(ArtifactValidationSupport support, Map<String, Set<String>> existingResources) {
         List<IBaseResource> resources = support.fetchAllConformanceResources();
+        assert resources != null;
         for (IBaseResource resource : resources) {
             String url = null;
             String version = null;
