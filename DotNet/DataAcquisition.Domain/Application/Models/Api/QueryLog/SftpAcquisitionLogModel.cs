@@ -1,4 +1,5 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
@@ -11,11 +12,14 @@ public class SftpAcquisitionLogModel
     public string FacilityId { get; set; } = string.Empty;
     public SftpAcquisitionType AcquisitionType { get; set; }
     public List<string> FileNames { get; set; } = [];
+    public DateTime? ScheduledDate { get; set; }
     public DateTime? ProcessDate { get; set; }
     public int? RetryAttempts { get; set; }
+    public RequestStatus Status { get; set; }
     public string? OriginatingTraceId { get; set; }
     public string? OriginatingSpanId { get; set; }
     public List<string> Notes { get; set; } = [];
+    public List<SftpAcquisitionBenchmark>? Benchmarks { get; set; }
 }
 
 public record PagedSftpAcquisitionLogModel : IPagedModel<SftpAcquisitionLogModel>
@@ -36,13 +40,18 @@ public static class SftpAcquisitionLogModelExtensions
         FacilityId = entity.FacilityId,
         AcquisitionType = entity.AcquisitionType,
         FileNames = entity.FileNames,
+        ScheduledDate = entity.ScheduledDate.HasValue
+            ? DateTime.SpecifyKind(entity.ScheduledDate.Value, DateTimeKind.Utc)
+            : null,
         ProcessDate = entity.ProcessDate.HasValue
             ? DateTime.SpecifyKind(entity.ProcessDate.Value, DateTimeKind.Utc)
             : null,
         RetryAttempts = entity.RetryAttempts,
+        Status = entity.Status,
         OriginatingTraceId = entity.OriginatingTraceId,
         OriginatingSpanId = entity.OriginatingSpanId,
-        Notes = entity.Notes
+        Notes = entity.Notes,
+        Benchmarks = entity.Benchmarks
     };
 
     public static SftpAcquisitionLog ToDomain(this SftpAcquisitionLogModel model) => new()
@@ -51,17 +60,21 @@ public static class SftpAcquisitionLogModelExtensions
         FacilityId = model.FacilityId,
         AcquisitionType = model.AcquisitionType,
         FileNames = model.FileNames,
+        ScheduledDate = model.ScheduledDate,
         ProcessDate = model.ProcessDate,
         RetryAttempts = model.RetryAttempts,
+        Status = model.Status,
         OriginatingTraceId = model.OriginatingTraceId,
         OriginatingSpanId = model.OriginatingSpanId,
-        Notes = model.Notes
+        Notes = model.Notes,
+        Benchmarks = model.Benchmarks
     };
 
     public static SftpAcquisitionLogModel ToModel(this CreateSftpLogRequest req) => new()
     {
         ExternalId = Guid.NewGuid(),
         FacilityId = req.FacilityId,
-        AcquisitionType = req.AcquisitionType
+        AcquisitionType = req.AcquisitionType,
+        Status = RequestStatus.Pending
     };
 }

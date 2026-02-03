@@ -509,7 +509,9 @@ export class FacilityEditComponent implements OnInit {
             port: 22,
             timeout: '00:01:00',
             removeAfterProcessing: false,
-            authenticationProtocol: 'Basic'
+            authenticationProtocol: 'Basic',
+            enableBenchmarking: false,
+            acquisitionConfigurations: []
           } as ISftpConfigurationModel;
           this.showNoSftpConfigAlert = true;
         } else {
@@ -577,7 +579,9 @@ export class FacilityEditComponent implements OnInit {
                     port: 22,
                     timeout: '00:01:00',
                     removeAfterProcessing: false,
-                    authenticationProtocol: 'Basic'
+                    authenticationProtocol: 'Basic',
+                    enableBenchmarking: false,
+                    acquisitionConfigurations: []
                   };
                 }
               },
@@ -589,7 +593,9 @@ export class FacilityEditComponent implements OnInit {
                   port: 22,
                   timeout: '00:01:00',
                   removeAfterProcessing: false,
-                  authenticationProtocol: 'Basic'
+                  authenticationProtocol: 'Basic',
+                  enableBenchmarking: false,
+                  acquisitionConfigurations: []
                 };
               }
             });

@@ -7,6 +7,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 public enum SftpAcquisitionType
 {
     Census,
+    CernerCensus,
     Resources
 }
 

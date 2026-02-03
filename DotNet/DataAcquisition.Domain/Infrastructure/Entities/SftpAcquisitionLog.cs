@@ -18,7 +18,13 @@ public class SftpAcquisitionLog
     public SftpAcquisitionType AcquisitionType { get; set; }
 
     public List<string> FileNames { get; set; } = [];
-    
+
+    /// <summary>
+    /// When this acquisition should be processed. Null means process immediately.
+    /// Logs are only picked up by the job when ScheduledDate is null or &lt;= DateTime.UtcNow.
+    /// </summary>
+    public DateTime? ScheduledDate { get; set; }
+
     public DateTime? ProcessDate { get; set; }
     
     public int? RetryAttempts { get; set; }
