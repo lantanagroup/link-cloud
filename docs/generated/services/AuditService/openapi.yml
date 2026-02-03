@@ -1,0 +1,361 @@
+﻿swagger: "2.0"
+info:
+  version: 0.4.1
+  title: Audit
+paths:
+  /api/audit/info:
+    get:
+      tags:
+      - Audit
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/ServiceInformation'
+  /api/audit:
+    get:
+      tags:
+      - Audit
+      summary: Returns a list of audit events based on filters provided.
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      - application/xml
+      - text/xml
+      parameters:
+      - in: query
+        name: searchText
+        description: ""
+        type: string
+      - in: query
+        name: facility
+        description: ""
+        type: string
+      - in: query
+        name: correlationId
+        description: ""
+        type: string
+      - in: query
+        name: service
+        description: ""
+        type: string
+      - in: query
+        name: action
+        description: ""
+        type: string
+      - in: query
+        name: user
+        description: ""
+        type: string
+      - in: query
+        name: sortBy
+        description: 'Options: FacilityId, Action, ServiceName, Resource, CreatedOn'
+        type: string
+      - in: query
+        name: sortOrder
+        description: Ascending = 0, Descending = 1, defaults to Ascending
+      - in: query
+        name: pageSize
+        description: ""
+        type: integer
+        format: int32
+        default: 10
+      - in: query
+        name: pageNumber
+        description: ""
+        type: integer
+        format: int32
+        default: 1
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/PagedAuditModel'
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/audit/{auditId}:
+    get:
+      tags:
+      - Audit
+      summary: Returns an audit event with the provided Audit Log Id.
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      - application/xml
+      - text/xml
+      parameters:
+      - in: path
+        name: auditId
+        description: ""
+        required: true
+        type: string
+        format: uuid
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/AuditModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/audit/facility/{facilityId}:
+    get:
+      tags:
+      - Audit
+      summary: Returns a list of audit events for a specific facility.
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      - application/xml
+      - text/xml
+      parameters:
+      - in: path
+        name: facilityId
+        description: ""
+        required: true
+        type: string
+      - in: query
+        name: sortBy
+        description: 'Options: FacilityId, Action, ServiceName, Resource, CreatedOn'
+        type: string
+      - in: query
+        name: sortOrder
+        description: Ascending = 0, Descending = 1, defaults to Ascending
+      - in: query
+        name: pageNumber
+        description: ""
+        type: integer
+        format: int32
+        default: 1
+      - in: query
+        name: pageSize
+        description: ""
+        type: integer
+        format: int32
+        default: 10
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/PagedAuditModel'
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /health:
+    get:
+      tags:
+      - Health
+      summary: Health check endpoint
+      description: Returns the health status of the service and its dependencies
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Healthy
+          schema:
+            type: object
+            properties:
+              status:
+                description: Overall health status
+                type: string
+              totalDuration:
+                description: Total duration of health checks
+                type: string
+              entries:
+                type: object
+                properties:
+                  Database:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                      description:
+                        type: string
+                      duration:
+                        type: string
+                      data:
+                        type: object
+                  Kafka:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                      description:
+                        type: string
+                      duration:
+                        type: string
+                      data:
+                        type: object
+        "503":
+          description: Unhealthy
+          schema:
+            type: object
+            properties:
+              status:
+                description: Overall health status
+                type: string
+              totalDuration:
+                description: Total duration of health checks
+                type: string
+              entries:
+                type: object
+                properties:
+                  Database:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                      description:
+                        type: string
+                      duration:
+                        type: string
+                      data:
+                        type: object
+                  Kafka:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                      description:
+                        type: string
+                      duration:
+                        type: string
+                      data:
+                        type: object
+definitions:
+  AuditModel:
+    type: object
+    properties:
+      id:
+        type: string
+      facilityId:
+        type: string
+      correlationId:
+        type: string
+      serviceName:
+        type: string
+      eventDate:
+        format: date-time
+        type: string
+      user:
+        type: string
+      action:
+        type: string
+      resource:
+        type: string
+      propertyChanges:
+        type: array
+        items:
+          $ref: '#/definitions/PropertyChangeModel'
+      notes:
+        type: string
+    additionalProperties: false
+  PagedAuditModel:
+    type: object
+    properties:
+      records:
+        type: array
+        items:
+          $ref: '#/definitions/AuditModel'
+      metadata:
+        $ref: '#/definitions/PaginationMetadata'
+    additionalProperties: false
+  PaginationMetadata:
+    type: object
+    properties:
+      pageSize:
+        format: int32
+        type: integer
+      pageNumber:
+        format: int32
+        type: integer
+      totalCount:
+        format: int64
+        type: integer
+      totalPages:
+        format: int64
+        type: integer
+    additionalProperties: false
+  ProblemDetails:
+    type: object
+    properties:
+      type:
+        type: string
+      title:
+        type: string
+      status:
+        format: int32
+        type: integer
+      detail:
+        type: string
+      instance:
+        type: string
+    additionalProperties: {}
+  PropertyChangeModel:
+    type: object
+    properties:
+      propertyName:
+        type: string
+      initialPropertyValue:
+        type: string
+      newPropertyValue:
+        type: string
+    additionalProperties: false
+  ServiceInformation:
+    type: object
+    properties:
+      serviceName:
+        type: string
+      version:
+        type: string
+      productVersion:
+        type: string
+      commit:
+        type: string
+      build:
+        type: string
+      swaggerUrl:
+        type: string
+    additionalProperties: false
+  SortOrder:
+    format: int32
+    enum:
+    - 0
+    - 1
+    type: integer
+
