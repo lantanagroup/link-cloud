@@ -162,11 +162,7 @@ export class ValidationConfigComponent implements OnInit {
     }
   }
 
-  openTxDependencies(packageName: string): void {
-    if (!packageName) {
-      return;
-    }
-
+  openTxDependencies(packageName?: string): void {
     this.dialog.open(TxDependenciesDialogComponent, {
       width: '75%',
       maxWidth: '900px',

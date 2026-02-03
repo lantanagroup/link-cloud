@@ -37,7 +37,13 @@
 <!-- IG Names -->
 <mat-card class="upload-card">
   <mat-card-content>
-    <mat-card-title>Validation Artifacts</mat-card-title>
+    <div class="header-with-action">
+      <mat-card-title>Validation Artifacts</mat-card-title>
+      <button mat-button color="primary" (click)="openTxDependencies()">
+        <mat-icon>list</mat-icon>
+        View All TX Dependencies
+      </button>
+    </div>
     <mat-list>
       @for (ig of implementationGuides; track ig) {
         <mat-list-item>
