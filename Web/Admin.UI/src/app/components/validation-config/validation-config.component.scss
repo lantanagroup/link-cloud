@@ -52,3 +52,10 @@
   font-weight: 600;
 }
 
+.header-with-action {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
