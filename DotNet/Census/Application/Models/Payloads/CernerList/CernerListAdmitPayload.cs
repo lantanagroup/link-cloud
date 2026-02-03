@@ -30,13 +30,15 @@ namespace LantanaGroup.Link.Census.Application.Models.Payloads.Cerner
 
         public PatientEvent CreatePatientEvent(string facilityId, string correlationId)
         {
-            return PatientEventFactory.Create(correlationId, PatientId, EncounterId, MedicalRecordNumber, Enums.EventType.CernerListAdmit, this, Enums.SourceType.SFTP, facilityId);
+            return PatientEventFactory.Create(correlationId, PatientId, EncounterId, MedicalRecordNumber, Enums.EventType.CernerListAdmit, this, Enums.SourceType.SFTP_FHIR, facilityId);
         }
 
         public PatientEncounter CreatePatientEncounter(string facilityId, string correlationId)
         {
             return new PatientEncounterBuilder(facilityId, MedicalRecordNumber, AdmitDate, null, correlationId, EncounterType, EncounterStatus)
-                .AddPatientIdentifier(PatientId, Enums.SourceType.SFTP).GetPatientEncounter();
+                .AddPatientIdentifier(PatientId, Enums.SourceType.SFTP_FHIR)
+                .AddVisitIdentifier(EncounterId, SourceType.SFTP_FHIR)
+                .GetPatientEncounter();
         }
 
         public PatientEncounter UpdatePatientEncounter(PatientEncounter patientEncounter)

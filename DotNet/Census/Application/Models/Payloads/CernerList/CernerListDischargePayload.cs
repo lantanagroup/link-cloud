@@ -24,7 +24,7 @@ namespace LantanaGroup.Link.Census.Application.Models.Payloads.Cerner
 
         public PatientEvent CreatePatientEvent(string facilityId, string correlationId)
         {
-            return PatientEventFactory.Create(correlationId, PatientId, null, null, Enums.EventType.CernerListDischarge, this, Enums.SourceType.SFTP, facilityId);
+            return PatientEventFactory.Create(correlationId, PatientId, null, null, Enums.EventType.CernerListDischarge, this, Enums.SourceType.SFTP_FHIR, facilityId);
         }
 
         public PatientEncounter UpdatePatientEncounter(PatientEncounter patientEncounter)

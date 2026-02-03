@@ -14,6 +14,7 @@ using LantanaGroup.Link.Shared.Application.Models.DataAcq;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using System.Diagnostics.Metrics;
+using System.Diagnostics.Tracing;
 
 namespace LantanaGroup.Link.Census.Application.Services
 {
@@ -55,9 +56,11 @@ namespace LantanaGroup.Link.Census.Application.Services
 
             await using var transaction = await _patientEventQueries.StartTransaction(cancellationToken);
 
+            List<IBaseResponse> messages = new List<IBaseResponse>();
+
             foreach (var admitPatient in admittedPatients) 
             {
-                string admitPatientIdentifier = admitPatient.GetIdentifierByType(SourceType.SFTP).Identifier;
+                string admitPatientIdentifier = admitPatient.GetIdentifierByType(SourceType.SFTP_FHIR).Identifier;
 
                 if (cernerEventValue.PatientEncounters.Any(x => x.PatientId == admitPatientIdentifier)) 
                 {
@@ -72,10 +75,21 @@ namespace LantanaGroup.Link.Census.Application.Services
                 await _patientEventManager.AddPatientEvent(patientEvent, cancellationToken);
                 await _patientEncounterManager.UpdatePatientEncounterAsync(admitPatient, cancellationToken);
                 await _patientEventQueries.CommitTransaction(transaction, cancellationToken);
+
+                messages.Add(new PatientEventResponse()
+                {
+                    CorrelationId = admitPatient.CorrelationId,
+                    FacilityId = facilityId,
+                    TopicName = KafkaTopic.CernerPatientsAcquired.ToString(),
+                    PatientEvent = new Models.Messages.PatientEvent()
+                    {
+                        PatientId = admitPatientIdentifier,
+                        EventType = PatientEvents.Discharge.ToString()
+                    }
+                });
             }
 
-            //TODO: Daniel - Fix 
-            return new List<IBaseResponse>();
+            return messages;
         }
         public async Task<List<IBaseResponse>> ProcessList(string facilityId, CernerPatientsAcquired cernerEventValue, CancellationToken cancellationToken)
         {
@@ -87,13 +101,11 @@ namespace LantanaGroup.Link.Census.Application.Services
                 await using var transaction = await _patientEventQueries.StartTransaction(cancellationToken);
                 try
                 {
-                    //var latestEvent = await _patientEventQueries.GetLatestEventByFacilityAndPatientId(facilityId, eventEncounter.PatientId, cancellationToken);
-
                     var foundPatientEncounter = admittedPatients.FirstOrDefault(
                         x => x.MedicalRecordNumber == eventEncounter.MRN && 
                         x.PatientIdentifiers.Any(
                             y => y.Identifier == eventEncounter.PatientId && 
-                            y.SourceType == SourceType.SFTP.ToString()));
+                            y.SourceType == SourceType.SFTP_FHIR.ToString()));
 
                     if (foundPatientEncounter != null && foundPatientEncounter.EncounterStatus == eventEncounter.EncounterStatus && foundPatientEncounter.EncounterType == eventEncounter.EncounterType && foundPatientEncounter.MedicalRecordNumber == eventEncounter.MRN) 
                     {
@@ -109,12 +121,22 @@ namespace LantanaGroup.Link.Census.Application.Services
 
                         await _patientEventManager.AddPatientEvent(patientEvent, cancellationToken);
                         await _patientEncounterManager.UpdatePatientEncounterAsync(foundPatientEncounter, cancellationToken);
+
+                        messages.Add(new PatientEventResponse()
+                        {
+                            CorrelationId = foundPatientEncounter.CorrelationId,
+                            FacilityId = facilityId,
+                            TopicName = KafkaTopic.CernerPatientsAcquired.ToString(),
+                            PatientEvent = new Models.Messages.PatientEvent() { 
+                                PatientId = eventEncounter.PatientId,
+                                EventType = PatientEvents.Update.ToString()
+                            }
+                        });
                     }
                     else 
                     {
                         var correlationId = Guid.NewGuid().ToString();
                         var admitPayload = new CernerListAdmitPayload(eventEncounter.PatientId, DateTime.UtcNow, eventEncounter.EncounterId, eventEncounter.FinNumber, eventEncounter.MRN, eventEncounter.EncounterStatus, eventEncounter.EncounterType);
-
 
                         var patientEvent = admitPayload.CreatePatientEvent(facilityId, correlationId);
 
@@ -128,6 +150,18 @@ namespace LantanaGroup.Link.Census.Application.Services
                             encounter = await _patientEncounterManager.AddPatientEncounterAsync(patientEncounter,
                                 cancellationToken);
                         }
+
+                        messages.Add(new PatientEventResponse()
+                        {
+                            CorrelationId = correlationId,
+                            FacilityId = facilityId,
+                            TopicName = KafkaTopic.CernerPatientsAcquired.ToString(),
+                            PatientEvent = new Models.Messages.PatientEvent()
+                            {
+                                PatientId = eventEncounter.PatientId,
+                                EventType = PatientEvents.Admit.ToString()
+                            }
+                        });
                     }
 
                     await _patientEventQueries.CommitTransaction(transaction, cancellationToken);
