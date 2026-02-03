@@ -24,6 +24,7 @@ The Tenant service is responsible for producing the `ReportScheduled` Kafka mess
 The Census service interacts with several Kafka topics as both a producer and consumer. Below are the error retry and dead-letter handling strategies for each relevant topic.
 
 ### PatientListsAcquired (Consumer)
+
 - **Consumption:** Census consumes `PatientListsAcquired` events to process patient lists for facilities.
 - **Retry:**
   - If message processing fails with a transient error, the message is retried according to the configured retry policy (using the shared `TransientExceptionHandler`).
@@ -35,6 +36,7 @@ The Census service interacts with several Kafka topics as both a producer and co
   - DLQ topics follow the `{TopicName}-Error` naming convention.
 
 ### PatientEvent (Producer)
+
 - **Production:** Census produces `PatientEvent` messages to signal patient-related events (admit, discharge, etc.).
 - **Retry:**
   - If message production fails, the error is logged and will enter retry topic for production failures in Census itself.
@@ -42,6 +44,7 @@ The Census service interacts with several Kafka topics as both a producer and co
   - If retry fails after 5 attempts, the message will be deadlettered.
 
 ### PatientCensusScheduled (Producer)
+
 - **Production:** Census produces `PatientCensusScheduled` messages to schedule census-related jobs.
 - **Retry:**
   - Production errors are logged, but there is no built-in retry topic for production failures in Census.
@@ -50,11 +53,39 @@ The Census service interacts with several Kafka topics as both a producer and co
 
 ---
 
+## Normalization Service
+
+The Normalization service processes FHIR resources acquired by the platform to ensure they meet standard evaluation requirements.
+
+### ResourceAcquired (Consumer)
+
+- **Consumption:** Consumes `ResourceAcquired` messages containing FHIR resources or acquisition completion signals.
+- **Retry:**
+  - If a transient error occurs during processing, the message is retried via the `TransientExceptionHandler`.
+  - **Exceptions triggering retry:** Any exception not explicitly caught as a dead-letter or transient exception type will default to the retry workflow.
+  - Retry topics follow the `ResourceAcquired-Retry` naming convention.
+- **Dead-letter:**
+  - Messages are moved to the DLQ if a non-retryable error occurs or if metadata extraction fails.
+  - **Exceptions triggering dead-letter:**
+    - Missing FacilityId (message key).
+    - Missing or empty CorrelationId in the message headers.
+    - Unsupported resource types during deserialization.
+    - Validation failures, such as a null message value or missing ReportableEvent.
+  - DLQ topics follow the `ResourceAcquired-Error` naming convention.
+
+### ResourceNormalized (Producer)
+
+- **Production:** Produces `ResourceNormalized` messages after successful transformation.
+- **Error Handling:** If production fails, the error is logged. There is no built-in Kafka-level retry for producer failures; errors are surfaced to the background service.
+
+---
+
 ## Report Service
 
 The Report service consumes and produces several Kafka topics. Below are the error retry and dead-letter handling strategies for each relevant topic, based on the actual code implementation.
 
 ### ReportScheduled (Consumer)
+
 - **Consumption:** Report consumes `ReportScheduled` events to schedule reports for facilities.
 - **Retry:**
   - If message processing fails with a transient error (e.g., temporary network issues, database timeouts), the message is retried using the shared `TransientExceptionHandler`.
@@ -66,6 +97,7 @@ The Report service consumes and produces several Kafka topics. Below are the err
   - DLQ topics follow the `ReportScheduled-Error` naming convention.
 
 ### PatientListsAcquired (Consumer)
+
 - **Consumption:** Report consumes `PatientListsAcquired` events to update patient submission entries for scheduled reports.
 - **Retry:**
   - Transient errors (e.g., missing scheduled reports, temporary DB issues) trigger the retry workflow via `TransientExceptionHandler`.
@@ -75,6 +107,7 @@ The Report service consumes and produces several Kafka topics. Below are the err
   - DLQ topics follow the `PatientListsAcquired-Error` naming convention.
 
 ### GenerateReportRequested (Consumer)
+
 - **Consumption:** Report consumes `GenerateReportRequested` events to generate or regenerate reports.
 - **Retry:**
   - Transient errors (e.g., missing report schedule, temporary failures) trigger the retry workflow via `TransientExceptionHandler`.
@@ -84,6 +117,7 @@ The Report service consumes and produces several Kafka topics. Below are the err
   - DLQ topics follow the `GenerateReportRequested-Error` naming convention.
 
 ### PayloadSubmitted (Consumer)
+
 - **Consumption:** Report consumes `PayloadSubmitted` events to update submission status for reports and patients.
 - **Retry:**
   - Transient errors (e.g., DB update failures, timeouts) trigger the retry workflow via `TransientExceptionHandler`.
@@ -93,6 +127,7 @@ The Report service consumes and produces several Kafka topics. Below are the err
   - DLQ topics follow the `PayloadSubmitted-Error` naming convention.
 
 ### ResourceEvaluated (Consumer)
+
 - **Consumption:** Report consumes `ResourceEvaluated` events to process evaluated resources and update submission entries.
 - **Retry:**
   - Transient errors (e.g., missing report schedule, deserialization issues, timeouts) trigger the retry workflow via `TransientExceptionHandler`.
