@@ -8,7 +8,8 @@ using Quartz;
 
 namespace LantanaGroup.Link.Tenant.Jobs
 {
-
+    //This is currently unused. It was designed to be incorporated into a retention system, but was never fully developed.
+    //Leaving here for potential future use.
     [DisallowConcurrentExecution]
     public class RetentionCheckScheduledJob : IJob
     {

@@ -194,7 +194,6 @@ namespace Tenant
             builder.Services.RegisterQuartzDatabase(serviceInformation.ConnectionString);
 
             builder.Services.AddSingleton<ReportScheduledJob>();
-            builder.Services.AddSingleton<RetentionCheckScheduledJob>();
 
             //Add CORS
             builder.Services.AddLinkCorsService(options => {

@@ -128,14 +128,9 @@ namespace IntegrationTests.Tenant
 
             // Add job classes
             builder.Services.AddTransient<ReportScheduledJob>();
-            builder.Services.AddTransient<RetentionCheckScheduledJob>();
 
             // Add ScheduleService
             builder.Services.AddScoped<ScheduleService>();
-
-            // Add job classes
-            builder.Services.AddTransient<ReportScheduledJob>();
-            builder.Services.AddTransient<RetentionCheckScheduledJob>();
 
             // Add test job factory
             builder.Services.AddSingleton<IJobFactory, TestJobFactory>();

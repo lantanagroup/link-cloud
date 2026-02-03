@@ -218,7 +218,6 @@ namespace LantanaGroup.Link.Tenant.Controllers
             }
             catch (ApplicationException ex)
             {
-                throw;
                 return BadRequest(ex.Message);
             }
             catch (Exception ex)
