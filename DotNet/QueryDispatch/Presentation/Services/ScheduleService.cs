@@ -1,6 +1,6 @@
-﻿using AngleSharp.Dom;
-using LanatanGroup.Link.QueryDispatch.Jobs;
+﻿using LanatanGroup.Link.QueryDispatch.Jobs;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Quartz;
@@ -190,7 +190,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
         {
             JobDataMap jobDataMap = new JobDataMap();
 
-            jobDataMap.Put("FacilityId", facilityId);
+            jobDataMap.PutObject("FacilityId", facilityId);
 
             return JobBuilder
                 .Create(typeof(QueryDispatchJob))
@@ -205,7 +205,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
         {
             JobDataMap jobDataMap = new JobDataMap();
 
-            jobDataMap.Put("PatientDispatchEntity", patientDispatchEntity);
+            jobDataMap.PutObject("PatientDispatchEntity", patientDispatchEntity);
 
             var offset = ComputeOffset(patientDispatchEntity);
 

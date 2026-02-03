@@ -56,16 +56,11 @@ export class CensusConfigFormComponent implements OnInit, OnChanges {
     this.configForm = new FormGroup({
       facilityId: new FormControl('', Validators.required),
       scheduledTrigger: new FormControl('', Validators.required),
+      enabled: new FormControl(true)  
     });
   }
 
   ngOnInit(): void {
-
-    this.configForm = new FormGroup({
-      facilityId: new FormControl('', Validators.required),
-      scheduledTrigger: new FormControl('', Validators.required),
-      enabled: new FormControl(true)  // Add this line
-    });
 
     if(this.item) {
       //set form values
@@ -93,7 +88,7 @@ export class CensusConfigFormComponent implements OnInit, OnChanges {
       this.scheduledTriggerControl.setValue(this.item.scheduledTrigger);
       this.scheduledTriggerControl.updateValueAndValidity();
 
-      this.enabledControl.setValue(this.item.enabled !== undefined ? this.item.enabled : true);
+      this.enabledControl.setValue(this.item?.enabled !== undefined ? this.item.enabled : true);
       this.enabledControl.updateValueAndValidity();
 
       // toggle view

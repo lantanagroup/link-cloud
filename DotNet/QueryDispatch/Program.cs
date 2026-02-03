@@ -1,4 +1,3 @@
-using Azure.Identity;
 using HealthChecks.UI.Client;
 using LanatanGroup.Link.QueryDispatch.Jobs;
 using LantanaGroup.Link.QueryDispatch.Application.Factory;
@@ -10,9 +9,9 @@ using LantanaGroup.Link.QueryDispatch.Presentation.Services;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
-using LantanaGroup.Link.Shared.Application.Factory;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
@@ -27,12 +26,7 @@ using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.OpenApi.Models;
-using Quartz;
-using Quartz.Impl;
-using Quartz.Spi;
 using QueryDispatch.Application.Extensions;
 using QueryDispatch.Application.Interfaces;
 using QueryDispatch.Application.Services;
@@ -40,11 +34,9 @@ using QueryDispatch.Application.Settings;
 using QueryDispatch.Domain;
 using QueryDispatch.Domain.Context;
 using QueryDispatch.Domain.Managers;
-using QueryDispatch.Persistence.Retry;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
-using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json.Serialization;
@@ -55,18 +47,9 @@ builder.Configuration.AddStandardEnvironmentConfiguration();
 // load external configuration source (if specified)
 builder.AddExternalConfiguration(QueryDispatchConstants.ServiceName);
 
-var serviceInformation = builder.Configuration.GetRequiredSection(QueryDispatchConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-if (serviceInformation != null)
-{
-    ServiceActivitySource.Initialize(serviceInformation);    
-}
-else
-{
-    throw new NullReferenceException("Service Information was null.");
-}
+var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
 
-// Additional configuration is required to successfully run gRPC on macOS.
-// For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
+var serviceInformation = builder.SetupServiceInformation(QueryDispatchConstants.ServiceName, assemblyVersion);
 
 var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
 builder.Services.AddSingleton<KafkaConnection>(kafkaConnection);
@@ -129,6 +112,8 @@ builder.Services.AddTransient<ITransientExceptionHandler<string, PatientEventVal
 //Add Services
 builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
+builder.Services.RegisterQuartzDatabase(serviceInformation.ConnectionString);
+
 //Add Hosted Services
 if (consumerSettings != null && !consumerSettings.DisableConsumer)
 {
@@ -138,35 +123,14 @@ if (consumerSettings != null && !consumerSettings.DisableConsumer)
 
 }
 
-var quartzProps = new NameValueCollection
-{
-    ["quartz.scheduler.instanceName"] = "QueryDispatchScheduler",
-    ["quartz.scheduler.instanceId"] = "AUTO",
-    ["quartz.jobStore.clustered"] = "true",
-    ["quartz.jobStore.type"] = "Quartz.Impl.AdoJobStore.JobStoreTX, Quartz",
-    ["quartz.jobStore.driverDelegateType"] = "Quartz.Impl.AdoJobStore.SqlServerDelegate, Quartz",
-    ["quartz.jobStore.tablePrefix"] = "quartz.QRTZ_",
-    ["quartz.jobStore.dataSource"] = "default",
-    ["quartz.dataSource.default.connectionString"] = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection),
-    ["quartz.dataSource.default.provider"] = builder.Configuration.GetValue<string>(ConfigurationConstants.AppSettings.DatabaseProvider),
-    ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
-    ["quartz.threadPool.threadCount"] = "5",
-    ["quartz.jobStore.useProperties"] = "false",
-    ["quartz.serializer.type"] = "json"
-};
-
-builder.Services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
-
 if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
 {
-    builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
-    builder.Services.AddSingleton(new RetryListenerSettings(QueryDispatchConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.PatientEventRetry.GetStringValue()]));
+    builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.PatientEventRetry.GetStringValue()]));
     builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<RetryScheduleService>();
     builder.Services.AddSingleton<RetryJob>();
 }
 
-builder.Services.AddSingleton<IJobFactory, QuartzJobFactory>();
 builder.Services.AddSingleton<QueryDispatchJob>();
 
 

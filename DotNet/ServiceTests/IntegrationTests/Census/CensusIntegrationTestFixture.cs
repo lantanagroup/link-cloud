@@ -9,6 +9,7 @@ using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Census.Domain.Queries;
+using LantanaGroup.Link.Shared.Application.Extensions; // Added for SetupServiceInformation
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
@@ -24,6 +25,7 @@ using Quartz.Impl;
 using Quartz.Logging;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 using Task = System.Threading.Tasks.Task;
+using System.Reflection;
 
 namespace IntegrationTests.Census;
 
@@ -62,50 +64,56 @@ public sealed class CensusIntegrationTestFixture : IDisposable
 
         var dbName = $"CensusTestDatabase_{Guid.NewGuid():N}";
 
-        _host = Host.CreateDefaultBuilder()
-            .ConfigureServices((_, services) =>
-            {
-                services.AddDbContext<CensusContext>(options =>
-                {
-                    options.UseInMemoryDatabase(dbName);
-                    options.ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));
-                });
+        var builder = Host.CreateApplicationBuilder();
 
-                // Core services
-                services.AddScoped<IPatientEventManager, PatientEventManager>();
-                services.AddScoped<IPatientEventQueries, PatientEventQueries>();
-                services.AddScoped<IPatientEncounterManager, PatientEncounterManager>();
-                services.AddScoped<IPatientEncounterQueries, PatientEncounterQueries>();
-                services.AddScoped<ICensusConfigManager, CensusConfigManager>();
-                services.AddScoped<IBaseEntityRepository<CensusConfigEntity>, CensusEntityRepository<CensusConfigEntity>>();
-                services.AddScoped<IBaseEntityRepository<PatientEncounter>, CensusEntityRepository<PatientEncounter>>();
-                services.AddScoped<IBaseEntityRepository<PatientEvent>, CensusEntityRepository<PatientEvent>>();
-                services.AddScoped<IBaseEntityRepository<PatientIdentifier>, CensusEntityRepository<PatientIdentifier>>();
-                services.AddScoped<IBaseEntityRepository<PatientVisitIdentifier>, CensusEntityRepository<PatientVisitIdentifier>>();
-                services.AddScoped<ICensusSchedulingRepository, CensusSchedulingRepository>();
-                services.AddScoped<IPatientListService, PatientListService>();
+        var assemblyVersion = Assembly.GetExecutingAssembly()
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "1.0.0-test";
 
-                services.AddSingleton<ICensusServiceMetrics, NullCensusServiceMetrics>();
-                services.AddSingleton<ITenantApiService, NullTenantApiService>();
+        // Register ServiceInformation using the extension method with the in-memory db name
+        var serviceInformation = builder.SetupServiceInformation(
+            "CensusService", // Replace with a constant if available
+            assemblyVersion,
+            dbName
+        );
 
-                services.AddQuartz(q => q.UseMicrosoftDependencyInjectionJobFactory());
-                services.AddQuartzHostedService(o => o.WaitForJobsToComplete = true);
+        builder.Services.AddDbContext<CensusContext>(options =>
+        {
+            options.UseInMemoryDatabase(dbName);
+            options.ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));
+        });
 
-                services.AddLogging(builder => builder.ClearProviders().AddProvider(new NullLoggerProvider()));
-                services.AddKeyedSingleton<ISchedulerFactory, StdSchedulerFactory>(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton);
+        // Core services
+        builder.Services.AddScoped<IPatientEventManager, PatientEventManager>();
+        builder.Services.AddScoped<IPatientEventQueries, PatientEventQueries>();
+        builder.Services.AddScoped<IPatientEncounterManager, PatientEncounterManager>();
+        builder.Services.AddScoped<IPatientEncounterQueries, PatientEncounterQueries>();
+        builder.Services.AddScoped<ICensusConfigManager, CensusConfigManager>();
+        builder.Services.AddScoped<IBaseEntityRepository<CensusConfigEntity>, CensusEntityRepository<CensusConfigEntity>>();
+        builder.Services.AddScoped<IBaseEntityRepository<PatientEncounter>, CensusEntityRepository<PatientEncounter>>();
+        builder.Services.AddScoped<IBaseEntityRepository<PatientEvent>, CensusEntityRepository<PatientEvent>>();
+        builder.Services.AddScoped<IBaseEntityRepository<PatientIdentifier>, CensusEntityRepository<PatientIdentifier>>();
+        builder.Services.AddScoped<IBaseEntityRepository<PatientVisitIdentifier>, CensusEntityRepository<PatientVisitIdentifier>>();
+        builder.Services.AddScoped<ICensusSchedulingRepository, CensusSchedulingRepository>();
+        builder.Services.AddScoped<IPatientListService, PatientListService>();
 
-                services.AddOpenTelemetry()
-                        .WithTracing(b => b
-                            .AddSource("CensusService")
-                            .SetSampler(new AlwaysOnSampler())
-                            .AddConsoleExporter());
+        builder.Services.AddSingleton<ICensusServiceMetrics, NullCensusServiceMetrics>();
+        builder.Services.AddSingleton<ITenantApiService, NullTenantApiService>();
 
-                services.AddTransient<CensusConfigController>();
-                services.AddTransient<PatientEventsController>();
-                services.AddTransient<PatientEncountersController>();
-            })
-            .Build();
+        builder.Services.AddQuartz(q => q.UseInMemoryStore());
 
+        builder.Services.AddLogging(builder => builder.ClearProviders().AddProvider(new NullLoggerProvider()));
+
+        builder.Services.AddOpenTelemetry()
+                .WithTracing(b => b
+                    .AddSource("CensusService")
+                    .SetSampler(new AlwaysOnSampler())
+                    .AddConsoleExporter());
+
+        builder.Services.AddTransient<CensusConfigController>();
+        builder.Services.AddTransient<PatientEventsController>();
+        builder.Services.AddTransient<PatientEncountersController>();
+
+        _host = builder.Build();
         _host.Start();
         return _host;
     }

@@ -21,7 +21,7 @@
 
     <properties>
         <cqf-fhir.version>3.12.0</cqf-fhir.version>
-        <hapi-fhir.version>7.4.0</hapi-fhir.version>
+        <hapi-fhir.version>7.6.1</hapi-fhir.version>
         <janino.version>2.6.1</janino.version>
     </properties>
 
@@ -29,6 +29,7 @@
         <module>shared</module>
         <module>measureeval</module>
         <module>validation</module>
+        <module>hapi</module>
     </modules>
 
     <dependencyManagement>
@@ -108,7 +109,7 @@
             <dependency>
                 <groupId>com.github.loki4j</groupId>
                 <artifactId>loki-logback-appender</artifactId>
-                <version>2.0.1</version>
+                <version>2.0.3</version>
             </dependency>
 
             <dependency>

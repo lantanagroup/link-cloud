@@ -13,7 +13,6 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
-using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
 
@@ -28,19 +27,20 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
         IDeadLetterExceptionHandler<long, ReadyToAcquire> deadLetterConsumerHandler,
         IDeadLetterExceptionHandler<string, string> deadLetterConsumerErrorHandler,
         ITransientExceptionHandler<long, ReadyToAcquire> transientExceptionHandler,
-        IOptions<ServiceInformation> serviceInformation,
+        ServiceInformation serviceInformation,
         IServiceScopeFactory serviceScopeFactory)
         : base(logger, kafkaConsumerFactory, deadLetterConsumerHandler, deadLetterConsumerErrorHandler, transientExceptionHandler, serviceInformation)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _serviceScopeFactory = serviceScopeFactory;
     }
+
     protected override ConsumerConfig CreateConsumerConfig()
     {
         var settings = new ConsumerConfig
         {
             EnableAutoCommit = false,
-            GroupId = ServiceActivitySource.ServiceName
+            GroupId = ServiceInformation.ServiceConfigName,
         };
         return settings;
     }
@@ -61,7 +61,7 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
         var logQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
         var dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
         DataAcquisitionLogModel? log = null; 
-        _logger.LogInformation("Processing ReadyToAcquire message with log id: {consumeResult.Message.Value.LogId}, and facility id: {consumeResult.Message.Value.FacilityId}", consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId);
+        _logger.LogInformation("Processing ReadyToAcquire message with log id: {LogId}, and facility id: {FacilityId}", consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId);
 
         try
         {
@@ -103,7 +103,7 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
                 }, cancellationToken);
             }
 
-            _logger.LogError(ex, "Error processing ReadyToAcquire message with log id: {consumeResult.Message.Value.LogId}, and facility id: {consumeResult.Message.Value.FacilityId}", consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId);
+            _logger.LogError(ex, "Error processing ReadyToAcquire message with log id: {LogId}, and facility id: {FacilityId}", consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId);
             throw new DeadLetterException("Error processing ReadyToAcquire message: " + ex.Message, ex);
         }
     }

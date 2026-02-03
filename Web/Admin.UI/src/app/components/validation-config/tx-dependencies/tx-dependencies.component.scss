@@ -1,0 +1,105 @@
+.tx-card {
+  max-width: 1100px;
+  margin: 32px auto;
+  padding: 24px;
+}
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.filter-search {
+  flex: 1 1 320px;
+  min-width: 260px;
+}
+
+.table-container {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+}
+
+.status-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.missing-text {
+  color: #d32f2f;
+  font-weight: 600;
+}
+
+.spinner-container {
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+}
+
+.empty-state {
+  padding: 12px 0;
+  color: #666;
+  font-style: italic;
+}
+
+.error-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #d32f2f;
+}
+
+tr.detail-row {
+  height: 0;
+}
+
+tr.element-row:not(.expanded-row):hover {
+  background: whitesmoke;
+}
+
+tr.element-row:not(.expanded-row):active {
+  background: #efefef;
+}
+
+.element-row td {
+  border-bottom-width: 0;
+  cursor: pointer;
+}
+
+.element-detail {
+  overflow: hidden;
+  display: flex;
+}
+
+.source-profiles-container {
+  width: 100%;
+  padding: 16px;
+  background-color: #f9f9f9;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.source-profile-item {
+  margin-bottom: 16px;
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.profile-url {
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.profile-elements {
+  font-size: 13px;
+  ul {
+    margin: 4px 0 0 20px;
+    padding: 0;
+  }
+}

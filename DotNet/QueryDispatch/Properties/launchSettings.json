@@ -1,5 +1,13 @@
 {
   "profiles": {
+    "QueryDispatch": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": "http://localhost:5118;https://localhost:7091"
+    },
     "http-docker": {
       "commandName": "Project",
       "launchBrowser": false,
