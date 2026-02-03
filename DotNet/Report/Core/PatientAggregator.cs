@@ -64,8 +64,8 @@ namespace LantanaGroup.Link.Report.Core
                 throw new Exception($"No ReportEntry record found when running patient aggregator (ReportId = {reportSchedule.Id}, PatientId = {patientId}, FacilityId = {reportSchedule.FacilityId}).");
             }
 
-            //The 'resourcesAdded' Dictionary will keep track of FHIR resource id's that have been added to the bundle to avoid adding duplicates across entries. The value of each dictionary entry will contain the associated FHIR types. It's a string List type in case there are different FHIR resources that share the same id. This is probably unlikely to happen, but is possible. 
-            Dictionary<string, int> resourcesAdded = new Dictionary<string, int>();
+            //The 'resourcesAdded' HashSet will keep track of FHIR resource id's that have been added to the bundle to avoid adding duplicates across entries. 
+            HashSet<string> resourcesAdded = new HashSet<string>();
             var parser = new FhirJsonParser();
 
             string bundleName = $"patient-{patientId}.ndjson";
@@ -92,7 +92,7 @@ namespace LantanaGroup.Link.Report.Core
                         {
                             string resource_reference = reader.ReadLine();
 
-                            if (string.IsNullOrWhiteSpace(resource_reference) || resourcesAdded.ContainsKey(resource_reference))
+                            if (string.IsNullOrWhiteSpace(resource_reference) || resourcesAdded.Contains(resource_reference))
                             {
                                 //Skip FHIR Resource line
                                 reader.Read();
@@ -115,7 +115,7 @@ namespace LantanaGroup.Link.Report.Core
 
                             if (split_reference[0] != "MeasureReport")
                             {
-                                resourcesAdded.Add(resource_reference, 1);
+                                resourcesAdded.Add(resource_reference);
                                 writer.WriteLine(reader.ReadLine());
                                 continue;
                             }
@@ -140,7 +140,7 @@ namespace LantanaGroup.Link.Report.Core
                             }
 
                             aggregateResult.MeasureReportResults.Add(aggregateMeasureReport);
-                            resourcesAdded.Add(resource_reference, 1);
+                            resourcesAdded.Add(resource_reference);
                             writer.WriteLine(measureReportString);
 
                             _metrics.IncrementReportGeneratedCounter(new List<KeyValuePair<string, object?>>() {
