@@ -20,7 +20,7 @@ namespace LantanaGroup.Link.Census.Application.Services
 {
     public interface ICernerListService 
     {
-        Task<List<IBaseResponse>> ProcessList(string facilityId, CernerPatientsAcquired cernerEventValue, CancellationToken cancellationToken);
+        Task<List<IBaseResponse>> ProcessAdmits(string facilityId, CernerPatientsAcquired cernerEventValue, CancellationToken cancellationToken);
         Task<List<IBaseResponse>> ProcessDischarges(string facilityId, CernerPatientsAcquired cernerEventValue, CancellationToken cancellationToken);
     }
     public class CernerListService : ICernerListService
@@ -91,7 +91,7 @@ namespace LantanaGroup.Link.Census.Application.Services
 
             return messages;
         }
-        public async Task<List<IBaseResponse>> ProcessList(string facilityId, CernerPatientsAcquired cernerEventValue, CancellationToken cancellationToken)
+        public async Task<List<IBaseResponse>> ProcessAdmits(string facilityId, CernerPatientsAcquired cernerEventValue, CancellationToken cancellationToken)
         {
             List<IBaseResponse> messages = new List<IBaseResponse>();
             var admittedPatients = await _patientEncounterQueries.GetAdmittedPatientsByFacility(facilityId, cancellationToken);
@@ -168,7 +168,7 @@ namespace LantanaGroup.Link.Census.Application.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error processing patient list for facility {FacilityId}", facilityId);
+                    _logger.LogError(ex, "Error processing Cerner list for facility {FacilityId}", facilityId);
                     await _patientEventQueries.RollbackTransaction(transaction, cancellationToken);
                     throw;
                 }

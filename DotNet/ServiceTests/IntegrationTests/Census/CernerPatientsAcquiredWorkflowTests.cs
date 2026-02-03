@@ -64,7 +64,7 @@ namespace IntegrationTests.Census
                 new NullCensusServiceMetrics(),
                 eventManager, eventQueries, encounterQueries, encounterManager, censusConfigManager);
 
-            var responses = await cernerListService.ProcessList(facilityId, cernerPatientsAcquiredEvent, CancellationToken.None);
+            var responses = await cernerListService.ProcessAdmits(facilityId, cernerPatientsAcquiredEvent, CancellationToken.None);
 
             Assert.Single(responses);
             Assert.Equal(PatientEvents.Admit.ToString(), ((PatientEventResponse)responses.First()).PatientEvent.EventType);
@@ -202,7 +202,7 @@ namespace IntegrationTests.Census
                 }
             };
 
-            var processedResponses = await cernerListService.ProcessList(facilityId, cernerPatientsAcquiredEvent, CancellationToken.None);
+            var processedResponses = await cernerListService.ProcessAdmits(facilityId, cernerPatientsAcquiredEvent, CancellationToken.None);
 
             Assert.Single(processedResponses);
             Assert.Equal(PatientEvents.Update.ToString(), ((PatientEventResponse)processedResponses.First()).PatientEvent.EventType);

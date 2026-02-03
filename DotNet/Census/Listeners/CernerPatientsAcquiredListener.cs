@@ -137,7 +137,7 @@ namespace LantanaGroup.Link.Census.Listeners
                 await _eventProducerService.ProduceEventsAsync(result.Message.Key, dischargeEvents, cancellationToken);
             }
 
-            await cernerListService.ProcessList(result.Message.Key, result.Message.Value, cancellationToken);
+            await cernerListService.ProcessAdmits(result.Message.Key, result.Message.Value, cancellationToken);
         }
     }
 }
