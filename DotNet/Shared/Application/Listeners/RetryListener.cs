@@ -20,14 +20,14 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
     {
         private readonly ILogger<RetryListener> _logger;
 
-        private readonly IKafkaConsumerFactory<string, string>
-            _kafkaConsumerFactory;
+        private readonly IKafkaConsumerFactory<string, string> _kafkaConsumerFactory;
 
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly IOptions<ConsumerSettings> _consumerSettings;
         private readonly IRetryModelFactory _retryEntityFactory;
         private readonly IDeadLetterExceptionHandler<string, string> _deadLetterExceptionHandler;
         private readonly RetryListenerSettings _retryListenerSettings;
+        private readonly ServiceInformation _serviceInformation;
         private readonly IServiceScopeFactory _serviceScopeFactory;
 
         public RetryListener(ILogger<RetryListener> logger,
@@ -37,6 +37,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
             IRetryModelFactory retryEntityFactory,
             IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler,
             RetryListenerSettings retryListenerSettings,
+            ServiceInformation serviceInformation,
             IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -47,7 +48,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
             _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentException(nameof(serviceScopeFactory));
             _retryListenerSettings = retryListenerSettings ?? throw new ArgumentException(nameof(retryListenerSettings));
-            _deadLetterExceptionHandler.ServiceName = retryListenerSettings.ServiceName ?? throw new ArgumentException(nameof(retryListenerSettings.ServiceName));
+            _serviceInformation = serviceInformation ?? throw new ArgumentException(nameof(serviceInformation));
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -59,7 +60,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
         {
             var config = new ConsumerConfig()
             {
-                GroupId = _retryListenerSettings.ServiceName,
+                GroupId = _serviceInformation.ServiceConfigName,
                 EnableAutoCommit = false
             };
 
@@ -69,7 +70,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
             {
                 consumer.Subscribe(_retryListenerSettings.Topics);
 
-                _logger.LogInformation("Started {ServiceName} retry consumer for topics: [{Topics}] {Timestamp}", _retryListenerSettings.ServiceName, string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+                _logger.LogInformation("Started {ServiceName} retry consumer for topics: [{Topics}] {Timestamp}", _serviceInformation.ServiceConfigName, string.Join(", ", consumer.Subscription), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -86,9 +87,9 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                                 if (consumeResult.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var exceptionService))
                                 {
                                     //If retry event is not from the exception service, disregard the retry event
-                                    if (Encoding.UTF8.GetString(exceptionService) != _retryListenerSettings.ServiceName)
+                                    if (Encoding.UTF8.GetString(exceptionService) != _serviceInformation.ServiceConfigName)
                                     {
-                                        _logger.LogWarning("Service that Retry instance is running in ({instanceServiceName}) is different from the service that produced the message ({messageServiceName}). Message will be disregarded.", _retryListenerSettings.ServiceName, Encoding.UTF8.GetString(exceptionService));
+                                        _logger.LogWarning("Service that Retry instance is running in ({instanceServiceName}) is different from the service that produced the message ({messageServiceName}). Message will be disregarded.", _serviceInformation.ServiceConfigName, Encoding.UTF8.GetString(exceptionService));
                                         return;
                                     }
                                 }
@@ -98,7 +99,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                                     int countValue = int.Parse(Encoding.UTF8.GetString(retryCount));
 
                                     //Dead letter if the retry count exceeds the configured retry duration count
-                                    if (countValue >= _consumerSettings.Value.ConsumerRetryDuration.Count())
+                                    if (countValue > _consumerSettings.Value.ConsumerRetryDuration.Count())
                                     {
                                         throw new DeadLetterException($"Retry count exceeded for message with key: {consumeResult.Message.Key}");
                                     }
@@ -110,6 +111,8 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
 
                                 var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
 
+                                _logger.LogInformation("Scheduling retry for {Topic}-{Id} at {ScheduledTrigger}, Retry Count: {RetryCount}", retryModel.Topic, retryModel.Id, retryModel.ScheduledTrigger, retryModel.RetryCount);
+
                                 await RetryScheduleService.CreateJobAndTrigger(retryModel, scheduler);
                             }
                             catch (DeadLetterException ex)
@@ -120,7 +123,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                             }
                             catch (Exception ex)
                             {
-                                _logger.LogError(ex, "Error in {ServiceName} retry consumer for topics: [{Topics}] at {Timestamp}", _retryListenerSettings.ServiceName, string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+                                _logger.LogError(ex, "Error in {ServiceName} retry consumer for topics: [{Topics}] at {Timestamp}", _serviceInformation.ServiceConfigName, string.Join(", ", consumer.Subscription), DateTime.UtcNow);
                             }
                             finally
                             {
