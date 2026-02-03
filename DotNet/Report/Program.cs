@@ -9,7 +9,6 @@ using LantanaGroup.Link.Report.Application.Options;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Domain.Queries;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.KafkaProducers;
@@ -171,7 +170,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IReportEntryManager, ReportEntryManager>();
     builder.Services.AddTransient<IReportPopulationManager, ReportPopulationManager>();
     builder.Services.AddTransient<IReportResourceManager, ReportResourceManager>();
-    builder.Services.AddTransient<ISubmissionEntryQueries, SubmissionEntryQueries>();
 
     // Add Link Security
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
