@@ -5,7 +5,6 @@ using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
-using LantanaGroup.Link.Report.Entities.Enums;
 using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
@@ -22,6 +21,7 @@ using Quartz;
 using Quartz.Impl;
 using Quartz.Impl.Matchers;
 using Xunit.Abstractions;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report
@@ -73,7 +73,7 @@ namespace IntegrationTests.Report
         //        FacilityId = schedule.FacilityId,
         //        ReportScheduleId = schedule.Id,
         //        PatientId = "Patient1",
-        //        Status = MeasureReportStatus.ValidationComplete,
+        //        Status = PatientSubmissionStatus.ValidationComplete,
         //        MeasureReport = new MeasureReport { Id = Guid.NewGuid().ToString(), Measure = "TestMeasure" }
         //    };
         //    var entry2 = new PatientSubmissionEntry
@@ -82,7 +82,7 @@ namespace IntegrationTests.Report
         //        FacilityId = schedule.FacilityId,
         //        ReportScheduleId = schedule.Id,
         //        PatientId = "Patient2",
-        //        Status = MeasureReportStatus.NotReportable
+        //        Status = PatientSubmissionStatus.NotReportable
         //    };
         //    await database.SubmissionEntryRepository.AddAsync(entry1);
         //    await database.SubmissionEntryRepository.AddAsync(entry2);
@@ -116,14 +116,14 @@ namespace IntegrationTests.Report
         //    // Add JobDetail mock
         //    var jobDetailMock = new Mock<IJobDetail>();
         //    var jobDetailDataMap = new JobDataMap();
-        //    jobDetailDataMap.Put("ReportScheduleId", schedule.Id);
+        //    jobDetailDataMap.PutObject("ReportScheduleId", schedule.Id);
         //    jobDetailMock.Setup(j => j.JobDataMap).Returns(jobDetailDataMap);
         //    contextMock.Setup(c => c.JobDetail).Returns(jobDetailMock.Object);
 
         //    // Trigger mock (keep as fallback)
         //    var triggerMock = new Mock<ITrigger>();
         //    var triggerDataMap = new JobDataMap();
-        //    triggerDataMap.Put("ReportScheduleId", schedule.Id);
+        //    triggerDataMap.PutObject("ReportScheduleId", schedule.Id);
         //    triggerMock.Setup(t => t.JobDataMap).Returns(triggerDataMap);
         //    contextMock.Setup(c => c.Trigger).Returns(triggerMock.Object);
 
@@ -188,7 +188,7 @@ namespace IntegrationTests.Report
         //            ReportScheduleId = schedule.Id,
         //            PatientId = patientId,
         //            ReportType = "TestReport",
-        //            Status = MeasureReportStatus.PendingEvaluation
+        //            Status = PatientSubmissionStatus.PendingEvaluation
         //        };
         //        await database.SubmissionEntryRepository.AddAsync(entry);
         //    }
@@ -212,14 +212,14 @@ namespace IntegrationTests.Report
         //    // Add JobDetail mock
         //    var jobDetailMock = new Mock<IJobDetail>();
         //    var jobDetailDataMap = new JobDataMap();
-        //    jobDetailDataMap.Put("ReportScheduleId", schedule.Id);
+        //    jobDetailDataMap.PutObject("ReportScheduleId", schedule.Id);
         //    jobDetailMock.Setup(j => j.JobDataMap).Returns(jobDetailDataMap);
         //    contextMock.Setup(c => c.JobDetail).Returns(jobDetailMock.Object);
 
         //    // Trigger mock
         //    var triggerMock = new Mock<ITrigger>();
         //    var triggerDataMap = new JobDataMap();
-        //    triggerDataMap.Put("ReportScheduleId", schedule.Id);
+        //    triggerDataMap.PutObject("ReportScheduleId", schedule.Id);
         //    triggerMock.Setup(t => t.JobDataMap).Returns(triggerDataMap);
         //    contextMock.Setup(c => c.Trigger).Returns(triggerMock.Object);
 
@@ -228,7 +228,7 @@ namespace IntegrationTests.Report
         //        loggerMock.Object,
         //        schedulerFactoryMock.Object,
         //        serviceScopeFactory,
-        //        dataAcqProducer, 
+        //        dataAcqProducer,
         //        readyValProducer,
         //        manifestProducer);
 
@@ -280,7 +280,7 @@ namespace IntegrationTests.Report
         //        FacilityId = schedule.FacilityId,
         //        ReportScheduleId = schedule.Id,
         //        PatientId = "Patient1",
-        //        Status = MeasureReportStatus.ReadyForValidation,
+        //        Status = PatientSubmissionStatus.ReadyForValidation,
         //        ValidationStatus = ValidationStatus.Pending,
         //        PayloadUri = "test://payload/patient1"
         //    };
@@ -308,14 +308,14 @@ namespace IntegrationTests.Report
         //    // Add JobDetail mock
         //    var jobDetailMock = new Mock<IJobDetail>();
         //    var jobDetailDataMap = new JobDataMap();
-        //    jobDetailDataMap.Put("ReportScheduleId", schedule.Id);
+        //    jobDetailDataMap.PutObject("ReportScheduleId", schedule.Id);
         //    jobDetailMock.Setup(j => j.JobDataMap).Returns(jobDetailDataMap);
         //    contextMock.Setup(c => c.JobDetail).Returns(jobDetailMock.Object);
 
         //    // Trigger mock (keep as fallback)
         //    var triggerMock = new Mock<ITrigger>();
         //    var triggerDataMap = new JobDataMap();
-        //    triggerDataMap.Put("ReportScheduleId", schedule.Id);
+        //    triggerDataMap.PutObject("ReportScheduleId", schedule.Id);
         //    triggerMock.Setup(t => t.JobDataMap).Returns(triggerDataMap);
         //    contextMock.Setup(c => c.Trigger).Returns(triggerMock.Object);
 
@@ -378,7 +378,7 @@ namespace IntegrationTests.Report
         //        FacilityId = schedule.FacilityId,
         //        ReportScheduleId = schedule.Id,
         //        PatientId = "Patient1",
-        //        Status = MeasureReportStatus.PendingEvaluation
+        //        Status = PatientSubmissionStatus.PendingEvaluation
         //    };
         //    await database.SubmissionEntryRepository.AddAsync(entry);
         //    await database.SaveChangesAsync();
@@ -403,14 +403,14 @@ namespace IntegrationTests.Report
         //    // Add JobDetail mock
         //    var jobDetailMock = new Mock<IJobDetail>();
         //    var jobDetailDataMap = new JobDataMap();
-        //    jobDetailDataMap.Put("ReportScheduleId", schedule.Id);
+        //    jobDetailDataMap.PutObject("ReportScheduleId", schedule.Id);
         //    jobDetailMock.Setup(j => j.JobDataMap).Returns(jobDetailDataMap);
         //    contextMock.Setup(c => c.JobDetail).Returns(jobDetailMock.Object);
 
         //    // Trigger mock (keep as fallback)
         //    var triggerMock = new Mock<ITrigger>();
         //    var triggerDataMap = new JobDataMap();
-        //    triggerDataMap.Put("ReportScheduleId", schedule.Id);
+        //    triggerDataMap.PutObject("ReportScheduleId", schedule.Id);
         //    triggerMock.Setup(t => t.JobDataMap).Returns(triggerDataMap);
         //    contextMock.Setup(c => c.Trigger).Returns(triggerMock.Object);
 
