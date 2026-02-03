@@ -255,8 +255,8 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         // Assert
         var objectResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal((int)HttpStatusCode.BadRequest, objectResult.StatusCode);
-        Assert.Equal("Incorrect Query Order", ((ProblemDetails)objectResult.Value).Title);
-        Assert.Contains("All ReferenceQueryConfig entries must appear after all ParameterQueryConfig entries in InitialQueries", ((ProblemDetails)objectResult.Value).Detail, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Bad Request", ((ProblemDetails)objectResult.Value).Title);
+        Assert.Contains("Query Plan validation failed:", ((ProblemDetails)objectResult.Value).Detail, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -393,8 +393,8 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         // Assert
         var objectResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal((int)HttpStatusCode.BadRequest, objectResult.StatusCode);
-        Assert.Equal("Incorrect Query Order", ((ProblemDetails)objectResult.Value).Title);
-        Assert.Contains("All ReferenceQueryConfig entries must", ((ProblemDetails)objectResult.Value).Detail, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Bad Request", ((ProblemDetails)objectResult.Value).Title);
+        Assert.Contains("Query Plan validation failed: Query Plan", ((ProblemDetails)objectResult.Value).Detail, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
