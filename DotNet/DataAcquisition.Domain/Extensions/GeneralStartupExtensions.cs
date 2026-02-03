@@ -18,6 +18,10 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Parsers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Processors;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -149,6 +153,7 @@ public static class GeneralStartupExtensions
         services.Configure<ApiSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.ApiSettings));
         services.Configure<SecretManagerSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.SecretManagement));
         services.Configure<SftpValidationSettings>(configuration.GetSection(SftpValidationSettings.SectionName));
+        services.Configure<SftpAcquisitionSettings>(configuration.GetSection(SftpAcquisitionSettings.SectionName));
 
         IConfigurationSection consumerSettingsSection = configuration.GetRequiredSection(nameof(ConsumerSettings));
         services.Configure<ConsumerSettings>(consumerSettingsSection);
@@ -283,6 +288,17 @@ public static class GeneralStartupExtensions
         //Data Pull Commands
         services.AddTransient<IReadFhirCommand, ReadFhirCommand>();
         services.AddTransient<ISearchFhirCommand, SearchFhirCommand>();
+
+        //SFTP Services
+        services.AddTransient<ISftpClientService, SftpClientService>();
+        services.AddTransient<IFileParserFactory, FileParserFactory>();
+        services.AddTransient<ISftpAcquisitionProcessorFactory, SftpAcquisitionProcessorFactory>();
+
+        //File Parsers (registered as IFileParser<T> for factory resolution)
+        services.AddTransient<IFileParser<CernerEncounters>, CernerCensusParser>();
+
+        //SFTP Acquisition Processors (registered for factory resolution)
+        services.AddTransient<ISftpAcquisitionProcessor, CernerCensusProcessor>();
     }
 
     private static void RegisterSecretManager(this IServiceCollection services, IConfiguration configuration)
@@ -331,6 +347,7 @@ public static class GeneralStartupExtensions
         services.RegisterKafkaProducer<string, PatientListMessage>(kafkaConnection, producerConfig, null, new IndentedJsonSerializer<PatientListMessage>());
         services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<long, ReadyToAcquire>(kafkaConnection, producerConfig);
+        services.RegisterKafkaProducer<string, CernerPatientsAcquired>(kafkaConnection, producerConfig);
 
         services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
         services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
@@ -340,6 +357,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IKafkaProducerFactory<string, ResourceAcquired>, KafkaProducerFactory<string, ResourceAcquired>>();
         services.AddTransient<IKafkaProducerFactory<string, PatientListMessage>, KafkaProducerFactory<string, PatientListMessage>>();
         services.AddTransient<IKafkaProducerFactory<long, ReadyToAcquire>, KafkaProducerFactory<long, ReadyToAcquire>>();
+        services.AddTransient<IKafkaProducerFactory<string, CernerPatientsAcquired>, KafkaProducerFactory<string, CernerPatientsAcquired>>();
 
         //Factories - Application
         services.AddTransient<IParameterQueryFactory, ParameterQueryFactory>();

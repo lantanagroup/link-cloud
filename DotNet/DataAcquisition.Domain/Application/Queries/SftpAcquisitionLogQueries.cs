@@ -6,12 +6,14 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
@@ -20,6 +22,23 @@ public interface ISftpAcquisitionLogQueries
     Task<SftpAcquisitionLog?> GetByIdAsync(long id, CancellationToken cancellationToken);
     Task<SftpAcquisitionLog?> GetByExternalIdAsync(Guid id, CancellationToken cancellationToken);
     Task<PagedSftpAcquisitionLogModel> SearchAsync(SftpLogSearchParameters queryParameters,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Gets pending logs ready for processing (ScheduledDate is null or in the past).
+    /// </summary>
+    Task<List<SftpAcquisitionLog>> GetPendingLogsAsync(
+        SftpAcquisitionType acquisitionType,
+        int limit,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Gets failed logs eligible for retry (under max retry attempts and ready to process).
+    /// </summary>
+    Task<List<SftpAcquisitionLog>> GetFailedLogsForRetryAsync(
+        SftpAcquisitionType acquisitionType,
+        int maxRetries,
+        int limit,
         CancellationToken cancellationToken);
 }
 
@@ -114,6 +133,46 @@ public class SftpAcquisitionLogQueries(
         }
     }
     
+    public async Task<List<SftpAcquisitionLog>> GetPendingLogsAsync(
+        SftpAcquisitionType acquisitionType,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        using var activity = Activity.Current?.Source.StartActivity();
+        activity?.SetTag("acquisitionType", acquisitionType.ToString());
+
+        var now = DateTime.UtcNow;
+        return await dbContext.SftpAcquisitionLogs
+            .Where(x => x.AcquisitionType == acquisitionType
+                        && x.Status == RequestStatus.Pending
+                        && (x.ScheduledDate == null || x.ScheduledDate <= now))
+            .OrderBy(x => x.ScheduledDate ?? DateTime.MinValue)
+            .ThenBy(x => x.Id)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<List<SftpAcquisitionLog>> GetFailedLogsForRetryAsync(
+        SftpAcquisitionType acquisitionType,
+        int maxRetries,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        using var activity = Activity.Current?.Source.StartActivity();
+        activity?.SetTag("acquisitionType", acquisitionType.ToString());
+
+        var now = DateTime.UtcNow;
+        return await dbContext.SftpAcquisitionLogs
+            .Where(x => x.AcquisitionType == acquisitionType
+                        && x.Status == RequestStatus.Failed
+                        && (x.RetryAttempts ?? 0) < maxRetries
+                        && (x.ScheduledDate == null || x.ScheduledDate <= now))
+            .OrderBy(x => x.ScheduledDate ?? DateTime.MinValue)
+            .ThenBy(x => x.Id)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+    }
+
     private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
     {
         var type = typeof(T);

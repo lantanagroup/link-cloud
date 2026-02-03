@@ -61,6 +61,91 @@
     </div>
   </div>
 
+  <div class="form-row">
+    <div class="toggle-container benchmarking-toggle">
+      <mat-slide-toggle formControlName="enableBenchmarking" [disabled]="viewOnly">
+        Enable performance benchmarking
+      </mat-slide-toggle>
+      <mat-icon matTooltip="When enabled, detailed timing metrics are collected for SFTP operations. Useful during facility onboarding.">info</mat-icon>
+    </div>
+  </div>
+
+  <div class="acquisition-configurations-section">
+    <div class="section-header">
+      <h4>Acquisition Configurations</h4>
+      @if (!viewOnly) {
+        <button mat-stroked-button type="button" (click)="addAcquisitionConfiguration()">
+          <mat-icon>add</mat-icon>
+          Add Acquisition Type
+        </button>
+      }
+    </div>
+
+    @if (acquisitionConfigurationsArray.length === 0) {
+      <p class="no-configs-hint">
+        <mat-icon>info</mat-icon>
+        No acquisition types configured. Add at least one to enable SFTP data acquisition.
+      </p>
+    }
+
+    <mat-accordion>
+      @for (config of acquisitionConfigurationsArray.controls; track config; let i = $index) {
+        <mat-expansion-panel [formGroup]="$any(config)">
+          <mat-expansion-panel-header>
+            <mat-panel-title>
+              {{ config.get('acquisitionType')?.value || 'New Configuration' }}
+            </mat-panel-title>
+            <mat-panel-description>
+              {{ config.get('fileNamePattern')?.value || 'All files' }}
+            </mat-panel-description>
+          </mat-expansion-panel-header>
+
+          <div class="acquisition-config-fields">
+            <mat-form-field appearance="outline" class="form-input">
+              <mat-label>Acquisition Type</mat-label>
+              <mat-select formControlName="acquisitionType" [disabled]="viewOnly">
+                @for (type of acquisitionTypes; track type) {
+                  <mat-option [value]="type">{{ type }}</mat-option>
+                }
+              </mat-select>
+              <mat-hint>Type of data to acquire from this SFTP connection</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="form-input">
+              <mat-label>Remote Directory</mat-label>
+              <input matInput formControlName="remoteDirectory" [readonly]="viewOnly"
+                     placeholder="/path/to/files">
+              <mat-hint>Directory for this acquisition type (optional, defaults to connection's remote directory)</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="form-input">
+              <mat-label>Processed Directory</mat-label>
+              <input matInput formControlName="processedDirectory" [readonly]="viewOnly"
+                     placeholder="/path/to/processed">
+              <mat-hint>Move files here after processing (optional, recommended for audit trail)</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="form-input">
+              <mat-label>File Name Pattern</mat-label>
+              <input matInput formControlName="fileNamePattern" [readonly]="viewOnly"
+                     placeholder="*.dat">
+              <mat-hint>Pattern to match files (e.g., "census_*.dat", "*.json"). Leave empty for all files.</mat-hint>
+            </mat-form-field>
+
+            @if (!viewOnly) {
+              <div class="config-actions">
+                <button mat-stroked-button color="warn" type="button" (click)="removeAcquisitionConfiguration(i)">
+                  <mat-icon>delete</mat-icon>
+                  Remove
+                </button>
+              </div>
+            }
+          </div>
+        </mat-expansion-panel>
+      }
+    </mat-accordion>
+  </div>
+
   @if (!viewOnly) {
     <div class="credentials-section">
       <div class="credentials-header">

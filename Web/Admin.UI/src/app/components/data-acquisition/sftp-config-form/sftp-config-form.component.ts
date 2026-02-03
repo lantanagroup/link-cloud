@@ -1,5 +1,6 @@
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
 import {
+  FormArray,
   FormBuilder,
   FormControl,
   FormGroup,
@@ -13,13 +14,17 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatSelectModule } from '@angular/material/select';
+import { MatExpansionModule } from '@angular/material/expansion';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { FormMode } from 'src/app/models/FormMode.enum';
 import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
 import { DataAcquisitionService } from 'src/app/services/gateway/data-acquisition/data-acquisition.service';
 import {
   ICreateSftpConfigurationModel,
+  ISftpAcquisitionTypeConfiguration,
   ISftpConfigurationModel,
-  ISftpCredentialStatusModel
+  ISftpCredentialStatusModel,
+  SftpAcquisitionType
 } from '../../../interfaces/data-acquisition/sftp-config-model.interface';
 
 @Component({
@@ -33,7 +38,9 @@ import {
     MatSlideToggleModule,
     ReactiveFormsModule,
     MatSnackBarModule,
-    MatSelectModule
+    MatSelectModule,
+    MatExpansionModule,
+    MatTooltipModule
   ],
   templateUrl: './sftp-config-form.component.html',
   styleUrls: ['./sftp-config-form.component.scss']
@@ -60,6 +67,7 @@ export class SftpConfigFormComponent implements OnInit, OnChanges {
   configForm!: FormGroup;
   credentialStatus: ISftpCredentialStatusModel | null = null;
   showCredentialFields: boolean = false;
+  acquisitionTypes = Object.values(SftpAcquisitionType);
 
   constructor(
     private snackBar: MatSnackBar,
@@ -73,6 +81,8 @@ export class SftpConfigFormComponent implements OnInit, OnChanges {
       remoteDirectory: this.fb.control(''),
       timeout: this.fb.control('00:01:00', Validators.required),
       removeAfterProcessing: this.fb.control(false),
+      enableBenchmarking: this.fb.control(false),
+      acquisitionConfigurations: this.fb.array([]),
       username: this.fb.control(''),
       password: this.fb.control('')
     });
@@ -94,6 +104,11 @@ export class SftpConfigFormComponent implements OnInit, OnChanges {
       this.timeoutControl.updateValueAndValidity();
       this.removeAfterProcessingControl.setValue(this.item.removeAfterProcessing);
       this.removeAfterProcessingControl.updateValueAndValidity();
+      this.enableBenchmarkingControl.setValue(this.item.enableBenchmarking || false);
+      this.enableBenchmarkingControl.updateValueAndValidity();
+
+      // Load existing acquisition configurations
+      this.loadAcquisitionConfigurations();
 
       // Load credential status if editing
       if (this.formMode === FormMode.Edit) {
@@ -107,6 +122,8 @@ export class SftpConfigFormComponent implements OnInit, OnChanges {
       this.timeoutControl.updateValueAndValidity();
       this.removeAfterProcessingControl.setValue(false);
       this.removeAfterProcessingControl.updateValueAndValidity();
+      this.enableBenchmarkingControl.setValue(false);
+      this.enableBenchmarkingControl.updateValueAndValidity();
       this.formMode = FormMode.Create;
       this.showCredentialFields = true;
     }
@@ -135,6 +152,11 @@ export class SftpConfigFormComponent implements OnInit, OnChanges {
       this.timeoutControl.updateValueAndValidity();
       this.removeAfterProcessingControl.setValue(this.item.removeAfterProcessing);
       this.removeAfterProcessingControl.updateValueAndValidity();
+      this.enableBenchmarkingControl.setValue(this.item.enableBenchmarking || false);
+      this.enableBenchmarkingControl.updateValueAndValidity();
+
+      // Load existing acquisition configurations
+      this.loadAcquisitionConfigurations();
 
       // Load credential status if editing
       if (this.formMode === FormMode.Edit) {
@@ -148,6 +170,8 @@ export class SftpConfigFormComponent implements OnInit, OnChanges {
       this.timeoutControl.updateValueAndValidity();
       this.removeAfterProcessingControl.setValue(false);
       this.removeAfterProcessingControl.updateValueAndValidity();
+      this.enableBenchmarkingControl.setValue(false);
+      this.enableBenchmarkingControl.updateValueAndValidity();
       this.showCredentialFields = true;
     }
 
@@ -183,16 +207,20 @@ export class SftpConfigFormComponent implements OnInit, OnChanges {
       this.remoteDirectoryControl.disable();
       this.timeoutControl.disable();
       this.removeAfterProcessingControl.disable();
+      this.enableBenchmarkingControl.disable();
       this.usernameControl.disable();
       this.passwordControl.disable();
+      this.acquisitionConfigurationsArray.controls.forEach(ctrl => ctrl.disable());
     } else {
       this.hostControl.enable();
       this.portControl.enable();
       this.remoteDirectoryControl.enable();
       this.timeoutControl.enable();
       this.removeAfterProcessingControl.enable();
+      this.enableBenchmarkingControl.enable();
       this.usernameControl.enable();
       this.passwordControl.enable();
+      this.acquisitionConfigurationsArray.controls.forEach(ctrl => ctrl.enable());
     }
   }
 
@@ -228,6 +256,41 @@ export class SftpConfigFormComponent implements OnInit, OnChanges {
     return this.configForm.get('password') as FormControl;
   }
 
+  get enableBenchmarkingControl(): FormControl {
+    return this.configForm.get('enableBenchmarking') as FormControl;
+  }
+
+  get acquisitionConfigurationsArray(): FormArray {
+    return this.configForm.get('acquisitionConfigurations') as FormArray;
+  }
+
+  loadAcquisitionConfigurations(): void {
+    this.acquisitionConfigurationsArray.clear();
+    if (this.item?.acquisitionConfigurations) {
+      this.item.acquisitionConfigurations.forEach(config => {
+        this.acquisitionConfigurationsArray.push(this.createAcquisitionConfigGroup(config));
+      });
+    }
+  }
+
+  createAcquisitionConfigGroup(config?: ISftpAcquisitionTypeConfiguration): FormGroup {
+    return this.fb.group({
+      acquisitionType: [config?.acquisitionType || SftpAcquisitionType.CernerCensus, Validators.required],
+      remoteDirectory: [config?.remoteDirectory || ''],
+      processedDirectory: [config?.processedDirectory || ''],
+      fileNamePattern: [config?.fileNamePattern || ''],
+      parsingConfiguration: [config?.parsingConfiguration || null]
+    });
+  }
+
+  addAcquisitionConfiguration(): void {
+    this.acquisitionConfigurationsArray.push(this.createAcquisitionConfigGroup());
+  }
+
+  removeAcquisitionConfiguration(index: number): void {
+    this.acquisitionConfigurationsArray.removeAt(index);
+  }
+
   clearHost(): void {
     this.hostControl.setValue('');
     this.hostControl.updateValueAndValidity();
@@ -247,7 +310,9 @@ export class SftpConfigFormComponent implements OnInit, OnChanges {
         remoteDirectory: this.remoteDirectoryControl.value || undefined,
         timeout: this.timeoutControl.value,
         removeAfterProcessing: this.removeAfterProcessingControl.value,
-        authenticationProtocol: 'Basic'
+        authenticationProtocol: 'Basic',
+        enableBenchmarking: this.enableBenchmarkingControl.value,
+        acquisitionConfigurations: this.acquisitionConfigurationsArray.value
       };
 
       // Add credentials if provided

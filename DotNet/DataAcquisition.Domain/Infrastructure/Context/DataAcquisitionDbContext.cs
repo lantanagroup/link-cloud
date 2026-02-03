@@ -1,5 +1,6 @@
 ﻿using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
@@ -195,6 +196,25 @@ public class DataAcquisitionDbContext : DbContext
             entity.HasIndex(i => i.FacilityId)
                 .HasDatabaseName("IX_SftpAcquisitionLog_FacilityId");
 
+            entity.HasIndex(i => i.ScheduledDate)
+                .HasDatabaseName("IX_SftpAcquisitionLog_ScheduledDate");
+
+            entity.Property(d => d.Status)
+                .HasConversion(new EnumToStringConverter<RequestStatus>());
+
+            entity.Property(d => d.AcquisitionType)
+                .HasConversion(new EnumToStringConverter<SftpAcquisitionType>());
+
+            entity.Property(e => e.FileNames)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
+                    v => v != null ? JsonSerializer.Deserialize<List<string>>(v, new JsonSerializerOptions()) ?? new List<string>() : new List<string>());
+
+            entity.Property(e => e.Notes)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
+                    v => v != null ? JsonSerializer.Deserialize<List<string>>(v, new JsonSerializerOptions()) ?? new List<string>() : new List<string>());
+
             entity.Property(e => e.Benchmarks)
                 .HasConversion(
                     v => v != null ? JsonSerializer.Serialize(v, new JsonSerializerOptions()) : null,
@@ -209,13 +229,25 @@ public class DataAcquisitionDbContext : DbContext
             entity.Property(e => e.OrganizationId)
                 .IsRequired()
                 .HasMaxLength(DataAcquisitionConstants.DatabaseSettings.MaxFacilityIdLength);
-            
+
             entity.Property(e => e.Host)
                 .IsRequired()
                 .HasMaxLength(256);
 
             entity.Property(e => e.RemoteDirectory)
                 .HasMaxLength(4096);
+
+            var jsonOptions = new JsonSerializerOptions
+            {
+                Converters = { new JsonStringEnumConverter() }
+            };
+
+            entity.Property(e => e.AcquisitionConfigurations)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, jsonOptions),
+                    v => v != null
+                        ? JsonSerializer.Deserialize<List<SftpAcquisitionTypeConfiguration>>(v, jsonOptions) ?? new List<SftpAcquisitionTypeConfiguration>()
+                        : new List<SftpAcquisitionTypeConfiguration>());
         });
 
         // Prefix and schema can be passed as parameters

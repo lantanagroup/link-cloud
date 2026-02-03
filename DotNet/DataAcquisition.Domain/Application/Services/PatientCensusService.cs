@@ -7,6 +7,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
@@ -40,6 +41,8 @@ public class PatientCensusService : IPatientCensusService
     private readonly IFhirQueryConfigurationQueries _fhirQueryConfigurationQueries;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
     private readonly IProducer<string, PatientListMessage> _kafkaProducer;
+    private readonly ISftpConfigurationQueries _sftpConfigurationQueries;
+    private readonly ISftpAcquisitionLogManager _sftpAcquisitionLogManager;
 
     public PatientCensusService(
         ILogger<PatientCensusService> logger,
@@ -48,7 +51,9 @@ public class PatientCensusService : IPatientCensusService
         IFhirQueryConfigurationQueries fhirQueryConfigurationQueries,
         IReadFhirCommand readFhirCommand,
         IDataAcquisitionLogManager dataAcquisitionLogManager,
-        IProducer<string, PatientListMessage> kafkaProducer)
+        IProducer<string, PatientListMessage> kafkaProducer,
+        ISftpConfigurationQueries sftpConfigurationQueries,
+        ISftpAcquisitionLogManager sftpAcquisitionLogManager)
     {
         _logger = logger;
         _authRetrievalService = authRetrievalService;
@@ -58,13 +63,59 @@ public class PatientCensusService : IPatientCensusService
         _fhirQueryListConfigurationQueries = fhirQueryListConfigurationQueries;
         _fhirQueryConfigurationQueries = fhirQueryConfigurationQueries;
         _kafkaProducer = kafkaProducer;
+        _sftpConfigurationQueries = sftpConfigurationQueries;
+        _sftpAcquisitionLogManager = sftpAcquisitionLogManager;
     }
 
     public async Task CreateLog(string facilityId, CancellationToken cancellationToken)
     {
         using var activity = Activity.Current?.Source.StartActivity();
         activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
-    
+
+        // Check if SFTP configuration exists for this facility
+        var sftpConfig = await _sftpConfigurationQueries.GetByOrganizationIdAsync(facilityId, cancellationToken);
+
+        if (sftpConfig is not null)
+        {
+            // Find a census-related acquisition configuration, it should only have one census type configured
+            var censusTypes = new[] { SftpAcquisitionType.CernerCensus, SftpAcquisitionType.Census };
+            var censusConfig = sftpConfig.AcquisitionConfigurations
+                .FirstOrDefault(c => censusTypes.Contains(c.AcquisitionType));
+
+            if (censusConfig != null)
+            {
+                // Create SftpAcquisitionLog for SFTP-based census
+                _logger.LogInformation(
+                    "Facility {FacilityId} is configured for SFTP census acquisition (type: {AcquisitionType})",
+                    facilityId, censusConfig.AcquisitionType);
+
+                var sftpLog = new SftpAcquisitionLogModel
+                {
+                    ExternalId = Guid.NewGuid(),
+                    FacilityId = facilityId,
+                    AcquisitionType = censusConfig.AcquisitionType,
+                    ScheduledDate = null,  // null = census should process immediately, can be set later for retry if needed
+                    ProcessDate = null,
+                    Status = RequestStatus.Pending,
+                    Notes = [$"[{DateTime.UtcNow:O}] SFTP {censusConfig.AcquisitionType} acquisition scheduled"]
+                };
+
+                await _sftpAcquisitionLogManager.CreateAsync(sftpLog, cancellationToken);
+
+                _logger.LogInformation(
+                    "Created SFTP acquisition log ({AcquisitionType}) for facility {FacilityId}",
+                    censusConfig.AcquisitionType, facilityId);
+                
+                return;
+            }
+
+            // SFTP config exists but no census acquisition configured - fall through to FHIR List
+            _logger.LogDebug(
+                "Facility {FacilityId} has SFTP config but no census acquisition configured, using FHIR List",
+                facilityId);
+        }
+
+        // No SFTP configuration, continue with FHIR List logic
         var facilityConfig = await _fhirQueryListConfigurationQueries.GetByFacilityIdAsync(facilityId, cancellationToken);
 
         if (facilityConfig == null)
