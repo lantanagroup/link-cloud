@@ -4,7 +4,6 @@ using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
-using LantanaGroup.Link.Report.Entities.Enums;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
