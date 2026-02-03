@@ -50,6 +50,7 @@ namespace IntegrationTests.Report
                 scope.ServiceProvider.GetRequiredService<IDeadLetterExceptionHandler<string, ValidationCompleteValue>>(),
                 scope.ServiceProvider.GetRequiredService<SubmitPayloadProducer>(),
                 mockScopeFactory?.Object ?? scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>(),
+                scope.ServiceProvider.GetRequiredService<ServiceInformation>(),
                 scope.ServiceProvider.GetRequiredService<BlobStorageService>(),
                 scope.ServiceProvider.GetRequiredService<PatientReportSubmissionBundler>(),
                 scope.ServiceProvider.GetRequiredService<ReportManifestProducer>(),

@@ -1,5 +1,6 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using System.Collections.Concurrent;
 using Task = System.Threading.Tasks.Task;
 

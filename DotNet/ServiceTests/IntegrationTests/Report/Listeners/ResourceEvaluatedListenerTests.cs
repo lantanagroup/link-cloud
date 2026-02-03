@@ -56,6 +56,7 @@ namespace IntegrationTests.Report
                 scope.ServiceProvider.GetRequiredService<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>(),
                 scope.ServiceProvider.GetRequiredService<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>(),
                 scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>(),
+                scope.ServiceProvider.GetRequiredService<ServiceInformation>(),
                 scope.ServiceProvider.GetRequiredService<PatientReportSubmissionBundler>(),
                 scope.ServiceProvider.GetRequiredService<BlobStorageService>(),
                 scope.ServiceProvider.GetRequiredService<ReadyForValidationProducer>(),
@@ -431,6 +432,9 @@ namespace IntegrationTests.Report
             mockServiceProvider.Setup(sp => sp.GetService(typeof(IReportScheduledManager))).Returns(new Mock<IReportScheduledManager>().Object);
             mockServiceProvider.Setup(sp => sp.GetService(It.Is<Type>(t => t != typeof(IReportScheduledManager)))).Returns<Type>(t => _fixture.ServiceProvider.GetService(t));
             mockScopeFactory.Setup(f => f.CreateScope()).Returns(mockScope.Object);
+
+            var serviceInfo = _fixture.ServiceProvider.GetRequiredService<ServiceInformation>();
+
             var reportScheduledManagerMock = mockServiceProvider.Object.GetService<IReportScheduledManager>();
             Mock.Get(reportScheduledManagerMock).Setup(m => m.GetReportSchedule(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ThrowsAsync(new TimeoutException());
 
@@ -440,6 +444,7 @@ namespace IntegrationTests.Report
                 _fixture.ServiceProvider.GetRequiredService<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>(),
                 _fixture.ServiceProvider.GetRequiredService<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>(),
                 mockScopeFactory.Object,
+                serviceInfo,
                 _fixture.ServiceProvider.GetRequiredService<PatientReportSubmissionBundler>(),
                 _fixture.ServiceProvider.GetRequiredService<BlobStorageService>(),
                 _fixture.ServiceProvider.GetRequiredService<ReadyForValidationProducer>(),
@@ -456,7 +461,7 @@ namespace IntegrationTests.Report
 
             var consumerConfig = new ConsumerConfig()
             {
-                GroupId = ReportConstants.ServiceName,
+                GroupId = serviceInfo.ServiceConfigName,
                 EnableAutoCommit = false
             };
 
@@ -482,6 +487,8 @@ namespace IntegrationTests.Report
             mockScopeFactory.Setup(f => f.CreateScope()).Returns(mockScope.Object);
             var reportScheduledManagerMock = mockServiceProvider.Object.GetService<IReportScheduledManager>();
 
+            var serviceInfo = _fixture.ServiceProvider.GetRequiredService<ServiceInformation>();
+
             var transHandler = _fixture.ServiceProvider.GetRequiredService<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
             var listener = new ResourceEvaluatedListener(
                 _fixture.ServiceProvider.GetRequiredService<ILogger<ResourceEvaluatedListener>>(),
@@ -489,6 +496,7 @@ namespace IntegrationTests.Report
                 transHandler,
                 _fixture.ServiceProvider.GetRequiredService<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>(),
                 mockScopeFactory.Object,
+                serviceInfo,
                 _fixture.ServiceProvider.GetRequiredService<PatientReportSubmissionBundler>(),
                 _fixture.ServiceProvider.GetRequiredService<BlobStorageService>(),
                 _fixture.ServiceProvider.GetRequiredService<ReadyForValidationProducer>(),
@@ -505,7 +513,7 @@ namespace IntegrationTests.Report
 
             var consumerConfig = new ConsumerConfig()
             {
-                GroupId = ReportConstants.ServiceName,
+                GroupId = serviceInfo.ServiceConfigName,
                 EnableAutoCommit = false
             };
 
