@@ -6,6 +6,8 @@ import {MatInputModule} from '@angular/material/input';
 import {MatCheckboxModule} from '@angular/material/checkbox';
 import {MatProgressSpinnerModule} from '@angular/material/progress-spinner';
 import {MatIconModule} from '@angular/material/icon';
+import {MatButtonModule} from '@angular/material/button';
+import {animate, state, style, transition, trigger} from '@angular/animations';
 import {Subscription} from 'rxjs';
 import {ValidationService} from '../../../services/gateway/validation/validation.service';
 import {ITerminologyDependency} from '../../../interfaces/validation/terminology-dependency.interface';
@@ -31,16 +33,25 @@ interface TxDependencyFilters {
     MatInputModule,
     MatCheckboxModule,
     MatProgressSpinnerModule,
-    MatIconModule
+    MatIconModule,
+    MatButtonModule
   ],
   templateUrl: './tx-dependencies.component.html',
-  styleUrls: ['./tx-dependencies.component.scss']
+  styleUrls: ['./tx-dependencies.component.scss'],
+  animations: [
+    trigger('detailExpand', [
+      state('collapsed,void', style({height: '0px', minHeight: '0'})),
+      state('expanded', style({height: '*'})),
+      transition('expanded <=> collapsed', animate('225ms cubic-bezier(0.4, 0.0, 0.2, 1)')),
+    ]),
+  ],
 })
 export class TxDependenciesComponent implements OnInit, OnDestroy {
-  @Input({ required: true }) package!: string;
+  @Input() package?: string;
   filters: FormGroup;
   dataSource = new MatTableDataSource<TxDependencyRow>([]);
-  displayedColumns: string[] = ['url', 'version', 'foundResource', 'foundVersion'];
+  displayedColumns: string[] = ['expand', 'url', 'version', 'foundResource', 'foundVersion'];
+  expandedElement: TxDependencyRow | null = null;
   loading = false;
   errorMessage = '';
 
@@ -80,16 +91,15 @@ export class TxDependenciesComponent implements OnInit, OnDestroy {
   }
 
   private loadDependencies(): void {
-    if (!this.package || !this.package.trim()) {
-      this.errorMessage = 'Please select a package to view TX dependencies.';
-      return;
-    }
-
     this.loading = true;
     this.errorMessage = '';
 
+    const obs = (this.package && this.package.trim())
+      ? this.validationService.getTxDependencies(this.package.trim())
+      : this.validationService.getAllTxDependencies();
+
     this.subscriptions.add(
-      this.validationService.getTxDependencies(this.package.trim()).subscribe({
+      obs.subscribe({
         next: (dependencies) => {
           this.dataSource.data = dependencies.map((dependency) => this.mapRow(dependency));
           this.loading = false;

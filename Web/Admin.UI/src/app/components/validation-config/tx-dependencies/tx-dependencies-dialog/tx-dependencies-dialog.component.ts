@@ -11,5 +11,5 @@ import {TxDependenciesComponent} from '../tx-dependencies.component';
   styleUrls: ['./tx-dependencies-dialog.component.scss']
 })
 export class TxDependenciesDialogComponent {
-  constructor(@Inject(MAT_DIALOG_DATA) public data: { package: string }) {}
+  constructor(@Inject(MAT_DIALOG_DATA) public data: { package?: string }) {}
 }

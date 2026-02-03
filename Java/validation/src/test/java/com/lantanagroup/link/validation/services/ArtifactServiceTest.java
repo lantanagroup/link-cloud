@@ -1,11 +1,11 @@
 package com.lantanagroup.link.validation.services;
 
 import ca.uhn.fhir.context.FhirContext;
+import com.lantanagroup.link.validation.configs.LinkConfig;
 import com.lantanagroup.link.validation.entities.Artifact;
 import com.lantanagroup.link.validation.entities.ArtifactType;
-import com.lantanagroup.link.validation.repositories.ArtifactRepository;
-import com.lantanagroup.link.validation.configs.LinkConfig;
 import com.lantanagroup.link.validation.models.TerminologyDependency;
+import com.lantanagroup.link.validation.repositories.ArtifactRepository;
 import org.hl7.fhir.r4.model.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,29 +47,34 @@ class ArtifactServiceTest {
         ed.setPath("Patient.gender");
         ed.getBinding().setValueSet("http://example.org/ValueSet/administrative-gender|4.0.1");
 
-        // Snapshot with fixed Coding (with version) - does not exist
+        // Snapshot with binding (no version) - exists in artifacts
         ElementDefinition ed2 = sd.getSnapshot().addElement();
-        ed2.setPath("Patient.extension");
+        ed2.setPath("Patient.maritalStatus");
+        ed2.getBinding().setValueSet("http://example.org/ValueSet/marital-status");
+
+        // Snapshot with binding (no version) - does NOT exist
+        ElementDefinition ed3 = sd.getSnapshot().addElement();
+        ed3.setPath("Patient.active");
+        ed3.getBinding().setValueSet("http://example.org/ValueSet/non-existent");
+
+        // Snapshot with fixed Coding (with version) - ignored
+        ElementDefinition ed4 = sd.getSnapshot().addElement();
+        ed4.setPath("Patient.extension");
         Coding fixedCoding = new Coding("http://example.org/CodeSystem/test", "code1", "Code 1");
         fixedCoding.setVersion("1.2.3");
-        ed2.setFixed(fixedCoding);
+        ed4.setFixed(fixedCoding);
 
-        // Differential with binding (no version) - exists in artifacts
-        ElementDefinition ed3 = sd.getDifferential().addElement();
-        ed3.setPath("Patient.maritalStatus");
-        ed3.getBinding().setValueSet("http://example.org/ValueSet/marital-status");
-
-        // Differential with pattern CodeableConcept - exists but version mismatch (if we had version)
-        ElementDefinition ed4 = sd.getDifferential().addElement();
-        ed4.setPath("Patient.communication.language");
+        // Snapshot with pattern CodeableConcept - ignored
+        ElementDefinition ed5 = sd.getSnapshot().addElement();
+        ed5.setPath("Patient.communication.language");
         CodeableConcept patternCC = new CodeableConcept();
         patternCC.addCoding(new Coding("http://example.org/CodeSystem/lang", "en", "English"));
-        ed4.setPattern(patternCC);
+        ed5.setPattern(patternCC);
 
-        // Differential with binding (no version) - does NOT exist
-        ElementDefinition ed5 = sd.getDifferential().addElement();
-        ed5.setPath("Patient.active");
-        ed5.getBinding().setValueSet("http://example.org/ValueSet/non-existent");
+        // Snapshot with binding (set to a version) - value set found but version doesn't match
+        ElementDefinition ed6 = sd.getSnapshot().addElement();
+        ed6.setPath("Patient.communication.language");
+        ed6.getBinding().setValueSet("http://example.org/ValueSet/patient-communication|1.2.3");
 
         Artifact artifactSd = new Artifact();
         artifactSd.setType(ArtifactType.RESOURCE);
@@ -93,44 +98,40 @@ class ArtifactServiceTest {
         artifactVs2.setName("vs2");
         artifactVs2.setContent(fhirContext.newJsonParser().encodeResourceToString(vs2).getBytes());
 
-        // Add CodeSystem that exists
-        CodeSystem cs1 = new CodeSystem();
-        cs1.setUrl("http://example.org/CodeSystem/lang");
-        Artifact artifactCs1 = new Artifact();
-        artifactCs1.setType(ArtifactType.RESOURCE);
-        artifactCs1.setName("cs1");
-        artifactCs1.setContent(fhirContext.newJsonParser().encodeResourceToString(cs1).getBytes());
+        // Add ValueSet that exists (no version)
+        ValueSet vs3 = new ValueSet();
+        vs3.setUrl("http://example.org/ValueSet/patient-communication");
+        vs3.setVersion("3.2.1");
+        Artifact artifactVs3 = new Artifact();
+        artifactVs3.setType(ArtifactType.RESOURCE);
+        artifactVs3.setName("vs3");
+        artifactVs3.setContent(fhirContext.newJsonParser().encodeResourceToString(vs3).getBytes());
 
-        when(artifactRepository.findAll()).thenReturn(List.of(artifactSd, artifactVs1, artifactVs2, artifactCs1));
+        when(artifactRepository.findAll()).thenReturn(List.of(artifactSd, artifactVs1, artifactVs2, artifactVs3));
 
         List<TerminologyDependency> dependencies = artifactService.getTerminologyDependencies();
 
-        assertEquals(5, dependencies.size());
+        assertEquals(4, dependencies.size());
 
         TerminologyDependency dep1 = dependencies.stream().filter(d -> d.getUrl().equals("http://example.org/ValueSet/administrative-gender")).findFirst().orElseThrow();
         assertEquals("4.0.1", dep1.getVersion());
         assertTrue(dep1.isResourceExists());
         assertTrue(dep1.isVersionExists());
 
-        TerminologyDependency dep2 = dependencies.stream().filter(d -> d.getUrl().equals("http://example.org/CodeSystem/test")).findFirst().orElseThrow();
-        assertEquals("1.2.3", dep2.getVersion());
-        assertFalse(dep2.isResourceExists());
-        assertFalse(dep2.isVersionExists());
+        TerminologyDependency dep2 = dependencies.stream().filter(d -> d.getUrl().equals("http://example.org/ValueSet/marital-status")).findFirst().orElseThrow();
+        assertNull(dep2.getVersion());
+        assertTrue(dep2.isResourceExists());
+        assertTrue(dep2.isVersionExists()); // version specified was null, so versionExists is true
 
-        TerminologyDependency dep3 = dependencies.stream().filter(d -> d.getUrl().equals("http://example.org/ValueSet/marital-status")).findFirst().orElseThrow();
+        TerminologyDependency dep3 = dependencies.stream().filter(d -> d.getUrl().equals("http://example.org/ValueSet/non-existent")).findFirst().orElseThrow();
         assertNull(dep3.getVersion());
-        assertTrue(dep3.isResourceExists());
-        assertTrue(dep3.isVersionExists()); // version specified was null, so versionExists is true
+        assertFalse(dep3.isResourceExists());
+        assertTrue(dep3.isVersionExists());
 
-        TerminologyDependency dep4 = dependencies.stream().filter(d -> d.getUrl().equals("http://example.org/CodeSystem/lang")).findFirst().orElseThrow();
-        assertNull(dep4.getVersion());
+        TerminologyDependency dep4 = dependencies.stream().filter(d -> d.getUrl().equals("http://example.org/ValueSet/patient-communication")).findFirst().orElseThrow();
+        assertEquals("1.2.3", dep4.getVersion());
         assertTrue(dep4.isResourceExists());
-        assertTrue(dep4.isVersionExists());
-
-        TerminologyDependency dep5 = dependencies.stream().filter(d -> d.getUrl().equals("http://example.org/ValueSet/non-existent")).findFirst().orElseThrow();
-        assertNull(dep5.getVersion());
-        assertFalse(dep5.isResourceExists());
-        assertTrue(dep5.isVersionExists());
+        assertFalse(dep4.isVersionExists());
     }
 
     @Test
