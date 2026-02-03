@@ -6,7 +6,6 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.Shared.Application;
 public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, ProduceKeyType, ProduceValueType>
@@ -16,7 +15,7 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
     protected readonly IKafkaConsumerFactory<ConsumeKeyType, ConsumeValueType> KafkaConsumerFactory;
     protected readonly IDeadLetterExceptionHandler<ConsumeKeyType, ConsumeValueType> DeadLetterConsumerHandler;
     protected readonly ITransientExceptionHandler<ConsumeKeyType, ConsumeValueType> TransientExceptionHandler;
-    protected readonly IOptions<ServiceInformation> ServiceInformation;
+    protected readonly ServiceInformation ServiceInformation;
     protected readonly string TopicName;
 
     protected BaseListener(
@@ -25,7 +24,7 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
         IDeadLetterExceptionHandler<ConsumeKeyType, ConsumeValueType> deadLetterConsumerHandler,
         IDeadLetterExceptionHandler<string, string> deadLetterConsumerErrorHandler,
         ITransientExceptionHandler<ConsumeKeyType, ConsumeValueType> transientExceptionHandler,
-        IOptions<ServiceInformation> serviceInformation)
+        ServiceInformation serviceInformation)
     {
         Logger = logger ?? throw new ArgumentNullException(nameof(logger));
         KafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentNullException(nameof(kafkaConsumerFactory));
@@ -37,10 +36,6 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
         //configure error handlers topic names
         DeadLetterConsumerHandler.Topic = $"{this.TopicName}-Error";
         TransientExceptionHandler.Topic = $"{this.TopicName}-Retry";
-
-        //configure error handlers service names
-        DeadLetterConsumerHandler.ServiceName = ServiceInformation.Value.ServiceName;
-        TransientExceptionHandler.ServiceName = ServiceInformation.Value.ServiceName;
         
     }
 
@@ -61,7 +56,7 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
 
         try
         {
-            Logger.LogInformation("Starting Consumer Loop for {ServiceName} on topic {topic}", ServiceInformation.Value.ServiceName, this.TopicName);
+            Logger.LogInformation("Starting Consumer Loop for {ServiceName} on topic {topic}", ServiceInformation.ServiceConfigName, this.TopicName);
 
             consumer.Subscribe(new string[] { this.TopicName });
 
@@ -94,9 +89,9 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                         {
                             Logger.LogError(ex,
                                 "Unhandled exception in listener for {ServiceName} on topic {Topic}",
-                                ServiceInformation.Value.ServiceName, this.TopicName);
+                                ServiceInformation.ServiceConfigName, this.TopicName);
 
-                            TransientExceptionHandler.HandleException(consumeResult, new TransientException($"{ServiceInformation.Value.ServiceName} Exception thrown: " + ex.Message), ExtractFacilityId(consumeResult));
+                            TransientExceptionHandler.HandleException(consumeResult, new TransientException($"{ServiceInformation.ServiceConfigName} Exception thrown: " + ex.Message), ExtractFacilityId(consumeResult));
                         }
                         finally
                         {
