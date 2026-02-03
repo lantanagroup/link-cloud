@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -22,6 +23,8 @@ public class SftpAcquisitionLog
     
     public int? RetryAttempts { get; set; }
     
+    public RequestStatus Status { get; set; }
+    
     [StringLength(32)]
     public string? OriginatingTraceId { get; set; }
     
@@ -29,4 +32,6 @@ public class SftpAcquisitionLog
     public string? OriginatingSpanId { get; set; }
 
     public List<string> Notes { get; set; } = [];
+
+    public List<SftpAcquisitionBenchmark>? Benchmarks { get; set; }
 }
