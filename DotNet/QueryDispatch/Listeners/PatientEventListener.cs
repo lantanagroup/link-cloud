@@ -46,13 +46,10 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
             _transientExceptionHandler = transientExceptionHandler;
             _consumeResultDeadLetterExceptionHandler = consumeResultDeadLetterExceptionHandler;
 
-            _transientExceptionHandler.ServiceName = "QueryDispatch";
             _transientExceptionHandler.Topic = nameof(KafkaTopic.PatientEvent) + "-Retry";
 
-            _deadLetterExceptionHandler.ServiceName = "QueryDispatch";
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.PatientEvent) + "-Error";
 
-            _consumeResultDeadLetterExceptionHandler.ServiceName = "QueryDispatch";
             _consumeResultDeadLetterExceptionHandler.Topic = nameof(KafkaTopic.PatientEvent) + "-Error";
             _producer = producer ?? throw new ArgumentException(nameof(producer));
         }
