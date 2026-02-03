@@ -1,15 +1,13 @@
-﻿using System.Diagnostics;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Exceptions;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Logging;
-using System.Text;
 using OpenTelemetry.Trace;
+using System.Diagnostics;
+using System.Text;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 {
@@ -18,62 +16,21 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
     {
         protected readonly ILogger<TransientExceptionHandler<K, V>> Logger;
         protected readonly IKafkaProducerFactory<K, V> ProducerFactory;
+        protected readonly ServiceInformation ServiceInformation;
 
         public string Topic { get; set; } = string.Empty;
 
-        public string ServiceName { get; set; } = string.Empty;
+        protected string ServiceName { get; set; } = string.Empty;
 
         public TransientExceptionHandler(ILogger<TransientExceptionHandler<K, V>> logger,
-            IKafkaProducerFactory<K, V> producerFactory)
+            IKafkaProducerFactory<K, V> producerFactory,
+            ServiceInformation serviceInformation)
         {
             Logger = logger;
             ProducerFactory = producerFactory;
-        }
+            ServiceInformation = serviceInformation;
 
-        public virtual void HandleException(Exception ex, V messageBody, string facilityId, string message = "")
-        {
-            var tEx = new TransientException(ex.Message, ex.InnerException);
-
-            //if (typeof(K) != typeof(Null))
-            //{
-            //    Logger.LogError("{GetType().Name}|{ServiceName}|{Topic}: Key type is not Null, cannot produce Audit or Retry events: " + message, GetType().Name, ServiceName, Topic);
-            //    throw new TypeNotAllowedException($"{GetType().Name}|{ServiceName}|{Topic}: Key type is not Null, cannot produce Audit or Retry events: " + message);
-            //}
-
-            try
-            {
-                message = message ?? "";
-                if (messageBody == null)
-                {
-                    Logger.LogError(ex, "{TypeName}|{ServiceName}|{Topic}: messageBody is null, cannot produce Audit or Retry events: {Message}", GetType().Name, ServiceName, Topic, message);
-                    return;
-                }
-
-                Logger.LogError(ex, "{Name}: Failed to process {S} Event: {Message}", GetType().Name, ServiceName, message);
-
-                ProduceRetryScheduledEvent(default, messageBody, null, facilityId, ex.Message, ex.StackTrace ?? string.Empty);
-            }
-            catch (Exception e)
-            {
-                Logger.LogError(e, "Error in {Name}.HandleException: {Message}", GetType().Name, e.Message);
-                throw;
-            }
-        }
-
-        public void HandleException(ConsumeResult<K, V> consumeResult, string facilityId, string message = "")
-        {
-            try
-            {
-                Logger.LogError("{Name}: Failed to process {S} Event: {Message}", GetType().Name, ServiceName, message);
-
-                ProduceRetryScheduledEvent(consumeResult.Message.Key, consumeResult.Message.Value,
-                    consumeResult.Message.Headers, facilityId, message);
-            }
-            catch (Exception e)
-            {
-                Logger.LogError(e, "Error in {Name}.HandleException: {Message}", GetType().Name, message);
-                throw;
-            }
+            ServiceName = ServiceInformation.ServiceConfigName ?? throw new ArgumentNullException("ServiceName must be populated");
         }
 
         public virtual void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, string facilityId)
@@ -87,7 +44,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             try
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 
                 Logger.LogError(ex, "{Name}: Failed to process {S} Event.", GetType().Name, ServiceName);
 
@@ -116,14 +73,31 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                 headers.Add(KafkaConstants.HeaderConstants.ExceptionService, Encoding.UTF8.GetBytes(ServiceName));
             }
 
-
+            //Exception Message
             if (headers.TryGetLastBytes(KafkaConstants.HeaderConstants.RetryExceptionMessage, out var exceptionValue))
             {
                 headers.Remove(KafkaConstants.HeaderConstants.RetryExceptionMessage);
             }
 
             headers.Add(KafkaConstants.HeaderConstants.RetryExceptionMessage, Encoding.UTF8.GetBytes(message + Environment.NewLine + stackTrace));
-            
+
+            // Retry Count
+            if (headers.TryGetLastBytes(KafkaConstants.HeaderConstants.RetryCount, out var retryValue))
+            {
+                // Parse the current value, increment, and update the header
+                var retryCountString = Encoding.UTF8.GetString(retryValue);
+                if (!int.TryParse(retryCountString, out var retryCount))
+                {
+                    retryCount = 0;
+                }
+                retryCount++;
+                headers.Remove(KafkaConstants.HeaderConstants.RetryCount);
+                headers.Add(KafkaConstants.HeaderConstants.RetryCount, Encoding.UTF8.GetBytes(retryCount.ToString()));
+            }
+            else
+            {
+                headers.Add(KafkaConstants.HeaderConstants.RetryCount, Encoding.UTF8.GetBytes(1.ToString()));
+            }
 
             if (!string.IsNullOrEmpty(facilityId) && !headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionFacilityId, out var topicValue))
             {

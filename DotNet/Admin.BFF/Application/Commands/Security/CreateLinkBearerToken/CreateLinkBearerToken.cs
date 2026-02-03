@@ -1,9 +1,9 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
-using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.DataProtection;
@@ -139,7 +139,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 throw;
             }
             

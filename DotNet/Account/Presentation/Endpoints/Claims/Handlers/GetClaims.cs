@@ -22,7 +22,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Claims.Handlers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 logger.LogError(ex, "Error getting claims");
                 throw;
             }
