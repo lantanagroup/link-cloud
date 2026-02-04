@@ -95,7 +95,7 @@ namespace LantanaGroup.Link.Report.Core
                             if (string.IsNullOrWhiteSpace(resource_reference) || resourcesAdded.Contains(resource_reference))
                             {
                                 //Skip FHIR Resource line
-                                reader.Read();
+                                reader.ReadLine();
                                 continue;
                             }
 
@@ -156,7 +156,7 @@ namespace LantanaGroup.Link.Report.Core
             return aggregateResult;
         }
 
-        public async void AppendResourceToBlob(string uri, DomainResource domainResource)
+        public async System.Threading.Tasks.Task AppendResourceToBlob(string uri, DomainResource domainResource)
         {
             AppendBlobClient appendBlobClient = _containerClient.GetAppendBlobClient(uri);
 

@@ -1,13 +1,13 @@
 package com.lantanagroup.link.validation.services;
 
 import ca.uhn.fhir.context.FhirContext;
-import com.lantanagroup.link.validation.entities.Artifact;
-import com.lantanagroup.link.validation.entities.ArtifactType;
-import com.lantanagroup.link.validation.repositories.ArtifactRepository;
 import ca.uhn.fhir.rest.api.SummaryEnum;
 import ca.uhn.fhir.rest.client.api.IGenericClient;
 import com.lantanagroup.link.validation.configs.LinkConfig;
+import com.lantanagroup.link.validation.entities.Artifact;
+import com.lantanagroup.link.validation.entities.ArtifactType;
 import com.lantanagroup.link.validation.models.TerminologyDependency;
+import com.lantanagroup.link.validation.repositories.ArtifactRepository;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IBaseResource;
@@ -50,7 +50,7 @@ public class ArtifactService {
     }
 
     public void deleteArtifact(ArtifactType type, String name) {
-        if (artifactRepository.deleteByTypeAndName(type, name)) {
+        if (artifactRepository.deleteByTypeAndName(type, name) > 0) {
             invalidateValidationSupport();
         }
     }
@@ -109,20 +109,19 @@ public class ArtifactService {
             resources = support.fetchAllStructureDefinitions();
         }
 
-        Set<String> dependencyStrings = new HashSet<>();
+        Map<String, TerminologyDependency> dependencyMap = new HashMap<>();
         if (resources != null) {
             for (IBaseResource resource : resources) {
                 if (resource instanceof StructureDefinition sd) {
                     if (sd.hasSnapshot()) {
                         for (ElementDefinition ed : sd.getSnapshot().getElement()) {
-                            addBindingDependencies(ed, dependencyStrings);
-                            addFixedPatternDependencies(ed, dependencyStrings);
+                            addBindingDependencies(sd, ed, dependencyMap);
+                            //addFixedPatternDependencies(sd, ed, dependencyMap);
                         }
-                    }
-                    if (sd.hasDifferential()) {
+                    } else if (sd.hasDifferential()) {
                         for (ElementDefinition ed : sd.getDifferential().getElement()) {
-                            addBindingDependencies(ed, dependencyStrings);
-                            addFixedPatternDependencies(ed, dependencyStrings);
+                            addBindingDependencies(sd, ed, dependencyMap);
+                            addFixedPatternDependencies(sd, ed, dependencyMap);
                         }
                     }
                 }
@@ -132,7 +131,7 @@ public class ArtifactService {
         // Remove tx dependencies related to Core FHIR R4, that start with either
         // http://hl7.org/fhir/ValueSet
         // or http://hl7.org/fhir/CodeSystem
-        dependencyStrings.removeIf(s ->
+        dependencyMap.keySet().removeIf(s ->
                 s.startsWith("http://hl7.org/fhir/ValueSet") ||
                 s.startsWith("http://hl7.org/fhir/CodeSystem") ||
                 s.startsWith("http://terminology.hl7.org/ValueSet") ||
@@ -141,25 +140,16 @@ public class ArtifactService {
         Map<String, Set<String>> existingResources = new HashMap<>();
         String remoteUrl = getTerminologyBaseUrl();
         if (StringUtils.isNotEmpty(remoteUrl)) {
+            logger.debug("Fetching terminology from remote server: {}", remoteUrl);
             fetchRemoteTerminology(remoteUrl, existingResources);
         } else {
+            logger.debug("Fetching terminology from local server");
             fetchLocalTerminology(support, existingResources);
         }
 
-        List<TerminologyDependency> results = new ArrayList<>();
-        for (String depString : dependencyStrings) {
-            String url;
-            String version = null;
-            if (depString.contains("|")) {
-                url = depString.substring(0, depString.indexOf("|"));
-                version = depString.substring(depString.indexOf("|") + 1);
-            } else {
-                url = depString;
-            }
-
-            TerminologyDependency dep = new TerminologyDependency();
-            dep.setUrl(url);
-            dep.setVersion(version);
+        for (TerminologyDependency dep : dependencyMap.values()) {
+            String url = dep.getUrl();
+            String version = dep.getVersion();
             boolean resourceExists = existingResources.containsKey(url);
             dep.setResourceExists(resourceExists);
             if (version == null) {
@@ -167,8 +157,10 @@ public class ArtifactService {
             } else {
                 dep.setVersionExists(resourceExists && existingResources.get(url).contains(version));
             }
-            results.add(dep);
         }
+
+        List<TerminologyDependency> results = new ArrayList<>(dependencyMap.values());
+        results.sort(Comparator.comparing(TerminologyDependency::getUrl));
         return results;
     }
 
@@ -188,22 +180,26 @@ public class ArtifactService {
     private void fetchRemoteTerminology(String baseUrl, Map<String, Set<String>> existingResources) {
         IGenericClient client = fhirContext.newRestfulGenericClient(baseUrl);
         try {
+            logger.debug("Fetching ValueSets and CodeSystems from remote terminology service");
             Bundle vsBundle = client.search()
                     .forResource(ValueSet.class)
                     .summaryMode(SummaryEnum.TRUE)
                     .returnBundle(Bundle.class)
                     .execute();
+            logger.debug("Fetched {} ValueSets from remote terminology service", vsBundle.getTotal());
             processBundle(vsBundle, existingResources, client);
         } catch (Exception e) {
             logger.error("Failed to fetch ValueSets from remote terminology service", e);
         }
 
         try {
+            logger.debug("Fetching CodeSystems from remote terminology service");
             Bundle csBundle = client.search()
                     .forResource(CodeSystem.class)
                     .summaryMode(SummaryEnum.TRUE)
                     .returnBundle(Bundle.class)
                     .execute();
+            logger.debug("Fetched {} CodeSystems from remote terminology service", csBundle.getTotal());
             processBundle(csBundle, existingResources, client);
         } catch (Exception e) {
             logger.error("Failed to fetch CodeSystems from remote terminology service", e);
@@ -237,6 +233,7 @@ public class ArtifactService {
 
     private void fetchLocalTerminology(ArtifactValidationSupport support, Map<String, Set<String>> existingResources) {
         List<IBaseResource> resources = support.fetchAllConformanceResources();
+        assert resources != null;
         for (IBaseResource resource : resources) {
             String url = null;
             String version = null;
@@ -253,34 +250,68 @@ public class ArtifactService {
         }
     }
 
-    private void addBindingDependencies(ElementDefinition ed, Set<String> dependencies) {
+    private void addBindingDependencies(StructureDefinition sd, ElementDefinition ed, Map<String, TerminologyDependency> dependencyMap) {
         if (ed.hasBinding() && ed.getBinding().hasValueSet()) {
-            dependencies.add(ed.getBinding().getValueSet());
+            addDependency(ed.getBinding().getValueSet(), sd, ed, dependencyMap);
         }
     }
 
-    private void addFixedPatternDependencies(ElementDefinition ed, Set<String> dependencies) {
+    private void addFixedPatternDependencies(StructureDefinition sd, ElementDefinition ed, Map<String, TerminologyDependency> dependencyMap) {
         if (ed.hasFixed()) {
-            addTypeDependencies(ed.getFixed(), dependencies);
+            addTypeDependencies(sd, ed, ed.getFixed(), dependencyMap);
         }
         if (ed.hasPattern()) {
-            addTypeDependencies(ed.getPattern(), dependencies);
+            addTypeDependencies(sd, ed, ed.getPattern(), dependencyMap);
         }
     }
 
-    private void addTypeDependencies(Type type, Set<String> dependencies) {
+    private void addTypeDependencies(StructureDefinition sd, ElementDefinition ed, Type type, Map<String, TerminologyDependency> dependencyMap) {
         if (type instanceof Coding coding) {
             if (coding.hasSystem()) {
                 String dependency = coding.getSystem();
                 if (coding.hasVersion()) {
                     dependency += "|" + coding.getVersion();
                 }
-                dependencies.add(dependency);
+                addDependency(dependency, sd, ed, dependencyMap);
             }
         } else if (type instanceof CodeableConcept codeableConcept) {
             for (Coding coding : codeableConcept.getCoding()) {
-                addTypeDependencies(coding, dependencies);
+                addTypeDependencies(sd, ed, coding, dependencyMap);
             }
+        }
+    }
+
+    private void addDependency(String depString, StructureDefinition sd, ElementDefinition ed, Map<String, TerminologyDependency> dependencyMap) {
+        TerminologyDependency dep = dependencyMap.computeIfAbsent(depString, k -> {
+            TerminologyDependency d = new TerminologyDependency();
+            String url;
+            String version = null;
+            if (k.contains("|")) {
+                url = k.substring(0, k.indexOf("|"));
+                version = k.substring(k.indexOf("|") + 1);
+            } else {
+                url = k;
+            }
+            d.setUrl(url);
+            d.setVersion(version);
+            return d;
+        });
+
+        String profileUrl = sd.getUrl();
+        String elementPath = ed.getPath();
+
+        TerminologyDependency.SourceProfile sp = dep.getSourceProfile().stream()
+                .filter(s -> s.getUrl().equals(profileUrl))
+                .findFirst()
+                .orElseGet(() -> {
+                    TerminologyDependency.SourceProfile s = new TerminologyDependency.SourceProfile();
+                    s.setUrl(profileUrl);
+                    dep.getSourceProfile().add(s);
+                    return s;
+                });
+
+        if (!sp.getElement().contains(elementPath)) {
+            sp.getElement().add(elementPath);
         }
     }
 }

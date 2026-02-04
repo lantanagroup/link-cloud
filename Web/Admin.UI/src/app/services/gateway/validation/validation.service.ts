@@ -58,7 +58,14 @@ export class ValidationService {
 
     const sanitizedPackage = encodeURIComponent(packageName);
     return this.http.get<ITerminologyDependency[]>(`${this.appConfigService.config?.baseApiUrl}/validation/artifact/PACKAGE/${sanitizedPackage}/tx-dependencies`).pipe(
-      tap(_ => console.log(`Fetched TX dependencies.`)),
+      tap(_ => console.log(`Fetched TX dependencies for package ${packageName}.`)),
+      catchError((error) => this.errorHandler.handleError(error))
+    )
+  }
+
+  getAllTxDependencies(): Observable<ITerminologyDependency[]> {
+    return this.http.get<ITerminologyDependency[]>(`${this.appConfigService.config?.baseApiUrl}/validation/artifact/tx-dependencies`).pipe(
+      tap(_ => console.log(`Fetched all TX dependencies.`)),
       catchError((error) => this.errorHandler.handleError(error))
     )
   }

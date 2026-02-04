@@ -227,6 +227,7 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
             }
         }
 
+        bundle.Total = bundle.Entry.Count;
         return bundle;
     }
 

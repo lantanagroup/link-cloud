@@ -20,7 +20,6 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
-using LantanaGroup.Link.Shared.Application.Factory;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
@@ -40,9 +39,11 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Serializers;
 using MongoDB.Driver;
 using Quartz;
-using Quartz.Spi;
 using Reddoxx.Quartz.MongoDbJobStore.Locking;
 using Reddoxx.Quartz.MongoDbJobStore.Redlock;
 using Serilog;
@@ -63,29 +64,40 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
+    var objectSerializer = new ObjectSerializer(type =>
+        ObjectSerializer.DefaultAllowedTypes(type) || // Keep defaults (primitives, safe types, etc.)
+        type.FullName?.StartsWith("LantanaGroup.Link.Shared") == true || // Your shared assembly/namespace
+        type.FullName?.StartsWith("LantanaGroup.Link.Report") == true);   // Add report-specific if needed
+
+    BsonClassMap.RegisterClassMap<RetryModel>(cm =>
+    {
+        cm.AutoMap();
+        cm.SetIgnoreExtraElements(true);
+        cm.GetMemberMap(c => c.Id).SetSerializer(new GuidSerializer(GuidRepresentation.Standard));
+    });
+
+    BsonSerializer.RegisterSerializer(objectSerializer);
+
+    // Bind MongoConnection settings from configuration (e.g., appsettings.json)
+    builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.Mongo));
+    var mongoSettings = builder.Services.BuildServiceProvider().GetRequiredService<IOptions<MongoConnection>>().Value;
+    var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+
+    var serviceInformation = builder.SetupServiceInformation(ReportConstants.ServiceName, assemblyVersion, mongoSettings.ConnectionString);
+
     // load external configuration source (if specified)
-    builder.AddExternalConfiguration(ReportConstants.ServiceName);
+    builder.AddExternalConfiguration(serviceInformation.ServiceConfigName);
 
     builder.WebHost.ConfigureKestrel(options =>
     {
         options.Limits.MaxRequestBodySize = 200 * 1024 * 1024; // Set limit to 200 MB
     });
 
-    var serviceInformation = builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-    if (serviceInformation != null)
-    {
-        ServiceActivitySource.Initialize(serviceInformation);
-    }
-    else
-    {
-        throw new NullReferenceException("Service Information was null.");
-    }
-
     // Add problem details
     builder.Services.AddProblemDetailsService(options =>
     {
         options.Environment = builder.Environment;
-        options.ServiceName = ReportConstants.ServiceName;
+        options.ServiceName = serviceInformation.ServiceConfigName;
         options.IncludeExceptionDetails = builder.Configuration.GetValue<bool>("ProblemDetails:IncludeExceptionDetails");
     });
 
@@ -105,7 +117,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Register IMongoClient as a singleton using the configured connection string
     builder.Services.AddSingleton<IMongoClient>(sp =>
     {
-        var mongoSettings = sp.GetRequiredService<IOptions<MongoConnection>>().Value;
         return new MongoClient(mongoSettings.ConnectionString);
     });
 
@@ -190,7 +201,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     // Add health checks
-    var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, ReportConstants.ServiceName).GetHealthCheckOptions();
+    var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, serviceInformation.ServiceConfigName).GetHealthCheckOptions();
     builder.Services.AddHealthChecks()
         .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
@@ -241,25 +252,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddStackExchangeRedisExtensions<SystemTextJsonSerializer>(new[] { redisConfiguration });
 
     // Add Quartz schedulers
-    // 1. MongoDB scheduler for EndOfReportPeriodJob
-    builder.Services.AddQuartz(q =>
-    {
-        q.UseJobFactory<QuartzJobFactory>();
-    });
+    // 1. MongoDB scheduler
+    builder.Services.AddQuartz();
+    builder.Services.AddSingleton<ReportMongoSchedulerFactory>();
+    builder.Services.AddSingleton<ISchedulerFactory>(sp => sp.GetRequiredService<ReportMongoSchedulerFactory>());
 
-    builder.Services.AddKeyedSingleton<ISchedulerFactory>("MongoScheduler", (provider, key) =>
-    {
-        var logger = provider.GetRequiredService<ILogger<ReportMongoSchedulerFactory>>();
-        var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
-        return new ReportMongoSchedulerFactory(scopeFactory, logger);
-    });
-
-    // 2. In-memory scheduler for RetryJob
-    builder.Services.AddSingleton<InMemorySchedulerFactory>();
-    builder.Services.AddKeyedSingleton<ISchedulerFactory>("RetryScheduler", (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
-
-    // Register job factory and jobs
-    builder.Services.AddSingleton<IJobFactory, QuartzJobFactory>();
+    // Register job factory and jobsS
     builder.Services.AddSingleton<RetryJob>();
     builder.Services.AddSingleton<EndOfReportPeriodJob>();
 
@@ -267,6 +265,15 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<MeasureReportScheduleService>();
 
     // Register listeners
+    builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceConfigName, [
+            KafkaTopic.ReportScheduledRetry.GetStringValue(),
+            KafkaTopic.MeasureReportGeneratedRetry.GetStringValue(),
+            KafkaTopic.PatientListsAcquiredRetry.GetStringValue(),
+            KafkaTopic.GenerateReportRequestedRetry.GetStringValue(),
+            KafkaTopic.PayloadSubmittedRetry.GetStringValue(),
+            KafkaTopic.ValidationCompleteRetry.GetStringValue(),
+        ]));
+
     builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<GenerateReportListener>();
     builder.Services.AddHostedService<ReportScheduledListener>();
@@ -274,12 +281,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<ValidationCompleteListener>();
     builder.Services.AddHostedService<PayloadSubmittedListener>();
     builder.Services.AddHostedService<MeasureReportGeneratedListener>();
-
-    builder.Services.AddSingleton(new RetryListenerSettings(ReportConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.MeasureReportGeneratedRetry.GetStringValue(), KafkaTopic.PatientListsAcquiredRetry.GetStringValue(), KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()]));
-    builder.Services.AddHostedService<RetryListener>();
-
-    builder.Services.AddHostedService<RetryScheduleService>();
-    builder.Services.AddHostedService<MeasureReportScheduleService>();
 
     builder.Services.AddTransient<PatientAggregator>();
     builder.Services.AddTransient<MeasureReportAggregator>();

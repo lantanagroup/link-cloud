@@ -44,6 +44,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly BlobStorageService _blobStorageService;
         private readonly ReadyForValidationProducer _readyForValidationProducer;
         private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
+        private readonly ServiceInformation _serviceInformation;
 
         private string Name => this.GetType().Name;
 
@@ -53,6 +54,7 @@ namespace LantanaGroup.Link.Report.Listeners
             ITransientExceptionHandler<Null, MeasureReportGeneratedValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<Null, MeasureReportGeneratedValue> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory,
+            ServiceInformation serviceInformation,
             BlobStorageService blobStorageService,
             ReadyForValidationProducer readyForValidationProducer,
             AuditableEventOccurredProducer auditableEventOccurredProducer)
@@ -66,14 +68,13 @@ namespace LantanaGroup.Link.Report.Listeners
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
-            _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _transientExceptionHandler.Topic = nameof(KafkaTopic.MeasureReportGenerated) + "-Retry";
-
-            _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.MeasureReportGenerated) + "-Error";
+
             _blobStorageService = blobStorageService;
             _readyForValidationProducer = readyForValidationProducer;
             _auditableEventOccurredProducer = auditableEventOccurredProducer;
+            _serviceInformation = serviceInformation;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -85,7 +86,7 @@ namespace LantanaGroup.Link.Report.Listeners
         {
             var consumerConfig = new ConsumerConfig()
             {
-                GroupId = ReportConstants.ServiceName,
+                GroupId = _serviceInformation.ServiceConfigName,
                 EnableAutoCommit = false
             };
 
@@ -211,7 +212,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             foreach (var aggregateMeasureReport in aggregateResult.MeasureReportResults)
             {
-                var populationModel = await reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == result.Message.Value.ReportTrackingId && x.Measure == result.Message.Value.ReportType);
+                var populationModel = await reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == result.Message.Value.ReportTrackingId && x.ReportType == result.Message.Value.ReportType);
 
                 if (populationModel == null)
                 {
