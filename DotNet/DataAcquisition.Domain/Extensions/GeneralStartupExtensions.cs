@@ -1,6 +1,4 @@
-﻿using System.Diagnostics;
-using System.Net;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Queries;
 using FluentValidation;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.ParameterFactories;
@@ -23,6 +21,7 @@ using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Caching;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -40,10 +39,14 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Quartz;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Settings.Configuration;
 using Serilog.Sinks.SystemConsole.Themes;
+using System.Diagnostics;
+using System.Net;
+using System.Reflection;
 using IHostingEnvironment = Microsoft.Extensions.Hosting.IHostingEnvironment;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
@@ -54,8 +57,15 @@ public static class GeneralStartupExtensions
         string serviceName,
         bool? configureRedis = false)
     {
+        var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+
+        var serviceInformation = builder.SetupServiceInformation(serviceName, assemblyVersion);
+
+        //Add Quartz scheduler with SQL persistence
+        builder.Services.RegisterQuartzDatabase(serviceInformation.ConnectionString);
+
         // load external configuration source (if specified)
-        builder.AddExternalConfiguration(serviceName);
+        builder.AddExternalConfiguration(serviceInformation.ServiceConfigName);
         
         builder.Configuration.RegisterMonitoring(builder.Logging, builder.Services);
         builder.Services.RegisterConfigs(builder.Configuration);
@@ -74,7 +84,7 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterManagers();
         builder.Services.RegisterServices();
         builder.Services.RegisterFactories(builder.Configuration);
-        builder.Services.RegisterTelemetry(builder.Configuration, builder.Environment, serviceName);
+        builder.Services.RegisterTelemetry(builder.Configuration, builder.Environment, serviceInformation.ServiceConfigName);
         builder.Services.RegisterProblemDetails((IHostingEnvironment)builder.Environment);
     }
 
@@ -110,21 +120,6 @@ public static class GeneralStartupExtensions
         // Clear defaults and use Serilog everywhere
         logging.ClearProviders();
         logging.AddSerilog(Log.Logger, dispose: true);
-
-        var serviceInformation = configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-        services.Configure<ServiceInformation>(configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation));
-
-        if (serviceInformation != null)
-        {
-            ServiceActivitySource.Initialize(serviceInformation);
-            Log.Information("ServiceActivitySource initialized with name: {ServiceName}, version: {Version}",
-            ServiceActivitySource.ServiceName,
-            serviceInformation.Version);
-        }
-        else
-        {
-            throw new NullReferenceException("Service Information was null.");
-        }
     }
 
     public static void RegisterConfigs(this IServiceCollection services, IConfigurationManager configuration)
@@ -276,6 +271,7 @@ public static class GeneralStartupExtensions
 
         //Validation
         services.AddValidatorsFromAssemblyContaining<UpdateDataAcquisitionLogModelValidator>();
+        services.AddScoped<IQueryPlanValidator, QueryPlanValidator>();
 
         //Factories - Producer
         var kafkaConnection = configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>() ?? throw new Exception("Missing Kafka Connection Settings");

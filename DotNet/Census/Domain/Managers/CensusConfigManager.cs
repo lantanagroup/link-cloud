@@ -1,6 +1,4 @@
-﻿using AngleSharp.Dom;
-using Census.Domain.Entities;
-using Confluent.Kafka;
+﻿using Census.Domain.Entities;
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Exceptions;

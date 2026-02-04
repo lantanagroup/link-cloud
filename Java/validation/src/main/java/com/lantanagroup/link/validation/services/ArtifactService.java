@@ -50,7 +50,7 @@ public class ArtifactService {
     }
 
     public void deleteArtifact(ArtifactType type, String name) {
-        if (artifactRepository.deleteByTypeAndName(type, name)) {
+        if (artifactRepository.deleteByTypeAndName(type, name) > 0) {
             invalidateValidationSupport();
         }
     }

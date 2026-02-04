@@ -9,6 +9,7 @@ import com.lantanagroup.link.validation.services.ArtifactService;
 import com.lantanagroup.link.validation.models.TerminologyDependency;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import jakarta.transaction.Transactional;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -21,6 +22,7 @@ import java.util.Set;
 @RestController
 @RequestMapping("/api/validation/artifact")
 @SecurityRequirement(name = "bearer-key")
+@Transactional
 public class ArtifactController {
     private final ArtifactRepository artifactRepository;
     private final ArtifactService artifactService;

@@ -80,7 +80,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 _logger.LogLinkAdminTokenGenerationException(ex.Message);
                 throw;
             }
@@ -103,7 +103,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 _logger.LogLinkAdminTokenGenerationException(ex.Message);
                 throw;
             }

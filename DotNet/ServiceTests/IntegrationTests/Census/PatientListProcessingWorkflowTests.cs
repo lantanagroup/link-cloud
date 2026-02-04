@@ -19,7 +19,6 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
 {
     private readonly CensusIntegrationTestFixture _fixture;
     private PatientListService _patientListService;
-    private CensusContext _db;
     private readonly ITestOutputHelper _output;
 
     public PatientListProcessingWorkflowTests(CensusIntegrationTestFixture fixture, ITestOutputHelper output)
@@ -31,7 +30,7 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
     [Fact]
     public async Task LargeScalePatientList_ProcessingWorkflow_CreatesEventsAndEncountersCorrectly()
     {
-        _db = _fixture.DbContext;
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
         // Get required services for creating PatientListService
         var eventManager = _fixture.ServiceProvider.GetRequiredService<IPatientEventManager>();
         var eventQueries = _fixture.ServiceProvider.GetRequiredService<IPatientEventQueries>();
@@ -62,7 +61,7 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
         var facilityIds = SeedData.GenerateFacilityIds(facilityCount);
 
         // Seed census configurations
-        await SeedData.SeedCensusConfigs(_db, facilityIds);
+        await SeedData.SeedCensusConfigs(db, facilityIds);
 
         // Generate patient list items according to the updated SeedData implementation
         var facilityLists = SeedData.GeneratePatientListItems(
@@ -70,8 +69,8 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
             patientIds);
 
         // Get counts before processing for comparison
-        int initialPatientEventCount = _db.PatientEvents.ToList().Count;
-        int initialPatientEncounterCount = _db.PatientEncounters.ToList().Count;
+        int initialPatientEventCount = db.PatientEvents.ToList().Count;
+        int initialPatientEncounterCount = db.PatientEncounters.ToList().Count;
 
         // Act - process all the lists
         var messages =
@@ -80,8 +79,8 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
         // Assert
 
         // Verify database counts increased
-        int newPatientEventCount = _db.PatientEvents.ToList().Count;
-        int newPatientEncounterCount = _db.PatientEncounters.ToList().Count;
+        int newPatientEventCount = db.PatientEvents.ToList().Count;
+        int newPatientEncounterCount = db.PatientEncounters.ToList().Count;
 
         _output.WriteLine(
             $"Initial patient events: {initialPatientEventCount}, After processing: {newPatientEventCount}");
@@ -101,13 +100,13 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
         _output.WriteLine($"Expected admits: {expectedAdmitCount}, Expected discharges: {expectedDischargeCount}");
 
         // Verify admit events
-        var admitEvents = _db.PatientEvents
+        var admitEvents = db.PatientEvents
             .Where(e => e.EventType == EventType.FHIRListAdmit)
             .Where(e => e.CreateDate > DateTime.UtcNow.AddMinutes(-2)) // Only check recent events
             .ToList();
 
         // Verify discharge events
-        var dischargeEvents = _db.PatientEvents
+        var dischargeEvents = db.PatientEvents
             .Where(e => e.EventType == EventType.FHIRListDischarge)
             .Where(e => e.CreateDate > DateTime.UtcNow.AddMinutes(-2)) // Only check recent events
             .ToList();
@@ -120,7 +119,7 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
         Assert.Equal(expectedDischargeCount, dischargeEvents.Count);
 
         // Verify patient encounters were created properly
-        var patientEncounters = _db.PatientEncounters
+        var patientEncounters = db.PatientEncounters
             .Where(e => e.CreateDate > DateTime.UtcNow.AddMinutes(-2)) // Only check recent encounters
             .ToList();
 
@@ -135,16 +134,17 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
         Assert.Equal(expectedDischargeMessages, messages.dischargeMessages.Count);
 
         // Validate patient records for a sample of facilities
-        ValidatePatientRecordsForSampleFacilities(facilityLists, facilityIds);
+        ValidatePatientRecordsForSampleFacilities(db, facilityLists, facilityIds);
 
         // Check that all patients in discharge events have a corresponding admit event
-        ValidateDischargedPatientsHadPriorAdmitEvents(dischargeEvents);
+        ValidateDischargedPatientsHadPriorAdmitEvents(db, dischargeEvents);
 
         // Verify proper event sequence (admit before discharge)
-        ValidateProperEventSequencing(patientIds);
+        ValidateProperEventSequencing(db, patientIds);
     }
 
     private void ValidatePatientRecordsForSampleFacilities(
+        CensusContext db,
         Dictionary<string, List<PatientListItem>> facilityLists,
         List<string> facilityIds)
     {
@@ -172,7 +172,7 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
             _output.WriteLine($"Facility {facilityId}: Discharged patients in list: {dischargedPatients.Count}");
 
             // Query database for admitted patients for this facility (those without a discharge date)
-            var dbAdmittedPatients = _db.PatientEncounters
+            var dbAdmittedPatients = db.PatientEncounters
                 .Where(e => e.FacilityId == facilityId && e.DischargeDate == null)
                 .SelectMany(e => e.PatientIdentifiers)
                 .Select(p => p.Identifier)
@@ -203,6 +203,7 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
     }
 
     private void ValidateDischargedPatientsHadPriorAdmitEvents(
+        CensusContext db,
         List<LantanaGroup.Link.Census.Domain.Entities.POI.PatientEvent> dischargeEvents)
     {
         // Sample up to 20 discharge events to validate
@@ -212,7 +213,7 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
         foreach (var dischargeEvent in sampleDischarges)
         {
             // Find matching admit event for this patient and facility
-            var matchingAdmitEvent = _db.PatientEvents
+            var matchingAdmitEvent = db.PatientEvents
                 .Where(e => e.SourcePatientId == dischargeEvent.SourcePatientId)
                 .Where(e => e.FacilityId == dischargeEvent.FacilityId)
                 .Where(e => e.EventType == EventType.FHIRListAdmit)
@@ -226,7 +227,7 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
         }
     }
 
-    private void ValidateProperEventSequencing(List<string> patientIds)
+    private void ValidateProperEventSequencing(CensusContext db, List<string> patientIds)
     {
         // Take a sample of patients to validate event sequencing
         var samplePatientIds = patientIds.Take(5).ToList();
@@ -234,7 +235,7 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
         foreach (var patientId in samplePatientIds)
         {
             // Get all events for this patient, ordered by timestamp
-            var patientEvents = _db.PatientEvents
+            var patientEvents = db.PatientEvents
                 .Where(e => e.SourcePatientId == patientId)
                 .OrderBy(e => e.CreateDate)
                 .ToList();

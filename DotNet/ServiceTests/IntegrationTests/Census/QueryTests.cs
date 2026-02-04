@@ -1,12 +1,13 @@
-﻿using LantanaGroup.Link.Census.Application.Interfaces;
-using LantanaGroup.Link.Census.Domain.Entities.POI;
-using LantanaGroup.Link.Census.Domain.Queries;
+﻿using LantanaGroup.Link.Census.Application.Factories;
+using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
-using Microsoft.Extensions.DependencyInjection;
+using LantanaGroup.Link.Census.Domain.Context;
+using LantanaGroup.Link.Census.Domain.Entities.POI;
+using LantanaGroup.Link.Census.Domain.Queries;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Task = System.Threading.Tasks.Task;
-using LantanaGroup.Link.Census.Application.Factories;
 
 namespace IntegrationTests.Census;
 
@@ -26,7 +27,7 @@ public class QueryTests
     public async Task GetLatestEventByFacilityAndPatientId_ReturnsLatestEvent()
     {
         // Arrange
-        var db = _fixture.DbContext;
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
         var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEventQueries>();
 
         var facilityId = "TestFacility" + Guid.NewGuid().ToString();
@@ -76,7 +77,7 @@ public class QueryTests
     public async Task GetPatientEvents_ReturnsFilteredEvents()
     {
         // Arrange
-        var db = _fixture.DbContext;
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
         var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEventQueries>();
 
         var facilityId = "TestFacility" + Guid.NewGuid().ToString();
@@ -144,7 +145,7 @@ public class QueryTests
     public async Task DeletePatientEventByCorrelationId_DeletesMatchingEvents()
     {
         // Arrange
-        var db = _fixture.DbContext;
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
         var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEventQueries>();
 
         // Reset database to ensure clean state
@@ -205,7 +206,7 @@ public class QueryTests
     public async Task GetPatientEncounterByCorrelationIdAsync_ReturnsCorrectEncounter()
     {
         // Arrange
-        var db = _fixture.DbContext;
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
         var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
 
         var correlationId = Guid.NewGuid().ToString();
@@ -254,7 +255,7 @@ public class QueryTests
     public async Task GetPatientEncounterByCorrelationIdAsync_WithInvalidCorrelationId_ThrowsArgumentException()
     {
         // Arrange
-        var db = _fixture.DbContext;
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
         var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
 
         // Act & Assert
@@ -272,7 +273,7 @@ public class QueryTests
     public async Task GetAdmittedPatientEventModelsByDateRange_ReturnsCorrectEvents()
     {
         // Arrange
-        var db = _fixture.DbContext;
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
         var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
 
         var facilityId = "TestFacility" + Guid.NewGuid().ToString();
@@ -377,7 +378,7 @@ public class QueryTests
     public async Task GetAdmittedPatientEventModelsByDateRange_WithInvalidParameters_ThrowsArgumentException()
     {
         // Arrange
-        var db = _fixture.DbContext;
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
         var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
 
         var facilityId = "TestFacility" + Guid.NewGuid().ToString();
@@ -393,7 +394,7 @@ public class QueryTests
     public async Task RebuildPatientEncounterTable_PopulatesEncountersFromEvents()
     {
         // Arrange
-        var dbContext = _fixture.DbContext;
+        var dbContext = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
         var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEventQueries>();
         var patientEncounterQueries = _fixture.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
 

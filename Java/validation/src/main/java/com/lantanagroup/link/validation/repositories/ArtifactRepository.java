@@ -11,5 +11,5 @@ import java.util.Optional;
 public interface ArtifactRepository extends JpaRepository<Artifact, Long> {
     Optional<Artifact> findByTypeAndName(ArtifactType type, String name);
 
-    boolean deleteByTypeAndName(ArtifactType type, String name);
+    int deleteByTypeAndName(ArtifactType type, String name);
 }

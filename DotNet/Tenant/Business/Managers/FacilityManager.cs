@@ -9,7 +9,6 @@ using LantanaGroup.Link.Tenant.Commands;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Models;
-using LantanaGroup.Link.Tenant.Services;
 using LantanaGroup.Link.Tenant.Utils;
 using Microsoft.Extensions.Options;
 using OpenTelemetry.Trace;
@@ -115,8 +114,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex, new TagList
-                {
+                Activity.Current?.AddException(ex, new TagList {
                     { "service.name", TenantConstants.ServiceName },
                     { "facility", newFacility.FacilityId },
                     { "action", AuditEventType.Create },
@@ -197,7 +195,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex, new TagList
+                Activity.Current?.AddException(ex, new TagList
                 {
                     { "service.name", TenantConstants.ServiceName },
                     { "facility", newFacility.FacilityId },
@@ -248,7 +246,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex, new TagList
+                Activity.Current?.AddException(ex, new TagList
                 {
                     { "service.name", TenantConstants.ServiceName },
                     { "facility", facilityId },
@@ -334,7 +332,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex, new TagList
+                Activity.Current?.AddException(ex, new TagList
                 {
                     { "service.name", TenantConstants.ServiceName },
                     { "facility", facilityId },

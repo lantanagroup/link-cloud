@@ -1,9 +1,8 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
-using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Quartz;
@@ -32,17 +31,10 @@ public class RetryJob : IJob
     {
         try
         {
-            using var scope = _serviceScopeFactory.CreateScope();
-            var _retryRepository = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<RetryModel>>();
-
-            var triggerMap = context.Trigger.JobDataMap;
-            var retryModel = (RetryModel)triggerMap["RetryModel"];
+            var dataMap = context.Trigger.JobDataMap;
+            var retryModel = dataMap.GetObject<RetryModel>("RetryModel");
 
             _logger.LogInformation("Executing RetryJob for {Topic}-{Id}", retryModel.Topic, retryModel.Id);
-
-            // remove the job from the scheduler and database
-            await RetryScheduleService.DeleteJob(retryModel, await _schedulerFactory.GetScheduler());
-            await _retryRepository.DeleteAsync(retryModel.Id);
 
             ProducerConfig config = new ProducerConfig()
             {
@@ -53,20 +45,12 @@ public class RetryJob : IJob
 
             foreach (var header in retryModel.Headers)
             {
+                _logger.LogInformation("RetryJob: Logging Message Headers: {key} - {value}", header.Key, Encoding.UTF8.GetBytes(header.Value));
                 headers.Add(header.Key, Encoding.UTF8.GetBytes(header.Value));
             }
 
-            //Remove the Retry Count Header and replace it with a new value.
-            if (headers.Any(h => h.Key == KafkaConstants.HeaderConstants.RetryCount))
-            {
-                headers.Remove(KafkaConstants.HeaderConstants.RetryCount);
-            }
-
-            headers.Add(KafkaConstants.HeaderConstants.RetryCount, Encoding.UTF8.GetBytes(retryModel.RetryCount.ToString()));
-
             using (var producer = _retryKafkaProducerFactory.CreateProducer(config, useOpenTelemetry: false))
             {
-
                 var darKey = retryModel.Key;
                 var darValue = retryModel.Value;
 
@@ -81,6 +65,8 @@ public class RetryJob : IJob
                 producer.Flush();
             }
 
+            // remove the job from the scheduler
+            await RetryScheduleService.DeleteJob(retryModel, await _schedulerFactory.GetScheduler());
         }
         catch (Exception ex)
         {

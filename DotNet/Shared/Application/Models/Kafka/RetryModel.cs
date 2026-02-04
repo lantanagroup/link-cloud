@@ -14,7 +14,6 @@ namespace LantanaGroup.Link.Shared.Application.Models
         public DateTime ScheduledTrigger { get; set; }
         public int RetryCount { get; set; }
         public string CorrelationId { get; set; }
-        public DateTime CreateDate { get; set; } = DateTime.UtcNow;
         public string JobId => $"{Id}-{FacilityId}-{Topic}";
     }
 }

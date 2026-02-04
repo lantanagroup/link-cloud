@@ -1,6 +1,4 @@
 ﻿using LantanaGroup.Link.Audit.Application.Interfaces;
-using MongoDB.Bson.Serialization.Attributes;
-using MongoDB.Bson;
 
 namespace LantanaGroup.Link.Audit.Domain.Entities
 {
