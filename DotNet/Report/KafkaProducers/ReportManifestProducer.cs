@@ -113,22 +113,14 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public async Task<bool> Produce(ReportSchedule schedule, string correlationId = null)
         {
+            if (!schedule.EndOfReportPeriodJobHasRun) {
+                return false;
+            }
+
             var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
-
-            //var allReady = !await database.SubmissionEntryRepository.AnyAsync(e => e.FacilityId == schedule.FacilityId
-            //    && e.ReportScheduleId == schedule.Id
-            //    && e.Status != MeasureReportStatus.NotReportable
-            //    && e.Status != MeasureReportStatus.ValidationComplete
-            //    && e.Status != MeasureReportStatus.Submitted, CancellationToken.None);
-
-            //if (!allReady)
-            //{
-            //    return false;
-            //}
 
             var reportEntries = await database.ReportEntryRepository.FindAsync(x => x.FacilityId == schedule.FacilityId && x.ReportScheduleId == schedule.Id);
             
-            //TODO: See if we can add to the query above...Add function to manager to handle 'ready for manifest' check
             foreach (var entry in reportEntries)
             {
                 if ((entry.ReportingStatus == ReportingStatus.NotReportable || entry.ReportingStatus == ReportingStatus.PassedValidation || entry.ReportingStatus == ReportingStatus.FailedValidation) && entry.SubmissionStatus == SubmissionStatus.Submitted)

@@ -1,5 +1,6 @@
 using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
+//using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
@@ -14,6 +15,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using System.Text;
 
 namespace LantanaGroup.Link.Report.Listeners;
 
@@ -58,24 +60,29 @@ public class PayloadSubmittedListener(
                             consumer.Commit();
                             return;
                         }
+
+                        if (!result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
+                        {
+                            throw new DeadLetterException($"{Name}: Received message without correlation ID (ReportId = {result.Message.Key.ReportScheduleId}, FacilityId = {result.Message.Key.FacilityId}).");
+                        }
+
+                        var correlationId = Encoding.UTF8.GetString(headerValue);
+
                         var scope = serviceScopeFactory.CreateScope();
                         var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
                         var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+                        var reportManifestProducer = scope.ServiceProvider.GetRequiredService<ReportManifestProducer>();
 
                         var facilityId = result.Message.Key.FacilityId;
                         
                         try
                         {
+                            var reportTrackingId = result.Message.Key.ReportScheduleId;
+                            var reportSchedule = (await reportScheduledManager.FindAsync(x => x.Id == reportTrackingId, consumeCancellationToken)).Single();
+
                             if (result.Message.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry)
                             {
                                 var reportEntry = await database.ReportEntryRepository.FirstAsync(e => e.PatientId == result.Message.Value.PatientId && e.ReportScheduleId == result.Message.Key.ReportScheduleId);
-
-                                //foreach (var item in submissionEntries)
-                                //{
-                                //    item.Status = PatientSubmissionStatus.Submitted;
-                                //    item.ModifyDate = DateTime.UtcNow;
-                                //    await database.ReportEntryStatusRepository.UpdateAsync(item);
-                                //}
 
                                 reportEntry.SubmissionStatus = SubmissionStatus.Submitted;
                                 reportEntry.ModifyDate = DateTime.UtcNow;
@@ -84,9 +91,6 @@ public class PayloadSubmittedListener(
                             }
                             else if (result.Message.Value.PayloadType == PayloadType.ReportSchedule)
                             {
-                                var reportTrackingId = result.Message.Key.ReportScheduleId;
-                                var reportSchedule = (await reportScheduledManager.FindAsync(x => x.Id == reportTrackingId, consumeCancellationToken)).Single();
-
                                 if (reportSchedule == null)
                                 {
                                     throw new DeadLetterException($"{Name}: Report schedule {reportTrackingId} not found");
@@ -99,6 +103,8 @@ public class PayloadSubmittedListener(
                                 reportSchedule.ModifyDate = DateTime.UtcNow;
                                 await reportScheduledManager.UpdateAsync(reportSchedule, consumeCancellationToken);
                             }
+
+                            await reportManifestProducer.Produce(reportSchedule, correlationId);
                         }
                         catch (DeadLetterException ex)
                         {

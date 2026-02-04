@@ -160,7 +160,6 @@ namespace LantanaGroup.Link.Report.Listeners
             var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
             var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
             var patientAggregator = scope.ServiceProvider.GetRequiredService<PatientAggregator>();
-            var reportManifestProducer = scope.ServiceProvider.GetRequiredService<ReportManifestProducer>();
 
             var facilityId = result.Message.Key;
             var value = result.Message.Value;
@@ -225,8 +224,6 @@ namespace LantanaGroup.Link.Report.Listeners
             {
                 throw new TransientException($"{Name}: An error was encountered when producing a Submit Payload event(ReportId = {schedule.Id}, FacilityId = {facilityId}, PatientId {value.PatientId}).", ex);
             }
-
-            await reportManifestProducer.Produce(schedule, correlationIdStr);
         }
 
         private static OperationOutcome GetOperationOutcome()
