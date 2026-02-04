@@ -27,6 +27,7 @@ public class AcquisitionProcessingScheduleService : IHostedService
             .WithDescription("Acquisition Processing Job")
             .Build();
 
+
         var trigger = TriggerBuilder
             .Create()
             .ForJob(job.Key)
@@ -35,11 +36,18 @@ public class AcquisitionProcessingScheduleService : IHostedService
             .WithDescription("Acquisition Processing Trigger")
             .Build();
 
-        var exists = await scheduler.CheckExists(job.Key);
-        if (!exists)
-            await scheduler.ScheduleJob(job, trigger);
+        var existingTrigger = await scheduler.GetTrigger(trigger.Key, cancellationToken);
+
+        if (existingTrigger != null)
+        {
+            // Trigger exists, update it
+            await scheduler.RescheduleJob(trigger.Key, trigger, cancellationToken);
+        }
         else
-            await scheduler.ScheduleJob(trigger);
+        {
+            // Trigger does not exist, schedule job and trigger
+            await scheduler.ScheduleJob(job, trigger, cancellationToken);
+        }
 
         await scheduler.Start(cancellationToken);
     }
