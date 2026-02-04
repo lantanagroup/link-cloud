@@ -1,3 +1,4 @@
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Census;
 
 namespace LantanaGroup.Link.Shared.Application.Models.Report;
@@ -13,12 +14,14 @@ public class ScheduledReportListSummary
     public List<string> ReportTypes { get; set; } = [];
     public Frequency Frequency { get; set; }
     
+    public bool? IsDeleted { get; set; } = false;
     public AdHocType? AdHocType { get; set; }
     public int CensusCount { get; set; }
     public int InitialPopulationCount { get; set; }
     public ScheduledReportMetrics? ReportMetrics { get; set; }
     public string? PayloadRootUri { get; set; }
-    public DateTime? CreatedDate { get; set; }
+    public DateTime? CreateDate { get; set; }
+    public ScheduleStatus? Status { get; set; }
 }
 
 public class ScheduledReportMetrics
