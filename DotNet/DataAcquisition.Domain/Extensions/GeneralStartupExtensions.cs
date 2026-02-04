@@ -95,10 +95,9 @@ public static class GeneralStartupExtensions
 
     public static void RegisterMonitoring(this IConfigurationManager configuration, ILoggingBuilder logging, IServiceCollection services)
     {
-        var env = configuration.GetValue<string>("ASPNETCORE_ENVIRONMENT") ?? "Production"; // Or inject IHostEnvironment if available
+        // Clear default providers first to avoid duplicate logging
+        logging.ClearProviders();
 
-        // Logging using Serilog
-        logging.AddSerilog();
         var loggerOptions = new ConfigurationReaderOptions { SectionName = DataAcquisitionConstants.AppSettingsSectionNames.Serilog };
         var serilogConfig = new LoggerConfiguration()
             .ReadFrom.Configuration(configuration, loggerOptions)
@@ -107,23 +106,9 @@ public static class GeneralStartupExtensions
             .Enrich.WithSpan()
             .Enrich.With<ActivityEnricher>();
 
-        // Add rich console only in Development (for local debugging)
-        if (env == "Development")
-        {
-            serilogConfig.WriteTo.Console(
-                outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}",
-                theme: AnsiConsoleTheme.Code  // Colorful output like default console
-            );
-        }
-        else
-        {
-            // In non-Development (e.g., Docker, Prod), no console or minimal
-        }
-
         Log.Logger = serilogConfig.CreateLogger();
 
-        // Clear defaults and use Serilog everywhere
-        logging.ClearProviders();
+        // Use Serilog as the logging provider
         logging.AddSerilog(Log.Logger, dispose: true);
 
         var serviceInformation = configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();

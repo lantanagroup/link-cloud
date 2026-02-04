@@ -27,7 +27,10 @@ builder.Configuration.AddStandardEnvironmentConfiguration();
 
 var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
 
-builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName, true);
+// Determine if secret manager should be enabled based on configuration
+var secretManagerEnabled = builder.Configuration.GetValue<bool>("SecretManagement:Enabled");
+
+builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName, configureRedis: true, configureSecretManager: secretManagerEnabled);
 
 builder.Services.RegisterQuartzDatabase(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection));
 

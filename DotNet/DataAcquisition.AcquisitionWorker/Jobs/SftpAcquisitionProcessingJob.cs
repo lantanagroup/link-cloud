@@ -317,16 +317,14 @@ public class SftpAcquisitionProcessingJob(
                 ? new SftpBenchmarkCollector(log.RetryAttempts ?? 0)
                 : null;
 
-            benchmark?.StartConnectionAndRetrieval();
-
             // Get the appropriate processor for this acquisition type
             var processor = processorFactory.GetProcessor(log.AcquisitionType);
 
             // Use the shared session via ProcessWithSessionAsync
+            // The processor tracks connection/retrieval and parse times internally
             var processedFiles =
-                await processor.ProcessWithSessionAsync(log, session, sftpConfig, acquisitionConfig, cancellationToken);
+                await processor.ProcessWithSessionAsync(log, session, sftpConfig, acquisitionConfig, cancellationToken, benchmark);
 
-            benchmark?.EndConnectionAndRetrieval();
             benchmark?.RecordSuccess(true);
 
             // Complete the log

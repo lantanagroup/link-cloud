@@ -7,6 +7,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
@@ -200,9 +201,11 @@ public class DataAcquisitionDbContext : DbContext
                 .HasDatabaseName("IX_SftpAcquisitionLog_ScheduledDate");
 
             entity.Property(d => d.Status)
+                .HasMaxLength(50)
                 .HasConversion(new EnumToStringConverter<RequestStatus>());
 
             entity.Property(d => d.AcquisitionType)
+                .HasMaxLength(50)
                 .HasConversion(new EnumToStringConverter<SftpAcquisitionType>());
 
             entity.Property(e => e.FileNames)
@@ -213,7 +216,11 @@ public class DataAcquisitionDbContext : DbContext
             entity.Property(e => e.Notes)
                 .HasConversion(
                     v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                    v => v != null ? JsonSerializer.Deserialize<List<string>>(v, new JsonSerializerOptions()) ?? new List<string>() : new List<string>());
+                    v => v != null ? JsonSerializer.Deserialize<List<string>>(v, new JsonSerializerOptions()) ?? new List<string>() : new List<string>())
+                .Metadata.SetValueComparer(new ValueComparer<List<string>>(
+                    (c1, c2) => c1 != null && c2 != null && c1.SequenceEqual(c2),
+                    c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                    c => c.ToList()));
 
             entity.Property(e => e.Benchmarks)
                 .HasConversion(

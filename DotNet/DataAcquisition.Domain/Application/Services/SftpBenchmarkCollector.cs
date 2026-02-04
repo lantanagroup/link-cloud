@@ -5,6 +5,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 
 /// <summary>
 /// Collects performance benchmark data during SFTP file acquisition and processing.
+/// Supports accumulating durations across multiple files when download and parse operations are interleaved.
 /// </summary>
 public class SftpBenchmarkCollector
 {
@@ -12,7 +13,7 @@ public class SftpBenchmarkCollector
     private readonly DateTime _attemptStartedAt;
     private readonly long _startTimestamp;
 
-    // Phase timestamps and durations
+    // Phase timestamps and accumulated durations
     private long _connectionAndRetrievalStartTimestamp;
     private double _connectionAndRetrievalDurationMs;
     private long _parseStartTimestamp;
@@ -36,7 +37,8 @@ public class SftpBenchmarkCollector
     }
 
     /// <summary>
-    /// Records the start of the SFTP connection and file retrieval phase.
+    /// Records the start of an SFTP connection and file retrieval operation.
+    /// Can be called multiple times for interleaved operations - durations accumulate.
     /// </summary>
     public void StartConnectionAndRetrieval()
     {
@@ -44,15 +46,17 @@ public class SftpBenchmarkCollector
     }
 
     /// <summary>
-    /// Records the end of the SFTP connection and file retrieval phase.
+    /// Records the end of an SFTP connection and file retrieval operation.
+    /// Duration is accumulated with previous calls for interleaved operations.
     /// </summary>
     public void EndConnectionAndRetrieval()
     {
-        _connectionAndRetrievalDurationMs = Stopwatch.GetElapsedTime(_connectionAndRetrievalStartTimestamp).TotalMilliseconds;
+        _connectionAndRetrievalDurationMs += Stopwatch.GetElapsedTime(_connectionAndRetrievalStartTimestamp).TotalMilliseconds;
     }
 
     /// <summary>
-    /// Records the start of the file parsing phase.
+    /// Records the start of a file parsing operation.
+    /// Can be called multiple times for interleaved operations - durations accumulate.
     /// </summary>
     public void StartParse()
     {
@@ -60,13 +64,14 @@ public class SftpBenchmarkCollector
     }
 
     /// <summary>
-    /// Records the end of the file parsing phase.
+    /// Records the end of a file parsing operation.
+    /// Duration is accumulated with previous calls for interleaved operations.
     /// </summary>
-    /// <param name="itemsProcessed">Number of items processed from the file(s).</param>
+    /// <param name="itemsProcessed">Number of items processed from the file. Accumulates across calls.</param>
     public void EndParse(int itemsProcessed)
     {
-        _parseDurationMs = Stopwatch.GetElapsedTime(_parseStartTimestamp).TotalMilliseconds;
-        _itemsProcessed = itemsProcessed;
+        _parseDurationMs += Stopwatch.GetElapsedTime(_parseStartTimestamp).TotalMilliseconds;
+        _itemsProcessed += itemsProcessed;
     }
 
     /// <summary>

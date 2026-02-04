@@ -68,7 +68,7 @@ export class SftpAcquisitionLogService {
       );
   }
 
-  getSftpAcquisitionLog(id: number): Observable<SftpAcquisitionLog> {
+  getSftpAcquisitionLog(id: string): Observable<SftpAcquisitionLog> {
     return this.http.get<SftpAcquisitionLog>(`${this.baseUrl}/${id}`)
       .pipe(
         catchError((error) => {
@@ -77,7 +77,7 @@ export class SftpAcquisitionLogService {
       );
   }
 
-  retrySftpAcquisitionLog(id: number): Observable<any> {
+  retrySftpAcquisitionLog(id: string): Observable<any> {
     return this.http.post<any>(`${this.baseUrl}/${id}/retry`, {})
       .pipe(
         catchError((error) => {
@@ -86,7 +86,7 @@ export class SftpAcquisitionLogService {
       );
   }
 
-  cancelSftpAcquisitionLog(id: number): Observable<any> {
+  cancelSftpAcquisitionLog(id: string): Observable<any> {
     return this.http.post<any>(`${this.baseUrl}/${id}/cancel`, {})
       .pipe(
         catchError((error) => {

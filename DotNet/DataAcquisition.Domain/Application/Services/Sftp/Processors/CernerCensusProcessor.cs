@@ -34,11 +34,12 @@ public class CernerCensusProcessor(
         SftpAcquisitionLog log,
         SftpConfigurationModel sftpConfig,
         SftpAcquisitionTypeConfiguration acquisitionConfig,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        SftpBenchmarkCollector? benchmark = null)
     {
         // Open session and delegate to the session-aware method
         await using var session = await sftpClientService.OpenSessionAsync(sftpConfig, cancellationToken);
-        return await ProcessWithSessionAsync(log, session, sftpConfig, acquisitionConfig, cancellationToken);
+        return await ProcessWithSessionAsync(log, session, sftpConfig, acquisitionConfig, cancellationToken, benchmark);
     }
 
     /// <inheritdoc/>
@@ -47,7 +48,8 @@ public class CernerCensusProcessor(
         ISftpSession session,
         SftpConfigurationModel sftpConfig,
         SftpAcquisitionTypeConfiguration acquisitionConfig,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        SftpBenchmarkCollector? benchmark = null)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity();
 
@@ -55,11 +57,13 @@ public class CernerCensusProcessor(
         var processedFiles = new List<string>();
         var totalEncounterCount = 0;
 
-        // List matching files
+        // List matching files (benchmark: connection and retrieval)
+        benchmark?.StartConnectionAndRetrieval();
         var files = await session.ListFilesAsync(
             remoteDir,
             acquisitionConfig.FileNamePattern,
             cancellationToken);
+        benchmark?.EndConnectionAndRetrieval();
 
         // Check if any files were found
         if (files.Count == 0)
@@ -107,17 +111,22 @@ public class CernerCensusProcessor(
                 fileExtension,
                 acquisitionConfig.ParsingConfiguration);
 
-            // Download and parse file
+            // Download file (benchmark: connection and retrieval)
+            benchmark?.StartConnectionAndRetrieval();
             using var fileStream = await session.DownloadFileAsync(file.FullName, cancellationToken);
+            benchmark?.EndConnectionAndRetrieval();
 
             //TODO: We should consider saving the files to process locally rather than keeping the connection open during parsing.
-            
+
+            // Parse file (benchmark: parsing)
+            benchmark?.StartParse();
             var fileEncounters = new List<CernerEncounters>();
             await foreach (var encounter in parser.ParseAsync(
                 fileStream, acquisitionConfig.ParsingConfiguration, cancellationToken))
             {
                 fileEncounters.Add(encounter);
             }
+            benchmark?.EndParse(fileEncounters.Count);
 
             // Produce Kafka event for patients found in this file
             var kafkaMessage = new Message<string, CernerPatientsAcquired>

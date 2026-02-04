@@ -155,7 +155,9 @@ public class SftpConfigurationManager(
             existingEntity.RemoteDirectory = model.RemoteDirectory;
             existingEntity.Timeout = model.Timeout;
             existingEntity.RemoveAfterProcessing = model.RemoveAfterProcessing;
-        
+            existingEntity.EnableBenchmarking = model.EnableBenchmarking;
+            existingEntity.AcquisitionConfigurations = model.AcquisitionConfigurations;
+
             // For now, we are only allowing Basic auth, so no need to update this field
             //existingEntity.AuthenticationProtocol = model.AuthenticationProtocol;
 

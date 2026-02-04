@@ -198,13 +198,14 @@ export class SftpAcquisitionLogViewComponent implements OnInit {
   }
 
   viewDetails(log: SftpAcquisitionLogSummary): void {
-    this.sftpLogService.getSftpAcquisitionLog(log.id).subscribe({
+    this.sftpLogService.getSftpAcquisitionLog(log.externalId).subscribe({
       next: (fullLog) => {
         const dialogRef = this.dialog.open(SftpAcquisitionLogDetailsComponent, {
-          width: '800px',
-          maxHeight: '90vh',
+          minWidth: '90vw',
+          maxHeight: '85vh',
+          panelClass: 'link-dialog-container',
           data: {
-            dialogTitle: `SFTP Acquisition Log - ${fullLog.externalId}`,
+            dialogTitle: 'SFTP Acquisition Log Details',
             sftpAcquisitionLog: fullLog
           }
         });
