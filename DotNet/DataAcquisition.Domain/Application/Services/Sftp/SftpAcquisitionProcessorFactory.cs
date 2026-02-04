@@ -4,6 +4,9 @@ using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp;
 
+/// <summary>
+/// Resolves SFTP acquisition processors from the DI container.
+/// </summary>
 public class SftpAcquisitionProcessorFactory : ISftpAcquisitionProcessorFactory
 {
     private readonly IServiceProvider _serviceProvider;
@@ -17,6 +20,7 @@ public class SftpAcquisitionProcessorFactory : ISftpAcquisitionProcessorFactory
         _logger = logger;
     }
 
+    /// <inheritdoc/>
     public ISftpAcquisitionProcessor GetProcessor(SftpAcquisitionType acquisitionType)
     {
         var processors = _serviceProvider.GetServices<ISftpAcquisitionProcessor>();

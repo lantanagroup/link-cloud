@@ -19,6 +19,7 @@ public class SftpSession : ISftpSession
         _logger = logger;
     }
 
+    /// <inheritdoc/>
     public Task<List<SftpFileInfo>> ListFilesAsync(
         string remoteDirectory,
         string? fileNamePattern,
@@ -46,6 +47,7 @@ public class SftpSession : ISftpSession
         return Task.FromResult(files);
     }
 
+    /// <inheritdoc/>
     public Task<MemoryStream> DownloadFileAsync(
         string remoteFilePath,
         CancellationToken cancellationToken)
@@ -62,6 +64,7 @@ public class SftpSession : ISftpSession
         return Task.FromResult(memoryStream);
     }
 
+    /// <inheritdoc/>
     public Task MoveFileAsync(
         string sourceFilePath,
         string destinationDirectory,
@@ -88,6 +91,7 @@ public class SftpSession : ISftpSession
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc/>
     public Task DeleteFileAsync(
         string remoteFilePath,
         CancellationToken cancellationToken)
