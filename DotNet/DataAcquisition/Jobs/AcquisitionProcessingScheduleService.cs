@@ -37,7 +37,18 @@ public class AcquisitionProcessingScheduleService : IHostedService
             .WithDescription("Acquisition Processing Trigger")
             .Build();
 
-        await scheduler.ScheduleJob(trigger);
+        var existingTrigger = await scheduler.GetTrigger(trigger.Key, cancellationToken);
+
+        if (existingTrigger != null)
+        {
+            // Trigger exists, reschedule it with the new definition
+            await scheduler.RescheduleJob(trigger.Key, trigger, cancellationToken);
+        }
+        else
+        {
+            // Trigger does not exist, schedule it
+            await scheduler.ScheduleJob(job, trigger, cancellationToken);
+        }
 
         await scheduler.Start(cancellationToken);
     }
