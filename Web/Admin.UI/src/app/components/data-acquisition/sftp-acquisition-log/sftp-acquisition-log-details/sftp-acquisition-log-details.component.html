@@ -27,6 +27,14 @@
           <span class="label">Status</span>
           <span class="value" [ngClass]="getStatusClass(log.status)">{{ log.status }}</span>
         </div>
+        @if (log.status === 'ConfigurationRequired') {
+          <div class="detail-item full-width">
+            <div class="config-warning">
+              <fa-icon [icon]="faExclamationTriangle"></fa-icon>
+              <span>This log requires configuration to be added before it can be processed. Once configuration is in place, use the Reset button to retry.</span>
+            </div>
+          </div>
+        }
         <div class="detail-item">
           <span class="label">Scheduled Date</span>
           <span class="value">{{ log.scheduledDate ? (log.scheduledDate | date:'medium') : 'Immediate' }}</span>
@@ -151,5 +159,11 @@
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
+  @if (isResettable()) {
+    <button mat-raised-button color="primary" (click)="resetLog()" [disabled]="isResetting">
+      <fa-icon [icon]="faRefresh"></fa-icon>
+      {{ isResetting ? 'Resetting...' : 'Reset for Retry' }}
+    </button>
+  }
   <button mat-raised-button (click)="onClose()">Close</button>
 </mat-dialog-actions>

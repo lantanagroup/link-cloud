@@ -193,4 +193,59 @@ public class SftpLogController : ControllerBase
             );
         }
     }
+
+    /// <summary>
+    /// Reset an SFTP log for retry after configuration has been fixed.
+    /// Only logs in ConfigurationRequired or MaxRetriesReached status can be reset.
+    /// </summary>
+    /// <param name="logId">The external ID of the log to reset</param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    [HttpPost("{logId}/reset")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult> ResetSftpLogForRetry(string logId, CancellationToken cancellationToken = default)
+    {
+        // Validate log ID
+        if (string.IsNullOrWhiteSpace(logId) || !Guid.TryParse(logId, out var externalId))
+        {
+            return BadRequest("Invalid SFTP Acquisition log ID.");
+        }
+
+        // Store httpContext so that it is not lost during processing
+        var httpContext = HttpContext;
+
+        try
+        {
+            // Get the log by external ID to get the internal ID
+            var log = await _queries.GetByExternalIdAsync(externalId, cancellationToken);
+
+            if (log is null)
+                return NotFound($"SFTP Acquisition log with ID {logId} not found.");
+
+            var success = await _manager.ResetForRetryAsync(log.Id, cancellationToken);
+
+            if (!success)
+            {
+                return Conflict(
+                    $"SFTP Acquisition log with ID {logId} cannot be reset. Only logs in ConfigurationRequired or MaxRetriesReached status can be reset.");
+            }
+
+            return Ok(new { message = $"SFTP Acquisition log {logId} has been reset for retry." });
+        }
+        catch (Exception)
+        {
+            return Problem(
+                title: "An error occurred while processing your request.",
+                detail:
+                $"An unexpected error occurred while processing your request, please see the logs for more details. TraceId: {httpContext.TraceIdentifier}",
+                statusCode: StatusCodes.Status500InternalServerError
+            );
+        }
+    }
 }

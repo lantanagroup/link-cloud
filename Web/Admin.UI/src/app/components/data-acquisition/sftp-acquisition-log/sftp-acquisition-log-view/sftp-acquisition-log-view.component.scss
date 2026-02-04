@@ -174,9 +174,14 @@
   font-weight: 500;
 }
 
-.status-failed, .status-maxRetryReached {
+.status-failed, .status-maxRetryReached, .status-configurationRequired {
   color: #ff5252;
   font-weight: 500;
+}
+
+.actions-cell {
+  display: flex;
+  gap: 0.25rem;
 }
 
 .no-results {

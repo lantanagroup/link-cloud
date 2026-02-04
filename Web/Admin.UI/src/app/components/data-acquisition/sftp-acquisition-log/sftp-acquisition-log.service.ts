@@ -18,7 +18,7 @@ export class SftpAcquisitionLogService {
   ) { }
 
   get baseUrl(): string {
-    return `${this.appConfigService.config?.baseApiUrl}/data/sftp-acquisition-logs`;
+    return `${this.appConfigService.config?.baseApiUrl}/data/sftp-logs`;
   }
 
   getSftpAcquisitionLogs(
@@ -88,6 +88,15 @@ export class SftpAcquisitionLogService {
 
   cancelSftpAcquisitionLog(id: number): Observable<any> {
     return this.http.post<any>(`${this.baseUrl}/${id}/cancel`, {})
+      .pipe(
+        catchError((error) => {
+          return this.errorHandler.handleError(error);
+        })
+      );
+  }
+
+  resetSftpAcquisitionLog(externalId: string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/${externalId}/reset`, {})
       .pipe(
         catchError((error) => {
           return this.errorHandler.handleError(error);

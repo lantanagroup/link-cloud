@@ -130,7 +130,7 @@
                       <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                     </svg>
                   }
-                  @if (log.status === 'Failed' || log.status === 'MaxRetriesReached') {
+                  @if (log.status === 'Failed' || log.status === 'MaxRetriesReached' || log.status === 'ConfigurationRequired') {
                     <svg class="pulse-warning" width="24" height="24" viewBox="0 0 24 24" fill="none">
                       <circle cx="12" cy="12" r="10" fill="#ff5252" opacity="0.2"/>
                       <path d="M12 8v4" stroke="#ff5252" stroke-width="2" stroke-linecap="round"/>
@@ -149,15 +149,22 @@
                     'status-processing': log.status === 'Processing',
                     'status-completed': log.status === 'Completed',
                     'status-failed': log.status === 'Failed',
-                    'status-maxRetryReached': log.status === 'MaxRetriesReached'
-                  }">{{ log.status }}</span>
+                    'status-maxRetryReached': log.status === 'MaxRetriesReached',
+                    'status-configurationRequired': log.status === 'ConfigurationRequired'
+                  }">{{ log.status === 'ConfigurationRequired' ? 'Config Required' : log.status }}</span>
                 </td>
                 <td class="data-col table-cell">{{ log.retryAttempts || 0 }}</td>
-                <td class="table-cell">
+                <td class="table-cell actions-cell">
                   <button type="button" class="link-button small primary" (click)="viewDetails(log)"
                           title="View details">
                     <fa-icon [icon]="faEye"></fa-icon>
                   </button>
+                  @if (isResettable(log)) {
+                    <button type="button" class="link-button small success" (click)="resetLog(log)"
+                            title="Reset for retry">
+                      <fa-icon [icon]="faRefresh"></fa-icon>
+                    </button>
+                  }
                 </td>
               </tr>
             }

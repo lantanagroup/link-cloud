@@ -136,10 +136,10 @@ public class SftpAcquisitionProcessingJob(
             logger.LogError("No SFTP configuration found for facility {FacilityId}, skipping {Count} logs",
                 facilityId, logs.Count);
 
-            // Mark all logs as failed
+            // Mark all logs as requiring configuration - these won't retry automatically
             foreach (var log in logs)
             {
-                await logManager.FailAsync(log.Id, $"No SFTP configuration found for facility {facilityId}", cancellationToken);
+                await logManager.SetConfigurationRequiredAsync(log.Id, $"No SFTP configuration found for facility {facilityId}", cancellationToken);
             }
             return;
         }
@@ -341,16 +341,20 @@ public class SftpAcquisitionProcessingJob(
 
             logger.LogError(ex, "Invalid operation for SFTP acquisition log {LogId} for facility {FacilityId}: {Message}",
                 log.Id, log.FacilityId, ex.Message);
-            await logManager.FailAsync(log.Id, ex.Message, cancellationToken);
-            
+
+            // InvalidOperationException typically indicates a configuration issue (e.g., missing acquisition config)
+            await logManager.SetConfigurationRequiredAsync(log.Id, ex.Message, cancellationToken);
+
             return new LogProcessingResult(SessionMayBeUnhealthy: false);
         }
         catch (NotSupportedException ex)
         {
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             activity?.AddException(ex);
-            await logManager.FailAsync(log.Id, ex.Message, cancellationToken);
-            
+
+            // NotSupportedException indicates an unsupported acquisition type - configuration issue
+            await logManager.SetConfigurationRequiredAsync(log.Id, ex.Message, cancellationToken);
+
             return new LogProcessingResult(SessionMayBeUnhealthy: false);
         }
         catch (Exception ex)
