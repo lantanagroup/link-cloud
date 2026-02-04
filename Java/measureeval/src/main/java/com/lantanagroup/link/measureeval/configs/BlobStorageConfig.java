@@ -22,7 +22,7 @@ public class BlobStorageConfig {
     @Bean
     public BlobStorageService blobStorageService(FhirContext fhirContext, ReportClient reportClient, MeasureReportGeneratedProducer measureReportGeneratedProducer) {
         if (StringUtils.isAnyEmpty(connectionString, blobContainerName)) {
-            return null;
+            throw new IllegalStateException("Missing required internal-blob-storage configuration: connectionString and blobContainerName must be set.");
         }
         return new BlobStorageService(connectionString, blobContainerName, fhirContext, reportClient, measureReportGeneratedProducer);
     }
