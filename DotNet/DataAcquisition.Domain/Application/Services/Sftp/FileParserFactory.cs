@@ -5,6 +5,9 @@ using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp;
 
+/// <summary>
+/// Resolves file parsers from the DI container based on file characteristics.
+/// </summary>
 public class FileParserFactory : IFileParserFactory
 {
     private readonly IServiceProvider _serviceProvider;
@@ -16,6 +19,7 @@ public class FileParserFactory : IFileParserFactory
         _logger = logger;
     }
 
+    /// <inheritdoc/>
     public IFileParser<TResult> GetParser<TResult>(
         SftpAcquisitionType acquisitionType,
         string fileExtension,

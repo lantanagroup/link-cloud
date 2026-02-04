@@ -33,4 +33,17 @@ public class SftpAcquisitionSettings
     /// Maximum retry attempts before marking as MaxRetriesReached.
     /// </summary>
     public int MaxRetryAttempts { get; set; } = 3;
+
+    /// <summary>
+    /// Base delay in seconds for retry backoff calculation.
+    /// Actual delay = BaseRetryDelaySeconds * 2^(retryAttempt - 1).
+    /// Default: 60 seconds (1 minute base, resulting in 1m, 2m, 4m, 8m delays).
+    /// </summary>
+    public int BaseRetryDelaySeconds { get; set; } = 60;
+
+    /// <summary>
+    /// Maximum delay in seconds for retry backoff (caps the exponential growth).
+    /// Default: 3600 seconds (1 hour).
+    /// </summary>
+    public int MaxRetryDelaySeconds { get; set; } = 3600;
 }

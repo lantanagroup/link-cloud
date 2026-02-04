@@ -4,9 +4,13 @@ using Renci.SshNet;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp;
 
+/// <summary>
+/// Creates SFTP sessions using credentials from the secure credential store.
+/// </summary>
 public class SftpClientService(ILogger<SftpClientService> logger, ISftpCredentialService credentialService)
     : ISftpClientService
 {
+    /// <inheritdoc/>
     public async Task<ISftpSession> OpenSessionAsync(SftpConfigurationModel sftpConfig, CancellationToken cancellationToken)
     {
         var credentials = await credentialService.GetCredentialsAsync(
