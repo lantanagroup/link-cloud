@@ -38,14 +38,6 @@ namespace LantanaGroup.Link.Report.Jobs
 
         public async Task Execute(IJobExecutionContext context)
         {
-            string? scheduleId = context.JobDetail.JobDataMap.GetString("ReportScheduleId")
-                                 ?? context.Trigger.JobDataMap?.GetString("ReportScheduleId");
-
-            if (string.IsNullOrEmpty(scheduleId))
-            {
-                _logger.LogError("EndOfReportPeriodJob executed but no ReportScheduleId found in job data");
-                return;
-            }
             ReportSchedule? schedule = null;
             try
             {
