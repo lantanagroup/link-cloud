@@ -205,7 +205,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 try
                 {
-                    patientAggregator.AppendResourceToBlob(reportEntry.AggregateReportBlobName, operationOutcome);
+                    await patientAggregator.AppendResourceToBlob(reportEntry.AggregateReportBlobName, operationOutcome);
                 }
                 catch (Exception ex)
                 {

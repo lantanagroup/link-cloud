@@ -212,7 +212,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             foreach (var aggregateMeasureReport in aggregateResult.MeasureReportResults)
             {
-                var populationModel = await reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == result.Message.Value.ReportTrackingId && x.Measure == result.Message.Value.ReportType);
+                var populationModel = await reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == result.Message.Value.ReportTrackingId && x.ReportType == result.Message.Value.ReportType);
 
                 if (populationModel == null)
                 {
