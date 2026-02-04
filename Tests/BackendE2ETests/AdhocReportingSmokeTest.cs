@@ -941,35 +941,30 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         for (var retry = 0; retry < MaxRetryCount; retry++)
         {
             await ScrapeLokiErrorsAsync();
-            var request = new RestRequest($"/Report/summaries?facilityId={facilityId}", Method.Get);
+
+            var request = new RestRequest($"/schedules/{reportId}", Method.Get);
             var response = await AdminBffClient.ExecuteAsync(request);
 
             if (response.StatusCode == HttpStatusCode.OK && response.ContentType != null && response.ContentType.Contains("application/json") && response.Content != null)
             {
                 var jsonResponse = JObject.Parse(response.Content);
-                var records = jsonResponse["records"] as JArray;
 
-                if (records != null)
+                if (jsonResponse["status"]?.ToString() == "500")
                 {
-                    var foundReport = records.FirstOrDefault(r => r["id"]?.ToString() == reportId);
-
-                    if (foundReport == null)
-                    {
-                        output.WriteLine("Report not found, yet.");
-                    }
-                    else if (bool.Parse(foundReport["submitted"]?.ToString() ?? "false"))
-                    {
-                        output.WriteLine("Report submitted.");
-                        return true;
-                    }
-                    else
-                    {
-                        output.WriteLine("Report not submitted, yet.");
-                    }
+                    output.WriteLine("Report submitted.");
+                    return true;
+                }
+                else
+                {
+                    output.WriteLine("Found Report, but is not submitted.");
                 }
             }
+            else 
+            {
+                output.WriteLine("Report not found.");
+            }
 
-            output.WriteLine($"Report is not submitted. Retrying in {PollingIntervalSeconds} seconds...");
+            output.WriteLine($"Retrying in {PollingIntervalSeconds} seconds...");
             await Task.Delay(PollingIntervalSeconds * 1000);
         }
         output.WriteLine($"Report {reportId} was not submitted after {MaxRetryCount} retries.");
