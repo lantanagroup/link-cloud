@@ -1,42 +1,57 @@
-import { APP_INITIALIZER, NgModule } from '@angular/core';
-import { AuthConfig, OAuthModule, OAuthModuleConfig, OAuthService } from "angular-oauth2-oidc";
-import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
+import {APP_INITIALIZER, NgModule} from '@angular/core';
+import {AuthConfig, OAuthModule, OAuthModuleConfig, OAuthService} from "angular-oauth2-oidc";
+import {provideHttpClient, withInterceptorsFromDi} from "@angular/common/http";
 
-import { AppComponent } from './app.component';
-import { AppConfigService } from './services/app-config.service';
-import { AppRoutingModule } from './app-routing.module';
-import { AuthenticationService } from './services/security/authentication.service';
-import { BreadcrumbComponent } from "./components/core/breadcrumb/breadcrumb.component";
-import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
-import { BrowserModule } from '@angular/platform-browser';
-import { FooterComponent } from "./components/core/footer/footer.component";
-import { HttpInterceptorProviders } from './interceptors/interceptor.barrel';
-import { LayoutModule } from '@angular/cdk/layout';
-import { LinkNavBarComponent } from './components/core/link-nav-bar/link-nav-bar.component';
-import { LoadingIndicatorComponent } from './components/core/loading-indicator/loading-indicator.component';
-import { MatButtonModule } from '@angular/material/button';
-import { MatExpansionModule } from '@angular/material/expansion';
-import { MatIconModule } from '@angular/material/icon';
-import { MatListModule } from '@angular/material/list';
-import { MatMenuModule } from '@angular/material/menu';
-import { MatNativeDateModule } from '@angular/material/core';
-import { MatSidenavModule } from '@angular/material/sidenav';
-import { MatToolbarModule } from '@angular/material/toolbar';
-import { StyleManagerService } from './services/style-manager-service';
-import { SubPreQualReportBannerComponent } from './components/sub-pre-qual-report/sub-pre-qual-report-banner/sub-pre-qual-report-banner.component';
-import { SubPreQualReportCategoriesTableComponent } from './components/sub-pre-qual-report/sub-pre-qual-report-categories-table/sub-pre-qual-report-categories-table.component';
-import { SubPreQualReportComponent } from './components/sub-pre-qual-report/sub-pre-qual-report.component';
-import { SubPreQualReportMetaComponent } from './components/sub-pre-qual-report/sub-pre-qual-report-meta/sub-pre-qual-report-meta.component';
-import { SubPreQualReportSummaryComponent } from './components/sub-pre-qual-report/sub-pre-qual-report-summary/sub-pre-qual-report-summary.component';
-import { ThemePickerComponent } from './components/core/theme-picker/theme-picker.component';
-import { ToastrModule } from 'ngx-toastr';
-import { VdButtonComponent } from './components/core/vd-button/vd-button.component';
-import { VdIconComponent } from './components/core/vd-icon/vd-icon.component';
-import { provideCharts, withDefaultRegisterables } from 'ng2-charts';
-import { TenantSearchBarComponent } from "./components/core/tenant-search-bar/tenant-search-bar/tenant-search-bar.component";
-import { QueryPlansDashboardComponent } from './components/query-plans/query-plans-dashboard/query-plans-dashboard.component';
-import { AppConfigurationDashboardComponent } from './components/app-configuration/app-configuration-dashboard/app-configuration-dashboard.component';
-import { KafkaDashboardComponent } from './components/kafka/kafka-dashboard/kafka-dashboard.component';
+import {AppComponent} from './app.component';
+import {AppConfigService} from './services/app-config.service';
+import {AppRoutingModule} from './app-routing.module';
+import {AuthenticationService} from './services/security/authentication.service';
+import {BreadcrumbComponent} from "./components/core/breadcrumb/breadcrumb.component";
+import {BrowserAnimationsModule} from '@angular/platform-browser/animations';
+import {BrowserModule} from '@angular/platform-browser';
+import {FooterComponent} from "./components/core/footer/footer.component";
+import {HttpInterceptorProviders} from './interceptors/interceptor.barrel';
+import {LayoutModule} from '@angular/cdk/layout';
+import {LinkNavBarComponent} from './components/core/link-nav-bar/link-nav-bar.component';
+import {LoadingIndicatorComponent} from './components/core/loading-indicator/loading-indicator.component';
+import {MatButtonModule} from '@angular/material/button';
+import {MatExpansionModule} from '@angular/material/expansion';
+import {MatIconModule} from '@angular/material/icon';
+import {MatListModule} from '@angular/material/list';
+import {MatMenuModule} from '@angular/material/menu';
+import {MatNativeDateModule} from '@angular/material/core';
+import {MatSidenavModule} from '@angular/material/sidenav';
+import {MatToolbarModule} from '@angular/material/toolbar';
+import {StyleManagerService} from './services/style-manager-service';
+import {
+  SubPreQualReportBannerComponent
+} from './components/sub-pre-qual-report/sub-pre-qual-report-banner/sub-pre-qual-report-banner.component';
+import {
+  SubPreQualReportCategoriesTableComponent
+} from './components/sub-pre-qual-report/sub-pre-qual-report-categories-table/sub-pre-qual-report-categories-table.component';
+import {SubPreQualReportComponent} from './components/sub-pre-qual-report/sub-pre-qual-report.component';
+import {
+  SubPreQualReportMetaComponent
+} from './components/sub-pre-qual-report/sub-pre-qual-report-meta/sub-pre-qual-report-meta.component';
+import {
+  SubPreQualReportSummaryComponent
+} from './components/sub-pre-qual-report/sub-pre-qual-report-summary/sub-pre-qual-report-summary.component';
+import {ThemePickerComponent} from './components/core/theme-picker/theme-picker.component';
+import {ToastrModule} from 'ngx-toastr';
+import {VdButtonComponent} from './components/core/vd-button/vd-button.component';
+import {VdIconComponent} from './components/core/vd-icon/vd-icon.component';
+import {provideCharts, withDefaultRegisterables} from 'ng2-charts';
+import {
+  TenantSearchBarComponent
+} from "./components/core/tenant-search-bar/tenant-search-bar/tenant-search-bar.component";
+import {
+  QueryPlansDashboardComponent
+} from './components/query-plans/query-plans-dashboard/query-plans-dashboard.component';
+import {
+  AppConfigurationDashboardComponent
+} from './components/app-configuration/app-configuration-dashboard/app-configuration-dashboard.component';
+import {KafkaDashboardComponent} from './components/kafka/kafka-dashboard/kafka-dashboard.component';
+import {TerminologyConfigComponent} from './components/terminology/terminology-config.component';
 
 export function initConfig(appConfig: AppConfigService, oauthService: OAuthService, authService: AuthenticationService, oauthModuleConfig: OAuthModuleConfig) {
   const configPromise = appConfig.loadConfig()
@@ -109,7 +124,8 @@ export function initConfig(appConfig: AppConfigService, oauthService: OAuthServi
     TenantSearchBarComponent,
     QueryPlansDashboardComponent,
     AppConfigurationDashboardComponent,
-    KafkaDashboardComponent
+    KafkaDashboardComponent,
+    TerminologyConfigComponent
 ],
   providers: [
     {

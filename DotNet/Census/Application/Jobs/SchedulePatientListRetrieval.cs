@@ -1,6 +1,7 @@
 ﻿using Census.Domain.Entities;
 using Confluent.Kafka;
 using LantanaGroup.Link.Census.Application.Settings;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
 using Quartz;
 
@@ -21,7 +22,8 @@ public class SchedulePatientListRetrieval : IJob
     public async Task Execute(IJobExecutionContext context)
     {
         //get facility
-        var facility = (CensusConfigEntity)context.JobDetail.JobDataMap.Get(CensusConstants.Scheduler.Facility);
+        var facility = context.JobDetail.JobDataMap.GetObject<CensusConfigEntity>(CensusConstants.Scheduler.Facility);
+
         _logger.LogDebug("Triggering {Topic} for facility: {FacilityId}", KafkaTopic.PatientCensusScheduled.ToString(), facility.FacilityID);
 
         // Skip execution if facility is disabled
