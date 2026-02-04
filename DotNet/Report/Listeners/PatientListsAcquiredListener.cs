@@ -24,6 +24,8 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ITransientExceptionHandler<string, PatientListMessage> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, PatientListMessage> _deadLetterExceptionHandler;
         private readonly IServiceScopeFactory _serviceScopeFactory;
+        private readonly ServiceInformation _serviceInformation;
+
         private string Name => this.GetType().Name;
 
         public PatientListsAcquiredListener(
@@ -31,19 +33,18 @@ namespace LantanaGroup.Link.Report.Listeners
             IKafkaConsumerFactory<string, PatientListMessage> kafkaConsumerFactory,
             ITransientExceptionHandler<string, PatientListMessage> transientExceptionHandler,
             IDeadLetterExceptionHandler<string, PatientListMessage> deadLetterExceptionHandler, 
-            IServiceScopeFactory serviceScopeFactory)
+            IServiceScopeFactory serviceScopeFactory, ServiceInformation serviceInformation)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _serviceScopeFactory = serviceScopeFactory;
+            _serviceInformation = serviceInformation;
 
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
-            _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _transientExceptionHandler.Topic = KafkaTopic.PatientListsAcquiredRetry.GetStringValue();
 
-            _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.PatientListsAcquired) + "-Error";
         }
 
@@ -56,7 +57,7 @@ namespace LantanaGroup.Link.Report.Listeners
         {
             var consumerConfig = new ConsumerConfig()
             {
-                GroupId = ReportConstants.ServiceName,
+                GroupId = _serviceInformation.ServiceConfigName,
                 EnableAutoCommit = false
             };
 

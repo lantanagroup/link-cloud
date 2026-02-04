@@ -52,7 +52,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.AuditEvent
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 _logger.LogAuditEventCreationException(ex.Message, model);
                 throw;
             }              

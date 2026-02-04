@@ -1,9 +1,11 @@
 ﻿using Azure.Identity;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace LantanaGroup.Link.Shared.Application.Extensions;
 
@@ -42,5 +44,41 @@ public static class ExternalConfigurationExtension
         }
 
         return builder;
+    }
+
+    public static ServiceInformation SetupServiceInformation(this IHostApplicationBuilder builder, string serviceName, string assemblyVersion)
+    {
+        var connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
+
+        return SetupServiceInformation(builder, serviceName, assemblyVersion, connectionString);
+    }
+
+    public static ServiceInformation SetupServiceInformation(this IHostApplicationBuilder builder, string serviceName, string assemblyVersion, string? connectionString)
+    {
+        if (string.IsNullOrEmpty(serviceName))
+        {
+            throw new NullReferenceException("Service Name is required.");
+        }
+
+        if (string.IsNullOrEmpty(assemblyVersion))
+        {
+            throw new NullReferenceException("Assembly Version is required.");
+        }
+
+        var serviceInformation = builder.Configuration.GetRequiredSection(ServiceInformation.SectionName).Get<ServiceInformation>();
+
+        if (serviceInformation != null)
+        {
+            serviceInformation!.ServiceConfigName = serviceName;
+            serviceInformation.ConnectionString = connectionString;
+            builder.Services.AddSingleton<ServiceInformation>(serviceInformation);
+            ServiceActivitySource.Initialize(assemblyVersion, serviceInformation);
+        }
+        else
+        {
+            throw new NullReferenceException("Service Information was null.");
+        }
+
+        return serviceInformation;
     }
 }

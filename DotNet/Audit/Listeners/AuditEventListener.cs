@@ -34,11 +34,9 @@ namespace LantanaGroup.Link.Audit.Listeners
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentNullException(nameof(transientExceptionHandler));
 
             //configure deadletter exception handlers
-            _deadLetterExceptionHandler.ServiceName = AuditConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.AuditableEventOccurred) + "-Error";
 
             //configure transient exception handler
-            _transientExceptionHandler.ServiceName = AuditConstants.ServiceName;
             _transientExceptionHandler.Topic = nameof(KafkaTopic.AuditableEventOccurred) + "-Retry";            
         }
 
@@ -80,7 +78,7 @@ namespace LantanaGroup.Link.Audit.Listeners
                             catch (DeadLetterException ex)
                             {
                                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                                Activity.Current?.RecordException(ex);
+                                Activity.Current?.AddException(ex);
 
                                 //TODO: may need to make dead letter exception handler accept nulls as that is a possibility for throwing a dead letter exception
                                 _deadLetterExceptionHandler.HandleException(result, ex, result?.Message.Key);                                   
@@ -89,7 +87,7 @@ namespace LantanaGroup.Link.Audit.Listeners
                             catch (TransientException ex)
                             {
                                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                                Activity.Current?.RecordException(ex);                                   
+                                Activity.Current?.AddException(ex);                                   
                                 _transientExceptionHandler.HandleException(result, ex, result.Message.Key);
                                 _consumer.Commit(result);
                             }      
@@ -97,7 +95,7 @@ namespace LantanaGroup.Link.Audit.Listeners
                         catch (ConsumeException ex)
                         {
                             Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                            Activity.Current?.RecordException(ex);
+                            Activity.Current?.AddException(ex);
                             _logger.LogConsumerException(nameof(KafkaTopic.AuditableEventOccurred), ex.Message);
 
                             if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
@@ -121,7 +119,7 @@ namespace LantanaGroup.Link.Audit.Listeners
                 catch(OperationCanceledException oce)
                 {
                     Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                    Activity.Current?.RecordException(oce);
+                    Activity.Current?.AddException(oce);
                     _logger.LogOperationCanceledException(nameof(KafkaTopic.AuditableEventOccurred), oce.Message);
                     _consumer.Close();
                     _consumer.Dispose();

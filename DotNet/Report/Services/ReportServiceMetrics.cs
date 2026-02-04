@@ -1,16 +1,14 @@
 ﻿using LantanaGroup.Link.Report.Application.Interfaces;
-using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Models;
 using System.Diagnostics.Metrics;
 
 namespace LantanaGroup.Link.Report.Services
 {
     public class ReportServiceMetrics : IReportServiceMetrics
     {
-        public const string MeterName = $"Link.{ReportConstants.ServiceName}";
-
-        public ReportServiceMetrics(IMeterFactory meterFactory)
+        public ReportServiceMetrics(IMeterFactory meterFactory, ServiceInformation serviceInformation)
         {
-            Meter meter = meterFactory.Create(MeterName);
+            Meter meter = meterFactory.Create($"Link.{serviceInformation.ServiceConfigName}");
             ReportGeneratedCounter = meter.CreateCounter<long>("link_report_service.report_generated.count");
         }
 
