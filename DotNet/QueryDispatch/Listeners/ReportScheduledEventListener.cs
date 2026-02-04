@@ -42,10 +42,8 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
             _consumeResultDeadLetterExceptionHandler = consumeResultDeadLetterExceptionHandler;
             _serviceScopeFactory = serviceScopeFactory;
 
-            _deadLetterExceptionHandler.ServiceName = "QueryDispatch";
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ReportScheduled) + "-Error";
 
-            _consumeResultDeadLetterExceptionHandler.ServiceName = "QueryDispatch";
             _consumeResultDeadLetterExceptionHandler.Topic = nameof(KafkaTopic.ReportScheduled) + "-Error";
         }
 
