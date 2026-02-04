@@ -206,8 +206,14 @@ public class ArtifactService {
             }
         }
 
-        resources.sort(Comparator.comparing(PackageDetailsModel.Resource::getResourceType)
-                .thenComparing(PackageDetailsModel.Resource::getId));
+        resources
+                .sort(
+                        Comparator.comparing(PackageDetailsModel.Resource::getResourceType)
+                                .thenComparing(
+                                        PackageDetailsModel.Resource::getId,
+                                        Comparator.nullsLast(Comparator.naturalOrder())
+                                )
+                );
         model.setResources(resources);
 
         return model;

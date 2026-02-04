@@ -171,7 +171,9 @@ export class ValidationConfigComponent implements OnInit {
     });
   }
 
-  openPackageDetails(packageName: string): void {
+  openPackageDetails(packageName: string, event: MouseEvent): void {
+    event.preventDefault(); // prevent page jump
+
     this.dialog.open(PackageDetailsDialogComponent, {
       width: '85%',
       maxWidth: '1000px',

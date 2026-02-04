@@ -48,7 +48,7 @@
       @for (ig of implementationGuides; track ig) {
         <mat-list-item>
           @if (ig.type === 'PACKAGE') {
-            <a (click)="openPackageDetails(ig.name)">{{ ig.name }}</a> (package)
+            <a href="#" (click)="openPackageDetails(ig.name, $event)">{{ ig.name }}</a> (package)
           }
           @else {
             <span>{{ig.name}} (resource)</span>
