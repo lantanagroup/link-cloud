@@ -98,7 +98,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
 
                                 using var scope = _serviceScopeFactory.CreateScope();
-                                var measureReportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+                                var reportScheduleManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
 
                                 facilityId = key;
                                 var startDate = value.StartDate.UtcDateTime;
@@ -113,7 +113,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 if (!string.IsNullOrEmpty(reportId))
                                 {
                                     _logger.LogDebug($"Report ID is not null. Checking if the report already exists.");
-                                    existing = await measureReportScheduledManager.SingleOrDefaultAsync(
+                                    existing = await reportScheduleManager.SingleOrDefaultAsync(
                                         x => x.Id == reportId, consumeCancellationToken);
                                 }
                                 else
@@ -145,7 +145,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     var reportName = _blobStorageService.GetReportName(reportSchedule);
                                     reportSchedule.PayloadRootUri = _blobStorageService.GetUri(reportName)?.ToString();
 
-                                    reportSchedule = await measureReportScheduledManager.AddAsync(reportSchedule, consumeCancellationToken);
+                                    reportSchedule = await reportScheduleManager.AddAsync(reportSchedule, consumeCancellationToken);
 
                                     await MeasureReportScheduleService.CreateJobAndTrigger(reportSchedule,
                                         await _schedulerFactory.GetScheduler(consumeCancellationToken));

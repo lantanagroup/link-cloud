@@ -28,4 +28,7 @@ public class ReportSchedule
     public Frequency Frequency { get; set; }
     public string? PayloadRootUri { get; set; }
     public ScheduleStatus Status { get; set; } = ScheduleStatus.New;
+    
+    // New soft-delete flag
+    public bool? IsDeleted { get; set; } = false;
 }

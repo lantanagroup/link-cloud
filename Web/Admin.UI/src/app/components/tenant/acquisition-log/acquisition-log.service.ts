@@ -138,7 +138,9 @@ export class AcquisitionLogService {
   }
 
   getAcquisitionLogStatistics(reportId: string): Observable<IDataAcquisitionLogStatistics> {
-    return this.http.get<IDataAcquisitionLogStatistics>(`${this.baseUrl}/report/${reportId}/statistics`)
+    const headers = new HttpHeaders({ 'X-Skip-Loading': 'true' });
+    
+    return this.http.get<IDataAcquisitionLogStatistics>(`${this.baseUrl}/report/${reportId}/statistics`, { headers: headers })
       .pipe(
         map((response: IDataAcquisitionLogStatistics) => {
           return response;

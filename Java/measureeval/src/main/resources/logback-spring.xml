@@ -10,6 +10,8 @@
         </encoder>
     </appender>
 
+    <logger name="org.apache.kafka.clients.producer.ProducerConfig" level="WARN" />
+
     <if condition='property("loki.enabled").equalsIgnoreCase("true")'>
         <then>
             <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
