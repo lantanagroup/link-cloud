@@ -1,169 +1,222 @@
-<div class="dialog-header">
-  <h2>{{ title }}</h2>
-  <button type="button" class="close-button" (click)="onClose()">
-    <fa-icon [icon]="faXmark"></fa-icon>
-  </button>
+<div class="link-dialog-header">
+  <div class="link-dialog-title">
+    {{title}}
+  </div>
+  <div class="link-dialog-button">
+    <button class="link-button light" (click)="onClose()">
+      <fa-icon [icon]="faXmark"></fa-icon>
+    </button>
+  </div>
 </div>
+<div class="link-dialog-content">
 
-<mat-dialog-content>
-  <div class="log-details">
-    <!-- Summary Section -->
-    <div class="detail-section">
-      <h3>Summary</h3>
-      <div class="detail-grid">
-        <div class="detail-item">
-          <span class="label">External ID</span>
-          <span class="value">{{ log.externalId }}</span>
+  <div class="link-card" style="margin-top: none; border-radius: .375em;">
+
+    <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          External ID:
+          <span class="data-value selectable-value" style="display: inline;">{{log.externalId}}</span>
         </div>
-        <div class="detail-item">
-          <span class="label">Facility</span>
-          <span class="value">{{ log.facilityId }}</span>
+      </div>
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Facility:
+          <span class="data-value selectable-value" style="display: inline;">{{log.facilityId}}</span>
         </div>
-        <div class="detail-item">
-          <span class="label">Acquisition Type</span>
-          <span class="value">{{ log.acquisitionType }}</span>
-        </div>
-        <div class="detail-item">
-          <span class="label">Status</span>
-          <span class="value" [ngClass]="getStatusClass(log.status)">{{ log.status }}</span>
-        </div>
-        @if (log.status === 'ConfigurationRequired') {
-          <div class="detail-item full-width">
-            <div class="config-warning">
-              <fa-icon [icon]="faExclamationTriangle"></fa-icon>
-              <span>This log requires configuration to be added before it can be processed. Once configuration is in place, use the Reset button to retry.</span>
-            </div>
-          </div>
-        }
-        <div class="detail-item">
-          <span class="label">Scheduled Date</span>
-          <span class="value">{{ log.scheduledDate ? (log.scheduledDate | date:'medium') : 'Immediate' }}</span>
-        </div>
-        <div class="detail-item">
-          <span class="label">Process Date</span>
-          <span class="value">{{ log.processDate ? (log.processDate | date:'medium') : 'Not processed' }}</span>
-        </div>
-        <div class="detail-item">
-          <span class="label">Retry Attempts</span>
-          <span class="value">{{ log.retryAttempts || 0 }}</span>
+      </div>
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Acquisition Type:
+          <span class="data-value" style="display: inline;">{{log.acquisitionType}}</span>
         </div>
       </div>
     </div>
 
-    <!-- Files Section -->
-    <div class="detail-section">
-      <h3>
-        <fa-icon [icon]="faFile"></fa-icon>
-        Files Processed ({{ log.fileNames?.length || 0 }})
-      </h3>
+    <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Status:
+          <span class="data-value" style="display: inline;">{{log.status}}</span>
+        </div>
+      </div>
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Scheduled Date:
+          <span class="data-value" style="display: inline;">{{log.scheduledDate ? (log.scheduledDate | date:'short') : 'Immediate'}}</span>
+        </div>
+      </div>
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Process Date:
+          <span class="data-value" style="display: inline;">{{log.processDate ? (log.processDate | date:'short') : 'Not processed'}}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Retry Attempts:
+          <span class="data-value" style="display: inline;">{{log.retryAttempts || 0}}</span>
+        </div>
+      </div>
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Files Processed:
+          <span class="data-value" style="display: inline;">{{log.fileNames?.length || 0}}</span>
+        </div>
+      </div>
+      <div style="flex: 1;">
+      </div>
+    </div>
+
+    @if (log.status === 'ConfigurationRequired') {
+      <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
+        <div style="flex: 1;">
+          <div class="config-warning">
+            <fa-icon [icon]="faExclamationTriangle"></fa-icon>
+            <span>This log requires configuration to be added before it can be processed. Once configuration is in place, use the Reset button to retry.</span>
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (isResettable()) {
+      <div class="link-card-row" style="justify-content: flex-end; margin-bottom: 2em;">
+        <button class="link-button primary" (click)="resetLog()" [disabled]="isResetting">
+          <fa-icon [icon]="faRefresh"></fa-icon>
+          {{ isResetting ? 'Resetting...' : 'Reset for Retry' }}
+        </button>
+      </div>
+    }
+
+  </div>
+
+  <!-- Files Section -->
+  <div class="link-card" style="border-radius: .375em; margin-top: 2em;">
+    <div class="link-dialog-section-header">
+      Files Processed
+    </div>
+    <div>
       @if (log.fileNames && log.fileNames.length > 0) {
-        <ul class="file-list">
+        <ul>
           @for (fileName of log.fileNames; track fileName) {
-            <li>{{ fileName }}</li>
+            <li>
+              <span class="data-value selectable-value">{{fileName}}</span>
+            </li>
           }
         </ul>
       } @else {
-        <p class="empty-message">No files processed yet.</p>
+        <div class="no-results">
+          <p class="no-results-subtext">No files processed yet.</p>
+        </div>
       }
     </div>
+  </div>
 
-    <!-- Benchmarks Section -->
-    @if (log.benchmarks && log.benchmarks.length > 0) {
-      <div class="detail-section">
-        <h3>
-          <fa-icon [icon]="faClock"></fa-icon>
-          Performance Benchmarks
-        </h3>
-        <mat-accordion>
-          @for (benchmark of log.benchmarks; track benchmark.attemptNumber) {
-            <mat-expansion-panel>
-              <mat-expansion-panel-header>
-                <mat-panel-title>
-                  Attempt #{{ benchmark.attemptNumber + 1 }}
-                  @if (benchmark.isSuccessful) {
-                    <fa-icon [icon]="faCheck" class="success-icon"></fa-icon>
-                  } @else {
-                    <fa-icon [icon]="faExclamationTriangle" class="failure-icon"></fa-icon>
-                  }
-                </mat-panel-title>
-                <mat-panel-description>
-                  Total: {{ formatDuration(benchmark.totalDurationMs) }}
-                </mat-panel-description>
-              </mat-expansion-panel-header>
-
-              <div class="benchmark-details">
-                <div class="benchmark-item">
-                  <span class="label">Started At</span>
-                  <span class="value">{{ benchmark.attemptStartedAt | date:'medium' }}</span>
-                </div>
-                <div class="benchmark-item">
-                  <span class="label">Connection & Retrieval</span>
-                  <span class="value">{{ formatDuration(benchmark.connectionAndRetrievalDurationMs) }}</span>
-                </div>
-                <div class="benchmark-item">
-                  <span class="label">Parse Duration</span>
-                  <span class="value">{{ formatDuration(benchmark.parseDurationMs) }}</span>
-                </div>
-                <div class="benchmark-item">
-                  <span class="label">Overhead</span>
-                  <span class="value">{{ formatDuration(benchmark.overheadDurationMs) }}</span>
-                </div>
-                <div class="benchmark-item">
-                  <span class="label">Items Processed</span>
-                  <span class="value">{{ benchmark.itemsProcessed }}</span>
-                </div>
-                <div class="benchmark-item">
-                  <span class="label">Total Duration</span>
-                  <span class="value">{{ formatDuration(benchmark.totalDurationMs) }}</span>
-                </div>
-              </div>
-            </mat-expansion-panel>
-          }
-        </mat-accordion>
+  <!-- Benchmarks Section -->
+  @if (log.benchmarks && log.benchmarks.length > 0) {
+    <div class="link-card" style="border-radius: .375em; margin-top: 2em;">
+      <div class="link-dialog-section-header">
+        Performance Benchmarks
       </div>
-    }
+      <mat-accordion>
+        @for (benchmark of log.benchmarks; track benchmark.attemptNumber) {
+          <mat-expansion-panel>
+            <mat-expansion-panel-header>
+              <mat-panel-title>
+                Attempt #{{ benchmark.attemptNumber + 1 }}
+                @if (benchmark.isSuccessful) {
+                  <fa-icon [icon]="faCheck" class="success-icon"></fa-icon>
+                } @else {
+                  <fa-icon [icon]="faExclamationTriangle" class="failure-icon"></fa-icon>
+                }
+              </mat-panel-title>
+              <mat-panel-description>
+                Total: {{ formatDuration(benchmark.totalDurationMs) }}
+              </mat-panel-description>
+            </mat-expansion-panel-header>
 
-    <!-- Notes Section -->
-    @if (log.notes && log.notes.length > 0) {
-      <div class="detail-section">
-        <h3>Notes</h3>
-        <ul class="notes-list">
+            <div class="benchmark-details">
+              <div class="benchmark-item">
+                <span class="data-label">Started At</span>
+                <span class="data-value">{{ benchmark.attemptStartedAt | date:'medium' }}</span>
+              </div>
+              <div class="benchmark-item">
+                <span class="data-label">Connection & Retrieval</span>
+                <span class="data-value">{{ formatDuration(benchmark.connectionAndRetrievalDurationMs) }}</span>
+              </div>
+              <div class="benchmark-item">
+                <span class="data-label">Parse Duration</span>
+                <span class="data-value">{{ formatDuration(benchmark.parseDurationMs) }}</span>
+              </div>
+              <div class="benchmark-item">
+                <span class="data-label">Overhead</span>
+                <span class="data-value">{{ formatDuration(benchmark.overheadDurationMs) }}</span>
+              </div>
+              <div class="benchmark-item">
+                <span class="data-label">Items Processed</span>
+                <span class="data-value">{{ benchmark.itemsProcessed }}</span>
+              </div>
+              <div class="benchmark-item">
+                <span class="data-label">Total Duration</span>
+                <span class="data-value">{{ formatDuration(benchmark.totalDurationMs) }}</span>
+              </div>
+            </div>
+          </mat-expansion-panel>
+        }
+      </mat-accordion>
+    </div>
+  }
+
+  <!-- Notes Section -->
+  <div class="link-card" style="border-radius: .375em; margin-top: 2em;">
+    <div class="link-dialog-section-header">
+      Notes
+    </div>
+    <div>
+      @if (log.notes && log.notes.length > 0) {
+        <ul>
           @for (note of log.notes; track note) {
-            <li>{{ note }}</li>
+            <li>
+              <span class="data-value">{{note}}</span>
+            </li>
           }
         </ul>
-      </div>
-    }
-
-    <!-- Tracing Section -->
-    @if (log.originatingTraceId || log.originatingSpanId) {
-      <div class="detail-section">
-        <h3>Tracing</h3>
-        <div class="detail-grid">
-          @if (log.originatingTraceId) {
-            <div class="detail-item">
-              <span class="label">Trace ID</span>
-              <span class="value monospace">{{ log.originatingTraceId }}</span>
-            </div>
-          }
-          @if (log.originatingSpanId) {
-            <div class="detail-item">
-              <span class="label">Span ID</span>
-              <span class="value monospace">{{ log.originatingSpanId }}</span>
-            </div>
-          }
+      } @else {
+        <div class="no-results">
+          <p class="no-results-subtext">No notes recorded.</p>
         </div>
-      </div>
-    }
+      }
+    </div>
   </div>
-</mat-dialog-content>
 
-<mat-dialog-actions align="end">
-  @if (isResettable()) {
-    <button mat-raised-button color="primary" (click)="resetLog()" [disabled]="isResetting">
-      <fa-icon [icon]="faRefresh"></fa-icon>
-      {{ isResetting ? 'Resetting...' : 'Reset for Retry' }}
-    </button>
+  <!-- Tracing Section -->
+  @if (log.originatingTraceId || log.originatingSpanId) {
+    <div class="link-card" style="border-radius: .375em; margin-top: 2em;">
+      <div class="link-dialog-section-header">
+        Tracing
+      </div>
+      <div class="link-card-row" style="justify-content: flex-start;">
+        @if (log.originatingTraceId) {
+          <div style="flex: 1;">
+            <div class="data-label inline-label">
+              Trace ID:
+              <span class="data-value selectable-value" style="display: inline; font-family: monospace;">{{log.originatingTraceId}}</span>
+            </div>
+          </div>
+        }
+        @if (log.originatingSpanId) {
+          <div style="flex: 1;">
+            <div class="data-label inline-label">
+              Span ID:
+              <span class="data-value selectable-value" style="display: inline; font-family: monospace;">{{log.originatingSpanId}}</span>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
   }
-  <button mat-raised-button (click)="onClose()">Close</button>
-</mat-dialog-actions>
+
+</div>

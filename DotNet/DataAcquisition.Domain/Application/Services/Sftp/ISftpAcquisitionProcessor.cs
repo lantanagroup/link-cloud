@@ -29,12 +29,14 @@ public interface ISftpAcquisitionProcessor
     /// <param name="sftpConfig">The SFTP server configuration including host, port, and connection settings.</param>
     /// <param name="acquisitionConfig">The acquisition-specific configuration including remote directory and file patterns.</param>
     /// <param name="cancellationToken">Token to cancel the asynchronous operation.</param>
+    /// <param name="benchmark">Optional benchmark collector for performance metrics.</param>
     /// <returns>A list of file names that were successfully processed.</returns>
     Task<List<string>> ProcessAsync(
         SftpAcquisitionLog log,
         SftpConfigurationModel sftpConfig,
         SftpAcquisitionTypeConfiguration acquisitionConfig,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        SftpBenchmarkCollector? benchmark = null);
 
     /// <summary>
     /// Processes an SFTP acquisition log entry using a provided SFTP session.
@@ -47,11 +49,13 @@ public interface ISftpAcquisitionProcessor
     /// <param name="sftpConfig">The SFTP server configuration including host, port, and connection settings.</param>
     /// <param name="acquisitionConfig">The acquisition-specific configuration including remote directory and file patterns.</param>
     /// <param name="cancellationToken">Token to cancel the asynchronous operation.</param>
+    /// <param name="benchmark">Optional benchmark collector for performance metrics.</param>
     /// <returns>A list of file names that were successfully processed.</returns>
     Task<List<string>> ProcessWithSessionAsync(
         SftpAcquisitionLog log,
         ISftpSession session,
         SftpConfigurationModel sftpConfig,
         SftpAcquisitionTypeConfiguration acquisitionConfig,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        SftpBenchmarkCollector? benchmark = null);
 }

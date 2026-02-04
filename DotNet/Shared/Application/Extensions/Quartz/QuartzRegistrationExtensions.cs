@@ -24,7 +24,7 @@ public static class QuartzRegistrationExtensions
                 {
                     sqlServerOptions.UseDriverDelegate<SqlServerDelegate>();
                     sqlServerOptions.ConnectionString = connectionString;
-                    sqlServerOptions.TablePrefix = "QRTZ_";
+                    sqlServerOptions.TablePrefix = "quartz.QRTZ_";
                 });
                 c.UseSystemTextJsonSerializer();
             });

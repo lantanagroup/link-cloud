@@ -240,8 +240,15 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
         using var activity = Activity.Current?.Source.StartActivity();
         activity?.SetTag(DiagnosticNames.EntityId, id);
 
+        var now = DateTime.UtcNow;
+
+        // Accept logs that are either:
+        // 1. Pending status (new logs ready to process)
+        // 2. Failed status with ScheduledDate in the past (retries ready to process)
         var log = await database.SftpAcquisitionLogRepository.FirstOrDefaultAsync(
-            x => x.Id == id && x.Status == RequestStatus.Pending,
+            x => x.Id == id &&
+                 (x.Status == RequestStatus.Pending ||
+                  (x.Status == RequestStatus.Failed && (x.ScheduledDate == null || x.ScheduledDate <= now))),
             cancellationToken);
 
         if (log is null) return false;
