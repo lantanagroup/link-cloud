@@ -143,6 +143,35 @@
   color: #4caf50;
 }
 
-.status-failed, .status-maxRetryReached {
+.status-failed, .status-maxRetryReached, .status-configurationRequired {
   color: #ff5252;
+}
+
+.full-width {
+  grid-column: 1 / -1;
+}
+
+.config-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  background-color: #fff3e0;
+  border: 1px solid #ffb74d;
+  border-radius: 4px;
+  color: #e65100;
+  font-size: 0.875rem;
+
+  fa-icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+}
+
+mat-dialog-actions {
+  button {
+    fa-icon {
+      margin-right: 4px;
+    }
+  }
 }

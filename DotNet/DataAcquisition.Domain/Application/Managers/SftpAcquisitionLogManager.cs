@@ -84,6 +84,29 @@ public interface ISftpAcquisitionLogManager
     /// <param name="id">The internal database ID of the log.</param>
     /// <param name="cancellationToken">Token to cancel the asynchronous operation.</param>
     Task SetMaxRetriesReachedAsync(long id, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Marks a log as requiring configuration before it can be processed.
+    /// Logs in this state will not be picked up for automatic retry and require
+    /// manual intervention to fix the configuration issue.
+    /// </summary>
+    /// <param name="id">The internal database ID of the log.</param>
+    /// <param name="errorMessage">The error message describing the missing configuration.</param>
+    /// <param name="cancellationToken">Token to cancel the asynchronous operation.</param>
+    Task SetConfigurationRequiredAsync(long id, string errorMessage, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Resets a log to pending status for retry after configuration has been fixed.
+    /// This operation is only allowed for logs in <see cref="RequestStatus.ConfigurationRequired"/>
+    /// or <see cref="RequestStatus.MaxRetriesReached"/> status.
+    /// </summary>
+    /// <param name="id">The internal database ID of the log.</param>
+    /// <param name="cancellationToken">Token to cancel the asynchronous operation.</param>
+    /// <returns>
+    /// <c>true</c> if the log was successfully reset;
+    /// <c>false</c> if the log was not found or is not in a resettable state.
+    /// </returns>
+    Task<bool> ResetForRetryAsync(long id, CancellationToken cancellationToken);
 }
 
 
@@ -318,5 +341,58 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
 
         await database.SaveChangesAsync();
         logger.LogError("SFTP acquisition log {LogId} reached maximum retry attempts", id);
+    }
+
+    /// <inheritdoc/>
+    public async Task SetConfigurationRequiredAsync(long id, string errorMessage, CancellationToken cancellationToken)
+    {
+        using var activity = Activity.Current?.Source.StartActivity();
+        activity?.SetTag(DiagnosticNames.EntityId, id);
+
+        var log = await database.SftpAcquisitionLogRepository.GetAsync(id, cancellationToken);
+        if (log is null)
+        {
+            logger.LogWarning("SFTP acquisition log {LogId} not found for configuration required update", id);
+            return;
+        }
+
+        log.Status = RequestStatus.ConfigurationRequired;
+        log.Notes.Add($"[{DateTime.UtcNow:O}] Configuration required: {errorMessage}");
+
+        await database.SaveChangesAsync();
+        logger.LogWarning("SFTP acquisition log {LogId} marked as configuration required: {Error}", id, errorMessage);
+    }
+
+    /// <inheritdoc/>
+    public async Task<bool> ResetForRetryAsync(long id, CancellationToken cancellationToken)
+    {
+        using var activity = Activity.Current?.Source.StartActivity();
+        activity?.SetTag(DiagnosticNames.EntityId, id);
+
+        var log = await database.SftpAcquisitionLogRepository.GetAsync(id, cancellationToken);
+        if (log is null)
+        {
+            logger.LogWarning("SFTP acquisition log {LogId} not found for reset", id);
+            return false;
+        }
+
+        // Only allow reset from terminal states that require intervention
+        if (log.Status != RequestStatus.ConfigurationRequired && log.Status != RequestStatus.MaxRetriesReached)
+        {
+            logger.LogWarning(
+                "SFTP acquisition log {LogId} cannot be reset from status {Status}. Only ConfigurationRequired or MaxRetriesReached logs can be reset.",
+                id, log.Status);
+            return false;
+        }
+
+        var previousStatus = log.Status;
+        log.Status = RequestStatus.Pending;
+        log.RetryAttempts = 0;
+        log.ScheduledDate = null;
+        log.Notes.Add($"[{DateTime.UtcNow:O}] Reset for retry from {previousStatus} status.");
+
+        await database.SaveChangesAsync();
+        logger.LogInformation("SFTP acquisition log {LogId} reset for retry from {PreviousStatus} status", id, previousStatus);
+        return true;
     }
 }

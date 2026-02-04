@@ -28,6 +28,13 @@ public class SftpSession : ISftpSession
         ObjectDisposedException.ThrowIf(_disposed, this);
         cancellationToken.ThrowIfCancellationRequested();
 
+        // Verify the remote directory exists before attempting to list
+        if (!_client.Exists(remoteDirectory))
+        {
+            throw new InvalidOperationException(
+                $"Remote directory '{remoteDirectory}' does not exist. Please verify the SFTP configuration.");
+        }
+
         var files = _client.ListDirectory(remoteDirectory)
             .Where(f => !f.IsDirectory && MatchesPattern(f.Name, fileNamePattern))
             .OrderBy(f => f.LastWriteTime)

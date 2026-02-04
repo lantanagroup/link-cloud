@@ -2,10 +2,11 @@ import { Component, Inject, OnInit } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
 import { CommonModule } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faXmark, faFile, faClock, faCheck, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
+import { faXmark, faFile, faClock, faCheck, faExclamationTriangle, faRefresh } from '@fortawesome/free-solid-svg-icons';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatButtonModule } from '@angular/material/button';
 import { SftpAcquisitionLog } from '../models/sftp-acquisition-log';
+import { SftpAcquisitionLogService } from '../sftp-acquisition-log.service';
 
 @Component({
   selector: 'app-sftp-acquisition-log-details',
@@ -26,16 +27,19 @@ export class SftpAcquisitionLogDetailsComponent implements OnInit {
   faClock = faClock;
   faCheck = faCheck;
   faExclamationTriangle = faExclamationTriangle;
+  faRefresh = faRefresh;
 
   title = '';
   log!: SftpAcquisitionLog;
+  isResetting = false;
 
   constructor(
     public dialogRef: MatDialogRef<SftpAcquisitionLogDetailsComponent>,
     @Inject(MAT_DIALOG_DATA) public data: {
       dialogTitle: string,
       sftpAcquisitionLog: SftpAcquisitionLog
-    }
+    },
+    private sftpLogService: SftpAcquisitionLogService
   ) { }
 
   ngOnInit(): void {
@@ -49,9 +53,27 @@ export class SftpAcquisitionLogDetailsComponent implements OnInit {
       'Processing': 'status-processing',
       'Completed': 'status-completed',
       'Failed': 'status-failed',
-      'MaxRetriesReached': 'status-maxRetryReached'
+      'MaxRetriesReached': 'status-maxRetryReached',
+      'ConfigurationRequired': 'status-configurationRequired'
     };
     return statusMap[status] || '';
+  }
+
+  isResettable(): boolean {
+    return this.log.status === 'ConfigurationRequired' || this.log.status === 'MaxRetriesReached';
+  }
+
+  resetLog(): void {
+    this.isResetting = true;
+    this.sftpLogService.resetSftpAcquisitionLog(this.log.externalId).subscribe({
+      next: () => {
+        this.dialogRef.close({ reset: true });
+      },
+      error: (error) => {
+        console.error('Error resetting SFTP acquisition log:', error);
+        this.isResetting = false;
+      }
+    });
   }
 
   formatDuration(ms: number): string {

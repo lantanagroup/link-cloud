@@ -2,7 +2,7 @@ import { animate, style, transition, trigger, keyframes } from '@angular/animati
 import { Location, CommonModule, KeyValuePipe } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faXmark, faRotate, faArrowLeft, faFilter, faSort, faSortUp, faSortDown, faEye } from '@fortawesome/free-solid-svg-icons';
+import { faXmark, faRotate, faArrowLeft, faFilter, faSort, faSortUp, faSortDown, faEye, faRefresh } from '@fortawesome/free-solid-svg-icons';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -71,6 +71,7 @@ export class SftpAcquisitionLogViewComponent implements OnInit {
   faSortUp = faSortUp;
   faSortDown = faSortDown;
   faEye = faEye;
+  faRefresh = faRefresh;
 
   defaultPageNumber = 0;
   defaultPageSize = 10;
@@ -86,7 +87,7 @@ export class SftpAcquisitionLogViewComponent implements OnInit {
   selectedFacilityFilter = 'Any';
   acquisitionTypeFilterOptions = Object.values(SftpAcquisitionType);
   selectedAcquisitionTypeFilter = 'Any';
-  statusFilterOptions = ['Pending', 'Processing', 'Completed', 'Failed', 'MaxRetriesReached'];
+  statusFilterOptions = ['Pending', 'Processing', 'Completed', 'Failed', 'MaxRetriesReached', 'ConfigurationRequired'];
   selectedStatusFilter = 'Any';
 
   constructor(
@@ -199,12 +200,18 @@ export class SftpAcquisitionLogViewComponent implements OnInit {
   viewDetails(log: SftpAcquisitionLogSummary): void {
     this.sftpLogService.getSftpAcquisitionLog(log.id).subscribe({
       next: (fullLog) => {
-        this.dialog.open(SftpAcquisitionLogDetailsComponent, {
+        const dialogRef = this.dialog.open(SftpAcquisitionLogDetailsComponent, {
           width: '800px',
           maxHeight: '90vh',
           data: {
             dialogTitle: `SFTP Acquisition Log - ${fullLog.externalId}`,
             sftpAcquisitionLog: fullLog
+          }
+        });
+
+        dialogRef.afterClosed().subscribe(result => {
+          if (result?.reset) {
+            this.loadLogs(this.paginationMetadata.pageNumber, this.paginationMetadata.pageSize, false);
           }
         });
       },
@@ -216,5 +223,23 @@ export class SftpAcquisitionLogViewComponent implements OnInit {
 
   navBack(): void {
     this.location.back();
+  }
+
+  isResettable(log: SftpAcquisitionLogSummary): boolean {
+    return log.status === 'ConfigurationRequired' || log.status === 'MaxRetriesReached';
+  }
+
+  resetLog(log: SftpAcquisitionLogSummary): void {
+    this.loadingService.show();
+    this.sftpLogService.resetSftpAcquisitionLog(log.externalId)
+      .pipe(finalize(() => this.loadingService.hide()))
+      .subscribe({
+        next: () => {
+          this.loadLogs(this.paginationMetadata.pageNumber, this.paginationMetadata.pageSize, false);
+        },
+        error: (error) => {
+          console.error('Error resetting SFTP acquisition log:', error);
+        }
+      });
   }
 }
