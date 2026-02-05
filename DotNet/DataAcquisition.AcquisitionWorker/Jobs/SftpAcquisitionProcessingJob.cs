@@ -40,14 +40,14 @@ public class SftpAcquisitionProcessingJob(
                 // Get pending logs for this acquisition type
                 var pendingLogs = await logQueries.GetPendingLogsAsync(
                     acquisitionType,
-                    settings.Value.MaxConcurrency * 2,
+                    settings.Value.MaxBatchSize,
                     context.CancellationToken);
 
                 // Also get failed logs eligible for retry
                 var retryLogs = await logQueries.GetFailedLogsForRetryAsync(
                     acquisitionType,
                     settings.Value.MaxRetryAttempts,
-                    settings.Value.MaxConcurrency,
+                    settings.Value.MaxBatchSize,
                     context.CancellationToken);
 
                 allLogs.AddRange(pendingLogs);
@@ -186,9 +186,9 @@ public class SftpAcquisitionProcessingJob(
                 {
                     await session.DisposeAsync();
                 }
-                catch (Exception disposeEx)
+                catch (Exception ex)
                 {
-                    logger.LogDebug(disposeEx, "Error disposing unhealthy SFTP session for facility {FacilityId}", facilityId);
+                    logger.LogDebug(ex, "Error disposing unhealthy SFTP session for facility {FacilityId}", facilityId);
                 }
 
                 try
@@ -320,8 +320,7 @@ public class SftpAcquisitionProcessingJob(
             // Get the appropriate processor for this acquisition type
             var processor = processorFactory.GetProcessor(log.AcquisitionType);
 
-            // Use the shared session via ProcessWithSessionAsync
-            // The processor tracks connection/retrieval and parse times internally
+            // Use the shared SFTP session
             var processedFiles =
                 await processor.ProcessWithSessionAsync(log, session, sftpConfig, acquisitionConfig, cancellationToken, benchmark);
 

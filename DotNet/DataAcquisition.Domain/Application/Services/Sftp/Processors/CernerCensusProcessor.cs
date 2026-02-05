@@ -7,6 +7,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Processors;
@@ -57,7 +58,7 @@ public class CernerCensusProcessor(
         var processedFiles = new List<string>();
         var totalEncounterCount = 0;
 
-        // List matching files (benchmark: connection and retrieval)
+        // List matching files
         benchmark?.StartConnectionAndRetrieval();
         var files = await session.ListFilesAsync(
             remoteDir,
@@ -87,10 +88,11 @@ public class CernerCensusProcessor(
             "Files Found",
             tags: new ActivityTagsCollection
             {
-                { "FacilityId", log.FacilityId },
-                { "AcquisitionType", log.AcquisitionType.ToString() },
-                { "Pattern", acquisitionConfig.FileNamePattern ?? "(all files)" },
-                { "FileCount", files.Count }
+                { DiagnosticNames.FacilityId, log.FacilityId },
+                { "acquisition.type", log.AcquisitionType.ToString() },
+                { "file.pattern", acquisitionConfig.FileNamePattern ?? "(all files)" },
+                { "file.count", files.Count },
+                { "file.names", string.Join(", ", files.Select(f => f.Name)) }
             }));
 
         logger.LogInformation(
@@ -111,14 +113,14 @@ public class CernerCensusProcessor(
                 fileExtension,
                 acquisitionConfig.ParsingConfiguration);
 
-            // Download file (benchmark: connection and retrieval)
+            // Download file
             benchmark?.StartConnectionAndRetrieval();
             using var fileStream = await session.DownloadFileAsync(file.FullName, cancellationToken);
             benchmark?.EndConnectionAndRetrieval();
 
             //TODO: We should consider saving the files to process locally rather than keeping the connection open during parsing.
 
-            // Parse file (benchmark: parsing)
+            // Parse file
             benchmark?.StartParse();
             var fileEncounters = new List<CernerEncounters>();
             await foreach (var encounter in parser.ParseAsync(
@@ -132,10 +134,7 @@ public class CernerCensusProcessor(
             var kafkaMessage = new Message<string, CernerPatientsAcquired>
             {
                 Key = log.FacilityId,
-                Headers = new Headers
-                {
-                    new Header("X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()))
-                },
+                Headers = [new Header("X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()))],
                 Value = new CernerPatientsAcquired
                 {
                     PatientEncounters = fileEncounters
@@ -145,6 +144,15 @@ public class CernerCensusProcessor(
             await kafkaProducer.ProduceAsync(
                 nameof(KafkaTopic.CernerPatientsAcquired), kafkaMessage, cancellationToken);
 
+            activity?.AddEvent(new ActivityEvent(
+                "Encounters Identified",
+                tags: new ActivityTagsCollection
+                {
+                    { "file.name", file.Name },
+                    { "encounter.count", fileEncounters.Count },
+                    { "encounter.identifiers", string.Join(", ", fileEncounters.Select(f => f.EncounterId)) }
+                }));
+            
             logger.LogDebug(
                 "Produced CernerPatientsAcquired event for file {FileName} with {EncounterCount} encounters",
                 file.Name, fileEncounters.Count);

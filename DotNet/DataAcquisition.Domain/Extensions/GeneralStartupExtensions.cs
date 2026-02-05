@@ -67,7 +67,7 @@ public static class GeneralStartupExtensions
         // load external configuration source (if specified)
         builder.AddExternalConfiguration(serviceName);
 
-        builder.Configuration.RegisterMonitoring(builder.Logging, builder.Services);
+        builder.Configuration.RegisterMonitoring(builder.Logging, builder.Services, serviceName);
         builder.Services.RegisterConfigs(builder.Configuration);
         builder.RegisterEntityFramework();
 
@@ -93,7 +93,7 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterProblemDetails((IHostingEnvironment)builder.Environment);
     }
 
-    public static void RegisterMonitoring(this IConfigurationManager configuration, ILoggingBuilder logging, IServiceCollection services)
+    public static void RegisterMonitoring(this IConfigurationManager configuration, ILoggingBuilder logging, IServiceCollection services, string serviceName)
     {
         // Clear default providers first to avoid duplicate logging
         logging.ClearProviders();
@@ -116,7 +116,7 @@ public static class GeneralStartupExtensions
 
         if (serviceInformation != null)
         {
-            ServiceActivitySource.Initialize(serviceInformation);
+            ServiceActivitySource.Initialize(serviceName, serviceInformation);
             Log.Information("ServiceActivitySource initialized with name: {ServiceName}, version: {Version}",
             ServiceActivitySource.ServiceName,
             serviceInformation.Version);
