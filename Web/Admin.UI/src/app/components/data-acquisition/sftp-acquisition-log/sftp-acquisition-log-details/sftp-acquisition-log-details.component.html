@@ -139,29 +139,39 @@
             </mat-expansion-panel-header>
 
             <div class="benchmark-details">
-              <div class="benchmark-item">
-                <span class="data-label">Started At</span>
-                <span class="data-value">{{ benchmark.attemptStartedAt | date:'medium' }}</span>
+              <div class="benchmark-summary">
+                <div class="benchmark-summary-item">
+                  <span class="data-label">Started At</span>
+                  <span class="data-value">{{ benchmark.attemptStartedAt | date:'medium' }}</span>
+                </div>
+                <div class="benchmark-summary-item">
+                  <span class="data-label">Items Processed</span>
+                  <span class="data-value">{{ benchmark.itemsProcessed }}</span>
+                </div>
               </div>
-              <div class="benchmark-item">
-                <span class="data-label">Connection & Retrieval</span>
-                <span class="data-value">{{ formatDuration(benchmark.connectionAndRetrievalDurationMs) }}</span>
-              </div>
-              <div class="benchmark-item">
-                <span class="data-label">Parse Duration</span>
-                <span class="data-value">{{ formatDuration(benchmark.parseDurationMs) }}</span>
-              </div>
-              <div class="benchmark-item">
-                <span class="data-label">Overhead</span>
-                <span class="data-value">{{ formatDuration(benchmark.overheadDurationMs) }}</span>
-              </div>
-              <div class="benchmark-item">
-                <span class="data-label">Items Processed</span>
-                <span class="data-value">{{ benchmark.itemsProcessed }}</span>
-              </div>
-              <div class="benchmark-item">
-                <span class="data-label">Total Duration</span>
-                <span class="data-value">{{ formatDuration(benchmark.totalDurationMs) }}</span>
+
+              <div class="phase-timing-section">
+                <div class="phase-timing-header">
+                  <fa-icon [icon]="faClock"></fa-icon>
+                  <span>Phase Timing Breakdown</span>
+                </div>
+                <div class="phase-timing-container">
+                  @for (phase of getPhases(benchmark); track phase.name) {
+                    <div class="phase-item">
+                      <div class="phase-info">
+                        <span class="phase-name">{{ phase.name }}</span>
+                        <span class="phase-duration">{{ formatDuration(phase.duration) }}</span>
+                      </div>
+                      <div class="phase-bar-background">
+                        <div
+                          class="phase-bar"
+                          [class]="phase.colorClass"
+                          [style.width.%]="getPhasePercentage(benchmark, phase.duration)"
+                        ></div>
+                      </div>
+                    </div>
+                  }
+                </div>
               </div>
             </div>
           </mat-expansion-panel>

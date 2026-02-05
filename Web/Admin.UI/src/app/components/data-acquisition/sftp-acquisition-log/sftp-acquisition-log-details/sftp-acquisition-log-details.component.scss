@@ -20,16 +20,98 @@
 }
 
 .benchmark-details {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
   padding-top: 8px;
 }
 
-.benchmark-item {
+.benchmark-summary {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.benchmark-summary-item {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+.phase-timing-section {
+  margin-top: 8px;
+}
+
+.phase-timing-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 12px;
+
+  fa-icon {
+    color: #666;
+  }
+}
+
+.phase-timing-container {
+  background-color: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.phase-item {
+  margin-bottom: 12px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.phase-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.phase-name {
+  font-size: 0.875rem;
+  color: #555;
+}
+
+.phase-duration {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #333;
+  font-variant-numeric: tabular-nums;
+}
+
+.phase-bar-background {
+  width: 100%;
+  height: 8px;
+  background-color: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.phase-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.phase-bar-blue {
+  background-color: #2196f3;
+}
+
+.phase-bar-purple {
+  background-color: #9c27b0;
+}
+
+.phase-bar-amber {
+  background-color: #ff9800;
 }
 
 .success-icon {
