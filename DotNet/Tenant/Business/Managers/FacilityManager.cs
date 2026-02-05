@@ -24,7 +24,8 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
         Task CreateAsync(Facility newFacility, CancellationToken cancellationToken = default);
         Task<string> UpdateAsync(System.Guid id, Facility newFacility, CancellationToken cancellationToken = default);
         Task<string> DeleteAsync(string facilityId, CancellationToken cancellationToken = default);
-        Task<string> SoftDeleteAsync(string facilityId, CancellationToken cancellationToken = default); // new
+        Task<string> SoftDeleteAsync(string facilityId, CancellationToken cancellationToken = default);
+        Task<string> RestoreAsync(string facilityId, CancellationToken cancellationToken = default);
         Task MeasureDefinitionExists(string reportType);
     }
 
@@ -341,6 +342,61 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
                 });
 
                 throw new ApplicationException($"Facility {facilityId} failed to soft delete. " + ex.Message);
+            }
+            return facilityId;
+        }
+
+        public async Task<string> RestoreAsync(string facilityId, CancellationToken cancellationToken = default)
+        {
+            Facility? existingFacility;
+
+            using Activity? activity =
+                ServiceActivitySource.Instance.StartActivity("Restore Facility Configuration");
+            var currentActivity = Activity.Current;
+            currentActivity?.AddTag("facility.id", facilityId);
+
+            // Validate the facility exists
+            using (ServiceActivitySource.Instance.StartActivity("Validate the Facility Configuration"))
+            {
+                existingFacility =
+                    await _repository.FirstOrDefaultAsync(f => f.FacilityId == facilityId, cancellationToken);
+                if (existingFacility is null)
+                {
+                    _logger.LogError("Facility with Id: {FacilityId} Not Found",
+                        HtmlInputSanitizer.Sanitize(facilityId));
+                    throw new ApplicationException($"Facility with Id: {facilityId} Not Found");
+                }
+
+                if (!existingFacility.IsDeleted)
+                {
+                    _logger.LogWarning("Facility with Id: {FacilityId} is not deleted",
+                        HtmlInputSanitizer.Sanitize(facilityId));
+                    throw new ApplicationException($"Facility with Id: {facilityId} is not deleted");
+                }
+            }
+
+            try
+            {
+                using (ServiceActivitySource.Instance.StartActivity("Mark Facility as Restored"))
+                {
+                    existingFacility.IsDeleted = false;
+                    existingFacility.ModifyDate = DateTime.UtcNow;
+                    _repository.Update(existingFacility);
+                    await _repository.SaveChangesAsync(cancellationToken);
+                }
+            }
+            catch (Exception ex)
+            {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.AddException(ex, new TagList
+                {
+                    { "service.name", TenantConstants.ServiceName },
+                    { "facility", facilityId },
+                    { "action", AuditEventType.Update },
+                    { "resource", existingFacility }
+                });
+
+                throw new ApplicationException($"Facility {facilityId} failed to restore. " + ex.Message);
             }
             return facilityId;
         }
