@@ -18,6 +18,8 @@ public class LogSearchParameters : GenericLogSearchParameters
 public class SftpLogSearchParameters : GenericLogSearchParameters
 {
     public string? FacilityId { get; set; }
+    public RequestStatus? Status { get; set; }
+    public SftpAcquisitionType? AcquisitionType { get; set; }
 }
 
 public class GenericLogSearchParameters
