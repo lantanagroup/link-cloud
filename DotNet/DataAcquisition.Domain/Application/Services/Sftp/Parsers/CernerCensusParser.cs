@@ -12,10 +12,8 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Par
 /// Handles SftpAcquisitionType.CernerCensus with hardcoded column positions.
 /// Format: person_id|encntr_id|facility|unit|room|bed|fin|mrn|pat_nam|enc_status|enc_type|admit_dt|disch_dt
 /// </summary>
-public class CernerCensusParser : IFileParser<CernerEncounters>
+public class CernerCensusParser(ILogger<CernerCensusParser> logger) : IFileParser<CernerEncounters>
 {
-    private readonly ILogger<CernerCensusParser> _logger;
-
     // Column indices for pipe-delimited format:
     // person_id|encntr_id|facility|unit|room|bed|fin|mrn|pat_nam|enc_status|enc_type|admit_dt|disch_dt
     private const int PersonIdIndex = 0;
@@ -29,11 +27,6 @@ public class CernerCensusParser : IFileParser<CernerEncounters>
     private const int AdmitDtIndex = 11;
     // Index 12 (disch_dt) parsed but not included in CernerEncounters model
     private const int MinColumnCount = 12;  // At least through admit_dt
-
-    public CernerCensusParser(ILogger<CernerCensusParser> logger)
-    {
-        _logger = logger;
-    }
 
     public bool CanParse(SftpAcquisitionType acquisitionType, string fileExtension, FileParsingConfiguration? config)
     {
@@ -78,7 +71,7 @@ public class CernerCensusParser : IFileParser<CernerEncounters>
         var fields = line.Split('|');
         if (fields.Length < MinColumnCount)
         {
-            _logger.LogWarning("Line {LineNumber} has insufficient columns ({Count}/{Expected}), skipping",
+            logger.LogWarning("Line {LineNumber} has insufficient columns ({Count}/{Expected}), skipping",
                 lineNumber, fields.Length, MinColumnCount);
             return null;
         }
@@ -88,7 +81,7 @@ public class CernerCensusParser : IFileParser<CernerEncounters>
 
         if (string.IsNullOrWhiteSpace(patientId) || string.IsNullOrWhiteSpace(encounterId))
         {
-            _logger.LogWarning("Line {LineNumber} has empty PatientId or EncounterId, skipping", lineNumber);
+            logger.LogWarning("Line {LineNumber} has empty PatientId or EncounterId, skipping", lineNumber);
             return null;
         }
 
