@@ -4,6 +4,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configurat
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Processors;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;

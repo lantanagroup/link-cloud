@@ -3,6 +3,7 @@ using System.Text;
 using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Parsers;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;

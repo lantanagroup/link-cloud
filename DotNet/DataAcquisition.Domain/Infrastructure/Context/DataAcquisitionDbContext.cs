@@ -211,7 +211,11 @@ public class DataAcquisitionDbContext : DbContext
             entity.Property(e => e.FileNames)
                 .HasConversion(
                     v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                    v => v != null ? JsonSerializer.Deserialize<List<string>>(v, new JsonSerializerOptions()) ?? new List<string>() : new List<string>());
+                    v => v != null ? JsonSerializer.Deserialize<List<string>>(v, new JsonSerializerOptions()) ?? new List<string>() : new List<string>())
+                .Metadata.SetValueComparer(new ValueComparer<List<string>>(
+                    (c1, c2) => c1 != null && c2 != null && c1.SequenceEqual(c2),
+                    c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                    c => c.ToList()));
 
             entity.Property(e => e.Notes)
                 .HasConversion(
@@ -225,7 +229,11 @@ public class DataAcquisitionDbContext : DbContext
             entity.Property(e => e.Benchmarks)
                 .HasConversion(
                     v => v != null ? JsonSerializer.Serialize(v, new JsonSerializerOptions()) : null,
-                    v => v != null ? JsonSerializer.Deserialize<List<SftpAcquisitionBenchmark>>(v, new JsonSerializerOptions()) : null);
+                    v => v != null ? JsonSerializer.Deserialize<List<SftpAcquisitionBenchmark>>(v, new JsonSerializerOptions()) : null)
+                .Metadata.SetValueComparer(new ValueComparer<List<SftpAcquisitionBenchmark>?>(
+                    (c1, c2) => (c1 == null && c2 == null) || (c1 != null && c2 != null && c1.SequenceEqual(c2)),
+                    c => c == null ? 0 : c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                    c => c == null ? null : c.ToList()));
         });
         
         //-------------------SftpConfiguration-------------------
@@ -254,7 +262,11 @@ public class DataAcquisitionDbContext : DbContext
                     v => JsonSerializer.Serialize(v, jsonOptions),
                     v => v != null
                         ? JsonSerializer.Deserialize<List<SftpAcquisitionTypeConfiguration>>(v, jsonOptions) ?? new List<SftpAcquisitionTypeConfiguration>()
-                        : new List<SftpAcquisitionTypeConfiguration>());
+                        : new List<SftpAcquisitionTypeConfiguration>())
+                .Metadata.SetValueComparer(new ValueComparer<List<SftpAcquisitionTypeConfiguration>>(
+                    (c1, c2) => c1 != null && c2 != null && JsonSerializer.Serialize(c1, jsonOptions) == JsonSerializer.Serialize(c2, jsonOptions),
+                    c => JsonSerializer.Serialize(c, jsonOptions).GetHashCode(),
+                    c => JsonSerializer.Deserialize<List<SftpAcquisitionTypeConfiguration>>(JsonSerializer.Serialize(c, jsonOptions), jsonOptions) ?? new List<SftpAcquisitionTypeConfiguration>()));
         });
 
         // Prefix and schema can be passed as parameters
