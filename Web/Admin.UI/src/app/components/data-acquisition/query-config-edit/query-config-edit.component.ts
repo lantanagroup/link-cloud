@@ -119,7 +119,7 @@ export class QueryConfigEditComponent implements OnInit {
       parameterType: [param?.parameterType || 'Variable', Validators.required],
       name: [param?.name || '', Validators.required],
       // Variable
-      variable: [param?.parameterType === 'Variable' ? (param as IVariableParameterModel).variable : VariableParameterType.patient],
+      variable: [param?.parameterType === 'Variable' ? this.normalizeVariableType((param as IVariableParameterModel).variable) : VariableParameterType.patient],
       format: [param?.parameterType === 'Variable' ? (param as IVariableParameterModel).format : ''],
       // Literal
       literal: [param?.parameterType === 'Literal' ? (param as ILiteralQueryParameterModel).literal : ''],
@@ -137,6 +137,41 @@ export class QueryConfigEditComponent implements OnInit {
 
   removeParameter(index: number): void {
     this.parameters.removeAt(index);
+  }
+
+  private normalizeVariableType(value: unknown): VariableParameterType {
+    if (value === null || value === undefined) {
+      return VariableParameterType.patient;
+    }
+
+    if (typeof value === 'number') {
+      return value as VariableParameterType;
+    }
+
+    if (typeof value === 'string') {
+      const sanitized = value.trim();
+      if (!sanitized) {
+        return VariableParameterType.patient;
+      }
+
+      const numericValue = Number(sanitized);
+      if (!Number.isNaN(numericValue)) {
+        return numericValue as VariableParameterType;
+      }
+
+      const key = sanitized.toLowerCase().replace(/[^a-z]/g, '');
+      const map: Record<string, VariableParameterType> = {
+        patient: VariableParameterType.patient,
+        lookbackstart: VariableParameterType.lookbackStart,
+        periodstart: VariableParameterType.periodStart,
+        periodend: VariableParameterType.periodEnd
+      };
+      if (key in map) {
+        return map[key];
+      }
+    }
+
+    return VariableParameterType.patient;
   }
 
   save(): void {
