@@ -2,9 +2,9 @@
   <div class="link-card">
     <div class="link-card-header">
       <div class="split-container" style="margin-bottom: 0;">
-        <div class="left-pane">
-          <p class="title">{{ facilityConfig?.facilityName }}
-            <p>
+            <div class="left-pane">
+               <p class="title">{{ facilityConfig?.facilityName }}
+              <p>
             </div>
             <div class="right-pane">
               <div class="link-button-group">
@@ -70,113 +70,165 @@
       }
     </div>
 
-    <div class="link-card" style="margin-top: 2em;">
-      <div class="link-card-header">
-        <div class="split-container" style="margin-bottom: 0;">
-          <div class="left-pane">
-            <p class="title">Facility Reports
-              <p>
-              </div>
-            </div>
-          </div>
-          @if (reportListSummary.length > 0) {
-            <div class="table-container no-border">
-              <table class="link-table">
-                <thead>
-                  <tr>
-                    <th class="header-column">Report ID</th>
-                    <th class="header-column">Reporting Period</th>
-                    <th class="header-column">Query Plan</th>
-                    <th class="header-column">Reporting Cadence</th>
-                    <th class="header-column">Measures</th>
-                    <th class="header-column">Patients in Census</th>
-                    <th class="header-column">Patients in IP</th>
-                    <th class="header-column">Status</th>
-                    <th class="header-column">Action</th>
-                  </tr>
-                </thead>
-                <tbody class="table-body">
-                  @for (report of reportListSummary; track report) {
-                    <tr [class.highlighted]="report.id === highlightedRowId">
-                      <td class="table-cell">
-                        <div class="link-button-wrapper" style="display: flex; align-items: center; gap: 8px;">
-                          <a [routerLink]="['/tenant/facility', facilityId, 'report', report.id]">
-                            {{ report.id }}
-                          </a>
-                        </div>
-                      </td>
-                      <td class="table-cell">
-                        <span class="report-period-col"><label>Start</label>: {{ report.reportStartDate }}</span>
-                        <span class="report-period-col"><label>End</label>: &nbsp;&nbsp;{{ report.reportEndDate }}</span>
-                      </td>
-                      <td class="table-cell">TODO</td>
-                      <td class="table-cell">
-                        <span
-                  [ngClass]="{
-                        'monthly-frequency': report.frequency === 'Monthly',
-                        'weekly-frequency': report.frequency === 'Weekly',
-                        'daily-frequency': report.frequency === 'Daily',
-                        'adhoc-frequency': report.frequency === 'Adhoc'
-                    }"
-                        >{{ report.frequency }}</span>
-                      </td>
-                      <td class="table-cell">
-                        <ul class="report-type-list no-bullets">
-                          @for (type of report.reportTypes; track type) {
-                            <li>{{ type }}</li>
-                          }
-                        </ul>
-                      </td>
-                      <td class="table-cell">{{ report.censusCount }}</td>
-                      <td class="table-cell">{{ report.initialPopulationCount }}</td>
-                      <td class="table-cell">
-                        <span
-                  [ngClass]="{
-                        'status-pending': report.submitted == false,
-                        'status-submitted': report.submitted == true
-                    }"
-                        >{{ report.submitted ? 'Submitted' : 'Pending' }}</span>
-                        @if (report.submitted) {
-                          <span style="display: block; margin-top: 1em;"
-                          >{{ report.submitDate }}</span>
-                        }
-                        @else if (report.createdDate) {
-                          <span style="display: block; margin-top: 1em;"
-                          >{{ report.createdDate }}</span>
-                        }
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          class="link-button secondary"
-                          (click)="onResubmit(report.id)">
-                          <fa-icon [icon]="faRotate"></fa-icon>
-                          Resubmit...
-                        </button>
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-              <mat-paginator
-                [length]="paginationMetadata.totalCount"
-                [pageIndex]="paginationMetadata.pageNumber"
-                [pageSize]="paginationMetadata.pageSize"
-                [pageSizeOptions]="[5, 10, 20]"
-                (page)="pagedEvent($event)"
-                showFirstLastButtons
-                aria-label="Select page of report summaries">
-              </mat-paginator>
-            </div>
-          } @else {
-            <div class="no-results">
-              <h2 class="no-results-title">No Reports Found</h2>
-              <p class="no-results-subtext">
-                Try adjusting your filters or search keywords and try again.
-              </p>
-            </div>
-          }
+  <div class="link-card" style="margin-top: 2em;">
+    <div class="link-card-header">
+      <div class="split-container" style="margin-bottom: 0;">
+        <div class="left-pane">
+          <p class="title">Facility Reports
+          <p>
         </div>
+      </div>
+      <div class="right-pane">
+        <label style="margin-left: 1em; font-weight: normal; cursor: pointer;">
+          <input type="checkbox" [(ngModel)]="showDeleted" (change)="onShowDeletedChange()" />
+          Show Deleted
+        </label>
+      </div>
+
+    </div>
+    @if (dataSource) {
+    <div class="table-container no-border">
+      <table mat-table [dataSource]="dataSource" matSort (matSortChange)="onSortChange($event)" style="width: 100%; background-color: transparent">
+
+        <!-- Report ID Column -->
+        <ng-container matColumnDef="id">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Report ID</th>
+          <td mat-cell *matCellDef="let element">
+            <a *ngIf="!element.isDeleted; else disabledText"
+               [routerLink]="['/tenant/facility', element.facilityId, 'report', element.id]">
+              {{ element.id }}
+            </a>
+            <ng-template #disabledText>
+              <span class="disabled-text">
+                {{ element.id }}
+              </span>
+            </ng-template>
+          </td>
+        </ng-container>
+
+        <!-- Facility ID Column -->
+        <ng-container matColumnDef="facilityId">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Facility ID</th>
+          <td mat-cell *matCellDef="let element">
+            <a *ngIf="!element.isDeleted; else disabledText"
+               [routerLink]="['/tenant/facility', element.facilityId]">
+              {{ element.facilityId }}
+            </a>
+            <ng-template #disabledText>
+              <span class="disabled-text">
+                {{ element.facilityId }}
+              </span>
+            </ng-template>
+          </td>
+        </ng-container>
+
+        <!-- Report Start Date Column -->
+        <ng-container matColumnDef="reportStartDate">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Reporting Period</th>
+          <td mat-cell *matCellDef="let element">
+            <div><strong>Start:</strong> {{ element.reportStartDate | date:'short' }}</div>
+            <div><strong>End:</strong> {{ element.reportEndDate | date:'short' }}</div>
+          </td>
+        </ng-container>
+
+        <!-- Report Types Column -->
+        <ng-container matColumnDef="reportTypes">
+          <th mat-header-cell *matHeaderCellDef>Measures</th>
+          <td mat-cell *matCellDef="let element">{{ element.reportTypes.join(', ') }}</td>
+        </ng-container>
+
+        <!-- Frequency Column -->
+        <ng-container matColumnDef="frequency">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Reporting Cadence</th>
+          <td mat-cell *matCellDef="let element">
+            <span [ngClass]="{
+                          'monthly-frequency': element.frequency === 'Monthly',
+                          'weekly-frequency': element.frequency === 'Weekly',
+                          'daily-frequency': element.frequency === 'Daily',
+                          'adhoc-frequency': element.frequency === 'Adhoc'
+      }">{{ element.frequency }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Patients in Census Column -->
+        <ng-container matColumnDef="patientsInCensus">
+          <th mat-header-cell *matHeaderCellDef>Patients in Census</th>
+          <td mat-cell *matCellDef="let element" style="text-align: center;">{{element.censusCount}}</td>
+        </ng-container>
+
+        <!-- Patients in IP Column -->
+        <ng-container matColumnDef="patientsInIP">
+          <th mat-header-cell *matHeaderCellDef>Patients in IP</th>
+          <td mat-cell *matCellDef="let element" style="text-align: center;">{{element.initialPopulationCount}}</td>
+        </ng-container>
+
+        <!-- Status Column -->
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
+          <td mat-cell *matCellDef="let element">
+            <div>
+              <span *ngIf="element.status == 0" class="status-new">New</span>
+              <span *ngIf="element.status == 100" class="status-scheduled">Scheduled</span>
+              <span *ngIf="element.status == 200" class="status-endOfPeriod">End of Period</span>
+              <span *ngIf="element.status == 500" class="status-submitted">Submitted</span>
+            </div>
+            <div style="margin-top:5px" *ngIf="element.submitDate">{{element.submitDate | date:'short'}}</div>
+            <div style="margin-top:5px" *ngIf="!element.submitDate">{{element.createDate | date:'short'}}</div>
+          </td>
+        </ng-container>
+
+        <!-- Action Column -->
+        <ng-container matColumnDef="action">
+          <th mat-header-cell *matHeaderCellDef>Action</th>
+          <td mat-cell *matCellDef="let element">
+            <button type="button"
+                    class="link-button secondary" [disabled]="element.isDeleted"
+                    (click)="onResubmit(element.id, element.facilityId)">
+              <fa-icon [icon]="faRotate"></fa-icon>
+              Resubmit...
+            </button>
+          </td>
+        </ng-container>
+        <!-- Deleted Column (show only if showDeleted = true) -->
+        <ng-container *ngIf="showDeleted" matColumnDef="isDeleted">
+          <th mat-header-cell *matHeaderCellDef>Deleted</th>
+          <td mat-cell *matCellDef="let row">{{ row.isDeleted ?? false ? 'Yes' : 'No' }}</td>
+        </ng-container>
+
+        <!-- Header and Row Definitions -->
+        <tr mat-header-row *matHeaderRowDef="getColumns()"></tr>
+        <tr mat-row *matRowDef="let row; columns: getColumns();" [class.deleted-row]="row.isDeleted"></tr>
+
+        <!-- No Data Row -->
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell" [attr.colspan]="getColumns().length">
+            <div class="no-data-message">
+              <mat-icon>search_off</mat-icon>
+              No reports found.
+            </div>
+          </td>
+        </tr>
+
+      </table>
+
+      <mat-paginator [length]="paginationMetadata.totalCount"
+                     [pageIndex]="paginationMetadata.pageNumber"
+                     [pageSize]="paginationMetadata.pageSize"
+                     [pageSizeOptions]="[5, 10, 20]"
+                     (page)="onPageChange($event)"
+                     showFirstLastButtons
+                     aria-label="Select page of report summaries">
+      </mat-paginator>
+    </div>
+    } @else {
+    <div class="no-results">
+      <h2 class="no-results-title">No Reports Found</h2>
+      <p class="no-results-subtext">
+        Try adjusting your filters or search keywords and try again.
+      </p>
+    </div>
+    }
+  </div>
 
       </div>
 

@@ -16,7 +16,6 @@ using LantanaGroup.Link.Tenant.Data.Entities;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Services;
-using LantanaGroup.Link.Tenant.Utils;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -178,7 +177,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 _logger.LogError(ex, "Exception Encountered in FacilityController.GetFacilityList");
                 return Problem("An error occurred while getting all facilities", null, 500);
             }
@@ -544,13 +543,9 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 var httpClient = _httpClient.CreateClient();
                 httpClient.Timeout = TimeSpan.FromSeconds(30);
 
-                var baseUrl = new Uri(_serviceRegistry.ReportServiceApiUrl.TrimEnd('/') + "/Report/Schedule");
+                var baseUrl = new Uri(_serviceRegistry.ReportServiceApiUrl.TrimEnd('/') + "/schedules");
 
-                var requestUrl = QueryHelpers.AddQueryString(baseUrl.ToString(), new Dictionary<string, string?>
-                { 
-                    ["facilityId"] = HtmlInputSanitizer.SanitizeAndRemove(facilityId),
-                    ["reportScheduleId"] = HtmlInputSanitizer.SanitizeAndRemove(request.ReportId) }
-                );
+                var requestUrl = $"{baseUrl}/{HtmlInputSanitizer.SanitizeAndRemove(request.ReportId)}";
 
                 if (!_linkBearerServiceOptions.Value.AllowAnonymous)
                 {

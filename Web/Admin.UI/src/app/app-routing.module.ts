@@ -1,7 +1,7 @@
-import { RouterModule, Routes } from '@angular/router';
+import {RouterModule, Routes} from '@angular/router';
 
-import { NgModule } from '@angular/core';
-import { AuthGuard } from './services/security/auth.guard'; // adjust the path
+import {NgModule} from '@angular/core';
+import {AuthGuard} from './services/security/auth.guard'; // adjust the path
 
 
 const routes: Routes = [
@@ -32,6 +32,7 @@ const routes: Routes = [
   { path: 'validation-config/validation-categories', loadComponent: () => import('./components/validation-config/validation-categories/validation-categories-list/validation-categories-list.component').then(mod => mod.ValidationCategoriesComponent) , canActivate: [AuthGuard] },
   { path: 'validation-config/validation-categories/:id/edit', loadComponent: () => import('./components/validation-config/validation-categories/edit-validation-category/edit-validation-category.component').then(mod => mod.EditValidationCategoryComponent), canActivate: [AuthGuard]  },
   { path: 'query-plans', loadComponent: () => import('./components/query-plans/query-plans-dashboard/query-plans-dashboard.component').then(mod => mod.QueryPlansDashboardComponent), canActivate: [AuthGuard]  },
+  { path: 'terminology-config', loadComponent: () => import('./components/terminology/terminology-config.component').then(mod => mod.TerminologyConfigComponent), canActivate: [AuthGuard]  },
   { path: 'app-configuration', loadComponent: () => import('./components/app-configuration/app-configuration-dashboard/app-configuration-dashboard.component').then(mod => mod.AppConfigurationDashboardComponent), canActivate: [AuthGuard]  },
   { path: 'kafka', loadComponent: () => import('./components/kafka/kafka-dashboard/kafka-dashboard.component').then(mod => mod.KafkaDashboardComponent) , canActivate: [AuthGuard] },
   { path: '', redirectTo: 'login', pathMatch: 'full' },

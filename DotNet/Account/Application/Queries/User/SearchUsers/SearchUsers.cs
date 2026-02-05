@@ -2,8 +2,8 @@
 using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Application.Models.Responses;
 using LantanaGroup.Link.Account.Application.Models.User;
-using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Telemetry;
+using LantanaGroup.Link.Shared.Application.Models;
 using System.Diagnostics;
 
 namespace LantanaGroup.Link.Account.Application.Queries.User

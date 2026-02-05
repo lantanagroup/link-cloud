@@ -1,6 +1,6 @@
 {
   "production": false,
-  "allowAlphaNumericFacilityId":  true,
+  "allowAlphaNumericFacilityId": true,
   "authRequired": true,
   "baseApiUrl": "/api",
   "oauth2": {

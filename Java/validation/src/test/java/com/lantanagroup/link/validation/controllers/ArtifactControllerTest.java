@@ -2,6 +2,7 @@ package com.lantanagroup.link.validation.controllers;
 
 import com.lantanagroup.link.validation.entities.Artifact;
 import com.lantanagroup.link.validation.entities.ArtifactType;
+import com.lantanagroup.link.validation.models.PackageDetailsModel;
 import com.lantanagroup.link.validation.models.TerminologyDependency;
 import com.lantanagroup.link.validation.repositories.ArtifactRepository;
 import com.lantanagroup.link.validation.services.ArtifactService;
@@ -68,6 +69,37 @@ class ArtifactControllerTest {
         when(artifactRepository.findByTypeAndName(ArtifactType.PACKAGE, packageId)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/validation/artifact/PACKAGE/" + packageId + "/tx-dependencies"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getPackageDetails() throws Exception {
+        String packageId = "test-package";
+        PackageDetailsModel model = new PackageDetailsModel();
+        model.setVersion("1.0.0");
+        PackageDetailsModel.Resource resource = new PackageDetailsModel.Resource();
+        resource.setResourceType("StructureDefinition");
+        resource.setId("test-sd");
+        resource.setUrl("http://test.com/sd");
+        resource.setName("TestSD");
+        resource.setVersion("0.1");
+        model.setResources(List.of(resource));
+
+        when(artifactService.getPackageDetails(packageId)).thenReturn(model);
+
+        mockMvc.perform(get("/api/validation/artifact/PACKAGE/" + packageId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value("1.0.0"))
+                .andExpect(jsonPath("$.resources[0].resourceType").value("StructureDefinition"))
+                .andExpect(jsonPath("$.resources[0].id").value("test-sd"));
+    }
+
+    @Test
+    void getPackageDetails_NotFound() throws Exception {
+        String packageId = "non-existent";
+        when(artifactService.getPackageDetails(packageId)).thenReturn(null);
+
+        mockMvc.perform(get("/api/validation/artifact/PACKAGE/" + packageId))
                 .andExpect(status().isNotFound());
     }
 }

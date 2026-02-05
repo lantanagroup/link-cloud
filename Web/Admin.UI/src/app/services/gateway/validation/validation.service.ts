@@ -4,6 +4,7 @@ import {catchError, map, Observable, tap} from 'rxjs';
 import {AppConfigService} from '../../app-config.service';
 import {Artifact} from "../../../interfaces/validation/artifact.interface";
 import {ITerminologyDependency} from "../../../interfaces/validation/terminology-dependency.interface";
+import {IPackageDetailsModel} from "../../../interfaces/validation/package-details.interface";
 import {ErrorHandlingService} from '../../error-handling.service';
 import {HttpClient} from '@angular/common/http';
 import {IEntityCreatedResponse} from 'src/app/interfaces/entity-created-response.model';
@@ -58,9 +59,24 @@ export class ValidationService {
 
     const sanitizedPackage = encodeURIComponent(packageName);
     return this.http.get<ITerminologyDependency[]>(`${this.appConfigService.config?.baseApiUrl}/validation/artifact/PACKAGE/${sanitizedPackage}/tx-dependencies`).pipe(
-      tap(_ => console.log(`Fetched TX dependencies.`)),
+      tap(_ => console.log(`Fetched TX dependencies for package ${packageName}.`)),
       catchError((error) => this.errorHandler.handleError(error))
     )
+  }
+
+  getAllTxDependencies(): Observable<ITerminologyDependency[]> {
+    return this.http.get<ITerminologyDependency[]>(`${this.appConfigService.config?.baseApiUrl}/validation/artifact/tx-dependencies`).pipe(
+      tap(_ => console.log(`Fetched all TX dependencies.`)),
+      catchError((error) => this.errorHandler.handleError(error))
+    )
+  }
+
+  getPackageDetails(packageName: string): Observable<IPackageDetailsModel> {
+    const sanitizedPackage = encodeURIComponent(packageName);
+    return this.http.get<IPackageDetailsModel>(`${this.appConfigService.config?.baseApiUrl}/validation/artifact/PACKAGE/${sanitizedPackage}`).pipe(
+      tap(_ => console.log(`Fetched package details for ${packageName}.`)),
+      catchError((error) => this.errorHandler.handleError(error))
+    );
   }
 
   getValidationCategory(id: string): Observable<IValidationIssueCategory> {

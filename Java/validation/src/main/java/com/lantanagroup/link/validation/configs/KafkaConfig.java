@@ -80,18 +80,21 @@ public class KafkaConfig {
 
     @Bean
     public Serializer<?> keySerializer(ObjectMapper objectMapper) {
-        Map<String, Serializer<?>> serializers = Map.of(
-                Topics.SERVICE_HEALTH_CHECK, new StringSerializer(),
-                Topics.VALIDATION_COMPLETE, new StringSerializer());
-        return new DelegatingByTopicSerializer(byPattern(serializers), new VoidSerializer());
+        Map<Class<?>, Serializer<?>> serializers = Map.of(
+                String.class, new StringSerializer(),
+                ReadyForValidation.Key.class, getJsonSerializer(objectMapper, ReadyForValidation.Key.class)
+        );
+        return new DelegatingByTypeSerializer(serializers);
     }
 
     @Bean
     public Serializer<?> valueSerializer(ObjectMapper objectMapper) {
-        Map<String, Serializer<?>> serializers = Map.of(
-                Topics.SERVICE_HEALTH_CHECK, new StringSerializer(),
-                Topics.VALIDATION_COMPLETE, getJsonSerializer(objectMapper, ValidationComplete.class));
-        return new DelegatingByTopicSerializer(byPattern(serializers), new VoidSerializer());
+        Map<Class<?>, Serializer<?>> serializers = Map.of(
+                String.class, new StringSerializer(),
+                ValidationComplete.class, getJsonSerializer(objectMapper, ValidationComplete.class),
+                ReadyForValidation.class, getJsonSerializer(objectMapper, ReadyForValidation.class)
+        );
+        return new DelegatingByTypeSerializer(serializers);
     }
 
     private Serializer<?> getJsonSerializer(ObjectMapper objectMapper, Class<?> type) {
