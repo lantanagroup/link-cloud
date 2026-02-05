@@ -84,6 +84,7 @@ public class CernerCensusProcessor(
             return processedFiles;
         }
         
+        // Add files found activity event
         activity?.AddEvent(new ActivityEvent(
             "Files Found",
             tags: new ActivityTagsCollection
@@ -144,6 +145,7 @@ public class CernerCensusProcessor(
             await kafkaProducer.ProduceAsync(
                 nameof(KafkaTopic.CernerPatientsAcquired), kafkaMessage, cancellationToken);
 
+            // Add encounters identified activity event
             activity?.AddEvent(new ActivityEvent(
                 "Encounters Identified",
                 tags: new ActivityTagsCollection
