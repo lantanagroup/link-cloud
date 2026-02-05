@@ -1,7 +1,7 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 
-namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Parsers;
 
 /// <summary>
 /// Defines operations for parsing files retrieved from SFTP servers.
