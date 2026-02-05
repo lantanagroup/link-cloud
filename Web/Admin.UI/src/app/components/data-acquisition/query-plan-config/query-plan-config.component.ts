@@ -349,6 +349,47 @@ export class QueryPlanConfigFormComponent {
     return JSON.stringify(plan, null, 2);
   }
 
+  applyImportedPlan(plan: any, preserveFacilityId: boolean, preserveType: boolean): string | null {
+    if (!plan || typeof plan !== 'object' || Array.isArray(plan)) {
+      return 'Imported JSON must be an object.';
+    }
+
+    const incomingInitialQueries = plan.InitialQueries ?? plan.initialQueries ?? {};
+    const incomingSupplementalQueries = plan.SupplementalQueries ?? plan.supplementalQueries ?? {};
+
+    if (incomingInitialQueries && (typeof incomingInitialQueries !== 'object' || Array.isArray(incomingInitialQueries))) {
+      return 'InitialQueries must be an object.';
+    }
+
+    if (incomingSupplementalQueries && (typeof incomingSupplementalQueries !== 'object' || Array.isArray(incomingSupplementalQueries))) {
+      return 'SupplementalQueries must be an object.';
+    }
+
+    const facilityId = preserveFacilityId
+      ? this.facilityIdControl.value
+      : (plan.FacilityId ?? plan.facilityId ?? this.facilityIdControl.value ?? '');
+
+    const type = preserveType
+      ? this.typeControl.value
+      : (plan.Type ?? plan.type ?? this.typeControl.value ?? 'Discharge');
+
+    this.item = {
+      id: plan.Id ?? plan.id ?? this.item?.id ?? '',
+      planName: plan.PlanName ?? plan.planName ?? '',
+      facilityId: facilityId ?? '',
+      ehrDescription: plan.EHRDescription ?? plan.ehrDescription ?? '',
+      lookBack: plan.LookBack ?? plan.lookBack ?? '',
+      initialQueries: incomingInitialQueries ?? {},
+      supplementalQueries: incomingSupplementalQueries ?? {},
+      type: type ?? 'Discharge'
+    } as IQueryPlanModel;
+
+    this.setFormValues();
+    this.formValueChanged.emit(this.planForm.invalid);
+
+    return null;
+  }
+
   submitConfiguration(): void {
     if (this.planForm.valid) {
         if (this.formMode == FormMode.Create) {
