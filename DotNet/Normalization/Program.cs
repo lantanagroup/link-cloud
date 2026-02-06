@@ -1,3 +1,4 @@
+using System.Reflection;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
@@ -32,11 +33,9 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
-using Quartz;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
-using System.Reflection;
 using AuditEventMessage = LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -113,23 +112,30 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
 
+    var dbProvider =
+        builder.Configuration.GetValue<string>(NormalizationConstants.AppSettingsSectionNames.DatabaseProvider);
+    string? databaseConnectionString = null;
+
+    if (dbProvider == ConfigurationConstants.AppSettings.SqlServerDatabaseProvider)
+    {
+        databaseConnectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
+
+        if (string.IsNullOrEmpty(databaseConnectionString))
+            throw new InvalidOperationException("Database connection string is null or empty.");
+
+        //Add Quartz scheduler with SQL persistence
+        builder.Services.RegisterQuartzDatabase(databaseConnectionString);
+    }
+
     builder.Services.AddDbContext<NormalizationDbContext>((sp, options) => {
 
         var updateBaseEntityInterceptor = sp.GetRequiredService<UpdateBaseEntityInterceptor>();
-        var dbProvider =
-            builder.Configuration.GetValue<string>(NormalizationConstants.AppSettingsSectionNames.DatabaseProvider);
         switch (dbProvider)
         {
             case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
-                string? connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
-
-                if (string.IsNullOrEmpty(connectionString))
-                    throw new InvalidOperationException("Database connection string is null or empty.");
-
                 options
-                    .UseSqlServer(connectionString)
+                    .UseSqlServer(databaseConnectionString)
                     .AddInterceptors(updateBaseEntityInterceptor);
-
                 break;
             default:
                 throw new InvalidOperationException("Database provider not supported.");
@@ -175,8 +181,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.JsonSerializerOptions.Converters.Add(new OperationConverter());
     });
 
-    //Add Quartz scheduler with SQL persistence
-    builder.Services.RegisterQuartzDatabase(serviceInformation.ConnectionString);
     builder.Services.AddTransient<RetryJob>();
 
     builder.Services.AddSingleton<CopyPropertyOperationService>();
