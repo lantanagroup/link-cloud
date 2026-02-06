@@ -78,13 +78,6 @@ public static class ExternalConfigurationExtension
 
     public static ServiceInformation SetupServiceInformation(this IHostApplicationBuilder builder, string serviceName, string assemblyVersion)
     {
-        var connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
-
-        return SetupServiceInformation(builder, serviceName, assemblyVersion, connectionString);
-    }
-
-    public static ServiceInformation SetupServiceInformation(this IHostApplicationBuilder builder, string serviceName, string assemblyVersion, string? connectionString)
-    {
         if (string.IsNullOrEmpty(serviceName))
         {
             throw new NullReferenceException("Service Name is required.");
@@ -100,7 +93,6 @@ public static class ExternalConfigurationExtension
         if (serviceInformation != null)
         {
             serviceInformation!.ServiceConfigName = serviceName;
-            serviceInformation.ConnectionString = connectionString;
             builder.Services.AddSingleton<ServiceInformation>(serviceInformation);
             ServiceActivitySource.Initialize(assemblyVersion, serviceInformation);
         }
