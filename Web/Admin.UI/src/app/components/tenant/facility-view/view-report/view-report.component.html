@@ -18,7 +18,7 @@
 
   <div style="display: inline-block; float:right;">
     <div class="link-button-group">
-      <button type="button" class="link-button secondary" aria-label="View Acquisition Log" (click)="onViewAcquisitionLog()">
+      <button type="button" class="link-button secondary" aria-label="View Acquisition Log" [routerLink]="['/tenant/acquisition-log']" [queryParams]="{ reportId: reportId }">
         <fa-icon [icon]="faFileInvoice"></fa-icon>
         Acquisition Log
       </button>

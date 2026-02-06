@@ -157,3 +157,39 @@ $skipped-status: #ffbf00;
 .pulse-warning-invert {
   filter: drop-shadow(0 0 2px #fff);
 }
+
+.table-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.table-footer mat-paginator {
+  margin-left: auto;
+}
+
+.page-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #4b5563;
+}
+
+.page-jump-label {
+  font-weight: 500;
+}
+
+.page-jump-input {
+  width: 5rem;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.page-jump-total {
+  color: #6b7280;
+}
