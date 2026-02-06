@@ -1,3 +1,4 @@
+using System.Reflection;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using Hl7.Fhir.Serialization;
@@ -51,7 +52,6 @@ using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using StackExchange.Redis.Extensions.Core.Configuration;
 using StackExchange.Redis.Extensions.System.Text.Json;
-using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
@@ -75,18 +75,18 @@ static void RegisterServices(WebApplicationBuilder builder)
         cm.SetIgnoreExtraElements(true);
         cm.GetMemberMap(c => c.Id).SetSerializer(new GuidSerializer(GuidRepresentation.Standard));
     });
+    
+    var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+    var serviceInformation = builder.SetupServiceInformation(ReportConstants.ServiceName, assemblyVersion);
+
+    // load external configuration source (if specified)
+    builder.AddExternalConfiguration(serviceInformation.ServiceConfigName);
 
     BsonSerializer.RegisterSerializer(objectSerializer);
 
     // Bind MongoConnection settings from configuration (e.g., appsettings.json)
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.Mongo));
     var mongoSettings = builder.Services.BuildServiceProvider().GetRequiredService<IOptions<MongoConnection>>().Value;
-    var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
-
-    var serviceInformation = builder.SetupServiceInformation(ReportConstants.ServiceName, assemblyVersion, mongoSettings.ConnectionString);
-
-    // load external configuration source (if specified)
-    builder.AddExternalConfiguration(serviceInformation.ServiceConfigName);
 
     builder.WebHost.ConfigureKestrel(options =>
     {
