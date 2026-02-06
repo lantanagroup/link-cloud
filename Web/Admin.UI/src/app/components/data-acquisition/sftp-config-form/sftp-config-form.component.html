@@ -93,7 +93,7 @@
         <mat-expansion-panel [formGroup]="$any(config)">
           <mat-expansion-panel-header>
             <mat-panel-title>
-              {{ config.get('acquisitionType')?.value || 'New Configuration' }}
+              {{ config.get('acquisitionType')?.value || 'New Configuration' }}{{ config.get('subType')?.value && config.get('subType')?.value !== 'None' ? ' / ' + config.get('subType')?.value : '' }}
             </mat-panel-title>
             <mat-panel-description>
               {{ config.get('fileNamePattern')?.value || 'All files' }}
@@ -109,6 +109,16 @@
                 }
               </mat-select>
               <mat-hint>Type of data to acquire from this SFTP connection</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="form-input">
+              <mat-label>Sub Type</mat-label>
+              <mat-select formControlName="subType" [disabled]="viewOnly">
+                @for (subType of acquisitionSubTypes; track subType) {
+                  <mat-option [value]="subType">{{ subType }}</mat-option>
+                }
+              </mat-select>
+              <mat-hint>Specific processor variant (e.g., CernerCCLExtract for Cerner census files)</mat-hint>
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="form-input">

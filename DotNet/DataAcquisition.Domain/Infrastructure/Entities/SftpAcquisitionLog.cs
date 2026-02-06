@@ -17,6 +17,8 @@ public class SftpAcquisitionLog
     
     public SftpAcquisitionType AcquisitionType { get; set; }
 
+    public SftpAcquisitionSubType SubType { get; set; } = SftpAcquisitionSubType.None;
+
     public List<string> FileNames { get; set; } = [];
     
     public DateTime? ScheduledDate { get; set; }

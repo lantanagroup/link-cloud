@@ -15,6 +15,12 @@ public class SftpAcquisitionTypeConfiguration
     public SftpAcquisitionType AcquisitionType { get; set; }
 
     /// <summary>
+    /// The subtype of acquisition, used to select the specific processor/parser
+    /// within a broad acquisition type (e.g., CernerCCLExtract within Census).
+    /// </summary>
+    public SftpAcquisitionSubType SubType { get; set; } = SftpAcquisitionSubType.None;
+
+    /// <summary>
     /// Remote directory for this acquisition type.
     /// If null, uses the parent SftpConfiguration.RemoteDirectory.
     /// </summary>

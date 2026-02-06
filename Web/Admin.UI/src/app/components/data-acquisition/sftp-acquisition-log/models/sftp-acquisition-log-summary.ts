@@ -1,12 +1,13 @@
 import { IPaginationMetadata } from '../../../../interfaces/pagination-metadata.interface';
-import { SftpAcquisitionType } from '../../../../interfaces/data-acquisition/sftp-config-model.interface';
+import { SftpAcquisitionType, SftpAcquisitionSubType } from '../../../../interfaces/data-acquisition/sftp-config-model.interface';
 
 export interface SftpAcquisitionLogSummary {
   id: number;
   externalId: string;
   facilityId: string;
   acquisitionType: SftpAcquisitionType;
-  fileCount: number;
+  subType: SftpAcquisitionSubType;
+  fileNames: string[];
   scheduledDate?: Date;
   processDate?: Date;
   status: string;

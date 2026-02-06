@@ -279,11 +279,11 @@ public static class GeneralStartupExtensions
         services.AddTransient<IFileParserFactory, FileParserFactory>();
         services.AddTransient<ISftpAcquisitionProcessorFactory, SftpAcquisitionProcessorFactory>();
 
-        //File Parsers (registered as IFileParser<T> for factory resolution)
-        services.AddTransient<IFileParser<CernerEncounters>, CernerCensusParser>();
+        //File Parsers
+        services.AddTransient<IFileParser<CernerEncounters>, CernerCclExtractParser>();
 
-        //SFTP Acquisition Processors (registered for factory resolution)
-        services.AddTransient<ISftpAcquisitionProcessor, CernerCensusProcessor>();
+        //SFTP Acquisition Processors
+        services.AddTransient<ISftpAcquisitionProcessor, CernerCclExtractProcessor>();
     }
 
     private static void RegisterSecretManager(this IServiceCollection services, IConfiguration configuration)
@@ -305,7 +305,7 @@ public static class GeneralStartupExtensions
             services.AddSingleton<ISecretManager, LocalSecretManager>();
         }
 
-        // Register credential service (depends on ISecretManager)
+        // Register credential service
         services.AddScoped<ISftpCredentialService, SftpCredentialService>();
     }
 

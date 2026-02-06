@@ -69,6 +69,15 @@
               </select>
             </div>
             <div class="filter-item">
+              <label>Sub Type</label>
+              <select [(ngModel)]="selectedSubTypeFilter">
+                <option value="Any">Any</option>
+                @for (option of subTypeFilterOptions; track option) {
+                  <option [value]="option">{{ option }}</option>
+                }
+              </select>
+            </div>
+            <div class="filter-item">
               <label>Status</label>
               <select [(ngModel)]="selectedStatusFilter">
                 <option value="Any">Any</option>
@@ -95,6 +104,10 @@
               <th scope="col" class="header-column sortable" (click)="onSort('acquisitionType')">
                 Type
                 <fa-icon [icon]="getSortIcon('acquisitionType')"></fa-icon>
+              </th>
+              <th scope="col" class="header-column sortable" (click)="onSort('subType')">
+                Sub Type
+                <fa-icon [icon]="getSortIcon('subType')"></fa-icon>
               </th>
               <th scope="col" class="header-column">
                 Files
@@ -140,7 +153,8 @@
                 </td>
                 <td class="data-col table-cell">{{ log.facilityId }}</td>
                 <td class="data-col table-cell">{{ log.acquisitionType }}</td>
-                <td class="data-col table-cell">{{ log.fileCount }} file(s)</td>
+                <td class="data-col table-cell">{{ log.subType !== 'None' ? log.subType : '-' }}</td>
+                <td class="data-col table-cell">{{ log.fileNames?.length || 0 }} file{{ log.fileNames?.length === 1 ? '' : 's' }}</td>
                 <td class="data-col table-cell">{{ log.scheduledDate | date:'short' }}</td>
                 <td class="data-col table-cell">{{ log.processDate | date:'short' }}</td>
                 <td class="table-cell">

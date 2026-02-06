@@ -11,6 +11,7 @@ public class SftpAcquisitionLogModel
     public Guid? ExternalId { get; set; }
     public string FacilityId { get; set; } = string.Empty;
     public SftpAcquisitionType AcquisitionType { get; set; }
+    public SftpAcquisitionSubType SubType { get; set; } = SftpAcquisitionSubType.None;
     public List<string> FileNames { get; set; } = [];
     public DateTime? ScheduledDate { get; set; }
     public DateTime? ProcessDate { get; set; }
@@ -30,7 +31,8 @@ public record PagedSftpAcquisitionLogModel : IPagedModel<SftpAcquisitionLogModel
 
 public record CreateSftpLogRequest(
     string FacilityId,
-    SftpAcquisitionType AcquisitionType);
+    SftpAcquisitionType AcquisitionType,
+    SftpAcquisitionSubType SubType = SftpAcquisitionSubType.None);
 
 public static class SftpAcquisitionLogModelExtensions
 {
@@ -39,6 +41,7 @@ public static class SftpAcquisitionLogModelExtensions
         ExternalId = entity.ExternalId,
         FacilityId = entity.FacilityId,
         AcquisitionType = entity.AcquisitionType,
+        SubType = entity.SubType,
         FileNames = entity.FileNames,
         ScheduledDate = entity.ScheduledDate.HasValue
             ? DateTime.SpecifyKind(entity.ScheduledDate.Value, DateTimeKind.Utc)
@@ -59,6 +62,7 @@ public static class SftpAcquisitionLogModelExtensions
         ExternalId = model.ExternalId ?? Guid.NewGuid(),
         FacilityId = model.FacilityId,
         AcquisitionType = model.AcquisitionType,
+        SubType = model.SubType,
         FileNames = model.FileNames,
         ScheduledDate = model.ScheduledDate,
         ProcessDate = model.ProcessDate,
@@ -75,6 +79,7 @@ public static class SftpAcquisitionLogModelExtensions
         ExternalId = Guid.NewGuid(),
         FacilityId = req.FacilityId,
         AcquisitionType = req.AcquisitionType,
+        SubType = req.SubType,
         Status = RequestStatus.Pending
     };
 }

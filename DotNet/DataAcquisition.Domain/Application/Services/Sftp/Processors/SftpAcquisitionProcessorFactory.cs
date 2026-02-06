@@ -5,19 +5,20 @@ using Microsoft.Extensions.Logging;
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Processors;
 
 /// <summary>
-/// Factory for selecting the appropriate <see cref="ISftpAcquisitionProcessor"/> based on acquisition type.
+/// Factory for selecting the appropriate <see cref="ISftpAcquisitionProcessor"/> based on acquisition type and subtype.
 /// Implementations resolve processors from the dependency injection container and select the one
-/// capable of handling the requested <see cref="SftpAcquisitionType"/>.
+/// capable of handling the requested <see cref="SftpAcquisitionType"/> and <see cref="SftpAcquisitionSubType"/>.
 /// </summary>
 public interface ISftpAcquisitionProcessorFactory
 {
     /// <summary>
-    /// Gets a processor capable of handling the specified acquisition type.
+    /// Gets a processor capable of handling the specified acquisition type and subtype.
     /// </summary>
     /// <param name="acquisitionType">The type of SFTP acquisition to process.</param>
-    /// <returns>An <see cref="ISftpAcquisitionProcessor"/> that can handle the acquisition type.</returns>
-    /// <exception cref="NotSupportedException">Thrown when no processor is registered for the acquisition type.</exception>
-    ISftpAcquisitionProcessor GetProcessor(SftpAcquisitionType acquisitionType);
+    /// <param name="subType">The subtype of SFTP acquisition to process.</param>
+    /// <returns>An <see cref="ISftpAcquisitionProcessor"/> that can handle the acquisition type and subtype.</returns>
+    /// <exception cref="NotSupportedException">Thrown when no processor is registered for the acquisition type and subtype.</exception>
+    ISftpAcquisitionProcessor GetProcessor(SftpAcquisitionType acquisitionType, SftpAcquisitionSubType subType);
 }
 
 
@@ -38,19 +39,19 @@ public class SftpAcquisitionProcessorFactory : ISftpAcquisitionProcessorFactory
     }
 
     /// <inheritdoc/>
-    public ISftpAcquisitionProcessor GetProcessor(SftpAcquisitionType acquisitionType)
+    public ISftpAcquisitionProcessor GetProcessor(SftpAcquisitionType acquisitionType, SftpAcquisitionSubType subType)
     {
         var processors = _serviceProvider.GetServices<ISftpAcquisitionProcessor>();
-        var processor = processors.FirstOrDefault(p => p.CanProcess(acquisitionType));
+        var processor = processors.FirstOrDefault(p => p.CanProcess(acquisitionType, subType));
 
         if (processor is null)
         {
-            _logger.LogError("No processor found for AcquisitionType={Type}", acquisitionType);
-            throw new NotSupportedException($"No processor available for {acquisitionType}");
+            _logger.LogError("No processor found for AcquisitionType={Type}, SubType={SubType}", acquisitionType, subType);
+            throw new NotSupportedException($"No processor available for {acquisitionType}/{subType}");
         }
 
-        _logger.LogDebug("Selected processor {ProcessorType} for {AcquisitionType}",
-            processor.GetType().Name, acquisitionType);
+        _logger.LogDebug("Selected processor {ProcessorType} for {AcquisitionType}/{SubType}",
+            processor.GetType().Name, acquisitionType, subType);
         return processor;
     }
 }

@@ -77,37 +77,41 @@ public class PatientCensusService : IPatientCensusService
 
         if (sftpConfig is not null)
         {
-            // Find a census-related acquisition configuration, it should only have one census type configured
-            var censusTypes = new[] { SftpAcquisitionType.CernerCensus, SftpAcquisitionType.Census };
-            var censusConfig = sftpConfig.AcquisitionConfigurations
-                .FirstOrDefault(c => censusTypes.Contains(c.AcquisitionType));
+            // Find all census-related acquisition configurations
+            var censusConfigs = sftpConfig.AcquisitionConfigurations
+                .Where(c => c.AcquisitionType == SftpAcquisitionType.Census)
+                .ToList();
 
-            if (censusConfig != null)
+            if (censusConfigs.Count > 0)
             {
-                // Create SftpAcquisitionLog for SFTP-based census
-                _logger.LogInformation(
-                    "Facility {FacilityId} is configured for SFTP census acquisition (type: {AcquisitionType})",
-                    facilityId, censusConfig.AcquisitionType);
-
-                var sftpLog = new SftpAcquisitionLogModel
+                foreach (var censusConfig in censusConfigs)
                 {
-                    ExternalId = Guid.NewGuid(),
-                    FacilityId = facilityId,
-                    AcquisitionType = censusConfig.AcquisitionType,
-                    ScheduledDate = null,  // null = census should process immediately, can be set later for retry if needed
-                    ProcessDate = null,
-                    Status = RequestStatus.Pending,
-                    OriginatingTraceId = Activity.Current?.TraceId.ToString(),
-                    OriginatingSpanId = Activity.Current?.SpanId.ToString(),
-                    Notes = [$"[{DateTime.UtcNow:O}] SFTP {censusConfig.AcquisitionType} acquisition scheduled"]
-                };
+                    // Create SftpAcquisitionLog for SFTP-based census
+                    _logger.LogInformation(
+                        "Facility {FacilityId} is configured for SFTP census acquisition (type: {AcquisitionType}, subType: {SubType})",
+                        facilityId, censusConfig.AcquisitionType, censusConfig.SubType);
 
-                await _sftpAcquisitionLogManager.CreateAsync(sftpLog, cancellationToken);
+                    var sftpLog = new SftpAcquisitionLogModel
+                    {
+                        ExternalId = Guid.NewGuid(),
+                        FacilityId = facilityId,
+                        AcquisitionType = censusConfig.AcquisitionType,
+                        SubType = censusConfig.SubType,
+                        ScheduledDate = null,  // null = census should process immediately, can be set later for retry if needed
+                        ProcessDate = null,
+                        Status = RequestStatus.Pending,
+                        OriginatingTraceId = Activity.Current?.TraceId.ToString(),
+                        OriginatingSpanId = Activity.Current?.SpanId.ToString(),
+                        Notes = [$"[{DateTime.UtcNow:O}] SFTP {censusConfig.AcquisitionType}/{censusConfig.SubType} acquisition scheduled"]
+                    };
 
-                _logger.LogInformation(
-                    "Created SFTP acquisition log ({AcquisitionType}) for facility {FacilityId}",
-                    censusConfig.AcquisitionType, facilityId);
-                
+                    await _sftpAcquisitionLogManager.CreateAsync(sftpLog, cancellationToken);
+
+                    _logger.LogInformation(
+                        "Created SFTP acquisition log ({AcquisitionType}/{SubType}) for facility {FacilityId}",
+                        censusConfig.AcquisitionType, censusConfig.SubType, facilityId);
+                }
+
                 return;
             }
 
