@@ -1,13 +1,5 @@
 import {Component, EventEmitter, OnDestroy, OnInit, Output} from '@angular/core';
-import {
-  FormArray,
-  FormBuilder,
-  FormControl,
-  FormGroup,
-  FormsModule,
-  ReactiveFormsModule,
-  Validators
-} from '@angular/forms';
+import {FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators} from '@angular/forms';
 import {CommonModule} from "@angular/common";
 import {MatSnackBar, MatSnackBarModule} from "@angular/material/snack-bar";
 import {MatFormFieldModule} from "@angular/material/form-field";
@@ -21,9 +13,7 @@ import {MatIconModule} from "@angular/material/icon";
 import {MatExpansionModule} from "@angular/material/expansion";
 import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
 import {MatDatepickerModule} from "@angular/material/datepicker";
-import {
-  IAdHocReportRequest
-} from "../../../interfaces/tenant/facility-config-model.interface";
+import {IAdHocReportRequest} from "../../../interfaces/tenant/facility-config-model.interface";
 import {TenantService} from "../../../services/gateway/tenant/tenant.service";
 import {MeasureDefinitionService} from "../../../services/gateway/measure-definition/measure.service";
 import {
@@ -34,12 +24,12 @@ import {
   debounceTime,
   distinctUntilChanged,
   firstValueFrom,
-  forkJoin,
   map,
   Observable,
   of,
   startWith,
-  Subject, takeUntil,
+  Subject,
+  takeUntil,
   tap
 } from "rxjs";
 import {MatCheckboxModule} from "@angular/material/checkbox";
@@ -251,7 +241,7 @@ export class GenerateReportFormComponent implements OnInit, OnDestroy {
             verticalPosition: 'top'
           });
           this.lastGeneratedReport = {facilityId: this.facilityIdControl.value, reportId: response.reportId};
-          this.resetForm();
+          this.router.navigate([`tenant/facility/${this.facilityIdControl.value}/report/${response.reportId}`]);
         },
         error: (err) => {
           // Display error message

@@ -1,46 +1,50 @@
 import {Component, OnInit} from '@angular/core';
-import { Location } from '@angular/common';
-import {ValidationResultsComponent} from "../validation-results/validation-results.component";
-import {CommonModule} from "@angular/common";
+import {CommonModule, Location} from '@angular/common';
 
 import {ActivatedRoute, Router, RouterLink, RouterLinkActive} from "@angular/router";
-import { FacilityViewService } from '../facility-view.service';
-import { IMeasureReportSummary, IReportListSummary } from '../report-view.interface';
-import { MatToolbarModule } from '@angular/material/toolbar';
-import { MatIconModule } from '@angular/material/icon';
-import { MatTabsModule } from '@angular/material/tabs';
-import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { MatDialog, MatDialogConfig, MatDialogModule } from '@angular/material/dialog';
-import { ViewMeasureReportComponent } from '../view-measure-report/view-measure-report.component';
-import { forkJoin, Subscription } from 'rxjs';
-import { FormsModule } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
-import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatTableDataSource, MatTableModule } from '@angular/material/table';
-import { MatSortModule, Sort } from '@angular/material/sort';
+import {FacilityViewService} from '../facility-view.service';
+import {IMeasureReportSummary} from '../report-view.interface';
+import {MatToolbarModule} from '@angular/material/toolbar';
+import {MatIconModule} from '@angular/material/icon';
+import {MatTabsModule} from '@angular/material/tabs';
+import {PaginationMetadata} from 'src/app/models/pagination-metadata.model';
+import {MatPaginatorModule, PageEvent} from '@angular/material/paginator';
+import {MatDialog, MatDialogConfig, MatDialogModule} from '@angular/material/dialog';
+import {ViewMeasureReportComponent} from '../view-measure-report/view-measure-report.component';
+import {FormsModule} from '@angular/forms';
+import {MatButtonModule} from '@angular/material/button';
+import {MatTooltipModule} from '@angular/material/tooltip';
+import {MatTableDataSource, MatTableModule} from '@angular/material/table';
+import {MatSortModule, Sort} from '@angular/material/sort';
 
-import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import {FontAwesomeModule} from '@fortawesome/angular-fontawesome';
 import {
-  faXmark,
-  faRotate,
   faArrowLeft,
   faFileArrowDown,
   faFileInvoice,
+  faGears,
+  faRotate,
   faSort,
-  faSortUp,
   faSortDown,
-  faGears
+  faSortUp,
+  faXmark
 } from '@fortawesome/free-solid-svg-icons';
-import { LoadingService } from 'src/app/services/loading.service';
-import { DonutChartComponent } from 'src/app/components/core/donut-chart/donut-chart.component';
-import { ViewReportTableCommandComponent } from './table-command/view-report-table-command.component';
-import { AcquisitionLogService } from '../../acquisition-log/acquisition-log.service';
-import { IDataAcquisitionLogStatistics } from 'src/app/interfaces/data-acquisition/data-acquisition-log-statistics.interface';
-import { ReportAnalysisComponent } from './report-analysis/report-analysis.component';
-import { IReportSchedule } from '../../../../interfaces/report/report-schedule.interface';
-import { ReportService } from '../../../../services/gateway/report/report.service';
-import { IReportEntry, IReportEntrySummary, ReportingStatus, SubmissionStatus } from '../../../../interfaces/report/report-entry.interface';
+import {LoadingService} from 'src/app/services/loading.service';
+import {DonutChartComponent} from 'src/app/components/core/donut-chart/donut-chart.component';
+import {ViewReportTableCommandComponent} from './table-command/view-report-table-command.component';
+import {AcquisitionLogService} from '../../acquisition-log/acquisition-log.service';
+import {
+  IDataAcquisitionLogStatistics
+} from 'src/app/interfaces/data-acquisition/data-acquisition-log-statistics.interface';
+import {ReportAnalysisComponent} from './report-analysis/report-analysis.component';
+import {IReportSchedule} from '../../../../interfaces/report/report-schedule.interface';
+import {ReportService} from '../../../../services/gateway/report/report.service';
+import {
+  IReportEntry,
+  IReportEntrySummary,
+  ReportingStatus,
+  SubmissionStatus
+} from '../../../../interfaces/report/report-entry.interface';
 
 @Component({
   selector: 'app-view-report',
@@ -299,17 +303,6 @@ export class ViewReportComponent implements OnInit {
       this.sortOrder = null;
     }
     this.loadReportEntries();
-  }
-
-  onViewAcquisitionLog() {
-
-    const urlTree = this.router.createUrlTree(['/tenant/acquisition-log'], {
-      queryParams: { reportId: this.reportId }
-    });
-    const fullUrl = this.router.serializeUrl(urlTree);
-
-    window.open(fullUrl, '_blank');
-    //this.router.navigate(['tenant/acquisition-log'], { queryParams: { reportId: this.reportId } });
   }
 
   onViewQueryAnalysis() {
