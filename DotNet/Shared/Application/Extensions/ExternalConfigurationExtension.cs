@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.Shared.Application.Extensions;
 
@@ -13,10 +14,21 @@ public static class ExternalConfigurationExtension
 {
     public static WebApplicationBuilder AddExternalConfiguration(this WebApplicationBuilder builder, string serviceName)
     {
+        using var loggerFactory = LoggerFactory.Create(logging =>
+        {
+            logging.AddConfiguration(builder.Configuration.GetSection("Logging"));
+            logging.AddConsole();
+            logging.AddDebug();
+            logging.AddEventSourceLogger();
+        });
+        var logger = loggerFactory.CreateLogger("ExternalConfigurationExtension");
+
         var externalConfigurationSource = builder.Configuration.GetSection(ConfigurationConstants.AppSettings.ExternalConfigurationSource).Get<string>();
 
         if (externalConfigurationSource is not null)
         {
+            logger.LogInformation("External configuration source configured: {ExternalConfigurationSource}.", externalConfigurationSource);
+
             switch (externalConfigurationSource)
             {
                 case "AzureAppConfiguration":
@@ -24,9 +36,20 @@ public static class ExternalConfigurationExtension
                     {
                         string? connectionString =
                             builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.AzureAppConfiguration);
-                        
-                        if (!string.IsNullOrEmpty(connectionString))
+
+                        if (string.IsNullOrEmpty(connectionString))
                         {
+                            logger.LogError(
+                                "External configuration source {ExternalConfigurationSource} is configured but connection string {ConnectionStringName} is missing or empty.",
+                                externalConfigurationSource,
+                                ConfigurationConstants.DatabaseConnections.AzureAppConfiguration);
+                            return;
+                        }
+
+                        try
+                        {
+                            logger.LogInformation("Connecting to external configuration source {ExternalConfigurationSource}.", externalConfigurationSource);
+
                             options.Connect(connectionString)
                                 // Load configuration values with no label
                                 .Select("*", LabelFilter.Null)
@@ -37,6 +60,13 @@ public static class ExternalConfigurationExtension
                                     serviceName + ":" + builder.Environment);
 
                             options.ConfigureKeyVault(kv => { kv.SetCredential(new DefaultAzureCredential()); });
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogError(ex,
+                                "External configuration source {ExternalConfigurationSource} is configured but failed to connect.",
+                                externalConfigurationSource);
+                            throw;
                         }
                     });
                     break;
