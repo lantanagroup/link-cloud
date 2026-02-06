@@ -14,21 +14,23 @@ using Microsoft.Extensions.Logging;
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Processors;
 
 /// <summary>
-/// Processor for Cerner SFTP census acquisition.
-/// Handles <see cref="SftpAcquisitionType.CernerCensus"/> and produces CernerPatientsAcquired Kafka events.
+/// Processor for Cerner CCL Extract SFTP census acquisition.
+/// Handles <see cref="SftpAcquisitionType.Census"/> with <see cref="SftpAcquisitionSubType.CernerCCLExtract"/>
+/// and produces CernerPatientsAcquired Kafka events.
 /// Produces one event per file containing patient encounter data.
 /// </summary>
-public class CernerCensusProcessor(
-    ILogger<CernerCensusProcessor> logger,
+public class CernerCclExtractProcessor(
+    ILogger<CernerCclExtractProcessor> logger,
     ISftpClientService sftpClientService,
     IFileParserFactory fileParserFactory,
     IProducer<string, CernerPatientsAcquired> kafkaProducer)
     : ISftpAcquisitionProcessor
 {
     /// <inheritdoc/>
-    public bool CanProcess(SftpAcquisitionType acquisitionType)
+    public bool CanProcess(SftpAcquisitionType acquisitionType, SftpAcquisitionSubType subType)
     {
-        return acquisitionType == SftpAcquisitionType.CernerCensus;
+        return acquisitionType == SftpAcquisitionType.Census
+               && subType == SftpAcquisitionSubType.CernerCCLExtract;
     }
 
     /// <inheritdoc/>
@@ -74,17 +76,18 @@ public class CernerCensusProcessor(
                 "No Files Found",
                 tags: new ActivityTagsCollection
                 {
-                    { "FacilityId", log.FacilityId },
-                    { "AcquisitionType", log.AcquisitionType.ToString() },
-                    { "Pattern", acquisitionConfig.FileNamePattern ?? "(all files)" }
+                    { DiagnosticNames.FacilityId, log.FacilityId },
+                    { "acquisition.type", log.AcquisitionType.ToString() },
+                    { "sub.type", acquisitionConfig.SubType.ToString() },
+                    { "file.pattern", acquisitionConfig.FileNamePattern ?? "(all files)" }
                 }));
 
             logger.LogInformation(
-                "No files found for facility {FacilityId}, type {AcquisitionType}, pattern {Pattern}",
-                log.FacilityId, log.AcquisitionType, acquisitionConfig.FileNamePattern ?? "(all files)");
+                "No files found for facility {FacilityId}, type {AcquisitionType}, sub-type {SubType}, pattern {Pattern}",
+                log.FacilityId, log.AcquisitionType, log.SubType, acquisitionConfig.FileNamePattern ?? "(all files)");
             return processedFiles;
         }
-        
+
         // Add files found activity event
         activity?.AddEvent(new ActivityEvent(
             "Files Found",
@@ -98,8 +101,8 @@ public class CernerCensusProcessor(
             }));
 
         logger.LogInformation(
-            "Found {FileCount} files for facility {FacilityId}, type {AcquisitionType}",
-            files.Count, log.FacilityId, log.AcquisitionType);
+            "Found {FileCount} {FileLabel} for facility {FacilityId}, type {AcquisitionType}, sub-type {SubType}, pattern {Pattern}",
+            files.Count, files.Count == 1 ? "file" : "files", log.FacilityId, log.AcquisitionType, log.SubType, acquisitionConfig.FileNamePattern ?? "(all files)");
 
         // Process each file
         foreach (var file in files)
@@ -112,6 +115,7 @@ public class CernerCensusProcessor(
             var fileExtension = Path.GetExtension(file.Name);
             var parser = fileParserFactory.GetParser<CernerEncounters>(
                 log.AcquisitionType,
+                acquisitionConfig.SubType,
                 fileExtension,
                 acquisitionConfig.ParsingConfiguration);
 
@@ -155,7 +159,7 @@ public class CernerCensusProcessor(
                     { "encounter.count", fileEncounters.Count },
                     { "encounter.identifiers", string.Join(", ", fileEncounters.Select(f => f.EncounterId)) }
                 }));
-            
+
             logger.LogDebug(
                 "Produced CernerPatientsAcquired event for file {FileName} with {EncounterCount} encounters",
                 file.Name, fileEncounters.Count);
@@ -189,8 +193,10 @@ public class CernerCensusProcessor(
         kafkaProducer.Flush(cancellationToken);
 
         logger.LogInformation(
-            "Successfully processed {FileCount} Cerner census files with {EncounterCount} total encounters for facility {FacilityId}",
-            processedFiles.Count, totalEncounterCount, log.FacilityId);
+            "Successfully processed {FileCount} {FileLabel} with {EncounterCount} {EncounterLabel} for facility {FacilityId}",
+            processedFiles.Count, processedFiles.Count == 1 ? "file" : "files",
+            totalEncounterCount, totalEncounterCount == 1 ? "encounter" : "encounters",
+            log.FacilityId);
 
         return processedFiles;
     }

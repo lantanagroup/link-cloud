@@ -21,7 +21,10 @@ public class CreateSftpLogRequestValidator : AbstractValidator<CreateSftpLogRequ
         RuleFor(x => x.AcquisitionType)
             .IsInEnum()
             .WithMessage("Type must be a valid SftpAcquisitionType.");
-     
+
+        RuleFor(x => x.SubType)
+            .IsInEnum()
+            .WithMessage("SubType must be a valid SftpAcquisitionSubType.");
     }
 }
 

@@ -24,6 +24,7 @@ export class SftpAcquisitionLogService {
   getSftpAcquisitionLogs(
     facilityId: string | null,
     acquisitionType: string | null,
+    subType: string | null,
     status: string | null,
     sortBy: string | null,
     sortOrder: 'ascending' | 'descending' | null,
@@ -49,6 +50,9 @@ export class SftpAcquisitionLogService {
     }
     if (acquisitionType) {
       params = params.set('acquisitionType', acquisitionType);
+    }
+    if (subType) {
+      params = params.set('subType', subType);
     }
     if (status) {
       params = params.set('status', status);

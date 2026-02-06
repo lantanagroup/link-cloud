@@ -14,7 +14,7 @@ import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
 import { SftpAcquisitionLogSummary } from '../models/sftp-acquisition-log-summary';
 import { SftpAcquisitionLogService } from '../sftp-acquisition-log.service';
 import { SftpAcquisitionLogDetailsComponent } from '../sftp-acquisition-log-details/sftp-acquisition-log-details.component';
-import { SftpAcquisitionType } from '../../../../interfaces/data-acquisition/sftp-config-model.interface';
+import { SftpAcquisitionType, SftpAcquisitionSubType } from '../../../../interfaces/data-acquisition/sftp-config-model.interface';
 
 @Component({
   selector: 'app-sftp-acquisition-log-view',
@@ -87,6 +87,8 @@ export class SftpAcquisitionLogViewComponent implements OnInit {
   selectedFacilityFilter = 'Any';
   acquisitionTypeFilterOptions = Object.values(SftpAcquisitionType);
   selectedAcquisitionTypeFilter = 'Any';
+  subTypeFilterOptions = Object.values(SftpAcquisitionSubType);
+  selectedSubTypeFilter = 'Any';
   statusFilterOptions = ['Pending', 'Processing', 'Completed', 'Failed', 'MaxRetriesReached', 'ConfigurationRequired'];
   selectedStatusFilter = 'Any';
 
@@ -107,7 +109,7 @@ export class SftpAcquisitionLogViewComponent implements OnInit {
     forkJoin([
       this.tenantService.getAllFacilities(),
       this.sftpLogService.getSftpAcquisitionLogs(
-        null, null, null, null, null,
+        null, null, null, null, null, null,
         this.defaultPageNumber, this.defaultPageSize, false
       )
     ]).subscribe({
@@ -128,6 +130,7 @@ export class SftpAcquisitionLogViewComponent implements OnInit {
     this.sftpLogService.getSftpAcquisitionLogs(
       this.selectedFacilityFilter !== 'Any' ? this.selectedFacilityFilter : null,
       this.selectedAcquisitionTypeFilter !== 'Any' ? this.selectedAcquisitionTypeFilter : null,
+      this.selectedSubTypeFilter !== 'Any' ? this.selectedSubTypeFilter : null,
       this.selectedStatusFilter !== 'Any' ? this.selectedStatusFilter : null,
       this.sortBy,
       this.sortOrder,
@@ -161,6 +164,7 @@ export class SftpAcquisitionLogViewComponent implements OnInit {
     this.filtersApplied = (
       this.selectedFacilityFilter !== 'Any' ||
       this.selectedAcquisitionTypeFilter !== 'Any' ||
+      this.selectedSubTypeFilter !== 'Any' ||
       this.selectedStatusFilter !== 'Any'
     );
   }
@@ -168,6 +172,7 @@ export class SftpAcquisitionLogViewComponent implements OnInit {
   clearFilters(): void {
     this.selectedFacilityFilter = 'Any';
     this.selectedAcquisitionTypeFilter = 'Any';
+    this.selectedSubTypeFilter = 'Any';
     this.selectedStatusFilter = 'Any';
     this.filtersApplied = false;
     this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);

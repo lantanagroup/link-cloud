@@ -15,10 +15,11 @@ public interface IFileParser<TResult>
     /// Determines if this parser can handle a file with the given characteristics.
     /// </summary>
     /// <param name="acquisitionType">The type of SFTP acquisition being processed.</param>
+    /// <param name="subType">The subtype of SFTP acquisition being processed.</param>
     /// <param name="fileExtension">The file extension including the dot (e.g., ".csv", ".txt").</param>
     /// <param name="config">Optional parsing configuration that may affect parser selection.</param>
     /// <returns><c>true</c> if this parser can handle the file; otherwise, <c>false</c>.</returns>
-    bool CanParse(SftpAcquisitionType acquisitionType, string fileExtension, FileParsingConfiguration? config);
+    bool CanParse(SftpAcquisitionType acquisitionType, SftpAcquisitionSubType subType, string fileExtension, FileParsingConfiguration? config);
 
     /// <summary>
     /// Parses the file stream and yields records as they are parsed.

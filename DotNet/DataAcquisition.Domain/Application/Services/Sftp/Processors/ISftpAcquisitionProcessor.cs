@@ -13,11 +13,12 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Pro
 public interface ISftpAcquisitionProcessor
 {
     /// <summary>
-    /// Determines if this processor can handle the given acquisition type.
+    /// Determines if this processor can handle the given acquisition type and subtype.
     /// </summary>
     /// <param name="acquisitionType">The type of SFTP acquisition to check.</param>
-    /// <returns><c>true</c> if this processor can handle the acquisition type; otherwise, <c>false</c>.</returns>
-    bool CanProcess(SftpAcquisitionType acquisitionType);
+    /// <param name="subType">The subtype of SFTP acquisition to check.</param>
+    /// <returns><c>true</c> if this processor can handle the acquisition type and subtype; otherwise, <c>false</c>.</returns>
+    bool CanProcess(SftpAcquisitionType acquisitionType, SftpAcquisitionSubType subType);
 
     /// <summary>
     /// Processes an SFTP acquisition log entry, managing its own SFTP session internally.

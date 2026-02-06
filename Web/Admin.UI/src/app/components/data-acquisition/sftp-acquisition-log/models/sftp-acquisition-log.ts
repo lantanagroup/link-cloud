@@ -1,4 +1,4 @@
-import { SftpAcquisitionType } from '../../../../interfaces/data-acquisition/sftp-config-model.interface';
+import { SftpAcquisitionType, SftpAcquisitionSubType } from '../../../../interfaces/data-acquisition/sftp-config-model.interface';
 
 export interface SftpAcquisitionBenchmark {
   attemptNumber: number;
@@ -16,6 +16,7 @@ export interface SftpAcquisitionLog {
   externalId: string;
   facilityId: string;
   acquisitionType: SftpAcquisitionType;
+  subType: SftpAcquisitionSubType;
   fileNames: string[];
   scheduledDate?: Date;
   processDate?: Date;

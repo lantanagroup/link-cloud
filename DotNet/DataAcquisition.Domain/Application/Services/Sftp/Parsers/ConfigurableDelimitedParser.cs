@@ -19,7 +19,7 @@ public class ConfigurableDelimitedParser : IFileParser<Dictionary<string, string
         _logger = logger;
     }
 
-    public bool CanParse(SftpAcquisitionType acquisitionType, string fileExtension, FileParsingConfiguration? config)
+    public bool CanParse(SftpAcquisitionType acquisitionType, SftpAcquisitionSubType subType, string fileExtension, FileParsingConfiguration? config)
     {
         // This parser handles any file when config specifies "Delimited" parser type with mappings
         return config?.ParserType == "Delimited" && config.ColumnMappings.Count > 0;

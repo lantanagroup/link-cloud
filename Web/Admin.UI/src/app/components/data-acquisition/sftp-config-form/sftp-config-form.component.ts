@@ -24,6 +24,7 @@ import {
   ISftpAcquisitionTypeConfiguration,
   ISftpConfigurationModel,
   ISftpCredentialStatusModel,
+  SftpAcquisitionSubType,
   SftpAcquisitionType
 } from '../../../interfaces/data-acquisition/sftp-config-model.interface';
 
@@ -68,6 +69,7 @@ export class SftpConfigFormComponent implements OnInit, OnChanges {
   credentialStatus: ISftpCredentialStatusModel | null = null;
   showCredentialFields: boolean = false;
   acquisitionTypes = Object.values(SftpAcquisitionType);
+  acquisitionSubTypes = Object.values(SftpAcquisitionSubType);
 
   constructor(
     private snackBar: MatSnackBar,
@@ -275,7 +277,8 @@ export class SftpConfigFormComponent implements OnInit, OnChanges {
 
   createAcquisitionConfigGroup(config?: ISftpAcquisitionTypeConfiguration): FormGroup {
     return this.fb.group({
-      acquisitionType: [config?.acquisitionType || SftpAcquisitionType.CernerCensus, Validators.required],
+      acquisitionType: [config?.acquisitionType || SftpAcquisitionType.Census, Validators.required],
+      subType: [config?.subType || SftpAcquisitionSubType.None, Validators.required],
       remoteDirectory: [config?.remoteDirectory || ''],
       processedDirectory: [config?.processedDirectory || ''],
       fileNamePattern: [config?.fileNamePattern || ''],

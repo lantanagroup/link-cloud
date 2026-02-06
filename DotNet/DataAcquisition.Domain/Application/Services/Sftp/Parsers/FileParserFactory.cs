@@ -17,14 +17,16 @@ public interface IFileParserFactory
     /// </summary>
     /// <typeparam name="TResult">The type of records the parser should produce.</typeparam>
     /// <param name="acquisitionType">The type of SFTP acquisition being processed.</param>
+    /// <param name="subType">The subtype of SFTP acquisition being processed.</param>
     /// <param name="fileExtension">The file extension including the dot (e.g., ".csv", ".txt").</param>
     /// <param name="config">Optional parsing configuration that may affect parser selection.</param>
     /// <returns>An <see cref="IFileParser{TResult}"/> that can parse the file.</returns>
     /// <exception cref="NotSupportedException">
-    /// Thrown when no parser is registered for the combination of acquisition type, file extension, and result type.
+    /// Thrown when no parser is registered for the combination of acquisition type, subtype, file extension, and result type.
     /// </exception>
     IFileParser<TResult> GetParser<TResult>(
         SftpAcquisitionType acquisitionType,
+        SftpAcquisitionSubType subType,
         string fileExtension,
         FileParsingConfiguration? config);
 }
@@ -46,21 +48,22 @@ public class FileParserFactory : IFileParserFactory
     /// <inheritdoc/>
     public IFileParser<TResult> GetParser<TResult>(
         SftpAcquisitionType acquisitionType,
+        SftpAcquisitionSubType subType,
         string fileExtension,
         FileParsingConfiguration? config)
     {
         // Get all registered parsers of the requested result type
         var parsers = _serviceProvider.GetServices<IFileParser<TResult>>();
 
-        var parser = parsers.FirstOrDefault(p => p.CanParse(acquisitionType, fileExtension, config));
+        var parser = parsers.FirstOrDefault(p => p.CanParse(acquisitionType, subType, fileExtension, config));
 
         if (parser is null)
         {
             _logger.LogError(
-                "No parser found for AcquisitionType={Type}, FileExtension={FileExtension}, ResultType={ResultType}",
-                acquisitionType, fileExtension, typeof(TResult).Name);
+                "No parser found for AcquisitionType={Type}, SubType={SubType}, FileExtension={FileExtension}, ResultType={ResultType}",
+                acquisitionType, subType, fileExtension, typeof(TResult).Name);
             throw new NotSupportedException(
-                $"No parser available for {acquisitionType}/{fileExtension} returning {typeof(TResult).Name}");
+                $"No parser available for {acquisitionType}/{subType}/{fileExtension} returning {typeof(TResult).Name}");
         }
 
         _logger.LogDebug("Selected parser {ParserType} for file extension {FileExtension}", parser.GetType().Name, fileExtension);

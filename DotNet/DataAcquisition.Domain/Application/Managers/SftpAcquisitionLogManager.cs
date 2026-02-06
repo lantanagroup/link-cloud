@@ -132,6 +132,9 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
         {
             var entity = model.ToDomain();
 
+            // Default ScheduledDate to now if not provided (immediate processing)
+            entity.ScheduledDate ??= DateTime.UtcNow;
+
             if (model.ProcessDate.HasValue)
             {
                 entity.ProcessDate = model.ProcessDate.Value.ToUniversalTime();

@@ -9,10 +9,10 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Par
 
 /// <summary>
 /// Parser for Cerner pipe-delimited census files (.dat).
-/// Handles SftpAcquisitionType.CernerCensus with hardcoded column positions.
+/// Handles SftpAcquisitionType.Census with SftpAcquisitionSubType.CernerCCLExtract using hardcoded column positions.
 /// Format: person_id|encntr_id|facility|unit|room|bed|fin|mrn|pat_nam|enc_status|enc_type|admit_dt|disch_dt
 /// </summary>
-public class CernerCensusParser(ILogger<CernerCensusParser> logger) : IFileParser<CernerEncounters>
+public class CernerCclExtractParser(ILogger<CernerCclExtractParser> logger) : IFileParser<CernerEncounters>
 {
     // Column indices for pipe-delimited format:
     // person_id|encntr_id|facility|unit|room|bed|fin|mrn|pat_nam|enc_status|enc_type|admit_dt|disch_dt
@@ -28,10 +28,11 @@ public class CernerCensusParser(ILogger<CernerCensusParser> logger) : IFileParse
     // Index 12 (disch_dt) parsed but not included in CernerEncounters model
     private const int MinColumnCount = 12;  // At least through admit_dt
 
-    public bool CanParse(SftpAcquisitionType acquisitionType, string fileExtension, FileParsingConfiguration? config)
+    public bool CanParse(SftpAcquisitionType acquisitionType, SftpAcquisitionSubType subType, string fileExtension, FileParsingConfiguration? config)
     {
-        // This parser handles CernerCensus acquisition type with .dat files
-        return acquisitionType == SftpAcquisitionType.CernerCensus
+        // This parser handles Census acquisition type with CernerCCLExtract subtype and .dat files
+        return acquisitionType == SftpAcquisitionType.Census
+               && subType == SftpAcquisitionSubType.CernerCCLExtract
                && fileExtension.Equals(".dat", StringComparison.OrdinalIgnoreCase);
     }
 

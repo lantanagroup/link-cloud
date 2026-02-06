@@ -1,7 +1,11 @@
 export enum SftpAcquisitionType {
   Census = 'Census',
-  CernerCensus = 'CernerCensus',
   Resources = 'Resources'
+}
+
+export enum SftpAcquisitionSubType {
+  None = 'None',
+  CernerCCLExtract = 'CernerCCLExtract'
 }
 
 export interface IFileParsingConfiguration {
@@ -17,6 +21,7 @@ export interface IFileParsingConfiguration {
 
 export interface ISftpAcquisitionTypeConfiguration {
   acquisitionType: SftpAcquisitionType;
+  subType: SftpAcquisitionSubType;
   remoteDirectory?: string;
   processedDirectory?: string;
   fileNamePattern?: string;

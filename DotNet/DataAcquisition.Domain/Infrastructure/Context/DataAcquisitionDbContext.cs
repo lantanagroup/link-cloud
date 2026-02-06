@@ -208,6 +208,10 @@ public class DataAcquisitionDbContext : DbContext
                 .HasMaxLength(50)
                 .HasConversion(new EnumToStringConverter<SftpAcquisitionType>());
 
+            entity.Property(d => d.SubType)
+                .HasMaxLength(50)
+                .HasConversion(new EnumToStringConverter<SftpAcquisitionSubType>());
+
             entity.Property(e => e.FileNames)
                 .HasConversion(
                     v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),

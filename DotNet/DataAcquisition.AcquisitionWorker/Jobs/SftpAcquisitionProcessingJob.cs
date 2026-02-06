@@ -32,7 +32,7 @@ public class SftpAcquisitionProcessingJob(
             var logQueries = scope.ServiceProvider.GetRequiredService<ISftpAcquisitionLogQueries>();
 
             // Sftp acquisition types to process
-            var acquisitionTypes = new[] { SftpAcquisitionType.CernerCensus };
+            var acquisitionTypes = new[] { SftpAcquisitionType.Census };
 
             var allLogs = new List<SftpAcquisitionLog>();
 
@@ -303,14 +303,14 @@ public class SftpAcquisitionProcessingJob(
 
         try
         {
-            // Find the acquisition configuration for this log's type
+            // Find the acquisition configuration for this log's type and subtype
             var acquisitionConfig = sftpConfig.AcquisitionConfigurations
-                .FirstOrDefault(c => c.AcquisitionType == log.AcquisitionType);
+                .FirstOrDefault(c => c.AcquisitionType == log.AcquisitionType && c.SubType == log.SubType);
 
             if (acquisitionConfig is null)
             {
                 throw new InvalidOperationException(
-                    $"No acquisition configuration found for type {log.AcquisitionType} in facility {log.FacilityId}");
+                    $"No acquisition configuration found for type {log.AcquisitionType}/{log.SubType} in facility {log.FacilityId}");
             }
 
             // Initialize benchmarking if enabled for this facility
@@ -318,8 +318,8 @@ public class SftpAcquisitionProcessingJob(
                 ? new SftpBenchmarkCollector(log.RetryAttempts ?? 0)
                 : null;
 
-            // Get the appropriate processor for this acquisition type
-            var processor = processorFactory.GetProcessor(log.AcquisitionType);
+            // Get the appropriate processor for this acquisition type and subtype
+            var processor = processorFactory.GetProcessor(log.AcquisitionType, log.SubType);
 
             // Use the shared SFTP session
             var processedFiles =

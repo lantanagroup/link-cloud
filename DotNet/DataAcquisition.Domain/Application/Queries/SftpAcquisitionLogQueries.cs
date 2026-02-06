@@ -105,6 +105,9 @@ public class SftpAcquisitionLogQueries(
             if(queryParameters.AcquisitionType.HasValue)
                 query = query.Where(x => x.AcquisitionType == queryParameters.AcquisitionType.Value);
 
+            if(queryParameters.SubType.HasValue)
+                query = query.Where(x => x.SubType == queryParameters.SubType.Value);
+
             query = queryParameters.SortOrder switch
             {
                 SortOrder.Ascending => query.OrderBy(SetSortBy<SftpAcquisitionLog>(queryParameters.SortBy)),
