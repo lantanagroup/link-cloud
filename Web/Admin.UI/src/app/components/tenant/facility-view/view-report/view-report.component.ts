@@ -106,8 +106,8 @@ export class ViewReportComponent implements OnInit {
   patientFilter: string = '';
   reportFilter: string = '';
   selectedMeasureFilter: string = 'any';
-  selectedReportStatusFilter: ReportingStatus|string = 'any';
-  selectedSubmissionStatusFilter: SubmissionStatus|string = 'any';
+  selectedReportStatusFilter: ReportingStatus | 'any' = 'any';
+  selectedSubmissionStatusFilter: SubmissionStatus | 'any' | 'pending' = 'any';
   measures: string[] = [];
   reportStatuses: ReportingStatus[] = [
     ReportingStatus.PatientIdentified,
@@ -116,7 +116,8 @@ export class ViewReportComponent implements OnInit {
     ReportingStatus.PassedValidation,
     ReportingStatus.FailedValidation
   ];
-  submissionStatuses: SubmissionStatus[] = [
+  submissionStatuses: Array<SubmissionStatus | 'pending'> = [
+    'pending',
     SubmissionStatus.PendingValidation,
     SubmissionStatus.Submitting,
     SubmissionStatus.Submitted,
@@ -174,7 +175,8 @@ export class ViewReportComponent implements OnInit {
     const reportingStatus = this.selectedReportStatusFilter !== 'any'
       ? this.selectedReportStatusFilter as ReportingStatus
       : undefined;
-    const submissionStatus = this.selectedSubmissionStatusFilter !== 'any'
+    const submissionStatusIsNull = this.selectedSubmissionStatusFilter === 'pending';
+    const submissionStatus = this.selectedSubmissionStatusFilter !== 'any' && !submissionStatusIsNull
       ? this.selectedSubmissionStatusFilter as SubmissionStatus
       : undefined;
     const reportType = this.selectedMeasureFilter !== 'any'
@@ -187,6 +189,7 @@ export class ViewReportComponent implements OnInit {
       reportScheduleId,
       reportingStatus,
       submissionStatus,
+      submissionStatusIsNull,
       reportType,
       this.sortBy || undefined,
       this.sortOrder || undefined,
@@ -335,6 +338,32 @@ export class ViewReportComponent implements OnInit {
     }
   }
 
+  onReportStatusSliceSelected(label: string): void {
+    const status = this.findReportingStatusByLabel(label);
+    if (status === null) {
+      return;
+    }
+
+    this.selectedReportStatusFilter = status;
+    this.paginationMetadata.pageNumber = 0;
+    this.loadReportEntries();
+  }
+
+  onSubmissionStatusSliceSelected(label: string): void {
+    if (this.isPendingSubmissionLabel(label)) {
+      this.selectedSubmissionStatusFilter = 'pending';
+    } else {
+      const status = this.findSubmissionStatusByLabel(label);
+      if (status === null) {
+        return;
+      }
+      this.selectedSubmissionStatusFilter = status;
+    }
+
+    this.paginationMetadata.pageNumber = 0;
+    this.loadReportEntries();
+  }
+
   getTotalResourceCount(measureReports: any[]): number {
     if (!measureReports || measureReports.length === 0) {
       return 0;
@@ -413,6 +442,37 @@ export class ViewReportComponent implements OnInit {
       default:
         return 'Pending';
     }
+  }
+
+  getSubmissionStatusFilterText(status: SubmissionStatus | 'pending'): string {
+    if (status === 'pending') {
+      return 'Pending';
+    }
+
+    return this.getSubmissionStatusText(status);
+  }
+
+  private findReportingStatusByLabel(label: string): ReportingStatus | null {
+    const match = this.reportStatuses.find((status) => this.getReportingStatusText(status) === label);
+    if (match !== undefined) {
+      return match;
+    }
+
+    return this.toReportingStatus(label);
+  }
+
+  private findSubmissionStatusByLabel(label: string): SubmissionStatus | null {
+    const match = this.submissionStatuses.find((status) =>
+      status !== 'pending' && this.getSubmissionStatusText(status as SubmissionStatus) === label);
+    if (match !== undefined && match !== 'pending') {
+      return match;
+    }
+
+    return this.toSubmissionStatus(label);
+  }
+
+  private isPendingSubmissionLabel(label: string): boolean {
+    return label.trim().toLowerCase() === 'pending';
   }
 
   private toReportingStatus(statusKey: string): ReportingStatus | null {

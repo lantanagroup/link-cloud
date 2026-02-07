@@ -37,6 +37,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             string? reportScheduleId,
             ReportingStatus? reportingStatus,
             SubmissionStatus? submissionStatus,
+            bool submissionStatusIsNull,
             string? reportType,
             string? sortBy,
             SortOrder? sortOrder,
@@ -158,6 +159,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             string? reportScheduleId,
             ReportingStatus? reportingStatus,
             SubmissionStatus? submissionStatus,
+            bool submissionStatusIsNull,
             string? reportType,
             string? sortBy,
             SortOrder? sortOrder,
@@ -187,7 +189,11 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 predicate = predicate.And(q => q.ReportingStatus == reportingStatus.Value);
             }
 
-            if (submissionStatus.HasValue)
+            if (submissionStatusIsNull)
+            {
+                predicate = predicate.And(q => q.SubmissionStatus == null);
+            }
+            else if (submissionStatus.HasValue)
             {
                 predicate = predicate.And(q => q.SubmissionStatus == submissionStatus.Value);
             }
