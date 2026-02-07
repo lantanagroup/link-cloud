@@ -63,6 +63,8 @@ public interface IDataAcquisitionLogQueries
 
     Task<DataAcquisitionLogStatistics> GetDataAcquisitionLogStatisticsByReportAsync(string reportId, CancellationToken cancellationToken = default);
 
+    Task<DataAcquisitionLogStatusStatistics> GetDataAcquisitionLogStatusStatisticsByReportAsync(string reportId, string? patientId = null, CancellationToken cancellationToken = default);
+
     Task<bool> CheckIfReferenceResourceHasBeenSent(string referenceId, string reportTrackingId, string facilityId, string correlationId, CancellationToken cancellationToken = default);
 
     Task<List<string>> GetFacilitiesWithPendingAndRetryableFailedRequests(CancellationToken cancellationToken = default);
@@ -535,6 +537,41 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         }
 
         return statistics;
+    }
+
+    public async Task<DataAcquisitionLogStatusStatistics> GetDataAcquisitionLogStatusStatisticsByReportAsync(string reportId, string? patientId = null, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(reportId))
+        {
+            throw new ArgumentNullException(nameof(reportId), "Report ID cannot be null or empty.");
+        }
+
+        var query = _dbContext.DataAcquisitionLogs
+            .AsNoTracking()
+            .Where(log => log.ReportTrackingId == reportId);
+
+        if (!string.IsNullOrWhiteSpace(patientId))
+        {
+            query = query.Where(log => log.PatientId == patientId);
+        }
+
+        var statuses = await query
+            .Where(log => log.Status != null)
+            .GroupBy(log => log.Status!.Value)
+            .OrderBy(g => g.Key)
+            .Select(g => new DataAcquisitionLogStatusCount
+            {
+                Name = g.Key.ToString(),
+                Count = g.Count()
+            })
+            .ToListAsync(cancellationToken);
+
+        return new DataAcquisitionLogStatusStatistics
+        {
+            ReportId = reportId,
+            PatientId = string.IsNullOrWhiteSpace(patientId) ? null : patientId,
+            Statuses = statuses
+        };
     }
 
     public async Task<bool> CheckIfReferenceResourceHasBeenSent(string referenceId, string reportTrackingId, string facilityId, string correlationId, CancellationToken cancellationToken = default)
