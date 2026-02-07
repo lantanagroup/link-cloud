@@ -40,7 +40,7 @@ authentication:
 
 link:
   data-acquisition:
-    base-url: http://dataacquisition:8065
+    base-url: http://dataacq:8065
 
 telemetry:
   exporter_endpoint: http://otel-collector:4317
