@@ -91,7 +91,7 @@ export class ViewReportComponent implements OnInit {
   reportEntrySummary: IReportEntrySummary | undefined;
   measureIpCountsData: Record<string, number> = {};
   reportStatusData: Record<string, number> = {};
-  validationStatusData: Record<string, number> = {};
+  submissionStatusData: Record<string, number> = {};
 
   defaultPageNumber: number = 0
   defaultPageSize: number = 10;
@@ -107,7 +107,7 @@ export class ViewReportComponent implements OnInit {
   reportFilter: string = '';
   selectedMeasureFilter: string = 'any';
   selectedReportStatusFilter: ReportingStatus|string = 'any';
-  selectedValidationStatusFilter: SubmissionStatus|string = 'any';
+  selectedSubmissionStatusFilter: SubmissionStatus|string = 'any';
   measures: string[] = [];
   reportStatuses: ReportingStatus[] = [
     ReportingStatus.PatientIdentified,
@@ -116,7 +116,7 @@ export class ViewReportComponent implements OnInit {
     ReportingStatus.PassedValidation,
     ReportingStatus.FailedValidation
   ];
-  validationStatuses: SubmissionStatus[] = [
+  submissionStatuses: SubmissionStatus[] = [
     SubmissionStatus.PendingValidation,
     SubmissionStatus.Submitting,
     SubmissionStatus.Submitted,
@@ -174,8 +174,8 @@ export class ViewReportComponent implements OnInit {
     const reportingStatus = this.selectedReportStatusFilter !== 'any'
       ? this.selectedReportStatusFilter as ReportingStatus
       : undefined;
-    const submissionStatus = this.selectedValidationStatusFilter !== 'any'
-      ? this.selectedValidationStatusFilter as SubmissionStatus
+    const submissionStatus = this.selectedSubmissionStatusFilter !== 'any'
+      ? this.selectedSubmissionStatusFilter as SubmissionStatus
       : undefined;
     const reportType = this.selectedMeasureFilter !== 'any'
       ? this.selectedMeasureFilter
@@ -216,8 +216,18 @@ export class ViewReportComponent implements OnInit {
         next: (data) => {
           this.reportEntrySummary = data;
           this.measureIpCountsData = data.reportTypeCounts;
-          this.reportStatusData = data.reportingStatusCounts;
-          this.validationStatusData = data.submissionStatusCounts;
+          this.reportStatusData = Object.entries(data.reportingStatusCounts).reduce((acc, [statusKey, count]) => {
+            const statusValue = this.toReportingStatus(statusKey);
+            const label = statusValue !== null ? this.getReportingStatusText(statusValue) : statusKey;
+            acc[label] = count;
+            return acc;
+          }, {} as Record<string, number>);
+          this.submissionStatusData = Object.entries(data.submissionStatusCounts).reduce((acc, [statusKey, count]) => {
+            const statusValue = this.toSubmissionStatus(statusKey);
+            const label = statusValue !== null ? this.getSubmissionStatusText(statusValue) : statusKey;
+            acc[label] = count;
+            return acc;
+          }, {} as Record<string, number>);
         },
         error: (error) => {
           console.error('Error loading report entry summary:', error);
@@ -250,7 +260,7 @@ export class ViewReportComponent implements OnInit {
     this.reportFilter = '';
     this.selectedMeasureFilter = 'any';
     this.selectedReportStatusFilter = 'any';
-    this.selectedValidationStatusFilter = 'any';
+    this.selectedSubmissionStatusFilter = 'any';
     this.paginationMetadata.pageNumber = 0;
     this.sortBy = null;
     this.sortOrder = null;
@@ -278,7 +288,7 @@ export class ViewReportComponent implements OnInit {
     this.loadReportEntries();
   }
 
-  onValidationStatusFilterChange(event: any): void {
+  onSubmissionStatusFilterChange(event: any): void {
     this.paginationMetadata.pageNumber = 0;
     this.loadReportEntries();
   }
@@ -358,8 +368,6 @@ export class ViewReportComponent implements OnInit {
 
   getSubmissionStatusClass(status: SubmissionStatus): string {
     switch (status) {
-      case SubmissionStatus.PendingValidation:
-        return 'status-pending';
       case SubmissionStatus.Submitting:
         return 'status-processing';
       case SubmissionStatus.Submitted:
@@ -369,7 +377,7 @@ export class ViewReportComponent implements OnInit {
       case SubmissionStatus.NotEligable:
         return 'status-not-reportable';
       default:
-        return '';
+        return 'status-pending';
     }
   }
 
@@ -403,8 +411,28 @@ export class ViewReportComponent implements OnInit {
       case SubmissionStatus.NotEligable:
         return 'Not Eligible';
       default:
-        return '';
+        return 'Pending';
     }
+  }
+
+  private toReportingStatus(statusKey: string): ReportingStatus | null {
+    const numericValue = Number(statusKey);
+    if (!Number.isNaN(numericValue)) {
+      return numericValue as ReportingStatus;
+    }
+
+    const enumValue = ReportingStatus[statusKey as keyof typeof ReportingStatus];
+    return typeof enumValue === 'number' ? (enumValue as ReportingStatus) : null;
+  }
+
+  private toSubmissionStatus(statusKey: string): SubmissionStatus | null {
+    const numericValue = Number(statusKey);
+    if (!Number.isNaN(numericValue)) {
+      return numericValue as SubmissionStatus;
+    }
+
+    const enumValue = SubmissionStatus[statusKey as keyof typeof SubmissionStatus];
+    return typeof enumValue === 'number' ? (enumValue as SubmissionStatus) : null;
   }
 
   navBack(): void {
