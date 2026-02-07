@@ -1,16 +1,11 @@
-﻿using AngleSharp.Dom;
-using Hl7.Fhir.Model;
+﻿using System.Linq.Expressions;
 using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LinqKit;
-using Microsoft.EntityFrameworkCore;
-using System.Linq.Expressions;
-using System.Threading;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
@@ -233,18 +228,15 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     summary.ReportingStatusCounts[reportingStatusKey] = 1;
                 }
 
-                if (entry.SubmissionStatus.HasValue)
-                {
-                    var submissionStatusKey = entry.SubmissionStatus.Value.ToString();
-                    if (summary.SubmissionStatusCounts.ContainsKey(submissionStatusKey))
-                    {
-                        summary.SubmissionStatusCounts[submissionStatusKey]++;
-                    }
-                    else
-                    {
-                        summary.SubmissionStatusCounts[submissionStatusKey] = 1;
-                    }
-                }
+                // Submission Status
+                var submissionStatusKey = entry.SubmissionStatus.HasValue
+                    ? entry.SubmissionStatus.Value.ToString()
+                    : "Pending";
+                
+                if (summary.SubmissionStatusCounts.ContainsKey(submissionStatusKey))
+                    summary.SubmissionStatusCounts[submissionStatusKey]++;
+                else
+                    summary.SubmissionStatusCounts[submissionStatusKey] = 1;
 
                 if (entry.SubmissionStatus != SubmissionStatus.NotEligable)
                 {
