@@ -108,10 +108,16 @@
         <app-donut-chart [data]="measureIpCountsData"></app-donut-chart>
       </div>
       <div class="report-chart-cell">
-        <app-donut-chart [data]="reportStatusData"></app-donut-chart>
+        <app-donut-chart
+          [data]="reportStatusData"
+          [enableSelection]="true"
+          (sliceSelected)="onReportStatusSliceSelected($event)"></app-donut-chart>
       </div>
       <div class="report-chart-cell">
-        <app-donut-chart [data]="submissionStatusData"></app-donut-chart>
+        <app-donut-chart
+          [data]="submissionStatusData"
+          [enableSelection]="true"
+          (sliceSelected)="onSubmissionStatusSliceSelected($event)"></app-donut-chart>
       </div>
     </div>
   </div>
@@ -119,7 +125,13 @@
   <mat-tab-group (selectedIndexChange)="onTabSelected($event)">
     <mat-tab label="Measure Reports">
       <div class="filter-bar">
-        <span class="filter-bar-header">Filters</span>
+        <div class="filter-bar-header-row">
+          <span class="filter-bar-header">Filters</span>
+          <button type="button" class="link-button primary" (click)="clearFilters()">
+            <fa-icon [icon]="faXmark"></fa-icon>
+            Clear Filters
+          </button>
+        </div>
         <div class="filter-bar-row">
           <div class="filter-bar-col">
             <div class="filter-bar-item">
@@ -161,17 +173,13 @@
               </label>
               <select id="validationStatusFilter" [(ngModel)]="selectedSubmissionStatusFilter" (change)="onSubmissionStatusFilterChange($event)">
                 <option value="any">Any</option>
-                <option *ngFor="let status of submissionStatuses" [value]="status">{{getSubmissionStatusText(status)}}</option>
+                <option *ngFor="let status of submissionStatuses" [value]="status">{{getSubmissionStatusFilterText(status)}}</option>
               </select>
             </div>
           </div>
 
           <div class="filter-bar-col">
             <div class="link-button-group">
-              <button class="link-button primary" (click)="clearFilters()">
-                <fa-icon [icon]="faXmark"></fa-icon>
-                Clear Filters
-              </button>
               <button class="link-button light" (click)="onRefresh()">
                 <fa-icon [icon]="faRotate"></fa-icon>
                 Refresh

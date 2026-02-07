@@ -113,6 +113,14 @@ $failed-status: #a1030eb3;
   margin-bottom: 2em;
 }
 
+.filter-bar-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1em;
+  margin-bottom: 0.5em;
+}
+
 .report-chart-labels {
   display: flex;
   justify-content: flex-start;
