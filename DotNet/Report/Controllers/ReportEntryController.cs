@@ -1,16 +1,16 @@
-﻿using LantanaGroup.Link.Report.Domain;
+﻿using System.Text.Json;
+using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
-using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
 
 namespace LantanaGroup.Link.Report.Controllers
 {
@@ -203,6 +203,7 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="reportScheduleId">Optional report schedule ID filter</param>
         /// <param name="reportingStatus">Optional reporting status filter</param>
         /// <param name="submissionStatus">Optional submission status filter</param>
+        /// <param name="submissionStatusIsNull">Optional flag to filter entries with no submission status</param>
         /// <param name="reportType">Optional report type filter</param>
         /// <param name="sortBy">Optional sort field (e.g., "CreateDate", "PatientId")</param>
         /// <param name="sortOrder">Optional sort order (Ascending or Descending)</param>
@@ -217,6 +218,7 @@ namespace LantanaGroup.Link.Report.Controllers
             string? reportScheduleId = null,
             ReportingStatus? reportingStatus = null,
             SubmissionStatus? submissionStatus = null,
+            bool submissionStatusIsNull = false,
             string? reportType = null,
             string? sortBy = null,
             SortOrder? sortOrder = null,
@@ -241,6 +243,7 @@ namespace LantanaGroup.Link.Report.Controllers
                     reportScheduleId,
                     reportingStatus,
                     submissionStatus,
+                    submissionStatusIsNull,
                     reportType,
                     sortBy,
                     sortOrder,
