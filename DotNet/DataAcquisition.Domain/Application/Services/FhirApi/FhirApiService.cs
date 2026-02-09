@@ -2,14 +2,13 @@
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
@@ -115,6 +114,10 @@ public class FhirApiService : IFhirApiService
 
             return resourceIds;
         }
+        catch (TooManyRequestsException ex)
+        {
+            throw; // Propagate to higher level
+        }
         catch (FhirOperationException ex)
         {
             if (fhirQuery.IsReference.GetValueOrDefault() && (ex.Status == HttpStatusCode.NotFound || ex.Status == HttpStatusCode.Gone))
@@ -190,7 +193,7 @@ public class FhirApiService : IFhirApiService
 
                 foreach (var resource in resources)
                 {
-                    if(fhirQuery.IsReference.HasValue && fhirQuery.IsReference.Value)
+                    if (fhirQuery.IsReference.HasValue && fhirQuery.IsReference.Value)
                     {
                         //if this is a reference resource, we need to handle it differently
                         await HandleReferenceResource(log, resource, cancellationToken);
@@ -210,6 +213,10 @@ public class FhirApiService : IFhirApiService
             }
 
             return resourceIds;
+        }
+        catch (TooManyRequestsException ex)
+        {
+            throw; // Propagate to higher level
         }
         catch (FhirOperationException ex)
         {
@@ -293,22 +300,22 @@ public class FhirApiService : IFhirApiService
         _kafkaProducer.Flush(cancellationToken);
     }
 
-    private void InsertDateExtension(DomainResource resource) 
+    private void InsertDateExtension(DomainResource resource)
     {
-        if(resource == null)
+        if (resource == null)
             throw new ArgumentNullException(nameof(resource));
 
-        if(resource.Meta == null)
+        if (resource.Meta == null)
         {
             resource.Meta = new Meta();
             resource.Meta.Extension = new List<Extension> { };
         }
 
-        if(resource.Meta.Extension == null)
+        if (resource.Meta.Extension == null)
             resource.Meta.Extension = new List<Extension> { };
 
         if (!resource.Extension.Any(e => e.Url == DataAcquisitionConstants.Extension.DateReceivedExtensionUri))
-            resource.Meta.Extension.Add(new Extension { Url = DataAcquisitionConstants.Extension.DateReceivedExtensionUri, Value =  new FhirDateTime(DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"))});
+            resource.Meta.Extension.Add(new Extension { Url = DataAcquisitionConstants.Extension.DateReceivedExtensionUri, Value = new FhirDateTime(DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")) });
     }
     #endregion
 }

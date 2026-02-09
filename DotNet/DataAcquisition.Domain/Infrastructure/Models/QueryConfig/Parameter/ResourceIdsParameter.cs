@@ -7,5 +7,5 @@ public class ResourceIdsParameter : IParameter
     public ParameterType ParameterType { get; set; } = ParameterType.ResourceIds;
     public string Name { get; set; }
     public string Resource { get; set; }
-    public string Paged { get; set; }
+    public string Paged { get; set; } = "100";
 }

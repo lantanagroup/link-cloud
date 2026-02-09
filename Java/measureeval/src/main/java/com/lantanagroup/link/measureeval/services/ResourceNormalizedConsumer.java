@@ -21,7 +21,7 @@ public class ResourceNormalizedConsumer extends AbstractResourceConsumer<Resourc
           KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate,
           EvaluateMeasureService evaluateMeasureService,
           PatientStatusBundler patientStatusBundler,
-          ResourceEvaluatedProducer resourceEvaluatedProducer,
+          BlobStorageService blobStorageService,
           ConsumerRecordRecoverer recoverer){
     super(
             resourceRepository,
@@ -31,7 +31,7 @@ public class ResourceNormalizedConsumer extends AbstractResourceConsumer<Resourc
             dataAcquisitionRequestedTemplate,
             evaluateMeasureService,
             patientStatusBundler,
-            resourceEvaluatedProducer,
+            blobStorageService,
             recoverer);
   }
 }

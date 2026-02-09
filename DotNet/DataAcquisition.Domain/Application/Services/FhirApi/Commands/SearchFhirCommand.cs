@@ -1,7 +1,9 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
@@ -9,8 +11,8 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Net;
 using System.Net.Http.Headers;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.Auth;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
@@ -22,7 +24,7 @@ public record SearchFhirCommandRequest(
     string? facilityId,
     string? patientId,
     string? correlationId,
-    QueryPhase? queryPhase, 
+    QueryPhase? queryPhase,
     FhirQueryType queryType
     );
 
@@ -65,17 +67,21 @@ public class SearchFhirCommand : ISearchFhirCommand
                 new KeyValuePair<string, object?>(DiagnosticNames.Resource, request.resourceType)
             ]);
 
-        if(request == null || string.IsNullOrWhiteSpace(request.facilityId) || string.IsNullOrWhiteSpace(request.queryConfig.FhirServerBaseUrl))
+        if (request == null || string.IsNullOrWhiteSpace(request.facilityId) || string.IsNullOrWhiteSpace(request.queryConfig.FhirServerBaseUrl))
         {
             _logger.LogError("Invalid request parameters. FacilityId: {FacilityId}; FhirServerBaseUrl: {FhirServerBaseUrl}", request?.facilityId?.Sanitize(), request?.queryConfig.FhirServerBaseUrl.Sanitize());
             yield break;
         }
 
 
-        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.queryConfig.MaxConcurrentRequests.GetValueOrDefault(1), _distributedLockSettings.Expiration, cancellationToken))
+        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.queryConfig.GetMaxConcurrentRequestsOrDefault(), _distributedLockSettings.Expiration, cancellationToken))
         {
+            // Create a new handler chain using a DelegatingHandler around a base HttpClientHandler
+            var innerHandler = new HttpClientHandler();
+            var headerCapturingHandler = new HeaderCapturingHandler { InnerHandler = innerHandler };
+            var httpClientWithHandler = new HttpClient(headerCapturingHandler);
 
-            var fhirClient = new FhirClient(request.queryConfig.FhirServerBaseUrl, _httpClient, new FhirClientSettings
+            var fhirClient = new FhirClient(request.queryConfig.FhirServerBaseUrl, httpClientWithHandler, new FhirClientSettings
             {
                 PreferredFormat = ResourceFormat.Json
             });
@@ -99,7 +105,12 @@ public class SearchFhirCommand : ISearchFhirCommand
                     resultBundle = await fhirClient.SearchAsync(request.searchParams, request.resourceType.ToString(), cancellationToken);
                 }
             }
-            catch(Exception ex)
+            catch (FhirOperationException ex) when (ex.Status == HttpStatusCode.TooManyRequests)
+            {
+                var retryAfter = FhirCommandUtils.ParseRetryAfter(headerCapturingHandler.LastResponseHeaders);
+                throw new TooManyRequestsException($"Too many requests for search on {request.resourceType}", retryAfter);
+            }
+            catch (Exception ex)
             {
                 _logger.LogError(ex, "Error encountered while searching FHIR resources. ResourceType: {ResourceType}; FacilityId: {facilityId};", request.resourceType, request.facilityId.Sanitize());
                 throw;
@@ -116,6 +127,11 @@ public class SearchFhirCommand : ISearchFhirCommand
                     try
                     {
                         resultBundle = await fhirClient.ContinueAsync(resultBundle, ct: cancellationToken);
+                    }
+                    catch (FhirOperationException ex) when (ex.Status == HttpStatusCode.TooManyRequests)
+                    {
+                        var retryAfter = FhirCommandUtils.ParseRetryAfter(headerCapturingHandler.LastResponseHeaders);
+                        throw new TooManyRequestsException($"Too many requests during paging for {request.resourceType}", retryAfter);
                     }
                     catch (Exception ex)
                     {
@@ -144,9 +160,14 @@ public class SearchFhirCommand : ISearchFhirCommand
                 new KeyValuePair<string, object?>(DiagnosticNames.Resource, request.resourceType)
             ]);
 
-        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.queryConfig.MaxConcurrentRequests.GetValueOrDefault(1), _distributedLockSettings.Expiration, cancellationToken))
+        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.queryConfig.GetMaxConcurrentRequestsOrDefault(), _distributedLockSettings.Expiration, cancellationToken))
         {
-            var fhirClient = new FhirClient(request.queryConfig.FhirServerBaseUrl, _httpClient, new FhirClientSettings
+            // Create a new handler chain using a DelegatingHandler around a base HttpClientHandler
+            var innerHandler = new HttpClientHandler();
+            var headerCapturingHandler = new HeaderCapturingHandler { InnerHandler = innerHandler };
+            var httpClientWithHandler = new HttpClient(headerCapturingHandler);
+
+            var fhirClient = new FhirClient(request.queryConfig.FhirServerBaseUrl, httpClientWithHandler, new FhirClientSettings
             {
                 PreferredFormat = ResourceFormat.Json
             });
@@ -157,7 +178,16 @@ public class SearchFhirCommand : ISearchFhirCommand
                 fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
             }
 
-            var resultBundle = await fhirClient.SearchAsync(request.searchParams, request.resourceType.ToString(), cancellationToken);
+            Bundle resultBundle;
+            try
+            {
+                resultBundle = await fhirClient.SearchAsync(request.searchParams, request.resourceType.ToString(), cancellationToken);
+            }
+            catch (FhirOperationException ex) when (ex.Status == HttpStatusCode.TooManyRequests)
+            {
+                var retryAfter = FhirCommandUtils.ParseRetryAfter(headerCapturingHandler.LastResponseHeaders);
+                throw new TooManyRequestsException($"Too many requests for non-paging search on {request.resourceType}", retryAfter);
+            }
             IncrementResourceAcquiredMetric(request.correlationId, request.patientId, request.facilityId, request.queryPhase.ToString(), request.resourceType.ToString(), resultBundle.Id);
             return resultBundle;
         }

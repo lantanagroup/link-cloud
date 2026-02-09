@@ -1,7 +1,7 @@
 package com.lantanagroup.link.validation.configs;
 
 import com.lantanagroup.link.shared.auth.JwtService;
-import com.lantanagroup.link.validation.services.ReportClient;
+import com.lantanagroup.link.shared.services.ReportClient;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;

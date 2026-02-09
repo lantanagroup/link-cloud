@@ -1,20 +1,20 @@
-
 import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faEllipsisV, faEye } from '@fortawesome/free-solid-svg-icons';
+import { MatButtonModule } from '@angular/material/button';
 import { ClickOutsideDirective } from 'src/app/directives/click-outside.directive';
-import { IMeasureReportSummary } from '../../report-view.interface';
+import { IReportEntry } from '../../../../../interfaces/report/report-entry.interface';
 
 @Component({
   selector: 'app-view-report-table-command',
   standalone: true,
-  imports: [FontAwesomeModule, ClickOutsideDirective],
+  imports: [FontAwesomeModule, ClickOutsideDirective, MatButtonModule],
   templateUrl: './view-report-table-command.component.html',
   styleUrl: './view-report-table-command.component.scss'
 })
 export class ViewReportTableCommandComponent implements OnInit {  
-  @Input() measureReport: IMeasureReportSummary | undefined;
-  @Output() viewDetails = new EventEmitter<IMeasureReportSummary>();
+  @Input() measureReport: IReportEntry | undefined;
+  @Output() viewDetails = new EventEmitter<IReportEntry>();
 
   faEllipsisV = faEllipsisV;
   faEye = faEye;

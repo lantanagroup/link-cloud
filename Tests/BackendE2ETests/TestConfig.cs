@@ -7,6 +7,7 @@ public static class TestConfig
     public static string ExternalFhirServerBase => Environment.GetEnvironmentVariable("EXTERNAL_FHIR_SERVER_BASE_URL") ?? "http://localhost:6157/fhir";
     public static string InternalFhirServerBase => Environment.GetEnvironmentVariable("INTERNAL_FHIR_SERVER_BASE_URL") ?? "http://fhir-server:8080/fhir";
     public static string AdminBffBase => Environment.GetEnvironmentVariable("ADMIN_BFF_BASE_URL") ?? "http://localhost:8063/api";
+    public static string LokiBaseUrl => Environment.GetEnvironmentVariable("LOKI_BASE_URL") ?? "http://localhost:3100";
     public static string? SmokeTestDownloadPath =>
     Environment.GetEnvironmentVariable("SMOKE_TEST_DOWNLOAD_PATH");
     public static bool CleanupSmokeTestData => bool.Parse(Environment.GetEnvironmentVariable("CLEANUP_SMOKE_TEST_DATA") ?? "true");

@@ -1,0 +1,33 @@
+---
+
+id: DataAcquisitionRequested
+name: Data Acquisition Requested
+version: 0.2.0
+
+summary: Signals that FHIR resources should be fetched for a patient.
+
+---
+
+## Overview
+
+Carries patient identifiers and report context, prompting the data retrieval component to query the facility for the
+necessary resources.
+
+<NodeGraph />
+
+## Command Schema
+
+### Key
+
+* type: string
+* value: facility id
+
+### Headers
+
+| Header Name      | Description                                                                                        |
+|------------------|----------------------------------------------------------------------------------------------------|
+| X-Correlation-Id | The correlation ID associated with the event that should be used in logs produced during the event |
+
+### Payload
+
+<SchemaViewer file="schema.json" />
