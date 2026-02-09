@@ -25,6 +25,11 @@ import {MatDialogModule} from '@angular/material/dialog';
 import {ActivatedRoute, Router} from '@angular/router';
 import {TableCommandComponent} from "./table-command/table-command.component";
 import {ReportService} from 'src/app/services/gateway/report/report.service';
+import {PieChartComponent} from 'src/app/components/core/pie-chart/pie-chart.component';
+import {
+  IDataAcquisitionLogStatusCount,
+  IDataAcquisitionLogStatusStatistics
+} from 'src/app/interfaces/data-acquisition/data-acquisition-log-status-statistics.interface';
 
 @Component({
   selector: 'app-acquisition-log-view',
@@ -35,7 +40,8 @@ import {ReportService} from 'src/app/services/gateway/report/report.service';
     FontAwesomeModule,
     MatPaginatorModule,
     MatDialogModule,
-    TableCommandComponent
+    TableCommandComponent,
+    PieChartComponent
 ],
   templateUrl: './acquisition-log-view.component.html',
   styleUrl: './acquisition-log-view.component.scss',
@@ -101,6 +107,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   reportIdFilter: string = '';
   reportIdFromRoute: string = '';
   reportFacilityId: string = '';
+  patientIdFromRoute: string = '';
   facilityFilterOptions: Record<string, string> = {};
   selectedFacilityFilter: string = 'Any';
   resourceTypeFilterOptions: string[] = [];
@@ -114,6 +121,10 @@ export class AcquisitionLogViewComponent implements OnInit {
   statusFilterOptions: string[] = [ "Pending", "Ready", "Processing", "Completed", "Failed", "Cancelled", "MaxRetriesReached", "Skipped"];
   selectedStatusFilter: string = 'Any';
   targetPageNumber: number | null = null;
+  statusChartData: Record<string, number> = {};
+  statusChartLoading = false;
+  statusChartReportId = '';
+  statusChartPatientId = '';
 
   constructor(
     private route: ActivatedRoute,
@@ -134,6 +145,7 @@ export class AcquisitionLogViewComponent implements OnInit {
     this.route.queryParamMap.subscribe(params => {
       const reportId = params.get('reportId');
       const facilityId = params.get('facilityId');
+      const patientId = params.get('patientId');
       if (reportId) {
         this.reportIdFilter = reportId;
         this.reportIdFromRoute = reportId;
@@ -145,6 +157,14 @@ export class AcquisitionLogViewComponent implements OnInit {
         this.reportIdFilter = '';
         this.reportIdFromRoute = '';
         this.reportFacilityId = '';
+      }
+
+      if (patientId) {
+        this.patientFilter = patientId;
+        this.patientIdFromRoute = patientId;
+      } else {
+        this.patientFilter = '';
+        this.patientIdFromRoute = '';
       }
     });
 
@@ -160,6 +180,7 @@ export class AcquisitionLogViewComponent implements OnInit {
             this.acquisitionLogs = response[2].records;
             this.paginationMetadata = response[2].metadata;
             this.syncTargetPageNumber();
+            this.loadStatusCounts();
 
             this.loadingService.hide();
           },
@@ -214,6 +235,7 @@ export class AcquisitionLogViewComponent implements OnInit {
 
   applyFilters(): void {
     this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);
+    this.loadStatusCounts();
     this.filterPanelOpen = false;
     this.onFilterApplication();
   }
@@ -232,10 +254,11 @@ export class AcquisitionLogViewComponent implements OnInit {
 
   refreshLogs(): void {
     this.loadLogs(this.getCurrentPageNumber(), this.getCurrentPageSize(), true);
+    this.loadStatusCounts();
   }
 
   clearFilters(): void {
-    this.patientFilter = '';
+    this.patientFilter = this.patientIdFromRoute;
     this.resourceIdFilter = '';
     this.selectedFacilityFilter = 'Any';
     this.reportIdFilter = this.reportIdFromRoute;
@@ -246,6 +269,7 @@ export class AcquisitionLogViewComponent implements OnInit {
     this.selectedStatusFilter = 'Any';
     this.filtersApplied = false;
     this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);
+    this.loadStatusCounts();
   }
 
   onSort(column: string): void {
@@ -361,6 +385,59 @@ export class AcquisitionLogViewComponent implements OnInit {
         console.error('Error loading report schedule:', error);
       }
     });
+  }
+
+  get showStatusChart(): boolean {
+    return this.reportIdFilter.trim().length > 0;
+  }
+
+  get hasStatusChartData(): boolean {
+    return Object.keys(this.statusChartData).length > 0;
+  }
+
+  private loadStatusCounts(): void {
+    const reportId = this.reportIdFilter.trim();
+    if (!reportId) {
+      this.clearStatusCounts();
+      return;
+    }
+
+    const patientId = this.patientFilter.trim();
+    this.statusChartLoading = true;
+    this.statusChartReportId = reportId;
+    this.statusChartPatientId = patientId;
+
+    this.acquisitionLogService.getAcquisitionLogStatusStatistics(reportId, patientId.length > 0 ? patientId : null)
+      .pipe(
+        finalize(() => {
+          this.statusChartLoading = false;
+        })
+      )
+      .subscribe({
+        next: (response: IDataAcquisitionLogStatusStatistics) => {
+          this.statusChartReportId = response.reportId;
+          this.statusChartPatientId = response.patientId ?? '';
+          this.statusChartData = this.toStatusChartData(response.statuses);
+        },
+        error: (error) => {
+          console.error('Error loading acquisition log status counts:', error);
+          this.clearStatusCounts();
+        }
+      });
+  }
+
+  private toStatusChartData(statuses: IDataAcquisitionLogStatusCount[]): Record<string, number> {
+    return statuses.reduce((acc, status) => {
+      acc[status.name] = status.count;
+      return acc;
+    }, {} as Record<string, number>);
+  }
+
+  private clearStatusCounts(): void {
+    this.statusChartData = {};
+    this.statusChartLoading = false;
+    this.statusChartReportId = '';
+    this.statusChartPatientId = '';
   }
 
 }
