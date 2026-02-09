@@ -1,8 +1,8 @@
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
@@ -12,6 +12,7 @@ public class DataAcquisitionLog
     public const int MaxRetryAttempts = 5;
 
     [Required]
+    [MaxLength(128)]
     public string FacilityId { get; set; }
 
     [Required]
@@ -49,6 +50,7 @@ public class DataAcquisitionLog
 
     public bool TailSent { get; set; } = false;
 
+    [MaxLength(128)]
     public string? ReportTrackingId { get; set; }
 
     public DateTime? ReportEndDate { get; set; }

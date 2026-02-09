@@ -589,7 +589,8 @@ namespace DataAcquisition.Domain.Migrations
 
                     b.Property<string>("FacilityId")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
 
                     b.Property<string>("FhirVersion")
                         .HasColumnType("nvarchar(max)");
@@ -624,7 +625,8 @@ namespace DataAcquisition.Domain.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("ReportTrackingId")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
 
                     b.Property<int?>("ReportableEvent")
                         .HasColumnType("int");
@@ -655,6 +657,16 @@ namespace DataAcquisition.Domain.Migrations
                         .HasDatabaseName("IX_DataAcquisitionLogs_Paging_Default");
 
                     SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("ExecutionDate", "Id"), new[] { "Priority", "FacilityId", "IsCensus", "PatientId", "ReportableEvent", "ReportTrackingId", "CorrelationId", "TraceId", "FhirVersion", "QueryType", "QueryPhase", "Status", "RetryAttempts", "CompletionDate", "CompletionTimeMilliseconds" });
+
+                    b.HasIndex("FacilityId", "ExecutionDate", "Id")
+                        .HasDatabaseName("IX_DataAcquisitionLogs_Facility_ExecutionDate_Id");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("FacilityId", "ExecutionDate", "Id"), new[] { "Priority", "PatientId", "FhirVersion", "QueryType", "QueryPhase", "Status" });
+
+                    b.HasIndex("ReportTrackingId", "ExecutionDate", "Id")
+                        .HasDatabaseName("IX_DataAcquisitionLogs_ReportTrackingId_ExecutionDate_Id");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("ReportTrackingId", "ExecutionDate", "Id"), new[] { "FacilityId", "Priority", "PatientId", "FhirVersion", "QueryType", "QueryPhase", "Status" });
 
                     b.ToTable("DataAcquisitionLog");
                 });
