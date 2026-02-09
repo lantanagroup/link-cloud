@@ -107,3 +107,47 @@ $failed-status: #a1030eb3;
     opacity: 1;
   }
 }
+
+.report-chart-card {
+  margin-top: 2em;
+  margin-bottom: 2em;
+}
+
+.filter-bar-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1em;
+  margin-bottom: 0.5em;
+}
+
+.report-chart-labels {
+  display: flex;
+  justify-content: flex-start;
+  gap: 1.5em;
+}
+
+.report-chart-label {
+  flex: 1 1 0;
+  text-align: center;
+}
+
+.report-chart-row {
+  display: flex;
+  align-items: stretch;
+  gap: 1.5em;
+}
+
+.report-chart-cell {
+  flex: 1 1 0;
+  height: 400px;
+  max-height: 400px;
+  min-height: 400px;
+  display: flex;
+}
+
+.report-chart-cell app-donut-chart,
+.report-chart-cell app-pie-chart {
+  flex: 1 1 auto;
+  min-width: 0;
+}

@@ -1,14 +1,18 @@
-import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
-import { Injectable } from '@angular/core';
-import { environment } from 'src/environments/environment';
-import { ErrorHandlingService } from '../../error-handling.service';
-import { IReportConfigModel } from 'src/app/interfaces/report/report-config-model.interface';
-import { IPagedReportSchedule, IReportSchedule } from 'src/app/interfaces/report/report-schedule.interface';
-import { Observable, catchError, map, tap } from 'rxjs';
-import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
-import { IEntityDeletedResponse } from 'src/app/interfaces/entity-deleted-response.interface';
-import { AppConfigService } from '../../app-config.service';
-import { IPagedReportEntry, IReportEntrySummary, ReportingStatus, SubmissionStatus } from 'src/app/interfaces/report/report-entry.interface';
+import {HttpClient, HttpHeaders, HttpParams} from '@angular/common/http';
+import {Injectable} from '@angular/core';
+import {ErrorHandlingService} from '../../error-handling.service';
+import {IReportConfigModel} from 'src/app/interfaces/report/report-config-model.interface';
+import {IPagedReportSchedule, IReportSchedule} from 'src/app/interfaces/report/report-schedule.interface';
+import {catchError, map, Observable, tap} from 'rxjs';
+import {IEntityCreatedResponse} from 'src/app/interfaces/entity-created-response.model';
+import {IEntityDeletedResponse} from 'src/app/interfaces/entity-deleted-response.interface';
+import {AppConfigService} from '../../app-config.service';
+import {
+  IPagedReportEntry,
+  IReportEntrySummary,
+  ReportingStatus,
+  SubmissionStatus
+} from 'src/app/interfaces/report/report-entry.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -161,6 +165,7 @@ export class ReportService {
     reportScheduleId?: string,
     reportingStatus?: ReportingStatus,
     submissionStatus?: SubmissionStatus,
+    submissionStatusIsNull?: boolean,
     reportType?: string,
     sortBy?: string,
     sortOrder?: 'ascending' | 'descending',
@@ -180,11 +185,14 @@ export class ReportService {
     if (reportScheduleId) {
       params = params.set('reportScheduleId', reportScheduleId);
     }
-    if (reportingStatus) {
+    if (reportingStatus !== undefined && reportingStatus !== null) {
       params = params.set('reportingStatus', reportingStatus);
     }
-    if (submissionStatus) {
+    if (submissionStatus !== undefined && submissionStatus !== null) {
       params = params.set('submissionStatus', submissionStatus);
+    }
+    if (submissionStatusIsNull) {
+      params = params.set('submissionStatusIsNull', 'true');
     }
     if (reportType) {
       params = params.set('reportType', reportType);
