@@ -1,9 +1,9 @@
-using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Reflection;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Health;
@@ -29,9 +29,6 @@ using LantanaGroup.Link.Tenant.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using Quartz;
-using Quartz.Impl;
-using Quartz.Spi;
 using Serilog;
 using Serilog.Debugging;
 using Serilog.Enrichers.Span;
@@ -75,15 +72,9 @@ namespace Tenant
                 options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
             });
 
-            var serviceInformation = builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-            if (serviceInformation != null)
-            {
-                ServiceActivitySource.Initialize(serviceInformation);
-            }
-            else
-            {
-                throw new NullReferenceException("Service Information was null.");
-            }
+            var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+
+            var serviceInformation = builder.SetupServiceInformation(TenantConstants.ServiceName, assemblyVersion);
 
             // Add services to the container.
             builder.Services.AddSingleton<ScheduleService>();
@@ -110,22 +101,29 @@ namespace Tenant
             builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
             builder.Services.AddSingleton<CreateAuditEventCommand>();
 
+            var dbProvider = builder.Configuration.GetValue<string>(TenantConstants.AppSettingsSectionNames.DatabaseProvider);
+            string? databaseConnectionString = null;
+
+            if (dbProvider == ConfigurationConstants.AppSettings.SqlServerDatabaseProvider)
+            {
+                databaseConnectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
+
+                if (string.IsNullOrEmpty(databaseConnectionString))
+                    throw new InvalidOperationException("Database connection string is null or empty.");
+
+                // Add Quartz scheduler with SQL persistence
+                builder.Services.RegisterQuartzDatabase(databaseConnectionString);
+            }
+
             //Add database context
             builder.Services.AddDbContext<TenantDbContext>((sp, options) =>
             {
                 var updateBaseEntityInterceptor = sp.GetService<UpdateBaseEntityInterceptor>()!;
 
-                switch (builder.Configuration.GetValue<string>(TenantConstants.AppSettingsSectionNames.DatabaseProvider))
+                switch (dbProvider)
                 {
                     case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
-                        string? connectionString =
-                            builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections
-                                .DatabaseConnection);
-
-                        if (string.IsNullOrEmpty(connectionString))
-                            throw new InvalidOperationException("Database connection string is null or empty.");
-
-                        options.UseSqlServer(connectionString)
+                        options.UseSqlServer(databaseConnectionString)
                            .AddInterceptors(updateBaseEntityInterceptor);
                         break;
                     default:
@@ -198,29 +196,7 @@ namespace Tenant
 
             SelfLog.Enable(Console.Error);
 
-            builder.Services.AddSingleton<IJobFactory, QuartzJobFactory>();
-
-            var quartzProps = new NameValueCollection
-            {
-                ["quartz.scheduler.instanceName"] = "TenantScheduler",
-                ["quartz.scheduler.instanceId"] = "AUTO",
-                ["quartz.jobStore.clustered"] = "true",
-                ["quartz.jobStore.type"] = "Quartz.Impl.AdoJobStore.JobStoreTX, Quartz",
-                ["quartz.jobStore.driverDelegateType"] = "Quartz.Impl.AdoJobStore.SqlServerDelegate, Quartz",
-                ["quartz.jobStore.tablePrefix"] = "quartz.QRTZ_",
-                ["quartz.jobStore.dataSource"] = "default",
-                ["quartz.dataSource.default.connectionString"] = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection),
-                ["quartz.dataSource.default.provider"] = "SqlServer",
-                ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
-                ["quartz.threadPool.threadCount"] = "5",
-                ["quartz.jobStore.useProperties"] = "false",
-                ["quartz.serializer.type"] = "json"
-            };
-
-            builder.Services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
-
             builder.Services.AddSingleton<ReportScheduledJob>();
-            builder.Services.AddSingleton<RetentionCheckScheduledJob>();
 
             //Add CORS
             builder.Services.AddLinkCorsService(options => {

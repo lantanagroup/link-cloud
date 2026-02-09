@@ -1,0 +1,418 @@
+﻿swagger: "2.0"
+info:
+  version: 0.4.1
+  title: Terminology
+paths:
+  /api/terminology/config/$reload-cache:
+    post:
+      tags:
+      - Config
+      summary: |-
+        Reloads the cache by clearing the existing data and repopulating it
+        using the configured terminology path.
+      responses:
+        "200":
+          description: OK
+  /api/terminology/fhir/ValueSet/{id}:
+    get:
+      tags:
+      - Fhir
+      summary: Retrieves a ValueSet resource by its unique identifier.
+      produces:
+      - application/fhir+json
+      - application/json
+      - text/plain
+      - text/json
+      parameters:
+      - in: path
+        name: id
+        description: The unique identifier for the ValueSet resource to retrieve.
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+            additionalProperties: {}
+  /api/terminology/fhir/ValueSet:
+    get:
+      tags:
+      - Fhir
+      summary: Retrieves a collection of ValueSet resources based on the specified query parameters.
+      produces:
+      - application/fhir+json
+      - application/json
+      - text/plain
+      - text/json
+      parameters:
+      - in: query
+        name: url
+        description: The canonical URL of the ValueSet to retrieve, if specified.
+        type: string
+      - in: query
+        name: _summary
+        description: An optional parameter indicating if a summary of the ValueSet should be included in the response.
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+            additionalProperties: {}
+  /api/terminology/fhir/ValueSet/$expand:
+    get:
+      tags:
+      - Fhir
+      summary: Expands a ValueSet resource by its unique identifier or URL.
+      produces:
+      - application/fhir+json
+      - application/json
+      - text/plain
+      - text/json
+      parameters:
+      - in: path
+        name: id
+        description: The unique identifier of the ValueSet resource to expand. Can be null if URL is provided.
+        required: true
+        type: string
+      - in: query
+        name: url
+        description: The URL of the ValueSet resource to expand. Can be null if id is provided.
+        type: string
+      - in: query
+        name: date
+        description: The date to use when querying the ValueSet resource. Optional.
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+            additionalProperties: {}
+  /api/terminology/fhir/ValueSet/{id}/$expand:
+    get:
+      tags:
+      - Fhir
+      summary: Expands a ValueSet resource by its unique identifier or URL.
+      produces:
+      - application/fhir+json
+      - application/json
+      - text/plain
+      - text/json
+      parameters:
+      - in: path
+        name: id
+        description: The unique identifier of the ValueSet resource to expand. Can be null if URL is provided.
+        required: true
+        type: string
+      - in: query
+        name: url
+        description: The URL of the ValueSet resource to expand. Can be null if id is provided.
+        type: string
+      - in: query
+        name: date
+        description: The date to use when querying the ValueSet resource. Optional.
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+            additionalProperties: {}
+  /api/terminology/fhir/CodeSystem/{id}:
+    get:
+      tags:
+      - Fhir
+      summary: Retrieves a CodeSystem resource by its unique identifier.
+      produces:
+      - application/fhir+json
+      - application/json
+      - text/plain
+      - text/json
+      parameters:
+      - in: path
+        name: id
+        description: The unique identifier for the CodeSystem resource to retrieve.
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+            additionalProperties: {}
+  /api/terminology/fhir/CodeSystem:
+    get:
+      tags:
+      - Fhir
+      summary: Retrieves a collection of CodeSystem resources based on the specified query parameters.
+      produces:
+      - application/fhir+json
+      - application/json
+      - text/plain
+      - text/json
+      parameters:
+      - in: query
+        name: url
+        description: The canonical URL of the CodeSystem to retrieve. If provided, retrieves a specific CodeSystem.
+        type: string
+      - in: query
+        name: _summary
+        description: |-
+          An optional parameter to request a summary representation of the CodeSystems.
+          If not specified, full details will be retrieved.
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+            additionalProperties: {}
+  /api/terminology/fhir/CodeSystem/$validate-code:
+    post:
+      tags:
+      - Fhir
+      summary: |-
+        Validates a code in a specific CodeSystem, using either the CodeSystem's unique identifier
+        or its URL. Optionally validates its display value as well.
+      consumes:
+      - application/json
+      - text/json
+      - application/*+json
+      produces:
+      - application/fhir+json
+      - application/json
+      - text/plain
+      - text/json
+      parameters:
+      - in: query
+        name: url
+        description: The URL of the CodeSystem in which the code should be validated. Optional if the id is provided.
+        type: string
+      - in: path
+        name: id
+        description: The unique identifier of the CodeSystem. Optional if the URL is provided.
+        required: true
+        type: string
+      - in: query
+        name: code
+        description: The code to validate. This parameter is required.
+        type: string
+      - in: query
+        name: display
+        description: An optional display value to validate against the code.
+        type: string
+      - in: body
+        name: body
+        description: A set of parameters containing validation details, such as the URL, code, and display, if not passed via other parameters.
+        schema:
+          type: object
+          additionalProperties: {}
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+            additionalProperties: {}
+  /api/terminology/fhir/CodeSystem/{id}/$validate-code:
+    post:
+      tags:
+      - Fhir
+      summary: |-
+        Validates a code in a specific CodeSystem, using either the CodeSystem's unique identifier
+        or its URL. Optionally validates its display value as well.
+      consumes:
+      - application/json
+      - text/json
+      - application/*+json
+      produces:
+      - application/fhir+json
+      - application/json
+      - text/plain
+      - text/json
+      parameters:
+      - in: query
+        name: url
+        description: The URL of the CodeSystem in which the code should be validated. Optional if the id is provided.
+        type: string
+      - in: path
+        name: id
+        description: The unique identifier of the CodeSystem. Optional if the URL is provided.
+        required: true
+        type: string
+      - in: query
+        name: code
+        description: The code to validate. This parameter is required.
+        type: string
+      - in: query
+        name: display
+        description: An optional display value to validate against the code.
+        type: string
+      - in: body
+        name: body
+        description: A set of parameters containing validation details, such as the URL, code, and display, if not passed via other parameters.
+        schema:
+          type: object
+          additionalProperties: {}
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+            additionalProperties: {}
+  /api/terminology/fhir/ValueSet/$validate-code:
+    post:
+      tags:
+      - Fhir
+      summary: Validates a given code, optionally with its system and display, against a specified ValueSet.
+      consumes:
+      - application/json
+      - text/json
+      - application/*+json
+      produces:
+      - application/fhir+json
+      - application/json
+      - text/plain
+      - text/json
+      parameters:
+      - in: query
+        name: url
+        description: The canonical URL of the ValueSet to validate against. This parameter is optional if the id is provided.
+        type: string
+      - in: path
+        name: id
+        description: The unique identifier of the ValueSet to validate against. This parameter is optional if the URL is provided.
+        required: true
+        type: string
+      - in: query
+        name: system
+        description: The system of the code to validate. This parameter is optional.
+        type: string
+      - in: query
+        name: code
+        description: The code to validate. This parameter is required.
+        type: string
+      - in: query
+        name: display
+        description: The display text associated with the code to validate. This parameter is optional.
+        type: string
+      - in: body
+        name: body
+        description: Additional parameters supplied in the request body to guide the validation operation. This parameter is optional.
+        schema:
+          type: object
+          additionalProperties: {}
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+            additionalProperties: {}
+  /api/terminology/fhir/ValueSet/{id}/$validate-code:
+    post:
+      tags:
+      - Fhir
+      summary: Validates a given code, optionally with its system and display, against a specified ValueSet.
+      consumes:
+      - application/json
+      - text/json
+      - application/*+json
+      produces:
+      - application/fhir+json
+      - application/json
+      - text/plain
+      - text/json
+      parameters:
+      - in: query
+        name: url
+        description: The canonical URL of the ValueSet to validate against. This parameter is optional if the id is provided.
+        type: string
+      - in: path
+        name: id
+        description: The unique identifier of the ValueSet to validate against. This parameter is optional if the URL is provided.
+        required: true
+        type: string
+      - in: query
+        name: system
+        description: The system of the code to validate. This parameter is optional.
+        type: string
+      - in: query
+        name: code
+        description: The code to validate. This parameter is required.
+        type: string
+      - in: query
+        name: display
+        description: The display text associated with the code to validate. This parameter is optional.
+        type: string
+      - in: body
+        name: body
+        description: Additional parameters supplied in the request body to guide the validation operation. This parameter is optional.
+        schema:
+          type: object
+          additionalProperties: {}
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+            additionalProperties: {}
+  /api/terminology/fhir/metadata:
+    get:
+      tags:
+      - Fhir
+      summary: |-
+        Returns the CapabilityStatement describing the functionalities
+        and conformance requirements of the FHIR Terminology server.
+      produces:
+      - application/fhir+json
+      - application/json
+      - text/plain
+      - text/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+            additionalProperties: {}
+  /api/terminology/info:
+    get:
+      tags:
+      - Terminology
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/ServiceInformation'
+definitions:
+  ServiceInformation:
+    type: object
+    properties:
+      serviceName:
+        type: string
+      version:
+        type: string
+      productVersion:
+        type: string
+      commit:
+        type: string
+      build:
+        type: string
+      swaggerUrl:
+        type: string
+    additionalProperties: false
+  SummaryType:
+    format: int32
+    enum:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+    type: integer
+tags:
+- name: Config
+  description: Configuration
+- name: Fhir
+  description: FHIR Terminology Operations
+

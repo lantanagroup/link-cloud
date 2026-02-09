@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -34,7 +35,7 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
         public async Task Execute(IJobExecutionContext context)
         {
             JobDataMap triggerMap = context.Trigger.JobDataMap!;
-            PatientDispatchEntity patientDispatchEntity = (PatientDispatchEntity)triggerMap["PatientDispatchEntity"];
+            var patientDispatchEntity = triggerMap.GetObject<PatientDispatchEntity>("PatientDispatchEntity");
 
             ProducerConfig config = new ProducerConfig()
             {
@@ -47,7 +48,7 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
                 using var scope = _serviceScopeFactory.CreateScope();
                 var patientDispatchMgr = scope.ServiceProvider.GetRequiredService<IPatientDispatchManager>();
 
-                DataAcquisitionRequestedValue dataAcquisitionRequestedValue = new DataAcquisitionRequestedValue()
+                var dataAcquisitionRequestedValue = new DataAcquisitionRequestedValue()
                 {
                     PatientId = patientDispatchEntity.PatientId,
                     ScheduledReports = new List<ScheduledReport>(),

@@ -3,7 +3,6 @@ using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Services;
-using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -25,21 +24,22 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IDeadLetterExceptionHandler<string, ReportScheduledValue> _deadLetterExceptionHandler;
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly IServiceScopeFactory _serviceScopeFactory;
+        private readonly ServiceInformation _serviceInformation;
         private readonly BlobStorageService _blobStorageService;
 
-        private string Name => this.GetType().Name;
-
         public ReportScheduledListener(ILogger<ReportScheduledListener> logger, IKafkaConsumerFactory<string, ReportScheduledValue> kafkaConsumerFactory,
-            [FromKeyedServices("MongoScheduler")] ISchedulerFactory schedulerFactory,
+            ISchedulerFactory schedulerFactory,
             ITransientExceptionHandler<string, ReportScheduledValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<string, ReportScheduledValue> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory,
-            BlobStorageService blobStorageService)
+            BlobStorageService blobStorageService,
+            ServiceInformation serviceInformation)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _schedulerFactory = schedulerFactory ?? throw new ArgumentException(nameof(schedulerFactory));
             _serviceScopeFactory = serviceScopeFactory;
+            _serviceInformation = serviceInformation;
 
             _transientExceptionHandler = transientExceptionHandler ??
                                                throw new ArgumentException(nameof(_deadLetterExceptionHandler));
@@ -47,10 +47,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _deadLetterExceptionHandler = deadLetterExceptionHandler ??
                                                throw new ArgumentException(nameof(_deadLetterExceptionHandler));
 
-            _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _transientExceptionHandler.Topic = nameof(KafkaTopic.ReportScheduled) + "-Retry";
-
-            _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ReportScheduled) + "-Error";
 
             _blobStorageService = blobStorageService;
@@ -66,7 +63,7 @@ namespace LantanaGroup.Link.Report.Listeners
         {
             var config = new ConsumerConfig()
             {
-                GroupId = ReportConstants.ServiceName,
+                GroupId = _serviceInformation.ServiceConfigName,
                 EnableAutoCommit = false
             };
 
@@ -101,7 +98,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
 
                                 using var scope = _serviceScopeFactory.CreateScope();
-                                var measureReportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+                                var reportScheduleManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
 
                                 facilityId = key;
                                 var startDate = value.StartDate.UtcDateTime;
@@ -116,7 +113,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 if (!string.IsNullOrEmpty(reportId))
                                 {
                                     _logger.LogDebug($"Report ID is not null. Checking if the report already exists.");
-                                    existing = await measureReportScheduledManager.SingleOrDefaultAsync(
+                                    existing = await reportScheduleManager.SingleOrDefaultAsync(
                                         x => x.Id == reportId, consumeCancellationToken);
                                 }
                                 else
@@ -148,7 +145,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     var reportName = _blobStorageService.GetReportName(reportSchedule);
                                     reportSchedule.PayloadRootUri = _blobStorageService.GetUri(reportName)?.ToString();
 
-                                    reportSchedule = await measureReportScheduledManager.AddAsync(reportSchedule, consumeCancellationToken);
+                                    reportSchedule = await reportScheduleManager.AddAsync(reportSchedule, consumeCancellationToken);
 
                                     await MeasureReportScheduleService.CreateJobAndTrigger(reportSchedule,
                                         await _schedulerFactory.GetScheduler(consumeCancellationToken));

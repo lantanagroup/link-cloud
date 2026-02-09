@@ -1,8 +1,11 @@
 using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
+//using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
@@ -12,6 +15,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using System.Text;
 
 namespace LantanaGroup.Link.Report.Listeners;
 
@@ -20,9 +24,12 @@ public class PayloadSubmittedListener(
     ITransientExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue> transientExceptionHandler,
     IDeadLetterExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue> deadLetterExceptionHandler,
     ILogger<PayloadSubmittedListener> logger,
-    IServiceScopeFactory serviceScopeFactory)
+    IServiceScopeFactory serviceScopeFactory,
+    ServiceInformation serviceInformation)
     : BackgroundService
 {
+    private string Name => this.GetType().Name;
+
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
         return Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
@@ -32,7 +39,7 @@ public class PayloadSubmittedListener(
     {
         var config = new ConsumerConfig()
         {
-            GroupId = ReportConstants.ServiceName,
+            GroupId = serviceInformation.ServiceConfigName,
             EnableAutoCommit = false
         };
 
@@ -40,8 +47,7 @@ public class PayloadSubmittedListener(
         try
         {
             consumer.Subscribe(nameof(KafkaTopic.PayloadSubmitted));
-            logger.LogInformation(
-                "Started report submitted consumer for topic '{Topic}' at {StartTime}", nameof(KafkaTopic.PayloadSubmitted), DateTime.UtcNow);
+            logger.LogInformation("Started report submitted consumer for topic '{Topic}' at {StartTime}", nameof(KafkaTopic.PayloadSubmitted), DateTime.UtcNow);
 
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -54,55 +60,51 @@ public class PayloadSubmittedListener(
                             consumer.Commit();
                             return;
                         }
+
+                        if (!result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
+                        {
+                            throw new DeadLetterException($"{Name}: Received message without correlation ID (ReportId = {result.Message.Key.ReportScheduleId}, FacilityId = {result.Message.Key.FacilityId}).");
+                        }
+
+                        var correlationId = Encoding.UTF8.GetString(headerValue);
+
                         var scope = serviceScopeFactory.CreateScope();
-                        var submissionEntryManager = scope.ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
                         var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+                        var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+                        var reportManifestProducer = scope.ServiceProvider.GetRequiredService<ReportManifestProducer>();
 
                         var facilityId = result.Message.Key.FacilityId;
                         
                         try
                         {
+                            var reportTrackingId = result.Message.Key.ReportScheduleId;
+                            var reportSchedule = (await reportScheduledManager.FindAsync(x => x.Id == reportTrackingId, consumeCancellationToken)).Single();
+
                             if (result.Message.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry)
                             {
-                                var submissionEntries = await submissionEntryManager.FindAsync(e => e.FacilityId == facilityId 
-                                                                                                                && e.Status != PatientSubmissionStatus.NotReportable
-                                                                                                                && e.PatientId == result.Message.Value.PatientId 
-                                                                                                                && e.ReportScheduleId == result.Message.Key.ReportScheduleId);
+                                var reportEntry = await database.ReportEntryRepository.FirstAsync(e => e.PatientId == result.Message.Value.PatientId && e.ReportScheduleId == result.Message.Key.ReportScheduleId);
 
-                                foreach (var entry in submissionEntries)
-                                {
-                                    entry.Status = PatientSubmissionStatus.Submitted;
-                                    entry.ModifyDate = DateTime.UtcNow;
-                                    await submissionEntryManager.UpdateAsync(new PatientSubmissionEntryUpdateModel
-                                    {
-                                        Id = entry.Id,
-                                        MeasureReport = entry.MeasureReport,
-                                        PayloadUri = entry.PayloadUri,
-                                        Status = entry.Status,
-                                        ValidationStatus = entry.ValidationStatus,
-                                    }, consumeCancellationToken);
-                                }
+                                reportEntry.SubmissionStatus = SubmissionStatus.Submitted;
+                                reportEntry.ModifyDate = DateTime.UtcNow;
+                                database.ReportEntryRepository.Update(reportEntry);
+                                await database.SaveChangesAsync();
                             }
                             else if (result.Message.Value.PayloadType == PayloadType.ReportSchedule)
                             {
-                                var reportTrackingId = result.Message.Key.ReportScheduleId;
-                                var reportSchedule = (await reportScheduledManager.FindAsync(x => x.Id == reportTrackingId, consumeCancellationToken)).Single();
-
                                 if (reportSchedule == null)
                                 {
-                                    logger.LogError("Report schedule {ReportTrackingId} not found", reportTrackingId);
-                                    throw new Exception($"Report schedule {reportTrackingId} not found");
+                                    throw new DeadLetterException($"{Name}: Report schedule {reportTrackingId} not found");
                                 }
 
-                                logger.LogInformation("Report submitted for {FacilityId} at {SubmissionTime}", 
-                                    reportSchedule.FacilityId.SanitizeAndRemove(), 
-                                    DateTime.UtcNow);
+                                logger.LogInformation("{Name}: Report submitted for {FacilityId} at {SubmissionTime}", Name, reportSchedule.FacilityId.SanitizeAndRemove(), DateTime.UtcNow);
 
                                 reportSchedule.Status = ScheduleStatus.Submitted;
                                 reportSchedule.SubmitReportDateTime = DateTime.UtcNow;
                                 reportSchedule.ModifyDate = DateTime.UtcNow;
                                 await reportScheduledManager.UpdateAsync(reportSchedule, consumeCancellationToken);
                             }
+
+                            await reportManifestProducer.Produce(reportSchedule, correlationId);
                         }
                         catch (DeadLetterException ex)
                         {

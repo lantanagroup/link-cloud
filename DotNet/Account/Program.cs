@@ -60,18 +60,16 @@ static void RegisterServices(WebApplicationBuilder builder)
 {
     // load external configuration source (if specified)
     builder.AddExternalConfiguration(AccountConstants.ServiceName);
-    
-    //Initialize activity source
+
     var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
-    var serviceInfoConfigSection = builder.Configuration.GetRequiredSection(ServiceInformation.SectionName);
-    var serviceInfo = ServiceInformation.GetServiceInformation(Assembly.GetExecutingAssembly(), builder.Configuration);
-    ServiceActivitySource.Initialize(assemblyVersion, serviceInfo);
+
+    var serviceInformation = builder.SetupServiceInformation(AccountConstants.ServiceName, assemblyVersion);    
 
     //Add problem details
     builder.Services.AddProblemDetailsService(options =>
     {
         options.Environment = builder.Environment;
-        options.ServiceName = serviceInfo?.ServiceName ?? AccountConstants.ServiceName;
+        options.ServiceName = serviceInformation?.ServiceName ?? AccountConstants.ServiceName;
         options.IncludeExceptionDetails = builder.Configuration.GetValue<bool>("ProblemDetails:IncludeExceptionDetails");
     });
 
@@ -83,7 +81,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
     builder.Services.Configure<UserManagementSettings>(builder.Configuration.GetSection(AccountConstants.AppSettingsSectionNames.UserManagement));
-    builder.Services.Configure<ServiceInformation>(serviceInfoConfigSection);
 
     //add factories
     builder.Services.AddFactories(kafkaConnection);
@@ -165,7 +162,8 @@ static void RegisterServices(WebApplicationBuilder builder)
         switch (dbProvider)
         {
             case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
-                string? connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
+
+                var connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
 
                 if (string.IsNullOrEmpty(connectionString))
                     throw new InvalidOperationException("Database connection string is null or empty.");

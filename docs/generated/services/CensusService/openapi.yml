@@ -1,0 +1,606 @@
+﻿swagger: "2.0"
+info:
+  version: 0.4.1
+  title: Census
+paths:
+  /api/census/info:
+    get:
+      tags:
+      - Census
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/ServiceInformation'
+  /api/census/{facilityId}/history/admitted:
+    get:
+      tags:
+      - Census
+      summary: Gets the admitted patients for a facility within a date range.
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: path
+        name: facilityId
+        description: ""
+        required: true
+        type: string
+      - in: query
+        name: startDate
+        description: ""
+        type: string
+        format: date-time
+      - in: query
+        name: endDate
+        description: ""
+        type: string
+        format: date-time
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+            additionalProperties: {}
+        "500":
+          description: Internal Server Error
+  /api/census/config:
+    post:
+      tags:
+      - CensusConfig
+      summary: Creates a CensusConfig for o given censusConfig
+      consumes:
+      - application/json
+      - text/json
+      - application/*+json
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: body
+        name: body
+        description: ""
+        schema:
+          $ref: '#/definitions/CensusConfigModel'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/CensusConfigEntity'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+  /api/census/config/{facilityId}:
+    get:
+      tags:
+      - CensusConfig
+      summary: Returns the CensusConfig for a given facilityId
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: path
+        name: facilityId
+        description: ""
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CensusConfigModel'
+        "500":
+          description: Internal Server Error
+    put:
+      tags:
+      - CensusConfig
+      summary: Updates a CensusConfig for a given censusConfigModel and facilityId
+      consumes:
+      - application/json
+      - text/json
+      - application/*+json
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: path
+        name: facilityId
+        description: ""
+        required: true
+        type: string
+      - in: body
+        name: body
+        description: ""
+        schema:
+          $ref: '#/definitions/CensusConfigModel'
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/CensusConfigEntity'
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/CensusConfigEntity'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ProblemDetails'
+        "500":
+          description: Internal Server Error
+    delete:
+      tags:
+      - CensusConfig
+      summary: Deletes the CensusConfig for a given facilityId
+      parameters:
+      - in: path
+        name: facilityId
+        description: ""
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "500":
+          description: Internal Server Error
+  /api/census/patient-encounters/current:
+    get:
+      tags:
+      - PatientEncounters
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: query
+        name: facilityId
+        type: string
+      - in: query
+        name: correlationId
+        type: string
+      - in: query
+        name: sortBy
+        type: string
+      - in: query
+        name: sortOrder
+      - in: query
+        name: pageSize
+        type: integer
+        format: int32
+        default: 10
+      - in: query
+        name: pageNumber
+        type: integer
+        format: int32
+        default: 1
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/PatientEncounterModelPagedConfigModel'
+  /api/census/patient-encounters/historical:
+    get:
+      tags:
+      - PatientEncounters
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: query
+        name: facilityId
+        type: string
+      - in: query
+        name: correlationId
+        type: string
+      - in: query
+        name: dateThreshold
+        type: string
+        format: date-time
+      - in: query
+        name: sortBy
+        type: string
+      - in: query
+        name: sortOrder
+      - in: query
+        name: pageSize
+        type: integer
+        format: int32
+        default: 10
+      - in: query
+        name: pageNumber
+        type: integer
+        format: int32
+        default: 1
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/PatientEncounterModelPagedConfigModel'
+  /api/census/patient-encounters/rebuild:
+    post:
+      tags:
+      - PatientEncounters
+      parameters:
+      - in: query
+        name: facilityId
+        type: string
+      - in: query
+        name: correlationId
+        type: string
+      responses:
+        "200":
+          description: OK
+  /api/census/patient-events:
+    get:
+      tags:
+      - PatientEvents
+      produces:
+      - text/plain
+      - application/json
+      - text/json
+      parameters:
+      - in: query
+        name: facilityId
+        type: string
+      - in: query
+        name: correlationId
+        type: string
+      - in: query
+        name: startDate
+        type: string
+        format: date-time
+      - in: query
+        name: endDate
+        type: string
+        format: date-time
+      - in: query
+        name: sortBy
+        type: string
+      - in: query
+        name: sortOrder
+      - in: query
+        name: pageSize
+        type: integer
+        format: int32
+        default: 10
+      - in: query
+        name: pageNumber
+        type: integer
+        format: int32
+        default: 1
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/PatientEventModelPagedConfigModel'
+  /api/census/patient-events/{id}:
+    delete:
+      tags:
+      - PatientEvents
+      summary: Deletes a patient event and rebuilds the materialized view for the related correlation id.
+      description: 'DELETE: api/patient-events/{id}'
+      parameters:
+      - in: path
+        name: id
+        description: The unique identifier of the patient event to delete. (Required)
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+  /api/census/patient-events/visit/{correlationId}:
+    delete:
+      tags:
+      - PatientEvents
+      summary: Deletes the patient event store for the given correlation id and removes the corresponding materialized view.
+      description: 'DELETE: api/patient-events/visit/{correlationId}'
+      parameters:
+      - in: path
+        name: correlationId
+        description: The correlation ID for the visit to delete. (Required)
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+  /health:
+    get:
+      tags:
+      - Health
+      summary: Health check endpoint
+      description: Returns the health status of the service and its dependencies
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Healthy
+          schema:
+            type: object
+            properties:
+              status:
+                description: Overall health status
+                type: string
+              totalDuration:
+                description: Total duration of health checks
+                type: string
+              entries:
+                type: object
+                properties:
+                  Database:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                      description:
+                        type: string
+                      duration:
+                        type: string
+                      data:
+                        type: object
+                  Kafka:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                      description:
+                        type: string
+                      duration:
+                        type: string
+                      data:
+                        type: object
+        "503":
+          description: Unhealthy
+          schema:
+            type: object
+            properties:
+              status:
+                description: Overall health status
+                type: string
+              totalDuration:
+                description: Total duration of health checks
+                type: string
+              entries:
+                type: object
+                properties:
+                  Database:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                      description:
+                        type: string
+                      duration:
+                        type: string
+                      data:
+                        type: object
+                  Kafka:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                      description:
+                        type: string
+                      duration:
+                        type: string
+                      data:
+                        type: object
+definitions:
+  CensusConfigEntity:
+    type: object
+    properties:
+      id:
+        type: string
+      createDate:
+        format: date-time
+        type: string
+      modifyDate:
+        format: date-time
+        type: string
+      facilityID:
+        type: string
+      scheduledTrigger:
+        type: string
+      enabled:
+        type: boolean
+    additionalProperties: false
+  CensusConfigModel:
+    required:
+    - facilityId
+    - scheduledTrigger
+    type: object
+    properties:
+      facilityId:
+        minLength: 1
+        type: string
+      scheduledTrigger:
+        minLength: 1
+        type: string
+      enabled:
+        type: boolean
+    additionalProperties: false
+  IPayload:
+    type: object
+    properties:
+      payloadType:
+        type: string
+        readOnly: true
+    additionalProperties: false
+  PaginationMetadata:
+    type: object
+    properties:
+      pageSize:
+        format: int32
+        type: integer
+      pageNumber:
+        format: int32
+        type: integer
+      totalCount:
+        format: int64
+        type: integer
+      totalPages:
+        format: int64
+        type: integer
+    additionalProperties: false
+  PatientEncounterModel:
+    type: object
+    properties:
+      id:
+        type: string
+      correlationId:
+        type: string
+      facilityId:
+        type: string
+      medicalRecordNumber:
+        type: string
+      admitDate:
+        format: date-time
+        type: string
+      dischargeDate:
+        format: date-time
+        type: string
+      encounterType:
+        type: string
+      encounterStatus:
+        type: string
+      encounterClass:
+        type: string
+      createDate:
+        format: date-time
+        type: string
+      modifyDate:
+        format: date-time
+        type: string
+      patientVisitIdentifiers:
+        type: array
+        items:
+          $ref: '#/definitions/PatientVisitIdentifierModel'
+      patientIdentifiers:
+        type: array
+        items:
+          $ref: '#/definitions/PatientIdentifierModel'
+    additionalProperties: false
+  PatientEncounterModelPagedConfigModel:
+    type: object
+    properties:
+      records:
+        type: array
+        items:
+          $ref: '#/definitions/PatientEncounterModel'
+      metadata:
+        $ref: '#/definitions/PaginationMetadata'
+    additionalProperties: false
+  PatientEventModel:
+    required:
+    - facilityId
+    - sourcePatientId
+    type: object
+    properties:
+      id:
+        type: string
+      facilityId:
+        minLength: 1
+        type: string
+      correlationId:
+        type: string
+      sourcePatientId:
+        minLength: 1
+        type: string
+      sourceVisitId:
+        type: string
+      medicalRecordNumber:
+        type: string
+      eventType:
+        type: string
+      payload:
+        $ref: '#/definitions/IPayload'
+      sourceType:
+        type: string
+    additionalProperties: false
+  PatientEventModelPagedConfigModel:
+    type: object
+    properties:
+      records:
+        type: array
+        items:
+          $ref: '#/definitions/PatientEventModel'
+      metadata:
+        $ref: '#/definitions/PaginationMetadata'
+    additionalProperties: false
+  PatientIdentifierModel:
+    type: object
+    properties:
+      id:
+        type: string
+      patientEncounterId:
+        type: string
+      identifier:
+        type: string
+      sourceType:
+        type: string
+      createDate:
+        format: date-time
+        type: string
+    additionalProperties: false
+  PatientVisitIdentifierModel:
+    type: object
+    properties:
+      id:
+        type: string
+      patientEncounterId:
+        type: string
+      identifier:
+        type: string
+      sourceType:
+        type: string
+      createDate:
+        format: date-time
+        type: string
+    additionalProperties: false
+  ProblemDetails:
+    type: object
+    properties:
+      type:
+        type: string
+      title:
+        type: string
+      status:
+        format: int32
+        type: integer
+      detail:
+        type: string
+      instance:
+        type: string
+    additionalProperties: {}
+  ServiceInformation:
+    type: object
+    properties:
+      serviceName:
+        type: string
+      version:
+        type: string
+      productVersion:
+        type: string
+      commit:
+        type: string
+      build:
+        type: string
+      swaggerUrl:
+        type: string
+    additionalProperties: false
+  SortOrder:
+    format: int32
+    enum:
+    - 0
+    - 1
+    type: integer
+

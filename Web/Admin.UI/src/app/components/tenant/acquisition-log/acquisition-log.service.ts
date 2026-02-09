@@ -1,11 +1,16 @@
-import { HttpClient, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
-import { Injectable } from '@angular/core';
-import { catchError, map, Observable } from 'rxjs';
-import { AppConfigService } from 'src/app/services/app-config.service';
-import { ErrorHandlingService } from 'src/app/services/error-handling.service';
-import { IPagedAcquisitionLogSummary } from './models/acquisition-log-summary';
-import { AcquisitionLog } from './models/acquisition-log';
-import { IDataAcquisitionLogStatistics } from 'src/app/interfaces/data-acquisition/data-acquisition-log-statistics.interface';
+import {HttpClient, HttpErrorResponse, HttpHeaders, HttpParams} from '@angular/common/http';
+import {Injectable} from '@angular/core';
+import {catchError, map, Observable} from 'rxjs';
+import {AppConfigService} from 'src/app/services/app-config.service';
+import {ErrorHandlingService} from 'src/app/services/error-handling.service';
+import {IPagedAcquisitionLogSummary} from './models/acquisition-log-summary';
+import {AcquisitionLog} from './models/acquisition-log';
+import {
+  IDataAcquisitionLogStatistics
+} from 'src/app/interfaces/data-acquisition/data-acquisition-log-statistics.interface';
+import {
+  IDataAcquisitionLogStatusStatistics
+} from 'src/app/interfaces/data-acquisition/data-acquisition-log-status-statistics.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -75,7 +80,7 @@ export class AcquisitionLogService {
     }
     if(priority) {
         params = params.set('priority', priority);
-    }  
+    }
 
     if(showLoadingIndicator)
     {
@@ -83,7 +88,7 @@ export class AcquisitionLogService {
       .pipe(
         map((response: IPagedAcquisitionLogSummary) => {
           //revert back to zero based paging
-          response.metadata.pageNumber--;          
+          response.metadata.pageNumber--;
           return response;
         }),
         catchError((error: HttpErrorResponse) => {
@@ -98,7 +103,7 @@ export class AcquisitionLogService {
       .pipe(
         map((response: IPagedAcquisitionLogSummary) => {
           //revert back to zero based paging
-          response.metadata.pageNumber--; 
+          response.metadata.pageNumber--;
           return response;
         }),
         catchError((error: HttpErrorResponse) => {
@@ -109,7 +114,7 @@ export class AcquisitionLogService {
     }
   }
 
-  getAcquisitionLog(id: string) : Observable<AcquisitionLog> {    
+  getAcquisitionLog(id: string) : Observable<AcquisitionLog> {
 
 
     return this.http.get<AcquisitionLog>(`${this.baseUrl}/${id}`)
@@ -138,9 +143,31 @@ export class AcquisitionLogService {
   }
 
   getAcquisitionLogStatistics(reportId: string): Observable<IDataAcquisitionLogStatistics> {
-    return this.http.get<IDataAcquisitionLogStatistics>(`${this.baseUrl}/report/${reportId}/statistics`)
+    const headers = new HttpHeaders({ 'X-Skip-Loading': 'true' });
+
+    return this.http.get<IDataAcquisitionLogStatistics>(`${this.baseUrl}/report/${reportId}/statistics`, { headers: headers })
       .pipe(
         map((response: IDataAcquisitionLogStatistics) => {
+          return response;
+        }),
+        catchError((error: HttpErrorResponse) => {
+          var err = this.errorHandler.handleError(error);
+          return err;
+        })
+      );
+  }
+
+  getAcquisitionLogStatusStatistics(reportId: string, patientId?: string | null): Observable<IDataAcquisitionLogStatusStatistics> {
+    const headers = new HttpHeaders({ 'X-Skip-Loading': 'true' });
+    let params = new HttpParams();
+
+    if (patientId) {
+      params = params.set('patientId', patientId);
+    }
+
+    return this.http.get<IDataAcquisitionLogStatusStatistics>(`${this.baseUrl}/report/${reportId}/status-counts`, { headers: headers, params: params })
+      .pipe(
+        map((response: IDataAcquisitionLogStatusStatistics) => {
           return response;
         }),
         catchError((error: HttpErrorResponse) => {

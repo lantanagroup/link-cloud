@@ -1,3 +1,4 @@
+using System.Net;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
@@ -12,7 +13,6 @@ using LantanaGroup.Link.Shared.Settings;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Net;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -304,6 +304,46 @@ public class LogController : Controller
         catch (Exception ex)
         {
             _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetReportStatistics"), ex, "An exception occurred while attempting to get report statistics with a report id of {id}", reportId.Sanitize());
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Get data acquisition log status counts for a report.
+    /// </summary>
+    /// <param name="reportId"></param>
+    /// <param name="patientId"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    [HttpGet("report/{reportId}/status-counts")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DataAcquisitionLogStatusStatistics))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<DataAcquisitionLogStatusStatistics>> GetReportStatusCounts(
+        [FromRoute] string reportId,
+        [FromQuery] string? patientId = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(reportId))
+        {
+            return BadRequest($"{nameof(reportId)} cannot be null or empty.");
+        }
+
+        reportId = HtmlInputSanitizer.Sanitize(reportId).SanitizeAndRemove();
+        patientId = string.IsNullOrWhiteSpace(patientId)
+            ? null
+            : HtmlInputSanitizer.Sanitize(patientId).SanitizeAndRemove();
+
+        try
+        {
+            var statistics = await _logQueries.GetDataAcquisitionLogStatusStatisticsByReportAsync(reportId, patientId, cancellationToken);
+
+            return Ok(statistics);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetReportStatusCounts"), ex, "An exception occurred while attempting to get report status counts with a report id of {id}", reportId.Sanitize());
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }

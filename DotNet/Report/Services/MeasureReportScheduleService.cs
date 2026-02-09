@@ -8,6 +8,7 @@ using Quartz;
 using Quartz.Spi;
 using System.Text.Json;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Extensions;
 
 namespace LantanaGroup.Link.Report.Services;
 
@@ -23,7 +24,7 @@ public class MeasureReportScheduleService : BackgroundService
     public MeasureReportScheduleService(
         ILogger<MeasureReportScheduleService> logger,
         IJobFactory jobFactory,
-        [FromKeyedServices("MongoScheduler")] ISchedulerFactory schedulerFactory,
+        ISchedulerFactory schedulerFactory,
         IServiceScopeFactory serviceScopeFactory)
     {
         _logger = logger;
@@ -85,8 +86,8 @@ public class MeasureReportScheduleService : BackgroundService
     public static IJobDetail CreateJob(ReportSchedule reportSchedule)
     {
         JobDataMap jobDataMap = new JobDataMap();
-        jobDataMap.Put("ReportScheduleId", reportSchedule.Id);
-        jobDataMap.Put("FacilityId", reportSchedule.FacilityId);
+        jobDataMap.PutObject<string>("ReportScheduleId", reportSchedule.Id);
+        jobDataMap.PutObject<string>("FacilityId", reportSchedule.FacilityId);
 
         return JobBuilder
             .Create(typeof(EndOfReportPeriodJob))
@@ -101,8 +102,7 @@ public class MeasureReportScheduleService : BackgroundService
     private static ITrigger CreateTrigger(ReportSchedule reportSchedule, JobKey jobKey)
     {
         JobDataMap jobDataMap = new JobDataMap();
-        string reportScheduleJson = JsonSerializer.Serialize(reportSchedule);
-        jobDataMap.Put(ReportConstants.MeasureReportSubmissionScheduler.ReportScheduleModel, reportScheduleJson);
+        jobDataMap.PutObject<ReportSchedule>(ReportConstants.MeasureReportSubmissionScheduler.ReportScheduleModel, reportSchedule);
 
         var offset = new DateTimeOffset(
             reportSchedule.ReportEndDate.Year,

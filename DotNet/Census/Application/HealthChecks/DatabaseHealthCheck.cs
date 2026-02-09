@@ -1,5 +1,4 @@
 ﻿using Census.Domain.Entities;
-using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.Extensions.Diagnostics.HealthChecks;

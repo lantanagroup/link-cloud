@@ -25,13 +25,11 @@ namespace LantanaGroup.Link.Shared.Application.Factories
 
             if (headers.ContainsKey(KafkaConstants.HeaderConstants.RetryCount))
             {
-                int count = int.Parse(headers[KafkaConstants.HeaderConstants.RetryCount]);
-                retryCount = count += 1;
-                headers[KafkaConstants.HeaderConstants.RetryCount] = retryCount.ToString();
+                retryCount = int.Parse(headers[KafkaConstants.HeaderConstants.RetryCount]);
             }
             else
             {
-                headers.TryAdd(KafkaConstants.HeaderConstants.RetryCount, retryCount.ToString());
+                headers.TryAdd(KafkaConstants.HeaderConstants.RetryCount, 1.ToString());
             }
 
             var triggerDuration = System.Xml.XmlConvert.ToTimeSpan(consumerSettings.ConsumerRetryDuration[retryCount - 1]);

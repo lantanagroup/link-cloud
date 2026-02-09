@@ -1,0 +1,75 @@
+---
+
+id: ValidateValueSetCode
+name: Validate ValueSet Code
+version: 0.3.0
+
+summary: Validate a code against a value set.
+
+badges:
+  - content: REST
+    backgroundColor: green
+    textColor: black
+
+---
+
+## Summary
+
+A REST operation implemented by the Terminology service that validates a code against a value set or code system using 
+terminology artifacts loaded in memory to support high performance.
+
+The validation code operation complies with the FHIR <a href="https://build.fhir.org/valueset-operation-validate-code.html" target="_blank">Operation $validate-code on ValueSet</a> specification.
+
+### Example Requests
+
+**Using query parameters with the ValueSet identified in the URL path**
+
+> Note: The "system" query parameter often has special characters in it that need to be URL encoded, as in this example.
+
+```
+POST {{terminology-api-base}}/api/terminology/fhir/ValueSet/address-type/$validate-code?code=physical&system=http%3A%2F%2Fhl7.org%2Ffhir%2Faddress-type
+```
+
+**Using query parameters**
+
+> Note: The "system" *and* "url" query parameters often have special characters that must be URL-encoded, as in this example.
+
+```
+POST {{terminology-api-base}}/api/terminology/fhir/ValueSet/$validate-code?url=http%3A%2F%2Fhl7.org%2Ffhir%2FValueSet%2Faddress-type&code=physical&system=http%3A%2F%2Fhl7.org%2Ffhir%2Faddress-type
+```
+
+### Example Response
+
+**Good/valid response**
+
+```
+{
+    "resourceType": "Parameters",
+    "parameter": [
+        {
+            "name": "result",
+            "valueBoolean": true
+        }
+    ]
+}
+```
+
+**Bad/invalid response**
+
+```
+{
+    "resourceType": "Parameters",
+    "parameter": [
+        {
+            "name": "result",
+            "valueBoolean": false
+        },
+        {
+            "name": "message",
+            "valueString": "Code not found in ValueSet"
+        }
+    ]
+}
+```
+
+<NodeGraph />

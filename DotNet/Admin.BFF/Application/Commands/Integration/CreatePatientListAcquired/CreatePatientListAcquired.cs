@@ -74,7 +74,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 _logger.LogKafkaProducerException(nameof(KafkaTopic.PatientListsAcquired), ex.Message);
                 throw;
             }

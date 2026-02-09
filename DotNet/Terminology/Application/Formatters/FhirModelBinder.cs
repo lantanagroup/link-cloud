@@ -34,7 +34,7 @@ public class FhirModelBinder : IModelBinder
         }
 
         var request = bindingContext.HttpContext.Request;
-        if (request.ContentType != "application/fhir+json" && request.ContentType != "application/json")
+        if (!request.HasJsonContentType())
         {
             bindingContext.Result = ModelBindingResult.Failed();
             return;

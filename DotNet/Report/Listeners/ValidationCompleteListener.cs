@@ -5,7 +5,6 @@ using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities.Enums;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
@@ -20,6 +19,7 @@ using System.Text;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Task = System.Threading.Tasks.Task;
 using Hl7.Fhir.Support;
+using Hl7.Fhir.Serialization;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -28,12 +28,11 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ILogger<ValidationCompleteListener> _logger;
         private readonly IKafkaConsumerFactory<string, ValidationCompleteValue> _kafkaConsumerFactory;
         private readonly IServiceScopeFactory _serviceScopeFactory;
+        private readonly ServiceInformation _serviceInformation;
         private readonly ITransientExceptionHandler<string, ValidationCompleteValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, ValidationCompleteValue> _deadLetterExceptionHandler;
         private readonly SubmitPayloadProducer _submitPayloadProducer;
-        private readonly ReportManifestProducer _reportManifestProducer;
         private readonly BlobStorageService _blobStorageService;
-        private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
         private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
 
         private string Name => this.GetType().Name;
@@ -45,24 +44,20 @@ namespace LantanaGroup.Link.Report.Listeners
             IDeadLetterExceptionHandler<string, ValidationCompleteValue> deadLetterExceptionHandler,
             SubmitPayloadProducer submitPayloadProducer,
             IServiceScopeFactory serviceScopeFactory,
+            ServiceInformation serviceInformation,
             BlobStorageService blobStorageService,
-            PatientReportSubmissionBundler patientReportSubmissionBundler,
-            ReportManifestProducer reportManifestProducer,
             AuditableEventOccurredProducer auditableEventOccurredProducer)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _serviceScopeFactory = serviceScopeFactory;
+            _serviceInformation = serviceInformation;
             _submitPayloadProducer = submitPayloadProducer;
             _blobStorageService = blobStorageService;
-            _patientReportSubmissionBundler = patientReportSubmissionBundler;
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
-            _reportManifestProducer = reportManifestProducer;
 
-            _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _transientExceptionHandler.Topic = nameof(KafkaTopic.ValidationComplete) + "-Retry";
-            _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ValidationComplete) + "-Error";
             _auditableEventOccurredProducer = auditableEventOccurredProducer;
         }
@@ -76,7 +71,7 @@ namespace LantanaGroup.Link.Report.Listeners
         {
             var consumerConfig = new ConsumerConfig()
             {
-                GroupId = ReportConstants.ServiceName,
+                GroupId = _serviceInformation.ServiceConfigName,
                 EnableAutoCommit = false
             };
 
@@ -161,107 +156,74 @@ namespace LantanaGroup.Link.Report.Listeners
 
         public async Task ProcessMessageAsync(ConsumeResult<string, ValidationCompleteValue> result, CancellationToken cancellationToken)
         {
+            using var scope = _serviceScopeFactory.CreateScope();
+            var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+            var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+            var patientAggregator = scope.ServiceProvider.GetRequiredService<PatientAggregator>();
+
             var facilityId = result.Message.Key;
             var value = result.Message.Value;
             var reportId = value.ReportTrackingId;
 
-            using var scope = _serviceScopeFactory.CreateScope();
-            var measureReportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
-            var submissionEntryManager = scope.ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
+            var schedule = await reportScheduledManager.SingleOrDefaultAsync(s => s.Id == reportId, cancellationToken);
 
-            var schedule = await measureReportScheduledManager.SingleOrDefaultAsync(s => s.Id == reportId, cancellationToken);
             if (schedule == null)
             {
-                throw new DeadLetterException($"No ReportSchedule found for ID {reportId}");
+                throw new DeadLetterException($"{Name}: No scheduled report record was found (ReportId = {reportId}, FacilityId = {facilityId}).");
             }
 
             if (!result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
             {
-                throw new DeadLetterException($"{Name}: Received message without correlation ID in topic: {result.Topic}, offset: {result.TopicPartitionOffset}");
+                throw new DeadLetterException($"{Name}: Received message without correlation ID (ReportId = {reportId}, FacilityId = {facilityId}).");
             }
 
             var correlationIdStr = Encoding.UTF8.GetString(headerValue);
+            var reportEntry = await reportEntryManager.GetEntry(schedule.Id, value.PatientId, cancellationToken);
 
-
-            var submissionEntries = await submissionEntryManager.FindAsync(
-                e => e.ReportScheduleId == schedule.Id && e.PatientId == value.PatientId && e.Status == PatientSubmissionStatus.ValidationRequested, cancellationToken);
-
-            if(!submissionEntries.Any() )
+            if (reportEntry == null)
             {
-                throw new DeadLetterException($"No Patient Submission Entries were found for schedule ID {schedule.Id}, patient ID {value.PatientId}, in status {PatientSubmissionStatus.ValidationRequested}");
-            }
-
-            var operationOutcome = GetOperationOutcome();
-
-            foreach (var entry in submissionEntries)
-            {
-                if (!value.IsValid)
-                {
-                    await submissionEntryManager.AddResourceAsync(entry, operationOutcome, ResourceCategoryType.Patient, cancellationToken);
-                }
-
-                entry.ValidationStatus = value.IsValid ? ValidationStatus.Passed : ValidationStatus.Failed;
-                entry.Status = PatientSubmissionStatus.ValidationComplete;
-                await submissionEntryManager.UpdateAsync(new PatientSubmissionEntryUpdateModel
-                {
-                    Id = entry.Id,
-                    MeasureReport = entry.MeasureReport,
-                    PayloadUri = entry.PayloadUri,
-                    Status = entry.Status,
-                    ValidationStatus = entry.ValidationStatus,
-                }, cancellationToken);
+                throw new DeadLetterException($"{Name}: No patient report entry records were found (ReportId = {schedule.Id}, FacilityId = {facilityId}, PatientId {value.PatientId}).");
             }
 
             if (!value.IsValid)
             {
-                var patientSubmission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, value.PatientId, schedule.Id);
-                string? uri;
+                var operationOutcome = new OperationOutcome()
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Issue = new List<OperationOutcome.IssueComponent>() {
+                        new OperationOutcome.IssueComponent() {
+                            Severity = OperationOutcome.IssueSeverity.Error,
+                            Code = OperationOutcome.IssueType.Invalid,
+                            Diagnostics = "Patient has failed Validation"
+                        }
+                    }
+                };
+
+                var serializer = new FhirJsonSerializer();
+                string json = serializer.SerializeToString(operationOutcome);
+
                 try
                 {
-                    uri = (await _blobStorageService.UploadAsync(schedule, patientSubmission, cancellationToken))?.ToString();
+                    await patientAggregator.AppendResourceToBlob(reportEntry.AggregateReportBlobName, operationOutcome);
                 }
                 catch (Exception ex)
                 {
-                    uri = null;
-                    _logger.LogError(ex, "Failed to upload to blob storage.");
-                    AuditEventMessage auditEvent = new()
-                    {
-                        FacilityId = facilityId,
-                        CorrelationId = correlationIdStr,
-                        EventDate = DateTime.UtcNow,
-                        Notes = $"Failed to upload to blob storage: {ex.GetType().Name}: {ex.Message}"
-                    };
-                    await _auditableEventOccurredProducer.ProduceAsync(auditEvent, cancellationToken);
-                }
-
-                if (!string.IsNullOrEmpty(uri))
-                {
-                    foreach (var entry in submissionEntries)
-                    {
-                        entry.PayloadUri = uri;
-                        await submissionEntryManager.UpdateAsync(new PatientSubmissionEntryUpdateModel
-                        {
-                            Id = entry.Id,
-                            MeasureReport = entry.MeasureReport,
-                            PayloadUri = entry.PayloadUri,
-                            Status = entry.Status,
-                            ValidationStatus = entry.ValidationStatus,
-                        }, cancellationToken);
-                    }
+                    throw new TransientException($"{Name}: Could not append OperationOutcome resource to patient aggregate report (ReportId = {schedule.Id}, FacilityId = {facilityId}, PatientId {value.PatientId}).");
                 }
             }
 
             try
             {
-                await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, correlationIdStr, submissionEntries.First().PayloadUri);
-            }
-            catch (ProduceException<SubmitPayloadKey, SubmitPayloadValue> ex)
-            {
-                _logger.LogError(ex, "An error was encountered generating a Submit Payload event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId.SanitizeAndRemove());
-                throw new TransientException($"An error was encountered generating a Submit Payload event.\n\tFacilityId: {facilityId}\n\t", ex);
-            }
+                reportEntry.ReportingStatus = value.IsValid ? ReportingStatus.PassedValidation : ReportingStatus.FailedValidation;
+                reportEntry.SubmissionStatus = SubmissionStatus.Submitting;
+                await reportEntryManager.UpdateAsync(reportEntry);
 
-            await _reportManifestProducer.Produce(schedule, correlationIdStr);
+                await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, correlationIdStr, reportEntry.AggregateReportUri);
+            }
+            catch (Exception ex)
+            {
+                throw new TransientException($"{Name}: An error was encountered when producing a Submit Payload event(ReportId = {schedule.Id}, FacilityId = {facilityId}, PatientId {value.PatientId}).", ex);
+            }
         }
 
         private static OperationOutcome GetOperationOutcome()

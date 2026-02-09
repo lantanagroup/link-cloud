@@ -52,11 +52,9 @@ namespace LantanaGroup.Link.Submission.Listeners
             });
 
             _transientExceptionHandler = transientExceptionHandler;
-            _transientExceptionHandler.ServiceName = SubmissionConstants.ServiceName;
             _transientExceptionHandler.Topic = TopicName + "-Retry";
 
             _deadLetterExceptionHandler = deadLetterExceptionHandler;
-            _deadLetterExceptionHandler.ServiceName = SubmissionConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = TopicName + "-Error";
 
             _blobStorageService = blobStorageService;

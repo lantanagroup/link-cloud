@@ -1,20 +1,27 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
+import { MatTableDataSource, MatTableModule } from '@angular/material/table';
+import { MatPaginatorModule, MatPaginator, PageEvent } from '@angular/material/paginator';
+import { MatSortModule, MatSort, Sort } from '@angular/material/sort';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { forkJoin, Subscription } from 'rxjs';
 import { TenantService } from '../../../services/gateway/tenant/tenant.service';
 import { LoadingService } from '../../../services/loading.service';
 import { FacilityViewService } from '../../tenant/facility-view/facility-view.service';
 import { PaginationMetadata } from '../../../models/pagination-metadata.model';
 import { IReportListSummary, IPagedReportListSummary } from '../../tenant/facility-view/report-view.interface';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { CommonModule } from '@angular/common';
 import { ResubmitDialogComponent } from "../../tenant/facility-view/resubmit-dialog.component";
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faRotate } from '@fortawesome/free-solid-svg-icons';
+import { IReportSchedule } from '../../../interfaces/report/report-schedule.interface';
+import { ReportService } from '../../../services/gateway/report/report.service';
+import {FormsModule} from "@angular/forms";
+import {MatCheckbox} from "@angular/material/checkbox";
 
 @Component({
   selector: 'app-reports-dashboard',
@@ -25,50 +32,47 @@ import { faRotate } from '@fortawesome/free-solid-svg-icons';
     MatIconModule,
     MatButtonModule,
     MatPaginatorModule,
+    MatTableModule,
+    MatSortModule,
+    MatTooltipModule,
     RouterLink,
-    FontAwesomeModule
+    FontAwesomeModule,
+    FormsModule,
+    MatCheckbox
   ],
   templateUrl: './reports-dashboard.component.html',
   styleUrls: ['./reports-dashboard.component.scss']
 })
-export class ReportsDashboardComponent implements OnInit {
+export class ReportsDashboardComponent implements OnInit, OnDestroy {
+  @ViewChild(MatPaginator, { static: false }) paginator!: MatPaginator;
+  @ViewChild(MatSort, { static: false }) sort!: MatSort;
+
   private subscription: Subscription | undefined;
-  defaultPageNumber: number = 0
+  defaultPageNumber: number = 0;
   defaultPageSize: number = 10;
-  reportListSummary: IReportListSummary[] = [];
-  paginationMetadata: PaginationMetadata = new PaginationMetadata;
+  paginationMetadata: PaginationMetadata = new PaginationMetadata();
   faRotate = faRotate;
+  showDeleted = false;
+
+  dataSource = new MatTableDataSource<IReportSchedule>([]);
+  reportSchedules: IReportSchedule[] = [];
+
+  currentSortBy: string = 'CreateDate';
+  currentSortOrder: number = 1; // 1 = Descending, 0 = Ascending
 
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private facilityViewService: FacilityViewService,
+    private reportService: ReportService,
     private loadingService: LoadingService,
     private dialog: MatDialog,
     private tenantService: TenantService,) {
   }
 
   ngOnInit(): void {
-    this.subscription = this.route.params.subscribe(params => {
-
-      this.loadingService.show();
-
-      forkJoin([
-        this.facilityViewService.getReportSummaryList('', this.defaultPageNumber, this.defaultPageSize)
-      ]).subscribe({
-        next: (response) => {
-
-          this.reportListSummary = response[0].records;
-          this.paginationMetadata = response[0].metadata;
-
-          this.loadingService.hide();
-        },
-        error: (error) => {
-          console.error('Error loading report summaries:', error);
-          this.loadingService.hide();
-        }
-      });
-    });
+    this.paginationMetadata.pageNumber = this.defaultPageNumber;
+    this.paginationMetadata.pageSize = this.defaultPageSize;
+    this.loadReportSchedules();
   }
 
   ngOnDestroy(): void {
@@ -77,26 +81,79 @@ export class ReportsDashboardComponent implements OnInit {
     }
   }
 
-  navigateTo(path: string) {
-    this.router.navigateByUrl(path);
+  getColumns(): string[] {
+    const cols = ['id', 'facilityId', 'reportStartDate', 'frequency', 'reportTypes', 'patientsInCensus', 'patientsInIP', 'status', 'action'];
+    if (this.showDeleted) cols.push('isDeleted');
+    return cols;
   }
 
-  pagedEvent(event: PageEvent) {
-    this.paginationMetadata.pageSize = event.pageSize;
-    this.paginationMetadata.pageNumber = event.pageIndex;
-    this.loadReportSummaryList(event.pageIndex, event.pageSize);
-  }
-
-  loadReportSummaryList(pageNumber: number, pageSize: number): void {
-    this.facilityViewService.getReportSummaryList('', pageNumber, pageSize).subscribe({
-      next: (response: IPagedReportListSummary) => {
-        this.reportListSummary = response.records;
-        this.paginationMetadata = response.metadata;
+  loadReportSchedules(): void {
+    this.loadingService.isLoading.next(true);
+    this.reportService.searchReportSchedules(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      this.showDeleted,
+      this.currentSortBy,
+      this.currentSortOrder,
+      this.paginationMetadata.pageSize,
+      this.paginationMetadata.pageNumber + 1 // API expects 1-based indexing
+    ).subscribe({
+      next: (data) => {
+        this.reportSchedules = data.records;
+        this.dataSource.data = this.reportSchedules;
+        this.paginationMetadata = data.metadata;
+        this.paginationMetadata.pageNumber = data.metadata.pageNumber - 1; // Convert back to 0-based
+        this.loadingService.isLoading.next(false);
       },
       error: (error) => {
-        console.error('Error fetching facility report summaries:', error);
+        console.error('Error loading report schedules:', error);
+        this.loadingService.isLoading.next(false);
       }
     });
+  }
+
+  onShowDeletedChange(): void {
+    this.paginationMetadata.pageNumber = 0;
+    this.loadReportSchedules();
+  }
+
+  onPageChange(event: PageEvent): void {
+    this.paginationMetadata.pageSize = event.pageSize;
+    this.paginationMetadata.pageNumber = event.pageIndex;
+    this.loadReportSchedules();
+  }
+
+  onSortChange(sort: Sort): void {
+    if (sort.active && sort.direction) {
+      // Map UI column names to API field names
+      const sortFieldMap: { [key: string]: string } = {
+        'id': 'Id',
+        'facilityId': 'FacilityId',
+        'reportStartDate': 'ReportStartDate',
+        'frequency': 'Frequency',
+        'status': 'Status'
+      };
+
+      this.currentSortBy = sortFieldMap[sort.active] || 'CreateDate';
+      this.currentSortOrder = sort.direction === 'desc' ? 1 : 0;
+    } else {
+      // Reset to default sort
+      this.currentSortBy = 'CreateDate';
+      this.currentSortOrder = 1;
+    }
+
+    // Reset to first page when sorting changes
+    this.paginationMetadata.pageNumber = 0;
+    this.loadReportSchedules();
+  }
+
+  navigateTo(path: string): void {
+    this.router.navigate([path]);
   }
 
   onResubmit(reportId: string, facilityId: string): void {
@@ -130,7 +187,7 @@ export class ReportsDashboardComponent implements OnInit {
         });
     });
   }
-    onRefresh() {
-      this.loadReportSummaryList(this.defaultPageNumber, this.defaultPageSize);
-    }
+  onRefresh() {
+    this.loadReportSchedules();
+  }
 }

@@ -1,21 +1,35 @@
-import { animate, style, transition, trigger, keyframes } from '@angular/animations';
-import { Location } from '@angular/common';
-import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
-import { AcquisitionLogSummary } from '../models/acquisition-log-summary';
-import { AcquisitionLogService } from '../acquisition-log.service';
-import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faXmark, faRotate, faArrowLeft, faFilter, faPlus, faSort, faSortUp, faSortDown } from '@fortawesome/free-solid-svg-icons';
-import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { FormsModule } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
-import { LoadingService } from 'src/app/services/loading.service';
-import { finalize, forkJoin } from 'rxjs';
-import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
-import { MatDialogModule } from '@angular/material/dialog';
-import { ActivatedRoute } from '@angular/router';
-import { TableCommandComponent } from "./table-command/table-command.component";
+import {animate, keyframes, style, transition, trigger} from '@angular/animations';
+import {CommonModule} from '@angular/common';
+import {Component, OnInit} from '@angular/core';
+import {AcquisitionLogSummary} from '../models/acquisition-log-summary';
+import {AcquisitionLogService} from '../acquisition-log.service';
+import {FontAwesomeModule} from '@fortawesome/angular-fontawesome';
+import {
+  faArrowLeft,
+  faFilter,
+  faPlus,
+  faRotate,
+  faSort,
+  faSortDown,
+  faSortUp,
+  faXmark
+} from '@fortawesome/free-solid-svg-icons';
+import {PaginationMetadata} from 'src/app/models/pagination-metadata.model';
+import {MatPaginatorModule, PageEvent} from '@angular/material/paginator';
+import {FormsModule} from '@angular/forms';
+import {MatButtonModule} from '@angular/material/button';
+import {LoadingService} from 'src/app/services/loading.service';
+import {finalize, forkJoin} from 'rxjs';
+import {TenantService} from 'src/app/services/gateway/tenant/tenant.service';
+import {MatDialogModule} from '@angular/material/dialog';
+import {ActivatedRoute, Router} from '@angular/router';
+import {TableCommandComponent} from "./table-command/table-command.component";
+import {ReportService} from 'src/app/services/gateway/report/report.service';
+import {PieChartComponent} from 'src/app/components/core/pie-chart/pie-chart.component';
+import {
+  IDataAcquisitionLogStatusCount,
+  IDataAcquisitionLogStatusStatistics
+} from 'src/app/interfaces/data-acquisition/data-acquisition-log-status-statistics.interface';
 
 @Component({
   selector: 'app-acquisition-log-view',
@@ -26,7 +40,8 @@ import { TableCommandComponent } from "./table-command/table-command.component";
     FontAwesomeModule,
     MatPaginatorModule,
     MatDialogModule,
-    TableCommandComponent
+    TableCommandComponent,
+    PieChartComponent
 ],
   templateUrl: './acquisition-log-view.component.html',
   styleUrl: './acquisition-log-view.component.scss',
@@ -90,6 +105,9 @@ export class AcquisitionLogViewComponent implements OnInit {
   patientFilter: string = '';
   resourceIdFilter: string = '';
   reportIdFilter: string = '';
+  reportIdFromRoute: string = '';
+  reportFacilityId: string = '';
+  patientIdFromRoute: string = '';
   facilityFilterOptions: Record<string, string> = {};
   selectedFacilityFilter: string = 'Any';
   resourceTypeFilterOptions: string[] = [];
@@ -102,27 +120,51 @@ export class AcquisitionLogViewComponent implements OnInit {
   selectedQueryTypeFilter: string = 'Any';
   statusFilterOptions: string[] = [ "Pending", "Ready", "Processing", "Completed", "Failed", "Cancelled", "MaxRetriesReached", "Skipped"];
   selectedStatusFilter: string = 'Any';
+  targetPageNumber: number | null = null;
+  statusChartData: Record<string, number> = {};
+  statusChartLoading = false;
+  statusChartReportId = '';
+  statusChartPatientId = '';
 
   constructor(
-    private location: Location,
     private route: ActivatedRoute,
+    private router: Router,
     private loadingService: LoadingService,
     private tenantService: TenantService,
+    private reportService: ReportService,
     private acquisitionLogService: AcquisitionLogService) { }
 
   ngOnInit(): void {
 
     this.paginationMetadata.pageNumber = this.defaultPageNumber;
     this.paginationMetadata.pageSize = this.defaultPageSize;
+    this.targetPageNumber = this.defaultPageNumber + 1;
 
     this.loadingService.show();
 
     this.route.queryParamMap.subscribe(params => {
       const reportId = params.get('reportId');
+      const facilityId = params.get('facilityId');
+      const patientId = params.get('patientId');
       if (reportId) {
         this.reportIdFilter = reportId;
+        this.reportIdFromRoute = reportId;
+        this.reportFacilityId = facilityId ?? '';
+        if (!this.reportFacilityId) {
+          this.loadReportFacility(reportId);
+        }
       } else {
         this.reportIdFilter = '';
+        this.reportIdFromRoute = '';
+        this.reportFacilityId = '';
+      }
+
+      if (patientId) {
+        this.patientFilter = patientId;
+        this.patientIdFromRoute = patientId;
+      } else {
+        this.patientFilter = '';
+        this.patientIdFromRoute = '';
       }
     });
 
@@ -137,6 +179,8 @@ export class AcquisitionLogViewComponent implements OnInit {
             this.resourceTypeFilterOptions = response[1];
             this.acquisitionLogs = response[2].records;
             this.paginationMetadata = response[2].metadata;
+            this.syncTargetPageNumber();
+            this.loadStatusCounts();
 
             this.loadingService.hide();
           },
@@ -172,6 +216,7 @@ export class AcquisitionLogViewComponent implements OnInit {
       next: (response) => {
         this.acquisitionLogs = response.records;
         this.paginationMetadata = response.metadata;
+        this.syncTargetPageNumber();
       },
       error: (error) => {
         console.error('Error loading acquisition logs:', error);
@@ -180,6 +225,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   }
 
   pagedEvent(event: PageEvent) {
+    this.targetPageNumber = event.pageIndex + 1;
     this.loadLogs(event.pageIndex, event.pageSize, true);
   }
 
@@ -189,6 +235,7 @@ export class AcquisitionLogViewComponent implements OnInit {
 
   applyFilters(): void {
     this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);
+    this.loadStatusCounts();
     this.filterPanelOpen = false;
     this.onFilterApplication();
   }
@@ -206,14 +253,15 @@ export class AcquisitionLogViewComponent implements OnInit {
   }
 
   refreshLogs(): void {
-    this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);
+    this.loadLogs(this.getCurrentPageNumber(), this.getCurrentPageSize(), true);
+    this.loadStatusCounts();
   }
 
   clearFilters(): void {
-    this.patientFilter = '';
+    this.patientFilter = this.patientIdFromRoute;
     this.resourceIdFilter = '';
     this.selectedFacilityFilter = 'Any';
-    this.reportIdFilter = '';
+    this.reportIdFilter = this.reportIdFromRoute;
     this.selectedResourceTypeFilter = 'Any';
     this.selectedPriorityFilter = 'Any';
     this.selectedQueryPhaseFilter = 'Any';
@@ -221,6 +269,7 @@ export class AcquisitionLogViewComponent implements OnInit {
     this.selectedStatusFilter = 'Any';
     this.filtersApplied = false;
     this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);
+    this.loadStatusCounts();
   }
 
   onSort(column: string): void {
@@ -252,8 +301,143 @@ export class AcquisitionLogViewComponent implements OnInit {
     this.acquisitionLogs[scheduledLogIndex].status = 'Ready';
   }
 
-  navBack(): void {
-    this.location.back();
+  returnToReport(): void {
+    if (!this.reportIdFromRoute || !this.reportFacilityId) {
+      return;
+    }
+
+    this.router.navigate(['/tenant/facility', this.reportFacilityId, 'report', this.reportIdFromRoute]);
+  }
+
+  goToPage(): void {
+    const totalPages = this.getTotalPages();
+    const requestedPage = Number(this.targetPageNumber);
+    if (!Number.isFinite(requestedPage)) {
+      this.syncTargetPageNumber();
+      return;
+    }
+
+    const normalizedPage = Math.floor(requestedPage);
+    if (normalizedPage < 1 || (totalPages && normalizedPage > totalPages)) {
+      this.syncTargetPageNumber();
+      return;
+    }
+
+    const targetIndex = normalizedPage - 1;
+    if (targetIndex === this.getCurrentPageNumber()) {
+      return;
+    }
+
+    this.loadLogs(targetIndex, this.getCurrentPageSize(), true);
+  }
+
+  canNavigateToPage(): boolean {
+    const totalPages = this.getTotalPages();
+    const requestedPage = Number(this.targetPageNumber);
+    if (!Number.isFinite(requestedPage)) {
+      return false;
+    }
+
+    const normalizedPage = Math.floor(requestedPage);
+    if (normalizedPage < 1) {
+      return false;
+    }
+
+    if (totalPages && normalizedPage > totalPages) {
+      return false;
+    }
+
+    return normalizedPage - 1 !== this.getCurrentPageNumber();
+  }
+
+  private getCurrentPageNumber(): number {
+    return this.paginationMetadata.pageNumber ?? this.defaultPageNumber;
+  }
+
+  private getCurrentPageSize(): number {
+    return this.paginationMetadata.pageSize ?? this.defaultPageSize;
+  }
+
+  private getTotalPages(): number {
+    if (this.paginationMetadata.totalPages) {
+      return this.paginationMetadata.totalPages;
+    }
+
+    const totalCount = this.paginationMetadata.totalCount ?? 0;
+    const pageSize = this.getCurrentPageSize();
+    if (!pageSize) {
+      return 0;
+    }
+
+    return Math.ceil(totalCount / pageSize);
+  }
+
+  private syncTargetPageNumber(): void {
+    this.targetPageNumber = this.getCurrentPageNumber() + 1;
+  }
+
+  private loadReportFacility(reportId: string): void {
+    this.reportService.getReportSchedule(reportId).subscribe({
+      next: (report) => {
+        this.reportFacilityId = report.facilityId;
+      },
+      error: (error) => {
+        console.error('Error loading report schedule:', error);
+      }
+    });
+  }
+
+  get showStatusChart(): boolean {
+    return this.reportIdFilter.trim().length > 0;
+  }
+
+  get hasStatusChartData(): boolean {
+    return Object.keys(this.statusChartData).length > 0;
+  }
+
+  private loadStatusCounts(): void {
+    const reportId = this.reportIdFilter.trim();
+    if (!reportId) {
+      this.clearStatusCounts();
+      return;
+    }
+
+    const patientId = this.patientFilter.trim();
+    this.statusChartLoading = true;
+    this.statusChartReportId = reportId;
+    this.statusChartPatientId = patientId;
+
+    this.acquisitionLogService.getAcquisitionLogStatusStatistics(reportId, patientId.length > 0 ? patientId : null)
+      .pipe(
+        finalize(() => {
+          this.statusChartLoading = false;
+        })
+      )
+      .subscribe({
+        next: (response: IDataAcquisitionLogStatusStatistics) => {
+          this.statusChartReportId = response.reportId;
+          this.statusChartPatientId = response.patientId ?? '';
+          this.statusChartData = this.toStatusChartData(response.statuses);
+        },
+        error: (error) => {
+          console.error('Error loading acquisition log status counts:', error);
+          this.clearStatusCounts();
+        }
+      });
+  }
+
+  private toStatusChartData(statuses: IDataAcquisitionLogStatusCount[]): Record<string, number> {
+    return statuses.reduce((acc, status) => {
+      acc[status.name] = status.count;
+      return acc;
+    }, {} as Record<string, number>);
+  }
+
+  private clearStatusCounts(): void {
+    this.statusChartData = {};
+    this.statusChartLoading = false;
+    this.statusChartReportId = '';
+    this.statusChartPatientId = '';
   }
 
 }

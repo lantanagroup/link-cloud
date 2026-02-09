@@ -1,0 +1,26 @@
+﻿.spinner-container {
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+}
+
+mat-dialog-content {
+  max-height: none !important;
+}
+
+table {
+  width: 100%;
+}
+
+.not-found {
+  color: #f44336;
+  font-weight: bold;
+}
+
+td[mat-cell] {
+  padding: 8px;
+}
+
+::ng-deep .mat-tooltip {
+  white-space: pre-line !important;
+}
