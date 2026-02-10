@@ -20,6 +20,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		topics.txt = topics.txt
 		AGENTS.md = AGENTS.md
 		.junie\guidelines.md = .junie\guidelines.md
+		.coderabbit.yaml = .coderabbit.yaml
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Audit", "DotNet\Audit\Audit.csproj", "{4C933C22-D465-41EF-B790-00E7F9098963}"
