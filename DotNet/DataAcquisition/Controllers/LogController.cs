@@ -93,7 +93,7 @@ public class LogController : Controller
                         ResourceId = resourceId,
                         QueryPhase = queryParameters.QueryPhase,
                         QueryType = queryParameters.QueryType,
-                        RequestStatus = queryParameters.Status,
+                        RequestStatuses = queryParameters.Statuses,
                         AcquisitionPriority = queryParameters.Priority,
                         PageNumber = queryParameters.PageNumber,
                         PageSize = queryParameters.PageSize,
@@ -503,6 +503,83 @@ public class LogController : Controller
         catch (Exception ex)
         {
             _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "Process"), ex, "An Exception occurred while attempting to process a log with a id of {id}", id);
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Process multiple data acquisition log entries.
+    /// </summary>
+    /// <returns>
+    /// A response indicating the result of the processing.
+    /// </returns>
+    [HttpPost("process-bulk")]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> ProcessBulk([FromBody] List<long> ids, CancellationToken cancellationToken = default)
+    {
+        if (ids == null || !ids.Any())
+        {
+            return BadRequest("IDs cannot be null or empty.");
+        }
+
+        try
+        {
+            await _logService.StartRetrievalProcessBulk(ids, cancellationToken);
+
+            return Accepted();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "ProcessBulk"), ex, "An Exception occurred while attempting to process logs in bulk.");
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Process data acquisition log entries based on search criteria.
+    /// </summary>
+    /// <returns>
+    /// A response indicating the result of the processing.
+    /// </returns>
+    [HttpPost("process-by-filter")]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> ProcessByFilter([FromBody] LogSearchParameters queryParameters, CancellationToken cancellationToken = default)
+    {
+        if (queryParameters == null)
+        {
+            return BadRequest("Query parameters are required.");
+        }
+
+        try
+        {
+            var result = await _logQueries.SearchAsync(
+                new SearchDataAcquisitionLogRequest
+                {
+                    FacilityId = queryParameters.FacilityId,
+                    PatientId = queryParameters.PatientId,
+                    ReportTrackingId = queryParameters.ReportId,
+                    ResourceId = queryParameters.ResourceId,
+                    QueryPhase = queryParameters.QueryPhase,
+                    QueryType = queryParameters.QueryType,
+                    RequestStatuses = queryParameters.Statuses,
+                    AcquisitionPriority = queryParameters.Priority,
+                    PageNumber = 1,
+                    PageSize = int.MaxValue // Get all matching IDs
+                }, cancellationToken);
+
+            if (result.Records != null && result.Records.Any())
+            {
+                var ids = result.Records.Select(r => r.Id).ToList();
+                await _logService.StartRetrievalProcessBulk(ids, cancellationToken);
+            }
+
+            return Accepted();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "ProcessByFilter"), ex, "An Exception occurred while attempting to process logs by filter.");
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }

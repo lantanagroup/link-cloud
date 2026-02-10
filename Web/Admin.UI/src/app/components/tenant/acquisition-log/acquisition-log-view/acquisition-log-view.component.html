@@ -167,23 +167,44 @@
             <label>
               Status
             </label>
-            <select id="statusFilter" [(ngModel)]="selectedStatusFilter">
-              <option value="Any">Any</option>
-              @for (option of statusFilterOptions; track option) {
-                <option [value]="option">{{option}}</option>
-              }
-            </select>
+            <mat-form-field appearance="outline" class="status-multi-select">
+              <mat-select [(ngModel)]="selectedStatusFilter" multiple placeholder="Select status(es)">
+                @for (option of statusFilterOptions; track option) {
+                  <mat-option [value]="option">{{option}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
           </div>
         </div>
       </div>
     }
   </div>
   @if (acquisitionLogs.length > 0) {
+    <div class="bulk-actions-container" style="padding: 10px 20px; display: flex; gap: 10px; align-items: center;">
+      @if (filtersApplied) {
+        <button type="button" class="link-button primary" (click)="selectAll()">
+          Select All ({{paginationMetadata.totalCount}})
+        </button>
+      }
+      <button type="button" class="link-button success" [disabled]="selectedLogIds.size === 0 && !isAllSelected" (click)="bulkExecute()">
+        <fa-icon [icon]="faPlus" style="margin-right: 5px;"></fa-icon>
+        Execute Selected ({{ isAllSelected ? paginationMetadata.totalCount : selectedLogIds.size }})
+      </button>
+      @if (selectedLogIds.size > 0 || isAllSelected) {
+        <button type="button" class="link-button secondary" (click)="clearSelection()">
+          Clear Selection
+        </button>
+      }
+    </div>
     <div class="table-container no-border">
       <table class="link-table">
         <thead class="table-head">
           <tr>
-            <th scope="col" class="header-column">
+            <th scope="col" class="header-column" style="width: 40px;">
+              <mat-checkbox (change)="$event.checked ? selectAll() : clearSelection()"
+                            [checked]="isAllSelected"
+                            [indeterminate]="selectedLogIds.size > 0 && !isAllSelected">
+              </mat-checkbox>
             </th>
             <th scope="col" class="header-column sortable" (click)="onSort('patientId')">
               Patient Id
@@ -229,9 +250,7 @@
           @for (log of acquisitionLogs; track log) {
             <tr @fadeInSlideUp [ngClass]="{'priority-critical': log.priority === 'Critical', 'priority-high': log.priority === 'High'}">
               <td class="table-cell" style="position: relative;">
-                @if (log.status !== 'Processing' && log.status !== 'Failed' && log.status !== 'Completed' && log.status !== 'Skipped' && log.status !== 'MaxRetriesReached') {
-                  <input type="checkbox" class="absolute left-4 top-1/2 -mt-2 h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-600">
-                }
+                <mat-checkbox [checked]="isLogSelected(log.id)" (change)="toggleSelection(log.id)"></mat-checkbox>
                 @if (log.status === 'Processing') {
                   <svg class="animate-spin" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round"

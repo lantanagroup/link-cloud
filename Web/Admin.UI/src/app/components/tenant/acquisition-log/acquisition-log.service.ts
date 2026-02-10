@@ -29,7 +29,7 @@ export class AcquisitionLogService {
     resourceId: string | null,
     queryType: string | null,
     queryPhase: string | null,
-    status: string | null,
+    status: string[] | string | null,
     priority: string | null,
     sortBy: string | null,
     sortOrder: 'ascending' | 'descending' | null,
@@ -76,7 +76,13 @@ export class AcquisitionLogService {
         params = params.set('queryPhase', queryPhase);
     }
     if(status) {
-        params = params.set('status', status);
+        if (Array.isArray(status)) {
+            status.forEach(s => {
+                params = params.append('statuses', s);
+            });
+        } else {
+            params = params.set('status', status);
+        }
     }
     if(priority) {
         params = params.set('priority', priority);
@@ -131,6 +137,59 @@ export class AcquisitionLogService {
 
   executeAcquisitionLog(id: string) : Observable<any> {
     return this.http.post<any>(`${this.baseUrl}/${id}/process`, id)
+    .pipe(
+      map((response: any) => {
+        return response;
+      }),
+      catchError((error: HttpErrorResponse) => {
+          var err = this.errorHandler.handleError(error);
+          return err;
+      })
+    )
+  }
+
+  bulkExecuteAcquisitionLogs(ids: string[]) : Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/process-bulk`, ids)
+    .pipe(
+      map((response: any) => {
+        return response;
+      }),
+      catchError((error: HttpErrorResponse) => {
+          var err = this.errorHandler.handleError(error);
+          return err;
+      })
+    )
+  }
+
+  bulkExecuteAcquisitionLogsByFilter(
+    patientId: string | null,
+    facilityId: string | null,
+    reportId: string | null,
+    resourceId: string | null,
+    queryType: string | null,
+    queryPhase: string | null,
+    status: string[] | string | null,
+    priority: string | null) : Observable<any> {
+
+    let body: any = {
+      patientId,
+      facilityId,
+      reportId,
+      resourceId,
+      queryType,
+      queryPhase,
+      priority
+    };
+
+    if (status) {
+      if (Array.isArray(status)) {
+        body.statuses = status;
+      } else {
+        body.status = status;
+      }
+    }
+
+    return this.http.post<any>(`${this.baseUrl}/process-by-filter`, body)
     .pipe(
       map((response: any) => {
         return response;

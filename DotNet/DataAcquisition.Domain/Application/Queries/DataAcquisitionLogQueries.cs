@@ -658,11 +658,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             query = query.Where(log => log.Priority == model.AcquisitionPriority.Value);
         }
 
-        if (model.RequestStatus.HasValue)
-        {
-            query = query.Where(log => log.Status == model.RequestStatus.Value);
-        }
-
         if (model.RequestStatuses != null && model.RequestStatuses.Any())
         {
             query = query.Where(log => log.Status != null && model.RequestStatuses.Contains(log.Status.Value));

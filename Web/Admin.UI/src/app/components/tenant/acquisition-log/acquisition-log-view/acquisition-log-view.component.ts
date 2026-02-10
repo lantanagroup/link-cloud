@@ -18,10 +18,15 @@ import {PaginationMetadata} from 'src/app/models/pagination-metadata.model';
 import {MatPaginatorModule, PageEvent} from '@angular/material/paginator';
 import {FormsModule} from '@angular/forms';
 import {MatButtonModule} from '@angular/material/button';
+import {MatSelectModule} from '@angular/material/select';
+import {MatCheckboxModule} from '@angular/material/checkbox';
+import {MatTooltipModule} from '@angular/material/tooltip';
 import {LoadingService} from 'src/app/services/loading.service';
 import {finalize, forkJoin} from 'rxjs';
 import {TenantService} from 'src/app/services/gateway/tenant/tenant.service';
 import {MatDialogModule} from '@angular/material/dialog';
+import {MatFormFieldModule} from '@angular/material/form-field';
+import {MatInputModule} from '@angular/material/input';
 import {ActivatedRoute, Router} from '@angular/router';
 import {TableCommandComponent} from "./table-command/table-command.component";
 import {ReportService} from 'src/app/services/gateway/report/report.service';
@@ -41,7 +46,12 @@ import {
     MatPaginatorModule,
     MatDialogModule,
     TableCommandComponent,
-    PieChartComponent
+    PieChartComponent,
+    MatSelectModule,
+    MatCheckboxModule,
+    MatTooltipModule,
+    MatFormFieldModule,
+    MatInputModule
 ],
   templateUrl: './acquisition-log-view.component.html',
   styleUrl: './acquisition-log-view.component.scss',
@@ -119,8 +129,10 @@ export class AcquisitionLogViewComponent implements OnInit {
   queryTypeFilterOptions: string[] = [ "Read", "Search", "BulkDataRequest", "BulkDataPoll" ];
   selectedQueryTypeFilter: string = 'Any';
   statusFilterOptions: string[] = [ "Pending", "Ready", "Processing", "Completed", "Failed", "Cancelled", "MaxRetriesReached", "Skipped"];
-  selectedStatusFilter: string = 'Any';
+  selectedStatusFilter: string[] = [];
   targetPageNumber: number | null = null;
+  selectedLogIds: Set<string> = new Set<string>();
+  isAllSelected: boolean = false;
   statusChartData: Record<string, number> = {};
   statusChartLoading = false;
   statusChartReportId = '';
@@ -201,7 +213,7 @@ export class AcquisitionLogViewComponent implements OnInit {
       this.resourceIdFilter.length > 0 ? this.resourceIdFilter : null,
       this.selectedQueryTypeFilter !== 'Any' ? this.selectedQueryTypeFilter : null,
       this.selectedQueryPhaseFilter !== 'Any' ? this.selectedQueryPhaseFilter : null,
-      this.selectedStatusFilter !== 'Any' ? this.selectedStatusFilter : null,
+      this.selectedStatusFilter.length > 0 ? this.selectedStatusFilter : null,
       this.selectedPriorityFilter !== 'Any' ? this.selectedPriorityFilter : null,
       this.sortBy,
       this.sortOrder,
@@ -249,7 +261,7 @@ export class AcquisitionLogViewComponent implements OnInit {
       this.selectedPriorityFilter !== 'Any' ||
       this.selectedQueryPhaseFilter !== 'Any' ||
       this.selectedQueryTypeFilter !== 'Any' ||
-      this.selectedStatusFilter !== 'Any');
+      this.selectedStatusFilter.length > 0);
   }
 
   refreshLogs(): void {
@@ -266,10 +278,68 @@ export class AcquisitionLogViewComponent implements OnInit {
     this.selectedPriorityFilter = 'Any';
     this.selectedQueryPhaseFilter = 'Any';
     this.selectedQueryTypeFilter = 'Any';
-    this.selectedStatusFilter = 'Any';
+    this.selectedStatusFilter = [];
     this.filtersApplied = false;
+    this.clearSelection();
     this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);
     this.loadStatusCounts();
+  }
+
+  toggleSelection(logId: string) {
+    if (this.selectedLogIds.has(logId)) {
+      this.selectedLogIds.delete(logId);
+    } else {
+      this.selectedLogIds.add(logId);
+    }
+    this.isAllSelected = false;
+  }
+
+  isLogSelected(logId: string): boolean {
+    return this.isAllSelected || this.selectedLogIds.has(logId);
+  }
+
+  selectAll() {
+    this.isAllSelected = true;
+    this.selectedLogIds.clear();
+  }
+
+  clearSelection() {
+    this.isAllSelected = false;
+    this.selectedLogIds.clear();
+  }
+
+  bulkExecute() {
+    this.loadingService.show();
+    let obs$;
+    if (this.isAllSelected) {
+      obs$ = this.acquisitionLogService.bulkExecuteAcquisitionLogsByFilter(
+        this.patientFilter !== 'Any' ? this.patientFilter : null,
+        this.selectedFacilityFilter !== 'Any' ? this.selectedFacilityFilter : null,
+        this.reportIdFilter.length > 0 ? this.reportIdFilter : null,
+        this.resourceIdFilter.length > 0 ? this.resourceIdFilter : null,
+        this.selectedQueryTypeFilter !== 'Any' ? this.selectedQueryTypeFilter : null,
+        this.selectedQueryPhaseFilter !== 'Any' ? this.selectedQueryPhaseFilter : null,
+        this.selectedStatusFilter.length > 0 ? this.selectedStatusFilter : null,
+        this.selectedPriorityFilter !== 'Any' ? this.selectedPriorityFilter : null
+      );
+    } else {
+      obs$ = this.acquisitionLogService.bulkExecuteAcquisitionLogs(Array.from(this.selectedLogIds));
+    }
+
+    obs$.pipe(
+      finalize(() => {
+        this.loadingService.hide();
+        this.clearSelection();
+        this.refreshLogs();
+      })
+    ).subscribe({
+      next: () => {
+        console.log('Bulk execution triggered successfully');
+      },
+      error: (error) => {
+        console.error('Error triggering bulk execution:', error);
+      }
+    });
   }
 
   onSort(column: string): void {

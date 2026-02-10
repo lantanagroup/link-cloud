@@ -249,6 +249,40 @@ $skipped-status: #ffbf00;
   color: #6b7280;
 }
 
+.status-multi-select {
+  width: 100%;
+
+  ::v-deep .mat-mdc-form-field-wrapper {
+    padding-bottom: 0;
+  }
+
+  ::v-deep .mat-mdc-form-field-subscript-wrapper {
+    display: none;
+  }
+
+  ::v-deep .mat-mdc-text-field-wrapper {
+    background-color: white;
+    height: 38px;
+    padding-top: 0;
+    padding-bottom: 0;
+    display: flex;
+    align-items: center;
+  }
+
+  ::v-deep .mat-mdc-form-field-infix {
+    padding-top: 0;
+    padding-bottom: 0;
+    min-height: auto;
+    display: flex;
+    align-items: center;
+  }
+}
+
+.bulk-actions-container {
+  border-bottom: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+}
+
 @media (max-width: 900px) {
   .status-summary {
     margin: 0.75rem 0.5rem 0;

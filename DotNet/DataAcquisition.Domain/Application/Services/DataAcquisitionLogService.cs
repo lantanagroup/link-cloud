@@ -13,6 +13,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 public interface IDataAcquisitionLogService
 {
     Task StartRetrievalProcess(long logId, CancellationToken cancellationToken = default);
+    Task StartRetrievalProcessBulk(List<long> logIds, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogService : IDataAcquisitionLogService
@@ -83,6 +84,26 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
 
             _logger.LogError(ex, "Encountered error triggering workflow for log id: {requestId}", request.Id);
             throw;
+        }
+    }
+
+    public async Task StartRetrievalProcessBulk(List<long> logIds, CancellationToken cancellationToken = default)
+    {
+        if (logIds == null || !logIds.Any())
+        {
+            return;
+        }
+
+        foreach (var logId in logIds)
+        {
+            try
+            {
+                await StartRetrievalProcess(logId, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to start retrieval process for log id {logId} during bulk operation.", logId);
+            }
         }
     }
 }
