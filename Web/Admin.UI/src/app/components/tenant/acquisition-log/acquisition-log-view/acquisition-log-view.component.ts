@@ -184,7 +184,7 @@ export class AcquisitionLogViewComponent implements OnInit {
     forkJoin([
       this.tenantService.getAllFacilities(),
       this.acquisitionLogService.getResourceTypes(),
-      this.acquisitionLogService.getAcquisitionLogs(null, null, this.reportIdFilter === '' ? null : this.reportIdFilter, null, null, null, null, null, null, null, null, this.defaultPageNumber, this.defaultPageSize, false)
+      this.acquisitionLogService.getAcquisitionLogs(this.patientFilter === '' ? null : this.patientFilter, this.selectedFacilityFilter === 'Any' ? null : this.selectedFacilityFilter, this.reportIdFilter === '' ? null : this.reportIdFilter, null, null, null, null, null, null, null, null, this.defaultPageNumber, this.defaultPageSize, false)
 
         ]).subscribe({
           next: (response) => {

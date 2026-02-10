@@ -22,6 +22,7 @@ import {
   faArrowLeft,
   faFileArrowDown,
   faFileInvoice,
+  faFileLines,
   faGears,
   faRotate,
   faSort,
@@ -76,6 +77,7 @@ export class ViewReportComponent implements OnInit {
   faArrowLeft = faArrowLeft;
   faFileArrowDown = faFileArrowDown;
   faFileInvoice = faFileInvoice;
+  faFileLines = faFileLines;
   faSort = faSort;
   faSortUp = faSortUp;
   faSortDown = faSortDown;
