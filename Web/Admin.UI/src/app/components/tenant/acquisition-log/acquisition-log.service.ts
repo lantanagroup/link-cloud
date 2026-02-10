@@ -63,9 +63,9 @@ export class AcquisitionLogService {
     if(reportId) {
         params = params.set('reportId', reportId);
     }
-    // if(resourceType) {
-    //     params = params.set('resourceType', resourceType);
-    // }
+    if(resourceType) {
+        params = params.set('resourceType', resourceType);
+    }
     if(resourceId) {
          params = params.set('resourceId', resourceId);
     }
@@ -165,6 +165,7 @@ export class AcquisitionLogService {
     patientId: string | null,
     facilityId: string | null,
     reportId: string | null,
+    resourceType: string | null,
     resourceId: string | null,
     queryType: string | null,
     queryPhase: string | null,
@@ -175,6 +176,7 @@ export class AcquisitionLogService {
       patientId,
       facilityId,
       reportId,
+      resourceType,
       resourceId,
       queryType,
       queryPhase,
@@ -232,22 +234,4 @@ export class AcquisitionLogService {
       );
   }
 
-  getResourceTypes(): Observable<string[]> {
-
-    //temporary test data
-    let types = ['Patient', 'Encounter', 'Location', 'Observation', 'MedicationRequest', 'Procedure'];
-    return new Observable<string[]>(observer => {
-
-      observer.next(types);
-      observer.complete();
-    });
-
-    return this.http.get<string[]>(`${this.baseUrl}/acquisition-logs/resource-types`)
-      .pipe(
-        catchError((error: HttpErrorResponse) => {
-          var err = this.errorHandler.handleError(error);
-          return err;
-        })
-      );
-  }
 }

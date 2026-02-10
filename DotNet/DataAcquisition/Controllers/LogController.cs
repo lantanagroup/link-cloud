@@ -95,6 +95,7 @@ public class LogController : Controller
                         QueryType = queryParameters.QueryType,
                         RequestStatuses = queryParameters.Statuses,
                         AcquisitionPriority = queryParameters.Priority,
+                        ResourceType = queryParameters.ResourceType,
                         PageNumber = queryParameters.PageNumber,
                         PageSize = queryParameters.PageSize,
                         SortBy = queryParameters.SortBy,
@@ -565,6 +566,7 @@ public class LogController : Controller
                     QueryType = queryParameters.QueryType,
                     RequestStatuses = queryParameters.Statuses,
                     AcquisitionPriority = queryParameters.Priority,
+                    ResourceType = queryParameters.ResourceType,
                     PageNumber = 1,
                     PageSize = int.MaxValue // Get all matching IDs
                 }, cancellationToken);

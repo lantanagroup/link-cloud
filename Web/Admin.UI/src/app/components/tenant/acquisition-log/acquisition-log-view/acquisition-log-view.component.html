@@ -120,10 +120,9 @@
             </div>
             <div class="filter-item">
               <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Query Type</mat-label>
-                <mat-select id="queryTypeFilter" [(ngModel)]="selectedQueryTypeFilter">
-                  <mat-option value="Any">Any</mat-option>
-                  @for (option of queryTypeFilterOptions; track option) {
+                <mat-label>Status</mat-label>
+                <mat-select [(ngModel)]="selectedStatusFilter" multiple>
+                  @for (option of statusFilterOptions; track option) {
                     <mat-option [value]="option">{{option}}</mat-option>
                   }
                 </mat-select>
@@ -143,37 +142,49 @@
                 <input matInput id="resourceIdFilter" [(ngModel)]="resourceIdFilter" placeholder="Enter a resource Id">
               </mat-form-field>
             </div>
-            <!-- <div class="filter-item">
-            <label>
-              Resource Type
-            </label>
-            <select id="resourceTypeFilter" [(ngModel)]="selectedResourceTypeFilter">
-              <option value="Any">Any</option>
-              <option *ngFor="let option of resourceTypeFilterOptions" [value]="option">{{option}}</option>
-            </select>
-          </div> -->
-          <div class="filter-item">
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Query Phase</mat-label>
-              <mat-select id="queryPhaseFilter" [(ngModel)]="selectedQueryPhaseFilter">
-                <mat-option value="Any">Any</mat-option>
-                @for (option of queryPhaseFilterOptions; track option) {
-                  <mat-option [value]="option">{{option}}</mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
+            <div class="filter-item">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Resource Type</mat-label>
+                <input type="text"
+                       placeholder="Pick a Resource Type"
+                       aria-label="Resource Type"
+                       matInput
+                       [(ngModel)]="selectedResourceTypeFilter"
+                       (input)="onResourceTypeInput($event)"
+                       (focus)="onResourceTypeFocus($event)"
+                       (blur)="onResourceTypeBlur()"
+                       [matAutocomplete]="resourceTypeAuto">
+                <mat-autocomplete #resourceTypeAuto="matAutocomplete">
+                  <mat-option value="Any">Any</mat-option>
+                  @for (option of filteredResourceTypeOptions; track option) {
+                    <mat-option [value]="option">{{option}}</mat-option>
+                  }
+                </mat-autocomplete>
+              </mat-form-field>
+            </div>
+            <div class="filter-item">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Query Type</mat-label>
+                <mat-select id="queryTypeFilter" [(ngModel)]="selectedQueryTypeFilter">
+                  <mat-option value="Any">Any</mat-option>
+                  @for (option of queryTypeFilterOptions; track option) {
+                    <mat-option [value]="option">{{option}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            </div>
+            <div class="filter-item">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Query Phase</mat-label>
+                <mat-select id="queryPhaseFilter" [(ngModel)]="selectedQueryPhaseFilter">
+                  <mat-option value="Any">Any</mat-option>
+                  @for (option of queryPhaseFilterOptions; track option) {
+                    <mat-option [value]="option">{{option}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            </div>
           </div>
-          <div class="filter-item">
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Status</mat-label>
-              <mat-select [(ngModel)]="selectedStatusFilter" multiple>
-                @for (option of statusFilterOptions; track option) {
-                  <mat-option [value]="option">{{option}}</mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
-          </div>
-        </div>
       </div>
     }
   </div>
@@ -272,7 +283,16 @@
                     </svg>
                   }
                 </td>
-                <td class="data-col table-cell  selectable-value">{{log.patientId}}</td>
+                <td class="data-col table-cell  selectable-value">
+                  {{log.patientId}}
+                  @if (log.patientId) {
+                    <fa-icon [icon]="faFilter"
+                             class="patient-filter-icon"
+                             (click)="filterByPatient(log.patientId)"
+                             matTooltip="Filter by this patient">
+                    </fa-icon>
+                  }
+                </td>
                 <td class="data-col table-cell">{{log.facilityId}}</td>
                 <td class="data-col table-cell">{{log.priority}}</td>
                 <td class="data-col table-cell">

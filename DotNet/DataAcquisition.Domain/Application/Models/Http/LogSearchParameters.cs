@@ -13,6 +13,7 @@ public class LogSearchParameters : GenericLogSearchParameters
     public FhirQueryType? QueryType { get; set; }
     public List<RequestStatus>? Statuses { get; set; }
     public AcquisitionPriority? Priority { get; set; }
+    public string? ResourceType { get; set; }
 }
 
 public class GenericLogSearchParameters

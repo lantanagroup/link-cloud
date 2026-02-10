@@ -27,6 +27,7 @@ import {TenantService} from 'src/app/services/gateway/tenant/tenant.service';
 import {MatDialogModule} from '@angular/material/dialog';
 import {MatFormFieldModule} from '@angular/material/form-field';
 import {MatInputModule} from '@angular/material/input';
+import {MatAutocompleteModule} from '@angular/material/autocomplete';
 import {ActivatedRoute, Router} from '@angular/router';
 import {TableCommandComponent} from "./table-command/table-command.component";
 import {ReportService} from 'src/app/services/gateway/report/report.service';
@@ -51,7 +52,8 @@ import {
     MatCheckboxModule,
     MatTooltipModule,
     MatFormFieldModule,
-    MatInputModule
+    MatInputModule,
+    MatAutocompleteModule
 ],
   templateUrl: './acquisition-log-view.component.html',
   styleUrl: './acquisition-log-view.component.scss',
@@ -92,6 +94,17 @@ import {
   ]
 })
 export class AcquisitionLogViewComponent implements OnInit {
+  // All resource types supported by Epic and Cerner as of 2/10/26
+  private readonly resourceTypes: string[] = [
+    'AllergyIntolerance', 'Appointment', 'AppointmentResponse', 'AuditEvent', 'Binary', 'CarePlan', 'CareTeam',
+    'Condition', 'Consent', 'Coverage', 'Device', 'DeviceRequest', 'DeviceUseStatement', 'DiagnosticReport',
+    'DocumentReference', 'Encounter', 'EpisodeOfCare', 'Goal', 'Group', 'Immunization', 'ImmunizationRecommendation',
+    'Location', 'Medication', 'MedicationAdministration', 'MedicationRequest', 'MedicationStatement', 'Observation',
+    'Organization', 'Patient', 'Person', 'Practitioner', 'PractitionerRole', 'Procedure', 'Provenance',
+    'Questionnaire', 'QuestionnaireResponse', 'ReferralRequest', 'ServiceRequest', 'RelatedPerson', 'Schedule',
+    'SearchParameter', 'Slot', 'Specimen', 'StructureDefinition', 'Subscription', 'ValueSet', 'CodeSystem'
+  ];
+
   faXmark = faXmark;
   faRotate = faRotate;
   faArrowLeft = faArrowLeft;
@@ -121,6 +134,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   facilityFilterOptions: Record<string, string> = {};
   selectedFacilityFilter: string = 'Any';
   resourceTypeFilterOptions: string[] = [];
+  filteredResourceTypeOptions: string[] = [];
   selectedResourceTypeFilter: string = 'Any';
   priorityFilterOptions: string[] = [ "Normal", "High", "Critical" ];
   selectedPriorityFilter: string = 'Any';
@@ -183,15 +197,15 @@ export class AcquisitionLogViewComponent implements OnInit {
 
     forkJoin([
       this.tenantService.getAllFacilities(),
-      this.acquisitionLogService.getResourceTypes(),
       this.acquisitionLogService.getAcquisitionLogs(this.patientFilter === '' ? null : this.patientFilter, this.selectedFacilityFilter === 'Any' ? null : this.selectedFacilityFilter, this.reportIdFilter === '' ? null : this.reportIdFilter, null, null, null, null, null, null, null, null, this.defaultPageNumber, this.defaultPageSize, false)
 
         ]).subscribe({
           next: (response) => {
             this.facilityFilterOptions = response[0];
-            this.resourceTypeFilterOptions = response[1];
-            this.acquisitionLogs = response[2].records;
-            this.paginationMetadata = response[2].metadata;
+            this.resourceTypeFilterOptions = this.resourceTypes;
+            this.filteredResourceTypeOptions = [...this.resourceTypes];
+            this.acquisitionLogs = response[1].records;
+            this.paginationMetadata = response[1].metadata;
             this.syncTargetPageNumber();
             this.loadStatusCounts();
 
@@ -210,7 +224,7 @@ export class AcquisitionLogViewComponent implements OnInit {
       this.patientFilter !== 'Any' ? this.patientFilter : null,
       this.selectedFacilityFilter !== 'Any' ? this.selectedFacilityFilter : null,
       this.reportIdFilter.length > 0 ? this.reportIdFilter : null,
-      null, //this.selectedResourceTypeFilter !== 'Any' ? this.selectedResourceTypeFilter : null,
+      this.selectedResourceTypeFilter !== 'Any' ? this.selectedResourceTypeFilter : null,
       this.resourceIdFilter.length > 0 ? this.resourceIdFilter : null,
       this.selectedQueryTypeFilter !== 'Any' ? this.selectedQueryTypeFilter : null,
       this.selectedQueryPhaseFilter !== 'Any' ? this.selectedQueryPhaseFilter : null,
@@ -246,6 +260,37 @@ export class AcquisitionLogViewComponent implements OnInit {
     this.filterPanelOpen = !this.filterPanelOpen;
   }
 
+  filterByPatient(patientId: string) {
+    this.patientFilter = patientId;
+    this.applyFilters();
+  }
+
+  onResourceTypeInput(event: any) {
+    const value = event.target.value;
+    this._filterResourceTypes(value);
+  }
+
+  onResourceTypeFocus(event: any) {
+    event.target.select();
+  }
+
+  onResourceTypeBlur() {
+    // Small delay to allow mat-autocomplete selection to process
+    setTimeout(() => {
+      if (this.selectedResourceTypeFilter !== 'Any' && !this.resourceTypes.includes(this.selectedResourceTypeFilter)) {
+        this.selectedResourceTypeFilter = 'Any';
+        this._filterResourceTypes('');
+      }
+    }, 200);
+  }
+
+  private _filterResourceTypes(value: string) {
+    const filterValue = (value || '').toLowerCase();
+    this.filteredResourceTypeOptions = this.resourceTypeFilterOptions.filter(option =>
+      option.toLowerCase().includes(filterValue)
+    );
+  }
+
   applyFilters(): void {
     this.loadLogs(this.defaultPageNumber, this.getCurrentPageSize(), true);
     this.loadStatusCounts();
@@ -254,7 +299,17 @@ export class AcquisitionLogViewComponent implements OnInit {
   }
 
   onFilterApplication(): void {
-    this.allowLogSelection = (this.reportIdFilter !== '');
+    this.allowLogSelection = (
+      this.reportIdFilter !== '' ||
+      this.patientFilter !== '' ||
+      this.selectedFacilityFilter !== 'Any' ||
+      this.selectedResourceTypeFilter !== 'Any' ||
+      this.resourceIdFilter !== '' ||
+      this.selectedQueryTypeFilter !== 'Any' ||
+      this.selectedQueryPhaseFilter !== 'Any' ||
+      this.selectedStatusFilter.length > 0 ||
+      this.selectedPriorityFilter !== 'Any'
+    );
   }
 
   refreshLogs(): void {
@@ -270,6 +325,7 @@ export class AcquisitionLogViewComponent implements OnInit {
     this.selectedFacilityFilter = 'Any';
     this.reportIdFilter = this.reportIdFromRoute;
     this.selectedResourceTypeFilter = 'Any';
+    this.filteredResourceTypeOptions = this.resourceTypeFilterOptions;
     this.selectedPriorityFilter = 'Any';
     this.selectedQueryPhaseFilter = 'Any';
     this.selectedQueryTypeFilter = 'Any';
@@ -311,6 +367,7 @@ export class AcquisitionLogViewComponent implements OnInit {
         this.patientFilter !== 'Any' ? this.patientFilter : null,
         this.selectedFacilityFilter !== 'Any' ? this.selectedFacilityFilter : null,
         this.reportIdFilter.length > 0 ? this.reportIdFilter : null,
+        this.selectedResourceTypeFilter !== 'Any' ? this.selectedResourceTypeFilter : null,
         this.resourceIdFilter.length > 0 ? this.resourceIdFilter : null,
         this.selectedQueryTypeFilter !== 'Any' ? this.selectedQueryTypeFilter : null,
         this.selectedQueryPhaseFilter !== 'Any' ? this.selectedQueryPhaseFilter : null,
