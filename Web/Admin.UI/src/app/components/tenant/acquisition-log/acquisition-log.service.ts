@@ -81,7 +81,7 @@ export class AcquisitionLogService {
                 params = params.append('statuses', s);
             });
         } else {
-            params = params.set('status', status);
+            params = params.append('statuses', status);
         }
     }
     if(priority) {
@@ -182,11 +182,7 @@ export class AcquisitionLogService {
     };
 
     if (status) {
-      if (Array.isArray(status)) {
-        body.statuses = status;
-      } else {
-        body.status = status;
-      }
+      body.statuses = Array.isArray(status) ? status : [status];
     }
 
     return this.http.post<any>(`${this.baseUrl}/process-by-filter`, body)

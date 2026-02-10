@@ -246,7 +246,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   }
 
   applyFilters(): void {
-    this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);
+    this.loadLogs(this.defaultPageNumber, this.getCurrentPageSize(), true);
     this.loadStatusCounts();
     this.filterPanelOpen = false;
     this.onFilterApplication();
@@ -265,7 +265,9 @@ export class AcquisitionLogViewComponent implements OnInit {
   }
 
   refreshLogs(): void {
-    this.loadLogs(this.getCurrentPageNumber(), this.getCurrentPageSize(), true);
+    const pageIndex = this.paginationMetadata?.pageNumber ?? this.defaultPageNumber;
+    const pageSize = this.paginationMetadata?.pageSize ?? this.defaultPageSize;
+    this.loadLogs(pageIndex, pageSize, true);
     this.loadStatusCounts();
   }
 
@@ -355,7 +357,7 @@ export class AcquisitionLogViewComponent implements OnInit {
       this.sortOrder = 'ascending';
     }
 
-    this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);
+    this.loadLogs(this.defaultPageNumber, this.getCurrentPageSize(), true);
   }
 
   getSortIcon(column: string) {
