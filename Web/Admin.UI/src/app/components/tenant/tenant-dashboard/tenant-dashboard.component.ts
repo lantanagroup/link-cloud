@@ -12,18 +12,18 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { FacilityConfigDialogComponent } from '../facility-config-dialog/facility-config-dialog.component';
 import { RouterLink } from '@angular/router';
 import { PaginationMetadata } from '../../../models/pagination-metadata.model';
-import {MatPaginatorModule, PageEvent} from "@angular/material/paginator";
-import {CensusService} from "../../../services/gateway/census/census.service";
-import {DataAcquisitionService} from "../../../services/gateway/data-acquisition/data-acquisition.service";
-import {QueryDispatchService} from "../../../services/gateway/query-dispatch/query-dispatch.service";
-import {OperationService} from "../../../services/gateway/normalization/operation.service";
-import {DeleteConfirmationDialogComponent} from "../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
+import { MatPaginatorModule, PageEvent } from "@angular/material/paginator";
+import { CensusService } from "../../../services/gateway/census/census.service";
+import { DataAcquisitionService } from "../../../services/gateway/data-acquisition/data-acquisition.service";
+import { QueryDispatchService } from "../../../services/gateway/query-dispatch/query-dispatch.service";
+import { OperationService } from "../../../services/gateway/normalization/operation.service";
+import { DeleteConfirmationDialogComponent } from "../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
 import { catchError, concatMap, take } from 'rxjs/operators';
-import {throwError, EMPTY, forkJoin, concat} from 'rxjs';
-import {ReportService} from "../../../services/gateway/report/report.service";
-import {MatCheckbox} from "@angular/material/checkbox";
-import {FormsModule} from "@angular/forms";
-import {NgIf} from "@angular/common";
+import { throwError, EMPTY, forkJoin, concat } from 'rxjs';
+import { ReportService } from "../../../services/gateway/report/report.service";
+import { MatCheckbox } from "@angular/material/checkbox";
+import { FormsModule } from "@angular/forms";
+import { NgIf } from "@angular/common";
 
 @Component({
   selector: 'app-tenant-dashboard',
@@ -64,9 +64,9 @@ export class TenantDashboardComponent implements OnInit {
   sortOrder: number = 0;
 
   constructor(private tenantService: TenantService, private reportService: ReportService, private censusService: CensusService,
-              private dataAcquisitionService: DataAcquisitionService,
-              private queryDispatchService: QueryDispatchService,
-              private operationService: OperationService, private dialog: MatDialog, private snackBar: MatSnackBar) { }
+    private dataAcquisitionService: DataAcquisitionService,
+    private queryDispatchService: QueryDispatchService,
+    private operationService: OperationService, private dialog: MatDialog, private snackBar: MatSnackBar) { }
 
   ngOnInit(): void {
     this.dataSource = new MatTableDataSource<IFacilityConfigModel>();
@@ -84,10 +84,10 @@ export class TenantDashboardComponent implements OnInit {
       this.paginationMetadata.pageSize,
       this.paginationMetadata.pageNumber,
       this.showDeleted).subscribe((facilities: PagedFacilityConfigModel) => {
-      this.facilities = facilities.records;
-      this.dataSource.data = this.facilities;
-      this.paginationMetadata = facilities.metadata;
-    });
+        this.facilities = facilities.records;
+        this.dataSource.data = this.facilities;
+        this.paginationMetadata = facilities.metadata;
+      });
   }
 
   getColumns(): string[] {
@@ -172,7 +172,7 @@ export class TenantDashboardComponent implements OnInit {
         safeDelete(this.operationService.deleteAllOperationsByFacility(facilityId)),
         safeDelete(this.tenantService.deleteFacilityConfiguration(facilityId))
       ).subscribe({
-        next: () => {},
+        next: () => { },
         complete: () => {
           this.snackBar.open('Facility and all related configurations deleted successfully', 'Close', { duration: 3000 });
           this.getFacilities();
@@ -215,9 +215,9 @@ export class TenantDashboardComponent implements OnInit {
       // Build sequential deletion sequence
       concat(
         safeDelete(this.tenantService.softDeleteFacilityConfiguration(facilityId)),
-       // safeDelete(this.reportService.deleteReports(facilityId)),
+        safeDelete(this.reportService.deleteReports(facilityId)),
       ).subscribe({
-        next: () => {},
+        next: () => { },
         complete: () => {
           this.snackBar.open('Facility soft deleted', 'Close', { duration: 3000 });
           this.getFacilities();

@@ -19,8 +19,8 @@ version: '3.4'
 ## audit: 8062
 ## admin-bff: 8063
 ## census: 8064
-## dataacquisition: 8065
-## dataacquisition.acquisitionworker: 8078
+## dataacq: 8065
+## dataacq-worker: 8078
 ## admin-ui: 8066
 ## measureeval: 8067
 ## normalization: 8068
@@ -426,7 +426,7 @@ services:
         condition: service_healthy
       census:
         condition: service_healthy
-      dataacquisition:
+      dataacq:
         condition: service_healthy
       measureeval:
         condition: service_healthy
@@ -503,7 +503,7 @@ services:
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8064/health" ]
 
-  dataacquisition:
+  dataacq:
     image: link-dataacquisition
     container_name: link-dataacquisition
     environment:
@@ -538,7 +538,7 @@ services:
       interval: 5s
       retries: 10
 
-  dataacquisition.acquisitionworker:
+  dataacq-worker:
      image: link-dataacquisitionworker
      container_name: link-dataacquisitionworker
      environment:
@@ -563,7 +563,7 @@ services:
          condition: service_completed_successfully
        otel-collector:
          condition: service_started
-       dataacquisition:
+       dataacq:
          condition: service_healthy
        loki:
          condition: service_started
@@ -598,6 +598,9 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       spring.kafka.properties.sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";
+      internal-blob-storage.connection-string: ${AZURITE_CONNECTION_STRING}
+      internal-blob-storage.blob-container-name: ${INTERNAL_BLOB_CONTAINER_NAME}
+      link.report.base-url: http://report:8072
     ports:
       - "8067:8067"
     build:
@@ -610,9 +613,9 @@ services:
         condition: service_completed_successfully
       mongo:
         condition: service_healthy
-      dataacquisition:
+      dataacq:
         condition: service_healthy
-      dataacquisition.acquisitionworker:
+      dataacq-worker:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8067/health"]

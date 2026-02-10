@@ -3,7 +3,13 @@
     <div class="link-card-header">
       <div class="split-container" style="margin-bottom: 0;">
         <div class="left-pane">
-          <p class="title">Acquisition Log Entries</p>
+          <p class="title">
+            @if (reportIdFromRoute) {
+              Acquisition Log Entries for Report {{reportIdFromRoute}}
+            } @else {
+              Acquisition Log Entries
+            }
+          </p>
         </div>
         <div class="right-pane">
           <div class="link-button-group">
@@ -27,13 +33,45 @@
             </button>
           </div>
 
-          <button type="button" class="link-button light" style="margin-left: 1em;" aria-label="Navigate to previous page" (click)="navBack()">
-            <fa-icon [icon]="faArrowLeft"></fa-icon>
-            Back
-          </button>
+          @if (reportIdFromRoute) {
+            <button type="button"
+              class="link-button light"
+              style="margin-left: 1em;"
+              aria-label="Return to report"
+              (click)="returnToReport()"
+              [disabled]="!reportFacilityId">
+              <fa-icon [icon]="faArrowLeft"></fa-icon>
+              Return to Report
+            </button>
+          }
         </div>
       </div>
     </div>
+    @if (showStatusChart) {
+      <div class="status-summary">
+        <div class="status-summary-header">
+          <div class="status-summary-title">Status breakdown</div>
+          <div class="status-summary-meta">
+            Report <span class="selectable-value">{{statusChartReportId || reportIdFilter}}</span>
+            @if (statusChartPatientId || patientFilter) {
+              <span class="status-summary-separator">|</span>
+              Patient <span class="selectable-value">{{statusChartPatientId || patientFilter}}</span>
+            }
+          </div>
+        </div>
+        <div class="status-summary-body">
+          @if (statusChartLoading) {
+            <div class="status-summary-loading">Loading status counts...</div>
+          } @else if (hasStatusChartData) {
+            <div class="status-summary-chart">
+              <app-pie-chart [data]="statusChartData" [width]="360" [height]="220"></app-pie-chart>
+            </div>
+          } @else {
+            <div class="status-summary-empty">No status data available for the current filters.</div>
+          }
+        </div>
+      </div>
+    }
     <div class="filter-container">
       @if (filterPanelOpen) {
         <div class="filter-panel" id="filterPanel" [@fadeGrowRightOut]>
@@ -246,14 +284,34 @@
             }
           </tbody>
         </table>
-        <mat-paginator [length]="paginationMetadata.totalCount"
-          [pageIndex]="paginationMetadata.pageNumber"
-          [pageSize]="paginationMetadata.pageSize"
-          [pageSizeOptions]="[5, 10, 20]"
-          (page)="pagedEvent($event)"
-          showFirstLastButtons
-          aria-label="Select page of acquisition logs">
-        </mat-paginator>
+        <div class="table-footer">
+          <div class="page-jump">
+            <label class="page-jump-label" for="pageJumpInput">Page</label>
+            <input
+              id="pageJumpInput"
+              class="page-jump-input"
+              type="number"
+              min="1"
+              [max]="paginationMetadata.totalPages"
+              step="1"
+              inputmode="numeric"
+              aria-label="Page number"
+              [(ngModel)]="targetPageNumber"
+              (keydown.enter)="goToPage()">
+            <span class="page-jump-total">of {{paginationMetadata.totalPages}}</span>
+            <button type="button" class="link-button secondary" (click)="goToPage()" [disabled]="!canNavigateToPage()">
+              Go
+            </button>
+          </div>
+          <mat-paginator [length]="paginationMetadata.totalCount"
+            [pageIndex]="paginationMetadata.pageNumber"
+            [pageSize]="paginationMetadata.pageSize"
+            [pageSizeOptions]="[5, 10, 20, 100]"
+            (page)="pagedEvent($event)"
+            showFirstLastButtons
+            aria-label="Select page of acquisition logs">
+          </mat-paginator>
+        </div>
       </div>
     } @else {
       <div class="no-results">

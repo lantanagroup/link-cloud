@@ -1,12 +1,14 @@
 package com.lantanagroup.link.validation.services;
 
 import ca.uhn.fhir.context.FhirContext;
+import com.lantanagroup.link.validation.configs.LinkConfig;
 import com.lantanagroup.link.validation.entities.Artifact;
 import com.lantanagroup.link.validation.entities.ArtifactType;
-import com.lantanagroup.link.validation.repositories.ArtifactRepository;
-import com.lantanagroup.link.validation.configs.LinkConfig;
 import com.lantanagroup.link.validation.models.TerminologyDependency;
-import org.hl7.fhir.r4.model.*;
+import com.lantanagroup.link.validation.repositories.ArtifactRepository;
+import org.hl7.fhir.r4.model.ElementDefinition;
+import org.hl7.fhir.r4.model.Enumerations;
+import org.hl7.fhir.r4.model.StructureDefinition;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,7 +18,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.io.IOException;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -47,15 +50,18 @@ class TerminologyDependencySourceProfileTest {
         ElementDefinition e1_1 = p1.getSnapshot().addElement();
         e1_1.setPath("Patient.gender");
         e1_1.getBinding().setValueSet(vsUrl);
+        e1_1.getBinding().setStrength(Enumerations.BindingStrength.REQUIRED);
         ElementDefinition e1_2 = p1.getSnapshot().addElement();
         e1_2.setPath("Patient.contact.gender");
         e1_2.getBinding().setValueSet(vsUrl);
+        e1_2.getBinding().setStrength(Enumerations.BindingStrength.REQUIRED);
 
         StructureDefinition p2 = new StructureDefinition();
         p2.setUrl(profile2Url);
         ElementDefinition e2_1 = p2.getSnapshot().addElement();
         e2_1.setPath("Observation.code");
         e2_1.getBinding().setValueSet(vsUrl);
+        e2_1.getBinding().setStrength(Enumerations.BindingStrength.REQUIRED);
 
         Artifact a1 = new Artifact();
         a1.setType(ArtifactType.RESOURCE);
@@ -94,8 +100,14 @@ class TerminologyDependencySourceProfileTest {
     void getTerminologyDependencies_Sorted() throws IOException {
         StructureDefinition p = new StructureDefinition();
         p.setUrl("http://example.org/SD");
-        p.getSnapshot().addElement().setPath("P.a").getBinding().setValueSet("http://example.org/VS/B");
-        p.getSnapshot().addElement().setPath("P.b").getBinding().setValueSet("http://example.org/VS/A");
+        ElementDefinition elementA = p.getSnapshot().addElement();
+        elementA.setPath("P.a");
+        elementA.getBinding().setValueSet("http://example.org/VS/B");
+        elementA.getBinding().setStrength(Enumerations.BindingStrength.REQUIRED);
+        ElementDefinition elementB = p.getSnapshot().addElement();
+        elementB.setPath("P.b");
+        elementB.getBinding().setValueSet("http://example.org/VS/A");
+        elementB.getBinding().setStrength(Enumerations.BindingStrength.REQUIRED);
 
         Artifact a = new Artifact();
         a.setType(ArtifactType.RESOURCE);

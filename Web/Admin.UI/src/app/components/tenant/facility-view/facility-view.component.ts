@@ -10,7 +10,7 @@ import {CommonModule} from '@angular/common';
 import {PaginationMetadata} from 'src/app/models/pagination-metadata.model';
 import {MatToolbarModule} from '@angular/material/toolbar';
 import {MatIconModule} from '@angular/material/icon';
-import {MatPaginatorModule, PageEvent} from '@angular/material/paginator';
+import {MatPaginatorModule, MatPaginator, PageEvent} from '@angular/material/paginator';
 import {MatButtonModule} from '@angular/material/button';
 import {FontAwesomeModule} from '@fortawesome/angular-fontawesome';
 import {faRotate, faArrowLeft, faGears} from '@fortawesome/free-solid-svg-icons';
@@ -18,6 +18,12 @@ import {LoadingService} from 'src/app/services/loading.service';
 import {forkJoin, Subscription} from 'rxjs';
 import {ResubmitDialogComponent} from "./resubmit-dialog.component";
 import {MatDialog} from "@angular/material/dialog";
+import {IPagedReportSchedule, IReportSchedule} from "../../../interfaces/report/report-schedule.interface";
+import {MatCell, MatCellDef} from "@angular/material/table";
+import { FormsModule } from "@angular/forms";
+import { MatTableDataSource, MatTableModule } from '@angular/material/table';
+import { MatSortModule, MatSort, Sort } from '@angular/material/sort';
+import { ReportService } from "../../../services/gateway/report/report.service";
 
 @Component({
   selector: 'app-facility-view',
@@ -29,7 +35,10 @@ import {MatDialog} from "@angular/material/dialog";
     MatIconModule,
     MatPaginatorModule,
     RouterLink,
-    MatCardModule
+    MatCardModule,
+    FormsModule,
+    MatTableModule,
+    MatSortModule
   ],
   templateUrl: './facility-view.component.html',
   styleUrl: './facility-view.component.scss'
@@ -47,10 +56,16 @@ export class FacilityViewComponent implements OnInit {
 
   defaultPageNumber: number = 0
   defaultPageSize: number = 10;
-  reportListSummary: IReportListSummary[] = [];
+  dataSource = new MatTableDataSource<IReportSchedule>([]);
+  reportSchedules: IReportSchedule[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
 
   highlightedRowId: string | null = null;
+
+  showDeleted: boolean = false;
+
+  currentSortBy: string = 'CreateDate';
+  currentSortOrder: number = 1; // 1 = Descending, 0 = Ascending
 
   constructor(
     private location: Location,
@@ -59,10 +74,13 @@ export class FacilityViewComponent implements OnInit {
     private tenantService: TenantService,
     private facilityViewService: FacilityViewService,
     private loadingService: LoadingService,
+    private reportService: ReportService,
     private dialog: MatDialog) {
   }
 
   ngOnInit(): void {
+    this.paginationMetadata.pageNumber = this.defaultPageNumber;
+    this.paginationMetadata.pageSize = this.defaultPageSize;
 
     this.subscription = this.route.params.subscribe(params => {
       this.facilityId = params['facilityId'];
@@ -70,8 +88,7 @@ export class FacilityViewComponent implements OnInit {
       this.loadingService.show();
 
       forkJoin([
-        this.tenantService.getFacilityConfiguration(this.facilityId),
-        this.facilityViewService.getReportSummaryList(this.facilityId, this.defaultPageNumber, this.defaultPageSize)
+        this.tenantService.getFacilityConfiguration(this.facilityId)
       ]).subscribe({
         next: (response) => {
           this.facilityConfig = response[0];
@@ -82,8 +99,7 @@ export class FacilityViewComponent implements OnInit {
             {cadence: 'Monthly', measures: this.facilityConfig.scheduledReports.monthly}
           ] : [];
 
-          this.reportListSummary = response[1].records;
-          this.paginationMetadata = response[1].metadata;
+          this.loadReportSchedules();
 
           this.loadingService.hide();
         },
@@ -99,6 +115,12 @@ export class FacilityViewComponent implements OnInit {
     if (this.subscription) {
       this.subscription.unsubscribe();
     }
+  }
+
+  getColumns(): string[] {
+    const cols = ['id', 'facilityId', 'reportStartDate', 'frequency', 'reportTypes', 'patientsInCensus', 'patientsInIP', 'status', 'action'];
+    if (this.showDeleted) cols.push('isDeleted');
+    return cols;
   }
 
   loadFacilityConfig(): void {
@@ -118,26 +140,34 @@ export class FacilityViewComponent implements OnInit {
     });
   }
 
-  loadReportSummaryList(pageNumber: number, pageSize: number): void {
-    this.facilityViewService.getReportSummaryList(this.facilityId, pageNumber, pageSize).subscribe({
-      next: (response: IPagedReportListSummary) => {
-        this.reportListSummary = response.records;
-        this.paginationMetadata = response.metadata;
+  loadReportSchedules(): void {
+    this.loadingService.isLoading.next(true);
+    this.reportService.searchReportSchedules(
+      this.facilityId,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      this.showDeleted,
+      this.currentSortBy,
+      this.currentSortOrder,
+      this.paginationMetadata.pageSize,
+      this.paginationMetadata.pageNumber + 1 // API expects 1-based indexing
+    ).subscribe({
+      next: (data) => {
+        this.reportSchedules = data.records;
+        this.dataSource.data = this.reportSchedules;
+        this.paginationMetadata = data.metadata;
+        this.paginationMetadata.pageNumber = data.metadata.pageNumber - 1; // Convert back to 0-based
+        this.loadingService.isLoading.next(false);
       },
       error: (error) => {
-        console.error('Error fetching facility report summaries:', error);
+        console.error('Error loading report schedules:', error);
+        this.loadingService.isLoading.next(false);
       }
     });
-  }
-
-  pagedEvent(event: PageEvent) {
-    this.paginationMetadata.pageSize = event.pageSize;
-    this.paginationMetadata.pageNumber = event.pageIndex;
-    this.loadReportSummaryList(event.pageIndex, event.pageSize);
-  }
-
-  onRefresh(): void {
-    this.loadReportSummaryList(this.defaultPageNumber, this.defaultPageSize);
   }
 
   onFacilityConfig(): void {
@@ -148,33 +178,74 @@ export class FacilityViewComponent implements OnInit {
     this.location.back();
   }
 
-  onResubmit(reportId: string): void {
-    // Highlight the row
-    this.highlightedRowId = reportId;
+  onShowDeletedChange(): void {
+    this.paginationMetadata.pageNumber = 0;
+    this.loadReportSchedules();
+  }
 
+  onPageChange(event: PageEvent): void {
+    this.paginationMetadata.pageSize = event.pageSize;
+    this.paginationMetadata.pageNumber = event.pageIndex;
+    this.loadReportSchedules();
+  }
+
+  onSortChange(sort: Sort): void {
+    if (sort.active && sort.direction) {
+      // Map UI column names to API field names
+      const sortFieldMap: { [key: string]: string } = {
+        'id': 'Id',
+        'facilityId': 'FacilityId',
+        'reportStartDate': 'ReportStartDate',
+        'frequency': 'Frequency',
+        'status': 'Status'
+      };
+
+      this.currentSortBy = sortFieldMap[sort.active] || 'CreateDate';
+      this.currentSortOrder = sort.direction === 'desc' ? 1 : 0;
+    } else {
+      // Reset to default sort
+      this.currentSortBy = 'CreateDate';
+      this.currentSortOrder = 1;
+    }
+
+    // Reset to first page when sorting changes
+    this.paginationMetadata.pageNumber = 0;
+    this.loadReportSchedules();
+  }
+
+  onResubmit(reportId: string, facilityId: string): void {
     const dialogRef = this.dialog.open(ResubmitDialogComponent, {
       width: '420px',
       data: {
-        facilityId: this.facilityId,
+        facilityId: facilityId,
         reportId,
-      },
-      panelClass: 'blue-dialog'
+      }
     });
 
     dialogRef.afterClosed().subscribe(result => {
-      // Remove highlight when dialog closes
-      this.highlightedRowId = null;
+      if (!result) {
+        // user cancelled dialog
+        return;
+      }
 
-      if (!result) return;
-
+      // result.bypassSubmission is true/false
       const { bypassSubmission, reportId } = result;
 
-      // Call your service
-      this.tenantService.regenerateReport(this.facilityId, reportId, bypassSubmission)
+      // Call your service and pass bypass flag
+      this.tenantService.regenerateReport(facilityId, reportId, bypassSubmission)
         .subscribe({
-          next: () => this.onRefresh(),
-          error: err => console.error('Resubmit failed', err)
+          next: response => {
+            // refresh list or show toast
+            this.onRefresh();
+          },
+          error: err => {
+            console.error('Resubmit failed', err);
+          }
         });
     });
+  }
+
+  onRefresh() {
+    this.loadReportSchedules();
   }
 }
