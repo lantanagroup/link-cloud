@@ -1,5 +1,4 @@
-﻿using Confluent.Kafka;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Internal;
@@ -129,7 +128,6 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                 return;
             }
 
-            // Core business logic - unchanged
             await patientDataService.ExecuteLogRequest(
                 new AcquisitionRequest(log.Id, item.FacilityId),
                 ct);
@@ -147,7 +145,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                 log.Notes.Add(safeMessage);
                 log.Status = RequestStatus.Failed;
 
-                await logManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                await logQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {
                     Id = log.Id,
                     Status = log.Status,

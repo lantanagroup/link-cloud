@@ -1,21 +1,15 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Internal;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Services.Security;
-using Microsoft.Extensions.Options;
-using System.Diagnostics;
 
 namespace LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
 
@@ -59,7 +53,6 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
 
         using var scope = _serviceScopeFactory.CreateScope();
         var logQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
-        var logManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
         var processor = scope.ServiceProvider.GetRequiredService<AcquisitionProcessorBackgroundService>();
 
         // ATOMIC STEP: Attempt to "claim" the log
@@ -77,7 +70,7 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
         var log = await logQueries.GetAsync(logId, cancellationToken);
         log.Notes ??= new List<string>();
         log.Notes.Add($"[{DateTime.UtcNow:O}] Queued for background acquisition processing");
-        await logManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+        await logQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
         {
             Id = log.Id,
             Notes = log.Notes,
@@ -104,7 +97,7 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
             // Minimally invasive: set back to Pending so the next trigger can try again
             log.Status = RequestStatus.Pending;
             log.Notes.Add($"[{DateTime.UtcNow:O}] Enqueue failed, reverting to Pending.");
-            await logManager.UpdateAsync(new UpdateDataAcquisitionLogModel { Id = log.Id, Status = log.Status, Notes = log.Notes });
+            await logQueries.UpdateAsync(new UpdateDataAcquisitionLogModel { Id = log.Id, Status = log.Status, Notes = log.Notes });
             throw new DeadLetterException("Failed to enqueue work item", ex); // Re-throw to let Kafka handle the retry/DLQ logic
         }
         // Method ends → offset committed quickly by base class
