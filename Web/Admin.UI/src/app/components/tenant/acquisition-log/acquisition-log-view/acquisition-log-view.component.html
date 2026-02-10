@@ -234,10 +234,6 @@
             <th scope="col" class="header-column">
               Resource
             </th>
-            <th scope="col" class="header-column sortable" (click)="onSort('fhirVersion')">
-              Fhir Version
-              <fa-icon [icon]="getSortIcon('fhirVersion')"></fa-icon>
-            </th>
             <th scope="col" class="header-column sortable" (click)="onSort('queryPhase')">
               Query Phase
               <fa-icon [icon]="getSortIcon('queryPhase')"></fa-icon>
@@ -283,7 +279,7 @@
                     </svg>
                   }
                 </td>
-                <td class="data-col table-cell  selectable-value">
+                <td class="data-col table-cell selectable-value">
                   {{log.patientId}}
                   @if (log.patientId) {
                     <fa-icon [icon]="faFilter"
@@ -301,7 +297,6 @@
                     <div class="sub-value selectable-value">{{log.resourceId}}</div>
                   }
                 </td>
-                <td class="data-col table-cell">{{log.fhirVersion}}</td>
                 <td class="data-col table-cell">{{log.queryPhase}}</td>
                 <td class="data-col table-cell">{{log.queryType}}</td>
                 <td class="data-col table-cell">{{log.executionDate | date:'shortDate'}}</td>
