@@ -15,7 +15,7 @@ using Quartz;
 
 namespace LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Jobs;
 
-[DisallowConcurrentExecution]
+// [DisallowConcurrentExecution]
 public class SftpAcquisitionProcessingJob(
     ILogger<SftpAcquisitionProcessingJob> logger,
     IServiceScopeFactory serviceScopeFactory,

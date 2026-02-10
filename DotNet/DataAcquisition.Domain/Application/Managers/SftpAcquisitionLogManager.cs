@@ -3,6 +3,7 @@ using System.Text.Json;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
@@ -113,7 +114,7 @@ public interface ISftpAcquisitionLogManager
 /// <summary>
 /// Manages SFTP acquisition log entries in the database.
 /// </summary>
-public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger, IDatabase database) : ISftpAcquisitionLogManager
+public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger, IDatabase database, DataAcquisitionDbContext dbContext) : ISftpAcquisitionLogManager
 {
     /// <inheritdoc/>
     public async Task<SftpAcquisitionLogModel> CreateAsync(SftpAcquisitionLogModel model, CancellationToken cancellationToken = default)
@@ -245,31 +246,24 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
 
         var now = DateTime.UtcNow;
 
-        // Accept logs that are either:
-        // 1. Pending status (new logs ready to process)
-        // 2. Failed status with ScheduledDate in the past (retries ready to process)
-        var log = await database.SftpAcquisitionLogRepository.FirstOrDefaultAsync(
-            x => x.Id == id &&
-                 (x.Status == RequestStatus.Pending ||
-                  (x.Status == RequestStatus.Failed && (x.ScheduledDate == null || x.ScheduledDate <= now))),
+        // Atomic update that claims the log only if it is still in an eligible state.
+        var rowsAffected = await dbContext.Database.ExecuteSqlAsync(
+            $"""
+            UPDATE SftpAcquisitionLog
+            SET Status = 'Processing', ProcessDate = {now}
+            WHERE Id = {id}
+              AND (Status = 'Pending' OR (Status = 'Failed' AND (ScheduledDate IS NULL OR ScheduledDate <= {now})))
+            """,
             cancellationToken);
 
-        if (log is null) return false;
-
-        log.Status = RequestStatus.Processing;
-        log.ProcessDate = DateTime.UtcNow;
-
-        try
+        if (rowsAffected > 0)
         {
-            await database.SaveChangesAsync();
             logger.LogDebug("Claimed SFTP acquisition log {LogId} for processing", id);
             return true;
         }
-        catch (DbUpdateConcurrencyException)
-        {
-            logger.LogDebug("SFTP acquisition log {LogId} already claimed by another worker", id);
-            return false;
-        }
+
+        logger.LogDebug("SFTP acquisition log {LogId} already claimed by another worker", id);
+        return false;
     }
 
     /// <inheritdoc/>
