@@ -32,7 +32,7 @@ When a facility is soft deleted:
 - The facility is excluded from default queries (unless `includeDeleted=true` is specified)
 - Associated reports are also marked as deleted
 
-**API Endpoint:** `DELETE /api/Facility/soft/{facilityId}`
+**API Endpoint:** `DELETE /api/Facility/softDelete/{facilityId}`
 
 ### Restore
 
@@ -144,7 +144,7 @@ A fully functional tenant requires configuration across multiple services. Each 
 - Maintain consistent `facilityId` usage across services
 
 ## Tenant Deletion
-- Use soft delete (`DELETE /api/Facility/soft/{facilityId}`) when you may need to restore the facility later
+- Use soft delete (`DELETE /api/Facility/softDelete/{facilityId}`) when you may need to restore the facility later
 - Use hard delete (`DELETE /api/Facility/{facilityId}`) only when you are certain the facility and all its data should be permanently removed
 - When restoring a soft-deleted facility, scheduled jobs are automatically recreated; however, verify that cross-service configurations are still valid
 - When querying for facilities in administrative interfaces, consider whether to include soft-deleted facilities using the `includeDeleted` parameter
