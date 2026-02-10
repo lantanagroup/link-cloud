@@ -8,6 +8,10 @@ This system is a high-performing, big-data platform intended to support collecti
 * The Scripts directory contains scripts used by developers and admins to help operate the system at runtime. These scripts must always abstract out sensitive variables into arguments. Arguments may default values to environment variables for ease-of use, when appropriate.
 * Changes to entities that are persisted with EntityFramework must always have a migration created for them, which ideally supports both upgarding *and* downgrading (in the event of failed system updates in other services).
 
+# Frameworks and Deployment Technologies
+
+* MongoDB queries should comply with limitations imposed by deployments within Azure CosmosDB for MongoDB RU (i.e. don't use aggregate pipelines that call mapReduce, $collStats, $indexStats, etc.)
+
 ## Pull Requests
 
 PR summaries/titles must follow one of the two formats:
