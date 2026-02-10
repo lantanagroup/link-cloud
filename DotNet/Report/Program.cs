@@ -131,10 +131,22 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add the MongoDbContext to the DI container, using the shared client
     builder.Services.AddDbContext<MongoDbContext>((sp, options) =>
     {
-        var client = sp.GetRequiredService<IMongoClient>();
-        var mongoSettings = sp.GetRequiredService<IOptions<MongoConnection>>().Value;
+        var querySettings = builder.Configuration.GetRequiredSection(nameof(EnhancedQueryLoggingSettings)).Get<EnhancedQueryLoggingSettings>();
 
-        options.UseMongoDB(client, mongoSettings.DatabaseName);      
+        var client = sp.GetRequiredService<IMongoClient>();
+        var mongoSettings = sp.GetRequiredService<IOptions<MongoConnection>>().Value;      
+
+        if (querySettings != null && querySettings.EnableEnhancedQueryLogging)
+        {
+            var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+            options.UseMongoDB(client, mongoSettings.DatabaseName)
+            .UseLoggerFactory(loggerFactory)
+            .EnableSensitiveDataLogging();
+        }
+        else
+        {
+            options.UseMongoDB(client, mongoSettings.DatabaseName);
+        }
     });
 
     builder.Services.AddHostedService<MongoIndexCreationService>();
