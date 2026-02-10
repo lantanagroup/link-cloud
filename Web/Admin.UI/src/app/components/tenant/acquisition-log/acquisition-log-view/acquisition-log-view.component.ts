@@ -110,7 +110,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
 
   //filters
-  filtersApplied: boolean = false;
+  allowLogSelection: boolean = false;
   filterPanelOpen = false;
   patientFilter: string = '';
   resourceIdFilter: string = '';
@@ -178,6 +178,7 @@ export class AcquisitionLogViewComponent implements OnInit {
         this.patientFilter = '';
         this.patientIdFromRoute = '';
       }
+      this.onFilterApplication();
     });
 
     forkJoin([
@@ -253,15 +254,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   }
 
   onFilterApplication(): void {
-    this.filtersApplied = (this.patientFilter !== '' ||
-      this.resourceIdFilter !== '' ||
-      this.selectedFacilityFilter !== 'Any' ||
-      this.reportIdFilter !== '' ||
-      this.selectedResourceTypeFilter !== 'Any' ||
-      this.selectedPriorityFilter !== 'Any' ||
-      this.selectedQueryPhaseFilter !== 'Any' ||
-      this.selectedQueryTypeFilter !== 'Any' ||
-      this.selectedStatusFilter.length > 0);
+    this.allowLogSelection = (this.reportIdFilter !== '');
   }
 
   refreshLogs(): void {
@@ -281,7 +274,7 @@ export class AcquisitionLogViewComponent implements OnInit {
     this.selectedQueryPhaseFilter = 'Any';
     this.selectedQueryTypeFilter = 'Any';
     this.selectedStatusFilter = [];
-    this.filtersApplied = false;
+    this.onFilterApplication();
     this.clearSelection();
     this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);
     this.loadStatusCounts();
