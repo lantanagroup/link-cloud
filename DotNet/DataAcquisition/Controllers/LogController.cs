@@ -72,7 +72,7 @@ public class LogController : Controller
             try
             {
                 var allowedSortBy = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                    { "ExecutionDate", "FacilityId", "PatientId", "QueryType", "QueryPhase", "Status", "Priority" };
+                    { "ExecutionDate", "CreateDate", "FacilityId", "PatientId", "QueryType", "QueryPhase", "Status", "Priority", "Id", "RetryAttempts" };
                 
                 if (!allowedSortBy.Contains(queryParameters.SortBy))
                 {

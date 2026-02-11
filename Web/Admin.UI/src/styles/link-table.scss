@@ -289,3 +289,56 @@
 .search-text-input:focus {
   border-color: #007bff;
 }
+
+// Material Form Field Overrides for compact filters
+.mat-mdc-form-field.compact-filter {
+  width: 100%;
+
+  .mat-mdc-text-field-wrapper {
+    background-color: #f5f5f5 !important;
+    height: 34px !important;
+    padding: 0 !important;
+  }
+
+  .mat-mdc-form-field-infix {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    min-height: 34px !important;
+    display: flex;
+    align-items: center;
+  }
+
+  .mat-mdc-form-field-subscript-wrapper {
+    display: none;
+  }
+
+  .mat-mdc-floating-label {
+    top: 17px !important;
+  }
+
+  &.mat-form-field-can-float.mat-form-field-should-float .mat-mdc-floating-label {
+    transform: translateY(-16px) scale(0.75) !important;
+  }
+
+  .mat-mdc-select-value,
+  .mat-mdc-select-placeholder,
+  .mat-mdc-floating-label,
+  input.mat-mdc-input-element {
+    font-size: 12px !important;
+  }
+
+  .mat-mdc-select-arrow-wrapper {
+    transform: translateY(-2px);
+  }
+
+  .mat-mdc-form-field-icon-suffix {
+    padding: 0;
+    .mat-mdc-icon-button {
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      fa-icon { font-size: 12px; color: #666; }
+      &:hover fa-icon { color: #333; }
+    }
+  }
+}

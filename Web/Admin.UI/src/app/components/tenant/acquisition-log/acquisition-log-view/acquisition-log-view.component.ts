@@ -28,7 +28,8 @@ import {MatDialogModule} from '@angular/material/dialog';
 import {MatFormFieldModule} from '@angular/material/form-field';
 import {MatInputModule} from '@angular/material/input';
 import {MatAutocompleteModule} from '@angular/material/autocomplete';
-import {ActivatedRoute, Router} from '@angular/router';
+import {MatExpansionModule} from '@angular/material/expansion';
+import {ActivatedRoute, Router, RouterLink} from '@angular/router';
 import {TableCommandComponent} from "./table-command/table-command.component";
 import {ReportService} from 'src/app/services/gateway/report/report.service';
 import {PieChartComponent} from 'src/app/components/core/pie-chart/pie-chart.component';
@@ -53,7 +54,9 @@ import {
     MatTooltipModule,
     MatFormFieldModule,
     MatInputModule,
-    MatAutocompleteModule
+    MatAutocompleteModule,
+    MatExpansionModule,
+    RouterLink
 ],
   templateUrl: './acquisition-log-view.component.html',
   styleUrl: './acquisition-log-view.component.scss',
@@ -124,7 +127,6 @@ export class AcquisitionLogViewComponent implements OnInit {
 
   //filters
   allowLogSelection: boolean = false;
-  filterPanelOpen = false;
   patientFilter: string = '';
   resourceIdFilter: string = '';
   reportIdFilter: string = '';
@@ -147,6 +149,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   targetPageNumber: number | null = null;
   selectedLogIds: Set<string> = new Set<string>();
   isAllSelected: boolean = false;
+  statusChartExpanded: boolean = false;
   statusChartData: Record<string, number> = {};
   statusChartLoading = false;
   statusChartReportId = '';
@@ -194,6 +197,9 @@ export class AcquisitionLogViewComponent implements OnInit {
       }
       this.onFilterApplication();
     });
+
+    const storedExpandedState = localStorage.getItem('acquisitionLogStatusChartExpanded');
+    this.statusChartExpanded = storedExpandedState ? JSON.parse(storedExpandedState) : false;
 
     forkJoin([
       this.tenantService.getAllFacilities(),
@@ -256,12 +262,13 @@ export class AcquisitionLogViewComponent implements OnInit {
     this.loadLogs(event.pageIndex, event.pageSize, true);
   }
 
-  toggleFilterPanel() {
-    this.filterPanelOpen = !this.filterPanelOpen;
-  }
-
   filterByPatient(patientId: string) {
     this.patientFilter = patientId;
+    this.applyFilters();
+  }
+
+  filterByResourceType(resourceType: string) {
+    this.selectedResourceTypeFilter = resourceType;
     this.applyFilters();
   }
 
@@ -294,8 +301,66 @@ export class AcquisitionLogViewComponent implements OnInit {
   applyFilters(): void {
     this.loadLogs(this.defaultPageNumber, this.getCurrentPageSize(), true);
     this.loadStatusCounts();
-    this.filterPanelOpen = false;
     this.onFilterApplication();
+  }
+
+  clearFilter(filterName: string): void {
+    switch (filterName) {
+      case 'patient':
+        this.patientFilter = this.patientIdFromRoute;
+        break;
+      case 'facility':
+        this.selectedFacilityFilter = 'Any';
+        break;
+      case 'priority':
+        this.selectedPriorityFilter = 'Any';
+        break;
+      case 'status':
+        this.selectedStatusFilter = [];
+        break;
+      case 'reportId':
+        this.reportIdFilter = this.reportIdFromRoute;
+        break;
+      case 'resourceId':
+        this.resourceIdFilter = '';
+        break;
+      case 'resourceType':
+        this.selectedResourceTypeFilter = 'Any';
+        this._filterResourceTypes('');
+        break;
+      case 'queryType':
+        this.selectedQueryTypeFilter = 'Any';
+        break;
+      case 'queryPhase':
+        this.selectedQueryPhaseFilter = 'Any';
+        break;
+    }
+    this.applyFilters();
+  }
+
+  isFilterActive(filterName: string): boolean {
+    switch (filterName) {
+      case 'patient':
+        return this.patientFilter !== this.patientIdFromRoute;
+      case 'facility':
+        return this.selectedFacilityFilter !== 'Any';
+      case 'priority':
+        return this.selectedPriorityFilter !== 'Any';
+      case 'status':
+        return this.selectedStatusFilter.length > 0;
+      case 'reportId':
+        return this.reportIdFilter !== this.reportIdFromRoute;
+      case 'resourceId':
+        return this.resourceIdFilter !== '';
+      case 'resourceType':
+        return this.selectedResourceTypeFilter !== 'Any';
+      case 'queryType':
+        return this.selectedQueryTypeFilter !== 'Any';
+      case 'queryPhase':
+        return this.selectedQueryPhaseFilter !== 'Any';
+      default:
+        return false;
+    }
   }
 
   onFilterApplication(): void {
@@ -560,6 +625,11 @@ export class AcquisitionLogViewComponent implements OnInit {
     this.statusChartLoading = false;
     this.statusChartReportId = '';
     this.statusChartPatientId = '';
+  }
+
+  onStatusChartToggle(expanded: boolean): void {
+    this.statusChartExpanded = expanded;
+    localStorage.setItem('acquisitionLogStatusChartExpanded', JSON.stringify(this.statusChartExpanded));
   }
 
 }
