@@ -10,33 +10,18 @@
               Acquisition Log Entries
             }
           </p>
+          <p class="sub-title">
+            Report <span class="selectable-value">{{reportIdFilter || 'Any'}}</span>
+            @if (patientFilter) {
+              <span class="status-summary-separator">|</span>
+              Patient <span class="selectable-value">{{patientFilter}}</span>
+            }
+          </p>
         </div>
         <div class="right-pane">
-          <div class="link-button-group">
-            <button type="button" class="link-button primary" aria-label="Reload acquisition logs" (click)="refreshLogs()">
-              <fa-icon [icon]="faRotate"></fa-icon>
-              Refresh
-            </button>
-            @if (filtersApplied) {
-              <button type="button"
-                class="link-button secondary"
-                aria-label="Clear filters"
-                (click)="clearFilters()"
-                [@fadeInOutScale]>
-                <fa-icon [icon]="faXmark"></fa-icon>
-                Clear Filters
-              </button>
-            }
-            <button type="button" class="filter-button link-button purple" aria-label="Show filters" (click)="toggleFilterPanel()" #filterBtn>
-              <fa-icon [icon]="faFilter"></fa-icon>
-              Filters
-            </button>
-          </div>
-
           @if (reportIdFromRoute) {
             <button type="button"
               class="link-button light"
-              style="margin-left: 1em;"
               aria-label="Return to report"
               (click)="returnToReport()"
               [disabled]="!reportFacilityId">
@@ -47,18 +32,15 @@
         </div>
       </div>
     </div>
+
     @if (showStatusChart) {
-      <div class="status-summary">
-        <div class="status-summary-header">
-          <div class="status-summary-title">Status breakdown</div>
-          <div class="status-summary-meta">
-            Report <span class="selectable-value">{{statusChartReportId || reportIdFilter}}</span>
-            @if (statusChartPatientId || patientFilter) {
-              <span class="status-summary-separator">|</span>
-              Patient <span class="selectable-value">{{statusChartPatientId || patientFilter}}</span>
-            }
-          </div>
-        </div>
+      <mat-expansion-panel [expanded]="statusChartExpanded" (opened)="onStatusChartToggle(true)" (closed)="onStatusChartToggle(false)" class="status-summary-panel">
+        <mat-expansion-panel-header class="status-summary-panel-header">
+          <mat-panel-title class="status-summary-panel-title">
+            Status breakdown
+          </mat-panel-title>
+        </mat-expansion-panel-header>
+
         <div class="status-summary-body">
           @if (statusChartLoading) {
             <div class="status-summary-loading">Loading status counts...</div>
@@ -70,120 +52,209 @@
             <div class="status-summary-empty">No status data available for the current filters.</div>
           }
         </div>
-      </div>
+      </mat-expansion-panel>
     }
-    <div class="filter-container">
-      @if (filterPanelOpen) {
-        <div class="filter-panel" id="filterPanel" [@fadeGrowRightOut]>
-          <div class="filter-row" style="justify-content: flex-end;">
-            <div class="filter-item" style="flex: 0 0 auto;">
-              <div class="link-button-group">
-                <button class="link-button success" (click)="applyFilters()">
-                  <fa-icon [icon]="faPlus"></fa-icon>
-                  Apply Filters
-                </button>
-                <button class="link-button primary" (click)="clearFilters()">
-                  <fa-icon [icon]="faXmark"></fa-icon>
-                  Clear Filters
-                </button>
-              </div>
-            </div>
-          </div>
-          <div class="filter-row">
-            <div class="filter-item">
-              <label>
-                Patient Id
-              </label>
-              <input id="patientIdFilter" type="text" [(ngModel)]="patientFilter" placeholder="Enter a Patient Id">
-            </div>
-            <div class="filter-item">
-              <label>
-                Facility
-              </label>
-              <select id="facilityFilter" [(ngModel)]="selectedFacilityFilter">
-                <option value="Any">Any</option>
-                @for (option of facilityFilterOptions | keyvalue; track option) {
-                  <option [value]="option.key">{{option.value}}</option>
-                }
-              </select>
-            </div>
-            <div class="filter-item">
-              <label>
-                Priority
-              </label>
-              <select id="priorityFilter" [(ngModel)]="selectedPriorityFilter">
-                <option value="Any">Any</option>
-                @for (option of priorityFilterOptions; track option) {
-                  <option [value]="option">{{option}}</option>
-                }
-              </select>
-            </div>
-            <div class="filter-item">
-              <label>
-                Query Type
-              </label>
-              <select id="queryTypeFilter" [(ngModel)]="selectedQueryTypeFilter">
-                <option value="Any">Any</option>
-                @for (option of queryTypeFilterOptions; track option) {
-                  <option [value]="option">{{option}}</option>
-                }
-              </select>
-            </div>
-          </div>
-          <div class="filter-row">
-            <div class="filter-item">
-              <label>
-                Report Id
-              </label>
-              <input id="reportIdFilter" type="text" [(ngModel)]="reportIdFilter" placeholder="Enter a report Id">
-            </div>
-            <div class="filter-item">
-              <label>
-                Resource Id
-              </label>
-              <input id="resourceIdFilter" type="text" [(ngModel)]="resourceIdFilter" placeholder="Enter a resource Id">
-            </div>
-            <!-- <div class="filter-item">
-            <label>
-              Resource Type
-            </label>
-            <select id="resourceTypeFilter" [(ngModel)]="selectedResourceTypeFilter">
-              <option value="Any">Any</option>
-              <option *ngFor="let option of resourceTypeFilterOptions" [value]="option">{{option}}</option>
-            </select>
-          </div> -->
-          <div class="filter-item">
-            <label>
-              Query Phase
-            </label>
-            <select id="queryPhaseFilter" [(ngModel)]="selectedQueryPhaseFilter">
-              <option value="Any">Any</option>
-              @for (option of queryPhaseFilterOptions; track option) {
-                <option [value]="option">{{option}}</option>
-              }
-            </select>
-          </div>
-          <div class="filter-item">
-            <label>
-              Status
-            </label>
-            <select id="statusFilter" [(ngModel)]="selectedStatusFilter">
-              <option value="Any">Any</option>
-              @for (option of statusFilterOptions; track option) {
-                <option [value]="option">{{option}}</option>
-              }
-            </select>
-          </div>
+
+    <div class="actions-bar">
+      <div class="filter-actions-group">
+        <div class="filter-item">
+          <mat-form-field appearance="outline" class="full-width compact-filter">
+            <mat-label>Patient Id</mat-label>
+            <input matInput id="patientIdFilter" [(ngModel)]="patientFilter" (keyup.enter)="applyFilters()" placeholder="Enter a Patient Id">
+            @if (isFilterActive('patient')) {
+              <button matSuffix mat-icon-button aria-label="Clear" (click)="clearFilter('patient'); $event.stopPropagation()">
+                <fa-icon [icon]="faXmark"></fa-icon>
+              </button>
+            }
+          </mat-form-field>
         </div>
+
+        <div class="filter-item">
+          <mat-form-field appearance="outline" class="full-width compact-filter">
+            <mat-label>Facility</mat-label>
+            <mat-select id="facilityFilter" [(ngModel)]="selectedFacilityFilter" (selectionChange)="applyFilters()">
+              <mat-option value="Any">Any</mat-option>
+              @for (option of facilityFilterOptions | keyvalue; track option) {
+                <mat-option [value]="option.key">{{option.value}}</mat-option>
+              }
+            </mat-select>
+            @if (isFilterActive('facility')) {
+              <button matSuffix mat-icon-button aria-label="Clear" (click)="clearFilter('facility'); $event.stopPropagation()">
+                <fa-icon [icon]="faXmark"></fa-icon>
+              </button>
+            }
+          </mat-form-field>
+        </div>
+
+        <div class="filter-item">
+          <mat-form-field appearance="outline" class="full-width compact-filter">
+            <mat-label>Priority</mat-label>
+            <mat-select id="priorityFilter" [(ngModel)]="selectedPriorityFilter" (selectionChange)="applyFilters()">
+              <mat-option value="Any">Any</mat-option>
+              @for (option of priorityFilterOptions; track option) {
+                <mat-option [value]="option">{{option}}</mat-option>
+              }
+            </mat-select>
+            @if (isFilterActive('priority')) {
+              <button matSuffix mat-icon-button aria-label="Clear" (click)="clearFilter('priority'); $event.stopPropagation()">
+                <fa-icon [icon]="faXmark"></fa-icon>
+              </button>
+            }
+          </mat-form-field>
+        </div>
+
+        <div class="filter-item">
+          <mat-form-field appearance="outline" class="full-width compact-filter">
+            <mat-label>Status</mat-label>
+            <mat-select [(ngModel)]="selectedStatusFilter" multiple (selectionChange)="applyFilters()">
+              @for (option of statusFilterOptions; track option) {
+                <mat-option [value]="option">{{option}}</mat-option>
+              }
+            </mat-select>
+            @if (isFilterActive('status')) {
+              <button matSuffix mat-icon-button aria-label="Clear" (click)="clearFilter('status'); $event.stopPropagation()">
+                <fa-icon [icon]="faXmark"></fa-icon>
+              </button>
+            }
+          </mat-form-field>
+        </div>
+
+        <div class="filter-item">
+          <mat-form-field appearance="outline" class="full-width compact-filter">
+            <mat-label>Report Id</mat-label>
+            <input matInput id="reportIdFilter" [(ngModel)]="reportIdFilter" (keyup.enter)="applyFilters()" placeholder="Enter a report Id">
+            @if (isFilterActive('reportId')) {
+              <button matSuffix mat-icon-button aria-label="Clear" (click)="clearFilter('reportId'); $event.stopPropagation()">
+                <fa-icon [icon]="faXmark"></fa-icon>
+              </button>
+            }
+          </mat-form-field>
+        </div>
+
+        <div class="filter-item">
+          <mat-form-field appearance="outline" class="full-width compact-filter">
+            <mat-label>Resource Id</mat-label>
+            <input matInput id="resourceIdFilter" [(ngModel)]="resourceIdFilter" (keyup.enter)="applyFilters()" placeholder="Enter a resource Id">
+            @if (isFilterActive('resourceId')) {
+              <button matSuffix mat-icon-button aria-label="Clear" (click)="clearFilter('resourceId'); $event.stopPropagation()">
+                <fa-icon [icon]="faXmark"></fa-icon>
+              </button>
+            }
+          </mat-form-field>
+        </div>
+
+        <div class="filter-item">
+          <mat-form-field appearance="outline" class="full-width compact-filter">
+            <mat-label>Resource Type</mat-label>
+            <input type="text"
+                   placeholder="Pick a Resource Type"
+                   aria-label="Resource Type"
+                   matInput
+                   [(ngModel)]="selectedResourceTypeFilter"
+                   (input)="onResourceTypeInput($event)"
+                   (focus)="onResourceTypeFocus($event)"
+                   (blur)="onResourceTypeBlur()"
+                   (keyup.enter)="applyFilters()"
+                   [matAutocomplete]="resourceTypeAuto">
+            <mat-autocomplete #resourceTypeAuto="matAutocomplete" (optionSelected)="applyFilters()">
+              <mat-option value="Any">Any</mat-option>
+              @for (option of filteredResourceTypeOptions; track option) {
+                <mat-option [value]="option">{{option}}</mat-option>
+              }
+            </mat-autocomplete>
+            @if (isFilterActive('resourceType')) {
+              <button matSuffix mat-icon-button aria-label="Clear" (click)="clearFilter('resourceType'); $event.stopPropagation()">
+                <fa-icon [icon]="faXmark"></fa-icon>
+              </button>
+            }
+          </mat-form-field>
+        </div>
+
+        <div class="filter-item">
+          <mat-form-field appearance="outline" class="full-width compact-filter">
+            <mat-label>Query Type</mat-label>
+            <mat-select id="queryTypeFilter" [(ngModel)]="selectedQueryTypeFilter" (selectionChange)="applyFilters()">
+              <mat-option value="Any">Any</mat-option>
+              @for (option of queryTypeFilterOptions; track option) {
+                <mat-option [value]="option">{{option}}</mat-option>
+              }
+            </mat-select>
+            @if (isFilterActive('queryType')) {
+              <button matSuffix mat-icon-button aria-label="Clear" (click)="clearFilter('queryType'); $event.stopPropagation()">
+                <fa-icon [icon]="faXmark"></fa-icon>
+              </button>
+            }
+          </mat-form-field>
+        </div>
+
+        <div class="filter-item">
+          <mat-form-field appearance="outline" class="full-width compact-filter">
+            <mat-label>Query Phase</mat-label>
+            <mat-select id="queryPhaseFilter" [(ngModel)]="selectedQueryPhaseFilter" (selectionChange)="applyFilters()">
+              <mat-option value="Any">Any</mat-option>
+              @for (option of queryPhaseFilterOptions; track option) {
+                <mat-option [value]="option">{{option}}</mat-option>
+              }
+            </mat-select>
+            @if (isFilterActive('queryPhase')) {
+              <button matSuffix mat-icon-button aria-label="Clear" (click)="clearFilter('queryPhase'); $event.stopPropagation()">
+                <fa-icon [icon]="faXmark"></fa-icon>
+              </button>
+            }
+          </mat-form-field>
+        </div>
+
+        <div class="btn-group" role="group" aria-label="Filtering">
+          <button class="link-button success" (click)="applyFilters()">
+            <fa-icon [icon]="faPlus"></fa-icon>
+            Apply Filters
+          </button>
+
+          <button class="link-button secondary"
+                  aria-label="Clear filters"
+                  (click)="clearFilters()"
+                  [@fadeInOutScale]>
+            <fa-icon [icon]="faXmark"></fa-icon>
+            Clear All Filters
+          </button>
+
+          <button type="button" class="link-button primary" aria-label="Reload acquisition logs" (click)="refreshLogs()">
+            <fa-icon [icon]="faRotate"></fa-icon>
+            Refresh
+          </button>
+        </div>
+
+        @if (selectedLogIds.size > 0 || isAllSelected) {
+          <div class="btn-group">
+            <button type="button" class="link-button secondary" (click)="clearSelection()">
+              Clear Selection
+            </button>
+            <button type="button" class="link-button success" [disabled]="selectedLogIds.size === 0 && !isAllSelected" (click)="bulkExecute()">
+              <fa-icon [icon]="faPlus" style="margin-right: 5px;"></fa-icon>
+              Execute Selected ({{ isAllSelected ? paginationMetadata.totalCount : selectedLogIds.size }})
+            </button>
+          </div>
+        }
       </div>
-    }
-  </div>
-  @if (acquisitionLogs.length > 0) {
-    <div class="table-container no-border">
+    </div>
+    @if (acquisitionLogs.length > 0) {
+      <div class="table-container no-border">
       <table class="link-table">
         <thead class="table-head">
           <tr>
-            <th scope="col" class="header-column">
+            <th scope="col" class="header-column" style="width: 40px;">
+              @if (allowLogSelection)
+              {
+                <mat-checkbox (change)="$event.checked ? selectAll() : clearSelection()"
+                              [checked]="isAllSelected"
+                              [indeterminate]="selectedLogIds.size > 0 && !isAllSelected"
+                              [disabled]="!allowLogSelection">
+                </mat-checkbox>
+              }
+            </th>
+            <th scope="col" class="header-column sortable" (click)="onSort('id')">
+              Log ID
+              <fa-icon [icon]="getSortIcon('id')"></fa-icon>
             </th>
             <th scope="col" class="header-column sortable" (click)="onSort('patientId')">
               Patient Id
@@ -193,16 +264,12 @@
               Facility
               <fa-icon [icon]="getSortIcon('facilityId')"></fa-icon>
             </th>
-            <th scope="col" class="header-column sortable" (click)="onSort('priority')">
-              Priority
-              <fa-icon [icon]="getSortIcon('priority')"></fa-icon>
-            </th>
             <th scope="col" class="header-column">
               Resource
             </th>
-            <th scope="col" class="header-column sortable" (click)="onSort('fhirVersion')">
-              Fhir Version
-              <fa-icon [icon]="getSortIcon('fhirVersion')"></fa-icon>
+            <th scope="col" class="header-column sortable" (click)="onSort('retryAttempts')">
+              Retries
+              <fa-icon [icon]="getSortIcon('retryAttempts')"></fa-icon>
             </th>
             <th scope="col" class="header-column sortable" (click)="onSort('queryPhase')">
               Query Phase
@@ -212,6 +279,10 @@
               Query Type
               <fa-icon [icon]="getSortIcon('queryType')"></fa-icon>
             </th>
+            <th scope="col" class="header-column sortable" (click)="onSort('createDate')">
+              Created
+              <fa-icon [icon]="getSortIcon('createDate')"></fa-icon>
+            </th>
             <th scope="col" class="header-column sortable" (click)="onSort('executionDate')">
               Scheduled
               <fa-icon [icon]="getSortIcon('executionDate')"></fa-icon>
@@ -220,7 +291,7 @@
               Status
               <fa-icon [icon]="getSortIcon('status')"></fa-icon>
             </th>
-            <th scope="col" class="header-column">
+            <th scope="col" class="header-column action-column">
               <span class="sr-only">Edit</span>
             </th>
           </tr>
@@ -229,13 +300,14 @@
           @for (log of acquisitionLogs; track log) {
             <tr @fadeInSlideUp [ngClass]="{'priority-critical': log.priority === 'Critical', 'priority-high': log.priority === 'High'}">
               <td class="table-cell" style="position: relative;">
-                @if (log.status !== 'Processing' && log.status !== 'Failed' && log.status !== 'Completed' && log.status !== 'Skipped' && log.status !== 'MaxRetriesReached') {
-                  <input type="checkbox" class="absolute left-4 top-1/2 -mt-2 h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-600">
-                }
-                @if (log.status === 'Processing') {
-                  <svg class="animate-spin" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                      d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 0 1 1.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.559.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.894.149c-.424.07-.764.383-.929.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 0 1-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.398.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 0 1-.12-1.45l.527-.737c.25-.35.272-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 0 1 .12-1.45l.773-.773a1.125 1.125 0 0 1 1.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894Z" />
+                  @if (allowLogSelection)
+                  {
+                    <mat-checkbox [checked]="isLogSelected(log.id)" (change)="toggleSelection(log.id)" [disabled]="!allowLogSelection"></mat-checkbox>
+                  }
+                  @if (log.status === 'Processing') {
+                    <svg class="animate-spin" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 0 1 1.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.559.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.894.149c-.424.07-.764.383-.929.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 0 1-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.398.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 0 1-.12-1.45l.527-.737c.25-.35.272-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 0 1 .12-1.45l.773-.773a1.125 1.125 0 0 1 1.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894Z" />
                       <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                     </svg>
                   }
@@ -248,19 +320,47 @@
                     </svg>
                   }
                 </td>
-                <td class="data-col table-cell  selectable-value">{{log.patientId}}</td>
-                <td class="data-col table-cell">{{log.facilityId}}</td>
-                <td class="data-col table-cell">{{log.priority}}</td>
+                <td class="data-col table-cell selectable-value">{{log.id}}</td>
+                <td class="data-col table-cell selectable-value">
+                  {{log.patientId}}
+                  @if (log.patientId) {
+                    <fa-icon [icon]="faFilter"
+                             class="patient-filter-icon"
+                             (click)="filterByPatient(log.patientId)"
+                             matTooltip="Filter by this patient">
+                    </fa-icon>
+                  }
+                </td>
+                <td class="data-col table-cell selectable-value">
+                  {{log.facilityId}}
+                  <a [routerLink]="['/tenant/facility', log.facilityId]" matTooltip="View Facility" class="facility-link">
+                    <fa-icon [icon]="faArrowLeft" [rotate]="180"></fa-icon>
+                  </a>
+                </td>
                 <td class="data-col table-cell">
-                  <div class="main-value">{{log.resourceTypes.toString()}}</div>
+                  <div class="main-value">
+                    {{log.resourceTypes.toString()}}
+                    @if (log.resourceTypes.length > 0 && selectedResourceTypeFilter === 'Any') {
+                      <fa-icon [icon]="faFilter"
+                               class="resource-filter-icon"
+                               (click)="filterByResourceType(log.resourceTypes[0])"
+                               matTooltip="Filter by this resource type">
+                      </fa-icon>
+                    }
+                  </div>
                   @if (log?.queryType != 'BulkDataRequest') {
                     <div class="sub-value selectable-value">{{log.resourceId}}</div>
                   }
                 </td>
-                <td class="data-col table-cell">{{log.fhirVersion}}</td>
+                <td class="data-col table-cell">{{log.retryAttempts || 0}}</td>
                 <td class="data-col table-cell">{{log.queryPhase}}</td>
                 <td class="data-col table-cell">{{log.queryType}}</td>
-                <td class="data-col table-cell">{{log.executionDate | date:'shortDate'}}</td>
+                <td class="data-col table-cell" [matTooltip]="log.createDate | date:'MM/dd/yyyy HH:mm:ss'">
+                  {{log.createDate | date:'M/d/yy HH:mm'}}
+                </td>
+                <td class="data-col table-cell" [matTooltip]="log.executionDate | date:'MM/dd/yyyy HH:mm:ss'">
+                  {{log.executionDate | date:'M/d/yy HH:mm'}}
+                </td>
                 <td class="table-cell">
                   <span [ngClass]="{
                     'status-pending': log.status === 'Pending',
@@ -273,7 +373,7 @@
                     'status-skipped': log.status === 'Skipped'
                   }">{{log.status}}</span>
                 </td>
-                <td class="table-cell">
+                <td class="table-cell action-column">
                   <app-table-command
                     [acquisitionLogId]="log.id"
                     [priority]="log.priority"

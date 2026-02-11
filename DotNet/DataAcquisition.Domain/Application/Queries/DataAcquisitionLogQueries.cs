@@ -152,7 +152,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             .ThenInclude(q => q.ResourceReferenceTypes)
             .Include(l => l.ReferenceResources)
             .SingleOrDefaultAsync(l => l.Id == id, cancellationToken);
-
+        
         return entity == null ? null : DataAcquisitionLogModel.FromDomain(entity);
     }
 
@@ -263,6 +263,8 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 log.QueryType,
                 log.QueryPhase,
                 log.ExecutionDate,
+                log.CreateDate,
+                log.RetryAttempts,
                 log.Status
             })
             .ToListAsync(cancellationToken);
@@ -325,6 +327,8 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     QueryType = log.QueryType,
                     QueryPhase = log.QueryPhase,
                     ExecutionDate = log.ExecutionDate,
+                    CreateDate = log.CreateDate,
+                    RetryAttempts = log.RetryAttempts,
                     Status = log.Status
                 };
             }).ToList();
@@ -430,6 +434,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     : new(),
                 Status = l.Status,
                 ExecutionDate = l.ExecutionDate,
+                CreateDate = l.CreateDate,
                 TraceId = l.TraceId,
                 RetryAttempts = l.RetryAttempts,
                 CompletionDate = l.CompletionDate,
@@ -686,11 +691,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             query = query.Where(log => log.Priority == model.AcquisitionPriority.Value);
         }
 
-        if (model.RequestStatus.HasValue)
-        {
-            query = query.Where(log => log.Status == model.RequestStatus.Value);
-        }
-
         if (model.RequestStatuses != null && model.RequestStatuses.Any())
         {
             query = query.Where(log => log.Status != null && model.RequestStatuses.Contains(log.Status.Value));
@@ -714,25 +714,15 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
         return normalizedSortBy switch
         {
-            "executiondate" => descending
-                ? query.OrderByDescending(log => log.ExecutionDate)
-                : query.OrderBy(log => log.ExecutionDate),
-            "facilityid" => descending
-                ? query.OrderByDescending(log => log.FacilityId)
-                : query.OrderBy(log => log.FacilityId),
-            "patientid" => descending
-                ? query.OrderByDescending(log => log.PatientId)
-                : query.OrderBy(log => log.PatientId),
-            "querytype" => descending
-                ? query.OrderByDescending(log => log.QueryType)
-                : query.OrderBy(log => log.QueryType),
-            "queryphase" => descending
-                ? query.OrderByDescending(log => log.QueryPhase)
-                : query.OrderBy(log => log.QueryPhase),
+            "executiondate" => descending ? query.OrderByDescending(log => log.ExecutionDate) : query.OrderBy(log => log.ExecutionDate),
+            "createdate" => descending ? query.OrderByDescending(log => log.CreateDate) : query.OrderBy(log => log.CreateDate),
+            "facilityid" => descending ? query.OrderByDescending(log => log.FacilityId) : query.OrderBy(log => log.FacilityId),
+            "patientid" => descending ? query.OrderByDescending(log => log.PatientId) : query.OrderBy(log => log.PatientId),
+            "querytype" => descending ? query.OrderByDescending(log => log.QueryType) : query.OrderBy(log => log.QueryType),
+            "queryphase" => descending ? query.OrderByDescending(log => log.QueryPhase) : query.OrderBy(log => log.QueryPhase),
             "status" => descending ? query.OrderByDescending(log => log.Status) : query.OrderBy(log => log.Status),
-            "priority" => descending
-                ? query.OrderByDescending(log => log.Priority)
-                : query.OrderBy(log => log.Priority),
+            "priority" => descending ? query.OrderByDescending(log => log.Priority) : query.OrderBy(log => log.Priority),
+            "retryattempts" => descending ? query.OrderByDescending(log => log.RetryAttempts) : query.OrderBy(log => log.RetryAttempts),
             _ => descending ? query.OrderByDescending(log => log.Id) : query.OrderBy(log => log.Id)
         };
     }

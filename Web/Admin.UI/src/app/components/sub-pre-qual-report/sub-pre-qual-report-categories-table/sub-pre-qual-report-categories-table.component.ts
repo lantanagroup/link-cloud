@@ -1,12 +1,11 @@
-import { Category, Issue } from "src/app/interfaces/sub-pre-qual-report-models.interface";
-import { Component, Input, OnInit, QueryList, ViewChild, ViewChildren, OnChanges, SimpleChanges } from '@angular/core';
-import { IValidationIssue, IValidationIssueCategorySummary } from '../../tenant/facility-view/report-view.interface';
-import { MatSort, MatSortModule } from "@angular/material/sort";
-import { MatTable, MatTableDataSource, MatTableModule } from "@angular/material/table";
-import { Subscription } from 'rxjs';
-import { animate, state, style, transition, trigger } from "@angular/animations";
-import { ActivatedRoute, RouterModule } from '@angular/router';
-import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
+import {Category, Issue} from "src/app/interfaces/sub-pre-qual-report-models.interface";
+import {Component, Input, OnChanges, OnInit, QueryList, SimpleChanges, ViewChild, ViewChildren} from '@angular/core';
+import {IValidationIssue, IValidationIssueCategorySummary} from '../../tenant/facility-view/report-view.interface';
+import {MatSort, MatSortModule} from "@angular/material/sort";
+import {MatTable, MatTableDataSource, MatTableModule} from "@angular/material/table";
+import {Subscription} from 'rxjs';
+import {animate, state, style, transition, trigger} from "@angular/animations";
+import {ActivatedRoute, RouterModule} from '@angular/router';
 
 /**
  * Interface that extends Category to include a MatTableDataSource for issues
@@ -37,7 +36,6 @@ interface CategoryData {
   imports: [
     MatTableModule,
     MatSortModule,
-    VdIconComponent,
     RouterModule
   ],
   templateUrl: './sub-pre-qual-report-categories-table.component.html',
