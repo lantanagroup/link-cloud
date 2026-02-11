@@ -66,9 +66,6 @@ app.Run();
 
 static void ConfigureLogging(WebApplicationBuilder builder)
 {
-    // Bind the enhanced logging settings
-    var enhancedLoggingSettings = builder.Configuration.GetRequiredSection(nameof(EnhancedQueryLoggingSettings)).Get<EnhancedQueryLoggingSettings>();
-
     // Create Serilog logger configuration
     var loggerConfig = new LoggerConfiguration()
         .ReadFrom.Configuration(builder.Configuration)
@@ -78,15 +75,6 @@ static void ConfigureLogging(WebApplicationBuilder builder)
         .Enrich.FromLogContext()
         .Enrich.WithSpan()
         .Enrich.With<ActivityEnricher>();
-
-    // Conditionally override EF Core (MongoDB provider) log levels based on the flag
-    var efCoreLogLevel = enhancedLoggingSettings != null && enhancedLoggingSettings.EnableEnhancedQueryLogging
-        ? LogEventLevel.Information
-        : LogEventLevel.Warning;
-
-    loggerConfig
-        .MinimumLevel.Override("Microsoft.EntityFrameworkCore", efCoreLogLevel)
-        .MinimumLevel.Override("Microsoft.EntityFrameworkCore.Database.Command", efCoreLogLevel);
 
     Log.Logger = loggerConfig.CreateLogger();
 
