@@ -50,7 +50,8 @@ export class QueryConfigEditComponent implements OnInit {
   queryConfigTypes = ['Parameter', 'Reference'];
   operationTypes = [
     { value: ReferenceQueryOperationType.read, label: 'Read' },
-    { value: ReferenceQueryOperationType.search, label: 'Search' }
+    { value: ReferenceQueryOperationType.search, label: 'Search' },
+    { value: ReferenceQueryOperationType.searchPost, label: 'SearchPost' }
   ];
 
   parameterTypes = ['Variable', 'Literal', 'ResourceIds'];
@@ -63,6 +64,40 @@ export class QueryConfigEditComponent implements OnInit {
 
   constructor(private fb: FormBuilder) {}
 
+  private normalizeOperationType(value: unknown): ReferenceQueryOperationType {
+    if (value === null || value === undefined) {
+      return ReferenceQueryOperationType.search;
+    }
+
+    if (typeof value === 'number') {
+      return value as ReferenceQueryOperationType;
+    }
+
+    if (typeof value === 'string') {
+      const sanitized = value.trim();
+      if (!sanitized) {
+        return ReferenceQueryOperationType.search;
+      }
+
+      const numericValue = Number(sanitized);
+      if (!Number.isNaN(numericValue)) {
+        return numericValue as ReferenceQueryOperationType;
+      }
+
+      const key = sanitized.toLowerCase().replace(/[^a-z]/g, '');
+      const map: Record<string, ReferenceQueryOperationType> = {
+        read: ReferenceQueryOperationType.read,
+        search: ReferenceQueryOperationType.search,
+        searchpost: ReferenceQueryOperationType.searchPost
+      };
+      if (key in map) {
+        return map[key];
+      }
+    }
+
+    return ReferenceQueryOperationType.search;
+  }
+
   ngOnInit(): void {
     this.initForm();
   }
@@ -72,7 +107,7 @@ export class QueryConfigEditComponent implements OnInit {
       resourceType: [this.config?.resourceType || '', Validators.required],
       queryConfigType: [this.config?.queryConfigType || 'Parameter', Validators.required],
       // Reference specific
-      operationType: [this.config?.queryConfigType === 'Reference' ? (this.config as IReferenceQueryConfigModel).operationType : ReferenceQueryOperationType.search],
+      operationType: [this.config?.queryConfigType === 'Reference' ? this.normalizeOperationType((this.config as IReferenceQueryConfigModel).operationType as unknown) : ReferenceQueryOperationType.search],
       paged: [this.config?.queryConfigType === 'Reference' ? (this.config as IReferenceQueryConfigModel).paged : 100],
       // Parameter specific
       parameters: this.fb.array([])
