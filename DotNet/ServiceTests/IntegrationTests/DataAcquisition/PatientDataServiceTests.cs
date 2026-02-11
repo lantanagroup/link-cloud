@@ -365,7 +365,7 @@ public class PatientDataServiceTests
         await _service.ExecuteLogRequest(request, cancellationToken);
 
         // Assert
-        _mockLogManager.Verify(manager => manager.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), cancellationToken), Times.AtLeastOnce);
+        _mockLogQueries.Verify(manager => manager.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), cancellationToken), Times.AtLeastOnce);
     }
 
     [Fact]
@@ -474,7 +474,7 @@ public class PatientDataServiceTests
         await _service.ExecuteLogRequest(request, cancellationToken);
 
         // Assert
-        _mockLogManager.Verify(
+        _mockLogQueries.Verify(
             m => m.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), cancellationToken),
             Times.Exactly(2)); // Processing → Completed
 
@@ -594,7 +594,7 @@ public class PatientDataServiceTests
             Times.Once,
             "ExecuteSearch should be called when at least one valid ID exists in _id parameter.");
 
-        _mockLogManager.Verify(
+        _mockLogQueries.Verify(
             m => m.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), cancellationToken),
             Times.AtLeast(2)); // Processing + Completed (possibly more if other logic runs)
 
@@ -705,7 +705,7 @@ public class PatientDataServiceTests
         await _service.ExecuteLogRequest(request, cancellationToken);
 
         // Assert - All IDs from all queries must be present
-        _mockLogManager.Verify(m => m.UpdateAsync(
+        _mockLogQueries.Verify(m => m.UpdateAsync(
             It.Is<UpdateDataAcquisitionLogModel>(u =>
                 u.ResourceAcquiredIds != null &&
                 u.ResourceAcquiredIds.Count == 4 &&
@@ -753,6 +753,10 @@ public class PatientDataServiceTests
             .ReturnsAsync(new FhirQueryConfigurationModel { FacilityId = "facility-1" });
 
         // Simulate 429 with Retry-After: 30 seconds
+        _mockLogQueries
+            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
+            .ReturnsAsync(true);
+
         _mockFhirApiService
             .Setup(x => x.ExecuteRead(
                 It.IsAny<DataAcquisitionLogModel>(),
@@ -766,7 +770,7 @@ public class PatientDataServiceTests
         await _service.ExecuteLogRequest(request, cancellationToken);
 
         // Assert: Log updated with delay (ExecutionDate ~30s from now), Pending status, retry incremented
-        _mockLogManager.Verify(m => m.UpdateAsync(
+        _mockLogQueries.Verify(m => m.UpdateAsync(
             It.Is<UpdateDataAcquisitionLogModel>(u =>
                 u.Status == RequestStatus.Pending &&
                 u.RetryAttempts == 0 &&
@@ -812,6 +816,10 @@ public class PatientDataServiceTests
             .ReturnsAsync(new FhirQueryConfigurationModel { FacilityId = "facility-1" });
 
         // Simulate 429 with Retry-After as a future date (e.g., 2 minutes from now)
+        _mockLogQueries
+            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
+            .ReturnsAsync(true);
+
         var futureDate = DateTimeOffset.UtcNow.AddMinutes(2);
         var expectedDelay = TimeSpan.FromMinutes(2);
         _mockFhirApiService
@@ -827,7 +835,7 @@ public class PatientDataServiceTests
         await _service.ExecuteLogRequest(request, cancellationToken);
 
         // Assert: Log rescheduled ~2min from now
-        _mockLogManager.Verify(m => m.UpdateAsync(
+        _mockLogQueries.Verify(m => m.UpdateAsync(
             It.Is<UpdateDataAcquisitionLogModel>(u =>
                 u.Status == RequestStatus.Pending &&
                 u.RetryAttempts == 0 &&
@@ -873,6 +881,10 @@ public class PatientDataServiceTests
             .ReturnsAsync(new FhirQueryConfigurationModel { FacilityId = "facility-1" });
 
         // Simulate 429 with negative/invalid Retry-After (parser will default to 60s)
+        _mockLogQueries
+            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
+            .ReturnsAsync(true);
+
         _mockFhirApiService
             .Setup(x => x.ExecuteRead(
                 It.IsAny<DataAcquisitionLogModel>(),
@@ -886,7 +898,7 @@ public class PatientDataServiceTests
         await _service.ExecuteLogRequest(request, cancellationToken);
 
         // Assert: Log rescheduled ~60s from now, Pending, retry=1, note reflects default delay
-        _mockLogManager.Verify(m => m.UpdateAsync(
+        _mockLogQueries.Verify(m => m.UpdateAsync(
             It.Is<UpdateDataAcquisitionLogModel>(u =>
                 u.Status == RequestStatus.Pending &&
                 u.RetryAttempts == 0 &&
