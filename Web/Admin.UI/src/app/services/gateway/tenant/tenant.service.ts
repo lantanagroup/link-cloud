@@ -68,9 +68,19 @@ export class TenantService {
   }
 
   softDeleteFacilityConfiguration(facilityId: string): Observable<IEntityDeletedResponse> {
-    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/facility/soft/${facilityId}`)
+    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/facility/softDelete/${facilityId}`)
       .pipe(
         tap(_ => console.log(`Delete Facility configuration.`)),
+        catchError((error) => {
+          return this.errorHandler.handleError(error);
+        })
+      )
+  }
+
+  restoreFacilityConfiguration(facilityId: string): Observable<void> {
+    return this.http.patch<void>(`${this.appConfigService.config?.baseApiUrl}/facility/restore/${facilityId}`, {})
+      .pipe(
+        tap(_ => console.log(`Restore Facility configuration.`)),
         catchError((error) => {
           return this.errorHandler.handleError(error);
         })

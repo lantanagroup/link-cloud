@@ -1,7 +1,6 @@
-﻿using IntegrationTests.DataAcquisition;
+﻿using System.Net;
 using LantanaGroup.Link.DataAcquisition.Controllers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -16,7 +15,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
-using System.Net;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using Task = System.Threading.Tasks.Task;
 
@@ -341,5 +339,52 @@ public class LogControllerTests : IClassFixture<DataAcquisitionIntegrationTestFi
 
         // Assert
         Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task ProcessByFilter_NoFilter_ReturnsBadRequest()
+    {
+        // Arrange
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var controller = CreateController(scope);
+        var queryParams = new LogSearchParameters();
+
+        // Act
+        var result = await controller.ProcessByFilter(queryParams);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal("At least one filter criteria must be provided.", badRequestResult.Value);
+    }
+
+    [Fact]
+    public async Task ProcessByFilter_WithFilter_ReturnsAccepted()
+    {
+        // Arrange
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var log = new DataAcquisitionLog
+        {
+            FacilityId = "TestFacility",
+            Status = RequestStatus.Pending
+        };
+        dbContext.DataAcquisitionLogs.Add(log);
+        await dbContext.SaveChangesAsync();
+
+        var controller = CreateController(scope);
+        var queryParams = new LogSearchParameters
+        {
+            FacilityId = "TestFacility"
+        };
+
+        // Act
+        var result = await controller.ProcessByFilter(queryParams);
+
+        // Assert
+        Assert.IsType<AcceptedResult>(result);
     }
 }

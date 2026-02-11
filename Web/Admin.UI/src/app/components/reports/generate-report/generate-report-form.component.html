@@ -148,6 +148,11 @@
             </td>
           </tr>
         }
+        @if (patients.length > 0) {
+          <div class="patient-count" style="margin-top: 10px; font-weight: bold;">
+            Total Patients: {{ patients.length }}
+          </div>
+        }
       </div>
     </div>
     <!-- Button -->
