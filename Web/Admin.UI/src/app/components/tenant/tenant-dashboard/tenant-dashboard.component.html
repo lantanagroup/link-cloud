@@ -80,6 +80,11 @@
                     matTooltip="View Facility" [disabled]="row.isDeleted">
               <mat-icon>visibility</mat-icon>
             </button>
+
+            <button mat-icon-button color="accent" (click)="onRestoreFacility(row.facilityId)"
+                    matTooltip="Restore Facility" *ngIf="row.isDeleted">
+              <mat-icon>restore</mat-icon>
+            </button>
           </td>
         </ng-container>
 

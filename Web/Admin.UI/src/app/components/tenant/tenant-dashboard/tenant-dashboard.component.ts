@@ -229,4 +229,53 @@ export class TenantDashboardComponent implements OnInit {
       });
     });
   }
+
+  onRestoreFacility(facilityId: string): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        message: 'Are you sure you want to restore this facility and all related report schedules?',
+        confirmButtonText: 'Restore',
+        title: 'Restore Facility',
+        icon: 'restore',
+        iconColor: 'accent'
+      }
+    });
+
+    dialogRef.afterClosed().pipe(take(1)).subscribe(result => {
+      if (!result) return;
+
+      this.snackBar.open('Restoring facility, please wait...', 'Close');
+
+      // Helper to skip 404s
+      const safeRestore = (obs: any) =>
+        obs.pipe(
+          catchError(err => {
+            if (err.status === 404) {
+              console.warn('Resource not found, skipping');
+              return EMPTY;
+            }
+            else {
+              return throwError(() => err);
+            }
+          })
+        );
+
+      // Build sequential restore sequence
+      concat(
+        safeRestore(this.tenantService.restoreFacilityConfiguration(facilityId)),
+        safeRestore(this.reportService.restoreReports(facilityId)),
+      ).subscribe({
+        next: () => { },
+        complete: () => {
+          this.snackBar.open('Facility restored successfully', 'Close', { duration: 3000 });
+          this.getFacilities();
+        },
+        error: (err) => {
+          console.error('Restore failed', err);
+          this.snackBar.open('Failed to restore facility', 'Close', { duration: 3000 });
+        }
+      });
+    });
+  }
 }
