@@ -1,25 +1,23 @@
-import { Component, OnInit, ViewChild, OnDestroy } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { MatToolbarModule } from '@angular/material/toolbar';
-import { MatIconModule } from '@angular/material/icon';
-import { MatButtonModule } from '@angular/material/button';
-import { MatDialog } from '@angular/material/dialog';
-import { MatTableDataSource, MatTableModule } from '@angular/material/table';
-import { MatPaginatorModule, MatPaginator, PageEvent } from '@angular/material/paginator';
-import { MatSortModule, MatSort, Sort } from '@angular/material/sort';
-import { MatTooltipModule } from '@angular/material/tooltip';
-import { forkJoin, Subscription } from 'rxjs';
-import { TenantService } from '../../../services/gateway/tenant/tenant.service';
-import { LoadingService } from '../../../services/loading.service';
-import { FacilityViewService } from '../../tenant/facility-view/facility-view.service';
-import { PaginationMetadata } from '../../../models/pagination-metadata.model';
-import { IReportListSummary, IPagedReportListSummary } from '../../tenant/facility-view/report-view.interface';
-import { CommonModule } from '@angular/common';
-import { ResubmitDialogComponent } from "../../tenant/facility-view/resubmit-dialog.component";
-import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faRotate } from '@fortawesome/free-solid-svg-icons';
-import { IReportSchedule } from '../../../interfaces/report/report-schedule.interface';
-import { ReportService } from '../../../services/gateway/report/report.service';
+import {Component, OnDestroy, OnInit, ViewChild} from '@angular/core';
+import {ActivatedRoute, Router, RouterLink} from '@angular/router';
+import {MatToolbarModule} from '@angular/material/toolbar';
+import {MatIconModule} from '@angular/material/icon';
+import {MatButtonModule} from '@angular/material/button';
+import {MatDialog} from '@angular/material/dialog';
+import {MatTableDataSource, MatTableModule} from '@angular/material/table';
+import {MatPaginator, MatPaginatorModule, PageEvent} from '@angular/material/paginator';
+import {MatSort, MatSortModule, Sort} from '@angular/material/sort';
+import {MatTooltipModule} from '@angular/material/tooltip';
+import {Subscription} from 'rxjs';
+import {TenantService} from '../../../services/gateway/tenant/tenant.service';
+import {LoadingService} from '../../../services/loading.service';
+import {PaginationMetadata} from '../../../models/pagination-metadata.model';
+import {CommonModule} from '@angular/common';
+import {ResubmitDialogComponent} from "../../tenant/facility-view/resubmit-dialog.component";
+import {FontAwesomeModule} from '@fortawesome/angular-fontawesome';
+import {faRotate} from '@fortawesome/free-solid-svg-icons';
+import {IReportSchedule} from '../../../interfaces/report/report-schedule.interface';
+import {ReportService} from '../../../services/gateway/report/report.service';
 import {FormsModule} from "@angular/forms";
 import {MatCheckbox} from "@angular/material/checkbox";
 
@@ -48,6 +46,7 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
   @ViewChild(MatSort, { static: false }) sort!: MatSort;
 
   private subscription: Subscription | undefined;
+  private readonly PAGE_SIZE_KEY = 'reportsDashboardPageSize';
   defaultPageNumber: number = 0;
   defaultPageSize: number = 10;
   paginationMetadata: PaginationMetadata = new PaginationMetadata();
@@ -70,6 +69,11 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    const savedPageSize = localStorage.getItem(this.PAGE_SIZE_KEY);
+    if (savedPageSize) {
+      this.defaultPageSize = +savedPageSize;
+    }
+
     this.paginationMetadata.pageNumber = this.defaultPageNumber;
     this.paginationMetadata.pageSize = this.defaultPageSize;
     this.loadReportSchedules();
@@ -125,6 +129,7 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
   onPageChange(event: PageEvent): void {
     this.paginationMetadata.pageSize = event.pageSize;
     this.paginationMetadata.pageNumber = event.pageIndex;
+    localStorage.setItem(this.PAGE_SIZE_KEY, event.pageSize.toString());
     this.loadReportSchedules();
   }
 

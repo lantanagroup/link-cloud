@@ -108,7 +108,7 @@
         <th mat-header-cell *matHeaderCellDef> Details </th>
         <td mat-cell *matCellDef="let element">
           @if (element.queryConfigType === 'Reference') {
-            Page: {{element.paged}}, Op: {{element.operationType === 0 ? 'Read' : 'Search'}}
+            Page: {{element.paged}}, Op: {{getOperationTypeDisplay(element.operationType)}}
           } @else {
             Params: {{element.parameters?.length || 0}}
           }
@@ -166,7 +166,7 @@
         <th mat-header-cell *matHeaderCellDef> Details </th>
         <td mat-cell *matCellDef="let element">
           @if (element.queryConfigType === 'Reference') {
-            Page: {{element.paged}}, Op: {{element.operationType === 0 ? 'Read' : 'Search'}}
+            Page: {{element.paged}}, Op: {{getOperationTypeDisplay(element.operationType)}}
           } @else {
             Params: {{element.parameters?.length || 0}}
           }

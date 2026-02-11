@@ -153,13 +153,14 @@ export class QueryPlanConfigFormComponent {
     const entries = Object.entries(record as Record<string, QueryConfigModel>);
     return entries
       .sort((a, b) => parseInt(a[0]) - parseInt(b[0]))
-      .map(e => e[1]);
+      .map(e => this.normalizeQueryConfig(e[1]));
   }
 
   arrayToRecord(array: QueryConfigModel[]): Record<string, QueryConfigModel> {
     const record: Record<string, QueryConfigModel> = {};
     array.forEach((item, index) => {
-      record[index.toString()] = item;
+      const normalized = this.normalizeQueryConfig(item);
+      record[index.toString()] = normalized;
     });
     return record;
   }
@@ -318,6 +319,60 @@ export class QueryPlanConfigFormComponent {
     this.lookBackControl.updateValueAndValidity();
   }
 
+  private normalizeOperationType(value: unknown): number {
+    if (value === null || value === undefined) return 1; // default Search
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return 1;
+      const numeric = Number(trimmed);
+      if (!Number.isNaN(numeric)) return numeric;
+      const key = trimmed.toLowerCase().replace(/[^a-z]/g, '');
+      const map: Record<string, number> = { read: 0, search: 1, searchpost: 2 };
+      if (key in map) return map[key];
+    }
+    return 1;
+  }
+
+  private normalizeVariableType(value: unknown): number {
+    if (value === null || value === undefined) return 0; // patient
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return 0;
+      const numeric = Number(trimmed);
+      if (!Number.isNaN(numeric)) return numeric;
+      const key = trimmed.toLowerCase().replace(/[^a-z]/g, '');
+      const map: Record<string, number> = {
+        patient: 0,
+        lookbackstart: 1,
+        periodstart: 2,
+        periodend: 3
+      };
+      if (key in map) return map[key];
+    }
+    return 0;
+  }
+
+  private normalizeQueryConfig(cfg: QueryConfigModel): QueryConfigModel {
+    if (!cfg) return cfg;
+    const c: any = cfg as any;
+
+    if (c.queryConfigType === 'Reference') {
+      c.operationType = this.normalizeOperationType(c.operationType);
+    }
+
+    if (c.parameters && Array.isArray(c.parameters)) {
+      c.parameters = c.parameters.map((p: any) => {
+        if (p && p.parameterType === 'Variable') {
+          p.variable = this.normalizeVariableType(p.variable);
+        }
+        return p;
+      });
+    }
+
+    return c as QueryConfigModel;
+  }
 
   toggleViewOnly(viewOnly: boolean) {
     this.facilityIdControl.disable();
@@ -439,4 +494,22 @@ export class QueryPlanConfigFormComponent {
     }
   }
 
+  getOperationTypeDisplay(op: number|string) {
+    switch (op) {
+      case 0:
+      case '0':
+      case 'Read':
+        return 'Read';
+      case 1:
+      case '1':
+      case 'Search':
+        return 'Search';
+      case 2:
+      case '2':
+      case 'SearchPost':
+        return 'SearchPost';
+      default:
+        return 'Unknown';
+    }
+  }
 }

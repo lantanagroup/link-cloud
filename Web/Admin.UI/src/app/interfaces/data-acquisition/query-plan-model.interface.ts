@@ -59,5 +59,6 @@ export enum VariableParameterType {
 
 export enum ReferenceQueryOperationType {
     read = 0,
-    search = 1
+    search = 1,
+    searchPost = 2
 }
