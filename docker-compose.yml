@@ -310,7 +310,7 @@ services:
       - link-nw
       
   kafka-ui:
-    image: provectuslabs/kafka-ui:latest
+    image: ghcr.io/kafbat/kafka-ui:latest
     container_name: kafka-ui
     ports:
       - 9095:8080
