@@ -49,6 +49,7 @@ using Reddoxx.Quartz.MongoDbJobStore.Locking;
 using Reddoxx.Quartz.MongoDbJobStore.Redlock;
 using Serilog;
 using Serilog.Enrichers.Span;
+using Serilog.Events;
 using Serilog.Exceptions;
 using StackExchange.Redis.Extensions.Core.Configuration;
 using StackExchange.Redis.Extensions.System.Text.Json;
@@ -56,11 +57,30 @@ using StackExchange.Redis.Extensions.System.Text.Json;
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
 
+ConfigureLogging(builder);
 RegisterServices(builder);
 var app = builder.Build();
 SetupMiddleware(app);
 
 app.Run();
+
+static void ConfigureLogging(WebApplicationBuilder builder)
+{
+    // Create Serilog logger configuration
+    var loggerConfig = new LoggerConfiguration()
+        .ReadFrom.Configuration(builder.Configuration)
+        .Filter.ByExcluding("RequestPath like '/health%'")
+        .Filter.ByExcluding("RequestPath like '/swagger%'")
+        .Enrich.WithExceptionDetails()
+        .Enrich.FromLogContext()
+        .Enrich.WithSpan()
+        .Enrich.With<ActivityEnricher>();
+
+    Log.Logger = loggerConfig.CreateLogger();
+
+    // Add Serilog to the logging pipeline
+    builder.Logging.AddSerilog();
+}
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
@@ -75,7 +95,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         cm.SetIgnoreExtraElements(true);
         cm.GetMemberMap(c => c.Id).SetSerializer(new GuidSerializer(GuidRepresentation.Standard));
     });
-    
+
     var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
     var serviceInformation = builder.SetupServiceInformation(ReportConstants.ServiceName, assemblyVersion);
 
@@ -131,10 +151,22 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add the MongoDbContext to the DI container, using the shared client
     builder.Services.AddDbContext<MongoDbContext>((sp, options) =>
     {
+        var querySettings = builder.Configuration.GetRequiredSection(nameof(EnhancedQueryLoggingSettings)).Get<EnhancedQueryLoggingSettings>();
+
         var client = sp.GetRequiredService<IMongoClient>();
         var mongoSettings = sp.GetRequiredService<IOptions<MongoConnection>>().Value;
 
-        options.UseMongoDB(client, mongoSettings.DatabaseName);      
+        if (querySettings != null && querySettings.EnableEnhancedQueryLogging)
+        {
+            var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+            options.UseMongoDB(client, mongoSettings.DatabaseName)
+            .UseLoggerFactory(loggerFactory)
+            .EnableSensitiveDataLogging();
+        }
+        else
+        {
+            options.UseMongoDB(client, mongoSettings.DatabaseName);
+        }
     });
 
     builder.Services.AddHostedService<MongoIndexCreationService>();
@@ -300,14 +332,14 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Exception Handling
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, GenerateReportValue>, DeadLetterExceptionHandler<string, GenerateReportValue>>();
     builder.Services.AddTransient<ITransientExceptionHandler<string, GenerateReportValue>, TransientExceptionHandler<string, GenerateReportValue>>();
-    
+
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, ReportScheduledValue>, DeadLetterExceptionHandler<string, ReportScheduledValue>>();
     builder.Services.AddTransient<ITransientExceptionHandler<string, ReportScheduledValue>, TransientExceptionHandler<string, ReportScheduledValue>>();
-    
+
     builder.Services.AddTransient<IDeadLetterExceptionHandler<Null, MeasureReportGeneratedValue>, DeadLetterExceptionHandler<Null, MeasureReportGeneratedValue>>();
 
     builder.Services.AddTransient<ITransientExceptionHandler<Null, MeasureReportGeneratedValue>, TransientExceptionHandler<Null, MeasureReportGeneratedValue>>();
-    
+
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
 
     //PatientListsAcquired Listener
@@ -321,7 +353,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     //ValidationComplete Listener
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, ValidationCompleteValue>, DeadLetterExceptionHandler<string, ValidationCompleteValue>>();
     builder.Services.AddTransient<ITransientExceptionHandler<string, ValidationCompleteValue>, TransientExceptionHandler<string, ValidationCompleteValue>>();
-    
+
     builder.Services.AddTransient<IDeadLetterExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue>, DeadLetterExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue>>();
     builder.Services.AddTransient<ITransientExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue>, TransientExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue>>();
 
@@ -336,20 +368,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.Environment = builder.Environment;
         options.ServiceName = ReportConstants.ServiceName;
-        options.ServiceVersion = serviceInformation.Version;                
+        options.ServiceVersion = serviceInformation.Version;
     });
-
-    // Logging using Serilog
-    builder.Logging.AddSerilog();
-    Log.Logger = new LoggerConfiguration()
-        .ReadFrom.Configuration(builder.Configuration)
-        .Filter.ByExcluding("RequestPath like '/health%'")
-        .Filter.ByExcluding("RequestPath like '/swagger%'")
-        .Enrich.WithExceptionDetails()
-        .Enrich.FromLogContext()
-        .Enrich.WithSpan()
-        .Enrich.With<ActivityEnricher>()
-        .CreateLogger();
 
     builder.Services.AddSingleton<IReportServiceMetrics, ReportServiceMetrics>();
 }
