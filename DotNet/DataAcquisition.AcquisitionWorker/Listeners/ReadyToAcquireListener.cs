@@ -96,7 +96,7 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
             _logger.LogError(ex, "Failed to enqueue work item for LogId {LogId}. Attempting to revert status.", logId);
             // Minimally invasive: set back to Pending so the next trigger can try again
             log.Status = RequestStatus.Pending;
-            log.Notes.Add($"[{DateTime.UtcNow:O}] Enqueue failed, reverting to Pending.");
+            log.Notes.Add($"[{DateTime.UtcNow:O}] Enqueue failed, reverting to Pending.\n\t{ex.InnerException}");
             await logQueries.UpdateAsync(new UpdateDataAcquisitionLogModel { Id = log.Id, Status = log.Status, Notes = log.Notes });
             throw new DeadLetterException("Failed to enqueue work item", ex); // Re-throw to let Kafka handle the retry/DLQ logic
         }
