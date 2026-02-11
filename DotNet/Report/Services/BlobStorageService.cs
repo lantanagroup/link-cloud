@@ -35,7 +35,7 @@ namespace LantanaGroup.Link.Report.Services
                 reportSchedule.ReportStartDate);
         }
 
-        private string GetBlobName(params string[] segments)
+        public string GetBlobName(params string[] segments)
         {
             IEnumerable<string> enumerable = segments;
             if (!string.IsNullOrEmpty(_settings.BlobRoot))

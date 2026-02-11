@@ -1,5 +1,3 @@
-using System.Linq.Expressions;
-using System.Reflection;
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
@@ -17,7 +15,6 @@ using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Expression = System.Linq.Expressions.Expression;
 using IDatabase = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
@@ -62,6 +59,8 @@ public interface IDataAcquisitionLogQueries
     Task<PagedConfigModel<DataAcquisitionLogModel>> SearchAsync(SearchDataAcquisitionLogRequest model, CancellationToken cancellationToken = default);
 
     Task<DataAcquisitionLogStatistics> GetDataAcquisitionLogStatisticsByReportAsync(string reportId, CancellationToken cancellationToken = default);
+
+    Task<DataAcquisitionLogStatusStatistics> GetDataAcquisitionLogStatusStatisticsByReportAsync(string reportId, string? patientId = null, CancellationToken cancellationToken = default);
 
     Task<bool> CheckIfReferenceResourceHasBeenSent(string referenceId, string reportTrackingId, string facilityId, string correlationId, CancellationToken cancellationToken = default);
 
@@ -271,83 +270,102 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var result = await SearchAsync(request, cancellationToken);
+        var query = BuildSearchQuery(request);
+        query = ApplySort(query, request.SortBy, request.SortOrder);
+
+        var total = await query.CountAsync(cancellationToken);
+        var pageLogs = await query
+            .Skip((request.PageNumber - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .Select(log => new
+            {
+                log.Id,
+                log.Priority,
+                log.FacilityId,
+                log.PatientId,
+                log.FhirVersion,
+                log.QueryType,
+                log.QueryPhase,
+                log.ExecutionDate,
+                log.Status
+            })
+            .ToListAsync(cancellationToken);
+
+        List<QueryLogSummaryModel> records;
+
+        if (pageLogs.Count == 0)
+        {
+            records = new List<QueryLogSummaryModel>();
+        }
+        else
+        {
+            var logIds = pageLogs.Select(log => log.Id).ToList();
+            var queryInfo = await _dbContext.FhirQueries
+                .AsNoTracking()
+                .Where(q => logIds.Contains(q.DataAcquisitionLogId))
+                .Select(q => new
+                {
+                    q.Id,
+                    q.DataAcquisitionLogId,
+                    q.QueryParameters,
+                    ResourceTypes = q.FhirQueryResourceTypes.Select(rt => rt.ResourceType).ToList()
+                })
+                .ToListAsync(cancellationToken);
+
+            var firstQueryByLogId = queryInfo
+                .OrderBy(q => q.Id)
+                .GroupBy(q => q.DataAcquisitionLogId)
+                .ToDictionary(g => g.Key, g => g.First());
+
+            records = pageLogs.Select(log =>
+            {
+                firstQueryByLogId.TryGetValue(log.Id, out var fhirQuery);
+                var resourceTypes = fhirQuery?.ResourceTypes?.Select(rt => rt.ToString()).ToList() ?? new List<string>();
+                string? resourceId;
+
+                if (resourceTypes.Count > 0 && resourceTypes[0] == ResourceType.Patient.ToString())
+                {
+                    resourceId = log.PatientId;
+                }
+                else if (log.QueryType == FhirQueryType.Read)
+                {
+                    resourceId = fhirQuery?.QueryParameters?.FirstOrDefault();
+                }
+                else
+                {
+                    resourceId = string.Empty;
+                }
+
+                return new QueryLogSummaryModel
+                {
+                    Id = log.Id,
+                    Priority = log.Priority,
+                    FacilityId = log.FacilityId,
+                    PatientId = log.PatientId,
+                    ResourceTypes = resourceTypes,
+                    ResourceId = resourceId,
+                    FhirVersion = log.FhirVersion ?? string.Empty,
+                    QueryType = log.QueryType,
+                    QueryPhase = log.QueryPhase,
+                    ExecutionDate = log.ExecutionDate,
+                    Status = log.Status
+                };
+            }).ToList();
+        }
+
         return new QueryLogSummaryModelResponse
         {
-            Records = result.Records.Select(QueryLogSummaryModel.FromDomain).ToList(),
-            Metadata = new PaginationMetadata(request.PageSize, request.PageNumber, result.Metadata.TotalCount)
+            Records = records,
+            Metadata = new PaginationMetadata(request.PageSize, request.PageNumber, total)
         };
     }
 
     public async Task<PagedConfigModel<DataAcquisitionLogModel>> SearchAsync(SearchDataAcquisitionLogRequest model, CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.DataAcquisitionLogs.AsNoTracking()
-            .AsQueryable();
+        var query = BuildSearchQuery(model);
+        query = ApplySort(query, model.SortBy, model.SortOrder);
 
-        if (!string.IsNullOrEmpty(model.FacilityId))
-        {
-            query = query.Where(log => log.FacilityId == model.FacilityId);
-        }
-
-        if (!string.IsNullOrEmpty(model.CorrelationId))
-        {
-            query = query.Where(log => log.CorrelationId == model.CorrelationId);
-        }
-
-        if (!string.IsNullOrEmpty(model.PatientId))
-        {
-            query = query.Where(log => log.PatientId == model.PatientId);
-        }
-
-        if (!string.IsNullOrEmpty(model.ReportTrackingId))
-        {
-            query = query.Where(log => log.ReportTrackingId == model.ReportTrackingId);
-        }
-
-        if (model.QueryPhase.HasValue)
-        {
-            query = query.Where(log => log.QueryPhase == model.QueryPhase.Value);
-        }
-
-        if (model.QueryType.HasValue)
-        {
-            query = query.Where(log => log.QueryType == model.QueryType.Value);
-        }
-
-        if (model.AcquisitionPriority.HasValue)
-        {
-            query = query.Where(log => log.Priority == model.AcquisitionPriority.Value);
-        }
-
-        if (model.RequestStatus.HasValue)
-        {
-            query = query.Where(log => log.Status == model.RequestStatus.Value);
-        }
-
-        if (model.RequestStatuses != null && model.RequestStatuses.Any())
-        {
-            query = (from l in query
-                     where l.Status != null && model.RequestStatuses.Contains(l.Status.Value)
-                     select l);
-        }
-
-        if (!string.IsNullOrEmpty(model.ResourceType))
-        {
-            var resourceType = (ResourceType)Enum.Parse(typeof(ResourceType), model.ResourceType);    
-            query = (from l in query
-                     join q in _dbContext.FhirQueries on l.Id equals q.DataAcquisitionLogId
-                     where q.FhirQueryResourceTypes.Any(r => r.ResourceType == resourceType)
-                     select l);
-        }
-
-        query = model.SortOrder switch
-        {
-            SortOrder.Ascending => query.OrderBy(SetSortBy<DataAcquisitionLog>(model.SortBy)),
-            SortOrder.Descending => query.OrderByDescending(SetSortBy<DataAcquisitionLog>(model.SortBy)),
-            _ => query
-        };
-
-        var total = await query.CountAsync();
+        var total = await query.CountAsync(cancellationToken);
 
         var logs = await query
             .Skip((model.PageNumber - 1) * model.PageSize)
@@ -537,6 +555,41 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         return statistics;
     }
 
+    public async Task<DataAcquisitionLogStatusStatistics> GetDataAcquisitionLogStatusStatisticsByReportAsync(string reportId, string? patientId = null, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(reportId))
+        {
+            throw new ArgumentNullException(nameof(reportId), "Report ID cannot be null or empty.");
+        }
+
+        var query = _dbContext.DataAcquisitionLogs
+            .AsNoTracking()
+            .Where(log => log.ReportTrackingId == reportId);
+
+        if (!string.IsNullOrWhiteSpace(patientId))
+        {
+            query = query.Where(log => log.PatientId == patientId);
+        }
+
+        var statuses = await query
+            .Where(log => log.Status != null)
+            .GroupBy(log => log.Status!.Value)
+            .OrderBy(g => g.Key)
+            .Select(g => new DataAcquisitionLogStatusCount
+            {
+                Name = g.Key.ToString(),
+                Count = g.Count()
+            })
+            .ToListAsync(cancellationToken);
+
+        return new DataAcquisitionLogStatusStatistics
+        {
+            ReportId = reportId,
+            PatientId = string.IsNullOrWhiteSpace(patientId) ? null : patientId,
+            Statuses = statuses
+        };
+    }
+
     public async Task<bool> CheckIfReferenceResourceHasBeenSent(string referenceId, string reportTrackingId, string facilityId, string correlationId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(referenceId))
@@ -564,6 +617,83 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             .Select(l => l.FacilityId)
             .Distinct()
             .ToListAsync(cancellationToken);
+    }
+
+    private IQueryable<DataAcquisitionLog> BuildSearchQuery(SearchDataAcquisitionLogRequest model)
+    {
+        var query = _dbContext.DataAcquisitionLogs.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrEmpty(model.FacilityId))
+        {
+            query = query.Where(log => log.FacilityId == model.FacilityId);
+        }
+
+        if (!string.IsNullOrEmpty(model.CorrelationId))
+        {
+            query = query.Where(log => log.CorrelationId == model.CorrelationId);
+        }
+
+        if (!string.IsNullOrEmpty(model.PatientId))
+        {
+            query = query.Where(log => log.PatientId == model.PatientId);
+        }
+
+        if (!string.IsNullOrEmpty(model.ReportTrackingId))
+        {
+            query = query.Where(log => log.ReportTrackingId == model.ReportTrackingId);
+        }
+
+        if (model.QueryPhase.HasValue)
+        {
+            query = query.Where(log => log.QueryPhase == model.QueryPhase.Value);
+        }
+
+        if (model.QueryType.HasValue)
+        {
+            query = query.Where(log => log.QueryType == model.QueryType.Value);
+        }
+
+        if (model.AcquisitionPriority.HasValue)
+        {
+            query = query.Where(log => log.Priority == model.AcquisitionPriority.Value);
+        }
+
+        if (model.RequestStatus.HasValue)
+        {
+            query = query.Where(log => log.Status == model.RequestStatus.Value);
+        }
+
+        if (model.RequestStatuses != null && model.RequestStatuses.Any())
+        {
+            query = query.Where(log => log.Status != null && model.RequestStatuses.Contains(log.Status.Value));
+        }
+
+        if (!string.IsNullOrEmpty(model.ResourceType))
+        {
+            var resourceType = Enum.Parse<ResourceType>(model.ResourceType, ignoreCase: true);
+            query = query.Where(log =>
+                log.FhirQueries.Any(q => q.FhirQueryResourceTypes.Any(r => r.ResourceType == resourceType)));
+        }
+
+        return query;
+    }
+
+    private static IQueryable<DataAcquisitionLog> ApplySort(IQueryable<DataAcquisitionLog> query, string? sortBy, SortOrder sortOrder)
+    {
+        var normalizedSortBy = sortBy?.Trim().ToLowerInvariant();
+        var descending = sortOrder == SortOrder.Descending;
+
+        return normalizedSortBy switch
+        {
+            "executiondate" => descending ? query.OrderByDescending(log => log.ExecutionDate) : query.OrderBy(log => log.ExecutionDate),
+            "facilityid" => descending ? query.OrderByDescending(log => log.FacilityId) : query.OrderBy(log => log.FacilityId),
+            "patientid" => descending ? query.OrderByDescending(log => log.PatientId) : query.OrderBy(log => log.PatientId),
+            "querytype" => descending ? query.OrderByDescending(log => log.QueryType) : query.OrderBy(log => log.QueryType),
+            "queryphase" => descending ? query.OrderByDescending(log => log.QueryPhase) : query.OrderBy(log => log.QueryPhase),
+            "status" => descending ? query.OrderByDescending(log => log.Status) : query.OrderBy(log => log.Status),
+            "priority" => descending ? query.OrderByDescending(log => log.Priority) : query.OrderBy(log => log.Priority),
+            _ => descending ? query.OrderByDescending(log => log.Id) : query.OrderBy(log => log.Id)
+        };
     }
 
     public async Task<List<DataAcquisitionLogModel>> GetNextEligibleBatchForFacility(string facilityId, long? lastId, int batchSize, List<RequestStatus> statuses, DateTime? designagtedExecutionTime = null, CancellationToken cancellationToken = default)
@@ -603,27 +733,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         return await query
             .Take(batchSize)
             .ToListAsync(cancellationToken);
-    }
-
-    private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
-    {
-        var type = typeof(T);
-        var inputSortBy = sortBy?.Trim();
-        string sortKey = "Id"; // default
-
-        if (!string.IsNullOrEmpty(inputSortBy))
-        {
-            var prop = type.GetProperty(inputSortBy, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
-            if (prop != null)
-            {
-                sortKey = prop.Name;
-            }
-        }
-
-        var parameter = Expression.Parameter(type, "p");
-        var property = Expression.Property(parameter, sortKey);
-        var converted = Expression.Convert(property, typeof(object));
-        return Expression.Lambda<Func<T, object>>(converted, parameter);
     }
 
     public Task<List<DataAcquisitionLogModel>> GetNextBatchForFacility(string facilityId, long? lastId, int batchSize, CancellationToken cancellationToken = default)
