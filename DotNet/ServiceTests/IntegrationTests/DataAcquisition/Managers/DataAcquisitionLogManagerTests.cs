@@ -303,6 +303,7 @@ public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionInteg
         });
 
         // Assert
+        Assert.True(result.Records.Any());
         foreach (var rec in result.Records)
         {
             if (rec.Status != RequestStatus.Pending && rec.Status != RequestStatus.Failed)

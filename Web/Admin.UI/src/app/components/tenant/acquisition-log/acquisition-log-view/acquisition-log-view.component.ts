@@ -260,6 +260,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   pagedEvent(event: PageEvent) {
     this.targetPageNumber = event.pageIndex + 1;
     this.loadLogs(event.pageIndex, event.pageSize, true);
+    this.clearSelection();
   }
 
   filterByPatient(patientId: string) {
@@ -302,6 +303,7 @@ export class AcquisitionLogViewComponent implements OnInit {
     this.loadLogs(this.defaultPageNumber, this.getCurrentPageSize(), true);
     this.loadStatusCounts();
     this.onFilterApplication();
+    this.clearSelection();
   }
 
   clearFilter(filterName: string): void {
@@ -425,6 +427,28 @@ export class AcquisitionLogViewComponent implements OnInit {
   }
 
   bulkExecute() {
+    if (!this.isAllSelected && this.selectedLogIds.size === 0) {
+      return;
+    }
+
+    if (!this.isAllSelected) {
+      const currentIds = new Set(this.acquisitionLogs.map(log => log.id));
+      const invalidIds: string[] = [];
+      this.selectedLogIds.forEach(id => {
+        if (!currentIds.has(id)) {
+          invalidIds.push(id);
+        }
+      });
+
+      invalidIds.forEach(id => this.selectedLogIds.delete(id));
+
+      if (this.selectedLogIds.size === 0) {
+        return;
+      }
+    } else {
+      this.selectedLogIds.clear();
+    }
+
     this.loadingService.show();
     let obs$;
     if (this.isAllSelected) {
@@ -473,6 +497,7 @@ export class AcquisitionLogViewComponent implements OnInit {
     }
 
     this.loadLogs(this.defaultPageNumber, this.getCurrentPageSize(), true);
+    this.clearSelection();
   }
 
   getSortIcon(column: string) {

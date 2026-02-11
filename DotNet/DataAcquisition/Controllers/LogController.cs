@@ -553,15 +553,33 @@ public class LogController : Controller
             return BadRequest("Query parameters are required.");
         }
 
+        if (string.IsNullOrWhiteSpace(queryParameters.FacilityId) &&
+            string.IsNullOrWhiteSpace(queryParameters.PatientId) &&
+            string.IsNullOrWhiteSpace(queryParameters.ReportId) &&
+            string.IsNullOrWhiteSpace(queryParameters.ResourceId) &&
+            !queryParameters.QueryPhase.HasValue &&
+            !queryParameters.QueryType.HasValue &&
+            (queryParameters.Statuses == null || !queryParameters.Statuses.Any()) &&
+            !queryParameters.Priority.HasValue &&
+            string.IsNullOrWhiteSpace(queryParameters.ResourceType))
+        {
+            return BadRequest("At least one filter criteria must be provided.");
+        }
+
         try
         {
+            var facilityId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.FacilityId);
+            var patientId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.PatientId);
+            var reportId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ReportId);
+            var resourceId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ResourceId);
+
             var result = await _logQueries.SearchAsync(
                 new SearchDataAcquisitionLogRequest
                 {
-                    FacilityId = queryParameters.FacilityId,
-                    PatientId = queryParameters.PatientId,
-                    ReportTrackingId = queryParameters.ReportId,
-                    ResourceId = queryParameters.ResourceId,
+                    FacilityId = facilityId,
+                    PatientId = patientId,
+                    ReportTrackingId = reportId,
+                    ResourceId = resourceId,
                     QueryPhase = queryParameters.QueryPhase,
                     QueryType = queryParameters.QueryType,
                     RequestStatuses = queryParameters.Statuses,
