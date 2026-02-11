@@ -2,6 +2,7 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using ResourceType = Hl7.Fhir.Model.ResourceType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 
@@ -17,6 +18,8 @@ public record QueryLogSummaryModel
     public FhirQueryType? QueryType { get; init; }
     public QueryPhase? QueryPhase { get; init; }
     public DateTime? ExecutionDate { get; init; }
+    public DateTime CreateDate { get; init; }
+    public int? RetryAttempts { get; init; }
     public RequestStatus? Status { get; init; }
 
     public static QueryLogSummaryModel FromDomain(DataAcquisitionLogModel log)
@@ -35,7 +38,7 @@ public record QueryLogSummaryModel
             FacilityId = log.FacilityId,
             PatientId = log.PatientId,
             ResourceTypes = firstFhirQuery?.ResourceTypes.Select(rt => rt.ToString()).ToList() ?? new List<string>(),
-            ResourceId = firstFhirQuery?.ResourceTypes.FirstOrDefault() == Hl7.Fhir.Model.ResourceType.Patient
+            ResourceId = firstFhirQuery?.ResourceTypes.FirstOrDefault() == ResourceType.Patient
                 ? log.PatientId
                 : log.QueryType == FhirQueryType.Read
                     ? firstFhirQuery?.QueryParameters.FirstOrDefault()
@@ -44,6 +47,8 @@ public record QueryLogSummaryModel
             QueryType = log.QueryType,
             QueryPhase = log.QueryPhase,
             ExecutionDate = log.ExecutionDate,
+            CreateDate = log.CreateDate,
+            RetryAttempts = log.RetryAttempts,
             Status = log.Status
         };
     }

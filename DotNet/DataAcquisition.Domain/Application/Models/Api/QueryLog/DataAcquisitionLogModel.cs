@@ -1,10 +1,10 @@
-﻿using DataAcquisition.Domain.Application.Models;
+﻿using System.ComponentModel.DataAnnotations;
+using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
-using System.ComponentModel.DataAnnotations;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Models;
@@ -26,6 +26,7 @@ public class DataAcquisitionLogModel
     public List<FhirQueryModel> FhirQuery { get; set; } = new List<FhirQueryModel>();
     public RequestStatus? Status { get; set; }
     public DateTime? ExecutionDate { get; set; }
+    public DateTime CreateDate { get; set; }
     [MaxLength(64)]
     public string? TraceId { get; set; }
     public int? RetryAttempts { get; set; } = 0;
@@ -82,6 +83,7 @@ public class DataAcquisitionLogModel
             }).ToList() : new(),
             Status = log.Status,
             ExecutionDate = log.ExecutionDate,
+            CreateDate = log.CreateDate,
             TraceId = log.TraceId,
             RetryAttempts = log.RetryAttempts,
             CompletionDate = log.CompletionDate,
