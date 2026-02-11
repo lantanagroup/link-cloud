@@ -28,7 +28,13 @@ export class LinkNavBarComponent {
   subnavItems: SubnavItem[] = [
     { label: 'Home', path: '/dashboard' },
     { label: 'Tenants', path: '/tenant' },
-    { label: 'Reports', path: '/reports' },
+    {
+      label: 'Reports',
+      path: '/reports',
+      children: [
+        { label: 'Generate Ad-Hoc Report', path: '/reports/generate-report' }
+      ]
+    },
     {
       label: 'Configuration',
       children: [
@@ -70,5 +76,14 @@ export class LinkNavBarComponent {
         matrixParams: 'ignored'
       })
     );
+  }
+
+  isRouteActive(path: string): boolean {
+    return this.router.isActive(path, {
+      paths: 'exact',
+      queryParams: 'ignored',
+      fragment: 'ignored',
+      matrixParams: 'ignored'
+    });
   }
 }

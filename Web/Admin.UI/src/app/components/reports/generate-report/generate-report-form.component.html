@@ -63,15 +63,30 @@
     </mat-form-field>
 
     <mat-checkbox formControlName="bypassSubmission">Bypass submission?</mat-checkbox>
+    <br>
+
+    <div class="row">
+      <div class="cadence-group">
+        <label>Reporting Cadence</label>
+        <mat-radio-group formControlName="reportingCadence">
+          <mat-radio-button value="Daily">Daily</mat-radio-button>
+          <mat-radio-button value="Monthly">Monthly</mat-radio-button>
+          <mat-radio-button value="Custom">Custom</mat-radio-button>
+        </mat-radio-group>
+      </div>
+    </div>
 
 
     <!-- Row 2: Dates -->
     <div class="row">
       <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Start Date</mat-label>
+        <mat-label>{{ reportingCadenceControl.value === 'Monthly' ? 'Month and Year' : 'Start Date' }}</mat-label>
         <input matInput [matDatepicker]="startPicker" formControlName="startDate" required/>
         <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
-        <mat-datepicker #startPicker></mat-datepicker>
+        <mat-datepicker #startPicker
+                        [startView]="reportingCadenceControl.value === 'Monthly' ? 'multi-year' : 'month'"
+                        (monthSelected)="chosenMonthHandler($event, startPicker)">
+        </mat-datepicker>
         @if (startDateControl.touched && startDateControl.hasError('required')) {
           <mat-error>
             Start date is required
@@ -81,9 +96,9 @@
 
       <mat-form-field appearance="outline" class="full-width">
         <mat-label>End Date</mat-label>
-        <input matInput [matDatepicker]="endPicker" formControlName="endDate" required/>
-        <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
-        <mat-datepicker #endPicker></mat-datepicker>
+        <input matInput [matDatepicker]="endPicker" formControlName="endDate" required [readonly]="reportingCadenceControl.value !== 'Custom'"/>
+        <mat-datepicker-toggle matSuffix [for]="endPicker" [disabled]="reportingCadenceControl.value !== 'Custom'"></mat-datepicker-toggle>
+        <mat-datepicker #endPicker [startAt]="startDateControl.value"></mat-datepicker>
         @if (endDateControl.touched && endDateControl.hasError('required')) {
           <mat-error>
             End date is required
