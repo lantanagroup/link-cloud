@@ -29,7 +29,7 @@ export class AcquisitionLogService {
     resourceId: string | null,
     queryType: string | null,
     queryPhase: string | null,
-    status: string | null,
+    status: string[] | string | null,
     priority: string | null,
     sortBy: string | null,
     sortOrder: 'ascending' | 'descending' | null,
@@ -63,9 +63,9 @@ export class AcquisitionLogService {
     if(reportId) {
         params = params.set('reportId', reportId);
     }
-    // if(resourceType) {
-    //     params = params.set('resourceType', resourceType);
-    // }
+    if(resourceType) {
+        params = params.set('resourceType', resourceType);
+    }
     if(resourceId) {
          params = params.set('resourceId', resourceId);
     }
@@ -76,7 +76,13 @@ export class AcquisitionLogService {
         params = params.set('queryPhase', queryPhase);
     }
     if(status) {
-        params = params.set('status', status);
+        if (Array.isArray(status)) {
+            status.forEach(s => {
+                params = params.append('statuses', s);
+            });
+        } else {
+            params = params.append('statuses', status);
+        }
     }
     if(priority) {
         params = params.set('priority', priority);
@@ -142,6 +148,57 @@ export class AcquisitionLogService {
     )
   }
 
+  bulkExecuteAcquisitionLogs(ids: string[]) : Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/process-bulk`, ids)
+    .pipe(
+      map((response: any) => {
+        return response;
+      }),
+      catchError((error: HttpErrorResponse) => {
+          var err = this.errorHandler.handleError(error);
+          return err;
+      })
+    )
+  }
+
+  bulkExecuteAcquisitionLogsByFilter(
+    patientId: string | null,
+    facilityId: string | null,
+    reportId: string | null,
+    resourceType: string | null,
+    resourceId: string | null,
+    queryType: string | null,
+    queryPhase: string | null,
+    status: string[] | string | null,
+    priority: string | null) : Observable<any> {
+
+    let body: any = {
+      patientId,
+      facilityId,
+      reportId,
+      resourceType,
+      resourceId,
+      queryType,
+      queryPhase,
+      priority
+    };
+
+    if (status) {
+      body.statuses = Array.isArray(status) ? status : [status];
+    }
+
+    return this.http.post<any>(`${this.baseUrl}/process-by-filter`, body)
+    .pipe(
+      map((response: any) => {
+        return response;
+      }),
+      catchError((error: HttpErrorResponse) => {
+          var err = this.errorHandler.handleError(error);
+          return err;
+      })
+    )
+  }
+
   getAcquisitionLogStatistics(reportId: string): Observable<IDataAcquisitionLogStatistics> {
     const headers = new HttpHeaders({ 'X-Skip-Loading': 'true' });
 
@@ -177,22 +234,4 @@ export class AcquisitionLogService {
       );
   }
 
-  getResourceTypes(): Observable<string[]> {
-
-    //temporary test data
-    let types = ['Patient', 'Encounter', 'Location', 'Observation', 'MedicationRequest', 'Procedure'];
-    return new Observable<string[]>(observer => {
-
-      observer.next(types);
-      observer.complete();
-    });
-
-    return this.http.get<string[]>(`${this.baseUrl}/acquisition-logs/resource-types`)
-      .pipe(
-        catchError((error: HttpErrorResponse) => {
-          var err = this.errorHandler.handleError(error);
-          return err;
-        })
-      );
-  }
 }
