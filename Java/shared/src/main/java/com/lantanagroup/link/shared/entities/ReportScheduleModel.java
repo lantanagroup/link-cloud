@@ -23,6 +23,6 @@ public class ReportScheduleModel {
     private AdHocType adHocType;
     private Frequency frequency;
     private String payloadRootUri;
-    private ScheduleStatus status = ScheduleStatus.New;
+    private String status;
 
 }

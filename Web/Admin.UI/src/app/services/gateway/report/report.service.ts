@@ -93,6 +93,16 @@ export class ReportService {
     );
   }
 
+  restoreReports(facilityId: string): Observable<void> {
+    return this.http.patch<void>(
+      `${this.appConfigService.config?.baseApiUrl}/schedules/facility/${facilityId}/status?deleted=false`,
+      {}
+    ).pipe(
+      tap(_ => console.log(`Request to restore report configuration was sent.`)),
+      catchError(error => this.errorHandler.handleError(error))
+    );
+  }
+
   searchReportSchedules(
     facilityId?: string,
     frequency?: string,
