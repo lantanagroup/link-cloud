@@ -23,6 +23,23 @@
   margin-right: 8px;
 }
 
+.cadence-group {
+  margin-bottom: 1.5em;
+  display: flex;
+  flex-direction: column;
+
+  label {
+    margin-bottom: 0.5em;
+    font-weight: bold;
+    color: rgba(0, 0, 0, 0.6);
+  }
+
+  mat-radio-group {
+    display: flex;
+    gap: 16px;
+  }
+}
+
 .form-input {
   width: 100%;
   margin-bottom: 1em;
