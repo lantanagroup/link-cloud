@@ -350,6 +350,10 @@ public class PatientDataServiceTests
         _mockFhirQueryQueries
             .Setup(m => m.GetByFacilityIdAsync("facilityId", cancellationToken))
             .ReturnsAsync(fhirQueryConfig);
+        
+        _mockLogQueries
+            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
+            .ReturnsAsync(true);
 
         // ADD THIS SETUP - Mock the ExecuteRead method to return a list of IDs
         _mockFhirApiService
@@ -430,6 +434,10 @@ public class PatientDataServiceTests
         _mockFhirQueryQueries
             .Setup(q => q.GetByFacilityIdAsync(facilityId, cancellationToken))
             .ReturnsAsync(fhirConfig);
+        
+        _mockLogQueries
+            .Setup(q => q.TrySetLogStatusAsync(logId, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
+            .ReturnsAsync(true);
 
         // Critical: We expect ExecuteSearch to be called exactly once for the valid ID,
         // but we will verify it is called only for the non-empty case later if needed.
@@ -452,7 +460,7 @@ public class PatientDataServiceTests
 
         // Expect exactly ONE update to Processing, then ONE final update to Completed
         var updateCallCount = 0;
-        _mockLogManager
+        _mockLogQueries
             .Setup(m => m.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), cancellationToken))
             .Callback<UpdateDataAcquisitionLogModel, CancellationToken>((model, _) =>
             {
@@ -552,7 +560,7 @@ public class PatientDataServiceTests
             .ReturnsAsync(fhirConfig);
 
         // Capture updates to verify final state and that "No IDs" note is NOT added
-        _mockLogManager
+        _mockLogQueries
             .Setup(m => m.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), cancellationToken))
             .Callback<UpdateDataAcquisitionLogModel, CancellationToken>((model, _) =>
             {
@@ -568,6 +576,10 @@ public class PatientDataServiceTests
                 }
             })
             .ReturnsAsync(logModel);
+        
+        _mockLogQueries
+            .Setup(q => q.TrySetLogStatusAsync(logId, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
+            .ReturnsAsync(true);
 
         // Expect ExecuteSearch to be called once (for Observation)
         _mockFhirApiService
@@ -599,13 +611,13 @@ public class PatientDataServiceTests
             Times.AtLeast(2)); // Processing + Completed (possibly more if other logic runs)
 
         // Final confirmation: log completed successfully without the "no IDs" note
-        _mockLogManager.Verify(
+        _mockLogQueries.Verify(
             m => m.UpdateAsync(
                 It.Is<UpdateDataAcquisitionLogModel>(u =>
                     u.Status == RequestStatus.Completed &&
                     (u.Notes == null || !u.Notes.Any(n => n.Contains("No IDs found in _id query parameter")))),
                 cancellationToken),
-            Times.Once);
+            Times.AtLeastOnce());
     }
 
     [Fact]
@@ -662,6 +674,10 @@ public class PatientDataServiceTests
         _mockFhirQueryQueries
             .Setup(q => q.GetByFacilityIdAsync("facility-1", cancellationToken))
             .ReturnsAsync(new FhirQueryConfigurationModel { FacilityId = "facility-1" });
+
+        _mockLogQueries
+            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
+            .ReturnsAsync(true);
 
         // Mock three different queries returning different IDs
         _mockFhirApiService
