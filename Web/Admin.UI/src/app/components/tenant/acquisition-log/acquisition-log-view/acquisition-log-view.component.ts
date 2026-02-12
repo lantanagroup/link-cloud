@@ -116,6 +116,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   faSort = faSort;
   faSortUp = faSortUp;
   faSortDown = faSortDown;
+  private readonly PAGE_SIZE_KEY = 'acquisitionLogPageSize';
 
   defaultPageNumber: number = 0
   defaultPageSize: number = 10;
@@ -164,6 +165,10 @@ export class AcquisitionLogViewComponent implements OnInit {
     private acquisitionLogService: AcquisitionLogService) { }
 
   ngOnInit(): void {
+    const savedPageSize = localStorage.getItem(this.PAGE_SIZE_KEY);
+    if (savedPageSize) {
+      this.defaultPageSize = +savedPageSize;
+    }
 
     this.paginationMetadata.pageNumber = this.defaultPageNumber;
     this.paginationMetadata.pageSize = this.defaultPageSize;
@@ -259,6 +264,7 @@ export class AcquisitionLogViewComponent implements OnInit {
 
   pagedEvent(event: PageEvent) {
     this.targetPageNumber = event.pageIndex + 1;
+    localStorage.setItem(this.PAGE_SIZE_KEY, event.pageSize.toString());
     this.loadLogs(event.pageIndex, event.pageSize, true);
     this.clearSelection();
   }
