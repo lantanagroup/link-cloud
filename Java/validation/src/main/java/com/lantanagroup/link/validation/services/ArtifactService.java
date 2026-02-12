@@ -37,11 +37,27 @@ public class ArtifactService {
         this.linkConfig = linkConfig;
     }
 
-    private void doSaveArtifact(ArtifactType type, String name, byte[] content) {
-        Artifact artifact = artifactRepository.findByTypeAndName(type, name).orElseGet(Artifact::new);
+    public Artifact getArtifact(ArtifactType type, String name, byte[] content) {
+        Artifact artifact = new Artifact();
         artifact.setType(type);
         artifact.setName(name);
         artifact.setContent(content);
+        return artifact;
+    }
+
+    /**
+     * Attempt to load the artifact into validation support.
+     * Failure should (hopefully) result in an unhandled exception thrown to the caller.
+     */
+    public void validateArtifact(ArtifactType type, String name, byte[] content) throws IOException {
+        Artifact artifact = getArtifact(type, name, content);
+        ArtifactValidationSupport validationSupport = createValidationSupport();
+        validationSupport.addArtifact(artifact);
+    }
+
+    private void doSaveArtifact(ArtifactType type, String name, byte[] content) {
+        Artifact artifact = artifactRepository.findByTypeAndName(type, name)
+                .orElseGet(() -> getArtifact(type, name, content));
         artifactRepository.save(artifact);
     }
 

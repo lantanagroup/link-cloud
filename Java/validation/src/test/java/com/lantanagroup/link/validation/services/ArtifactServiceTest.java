@@ -15,6 +15,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 
@@ -236,5 +238,42 @@ class ArtifactServiceTest {
         when(artifactRepository.findByTypeAndName(ArtifactType.PACKAGE, "non-existent")).thenReturn(Optional.empty());
         PackageDetailsModel results = artifactService.getPackageDetails("non-existent");
         assertNull(results);
+    }
+
+    @Test
+    void validateArtifact_ValidPackage() throws IOException {
+        byte[] content;
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        try (InputStream stream = classLoader.getResourceAsStream("artifacts/packages/gov.cdc.nhsn.measures.tgz")) {
+            content = stream.readAllBytes();
+        }
+        assertDoesNotThrow(() ->
+                artifactService.validateArtifact(ArtifactType.PACKAGE, "gov.cdc.nhsn.measures", content));
+    }
+
+    @Test
+    void validateArtifact_InvalidPackage() {
+        assertThrows(Exception.class, () ->
+                artifactService.validateArtifact(ArtifactType.PACKAGE, "gov.cdc.nhsn.measures", new byte[0]));
+    }
+
+    @Test
+    void validateArtifact_ValidResource() {
+        String json = """
+                {
+                    "resourceType": "StructureDefinition",
+                    "id": "the-structure-definition",
+                    "url": "http://example.com/StructureDefinition/the-structure-definition"
+                }
+                """;
+        byte[] content = json.getBytes(StandardCharsets.UTF_8);
+        assertDoesNotThrow(() ->
+                artifactService.validateArtifact(ArtifactType.RESOURCE, "the-structure-definition", content));
+    }
+
+    @Test
+    void validateArtifact_InvalidResource() {
+        assertThrows(Exception.class, () ->
+                artifactService.validateArtifact(ArtifactType.RESOURCE, "the-structure-definition", new byte[0]));
     }
 }
