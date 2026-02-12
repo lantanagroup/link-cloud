@@ -1,6 +1,6 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Results;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
-using System.Data.Entity;
+using Microsoft.EntityFrameworkCore;
 
 namespace DataAcquisition.Domain.Application.Queries
 {
@@ -25,9 +25,8 @@ namespace DataAcquisition.Domain.Application.Queries
                 throw new ArgumentNullException(nameof(facilityId));
             }
 
-            var query = from q in _dbContext.FhirQueries
-                        where q.FacilityId == facilityId
-                        select q;
+            var query = _dbContext.FhirQueries.AsNoTracking()
+             .Where(q => q.FacilityId == facilityId);
 
             if (!string.IsNullOrEmpty(correlationId))
             {
