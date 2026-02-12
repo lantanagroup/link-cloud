@@ -1,8 +1,6 @@
 ﻿using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Rest;
-using Hl7.Fhir.Utility;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
@@ -32,7 +30,10 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 public interface IPatientDataService
 {
     Task CreateLogEntries(GetPatientDataRequest request, CancellationToken cancellationToken);
-    Task<List<Resource>> ValidateFacilityConnection(GetPatientDataRequest request, CancellationToken cancellationToken = default);
+
+    Task<List<Resource>> ValidateFacilityConnection(GetPatientDataRequest request,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Executes the log request for data acquisition.
     /// </summary>
@@ -87,19 +88,24 @@ public class PatientDataService : IPatientDataService
 
 
         _readFhirCommand = readFhirCommand ?? throw new ArgumentNullException(nameof(readFhirCommand));
-        _dataAcquisitionLogManager = dataAcquisitionLogManager ?? throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
-        _dataAcquisitionLogQueries = dataAcquisitionLogQueries ?? throw new ArgumentNullException(nameof(dataAcquisitionLogQueries));
+        _dataAcquisitionLogManager = dataAcquisitionLogManager ??
+                                     throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
+        _dataAcquisitionLogQueries = dataAcquisitionLogQueries ??
+                                     throw new ArgumentNullException(nameof(dataAcquisitionLogQueries));
         _fhirApiService = fhirApiService ?? throw new ArgumentNullException(nameof(fhirApiService));
-        _distributedSemaphoreProvider = distributedSemaphoreProvider ?? throw new ArgumentNullException(nameof(distributedSemaphoreProvider));
+        _distributedSemaphoreProvider = distributedSemaphoreProvider ??
+                                        throw new ArgumentNullException(nameof(distributedSemaphoreProvider));
         _patientCensusService = patientCensusService ?? throw new ArgumentNullException(nameof(patientCensusService));
     }
 
-    public async Task<List<Resource>> ValidateFacilityConnection(GetPatientDataRequest request, CancellationToken cancellationToken = default)
+    public async Task<List<Resource>> ValidateFacilityConnection(GetPatientDataRequest request,
+        CancellationToken cancellationToken = default)
     {
         if (request == null)
             throw new ArgumentNullException(nameof(request));
 
-        var authenticationConfig = await _fhirQueryQueries.GetAuthenticationConfigurationByFacilityId(request.FacilityId, cancellationToken);
+        var authenticationConfig =
+            await _fhirQueryQueries.GetAuthenticationConfigurationByFacilityId(request.FacilityId, cancellationToken);
         var queryConfig = await _fhirQueryQueries.GetByFacilityIdAsync(request.FacilityId, cancellationToken);
 
         var patient = await _readFhirCommand.ExecuteAsync(
@@ -124,26 +130,28 @@ public class PatientDataService : IPatientDataService
         var initialQueries = queryPlan.InitialQueries.OrderBy(x => x.Key);
         var supplementalQueries = queryPlan.SupplementalQueries.OrderBy(x => x.Key);
 
-        var referenceTypes = queryPlan.InitialQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList();
-        referenceTypes.AddRange(queryPlan.SupplementalQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList());
+        var referenceTypes = queryPlan.InitialQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType)
+            .Distinct().ToList();
+        referenceTypes.AddRange(queryPlan.SupplementalQueries.Values.OfType<ReferenceQueryConfig>()
+            .Select(x => x.ResourceType).Distinct().ToList());
 
         resources.AddRange(await _queryListProcessor.ExecuteFacilityValidationRequest(
-                queryPlan.InitialQueries.OrderBy(x => x.Key),
-                request,
-                queryConfig,
-                request.ConsumeResult.Value.ScheduledReports.FirstOrDefault(),
-                queryPlan,
-                referenceTypes,
-                QueryPlanType.Initial.ToString()));
+            queryPlan.InitialQueries.OrderBy(x => x.Key),
+            request,
+            queryConfig,
+            request.ConsumeResult.Value.ScheduledReports.FirstOrDefault(),
+            queryPlan,
+            referenceTypes,
+            QueryPlanType.Initial.ToString()));
 
         resources.AddRange(await _queryListProcessor.ExecuteFacilityValidationRequest(
-                queryPlan.SupplementalQueries.OrderBy(x => x.Key),
-                request,
-                queryConfig,
-                request.ConsumeResult.Value.ScheduledReports.FirstOrDefault(),
-                queryPlan,
-                referenceTypes,
-                QueryPlanType.Supplemental.ToString()));
+            queryPlan.SupplementalQueries.OrderBy(x => x.Key),
+            request,
+            queryConfig,
+            request.ConsumeResult.Value.ScheduledReports.FirstOrDefault(),
+            queryPlan,
+            referenceTypes,
+            QueryPlanType.Supplemental.ToString()));
 
         return resources;
     }
@@ -158,21 +166,26 @@ public class PatientDataService : IPatientDataService
         FhirQueryConfigurationModel? fhirQueryConfiguration = null;
         QueryPlanModel? queryPlan = null;
 
-        if (dataAcqRequested == null || string.IsNullOrWhiteSpace(dataAcqRequested.PatientId) || string.IsNullOrWhiteSpace(request.FacilityId))
+        if (dataAcqRequested == null || string.IsNullOrWhiteSpace(dataAcqRequested.PatientId) ||
+            string.IsNullOrWhiteSpace(request.FacilityId))
         {
             throw new ArgumentException("Invalid request data. PatientId and FacilityId must be provided.");
         }
 
         try
         {
-            fhirQueryConfiguration = await _fhirQueryQueries.GetByFacilityIdAsync(request.FacilityId, cancellationToken);
+            fhirQueryConfiguration =
+                await _fhirQueryQueries.GetByFacilityIdAsync(request.FacilityId, cancellationToken);
 
             if (fhirQueryConfiguration == null)
             {
-                throw new ArgumentNullException("No FHIR Query Confiugration found for FacilityId: " + request.FacilityId);
+                throw new ArgumentNullException("No FHIR Query Confiugration found for FacilityId: " +
+                                                request.FacilityId);
             }
 
-            Frequency reportableEventTranslation = ReportableEventToQueryPlanTypeFactory.GenerateQueryPlanTypeFromReportableEvent(request.ConsumeResult.Value.ReportableEvent);
+            Frequency reportableEventTranslation =
+                ReportableEventToQueryPlanTypeFactory.GenerateQueryPlanTypeFromReportableEvent(request.ConsumeResult
+                    .Value.ReportableEvent);
 
             queryPlan = (await _queryPlanQueries.SearchAsync(new SearchQueryPlanModel
             {
@@ -208,26 +221,32 @@ public class PatientDataService : IPatientDataService
 
         if (queryPlan != null)
         {
-            var initialQueries = queryPlan.InitialQueries.OrderBy(x => int.TryParse(x.Key, out int num) ? num : int.MaxValue);
-            var supplementalQueries = queryPlan.SupplementalQueries.OrderBy(x => int.TryParse(x.Key, out int num) ? num : int.MaxValue);
+            var initialQueries =
+                queryPlan.InitialQueries.OrderBy(x => int.TryParse(x.Key, out int num) ? num : int.MaxValue);
+            var supplementalQueries =
+                queryPlan.SupplementalQueries.OrderBy(x => int.TryParse(x.Key, out int num) ? num : int.MaxValue);
 
-            var referenceStrTypes = queryPlan.InitialQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList();
-            referenceStrTypes.AddRange(queryPlan.SupplementalQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList());
+            var referenceStrTypes = queryPlan.InitialQueries.Values.OfType<ReferenceQueryConfig>()
+                .Select(x => x.ResourceType).Distinct().ToList();
+            referenceStrTypes.AddRange(queryPlan.SupplementalQueries.Values.OfType<ReferenceQueryConfig>()
+                .Select(x => x.ResourceType).Distinct().ToList());
 
             var referenceTypes = referenceStrTypes.Select(x =>
-                                    new ResourceReferenceType
-                                    {
-                                        FacilityId = request.FacilityId,
-                                        QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Value.QueryType),
-                                        ResourceType = x,
-                                    }).ToList();
+                new ResourceReferenceType
+                {
+                    FacilityId = request.FacilityId,
+                    QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Value.QueryType),
+                    ResourceType = x,
+                }).ToList();
 
 
             foreach (var schedReport in request.ConsumeResult.Message.Value.ScheduledReports)
             {
                 if (request.QueryPlanType == QueryPlanType.Initial)
                 {
-                    var priority = schedReport.Frequency == Frequency.Daily ? AcquisitionPriority.High : AcquisitionPriority.Normal;
+                    var priority = schedReport.Frequency == Frequency.Daily
+                        ? AcquisitionPriority.High
+                        : AcquisitionPriority.Normal;
 
                     try
                     {
@@ -243,31 +262,36 @@ public class PatientDataService : IPatientDataService
                                 Status = RequestStatus.Pending,
                                 FhirVersion = "R4",
                                 QueryType = FhirQueryType.Read,
-                                QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),
+                                QueryPhase =
+                                    QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),
                                 ScheduledReport = schedReport,
                                 TraceId = traceAndSpanDelimited,
                                 FhirQuery = new List<CreateFhirQueryModel>
                                 {
-                                        new CreateFhirQueryModel
-                                        {
-                                            QueryType = FhirQueryType.Read,
-                                            ResourceTypes = new List<ResourceType> { ResourceType.Patient },
-                                            QueryParameters = new List<string>(),
-                                            FacilityId = request.FacilityId,
-                                            ResourceReferenceTypes = referenceTypes.Select(x =>
+                                    new CreateFhirQueryModel
+                                    {
+                                        QueryType = FhirQueryType.Read,
+                                        ResourceTypes = new List<ResourceType> { ResourceType.Patient },
+                                        QueryParameters = new List<string>(),
+                                        FacilityId = request.FacilityId,
+                                        ResourceReferenceTypes = referenceTypes.Select(x =>
                                             new CreateResourceReferenceTypeModel
                                             {
                                                 FacilityId = request.FacilityId,
-                                                QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),
+                                                QueryPhase =
+                                                    QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value
+                                                        .QueryType),
                                                 ResourceType = x.ResourceType,
                                             }).ToList(),
-                                        }
+                                    }
                                 },
                             }, cancellationToken);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error creating log entry for facility {FacilityId} and patient {PatientId}", request.FacilityId.Sanitize(), dataAcqRequested.PatientId);
+                        _logger.LogError(ex,
+                            "Error creating log entry for facility {FacilityId} and patient {PatientId}",
+                            request.FacilityId.Sanitize(), dataAcqRequested.PatientId);
 
                         throw;
                     }
@@ -276,22 +300,25 @@ public class PatientDataService : IPatientDataService
                 try
                 {
                     await _queryListProcessor.Process(
-                            dataAcqRequested.QueryType.Equals("Initial", System.StringComparison.InvariantCultureIgnoreCase) ? initialQueries : supplementalQueries,
-                            request,
-                            fhirQueryConfiguration,
-                            queryPlan,
-                            referenceTypes,
-                            dataAcqRequested.QueryType.Equals("Initial", System.StringComparison.InvariantCultureIgnoreCase) ? QueryPlanType.Initial.ToString() : QueryPlanType.Supplemental.ToString(),
-                            schedReport,
-                            cancellationToken);
-
+                        dataAcqRequested.QueryType.Equals("Initial", System.StringComparison.InvariantCultureIgnoreCase)
+                            ? initialQueries
+                            : supplementalQueries,
+                        request,
+                        fhirQueryConfiguration,
+                        queryPlan,
+                        referenceTypes,
+                        dataAcqRequested.QueryType.Equals("Initial", System.StringComparison.InvariantCultureIgnoreCase)
+                            ? QueryPlanType.Initial.ToString()
+                            : QueryPlanType.Supplemental.ToString(),
+                        schedReport,
+                        cancellationToken);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error retrieving data from EHR for facility: {FacilityId}", request.FacilityId);
+                    _logger.LogError(ex, "Error retrieving data from EHR for facility: {FacilityId}",
+                        request.FacilityId);
                     throw;
                 }
-
             }
         }
     }
@@ -310,135 +337,147 @@ public class PatientDataService : IPatientDataService
         if (request == null)
             throw new ArgumentNullException(nameof(request));
 
-        //get semaphore for the facility and logId
-        using (_distributedSemaphoreProvider.AcquireSemaphore($"{request.facilityId}-{request.logId}", 1, TimeSpan.FromSeconds(60), cancellationToken: cancellationToken))
+        //1. get log
+        var log = await _dataAcquisitionLogQueries.GetAsync(request.logId, cancellationToken);
+
+        try
         {
-            //1. get log
-            var log = await _dataAcquisitionLogQueries.GetAsync(request.logId, cancellationToken);
-
-            try
+            //check if log is null
+            if (log == null)
             {
-                //check if log is null
-                if (log == null)
-                {
-                    throw new ArgumentException($"Log with ID {request.logId} does not exist.");
-                }
+                throw new ArgumentException($"Log with ID {request.logId} does not exist.");
+            }
 
-                if(log.ExecutionDate > DateTime.UtcNow)
-                {
-                    throw new ProcessingDelayException(@$"Log Exection Date {log.ExecutionDate} indicates a future processing time.");
-                }
+            if (log.ExecutionDate > DateTime.UtcNow)
+            {
+                throw new ProcessingDelayException(
+                    @$"Log Exection Date {log.ExecutionDate} indicates a future processing time.");
+            }
 
-                //check to ensure that facilityId matches
-                if (!log.FacilityId.Equals(request.facilityId, StringComparison.InvariantCultureIgnoreCase))
-                {
-                    throw new ArgumentException($"Facility ID {request.facilityId} does not match log's facility ID {log.FacilityId}.");
-                }
+            //check to ensure that facilityId matches
+            if (!log.FacilityId.Equals(request.facilityId, StringComparison.InvariantCultureIgnoreCase))
+            {
+                throw new ArgumentException(
+                    $"Facility ID {request.facilityId} does not match log's facility ID {log.FacilityId}.");
+            }
 
-                //check if log has any FhirQuery objects
-                if (log.FhirQuery == null || !log.FhirQuery.Any())
-                {
-                    throw new ArgumentException($"Log with ID {log.Id} does not have any FHIR queries defined.");
-                }
+            //check if log has any FhirQuery objects
+            if (log.FhirQuery == null || !log.FhirQuery.Any())
+            {
+                throw new ArgumentException($"Log with ID {log.Id} does not have any FHIR queries defined.");
+            }
 
-                //check if resource types are defined in all FhirQuery objects
-                if (log.FhirQuery.Any(x => x.ResourceTypes == null || !x.ResourceTypes.Any()))
-                {
-                    throw new ArgumentException($"Log with ID {log.Id} has a FHIR query with no resource types defined.");
-                }
+            //check if resource types are defined in all FhirQuery objects
+            if (log.FhirQuery.Any(x => x.ResourceTypes == null || !x.ResourceTypes.Any()))
+            {
+                throw new ArgumentException($"Log with ID {log.Id} has a FHIR query with no resource types defined.");
+            }
 
-                //check if query type is search and there are no query parameters in FhirQuery
-                if (log.FhirQuery != null && log.FhirQuery.Any() && log.FhirQuery.Any(x => x.QueryType == FhirQueryType.Search && !x.QueryParameters.Any()))
-                {
-                    throw new ArgumentException($"Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
-                }
+            //check if query type is search and there are no query parameters in FhirQuery
+            if (log.FhirQuery != null && log.FhirQuery.Any() &&
+                log.FhirQuery.Any(x => x.QueryType == FhirQueryType.Search && !x.QueryParameters.Any()))
+            {
+                throw new ArgumentException(
+                    $"Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
+            }
 
-                //check if isCensus, if true, create scope for PatientCensusService and execute RetrieveListData
-                if (log.IsCensus)
+            //check if isCensus, if true, create scope for PatientCensusService and execute RetrieveListData
+            if (log.IsCensus)
+            {
+                await _patientCensusService.RetrieveListData(log, true, cancellationToken);
+                return;
+            }
+
+            ActivityContext parentContext = default;
+
+            if (!string.IsNullOrWhiteSpace(log.TraceId))
+            {
+                var parts = log.TraceId.Split('|'); // Or whatever delimiter you choose
+                if (parts.Length == 2 &&
+                    parts[0].Length == 32 && IsValidHex(parts[0]) &&
+                    parts[1].Length == 16 && IsValidHex(parts[1]))
                 {
-                    await _patientCensusService.RetrieveListData(log, true, cancellationToken);
+                    try
+                    {
+                        var traceId = ActivityTraceId.CreateFromString(parts[0].AsSpan());
+                        var spanId = ActivitySpanId.CreateFromString(parts[1].AsSpan());
+                        var traceFlags = ActivityTraceFlags.Recorded;
+
+                        parentContext = new ActivityContext(traceId, spanId, traceFlags);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to parse combined TraceId/SpanId {TraceId} for log {LogId}",
+                            log.TraceId.Sanitize(), log.Id);
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("Invalid combined TraceId format (expected 32-16 hex chars) for log {LogId}",
+                        log.Id);
+                }
+            }
+
+
+            using var activity = ServiceActivitySource.Instance.StartActivity(
+                "PatientDataService.ExecuteLogRequest",
+                ActivityKind.Internal,
+                parentContext);
+
+            activity?.SetTag("link.log_id", log.Id.ToString());
+            activity?.SetTag("link.facility_id", log.FacilityId);
+            activity?.SetTag("link.correlation_id", log.CorrelationId ?? string.Empty);
+            activity?.SetTag("link.report_tracking_id", log.ReportTrackingId ?? string.Empty);
+            activity?.SetTag("link.patient_id", log.PatientId?.Sanitize());
+
+            //check if log is flagged as a reference, if yes, check if all non-reference logs for a facility, correlationId, and reportTrackingId are marked as 'Completed'
+            if (log.FhirQuery is not null && log.FhirQuery.Any(x => x.IsReference.HasValue && x.IsReference.Value))
+            {
+                var nonReferenceLogsCnt = await _dataAcquisitionLogQueries.GetCountOfNonRefLogsIncompleteAsync(
+                    log.FacilityId,
+                    log.ReportTrackingId,
+                    log.CorrelationId,
+                    cancellationToken);
+
+                if (nonReferenceLogsCnt > 0)
+                {
+                    log.Notes ??= new List<string>();
+                    log.Status = RequestStatus.Pending;
+                    log.Notes.Add(
+                        $"[{DateTime.UtcNow}] Deferring log with ID {log.Id} due to {nonReferenceLogsCnt} incomplete non-reference log(s).");
+                    await _dataAcquisitionLogQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
+                    {
+                        Id = log.Id,
+                        ResourceAcquiredIds = log.ResourceAcquiredIds,
+                        RetryAttempts = log.RetryAttempts,
+                        CompletionDate = log.CompletionDate,
+                        CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                        TraceId = log.TraceId,
+                        ExecutionDate = log.ExecutionDate,
+                        Notes = log.Notes,
+                        Status = log.Status,
+                    }, cancellationToken);
                     return;
                 }
+            }
 
-                ActivityContext parentContext = default;
+            //check if log is not in ready state
+            if (!request.ignoreStatusConstraint && log.Status != RequestStatus.Queued)
+            {
+                throw new ArgumentException(
+                    $"Log with ID {log.Id} is not in a queued state. Current status: {log.Status}");
+            }
 
-                if (!string.IsNullOrWhiteSpace(log.TraceId))
-                {
-                    var parts = log.TraceId.Split('|');  // Or whatever delimiter you choose
-                    if (parts.Length == 2 &&
-                        parts[0].Length == 32 && IsValidHex(parts[0]) &&
-                        parts[1].Length == 16 && IsValidHex(parts[1]))
-                    {
-                        try
-                        {
-                            var traceId = ActivityTraceId.CreateFromString(parts[0].AsSpan());
-                            var spanId = ActivitySpanId.CreateFromString(parts[1].AsSpan());
-                            var traceFlags = ActivityTraceFlags.Recorded;
+            //2. atomically update to "Processing"
+            var successfullyUpdatedLog = await _dataAcquisitionLogQueries.TrySetLogStatusAsync(log.Id,
+                new List<RequestStatus> { RequestStatus.Queued }, RequestStatus.Processing,
+                cancellationToken);
 
-                            parentContext = new ActivityContext(traceId, spanId, traceFlags);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "Failed to parse combined TraceId/SpanId {TraceId} for log {LogId}", log.TraceId.Sanitize(), log.Id);
-                        }
-                    }
-                    else
-                    {
-                        _logger.LogWarning("Invalid combined TraceId format (expected 32-16 hex chars) for log {LogId}", log.Id);
-                    }
-                }
-
-
-                using var activity = ServiceActivitySource.Instance.StartActivity(
-                    "PatientDataService.ExecuteLogRequest",
-                    ActivityKind.Internal,
-                    parentContext);
-
-                activity?.SetTag("link.log_id", log.Id.ToString());
-                activity?.SetTag("link.facility_id", log.FacilityId);
-                activity?.SetTag("link.correlation_id", log.CorrelationId ?? string.Empty);
-                activity?.SetTag("link.report_tracking_id", log.ReportTrackingId ?? string.Empty);
-                activity?.SetTag("link.patient_id", log.PatientId?.Sanitize());
-
-                //check if log is flagged as a reference, if yes, check if all non-reference logs for a facility, correlationId, and reportTrackingId are marked as 'Completed'
-                if (log.FhirQuery is not null && log.FhirQuery.Any(x => x.IsReference.HasValue && x.IsReference.Value))
-                {
-                    var nonReferenceLogsCnt = await _dataAcquisitionLogQueries.GetCountOfNonRefLogsIncompleteAsync(
-                        log.FacilityId,
-                        log.ReportTrackingId,
-                        log.CorrelationId,
-                        cancellationToken);
-
-                    if (nonReferenceLogsCnt > 0)
-                    {
-                        log.Notes ??= new List<string>();
-                        log.Status = RequestStatus.Pending;
-                        log.Notes.Add($"[{DateTime.UtcNow}] Deferring log with ID {log.Id} due to {nonReferenceLogsCnt} incomplete non-reference log(s).");
-                        await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
-                        {
-                            Id = log.Id,
-                            ResourceAcquiredIds = log.ResourceAcquiredIds,
-                            RetryAttempts = log.RetryAttempts,
-                            CompletionDate = log.CompletionDate,
-                            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
-                            TraceId = log.TraceId,
-                            ExecutionDate = log.ExecutionDate,
-                            Notes = log.Notes,
-                            Status = log.Status,
-                        }, cancellationToken);
-                        return;
-                    }
-                }
-
-                //check if log is not in ready state
-                if (!request.ignoreStatusConstraint && log.Status != RequestStatus.Ready)
-                {
-                    throw new ArgumentException($"Log with ID {log.Id} is not in a ready state. Current status: {log.Status}");
-                }
-
-                //2. set to "Processing"
+            if (successfullyUpdatedLog)
+            {
+                //3. set to "Processing"
                 log.Status = RequestStatus.Processing;
-                await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                await _dataAcquisitionLogQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {
                     Id = log.Id,
                     ResourceAcquiredIds = log.ResourceAcquiredIds,
@@ -456,7 +495,8 @@ public class PatientDataService : IPatientDataService
                 stopwatch.Start();
 
                 //4. get fhir query configuration
-                var fhirQueryConfiguration = await _fhirQueryQueries.GetByFacilityIdAsync(log.FacilityId, cancellationToken);
+                var fhirQueryConfiguration =
+                    await _fhirQueryQueries.GetByFacilityIdAsync(log.FacilityId, cancellationToken);
 
                 if (fhirQueryConfiguration == null)
                 {
@@ -478,9 +518,11 @@ public class PatientDataService : IPatientDataService
                     }
 
                     //check if log is search and not census, if true,
-                    if ((fhirQuery.QueryType == FhirQueryType.Search || fhirQuery.QueryType == FhirQueryType.SearchPost) && !log.IsCensus)
+                    if ((fhirQuery.QueryType == FhirQueryType.Search ||
+                         fhirQuery.QueryType == FhirQueryType.SearchPost) && !log.IsCensus)
                     {
-                        var idParams = fhirQuery.QueryParameters.Where(x => x.StartsWith("_id=", StringComparison.InvariantCultureIgnoreCase)).ToList();
+                        var idParams = fhirQuery.QueryParameters
+                            .Where(x => x.StartsWith("_id=", StringComparison.InvariantCultureIgnoreCase)).ToList();
                         if (idParams.Any())
                         {
                             var ids = new List<string>();
@@ -496,7 +538,8 @@ public class PatientDataService : IPatientDataService
                             if (!ids.Any())
                             {
                                 log.Notes ??= [];
-                                log.Notes.Add($"[{DateTime.UtcNow}] No IDs found in _id query parameter for {fhirQuery.QueryType} FHIR query. Marking log as Completed.");
+                                log.Notes.Add(
+                                    $"[{DateTime.UtcNow}] No IDs found in _id query parameter for {fhirQuery.QueryType} FHIR query. Marking log as Completed.");
                                 skipFetch = true;
                             }
                         }
@@ -508,13 +551,20 @@ public class PatientDataService : IPatientDataService
                         {
                             if (fhirQuery.QueryType == FhirQueryType.Read)
                             {
-                                var ids = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType, fhirQueryConfiguration, cancellationToken);
-                                if (ids != null) foreach (var id in ids) resourceIds.Add(id);
+                                var ids = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType,
+                                    fhirQueryConfiguration, cancellationToken);
+                                if (ids != null)
+                                    foreach (var id in ids)
+                                        resourceIds.Add(id);
                             }
-                            else if (fhirQuery.QueryType == FhirQueryType.Search || fhirQuery.QueryType == FhirQueryType.SearchPost)
+                            else if (fhirQuery.QueryType == FhirQueryType.Search ||
+                                     fhirQuery.QueryType == FhirQueryType.SearchPost)
                             {
-                                var ids = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, resourceType, cancellationToken);
-                                if (ids != null) foreach (var id in ids) resourceIds.Add(id);
+                                var ids = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration,
+                                    resourceType, cancellationToken);
+                                if (ids != null)
+                                    foreach (var id in ids)
+                                        resourceIds.Add(id);
                             }
                             else if (fhirQuery.QueryType == FhirQueryType.BulkDataRequest)
                             {
@@ -536,7 +586,7 @@ public class PatientDataService : IPatientDataService
                 log.Status = skipFetch ? RequestStatus.Skipped : RequestStatus.Completed;
                 log.ResourceAcquiredIds = resourceIds.ToList();
 
-                await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                await _dataAcquisitionLogQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {
                     Id = log.Id,
                     RetryAttempts = log.RetryAttempts,
@@ -549,78 +599,81 @@ public class PatientDataService : IPatientDataService
                     Status = log.Status,
                 }, cancellationToken);
             }
-            catch(ProcessingDelayException ex)
+        }
+        catch (ProcessingDelayException ex)
+        {
+            log!.Notes ??= new List<string>();
+
+            log.RetryAttempts ??= 0;
+
+            log.Status = RequestStatus.Pending;
+            log.Notes.Add(ex.Message);
+
+            await _dataAcquisitionLogQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
             {
-                log!.Notes ??= new List<string>();
+                Id = log.Id,
+                RetryAttempts = log.RetryAttempts,
+                ExecutionDate = log.ExecutionDate,
+                Status = log.Status,
+                Notes = log.Notes,
+                ResourceAcquiredIds = log.ResourceAcquiredIds,
+                CompletionDate = log.CompletionDate,
+                CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                TraceId = log.TraceId
+            }, cancellationToken);
+        }
+        catch (TooManyRequestsException ex)
+        {
+            _logger.LogWarning(ex, "Throttled by 429 for facility {FacilityId}", log.FacilityId.Sanitize());
 
-                log.RetryAttempts ??= 0;
+            log.Notes ??= new List<string>();
 
-                log.Status = RequestStatus.Pending;
-                log.Notes.Add(ex.Message);
+            log.RetryAttempts ??= 0;
 
-                await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
-                {
-                    Id = log.Id,
-                    RetryAttempts = log.RetryAttempts,
-                    ExecutionDate = log.ExecutionDate,
-                    Status = log.Status,
-                    Notes = log.Notes,
-                    ResourceAcquiredIds = log.ResourceAcquiredIds,
-                    CompletionDate = log.CompletionDate,
-                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
-                    TraceId = log.TraceId
-                }, cancellationToken);
-            }
-            catch (TooManyRequestsException ex)
+            log.ExecutionDate = DateTime.UtcNow.Add(ex.RetryAfter);
+            log.Status = RequestStatus.Pending; //Don't count this as a failure
+            log.Notes.Add(
+                $"[{DateTime.UtcNow}] Throttled (429): Retrying after {ex.RetryAfter.TotalSeconds}s. Attempt {log.RetryAttempts}.");
+
+            await _dataAcquisitionLogQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
             {
-                _logger.LogWarning(ex, "Throttled by 429 for facility {FacilityId}", log.FacilityId.Sanitize());
+                Id = log.Id,
+                RetryAttempts = log.RetryAttempts,
+                ExecutionDate = log.ExecutionDate,
+                Status = log.Status,
+                Notes = log.Notes,
+                ResourceAcquiredIds = log.ResourceAcquiredIds,
+                CompletionDate = log.CompletionDate,
+                CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                TraceId = log.TraceId
+            }, cancellationToken);
 
-                log.Notes ??= new List<string>();
+            await _dataAcquisitionLogManager.ThrottleFacilityAcquisitions(log.FacilityId, log.ExecutionDate.Value,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "PatientDataService.ExecuteLogRequest error");
 
-                log.RetryAttempts ??= 0;
+            log.Notes ??= new List<string>();
 
-                log.ExecutionDate = DateTime.UtcNow.Add(ex.RetryAfter);
-                log.Status = RequestStatus.Pending; //Don't count this as a failure
-                log.Notes.Add($"[{DateTime.UtcNow}] Throttled (429): Retrying after {ex.RetryAfter.TotalSeconds}s. Attempt {log.RetryAttempts}.");
-
-                await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
-                {
-                    Id = log.Id,
-                    RetryAttempts = log.RetryAttempts,
-                    ExecutionDate = log.ExecutionDate,
-                    Status = log.Status,
-                    Notes = log.Notes,
-                    ResourceAcquiredIds = log.ResourceAcquiredIds,
-                    CompletionDate = log.CompletionDate,
-                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
-                    TraceId = log.TraceId
-                }, cancellationToken);
-
-                await _dataAcquisitionLogManager.ThrottleFacilityAcquisitions(log.FacilityId, log.ExecutionDate.Value, cancellationToken);
-            }
-            catch (Exception ex)
+            log.Status = RequestStatus.Failed;
+            log.Notes.Add(
+                $"PatientDataService.ExecuteLogRequest: [{DateTime.UtcNow}] Error encountered: {log.FacilityId?.Sanitize() ?? string.Empty}\n{ex.Message}\n{ex.InnerException?.Message ?? string.Empty}");
+            await _dataAcquisitionLogQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
             {
-                _logger.LogError(ex, "PatientDataService.ExecuteLogRequest error");
+                Id = log.Id,
+                ResourceAcquiredIds = log.ResourceAcquiredIds,
+                RetryAttempts = log.RetryAttempts,
+                CompletionDate = log.CompletionDate,
+                CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                TraceId = log.TraceId,
+                ExecutionDate = log.ExecutionDate,
+                Notes = log.Notes,
+                Status = log.Status,
+            }, cancellationToken);
 
-                log.Notes ??= new List<string>();
-
-                log.Status = RequestStatus.Failed;
-                log.Notes.Add($"PatientDataService.ExecuteLogRequest: [{DateTime.UtcNow}] Error encountered: {log.FacilityId?.Sanitize() ?? string.Empty}\n{ex.Message}\n{ex.InnerException?.Message ?? string.Empty}");
-                await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
-                {
-                    Id = log.Id,
-                    ResourceAcquiredIds = log.ResourceAcquiredIds,
-                    RetryAttempts = log.RetryAttempts,
-                    CompletionDate = log.CompletionDate,
-                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
-                    TraceId = log.TraceId,
-                    ExecutionDate = log.ExecutionDate,
-                    Notes = log.Notes,
-                    Status = log.Status,
-                }, cancellationToken);
-
-                throw;
-            }
+            throw;
         }
     }
 
@@ -638,6 +691,7 @@ public class PatientDataService : IPatientDataService
             if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')))
                 return false;
         }
+
         return true;
     }
 }

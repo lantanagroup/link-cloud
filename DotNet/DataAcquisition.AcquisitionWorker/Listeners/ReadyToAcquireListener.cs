@@ -1,18 +1,15 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Internal;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
 
@@ -47,66 +44,63 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
 
     protected override async Task ExecuteListenerAsync(ConsumeResult<long, ReadyToAcquire> consumeResult, CancellationToken cancellationToken = default)
     {
-        var logId = consumeResult.Message?.Value?.LogId;
-        var facilityId = consumeResult.Message?.Value?.FacilityId;
-
-        if (logId == default || string.IsNullOrWhiteSpace(facilityId))
+        var value = consumeResult.Message?.Value;
+        if (value?.LogId == null || string.IsNullOrWhiteSpace(value.FacilityId))
         {
-            _logger.LogError("LogId or FacilityId is null or empty in ReadyToAcquire message. LogId: {LogId}, FacilityId: {FacilityId}", logId, facilityId);
-            throw new DeadLetterException("LogId or FacilityId is null or empty in ReadyToAcquire message.");
+            _logger.LogError("Invalid ReadyToAcquire message - missing LogId or FacilityId");
+            throw new DeadLetterException("Invalid ReadyToAcquire message");
         }
 
         using var scope = _serviceScopeFactory.CreateScope();
-        var patientDataService = scope.ServiceProvider.GetRequiredService<IPatientDataService>();
         var logQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
-        var dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
-        DataAcquisitionLogModel? log = null; 
-        _logger.LogInformation("Processing ReadyToAcquire message with log id: {LogId}, and facility id: {FacilityId}", consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId);
+        var processor = scope.ServiceProvider.GetRequiredService<AcquisitionProcessorBackgroundService>();
+
+        // ATOMIC STEP: Attempt to "claim" the log
+        // This replaces the GetAsync -> Check Status -> UpdateAsync flow
+        var logId = value.LogId.Value;
+        bool claimed = await logQueries.TrySetLogToQueuedAsync(logId, cancellationToken);
+
+        if (!claimed)
+        {
+            _logger.LogInformation("LogId {LogId} was already claimed or is in a non-processable state. Skipping duplicate request.", logId);
+            return;
+        }
+
+        // getting the log in case the enqueue fails and we need to revert the status
+        var log = await logQueries.GetAsync(logId, cancellationToken);
+        log.Notes ??= new List<string>();
+        log.Notes.Add($"[{DateTime.UtcNow:O}] Queued for background acquisition processing");
+        await logQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
+        {
+            Id = log.Id,
+            Notes = log.Notes,
+            ResourceAcquiredIds = log.ResourceAcquiredIds,
+            RetryAttempts = log.RetryAttempts,
+            CompletionDate = log.CompletionDate,
+            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+            ExecutionDate = log.ExecutionDate,
+            Status = log.Status,
+            TraceId = log.TraceId
+        });
 
         try
         {
-            log = await logQueries.GetAsync(logId!.Value, cancellationToken);
-
-            if(log == null)
-            {
-                throw new DeadLetterException($"No DataAcquisitionLog found for log id: {logId}");
-            }
-
-            // Process the ReadyToAcquire message
-            await patientDataService.ExecuteLogRequest(new AcquisitionRequest(log.Id, facilityId), cancellationToken);
-        }
-        catch(ProduceException<string, ResourceAcquired> ex)
-        {
-            _logger.LogError(ex, "Error producing ReadyToAcquire message for log id: {logId}, facility id: {facilityId}", logId, facilityId);
-            throw new TransientException("Error producing ReadyToAcquire message", ex);
+            await processor.EnqueueAsync(new AcquisitionWorkItem(
+                LogId: logId,
+                FacilityId: value.FacilityId
+            ), cancellationToken);
+            _logger.LogInformation("Queued LogId {LogId} for facility {FacilityId}", logId, value.FacilityId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "PatientDataService.ExecuteLogRequest: [{Time}] Error encountered", DateTime.UtcNow);
-
-            if (log != null)
-            {
-                log.Notes ??= new();
-
-                log.Status = RequestStatus.Failed;
-                log.Notes.Add($"ReadyToAcquireListener.ExecuteListenerAsync: [{DateTime.UtcNow}] Error encountered: {facilityId.Sanitize() ?? string.Empty}\n{ex.Message}\n{ex.InnerException?.Message ?? string.Empty}");
-                await dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
-                {
-                    Id = log.Id,
-                    ResourceAcquiredIds = log.ResourceAcquiredIds,
-                    RetryAttempts = log.RetryAttempts,
-                    CompletionDate = log.CompletionDate,
-                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
-                    TraceId = log.TraceId,
-                    ExecutionDate = log.ExecutionDate,
-                    Notes = log.Notes,
-                    Status = log.Status,
-                }, cancellationToken);
-            }
-
-            _logger.LogError(ex, "Error processing ReadyToAcquire message with log id: {LogId}, and facility id: {FacilityId}", consumeResult.Message.Value.LogId, consumeResult.Message.Value.FacilityId);
-            throw new DeadLetterException("Error processing ReadyToAcquire message: " + ex.Message, ex);
+            _logger.LogError(ex, "Failed to enqueue work item for LogId {LogId}. Attempting to revert status.", logId);
+            // Minimally invasive: set back to Pending so the next trigger can try again
+            log.Status = RequestStatus.Pending;
+            log.Notes.Add($"[{DateTime.UtcNow:O}] Enqueue failed, reverting to Pending.\n\t{ex.InnerException}");
+            await logQueries.UpdateAsync(new UpdateDataAcquisitionLogModel { Id = log.Id, Status = log.Status, Notes = log.Notes });
+            throw new DeadLetterException("Failed to enqueue work item", ex); // Re-throw to let Kafka handle the retry/DLQ logic
         }
+        // Method ends → offset committed quickly by base class
     }
 
     protected override string ExtractCorrelationId(ConsumeResult<long, ReadyToAcquire> consumeResult)
