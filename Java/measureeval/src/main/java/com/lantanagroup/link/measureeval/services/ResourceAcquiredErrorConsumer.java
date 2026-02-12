@@ -22,7 +22,8 @@ public class ResourceAcquiredErrorConsumer extends AbstractResourceConsumer<Reso
             EvaluateMeasureService evaluateMeasureService,
             PatientStatusBundler patientStatusBundler,
             BlobStorageService blobStorageService,
-            ConsumerRecordRecoverer recoverer){
+            ConsumerRecordRecoverer recoverer,
+            MeasureReportGeneratedProducer measureReportGeneratedProducer){
         super(
                 resourceRepository,
                 patientStatusRepository,
@@ -32,6 +33,7 @@ public class ResourceAcquiredErrorConsumer extends AbstractResourceConsumer<Reso
                 evaluateMeasureService,
                 patientStatusBundler,
                 blobStorageService,
-                recoverer);
+                recoverer,
+                measureReportGeneratedProducer);
     }
 }
