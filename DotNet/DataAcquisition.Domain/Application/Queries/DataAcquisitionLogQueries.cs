@@ -366,21 +366,35 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     {
         var stallThreshold = DateTime.UtcNow.AddMinutes(-stallMinutes);
 
-        var stalledLogs = await _dbContext.DataAcquisitionLogs
-            .Where(l => l.Status == RequestStatus.Queued && l.ModifyDate <= stallThreshold)
-            .ToListAsync(cancellationToken);
-
-        if (stalledLogs.Count == 0)
-            return 0;
-
-        foreach (var log in stalledLogs)
+        using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        try
         {
-            log.Status = RequestStatus.Failed;
-            log.ModifyDate = DateTime.UtcNow;
-            log.Notes.Add($"[{DateTime.UtcNow}] Request failed due to being in Queued status for more than {stallMinutes} minutes.");
-        }
+            var stalledLogs = await _dbContext.DataAcquisitionLogs
+                .Where(l => l.Status == RequestStatus.Queued && l.ModifyDate <= stallThreshold)
+                .ToListAsync(cancellationToken);
 
-        return await _dbContext.SaveChangesAsync(cancellationToken);
+            if (stalledLogs.Count == 0)
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return 0;
+            }
+
+            foreach (var log in stalledLogs)
+            {
+                log.Status = RequestStatus.Failed;
+                log.ModifyDate = DateTime.UtcNow;
+                log.Notes.Add($"[{DateTime.UtcNow}] Request failed due to being in Queued status for more than {stallMinutes} minutes.");
+            }
+
+            var result = await _dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return result;
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 
     public async Task<PagedConfigModel<DataAcquisitionLogModel>> SearchAsync(SearchDataAcquisitionLogRequest model,
