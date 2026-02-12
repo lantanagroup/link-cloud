@@ -366,7 +366,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     {
         var stallThreshold = DateTime.UtcNow.AddMinutes(-stallMinutes);
 
-        using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable,cancellationToken);
         try
         {
             var stalledLogs = await _dbContext.DataAcquisitionLogs
