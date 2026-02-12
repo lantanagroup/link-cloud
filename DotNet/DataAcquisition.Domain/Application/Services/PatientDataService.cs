@@ -470,7 +470,7 @@ public class PatientDataService : IPatientDataService
 
             //2. atomically update to "Processing"
             var successfullyUpdatedLog = await _dataAcquisitionLogQueries.TrySetLogStatusAsync(log.Id,
-                new List<RequestStatus> { RequestStatus.Queued, RequestStatus.Failed }, RequestStatus.Processing,
+                new List<RequestStatus> { RequestStatus.Queued }, RequestStatus.Processing,
                 cancellationToken);
 
             if (successfullyUpdatedLog)
