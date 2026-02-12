@@ -1,0 +1,113 @@
+<form [formGroup]="queryForm" class="query-edit-form">
+  <div class="form-row">
+    <mat-form-field appearance="outline">
+      <mat-label>Resource Type</mat-label>
+      <mat-select formControlName="resourceType">
+        @for (type of resourceTypes; track type) {
+          <mat-option [value]="type">{{type}}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Query Config Type</mat-label>
+      <mat-select formControlName="queryConfigType">
+        @for (type of queryConfigTypes; track type) {
+          <mat-option [value]="type">{{type}}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  @if (queryForm.get('queryConfigType')?.value === 'Reference') {
+    <div class="form-row">
+      <mat-form-field appearance="outline">
+        <mat-label>Operation Type</mat-label>
+        <mat-select formControlName="operationType">
+          @for (op of operationTypes; track op.value) {
+            <mat-option [value]="op.value">{{op.label}}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Paged</mat-label>
+        <input matInput type="number" formControlName="paged">
+      </mat-form-field>
+    </div>
+  }
+
+  @if (queryForm.get('queryConfigType')?.value === 'Parameter') {
+    <div class="parameters-section">
+      <div class="section-header">
+        <h3>Parameters</h3>
+        @if (!viewOnly) {
+          <button mat-stroked-button color="primary" type="button" (click)="addParameter()">
+            <mat-icon>add</mat-icon> Add Parameter
+          </button>
+        }
+      </div>
+
+      <div formArrayName="parameters">
+        @for (param of parameters.controls; track $index) {
+          <div [formGroupName]="$index" class="parameter-row">
+            <mat-form-field appearance="outline" class="small-field">
+              <mat-label>Type</mat-label>
+              <mat-select formControlName="parameterType">
+                @for (pType of parameterTypes; track pType) {
+                  <mat-option [value]="pType">{{pType}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Name</mat-label>
+              <input matInput formControlName="name">
+            </mat-form-field>
+
+            @if (param.get('parameterType')?.value === 'Variable') {
+              <mat-form-field appearance="outline">
+                <mat-label>Variable</mat-label>
+                <mat-select formControlName="variable">
+                  @for (vType of variableTypes; track vType.value) {
+                    <mat-option [value]="vType.value">{{vType.label}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Format</mat-label>
+                <input matInput formControlName="format">
+              </mat-form-field>
+            }
+
+            @if (param.get('parameterType')?.value === 'Literal') {
+              <mat-form-field appearance="outline">
+                <mat-label>Literal</mat-label>
+                <input matInput formControlName="literal">
+              </mat-form-field>
+            }
+
+            @if (param.get('parameterType')?.value === 'ResourceIds') {
+              <mat-form-field appearance="outline">
+                <mat-label>Resource</mat-label>
+                <input matInput formControlName="resource">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Paged</mat-label>
+                <input matInput formControlName="paged">
+              </mat-form-field>
+            }
+
+            @if (!viewOnly) {
+              <button mat-icon-button color="warn" type="button" (click)="removeParameter($index)">
+                <mat-icon>delete</mat-icon>
+              </button>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
+</form>

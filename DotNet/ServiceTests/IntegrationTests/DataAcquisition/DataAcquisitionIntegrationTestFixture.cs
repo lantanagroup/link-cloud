@@ -5,6 +5,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Application.Extensions;
@@ -21,7 +22,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Moq;
 using OpenTelemetry.Trace;
-using System.Reflection;
 
 namespace IntegrationTests.DataAcquisition
 {
@@ -55,10 +55,9 @@ namespace IntegrationTests.DataAcquisition
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
 
             // Setup ServiceInformation with the correct connection string
-            var serviceInformation = builder.SetupServiceInformation(
+            builder.SetupServiceInformation(
                 "DataAcquisitionService", // Replace with your actual service name constant if available
-                assemblyVersion,
-                sqliteConnectionString
+                assemblyVersion
             );
 
             builder.Services.AddDbContext<DataAcquisitionDbContext>(options =>
@@ -77,7 +76,7 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddTransient<IEntityRepository<ResourceReferenceType>, EntityRepository<ResourceReferenceType, DataAcquisitionDbContext>>();
 
             // Register IDatabase implementation
-            builder.Services.AddScoped<LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase, LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Database>();
+            builder.Services.AddScoped<IDatabase, Database>();
             builder.Services.AddScoped<IQueryPlanValidator, QueryPlanValidator>();
             builder.Services.AddTransient<IDataAcquisitionLogService, DataAcquisitionLogService>();
 

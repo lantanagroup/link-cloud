@@ -13,6 +13,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 public interface IDataAcquisitionLogService
 {
     Task StartRetrievalProcess(long logId, CancellationToken cancellationToken = default);
+    Task StartRetrievalProcessBulk(List<long> logIds, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogService : IDataAcquisitionLogService
@@ -83,6 +84,48 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
 
             _logger.LogError(ex, "Encountered error triggering workflow for log id: {requestId}", request.Id);
             throw;
+        }
+    }
+
+    public async Task StartRetrievalProcessBulk(List<long> logIds, CancellationToken cancellationToken = default)
+    {
+        if (logIds == null || !logIds.Any())
+        {
+            return;
+        }
+
+        int successCount = 0;
+        int failureCount = 0;
+        Exception? firstException = null;
+
+        foreach (var logId in logIds)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            try
+            {
+                await StartRetrievalProcess(logId, cancellationToken);
+                successCount++;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                failureCount++;
+                firstException ??= ex;
+                _logger.LogDebug(ex, "Failed to start retrieval process for log id {logId} during bulk operation.", logId);
+            }
+        }
+
+        if (failureCount > 0)
+        {
+            _logger.LogWarning("Bulk retrieval process completed with {successCount} successes and {failureCount} failures. First error: {errorMessage}", successCount, failureCount, firstException?.Message);
+        }
+        else
+        {
+            _logger.LogInformation("Bulk retrieval process completed successfully for all {successCount} logs.", successCount);
         }
     }
 }

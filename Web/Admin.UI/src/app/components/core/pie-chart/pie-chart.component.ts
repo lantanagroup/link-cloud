@@ -1,4 +1,4 @@
-import { Component, ElementRef, Input, ViewChild } from '@angular/core';
+import {AfterViewInit, Component, ElementRef, Input, OnChanges, SimpleChanges, ViewChild} from '@angular/core';
 import * as d3 from 'd3';
 
 
@@ -8,7 +8,7 @@ import * as d3 from 'd3';
   templateUrl: './pie-chart.component.html',
   styleUrl: './pie-chart.component.scss'
 })
-export class PieChartComponent {
+export class PieChartComponent implements AfterViewInit, OnChanges {
   @ViewChild('chart', { static: true }) chartElement!: ElementRef<SVGSVGElement>;
   @Input() data: Record<string, number> = {};
   @Input() width = 700;
@@ -16,16 +16,22 @@ export class PieChartComponent {
 
   constructor() { }
 
-   ngOnInit(): void {
+  ngAfterViewInit(): void {
+    this.createChart();
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (this.chartElement) {
       this.createChart();
-    } 
-  
+    }
+  }
+
     private createChart(): void {
       const svgEl = this.chartElement.nativeElement;
-  
+
       // Clear previous chart
       d3.select(svgEl).selectAll('*').remove();
-  
+
       const svg = d3.select(svgEl)
         .attr('width', this.width)
         .attr('height', this.height)
@@ -33,24 +39,24 @@ export class PieChartComponent {
         .attr('transform', `translate(${this.width / 2}, ${this.height / 2})`);
 
       const radius = Math.min(this.width, this.height) / 2;
-  
+
       // Color scale
       const color = d3.scaleOrdinal<string>()
         .domain(Object.keys(this.data))
         .range(d3.schemeCategory10);
-  
+
       // Pie & Arc generators
       const pie = d3.pie<{ key: string; value: number }>()
         .value(d => d.value);
-  
+
       const arc = d3.arc<d3.PieArcDatum<{ key: string; value: number }>>()
         .innerRadius(5) // set >0 for a donut chart
         .outerRadius(radius - 10);
-  
+
       const pieData = pie(
-        Object.entries(this.data).map(([key, value]) => ({ key, value }))          
+        Object.entries(this.data).map(([key, value]) => ({ key, value }))
       );
-  
+
       // Draw slices
       svg.selectAll('path')
         .data(pieData)
@@ -73,7 +79,7 @@ export class PieChartComponent {
         .on('mouseout', () => {
           tooltip.transition().duration(150).style('opacity', 0);
         });
-  
+
         // Create a group-level tooltip text element (initially hidden)
         const tooltip = svg.append('text')
         .attr('text-anchor', 'middle')
@@ -82,16 +88,16 @@ export class PieChartComponent {
         .style('fill', '#000')
         .style('pointer-events', 'none')
         .style('opacity', 0);
-  
+
 
         const margin = { top: 10, left: 10 };
         const legendSpacing = 20;
-  
+
         const legend = d3.select(svgEl)
           .append('g')
           .attr('class', 'legend')
-          .attr('transform', `translate(${margin.left}, ${margin.top})`);     
-  
+          .attr('transform', `translate(${margin.left}, ${margin.top})`);
+
         legend.selectAll('g')
           .data(
             Object.entries(this.data).map(([key, value]) => ({ key, value }))
@@ -100,18 +106,18 @@ export class PieChartComponent {
           .append('g')
           .attr('transform', (_, i) => `translate(0, ${i * 20})`)
           .each(function(d) {
-            const g = d3.select(this);  
+            const g = d3.select(this);
             g.append('rect')
               .attr('width', 14)
               .attr('height', 14)
               .attr('fill', color(d.key));
-  
+
             g.append('text')
               .attr('x', 20)
               .attr('y', 11)
               .text(`${d.key}: ${d.value}`)
               .style('font-size', '14px');
-          });     
-  
+          });
+
     }
 }

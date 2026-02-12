@@ -1,4 +1,7 @@
-﻿using Confluent.Kafka;
+﻿using System.Collections.Specialized;
+using System.Diagnostics;
+using System.Net;
+using Confluent.Kafka;
 using LantanaGroup.Link.Account.Persistence.Interceptors;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
@@ -28,8 +31,6 @@ using Microsoft.Extensions.Options;
 using Quartz;
 using Quartz.Impl;
 using Quartz.Spi;
-using System.Collections.Specialized;
-using System.Net;
 using static LantanaGroup.Link.Shared.Application.Extensions.Security.BackendAuthenticationServiceExtension;
 using Task = System.Threading.Tasks.Task;
 
@@ -55,7 +56,7 @@ namespace IntegrationTests.Tenant
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
 
             // Register ServiceInformation using the extension method
-           var serviceInformation = builder.SetupServiceInformation(TenantConstants.ServiceName, assemblyVersion, _inMemoryDatabaseName);
+           var serviceInformation = builder.SetupServiceInformation(TenantConstants.ServiceName, assemblyVersion);
 
             // Add in-memory database with warning suppression
             builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
@@ -136,7 +137,7 @@ namespace IntegrationTests.Tenant
             builder.Services.AddSingleton<IJobFactory, TestJobFactory>();
 
             // Configure Quartz with RAMJobStore
-            builder.Services.RegisterQuartzDatabase(serviceInformation.ConnectionString);
+            builder.Services.RegisterQuartzDatabase(_inMemoryDatabaseName);
 
             var quartzProps = new NameValueCollection
             {
@@ -194,9 +195,9 @@ namespace IntegrationTests.Tenant
             }
             catch (OperationCanceledException) { /* ignore – already stopped */ }
 
-            var threads = System.Diagnostics.Process.GetCurrentProcess().Threads;
+            var threads = Process.GetCurrentProcess().Threads;
             Console.WriteLine($"Threads alive: {threads.Count}");
-            foreach (System.Diagnostics.ProcessThread t in threads)
+            foreach (ProcessThread t in threads)
                 Console.WriteLine($"  ID:{t.Id} StartTime:{t.StartTime} State:{t.ThreadState}");
 
             _host.Dispose();

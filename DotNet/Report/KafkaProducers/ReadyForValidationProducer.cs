@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Text;
 
@@ -28,20 +29,14 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public async Task Produce(List<ProduceValidationModel> needValidation)
         {
-            var submissionEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
-
             foreach (var entry in needValidation)
             {
-               await Produce(entry.ReportScheduleId, entry.ReportTypes, entry.FacilityId, entry.PatientId, entry.PayloadUri, Guid.NewGuid().ToString(), submissionEntryManager);
+                await Produce(entry.ReportScheduleId, entry.ReportTypes, entry.FacilityId, entry.PatientId, entry.PayloadUri, Guid.NewGuid().ToString());
             }
         }
 
-        public async Task Produce(string scheduleId, List<string> reportTypes, string facilityId, string patientId, string? payloadUri, string correlationId, ISubmissionEntryManager? manager = null)
+        public async Task Produce(string scheduleId, List<string> reportTypes, string facilityId, string patientId, string? payloadUri, string correlationId)
         {
-            var corrId = string.IsNullOrWhiteSpace(correlationId)
-                       ? Guid.NewGuid().ToString()
-                       : correlationId;
-
             _readyForValidationProducer.Produce(nameof(KafkaTopic.ReadyForValidation),
                 new Message<ReadyForValidationKey, ReadyForValidationValue>
                 {
@@ -59,18 +54,24 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     },
                     Headers = new Headers
                     {
-                        { "X-Correlation-Id",  Encoding.UTF8.GetBytes(corrId) }
+                        { "X-Correlation-Id",  Encoding.UTF8.GetBytes(correlationId) }
                     }
                 });
 
             _readyForValidationProducer.Flush();
 
-            if(manager == null)
+            var reportEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportEntryManager>();
+            var entry = await reportEntryManager.GetEntry(scheduleId, patientId);
+
+            if (entry == null) 
             {
-                manager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
+                throw new Exception($"No report entry record was found (ReportId = {scheduleId}, FacilityId = {facilityId}).");
             }
 
-            await manager.UpdateStatusToValidationRequested(scheduleId, facilityId, patientId, CancellationToken.None);
+            entry.ReportingStatus = Domain.Enums.ReportingStatus.PendingValidation;
+            entry.SubmissionStatus = Domain.Enums.SubmissionStatus.PendingValidation;
+            
+            await reportEntryManager.UpdateAsync(entry);
         }
     }
 }

@@ -9,11 +9,10 @@ using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Census.Domain.Queries;
-using LantanaGroup.Link.Shared.Application.Extensions; // Added for SetupServiceInformation
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
-using LantanaGroup.Link.Shared.Settings;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,11 +20,10 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry.Trace;
 using Quartz;
-using Quartz.Impl;
 using Quartz.Logging;
+// Added for SetupServiceInformation
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 using Task = System.Threading.Tasks.Task;
-using System.Reflection;
 
 namespace IntegrationTests.Census;
 
@@ -72,8 +70,7 @@ public sealed class CensusIntegrationTestFixture : IDisposable
         // Register ServiceInformation using the extension method with the in-memory db name
         var serviceInformation = builder.SetupServiceInformation(
             "CensusService", // Replace with a constant if available
-            assemblyVersion,
-            dbName
+            assemblyVersion
         );
 
         builder.Services.AddDbContext<CensusContext>(options =>

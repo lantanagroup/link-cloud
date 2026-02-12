@@ -40,8 +40,30 @@ public class AcquisitionProcessingJob : IJob
 
     public async Task Execute(IJobExecutionContext context)
     {
+        await FailStalledQueuedLogs(context.CancellationToken);
         await ProcessPendingLogs(context.CancellationToken);
         await ProcessPendingTailingMessages(context.CancellationToken);
+    }
+
+    private async Task FailStalledQueuedLogs(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var scope = _serviceScopeFactory.CreateScope();
+            var dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+            
+            _logger.LogInformation("Checking for stalled queued logs...");
+            int failedCount = await dataAcquisitionLogQueries.FailStalledQueuedLogsAsync(15, cancellationToken);
+            
+            if (failedCount > 0)
+            {
+                _logger.LogInformation("Successfully failed {count} stalled queued logs.", failedCount);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while failing stalled queued logs.");
+        }
     }
 
     public async Task ProcessPendingLogs(CancellationToken cancellationToken)

@@ -16,9 +16,10 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
         Task<FacilityModel?> GetAsync(Guid id, CancellationToken cancellationToken = default);
 
         Task<FacilityModel?> GetAsync(string facilityId, string? facilityName = null,
-            CancellationToken cancellationToken = default);
+            CancellationToken cancellationToken = default, bool includeDeleted = false);
 
-        Task<List<FacilityModel>> SearchAsync(FacilitySearchModel model, CancellationToken cancellationToken = default);
+        Task<List<FacilityModel>> SearchAsync(FacilitySearchModel model, CancellationToken cancellationToken = default,
+            bool includeDeleted = false);
 
         Task<PagedConfigModel<FacilityModel>> PagedSearchAsync(FacilitySearchModel model,
             string sortBy = "FacilityId", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10,
@@ -42,16 +43,16 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
         }
 
         public async Task<FacilityModel?> GetAsync(string facilityId, string? facilityName = null,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default, bool includeDeleted = false)
         {
             return (await SearchAsync(new FacilitySearchModel { FacilityId = facilityId, FacilityName = facilityName },
-                cancellationToken)).SingleOrDefault();
+                cancellationToken, includeDeleted)).SingleOrDefault();
         }
 
         public async Task<List<FacilityModel>> SearchAsync(FacilitySearchModel model,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default, bool includeDeleted = false)
         {
-            var result = await PagedSearchAsync(model, pageSize: int.MaxValue, cancellationToken: cancellationToken);
+            var result = await PagedSearchAsync(model, pageSize: int.MaxValue, includeDeleted: includeDeleted, cancellationToken: cancellationToken);
             return result.Records;
         }
 

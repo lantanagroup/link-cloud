@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Reflection;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Extensions;
@@ -27,14 +29,11 @@ using LantanaGroup.Link.Tenant.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using Quartz;
 using Serilog;
 using Serilog.Debugging;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
-using System.Diagnostics;
-using System.Reflection;
 
 namespace Tenant
 {
@@ -102,22 +101,29 @@ namespace Tenant
             builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
             builder.Services.AddSingleton<CreateAuditEventCommand>();
 
+            var dbProvider = builder.Configuration.GetValue<string>(TenantConstants.AppSettingsSectionNames.DatabaseProvider);
+            string? databaseConnectionString = null;
+
+            if (dbProvider == ConfigurationConstants.AppSettings.SqlServerDatabaseProvider)
+            {
+                databaseConnectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
+
+                if (string.IsNullOrEmpty(databaseConnectionString))
+                    throw new InvalidOperationException("Database connection string is null or empty.");
+
+                // Add Quartz scheduler with SQL persistence
+                builder.Services.RegisterQuartzDatabase(databaseConnectionString);
+            }
+
             //Add database context
             builder.Services.AddDbContext<TenantDbContext>((sp, options) =>
             {
                 var updateBaseEntityInterceptor = sp.GetService<UpdateBaseEntityInterceptor>()!;
 
-                switch (builder.Configuration.GetValue<string>(TenantConstants.AppSettingsSectionNames.DatabaseProvider))
+                switch (dbProvider)
                 {
                     case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
-                        string? connectionString =
-                            builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections
-                                .DatabaseConnection);
-
-                        if (string.IsNullOrEmpty(connectionString))
-                            throw new InvalidOperationException("Database connection string is null or empty.");
-
-                        options.UseSqlServer(connectionString)
+                        options.UseSqlServer(databaseConnectionString)
                            .AddInterceptors(updateBaseEntityInterceptor);
                         break;
                     default:
@@ -189,9 +195,6 @@ namespace Tenant
                 .CreateLogger();
 
             SelfLog.Enable(Console.Error);
-
-            //Add Quartz scheduler with SQL persistence
-            builder.Services.RegisterQuartzDatabase(serviceInformation.ConnectionString);
 
             builder.Services.AddSingleton<ReportScheduledJob>();
 

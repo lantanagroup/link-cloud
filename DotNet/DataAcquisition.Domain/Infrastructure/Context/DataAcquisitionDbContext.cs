@@ -1,4 +1,6 @@
-﻿using AppAny.Quartz.EntityFrameworkCore.Migrations;
+﻿using System.Text.Json;
+using System.Text.Json.Serialization;
+using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -10,9 +12,8 @@ using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.Configuration;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
+using ResourceType = Hl7.Fhir.Model.ResourceType;
 using ScheduledReport = LantanaGroup.Link.Shared.Application.Models.ScheduledReport;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -80,8 +81,8 @@ public class DataAcquisitionDbContext : DbContext
 
             entity.Property(p => p.EHRPatientLists)
             .HasConversion(
-                v => JsonSerializer.Serialize(v, new JsonSerializerOptions { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } }),
-                v => JsonSerializer.Deserialize<List<EhrPatientList>>(v, new JsonSerializerOptions { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } }));
+                v => JsonSerializer.Serialize(v, new JsonSerializerOptions { Converters = { new JsonStringEnumConverter() } }),
+                v => JsonSerializer.Deserialize<List<EhrPatientList>>(v, new JsonSerializerOptions { Converters = { new JsonStringEnumConverter() } }));
         });
 
         //-------------------ReferenceResources-------------------
@@ -115,7 +116,7 @@ public class DataAcquisitionDbContext : DbContext
         {
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
 
-            entity.Property(e => e.ResourceType).HasConversion(new EnumToStringConverter<Hl7.Fhir.Model.ResourceType>());
+            entity.Property(e => e.ResourceType).HasConversion(new EnumToStringConverter<ResourceType>());
 
             entity.HasOne(d => d.FhirQuery).WithMany(p => p.FhirQueryResourceTypes)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -170,6 +171,29 @@ public class DataAcquisitionDbContext : DbContext
                     nameof(DataAcquisitionLog.RetryAttempts),
                     nameof(DataAcquisitionLog.CompletionDate),
                     nameof(DataAcquisitionLog.CompletionTimeMilliseconds)
+                );
+
+            entity.HasIndex(e => new { e.FacilityId, e.ExecutionDate, e.Id })
+                .HasDatabaseName("IX_DataAcquisitionLogs_Facility_ExecutionDate_Id")
+                .IncludeProperties(
+                    nameof(DataAcquisitionLog.Priority),
+                    nameof(DataAcquisitionLog.PatientId),
+                    nameof(DataAcquisitionLog.FhirVersion),
+                    nameof(DataAcquisitionLog.QueryType),
+                    nameof(DataAcquisitionLog.QueryPhase),
+                    nameof(DataAcquisitionLog.Status)
+                );
+
+            entity.HasIndex(e => new { e.ReportTrackingId, e.ExecutionDate, e.Id })
+                .HasDatabaseName("IX_DataAcquisitionLogs_ReportTrackingId_ExecutionDate_Id")
+                .IncludeProperties(
+                    nameof(DataAcquisitionLog.FacilityId),
+                    nameof(DataAcquisitionLog.Priority),
+                    nameof(DataAcquisitionLog.PatientId),
+                    nameof(DataAcquisitionLog.FhirVersion),
+                    nameof(DataAcquisitionLog.QueryType),
+                    nameof(DataAcquisitionLog.QueryPhase),
+                    nameof(DataAcquisitionLog.Status)
                 );
         });
 

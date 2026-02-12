@@ -334,6 +334,7 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
                 boolean success = "true".equalsIgnoreCase((String)resultValues.get(0));
                 IValidationSupport.CodeValidationResult retVal = new IValidationSupport.CodeValidationResult();
                 if (success) {
+                    retVal.setSeverity(retVal.getSeverity() != null ? retVal.getSeverity() : IssueSeverity.INFORMATION);
                     retVal.setCode(theCode);
                     List<String> displayValues = ParametersUtil.getNamedParameterValuesAsString(this.getFhirContext(), output, "display");
                     if (!displayValues.isEmpty()) {

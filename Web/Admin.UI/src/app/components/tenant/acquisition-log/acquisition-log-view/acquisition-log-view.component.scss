@@ -1,42 +1,17 @@
-@use '../../../../../styles/core.scss';
-@use '../../../../../styles/link-table.scss';
-
 @use 'sass:color';
 
 .priority-high {
-    background-color: rgb(161, 112, 3, .7);
-}
-
-    .priority-high > td.data-col ,
-    .priority-high > td.data-col > div {
-        color: #FFFFFF;
-    }
-
-    .priority-high > td.priority-col,
-    .priority-high > td.data-col > div.log-resource-type {
-        font-weight: 900;
-    }
-
-tr.priority-high:hover {
-    background-color: color.adjust(rgb(161, 112, 3, .7), $lightness: 5%) !important;
+  background-color: rgba(161, 112, 3, 0.7);
+  &:hover { background-color: color.adjust(rgba(161, 112, 3, 0.7), $lightness: 5%) !important; }
+  > td.data-col, > td.data-col > div { color: #FFFFFF; }
+  > td.priority-col, > td.data-col > div.log-resource-type { font-weight: 900; }
 }
 
 .priority-critical {
   background-color: rgba(161, 3, 14, 0.702);
-}
-
-    .priority-critical > td.data-col,
-        .priority-critical > td.data-col > div {
-            color: #FFFFFF;
-        }
-
-    .priority-critical > td.priority-col,
-    .priority-critical > td.data-col > div.log-resource-type {
-        font-weight: 900;
-    }
-
-tr.priority-critical:hover {
-    background-color: color.adjust(rgb(161, 3, 14, 0.702), $lightness: 5%) !important;
+  &:hover { background-color: color.adjust(rgba(161, 3, 14, 0.702), $lightness: 5%) !important; }
+  > td.data-col, > td.data-col > div { color: #FFFFFF; }
+  > td.priority-col, > td.data-col > div.log-resource-type { font-weight: 900; }
 }
 
 .log-status {
@@ -116,6 +91,13 @@ $skipped-status: #ffbf00;
   border-radius: 0.375rem;
 }
 
+.status-queued {
+  background-color: #0ea5e9; // sky-blue
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+}
 
 .animate-spin {
   height: 1.25rem;
@@ -156,4 +138,184 @@ $skipped-status: #ffbf00;
 
 .pulse-warning-invert {
   filter: drop-shadow(0 0 2px #fff);
+}
+
+.table-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.table-footer mat-paginator {
+  margin-left: auto;
+}
+
+.page-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #4b5563;
+}
+
+.page-jump-label {
+  font-weight: 500;
+}
+
+.page-jump-input {
+  width: 5rem;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.page-jump-total {
+  color: #6b7280;
+}
+
+.status-summary-panel {
+  margin: 1rem 1rem 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: none;
+  background: #f8fafc;
+
+  &.mat-expanded {
+    margin-bottom: 1rem;
+  }
+}
+
+.status-summary-panel-header {
+  height: 48px !important;
+}
+
+.status-summary-panel-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #1f2937;
+}
+
+.status-summary-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  padding-bottom: 1rem;
+}
+
+.status-summary-chart {
+  width: 360px;
+  max-width: 100%;
+}
+
+.status-summary-loading,
+.status-summary-empty {
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.status-summary-separator {
+  color: #cbd5e1;
+  margin: 0 5px;
+}
+
+.sub-title {
+  margin-bottom: 0;
+}
+
+.actions-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 20px;
+  background-color: #fdfdfd;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 1rem;
+  align-items: center;
+
+  .filter-actions-group, .bulk-actions-group {
+    display: contents; /* Let children participate in the main flex container */
+  }
+
+  .filter-item {
+    flex: 1 1 180px;
+    min-width: 150px;
+    max-width: 300px;
+  }
+}
+
+.patient-log-link {
+  margin-left: 8px;
+  color: #5f6672;
+  transition: color 0.2s;
+  cursor: pointer;
+
+  &:hover {
+    color: #005a75;
+  }
+}
+
+.patient-filter-icon {
+  margin-left: 8px;
+  color: #5f6672;
+  transition: color 0.2s;
+  cursor: pointer;
+  font-size: 0.8rem;
+
+  &:hover {
+    color: #005a75;
+  }
+}
+
+.resource-filter-icon {
+  margin-left: 8px;
+  color: #5f6672;
+  transition: color 0.2s;
+  cursor: pointer;
+  font-size: 0.8rem;
+
+  &:hover {
+    color: #005a75;
+  }
+}
+
+.facility-link {
+  margin-left: 8px;
+  color: #5f6672;
+  transition: color 0.2s;
+  cursor: pointer;
+  text-decoration: none;
+
+  &:hover {
+    color: #005a75;
+  }
+
+  fa-icon {
+    font-size: 0.85rem;
+  }
+}
+
+.action-column {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+  padding-right: 1.5rem !important;
+
+  ::ng-deep .menu-container {
+    display: flex;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 900px) {
+  .status-summary-panel {
+    margin: 0.75rem 0.5rem 0;
+  }
+
+  .status-summary-body {
+    min-height: 200px;
+  }
 }

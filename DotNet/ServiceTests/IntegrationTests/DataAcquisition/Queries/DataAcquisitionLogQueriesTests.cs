@@ -337,8 +337,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         {
             FacilityId = facilityId,
             ReportTrackingId = reportTrackingId,
-            CorrelationId = correlationId,
-            RequestStatus = RequestStatus.Completed
+            CorrelationId = correlationId
         })).Records.FirstOrDefault();
 
         // Assert

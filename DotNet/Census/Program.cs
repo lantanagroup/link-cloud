@@ -1,3 +1,6 @@
+using System.Diagnostics;
+using System.Reflection;
+using System.Text.Json.Serialization;
 using Census.Domain.Entities;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
@@ -36,14 +39,10 @@ using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.OpenApi.Models;
-using Quartz;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
-using System.Diagnostics;
-using System.Reflection;
 using PatientEvent = LantanaGroup.Link.Census.Domain.Entities.POI.PatientEvent;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -78,21 +77,32 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // EF Core and Interceptors
     builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
+    var dbProvider = builder.Configuration.GetValue<string>(CensusConstants.AppSettings.DatabaseProvider);
+    string? databaseConnectionString = null;
+
+    if (dbProvider == ConfigurationConstants.AppSettings.SqlServerDatabaseProvider)
+    {
+        databaseConnectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
+
+        if (string.IsNullOrEmpty(databaseConnectionString))
+            throw new InvalidOperationException("Database connection string is null or empty.");
+
+        // Quartz Scheduler with SQL persistence
+        builder.Services.RegisterQuartzDatabase(databaseConnectionString);
+    }
+
     builder.Services.AddDbContext<CensusContext>((sp, options) =>
     {
         var updateBaseEntityInterceptor = sp.GetService<UpdateBaseEntityInterceptor>();
-        switch (builder.Configuration.GetValue<string>(CensusConstants.AppSettings.DatabaseProvider))
+        switch (dbProvider)
         {
             case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
-                string? connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
-                if (string.IsNullOrEmpty(connectionString))
-                    throw new InvalidOperationException("Database connection string is null or empty.");
-
-                options.UseSqlServer(connectionString, sqlOptions =>
+                options.UseSqlServer(databaseConnectionString, sqlOptions =>
                 {
                     sqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
                 })
                 .AddInterceptors(updateBaseEntityInterceptor);
+
                 break;
             default:
                 throw new InvalidOperationException($"Database provider not supported. Attempting to find section named: {CensusConstants.AppSettings.DatabaseProvider}");
@@ -103,7 +113,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHttpClient();
     builder.Services.AddControllers().AddJsonOptions(options =>
     {
-        options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+        options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
         options.JsonSerializerOptions.ForFhir();
     });
@@ -150,8 +160,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITransientExceptionHandler<string, string>, TransientExceptionHandler<string, string>>();
     builder.Services.AddTransient<ITransientExceptionHandler<string, PatientListMessage>, TransientExceptionHandler<string, PatientListMessage>>();
 
-    // Quartz Scheduler with SQL persistence
-    builder.Services.RegisterQuartzDatabase(serviceInformation.ConnectionString);
     builder.Services.AddTransient<SchedulePatientListRetrieval>();
     builder.Services.AddTransient<RetryJob>();
 
