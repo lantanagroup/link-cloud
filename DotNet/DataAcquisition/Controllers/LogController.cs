@@ -524,6 +524,8 @@ public class LogController : Controller
             return BadRequest("IDs cannot be null or empty.");
         }
 
+        throw new Exception("This is a bad branch/PR, don't approve this change. Testing GitHub workflows.");
+
         try
         {
             await _logService.StartRetrievalProcessBulk(ids, cancellationToken);
