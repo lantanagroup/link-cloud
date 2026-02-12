@@ -41,13 +41,13 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             try
             {
                 var ex = new Exception(message);
-                Logger.LogError(ex, "{Name}: Failed to process {S} Event.", GetType().Name, ServiceName);
+                Logger.LogError(ex, "{Name}: Failed to process {S} Event. (Partition: {Partition} Offset: {Offset})", GetType().Name, ServiceName, consumeResult.Partition.Value, consumeResult.Offset.Value);
 
-                ProduceDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, message);
+                ProduceDeadLetter(consumeResult, message);
             }
             catch (Exception e)
             {
-                Logger.LogError(e, "Error in {name}.HandleException: {message}", GetType().Name, e.Message);
+                Logger.LogError(e, "Error in {name}. HandleException: {message}", GetType().Name, e.Message);
             }
         }
 
@@ -63,10 +63,10 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.AddException(ex);
-                
-                Logger.LogError(ex, "{Name}: Failed to process {S} Event.", GetType().Name, ServiceName);
 
-                ProduceDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, ex.Message);
+                Logger.LogError(ex, "{Name}: Failed to process {S} Event. (Partition: {Partition} Offset: {Offset})", GetType().Name, ServiceName, consumeResult.Partition.Value, consumeResult.Offset.Value);
+
+                ProduceDeadLetter(consumeResult, ex.Message);
             }
             catch (Exception e)
             {
@@ -74,7 +74,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             }
         }
 
-        public virtual void ProduceDeadLetter(K key, V value, Headers headers, string exceptionMessage)
+        public virtual void ProduceDeadLetter(ConsumeResult<K, V> consumeResult, string exceptionMessage)
         {
             if (string.IsNullOrWhiteSpace(Topic))
             {
@@ -82,19 +82,21 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                     $"{GetType().Name}.Topic has not been configured. Cannot Produce Dead Letter Event for {ServiceName}");
             }
 
-            if (!headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var headerValue))
+            if (!consumeResult.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var headerValue))
             {
-                headers.Add(KafkaConstants.HeaderConstants.ExceptionService, Encoding.UTF8.GetBytes(ServiceName));
+                consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.ExceptionService, Encoding.UTF8.GetBytes(ServiceName));
             }
 
-            headers.Add(KafkaConstants.HeaderConstants.ExceptionMessage, Encoding.UTF8.GetBytes(exceptionMessage));
+            consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.ExceptionPartition, Encoding.UTF8.GetBytes(consumeResult.Partition.Value.ToString()));
+            consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.ExceptionOffset, Encoding.UTF8.GetBytes(consumeResult.Offset.Value.ToString()));
+            consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.ExceptionMessage, Encoding.UTF8.GetBytes(exceptionMessage));
 
             using var producer = ProducerFactory.CreateProducer(new ProducerConfig() { CompressionType = CompressionType.Zstd });
             producer.Produce(Topic, new Message<K, V>
             {
-                Key = key,
-                Value = value,
-                Headers = headers
+                Key = consumeResult.Message.Key,
+                Value = consumeResult.Message.Value,
+                Headers = consumeResult.Message.Headers
             });
 
             producer.Flush();

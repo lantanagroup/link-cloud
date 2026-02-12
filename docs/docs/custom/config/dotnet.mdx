@@ -227,3 +227,14 @@ The ServiceInformation configuration allows exposing build, version and deployme
 | ServiceInformation__Commit         | Git commit hash of deployed version | No       | None                            | No      |
 
 The service automatically extracts information from .NET assembly version in the AssemblyInfo.cs file or project file
+
+## Data Acquisition Worker Configuration
+
+# AcquisitionWorkerProcessorSettings
+
+The AcquisitionWorkerProcessorSettings configuration allows exposing allows the setting of configuration for concurrency and channel size.
+
+| Property                                                         | Description                                           | Required | Default Value | Secret? |
+|------------------------------------------------------------------|-------------------------------------------------------|----------|---------------|---------|
+| AcquisitionWorkerProcessorSettings__MaxConcurrentAcquisitions    | Sets the concurrency for processing of kafka messages | No       | 8             | No      |
+| AcquisitionWorkerProcessorSettings__WorkChannelCapacity          | Capacity of channel for a DAW instance                | No       | 200           | No      |

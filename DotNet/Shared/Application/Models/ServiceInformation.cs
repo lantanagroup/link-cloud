@@ -1,7 +1,7 @@
-﻿using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using System.Reflection;
+﻿using System.Reflection;
 using System.Text.Json;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.Shared.Application.Models;
 
@@ -15,10 +15,6 @@ public class ServiceInformation
     public string Commit { get; init; } = string.Empty;
     public string Build { get; init; } = string.Empty;
     public string SwaggerUrl { get; set; } = string.Empty;
-
-    [System.Text.Json.Serialization.JsonIgnore]
-    [Newtonsoft.Json.JsonIgnore]
-    public string? ConnectionString { get; set; }
 
     public static ServiceInformation GetServiceInformation(Assembly assembly, IConfiguration configuration)
     {

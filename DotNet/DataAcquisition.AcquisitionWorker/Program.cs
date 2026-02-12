@@ -1,6 +1,7 @@
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
+using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Extensions;
@@ -22,11 +23,18 @@ builder.Configuration.AddStandardEnvironmentConfiguration();
 
 var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
 
+//register worker processor config
+builder.Services.Configure<AcquisitionWorkerProcessorSettings>(
+    builder.Configuration.GetSection("AcquisitionWorkerProcessorSettings"));
+
 builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName, true);
 
 builder.Services.AddTransient<IDataAcquisitionServiceMetrics, DataAcquisitionServiceMetrics>();
 builder.Services.AddTransient<ICreateSystemToken, CreateSystemToken>();
 builder.Services.AddSingleton(TimeProvider.System);
+
+builder.Services.AddSingleton<AcquisitionProcessorBackgroundService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<AcquisitionProcessorBackgroundService>());
 
 //Add CORS
 builder.Services.AddLinkCorsService(options => {
