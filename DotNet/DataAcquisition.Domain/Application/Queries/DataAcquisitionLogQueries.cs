@@ -366,15 +366,21 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     {
         var stallThreshold = DateTime.UtcNow.AddMinutes(-stallMinutes);
 
-        int rowsAffected = await _dbContext.DataAcquisitionLogs
+        var stalledLogs = await _dbContext.DataAcquisitionLogs
             .Where(l => l.Status == RequestStatus.Queued && l.ModifyDate <= stallThreshold)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(l => l.Status, RequestStatus.Failed)
-                .SetProperty(l => l.ModifyDate, DateTime.UtcNow)
-                .SetProperty(l => l.Notes, l => l.Notes.Append($"[{DateTime.UtcNow}] Request failed due to being in Queued status for more than {stallMinutes} minutes.").ToList()),
-                cancellationToken);
+            .ToListAsync(cancellationToken);
 
-        return rowsAffected;
+        if (stalledLogs.Count == 0)
+            return 0;
+
+        foreach (var log in stalledLogs)
+        {
+            log.Status = RequestStatus.Failed;
+            log.ModifyDate = DateTime.UtcNow;
+            log.Notes.Add($"[{DateTime.UtcNow}] Request failed due to being in Queued status for more than {stallMinutes} minutes.");
+        }
+
+        return await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<PagedConfigModel<DataAcquisitionLogModel>> SearchAsync(SearchDataAcquisitionLogRequest model,
