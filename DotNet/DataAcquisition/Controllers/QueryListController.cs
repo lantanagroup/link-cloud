@@ -39,6 +39,11 @@ public class QueryListController : Controller
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<FhirListConfigurationModel>> GetFhirConfiguration(string facilityId, CancellationToken cancellationToken)
     {
+        if (facilityId == "SomeTestFacility")
+        {
+            throw new Exception("Test facility not supported");
+        }
+        
         if (string.IsNullOrWhiteSpace(facilityId))
         {
             return BadRequest("A facility id is required.");
