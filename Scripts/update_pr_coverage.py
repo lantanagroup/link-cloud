@@ -92,6 +92,12 @@ def parse_cobertura(report_path, changed_files):
                     for method in cls.findall(".//method"):
                         if any(l.get("number") == str(line_num) for l in method.findall(".//line")):
                             method_name = method.get("name")
+                            # Handle .NET async state machine methods
+                            if method_name == "MoveNext":
+                                class_name = cls.get("name", "")
+                                match = re.search(r"<([^>]+)>", class_name)
+                                if match:
+                                    method_name = match.group(1)
                             break
                     
                     print(f"    [DOTNET] Line {line_num} in {method_name}() - {status}")
