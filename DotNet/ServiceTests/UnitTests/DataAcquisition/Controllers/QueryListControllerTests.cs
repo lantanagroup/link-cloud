@@ -83,6 +83,14 @@ namespace UnitTests.DataAcquisition.Controllers
         }
 
         [Fact]
+        public async Task GetFhirConfiguration_ThrowsException_WhenSpecialTestFacilityIdIsUsed()
+        {
+            // Act & Assert
+            var exception = await Assert.ThrowsAsync<Exception>(() => _controller.GetFhirConfiguration("SomeTestFacility", CancellationToken.None));
+            Assert.Equal("Test facility not supported", exception.Message);
+        }
+
+        [Fact]
         public async Task GetFhirConfiguration_LogsAndThrows_WhenExceptionOccurs()
         {
             // Arrange
