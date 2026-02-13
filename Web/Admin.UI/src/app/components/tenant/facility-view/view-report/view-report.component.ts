@@ -22,6 +22,7 @@ import {
   faArrowLeft,
   faFileArrowDown,
   faFileInvoice,
+  faFileLines,
   faGears,
   faRotate,
   faSort,
@@ -76,11 +77,13 @@ export class ViewReportComponent implements OnInit {
   faArrowLeft = faArrowLeft;
   faFileArrowDown = faFileArrowDown;
   faFileInvoice = faFileInvoice;
+  faFileLines = faFileLines;
   faSort = faSort;
   faSortUp = faSortUp;
   faSortDown = faSortDown;
   faGears = faGears;
 
+  private readonly PAGE_SIZE_KEY = 'viewReportPageSize';
   facilityId: string = '';
   reportId: string = '';
 
@@ -136,6 +139,12 @@ export class ViewReportComponent implements OnInit {
     private reportService: ReportService) { }
 
   ngOnInit(): void {
+    const savedPageSize = localStorage.getItem(this.PAGE_SIZE_KEY);
+    if (savedPageSize) {
+      this.defaultPageSize = +savedPageSize;
+    }
+    this.paginationMetadata.pageSize = this.defaultPageSize;
+
     this.facilityId = this.route.snapshot.paramMap.get('facilityId') || '';
     this.reportId = this.route.snapshot.paramMap.get('reportId') || '';
     this.loadReportSchedule();
@@ -304,6 +313,7 @@ export class ViewReportComponent implements OnInit {
   onPageChange(event: PageEvent): void {
     this.paginationMetadata.pageSize = event.pageSize;
     this.paginationMetadata.pageNumber = event.pageIndex;
+    localStorage.setItem(this.PAGE_SIZE_KEY, event.pageSize.toString());
     this.loadReportEntries();
   }
 
