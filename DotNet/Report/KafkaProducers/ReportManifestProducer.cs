@@ -123,7 +123,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             
             foreach (var entry in reportEntries)
             {
-                if ((entry.ReportingStatus == ReportingStatus.NotReportable || entry.ReportingStatus == ReportingStatus.PassedValidation || entry.ReportingStatus == ReportingStatus.FailedValidation) && entry.SubmissionStatus == SubmissionStatus.Submitted)
+                if ((entry.ReportingStatus == ReportingStatus.NotReportable || entry.ReportingStatus == ReportingStatus.PassedValidation || entry.ReportingStatus == ReportingStatus.FailedValidation) && (entry.SubmissionStatus == SubmissionStatus.Submitted || entry.SubmissionStatus == SubmissionStatus.NotEligable))
                 {
                     continue;
                 }
@@ -154,6 +154,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 // Return false to indicate failure
                 return false;
             }
+
+            _logger.LogDebug("Manifest generated (Facility = {FacilityId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId, schedule.Id);
 
             await _payloadSubmittedProducer.Produce(schedule, PayloadType.ReportSchedule, payloadUri: payloadUri?.ToString());
 
