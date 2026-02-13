@@ -366,15 +366,35 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     {
         var stallThreshold = DateTime.UtcNow.AddMinutes(-stallMinutes);
 
-        int rowsAffected = await _dbContext.DataAcquisitionLogs
-            .Where(l => l.Status == RequestStatus.Queued && l.ModifyDate <= stallThreshold)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(l => l.Status, RequestStatus.Failed)
-                .SetProperty(l => l.ModifyDate, DateTime.UtcNow)
-                .SetProperty(l => l.Notes, l => l.Notes.Append($"[{DateTime.UtcNow}] Request failed due to being in Queued status for more than {stallMinutes} minutes.").ToList()),
-                cancellationToken);
+        using var transaction = await _dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead,cancellationToken);
+        try
+        {
+            var stalledLogs = await _dbContext.DataAcquisitionLogs
+                .Where(l => l.Status == RequestStatus.Queued && l.ModifyDate <= stallThreshold)
+                .ToListAsync(cancellationToken);
 
-        return rowsAffected;
+            if (stalledLogs.Count == 0)
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return 0;
+            }
+
+            foreach (var log in stalledLogs)
+            {
+                log.Status = RequestStatus.Failed;
+                log.ModifyDate = DateTime.UtcNow;
+                log.Notes.Add($"[{DateTime.UtcNow}] Request failed due to being in Queued status for more than {stallMinutes} minutes.");
+            }
+
+            var result = await _dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return result;
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 
     public async Task<PagedConfigModel<DataAcquisitionLogModel>> SearchAsync(SearchDataAcquisitionLogRequest model,
