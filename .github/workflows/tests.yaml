@@ -9,6 +9,7 @@ on:
       - workflow/**
       - release/**
       - hotfix/**
+      - tech_debt/**
       - test/**
 
 permissions:
