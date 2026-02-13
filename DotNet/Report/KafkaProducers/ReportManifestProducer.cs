@@ -155,6 +155,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 return false;
             }
 
+            _logger.LogDebug("Manifest generated (Facility = {FacilityId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId, schedule.Id);
+
             await _payloadSubmittedProducer.Produce(schedule, PayloadType.ReportSchedule, payloadUri: payloadUri?.ToString());
 
             return true;
