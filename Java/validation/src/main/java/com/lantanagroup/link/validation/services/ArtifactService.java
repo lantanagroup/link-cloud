@@ -58,6 +58,7 @@ public class ArtifactService {
     private void doSaveArtifact(ArtifactType type, String name, byte[] content) {
         Artifact artifact = artifactRepository.findByTypeAndName(type, name)
                 .orElseGet(() -> getArtifact(type, name, content));
+        artifact.setContent(content);
         artifactRepository.save(artifact);
     }
 
