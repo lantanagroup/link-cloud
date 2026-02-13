@@ -6,6 +6,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
@@ -214,7 +215,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
-            var relativeUrl = $"api/schedules/{reportScheduleId}";
+            var relativeUrl = $"api/schedules/{HtmlInputSanitizer.Sanitize(reportScheduleId)}";
 
             var response = await _client.GetAsync(relativeUrl, cancellationToken);
 
