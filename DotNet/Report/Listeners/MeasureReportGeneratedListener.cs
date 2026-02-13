@@ -179,10 +179,6 @@ namespace LantanaGroup.Link.Report.Listeners
 
             var correlationId = Encoding.UTF8.GetString(headerValue);
 
-            var reportEntry = await reportEntryManager.UpdateAsyncWithConsumerResult(result.Message.Value);
-            var readyForAggregation = reportEntry.MeasureReportList.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable || x.Status == Domain.Enums.MeasureReportStatus.ReadyForValidation);
-
-
             var schedule = await reportScheduledManager.GetReportSchedule(result.Message.Value.FacilityId, result.Message.Value.ReportTrackingId, cancellationToken);
 
             if (schedule == null)
@@ -190,8 +186,24 @@ namespace LantanaGroup.Link.Report.Listeners
                 throw new DeadLetterException($"{Name}: No scheduled report record was found (ReportId = {result.Message.Value.ReportTrackingId}, FacilityId = {result.Message.Value.FacilityId}).");
             }
 
+            var reportEntry = await reportEntryManager.UpdateAsyncWithConsumerResult(result.Message.Value);
+
+            var isAllNonReportable = reportEntry.MeasureReportList.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable);
+
+            //Handles the case when all Measure Reports for a patient do not meet the criteria for all measures. In this case, we want to update the patient entry as 'Not Reportable'. Afterwards, we will attempt to produce a manifest if this consumed event was the last for the reporting period.
+            if (isAllNonReportable)
+            {
+                await reportEntryManager.UpdateAsyncNotReportableEntry(reportEntry, cancellationToken);
+                await reportManifestProducer.Produce(schedule, correlationId);
+                return;
+            }
+
+            var readyForAggregation = reportEntry.MeasureReportList.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable || x.Status == Domain.Enums.MeasureReportStatus.ReadyForValidation);
+
+            //The aggregation step for a patient will only be performed once the Report service has consumed 'MeasureReportGenerated' events for all entries in reportEntry.MeasureReportList.
             if (!readyForAggregation)
             {
+                //TODO - Daniel: The 'isAllNonReportable' logic above was recently added (2/12/2026) and may replace the need for executing reportManifestProducer below. It won't hurt to run, but may not be needed. If we find that we don't need to execute the manifest producer, we will only need to return in this block.
                 await reportManifestProducer.Produce(schedule, correlationId);
                 return;
             }

@@ -123,7 +123,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             
             foreach (var entry in reportEntries)
             {
-                if ((entry.ReportingStatus == ReportingStatus.NotReportable || entry.ReportingStatus == ReportingStatus.PassedValidation || entry.ReportingStatus == ReportingStatus.FailedValidation) && entry.SubmissionStatus == SubmissionStatus.Submitted)
+                if ((entry.ReportingStatus == ReportingStatus.NotReportable || entry.ReportingStatus == ReportingStatus.PassedValidation || entry.ReportingStatus == ReportingStatus.FailedValidation) && (entry.SubmissionStatus == SubmissionStatus.Submitted || entry.SubmissionStatus == SubmissionStatus.NotEligable))
                 {
                     continue;
                 }
