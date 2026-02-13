@@ -959,4 +959,58 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         Assert.Equal(3, batch.Count);
         Assert.All(batch, l => Assert.Equal(facilityId, l.FacilityId));
     }
+
+    [Fact]
+    public async Task FailStalledQueuedLogsAsync_FailsStalledLogs()
+    {
+        // Arrange
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        // Reset database for this test
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var stallMinutes = 15;
+        var stalledDate = DateTime.UtcNow.AddMinutes(-(stallMinutes + 1));
+        var recentDate = DateTime.UtcNow;
+
+        var stalledLog = new DataAcquisitionLog
+        {
+            FacilityId = "TestFacility",
+            Status = RequestStatus.Queued,
+            ModifyDate = stalledDate,
+            Notes = new List<string> { "Initial note" }
+        };
+
+        var recentLog = new DataAcquisitionLog
+        {
+            FacilityId = "TestFacility",
+            Status = RequestStatus.Queued,
+            ModifyDate = recentDate,
+            Notes = new List<string> { "Initial note" }
+        };
+
+        dbContext.DataAcquisitionLogs.AddRange(stalledLog, recentLog);
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        // Act
+        int rowsAffected = await queries.FailStalledQueuedLogsAsync(stallMinutes);
+
+        // Assert
+        Assert.Equal(1, rowsAffected);
+
+        var updatedStalledLog = await dbContext.DataAcquisitionLogs.FindAsync(stalledLog.Id);
+        Assert.NotNull(updatedStalledLog);
+        Assert.Equal(RequestStatus.Failed, updatedStalledLog.Status);
+        Assert.Equal(2, updatedStalledLog.Notes.Count);
+        Assert.Contains("Request failed due to being in Queued status", updatedStalledLog.Notes.Last());
+
+        var updatedRecentLog = await dbContext.DataAcquisitionLogs.FindAsync(recentLog.Id);
+        Assert.NotNull(updatedRecentLog);
+        Assert.Equal(RequestStatus.Queued, updatedRecentLog.Status);
+        Assert.Single(updatedRecentLog.Notes);
+    }
 }
