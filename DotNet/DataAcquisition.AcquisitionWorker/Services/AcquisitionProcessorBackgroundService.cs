@@ -9,6 +9,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Options;
 using System.Threading.Channels;
 
@@ -124,7 +125,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
 
             if (log.Status != RequestStatus.Queued)
             {
-                _logger.LogInformation("Log {LogId} no longer in Queued state ({Status}) - skipping", log.Id, log.Status);
+                _logger.LogInformation("Log {LogId} no longer in Queued state ({Status}) - skipping", log.Id.ToString().SanitizeUntrustedString(), log.Status?.ToString().SanitizeUntrustedString());
                 return;
             }
 
