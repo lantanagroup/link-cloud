@@ -80,6 +80,8 @@ public class PayloadSubmittedListener(
                             var reportTrackingId = result.Message.Key.ReportScheduleId;
                             var reportSchedule = (await reportScheduledManager.FindAsync(x => x.Id == reportTrackingId, consumeCancellationToken)).Single();
 
+                            logger.LogDebug("Consuming Event (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", facilityId, result.Message.Value.PatientId, reportTrackingId);
+
                             if (result.Message.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry)
                             {
                                 var reportEntry = await database.ReportEntryRepository.FirstAsync(e => e.PatientId == result.Message.Value.PatientId && e.ReportScheduleId == result.Message.Key.ReportScheduleId);
@@ -88,6 +90,9 @@ public class PayloadSubmittedListener(
                                 reportEntry.ModifyDate = DateTime.UtcNow;
                                 database.ReportEntryRepository.Update(reportEntry);
                                 await database.SaveChangesAsync();
+
+                                //Will build and produce the manifest if this is the last consumed patient payload
+                                await reportManifestProducer.Produce(reportSchedule, correlationId);
                             }
                             else if (result.Message.Value.PayloadType == PayloadType.ReportSchedule)
                             {
@@ -96,15 +101,11 @@ public class PayloadSubmittedListener(
                                     throw new DeadLetterException($"{Name}: Report schedule {reportTrackingId} not found");
                                 }
 
-                                logger.LogInformation("{Name}: Report submitted for {FacilityId} at {SubmissionTime}", Name, reportSchedule.FacilityId.SanitizeAndRemove(), DateTime.UtcNow);
-
                                 reportSchedule.Status = ScheduleStatus.Submitted;
                                 reportSchedule.SubmitReportDateTime = DateTime.UtcNow;
                                 reportSchedule.ModifyDate = DateTime.UtcNow;
                                 await reportScheduledManager.UpdateAsync(reportSchedule, consumeCancellationToken);
                             }
-
-                            await reportManifestProducer.Produce(reportSchedule, correlationId);
                         }
                         catch (DeadLetterException ex)
                         {
