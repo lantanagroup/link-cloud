@@ -27,8 +27,8 @@ namespace LantanaGroup.Link.Report.Entities
         [BsonRepresentation(MongoDB.Bson.BsonType.String)]
         public MeasureReportStatus Status { get; set; } = MeasureReportStatus.EntryCreated;
         public string ReportType { get; set; } = string.Empty;
-        public string MeasureReportUri { get; set; } = string.Empty;
-        public string MeasureReportFileName { get; set; } = string.Empty;
+        public string? MeasureReportUri { get; set; } = null;
+        public string? MeasureReportFileName { get; set; } = null;
         //Key = ResourceType
         public Dictionary<string, int> ResourceCount { get; set; } = new Dictionary<string, int>();
     }

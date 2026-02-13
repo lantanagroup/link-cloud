@@ -9,13 +9,15 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 {
     public class ReadyForValidationProducer
     {
+        private readonly ILogger<ReadyForValidationProducer> _logger;
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly IProducer<ReadyForValidationKey, ReadyForValidationValue> _readyForValidationProducer;
 
-        public ReadyForValidationProducer(IProducer<ReadyForValidationKey, ReadyForValidationValue> readyForValidationProducer, IServiceScopeFactory serviceScopeFactory)
+        public ReadyForValidationProducer(IProducer<ReadyForValidationKey, ReadyForValidationValue> readyForValidationProducer, IServiceScopeFactory serviceScopeFactory, ILogger<ReadyForValidationProducer> logger)
         {
             _readyForValidationProducer = readyForValidationProducer;
             _serviceScopeFactory = serviceScopeFactory;
+            _logger = logger;
         }
 
         public class ProduceValidationModel
@@ -37,6 +39,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public async Task Produce(string scheduleId, List<string> reportTypes, string facilityId, string patientId, string? payloadUri, string correlationId)
         {
+            _logger.LogDebug("Producing ReadyForValidation (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", facilityId, patientId, scheduleId);
+
             _readyForValidationProducer.Produce(nameof(KafkaTopic.ReadyForValidation),
                 new Message<ReadyForValidationKey, ReadyForValidationValue>
                 {

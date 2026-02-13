@@ -30,7 +30,7 @@ public class MeasureReportGeneratedProducer {
             String payloadUri,
             String blobName) {
 
-        if (patientStatus == null || report == null || report.getReportTrackingId() == null || measureReport == null || payloadUri == null) {
+        if (patientStatus == null || report == null || report.getReportTrackingId() == null || measureReport == null) {
             throw new IllegalArgumentException("All parameters are required");
         }
 
@@ -40,12 +40,16 @@ public class MeasureReportGeneratedProducer {
                     Topics.MEASURE_REPORT_GENERATED, report.getReportTrackingId());
         }
 
-        int lastSlashIndex = payloadUri.lastIndexOf('/');
-        if (lastSlashIndex == -1) {
-            throw new IllegalArgumentException("payloadUri must contain at least one forward slash");
-        }
+        String reportUri = null;
 
-        String reportUri = payloadUri.substring(0, lastSlashIndex);
+        if (payloadUri != null) {
+            int lastSlashIndex = payloadUri.lastIndexOf('/');
+            if (lastSlashIndex == -1) {
+                throw new IllegalArgumentException("payloadUri must contain at least one forward slash");
+            }
+
+            reportUri = payloadUri.substring(0, lastSlashIndex);
+        }
 
         MeasureReportGenerated value = new MeasureReportGenerated(
                 measureReport.getIdPart(),
