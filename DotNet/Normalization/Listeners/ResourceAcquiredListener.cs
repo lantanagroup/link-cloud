@@ -225,15 +225,6 @@ public class ResourceAcquiredListener : BackgroundService
                     {
                         _logger.LogError(ex, $"Failed to process Patient Event.");
 
-                        var auditValue = new Shared.Application.Models.Kafka.AuditEventMessage
-                        {
-                            FacilityId = message.Message.Key,
-                            Action = AuditEventType.Query,
-                            ServiceName = NormalizationConstants.ServiceName,
-                            EventDate = DateTime.UtcNow,
-                            Notes = $"Data Acquisition processing failure \nException Message: {ex}",
-                        };
-
                         _transientExceptionHandler.HandleException(message, new TransientException("Data Acquisition Exception thrown: " + ex.Message), message.Message.Key);
                     }
                     finally
@@ -297,7 +288,16 @@ public class ResourceAcquiredListener : BackgroundService
             Headers = headers,
             Value = resourceNormalizedMessage
         };
-        await _producer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
+
+        try
+        {
+            await _producer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
+        }
+        catch (ProduceException<string, ResourceNormalizedMessage> ex)
+        {
+            _logger.LogError(ex, "Failed to produce ResourceNormalized message. FacilityId: {FacilityId}, CorrelationId: {CorrelationId}, FhirResourceType: {fhirResourceType}, ResourceId: {resourceId}", facilityId, correlationId, resource.TypeName, resource.Id);
+            throw new TransientException($"Failed to produce ResourceNormalized message: {ex.Message}", ex);
+        }
     }
 
     public void Cancel()
