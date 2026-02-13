@@ -25,6 +25,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ArtifactServiceTest {
+    private static final String NHSN_MEASURES_PACKAGE_NAME = "gov.cdc.nhsn.measures";
+
     private ArtifactService artifactService;
 
     @Mock
@@ -240,21 +242,28 @@ class ArtifactServiceTest {
         assertNull(results);
     }
 
+    private byte[] getPackageContent(String name) throws IOException {
+        String resourceName = String.format("artifacts/packages/%s.tgz", name);
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        try (InputStream stream = classLoader.getResourceAsStream(resourceName)) {
+            if (stream == null) {
+                throw new IllegalArgumentException("Package not found: " + name);
+            }
+            return stream.readAllBytes();
+        }
+    }
+
     @Test
     void validateArtifact_ValidPackage() throws IOException {
-        byte[] content;
-        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-        try (InputStream stream = classLoader.getResourceAsStream("artifacts/packages/gov.cdc.nhsn.measures.tgz")) {
-            content = stream.readAllBytes();
-        }
+        byte[] content = getPackageContent(NHSN_MEASURES_PACKAGE_NAME);
         assertDoesNotThrow(() ->
-                artifactService.validateArtifact(ArtifactType.PACKAGE, "gov.cdc.nhsn.measures", content));
+                artifactService.validateArtifact(ArtifactType.PACKAGE, NHSN_MEASURES_PACKAGE_NAME, content));
     }
 
     @Test
     void validateArtifact_InvalidPackage() {
         assertThrows(Exception.class, () ->
-                artifactService.validateArtifact(ArtifactType.PACKAGE, "gov.cdc.nhsn.measures", new byte[0]));
+                artifactService.validateArtifact(ArtifactType.PACKAGE, NHSN_MEASURES_PACKAGE_NAME, new byte[0]));
     }
 
     @Test
@@ -275,5 +284,33 @@ class ArtifactServiceTest {
     void validateArtifact_InvalidResource() {
         assertThrows(Exception.class, () ->
                 artifactService.validateArtifact(ArtifactType.RESOURCE, "the-structure-definition", new byte[0]));
+    }
+
+    @Test
+    void getValidationSupport_ValidArtifact() throws IOException {
+        Artifact artifact = new Artifact();
+        artifact.setType(ArtifactType.PACKAGE);
+        artifact.setName(NHSN_MEASURES_PACKAGE_NAME);
+        artifact.setContent(getPackageContent(NHSN_MEASURES_PACKAGE_NAME));
+        when(artifactRepository.findAll()).thenReturn(List.of(artifact));
+        ArtifactValidationSupport validationSupport = artifactService.getValidationSupport();
+        assertNotNull(validationSupport);
+        List<ImplementationGuide> igs = validationSupport.getImplementationGuides();
+        assertEquals(1, igs.size());
+        assertEquals(NHSN_MEASURES_PACKAGE_NAME, igs.get(0).getIdPart());
+    }
+
+    @Test
+    void getValidationSupport_InvalidArtifact() {
+        Artifact artifact = new Artifact();
+        artifact.setType(ArtifactType.PACKAGE);
+        artifact.setName(NHSN_MEASURES_PACKAGE_NAME);
+        artifact.setContent(new byte[0]);
+        when(artifactRepository.findAll()).thenReturn(List.of(artifact));
+        // Invalid artifact makes lazy initialization fail
+        assertThrows(Exception.class, artifactService::getValidationSupport);
+        // And partially initialized support is *not* cached
+        // I.e., subsequent initialization attempts also fail
+        assertThrows(Exception.class, artifactService::getValidationSupport);
     }
 }

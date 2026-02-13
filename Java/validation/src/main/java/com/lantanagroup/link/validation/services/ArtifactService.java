@@ -97,13 +97,14 @@ public class ArtifactService {
     }
 
     public synchronized ArtifactValidationSupport getValidationSupport() throws IOException {
-        if (validationSupport == null) {
-            validationSupport = createValidationSupport();
+        if (this.validationSupport == null) {
+            ArtifactValidationSupport validationSupport = createValidationSupport();
             for (Artifact artifact : artifactRepository.findAll()) {
                 validationSupport.addArtifact(artifact);
             }
+            this.validationSupport = validationSupport;
         }
-        return validationSupport;
+        return this.validationSupport;
     }
 
     protected ArtifactValidationSupport createValidationSupport() {
