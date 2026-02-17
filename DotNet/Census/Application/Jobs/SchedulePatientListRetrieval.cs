@@ -42,7 +42,7 @@ public class SchedulePatientListRetrieval : IJob
         }
         catch (ProduceException<string, Null> ex)
         {
-            _logger.LogError(ex, "SchedulePatientListRetrieval: Error producing {event} message to Kafka for facility: {FacilityId}", KafkaTopic.PatientCensusScheduled.ToString(), facility.FacilityID);
+            _logger.LogError(ex, "SchedulePatientListRetrieval: Error producing {Topic} message to Kafka for facility: {FacilityId}", KafkaTopic.PatientCensusScheduled.ToString(), facility.FacilityID);
             throw;
         }
     }
