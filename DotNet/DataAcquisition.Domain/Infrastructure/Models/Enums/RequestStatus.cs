@@ -16,5 +16,7 @@ public enum RequestStatus
     [StringValue("Max Retries Reached")]
     MaxRetriesReached,
     [StringValue("Skipped")]
-    Skipped
+    Skipped,
+    [StringValue("Configuration Required")]
+    ConfigurationRequired
 }

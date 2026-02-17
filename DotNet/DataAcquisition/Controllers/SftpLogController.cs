@@ -25,7 +25,6 @@ public class SftpLogController : ControllerBase
     private readonly ISftpAcquisitionLogQueries _queries;
     private readonly ITenantApiService _tenantApiService;
     private readonly IValidator<CreateSftpLogRequest> _createValidator;
-    private readonly IValidator<UpdateSftpLogRequest> _updateValidator;
 
     private const int DefaultLogPageSize = 20;
     private const string DefaultSortBy = "ProcessDate";
@@ -35,15 +34,13 @@ public class SftpLogController : ControllerBase
         ISftpAcquisitionLogManager manager,
         ISftpAcquisitionLogQueries queries,
         ITenantApiService tenantApiService,
-        IValidator<CreateSftpLogRequest> createValidator,
-        IValidator<UpdateSftpLogRequest> updateValidator)
+        IValidator<CreateSftpLogRequest> createValidator)
     {
         _logger = logger;
         _manager = manager;
         _queries = queries;
         _tenantApiService = tenantApiService;
         _createValidator = createValidator;
-        _updateValidator = updateValidator;
     }
     
     /// <summary>
@@ -170,7 +167,10 @@ public class SftpLogController : ControllerBase
                 return BadRequest($"No facility found for organizationId: {organizationId}");
             }
 
-            var createdLog = await _manager.CreateAsync(req.ToModel(), cancellationToken);
+            var model = req.ToModel();
+            model.FacilityId = organizationId; // Use sanitized ID
+
+            var createdLog = await _manager.CreateAsync(model, cancellationToken);
 
             return Created($"/api/data/sftp-logs/{createdLog.ExternalId}", createdLog);
 
@@ -195,72 +195,48 @@ public class SftpLogController : ControllerBase
     }
 
     /// <summary>
-    /// Update Process Date of SFTP log
+    /// Reset an SFTP log for retry after configuration has been fixed.
+    /// Only logs in ConfigurationRequired or MaxRetriesReached status can be reset.
     /// </summary>
-    /// <param name="logId"></param>
-    /// <param name="req"></param>
+    /// <param name="logId">The external ID of the log to reset</param>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
-    [HttpPut("{logId}")]
-    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(SftpAcquisitionLogModel))]
+    [HttpPost("{logId}/reset")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult> UpdateSftpLogProcessDate(string logId, UpdateSftpLogRequest req, CancellationToken cancellationToken = default)
+    public async Task<ActionResult> ResetSftpLogForRetry(string logId, CancellationToken cancellationToken = default)
     {
         // Validate log ID
-        if (string.IsNullOrWhiteSpace(logId) || !Guid.TryParse(logId, out var id))
+        if (string.IsNullOrWhiteSpace(logId) || !Guid.TryParse(logId, out var externalId))
         {
-            return BadRequest("Invalid log ID.");
-        }
-        
-        if (id == Guid.Empty)
-        {
-            return BadRequest("Invalid SFTP Acquisition Log Id.");
-        }
-        
-        // Validate the request
-        var validationResult = await _updateValidator.ValidateAsync(req, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            foreach (var error in validationResult.Errors)
-            {
-                ModelState.AddModelError(error.PropertyName, error.ErrorMessage);
-            }
-            return BadRequest(ModelState);
-        }
-
-        // Validate the request model id matches the id in the url
-        if (!string.Equals(req.ExternalId, id.ToString(), StringComparison.OrdinalIgnoreCase))
-        {
-            _logger.LogWarning("Sftp Log id in the request body ({RequestExternalId}) does not match the id in the url ({ExternalId}).", req.ExternalId, logId.Sanitize());
-            return BadRequest("The sftp log ids in the request body and url do not match.");
+            return BadRequest("Invalid SFTP Acquisition log ID.");
         }
 
         // Store httpContext so that it is not lost during processing
         var httpContext = HttpContext;
 
-        // validate user access to organization before proceeding - future enhancement
-
         try
         {
-            var updatedLog = await _manager.UserUpdateAsync(req.ToModel(), cancellationToken);
+            // Get the log by external ID to get the internal ID
+            var log = await _queries.GetByExternalIdAsync(externalId, cancellationToken);
 
-            return Accepted(updatedLog);
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(ex.Message);
-        }
-        catch (MissingFacilityIdException ex)
-        {
-            return BadRequest(ex.Message);
-        }
-        catch (DomainEntityNotFoundException ex)
-        {
-            return NotFound(ex.Message);
+            if (log is null)
+                return NotFound($"SFTP Acquisition log with ID {logId} not found.");
+
+            var success = await _manager.ResetForRetryAsync(log.Id, cancellationToken);
+
+            if (!success)
+            {
+                return Conflict(
+                    $"SFTP Acquisition log with ID {logId} cannot be reset. Only logs in ConfigurationRequired or MaxRetriesReached status can be reset.");
+            }
+
+            return Ok(new { message = $"SFTP Acquisition log {logId} has been reset for retry." });
         }
         catch (Exception)
         {

@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations.Schema;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -46,4 +47,18 @@ public class SftpConfiguration
     /// Current supported types: "Basic"
     /// </summary>
     public AuthType AuthenticationProtocol { get; set; } = AuthType.Basic;
+
+    /// <summary>
+    /// Enables detailed benchmark timing collection for this facility.
+    /// Useful during onboarding to measure SFTP performance.
+    /// </summary>
+    public bool EnableBenchmarking { get; set; } = false;
+
+    /// <summary>
+    /// List of acquisition configurations for different data types.
+    /// Each configuration specifies its acquisition type, directory, file pattern, and parsing rules.
+    /// A facility can have multiple acquisition types from the same SFTP server.
+    /// Stored as JSON.
+    /// </summary>
+    public List<SftpAcquisitionTypeConfiguration> AcquisitionConfigurations { get; set; } = [];
 }

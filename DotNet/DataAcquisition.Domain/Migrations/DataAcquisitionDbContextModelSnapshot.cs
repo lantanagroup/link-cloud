@@ -17,7 +17,7 @@ namespace DataAcquisition.Domain.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.22")
+                .HasAnnotation("ProductVersion", "8.0.23")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -939,8 +939,13 @@ namespace DataAcquisition.Domain.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
-                    b.Property<int>("EncounterCount")
-                        .HasColumnType("int");
+                    b.Property<string>("AcquisitionType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Benchmarks")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<Guid>("ExternalId")
                         .HasColumnType("uniqueidentifier");
@@ -950,21 +955,48 @@ namespace DataAcquisition.Domain.Migrations
                         .HasMaxLength(250)
                         .HasColumnType("nvarchar(250)");
 
-                    b.Property<string>("FileName")
+                    b.Property<string>("FileNames")
                         .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
+                        .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("PatientCount")
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OriginatingSpanId")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("OriginatingTraceId")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTime?>("ProcessDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("RetryAttempts")
                         .HasColumnType("int");
 
-                    b.Property<DateTime>("ProcessDate")
+                    b.Property<DateTime?>("ScheduledDate")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("SubType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.HasKey("Id");
 
                     b.HasIndex("FacilityId")
                         .HasDatabaseName("IX_SftpAcquisitionLog_FacilityId");
+
+                    b.HasIndex("ScheduledDate")
+                        .HasDatabaseName("IX_SftpAcquisitionLog_ScheduledDate");
 
                     b.ToTable("SftpAcquisitionLog");
                 });
@@ -976,8 +1008,15 @@ namespace DataAcquisition.Domain.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasDefaultValueSql("NEWID()");
 
+                    b.Property<string>("AcquisitionConfigurations")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int>("AuthenticationProtocol")
                         .HasColumnType("int");
+
+                    b.Property<bool>("EnableBenchmarking")
+                        .HasColumnType("bit");
 
                     b.Property<string>("Host")
                         .IsRequired()

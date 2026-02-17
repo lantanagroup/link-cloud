@@ -1,6 +1,7 @@
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
+using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Extensions;
@@ -9,7 +10,10 @@ using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Health;
+using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Jobs;
+using Quartz.Spi;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -23,9 +27,17 @@ builder.Configuration.AddStandardEnvironmentConfiguration();
 
 var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
 
-builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName, true);
+// Determine if secret manager should be enabled based on configuration
+var secretManagerEnabled = builder.Configuration.GetValue<bool>("SecretManagement:Enabled");
+
+builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName, configureRedis: true, configureSecretManager: secretManagerEnabled);
 
 builder.Services.RegisterQuartzDatabase(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection));
+
+//Register Quartz Job Factory and SFTP Acquisition Job
+builder.Services.AddSingleton<IJobFactory, QuartzJobFactory>();
+builder.Services.AddTransient<SftpAcquisitionProcessingJob>();
+
 builder.Services.AddTransient<IDataAcquisitionServiceMetrics, DataAcquisitionServiceMetrics>();
 builder.Services.AddTransient<ICreateSystemToken, CreateSystemToken>();
 builder.Services.AddSingleton(TimeProvider.System);
@@ -48,6 +60,9 @@ if (!consumerSettings?.DisableConsumer ?? true)
 {
     builder.Services.AddHostedService<ReadyToAcquireListener>();
 }
+
+//Add SFTP Acquisition Scheduling Service
+builder.Services.AddHostedService<SftpAcquisitionScheduleService>();
 
 // TODO: Retry consumer services temporarily disabled for LNK-4038
 if (!consumerSettings?.DisableRetryConsumer ?? true)

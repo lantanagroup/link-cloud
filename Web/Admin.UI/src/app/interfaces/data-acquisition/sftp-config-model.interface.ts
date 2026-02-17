@@ -1,3 +1,33 @@
+export enum SftpAcquisitionType {
+  Census = 'Census',
+  Resources = 'Resources'
+}
+
+export enum SftpAcquisitionSubType {
+  None = 'None',
+  CernerCCLExtract = 'CernerCCLExtract'
+}
+
+export interface IFileParsingConfiguration {
+  fileExtension: string;
+  parserType: string;
+  delimiter: string;
+  hasHeaderRow: boolean;
+  dateFormat: string;
+  idSuffixToStrip?: string;
+  columnMappings: { [key: string]: number };
+  additionalProperties?: { [key: string]: string };
+}
+
+export interface ISftpAcquisitionTypeConfiguration {
+  acquisitionType: SftpAcquisitionType;
+  subType: SftpAcquisitionSubType;
+  remoteDirectory?: string;
+  processedDirectory?: string;
+  fileNamePattern?: string;
+  parsingConfiguration?: IFileParsingConfiguration;
+}
+
 export interface ISftpConfigurationModel {
   id?: string;
   organizationId: string;
@@ -7,6 +37,8 @@ export interface ISftpConfigurationModel {
   timeout: string;
   removeAfterProcessing: boolean;
   authenticationProtocol: string;
+  enableBenchmarking: boolean;
+  acquisitionConfigurations: ISftpAcquisitionTypeConfiguration[];
 }
 
 export interface ISftpCredentialsModel {

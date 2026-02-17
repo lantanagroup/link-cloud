@@ -18,55 +18,13 @@ public class CreateSftpLogRequestValidator : AbstractValidator<CreateSftpLogRequ
             .NotEmpty()
             .WithMessage("Facility ID is required.");
 
-        RuleFor(x => x.FileName)
-            .NotEmpty()
-            .WithMessage("File name is required.")
-            .MaximumLength(settings.MaxLength)
-            .WithMessage($"File name cannot exceed {settings.MaxLength} characters.")
-            .Must(fileName => SftpFileNameValidationRules.HaveValidExtension(fileName, allowedExtensions))
-            .WithMessage($"File name has an invalid extension. Allowed extensions: {string.Join(", ", allowedExtensions)}.")
-            .Must(SftpFileNameValidationRules.NotContainInvalidCharacters)
-            .WithMessage("File name contains invalid characters.");
+        RuleFor(x => x.AcquisitionType)
+            .IsInEnum()
+            .WithMessage("Type must be a valid SftpAcquisitionType.");
 
-        RuleFor(x => x.ProcessDate)
-            .NotEmpty()
-            .WithMessage("Process date is required.")
-            .Must(date => date > DateTime.UtcNow)
-            .WithMessage("Process date must be in the future.");
-    }
-}
-
-/// <summary>
-/// Validator for UpdateSftpLogRequest
-/// </summary>
-public class UpdateSftpLogRequestValidator : AbstractValidator<UpdateSftpLogRequest>
-{
-    public UpdateSftpLogRequestValidator(IOptions<SftpValidationSettings> options)
-    {
-        var settings = options.Value.FileName;
-        var allowedExtensions = settings.GetEffectiveAllowedExtensions();
-
-        RuleFor(x => x.ExternalId)
-            .NotEmpty()
-            .WithMessage("External ID is required.")
-            .Must(id => Guid.TryParse(id, out _))
-            .WithMessage("External ID must be a valid GUID.");
-
-        RuleFor(x => x.FileName)
-            .NotEmpty()
-            .WithMessage("File name is required.")
-            .MaximumLength(settings.MaxLength)
-            .WithMessage($"File name cannot exceed {settings.MaxLength} characters.")
-            .Must(fileName => SftpFileNameValidationRules.HaveValidExtension(fileName, allowedExtensions))
-            .WithMessage($"File name has an invalid extension. Allowed extensions: {string.Join(", ", allowedExtensions)}.")
-            .Must(SftpFileNameValidationRules.NotContainInvalidCharacters)
-            .WithMessage("File name contains invalid characters.");
-
-        RuleFor(x => x.ProcessDate)
-            .NotEmpty()
-            .WithMessage("Process date is required.")
-            .Must(date => date > DateTime.UtcNow)
-            .WithMessage("Process date must be in the future.");
+        RuleFor(x => x.SubType)
+            .IsInEnum()
+            .WithMessage("SubType must be a valid SftpAcquisitionSubType.");
     }
 }
 

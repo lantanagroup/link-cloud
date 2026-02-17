@@ -18,6 +18,10 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Parsers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Processors;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -63,7 +67,7 @@ public static class GeneralStartupExtensions
         // load external configuration source (if specified)
         builder.AddExternalConfiguration(serviceName);
 
-        builder.Configuration.RegisterMonitoring(builder.Logging, builder.Services);
+        builder.Configuration.RegisterMonitoring(builder.Logging, builder.Services, serviceName);
         builder.Services.RegisterConfigs(builder.Configuration);
         builder.RegisterEntityFramework();
 
@@ -89,12 +93,11 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterProblemDetails((IHostingEnvironment)builder.Environment);
     }
 
-    public static void RegisterMonitoring(this IConfigurationManager configuration, ILoggingBuilder logging, IServiceCollection services)
+    public static void RegisterMonitoring(this IConfigurationManager configuration, ILoggingBuilder logging, IServiceCollection services, string serviceName)
     {
-        var env = configuration.GetValue<string>("ASPNETCORE_ENVIRONMENT") ?? "Production"; // Or inject IHostEnvironment if available
+        // Clear default providers first to avoid duplicate logging
+        logging.ClearProviders();
 
-        // Logging using Serilog
-        logging.AddSerilog();
         var loggerOptions = new ConfigurationReaderOptions { SectionName = DataAcquisitionConstants.AppSettingsSectionNames.Serilog };
         var serilogConfig = new LoggerConfiguration()
             .ReadFrom.Configuration(configuration, loggerOptions)
@@ -103,23 +106,9 @@ public static class GeneralStartupExtensions
             .Enrich.WithSpan()
             .Enrich.With<ActivityEnricher>();
 
-        // Add rich console only in Development (for local debugging)
-        if (env == "Development")
-        {
-            serilogConfig.WriteTo.Console(
-                outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}",
-                theme: AnsiConsoleTheme.Code  // Colorful output like default console
-            );
-        }
-        else
-        {
-            // In non-Development (e.g., Docker, Prod), no console or minimal
-        }
-
         Log.Logger = serilogConfig.CreateLogger();
 
-        // Clear defaults and use Serilog everywhere
-        logging.ClearProviders();
+        // Use Serilog as the logging provider
         logging.AddSerilog(Log.Logger, dispose: true);
 
         var serviceInformation = configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
@@ -127,7 +116,7 @@ public static class GeneralStartupExtensions
 
         if (serviceInformation != null)
         {
-            ServiceActivitySource.Initialize(serviceInformation);
+            ServiceActivitySource.Initialize(serviceName, serviceInformation);
             Log.Information("ServiceActivitySource initialized with name: {ServiceName}, version: {Version}",
             ServiceActivitySource.ServiceName,
             serviceInformation.Version);
@@ -149,6 +138,7 @@ public static class GeneralStartupExtensions
         services.Configure<ApiSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.ApiSettings));
         services.Configure<SecretManagerSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.SecretManagement));
         services.Configure<SftpValidationSettings>(configuration.GetSection(SftpValidationSettings.SectionName));
+        services.Configure<SftpAcquisitionSettings>(configuration.GetSection(SftpAcquisitionSettings.SectionName));
 
         IConfigurationSection consumerSettingsSection = configuration.GetRequiredSection(nameof(ConsumerSettings));
         services.Configure<ConsumerSettings>(consumerSettingsSection);
@@ -283,6 +273,17 @@ public static class GeneralStartupExtensions
         //Data Pull Commands
         services.AddTransient<IReadFhirCommand, ReadFhirCommand>();
         services.AddTransient<ISearchFhirCommand, SearchFhirCommand>();
+
+        //SFTP Services
+        services.AddTransient<ISftpClientService, SftpClientService>();
+        services.AddTransient<IFileParserFactory, FileParserFactory>();
+        services.AddTransient<ISftpAcquisitionProcessorFactory, SftpAcquisitionProcessorFactory>();
+
+        //File Parsers
+        services.AddTransient<IFileParser<CernerEncounters>, CernerCclExtractParser>();
+
+        //SFTP Acquisition Processors
+        services.AddTransient<ISftpAcquisitionProcessor, CernerCclExtractProcessor>();
     }
 
     private static void RegisterSecretManager(this IServiceCollection services, IConfiguration configuration)
@@ -304,7 +305,7 @@ public static class GeneralStartupExtensions
             services.AddSingleton<ISecretManager, LocalSecretManager>();
         }
 
-        // Register credential service (depends on ISecretManager)
+        // Register credential service
         services.AddScoped<ISftpCredentialService, SftpCredentialService>();
     }
 
@@ -331,6 +332,7 @@ public static class GeneralStartupExtensions
         services.RegisterKafkaProducer<string, PatientListMessage>(kafkaConnection, producerConfig, null, new IndentedJsonSerializer<PatientListMessage>());
         services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<long, ReadyToAcquire>(kafkaConnection, producerConfig);
+        services.RegisterKafkaProducer<string, CernerPatientsAcquired>(kafkaConnection, producerConfig);
 
         services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
         services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
@@ -340,6 +342,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IKafkaProducerFactory<string, ResourceAcquired>, KafkaProducerFactory<string, ResourceAcquired>>();
         services.AddTransient<IKafkaProducerFactory<string, PatientListMessage>, KafkaProducerFactory<string, PatientListMessage>>();
         services.AddTransient<IKafkaProducerFactory<long, ReadyToAcquire>, KafkaProducerFactory<long, ReadyToAcquire>>();
+        services.AddTransient<IKafkaProducerFactory<string, CernerPatientsAcquired>, KafkaProducerFactory<string, CernerPatientsAcquired>>();
 
         //Factories - Application
         services.AddTransient<IParameterQueryFactory, ParameterQueryFactory>();
