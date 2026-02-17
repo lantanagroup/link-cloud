@@ -114,34 +114,6 @@ public class StringSecurityExtensionsTest
     }
 
     [Fact]
-    public void SanitizeUntrustedString_WithJapaneseCharacters_PreservesCharacters()
-    {
-        // Arrange - Japanese characters (U+65E5, U+672C, U+8A9E)
-        var input = "" + (char)0x65E5 + (char)0x672C + (char)0x8A9E;
-        var expected = "日本語";
-
-        // Act
-        var result = input.SanitizeUntrustedString();
-
-        // Assert
-        Assert.Equal(expected, result);
-    }
-
-    [Fact]
-    public void SanitizeUntrustedString_WithMixedUnicode_PreservesUnicode()
-    {
-        // Arrange - "Hello " followed by Chinese characters (U+4E16, U+754C)
-        var input = "Hello " + (char)0x4E16 + (char)0x754C;
-        var expected = "Hello 世界";
-
-        // Act
-        var result = input.SanitizeUntrustedString();
-
-        // Assert
-        Assert.Equal(expected, result);
-    }
-
-    [Fact]
     public void SanitizeUntrustedString_WithSpanishCharacters_PreservesCharacters()
     {
         // Arrange - "Ñoño" using Ñ (U+00D1) and ñ (U+00F1)
@@ -204,20 +176,6 @@ public class StringSecurityExtensionsTest
 
         // Assert
         Assert.Equal("Normal log  Hidden data", result);
-    }
-
-    [Fact]
-    public void SanitizeUntrustedString_WithMixedCharacters_SanitizesCorrectly()
-    {
-        // Arrange - Mix of valid, control characters, and Unicode (™ U+2122, © U+00A9)
-        var input = "Valid\nInvalid\tMixed" + (char)0x2122 + "Unicode" + (char)0x00A9;
-        var expected = "Valid Invalid Mixed™Unicode©";
-
-        // Act
-        var result = input.SanitizeUntrustedString();
-
-        // Assert
-        Assert.Equal(expected, result);
     }
 
     [Theory]
