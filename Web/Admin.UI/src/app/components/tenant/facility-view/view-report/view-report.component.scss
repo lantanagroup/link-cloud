@@ -161,3 +161,14 @@ $failed-status: #a1030eb3;
     color: #005a75;
   }
 }
+
+.patient-log-link {
+  margin-left: 8px;
+  color: #5f6672;
+  transition: color 0.2s;
+  cursor: pointer;
+
+  &:hover {
+    color: #005a75;
+  }
+}
