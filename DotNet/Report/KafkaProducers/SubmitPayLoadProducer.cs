@@ -11,18 +11,21 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 {
     public class SubmitPayloadProducer
     {
+        private readonly ILogger<SubmitPayloadProducer> _logger;
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly IProducer<SubmitPayloadKey, SubmitPayloadValue> _submitPayloadProducer;
 
 
-        public SubmitPayloadProducer(IServiceScopeFactory serviceScopeFactory, IProducer<SubmitPayloadKey, SubmitPayloadValue> submitPayloadProducer) 
+        public SubmitPayloadProducer(IServiceScopeFactory serviceScopeFactory, IProducer<SubmitPayloadKey, SubmitPayloadValue> submitPayloadProducer, ILogger<SubmitPayloadProducer> logger)
         {
             _submitPayloadProducer = submitPayloadProducer;
             _serviceScopeFactory = serviceScopeFactory;
+            _logger = logger;
         }
 
         public async Task<bool> Produce(ReportSchedule schedule, PayloadType payloadType, string? patientId = null, string? correlationId = null, string? payloadUri = null)
         {
+            _logger.LogDebug("Producing SubmitPayload (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId, patientId, schedule.Id);
 
             var corrId = string.IsNullOrWhiteSpace(correlationId)
                       ? Guid.NewGuid().ToString()

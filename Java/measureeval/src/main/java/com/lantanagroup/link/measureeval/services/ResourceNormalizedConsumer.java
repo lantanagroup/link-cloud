@@ -22,7 +22,8 @@ public class ResourceNormalizedConsumer extends AbstractResourceConsumer<Resourc
           EvaluateMeasureService evaluateMeasureService,
           PatientStatusBundler patientStatusBundler,
           BlobStorageService blobStorageService,
-          ConsumerRecordRecoverer recoverer){
+          ConsumerRecordRecoverer recoverer,
+          MeasureReportGeneratedProducer measureReportGeneratedProducer){
     super(
             resourceRepository,
             patientStatusRepository,
@@ -32,6 +33,7 @@ public class ResourceNormalizedConsumer extends AbstractResourceConsumer<Resourc
             evaluateMeasureService,
             patientStatusBundler,
             blobStorageService,
-            recoverer);
+            recoverer,
+            measureReportGeneratedProducer);
   }
 }

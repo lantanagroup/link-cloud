@@ -949,7 +949,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             {
                 var jsonResponse = JObject.Parse(response.Content);
 
-                if (jsonResponse["status"]?.ToString() == "500")
+                if (jsonResponse["status"]?.ToString() == "Submitted")
                 {
                     output.WriteLine("Report submitted.");
                     return true;

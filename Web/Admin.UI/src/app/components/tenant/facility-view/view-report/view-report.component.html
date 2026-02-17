@@ -88,11 +88,18 @@
         </div>
       </div>
       <div>
-        <div class="data-label">
-          Submitted
-          <span class="data-value selectable-value"
-                style="white-space: pre-line">{{ reportSummary?.submitted ? (reportSummary?.submitDate | date:'MM/dd/yyyy') + '\n' + (reportSummary?.submitDate | date:'hh:mm a') : "Pending" }}</span>
+         <span class="data-value">
+          @switch (reportSummary?.status) {
+            @case ('New') { <span class="status-new">New</span> }
+            @case ('Scheduled') { <span class="status-scheduled">Scheduled</span> }
+            @case ('EndOfPeriod') { <span class="status-endOfPeriod">End of Period</span> }
+            @case ('Submitted') { <span class="status-submitted">Submitted</span> }
+          }
+        </span>
+        <div style="margin-top:5px">
+          {{(reportSummary.submitDate || reportSummary.createDate) | date:'short'}}
         </div>
+
       </div>
     </div>
   </div>
@@ -123,7 +130,7 @@
   </div>
 
   <mat-tab-group (selectedIndexChange)="onTabSelected($event)">
-    <mat-tab label="Patient Reports">
+    <mat-tab label="Measure Reports">
       <div class="filter-bar">
         <div class="filter-bar-header-row">
           <span class="filter-bar-header">Filters</span>
@@ -194,12 +201,7 @@
           <!-- Patient ID Column -->
           <ng-container matColumnDef="id">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Patient ID</th>
-            <td mat-cell *matCellDef="let element">
-              {{element.patientId}}
-              <a [routerLink]="['/tenant/acquisition-log']" [queryParams]="{ reportId: reportId, patientId: element.patientId }" matTooltip="View Acquisition Logs" class="patient-log-link">
-                <fa-icon [icon]="faFileLines"></fa-icon>
-              </a>
-            </td>
+            <td mat-cell *matCellDef="let element">{{element.patientId}}</td>
           </ng-container>
 
           <!-- Measure Column -->

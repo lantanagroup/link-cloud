@@ -108,7 +108,7 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
                 measureReport.setId(UUID.randomUUID().toString());
             }
 
-            blobStorageService.storePatientInBlobStorage(patientStatus, measureReport);
+            blobStorageService.storePatientInBlobStorage(patientStatus, r, measureReport);
         });
 
         boolean reportablePatient = patientStatus.getReports().stream().anyMatch(PatientReportingEvaluationStatus.Report::getReportable);

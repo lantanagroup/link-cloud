@@ -49,6 +49,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     private final EvaluateMeasureService evaluateMeasureService;
     private final PatientStatusBundler patientStatusBundler;
     private final BlobStorageService blobStorageService;
+    private final MeasureReportGeneratedProducer measureReportGeneratedProducer;
 
     public AbstractResourceConsumer (
             ResourceRepository resourceRepository,
@@ -59,10 +60,11 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             EvaluateMeasureService evaluateMeasureService,
             PatientStatusBundler patientStatusBundler,
             BlobStorageService blobStorageService,
-            ConsumerRecordRecoverer recoverer) {
+            ConsumerRecordRecoverer recoverer, MeasureReportGeneratedProducer measureReportGeneratedProducer) {
         super(recoverer);
         this.resourceRepository = resourceRepository;
         this.patientStatusRepository = patientStatusRepository;
+        this.measureReportGeneratedProducer = measureReportGeneratedProducer;
         patientStatusCache = Collections.synchronizedMap(new PassiveExpiringMap<>(1L, TimeUnit.MINUTES));
         this.reportabilityPredicate = reportabilityPredicate;
         this.measureEvalMetrics = measureEvalMetrics;
@@ -223,8 +225,12 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             switch (value.getQueryType()) {
                 case INITIAL -> {
                     updateReportability(patientStatus, report, measureReport);
+
+                    if (!report.getReportable()) {
+                        measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(patientStatus, report, measureReport, null, null);
+                    }
                 }
-                case SUPPLEMENTAL -> blobStorageService.storePatientInBlobStorage(patientStatus, measureReport);
+                case SUPPLEMENTAL -> blobStorageService.storePatientInBlobStorage(patientStatus, report, measureReport);
                 default -> throw new IllegalStateException(String.format("Unexpected query type: %s", value.getQueryType()));
             }
         }
