@@ -33,9 +33,17 @@ public class SchedulePatientListRetrieval : IJob
             return;
         }
 
-        await _kafkaProducer.ProduceAsync(KafkaTopic.PatientCensusScheduled.ToString(), new Message<string, Null>
+        try
         {
-            Key = facility.FacilityID
-        });
+            await _kafkaProducer.ProduceAsync(KafkaTopic.PatientCensusScheduled.ToString(), new Message<string, Null>
+            {
+                Key = facility.FacilityID
+            });
+        }
+        catch (ProduceException<string, Null> ex)
+        {
+            _logger.LogError(ex, "SchedulePatientListRetrieval: Error producing {event} message to Kafka for facility: {FacilityId}", KafkaTopic.PatientCensusScheduled.ToString(), facility.FacilityID);
+            throw;
+        }
     }
 }
