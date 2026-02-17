@@ -54,6 +54,5 @@ public class EventProducerService<MessageType> : IEventProducerService<MessageTy
                 }
             }
         }
-        { }
     }
 }
