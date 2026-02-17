@@ -13,10 +13,12 @@ public interface IEventProducerService<MessageType>
 
 public class EventProducerService<MessageType> : IEventProducerService<MessageType> 
 {
+    private readonly ILogger<EventProducerService<MessageType>> _logger;
     private readonly IProducer<string, MessageType> _kafkaProducer;
 
-    public EventProducerService(IProducer<string, MessageType> kafkaProducer)
+    public EventProducerService(ILogger<EventProducerService<MessageType>> logger, IProducer<string, MessageType> kafkaProducer)
     {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
     }
 
@@ -41,7 +43,15 @@ public class EventProducerService<MessageType> : IEventProducerService<MessageTy
                     Value = (MessageType)(object)patientEventResponse.PatientEvent
                 };
 
-                await _kafkaProducer.ProduceAsync(KafkaTopic.PatientEvent.ToString(), message);
+                try 
+                {
+                    await _kafkaProducer.ProduceAsync(KafkaTopic.PatientEvent.ToString(), message, cancellationToken);
+                }
+                catch (ProduceException<string, MessageType> ex)
+                {
+                   _logger.LogError(ex, "EventProducerService: Error producing event to Kafka topic {Topic} for facility: {FacilityId}.", KafkaTopic.PatientEvent.ToString(), patientEventResponse.FacilityId);
+                    throw;
+                }
             }
         }
     }
