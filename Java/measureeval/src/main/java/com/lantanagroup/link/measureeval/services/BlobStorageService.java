@@ -80,7 +80,7 @@ public class BlobStorageService {
             throw new ValidationException("Payload URI for report " + report.getReportTrackingId() + " is null");
         }
 
-        String patientIdPart = "patient-" + report.getReportType() + "-" + status.getPatientId();
+        String patientIdPart = "patient-" + status.getPatientId() + "-" + report.getReportType();
         String fileName = patientIdPart + ".mr";
         String patientPayloadUri = payloadUri.endsWith("/") ? payloadUri + fileName : payloadUri + "/" + fileName;
 
