@@ -169,6 +169,10 @@ namespace LantanaGroup.Link.Report.Listeners
                 throw new DeadLetterException($"{Name}: Received message without correlation ID (ReportId = {result.Message.Value.ReportTrackingId}, FacilityId = {result.Message.Value.FacilityId}).");
             }
 
+            var messageValue = result.Message.Value;
+
+            _logger.LogDebug("Consuming Event (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId}, ReportType = {ReportType})", messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId, messageValue.ReportType);
+
             using var scope = _serviceScopeFactory.CreateScope();
             var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
             var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
@@ -180,44 +184,68 @@ namespace LantanaGroup.Link.Report.Listeners
 
             var correlationId = Encoding.UTF8.GetString(headerValue);
 
-            var reportEntry = await reportEntryManager.UpdateAsyncWithConsumerResult(result.Message.Value);
-            var readyForAggregation = reportEntry.MeasureReportList.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable || x.Status == Domain.Enums.MeasureReportStatus.ReadyForValidation);
-
-
-            var schedule = await reportScheduledManager.GetReportSchedule(result.Message.Value.FacilityId, result.Message.Value.ReportTrackingId, cancellationToken);
+            var schedule = await reportScheduledManager.GetReportSchedule(messageValue.FacilityId, messageValue.ReportTrackingId, cancellationToken);
 
             if (schedule == null)
             {
-                throw new DeadLetterException($"{Name}: No scheduled report record was found (ReportId = {result.Message.Value.ReportTrackingId}, FacilityId = {result.Message.Value.FacilityId}).");
+                throw new DeadLetterException($"{Name}: No scheduled report record was found (ReportId = {messageValue.ReportTrackingId}, FacilityId = {result.Message.Value.FacilityId}).");
             }
 
-            if (!readyForAggregation)
+            var reportEntry = await reportEntryManager.UpdateAsyncWithConsumerResult(messageValue);
+
+            var isAllNonReportable = reportEntry.MeasureReportList.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable);
+
+            //Handles the case when all Measure Reports for a patient do not meet the criteria for the reported measures. In this case, we want to update the patient entry as 'Not Reportable'. Afterwards, we will attempt to produce a manifest if this consumed event was the last for the reporting period.
+            if (isAllNonReportable)
             {
+                _logger.LogDebug("Entry not reportable (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId);
+
+                await reportEntryManager.UpdateAsyncNotReportableEntry(reportEntry, cancellationToken);
                 await reportManifestProducer.Produce(schedule, correlationId);
                 return;
             }
+
+            var readyForAggregation = reportEntry.MeasureReportList.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable || x.Status == Domain.Enums.MeasureReportStatus.ReadyForValidation);
+
+            //The aggregation step for a patient will only be performed once the Report service has consumed 'MeasureReportGenerated' events for all entries in reportEntry.MeasureReportList.
+            if (!readyForAggregation)
+            {
+                _logger.LogDebug("Patient not ready for aggregation (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId);
+                //TODO - Daniel: The 'isAllNonReportable' logic above was recently added (2/12/2026) and may replace the need for executing reportManifestProducer below. It won't hurt to run, but may not be needed. If we find that we don't need to execute the manifest producer, we will only need to return in this block.
+                await reportManifestProducer.Produce(schedule, correlationId);
+                return;
+            }
+
+            _logger.LogDebug("Patient ready for aggregation (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId);
+            var startTime = Stopwatch.GetTimestamp();
 
             AggregateResult aggregateResult;
 
             try
             {
-                aggregateResult = await patientAggregator.AggregateToABS(result.Message.Value.PatientId, schedule);
+                aggregateResult = await patientAggregator.AggregateToABS(messageValue.PatientId, schedule);
             }
             catch (Exception ex)
             {
                 throw new DeadLetterException(ex.Message);
             }
 
+            var elapsed = Stopwatch.GetElapsedTime(startTime);
+
+            _logger.LogDebug("Patient aggregation complete. Elapsed time: {Elapsed} (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", elapsed.ToString(), messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId);
+
+            startTime = Stopwatch.GetTimestamp();
+
             await reportEntryManager.UpdateAsyncWithAggregateResult(reportEntry, aggregateResult);
-            await reportResourceManager.AddAsyncWithAggregateResult(facilityId, result.Message.Value.ReportTrackingId, result.Message.Value.PatientId, aggregateResult, cancellationToken);
+            await reportResourceManager.AddAsyncWithAggregateResult(facilityId, messageValue.ReportTrackingId, messageValue.PatientId, aggregateResult, cancellationToken);
 
             foreach (var aggregateMeasureReport in aggregateResult.MeasureReportResults)
             {
-                var populationModel = await reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == result.Message.Value.ReportTrackingId && x.ReportType == result.Message.Value.ReportType);
+                var populationModel = await reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == messageValue.ReportTrackingId && x.ReportType == messageValue.ReportType);
 
                 if (populationModel == null)
                 {
-                    await reportPopulationManager.AddAsyncWithAggregateResult(result.Message.Value.FacilityId, result.Message.Value.ReportTrackingId, aggregateMeasureReport, cancellationToken);
+                    await reportPopulationManager.AddAsyncWithAggregateResult(messageValue.FacilityId, messageValue.ReportTrackingId, aggregateMeasureReport, cancellationToken);
                     continue;
                 }
 
@@ -229,13 +257,17 @@ namespace LantanaGroup.Link.Report.Listeners
                 return;
             }
 
+            elapsed = Stopwatch.GetElapsedTime(startTime);
+
+            _logger.LogDebug("Update to Mongo collections complete. Elapsed time: {Elapsed} (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", elapsed.ToString(), messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId);
+
             try
             {
-                await _readyForValidationProducer.Produce(schedule.Id, schedule.ReportTypes, schedule.FacilityId, result.Message.Value.PatientId, aggregateResult.Uri.AbsoluteUri, correlationId);
+                await _readyForValidationProducer.Produce(schedule.Id, schedule.ReportTypes, schedule.FacilityId, messageValue.PatientId, aggregateResult.Uri.AbsoluteUri, correlationId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An error was encountered producing a ReadyForValidation (ReportId = {reportId}, FacilityId = {facilityId}, PatientId = {patientId}).", schedule.Id.SanitizeUntrustedString(), schedule.FacilityId.SanitizeUntrustedString(), result.Message.Value.PatientId.SanitizeUntrustedString());
+                _logger.LogError(ex, "An error was encountered producing a ReadyForValidation (ReportId = {reportId}, FacilityId = {facilityId}, PatientId = {patientId}).", schedule.Id.SantizeUntrustedString(), schedule.FacilityId.SantizeUntrustedString(), messageValue.PatientId.SantizeUntrustedString());
                 throw new DeadLetterException(ex.Message);
             }
         }
