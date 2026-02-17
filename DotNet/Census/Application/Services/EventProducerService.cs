@@ -49,7 +49,7 @@ public class EventProducerService<MessageType> : IEventProducerService<MessageTy
                 }
                 catch (ProduceException<string, MessageType> ex)
                 {
-                   _logger.LogError(ex, "EventProducerService: Error producing {event} event to Kafka for facility: {FacilityId}.", KafkaTopic.PatientEvent.ToString(), patientEventResponse.FacilityId);
+                   _logger.LogError(ex, "EventProducerService: Error producing event to Kafka topic {Topic} for facility: {FacilityId}.", KafkaTopic.PatientEvent.ToString(), patientEventResponse.FacilityId);
                     throw;
                 }
             }
