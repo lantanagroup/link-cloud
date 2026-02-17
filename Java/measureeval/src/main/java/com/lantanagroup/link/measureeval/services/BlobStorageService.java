@@ -68,46 +68,44 @@ public class BlobStorageService {
         return blobName;
     }
 
-    public void storePatientInBlobStorage(PatientReportingEvaluationStatus status, MeasureReport measureReport) {
+    public void storePatientInBlobStorage(PatientReportingEvaluationStatus status, PatientReportingEvaluationStatus.Report report, MeasureReport measureReport) {
         IParser jsonParser = this.fhirContext.newJsonParser()
                 //.setSuppressNarratives(true)    // consider this if narrative "text" fields aren't desired downstream
                 .setPrettyPrint(false);     // Ensure no tab delim so that it serializes to a single line per each resource
 
-        for (PatientReportingEvaluationStatus.Report report : status.getReports()) {
-            ReportScheduleModel summary = this.reportClient.getReportSchedule(report.getReportTrackingId());
-            String payloadUri = summary.getPayloadRootUri();
+        ReportScheduleModel summary = this.reportClient.getReportSchedule(report.getReportTrackingId());
+        String payloadUri = summary.getPayloadRootUri();
 
-            if (payloadUri == null) {
-                throw new ValidationException("Payload URI for report " + report.getReportTrackingId() + " is null");
-            }
-
-            String patientIdPart = "patient-" + report.getReportType() + "-" + status.getPatientId();
-            String fileName = patientIdPart + ".mr";
-            String patientPayloadUri = payloadUri.endsWith("/") ? payloadUri + fileName : payloadUri + "/" + fileName;
-
-            StringBuilder sb = new StringBuilder();
-            List<Resource> resources = this.normalize(measureReport);
-
-            for (Resource resource : resources) {
-                String idLine = resource.getResourceType().toString() + "/" + resource.getIdPart();       // i.e. Condition/A
-                sb.append(idLine).append("\n");
-                sb.append(jsonParser.encodeResourceToString(resource)).append("\n");
-            }
-
-            String blobName;
-
-            try {
-                // Upload to ABS
-                blobName = this.upload(patientPayloadUri, sb.toString());
-                logger.info("Uploaded patient {} payload for report {} to blob storage: {}", status.getPatientId(), report.getReportTrackingId(), patientPayloadUri);
-            } catch (Exception ex) {
-                logger.error("Failed to upload patient payload to blob storage: {}", ex.getMessage(), ex);
-                throw ex;
-            }
-
-            // Produce MeasureReportGenerated event
-            this.measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(status, report, measureReport, patientPayloadUri, blobName);
+        if (payloadUri == null) {
+            throw new ValidationException("Payload URI for report " + report.getReportTrackingId() + " is null");
         }
+
+        String patientIdPart = "patient-" + report.getReportType() + "-" + status.getPatientId();
+        String fileName = patientIdPart + ".mr";
+        String patientPayloadUri = payloadUri.endsWith("/") ? payloadUri + fileName : payloadUri + "/" + fileName;
+
+        StringBuilder sb = new StringBuilder();
+        List<Resource> resources = this.normalize(measureReport);
+
+        for (Resource resource : resources) {
+            String idLine = resource.getResourceType().toString() + "/" + resource.getIdPart();       // i.e. Condition/A
+            sb.append(idLine).append("\n");
+            sb.append(jsonParser.encodeResourceToString(resource)).append("\n");
+        }
+
+        String blobName;
+
+        try {
+            // Upload to ABS
+            blobName = this.upload(patientPayloadUri, sb.toString());
+            logger.info("Uploaded patient {} payload for report {} to blob storage: {}", status.getPatientId(), report.getReportTrackingId(), patientPayloadUri);
+        } catch (Exception ex) {
+            logger.error("Failed to upload patient payload to blob storage: {}", ex.getMessage(), ex);
+            throw ex;
+        }
+
+        // Produce MeasureReportGenerated event
+        this.measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(status, report, measureReport, patientPayloadUri, blobName);
     }
 
     private List<Resource> normalize(MeasureReport measureReport) {

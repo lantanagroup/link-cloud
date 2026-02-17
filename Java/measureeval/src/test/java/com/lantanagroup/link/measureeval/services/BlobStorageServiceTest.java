@@ -99,7 +99,7 @@ class BlobStorageServiceTest {
         MeasureReport measureReport = new MeasureReport();
         measureReport.setId("mr1");
 
-        blobStorageService.storePatientInBlobStorage(status, measureReport);
+        blobStorageService.storePatientInBlobStorage(status, report, measureReport);
 
         String expectedBlobName = "root/patient-type1-patient1.mr";
         verify(containerClient).getBlobClient(expectedBlobName);
@@ -128,7 +128,7 @@ class BlobStorageServiceTest {
         measureReport.addContained(patient);
         measureReport.setSubject(new Reference("#LCR-patient-A"));
 
-        blobStorageService.storePatientInBlobStorage(status, measureReport);
+        blobStorageService.storePatientInBlobStorage(status, report, measureReport);
 
         ArgumentCaptor<BinaryData> contentCaptor = ArgumentCaptor.forClass(BinaryData.class);
         verify(blobClient).upload(contentCaptor.capture(), eq(true));
@@ -157,7 +157,7 @@ class BlobStorageServiceTest {
         MeasureReport measureReport = new MeasureReport();
 
         assertThrows(ValidationException.class, () -> {
-            blobStorageService.storePatientInBlobStorage(status, measureReport);
+            blobStorageService.storePatientInBlobStorage(status, report, measureReport);
         });
     }
 
@@ -178,7 +178,7 @@ class BlobStorageServiceTest {
         doThrow(new RuntimeException("Upload failed")).when(blobClient).upload(any(BinaryData.class), anyBoolean());
 
         assertThrows(RuntimeException.class, () -> {
-            blobStorageService.storePatientInBlobStorage(status, measureReport);
+            blobStorageService.storePatientInBlobStorage(status, report, measureReport);
         });
     }
 
@@ -197,7 +197,7 @@ class BlobStorageServiceTest {
         MeasureReport measureReport = new MeasureReport();
         // ID is not set
 
-        blobStorageService.storePatientInBlobStorage(status, measureReport);
+        blobStorageService.storePatientInBlobStorage(status, report, measureReport);
 
         assertNotNull(measureReport.getId());
 
