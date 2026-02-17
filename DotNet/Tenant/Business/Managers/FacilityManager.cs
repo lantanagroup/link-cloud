@@ -343,6 +343,12 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
 
                 throw new ApplicationException($"Facility {facilityId} failed to soft delete. " + ex.Message);
             }
+
+            // audit soft delete facility event
+            AuditEventMessage auditMessageEvent = Helper.SoftDeleteFacilityAuditEvent(existingFacility);
+            _ = Task.Run(() =>
+                _createAuditEventCommand.Execute(existingFacility.FacilityId, auditMessageEvent, cancellationToken));
+
             return facilityId;
         }
 
@@ -392,12 +398,18 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
                 {
                     { "service.name", TenantConstants.ServiceName },
                     { "facility", facilityId },
-                    { "action", AuditEventType.Update },
+                    { "action", AuditEventType.Restore },
                     { "resource", existingFacility }
                 });
 
                 throw new ApplicationException($"Facility {facilityId} failed to restore. " + ex.Message);
             }
+
+            // audit restore facility event
+            AuditEventMessage auditMessageEvent = Helper.RestoreFacilityAuditEvent(existingFacility);
+            _ = Task.Run(() =>
+                _createAuditEventCommand.Execute(existingFacility.FacilityId, auditMessageEvent, cancellationToken));
+
             return facilityId;
         }
 
