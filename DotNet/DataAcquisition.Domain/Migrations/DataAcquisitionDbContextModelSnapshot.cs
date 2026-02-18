@@ -17,7 +17,7 @@ namespace DataAcquisition.Domain.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.4")
+                .HasAnnotation("ProductVersion", "8.0.23")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -610,13 +610,16 @@ namespace DataAcquisition.Domain.Migrations
 
                     b.Property<string>("Priority")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("QueryPhase")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("QueryType")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<DateTime?>("ReportEndDate")
                         .HasColumnType("datetime2");
@@ -641,7 +644,8 @@ namespace DataAcquisition.Domain.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Status")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<bool>("TailSent")
                         .HasColumnType("bit");
@@ -658,15 +662,15 @@ namespace DataAcquisition.Domain.Migrations
 
                     SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("ExecutionDate", "Id"), new[] { "Priority", "FacilityId", "IsCensus", "PatientId", "ReportableEvent", "ReportTrackingId", "CorrelationId", "TraceId", "FhirVersion", "QueryType", "QueryPhase", "Status", "RetryAttempts", "CompletionDate", "CompletionTimeMilliseconds" });
 
-                    b.HasIndex("FacilityId", "ExecutionDate", "Id")
-                        .HasDatabaseName("IX_DataAcquisitionLogs_Facility_ExecutionDate_Id");
-
-                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("FacilityId", "ExecutionDate", "Id"), new[] { "Priority", "PatientId", "FhirVersion", "QueryType", "QueryPhase", "Status" });
-
                     b.HasIndex("ReportTrackingId", "ExecutionDate", "Id")
                         .HasDatabaseName("IX_DataAcquisitionLogs_ReportTrackingId_ExecutionDate_Id");
 
                     SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("ReportTrackingId", "ExecutionDate", "Id"), new[] { "FacilityId", "Priority", "PatientId", "FhirVersion", "QueryType", "QueryPhase", "Status" });
+
+                    b.HasIndex("FacilityId", "Status", "ExecutionDate", "Id")
+                        .HasDatabaseName("IX_DataAcquisitionLogs_Facility_Status_ExecutionDate_Id");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("FacilityId", "Status", "ExecutionDate", "Id"), new[] { "Priority", "IsCensus", "PatientId", "ReportableEvent", "ReportTrackingId", "CorrelationId", "FhirVersion", "QueryType", "QueryPhase", "TraceId", "RetryAttempts", "CompletionDate", "CompletionTimeMilliseconds", "ResourceAcquiredIds", "Notes", "ScheduledReport" });
 
                     b.ToTable("DataAcquisitionLog");
                 });

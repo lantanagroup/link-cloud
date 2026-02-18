@@ -139,17 +139,21 @@ public class DataAcquisitionDbContext : DbContext
                 v => JsonSerializer.Deserialize<ScheduledReport>(v, new JsonSerializerOptions())
             );
 
+            entity.Property(d => d.Status)
+                .HasConversion(new EnumToStringConverter<RequestStatus>())
+                .HasMaxLength(50);
+
             entity.Property(d => d.Priority)
-                .HasConversion(new EnumToStringConverter<AcquisitionPriority>());
+                .HasConversion(new EnumToStringConverter<AcquisitionPriority>())
+                .HasMaxLength(50);
 
             entity.Property(d => d.QueryPhase)
-                .HasConversion(new EnumToStringConverter<QueryPhase>());
-
-            entity.Property(d => d.Status)
-                .HasConversion(new EnumToStringConverter<RequestStatus>());
+                .HasConversion(new EnumToStringConverter<QueryPhase>())
+                .HasMaxLength(50);
 
             entity.Property(d => d.QueryType)
-                .HasConversion(new EnumToStringConverter<FhirQueryType>());
+                .HasConversion(new EnumToStringConverter<FhirQueryType>())
+                .HasMaxLength(50);
 
             entity.HasIndex(e => new { e.ExecutionDate, e.Id })
                 .IsDescending()
@@ -173,15 +177,25 @@ public class DataAcquisitionDbContext : DbContext
                     nameof(DataAcquisitionLog.CompletionTimeMilliseconds)
                 );
 
-            entity.HasIndex(e => new { e.FacilityId, e.ExecutionDate, e.Id })
-                .HasDatabaseName("IX_DataAcquisitionLogs_Facility_ExecutionDate_Id")
+            entity.HasIndex(e => new { e.FacilityId, e.Status, e.ExecutionDate, e.Id })
+                .HasDatabaseName("IX_DataAcquisitionLogs_Facility_Status_ExecutionDate_Id")
                 .IncludeProperties(
                     nameof(DataAcquisitionLog.Priority),
+                    nameof(DataAcquisitionLog.IsCensus),
                     nameof(DataAcquisitionLog.PatientId),
+                    nameof(DataAcquisitionLog.ReportableEvent),
+                    nameof(DataAcquisitionLog.ReportTrackingId),
+                    nameof(DataAcquisitionLog.CorrelationId),
                     nameof(DataAcquisitionLog.FhirVersion),
                     nameof(DataAcquisitionLog.QueryType),
                     nameof(DataAcquisitionLog.QueryPhase),
-                    nameof(DataAcquisitionLog.Status)
+                    nameof(DataAcquisitionLog.TraceId),
+                    nameof(DataAcquisitionLog.RetryAttempts),
+                    nameof(DataAcquisitionLog.CompletionDate),
+                    nameof(DataAcquisitionLog.CompletionTimeMilliseconds),
+                    nameof(DataAcquisitionLog.ResourceAcquiredIds),
+                    nameof(DataAcquisitionLog.Notes),
+                    nameof(DataAcquisitionLog.ScheduledReport)
                 );
 
             entity.HasIndex(e => new { e.ReportTrackingId, e.ExecutionDate, e.Id })
