@@ -65,11 +65,13 @@ services:
       - hapi.fhir.validation.responses_enabled=false
     volumes:
       - fhir_data:/data
-      - ./Java/hapi/src/main/java/com/lantanagroup/link/hapi/HealthCheck.java:/app/HealthCheck.java
     networks:
       - link-nw
     healthcheck:
-      test: ["CMD", "java", "/app/HealthCheck.java", "http://localhost:8080/fhir/metadata"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/fhir/metadata"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
       start_period: 60s
       
   ###########################################
@@ -605,6 +607,7 @@ services:
     container_name: link-measureeval
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      spring.main.lazy-initialization: "true"
       spring.kafka.properties.sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";
       internal-blob-storage.connection-string: ${AZURITE_CONNECTION_STRING}
       internal-blob-storage.blob-container-name: ${INTERNAL_BLOB_CONTAINER_NAME}
@@ -804,6 +807,7 @@ services:
     container_name: link-validation
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      spring.main.lazy-initialization: "true"
       spring.datasource.password: ${LINK_DB_PASS}
       spring.kafka.properties.sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";
       internal-blob-storage.connection-string: ${AZURITE_CONNECTION_STRING}

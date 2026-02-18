@@ -48,8 +48,8 @@ jobs:
 
     env:
       PROJECT_NAME: link
-      HEALTH_CHECK_TIMEOUT: 10
-      CHECK_INTERVAL: 5
+      HEALTH_CHECK_TIMEOUT: 60
+      CHECK_INTERVAL: 10
 
     steps:          
       - name: Checkout code
@@ -68,7 +68,7 @@ jobs:
         run: docker compose up --no-build -d
 
       - name: Wait for services to start
-        run: sleep 30
+        run: sleep 10
 
       - name: Wait for Services to Become Healthy
         run: |

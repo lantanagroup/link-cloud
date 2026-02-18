@@ -24,16 +24,16 @@ while true; do
   containers=$(docker ps --filter "name=${PROJECT_NAME}|fhir-" --format '{{.Names}}')
   
   for container in $containers; do
-    if [[ "$container" == "${PROJECT_NAME}-admin-ui" ]]; then
-      # Skip this container and continue with the next iteration
-      continue
+    health_status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}healthy{{end}}' "$container" 2>/dev/null)
+    
+    # Fallback to 'healthy' if empty (no health check defined)
+    if [[ -z "$health_status" ]]; then
+      health_status="healthy"
     fi
-
-    health_status=$(docker inspect --format '{{.State.Health.Status}}' "$container" 2>/dev/null || echo "no-healthcheck")
 
     echo "$container health: $health_status"
 
-    if [[ "$health_status" != "healthy" && "$health_status" != "no-healthcheck" ]]; then
+    if [[ "$health_status" != "healthy" ]]; then
       unhealthy_services=$((unhealthy_services + 1))
       unhealthy_services_list+=("$container")
     fi
