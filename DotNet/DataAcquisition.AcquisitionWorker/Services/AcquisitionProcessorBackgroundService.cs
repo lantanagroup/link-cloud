@@ -125,7 +125,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
 
             if (log.Status != RequestStatus.Queued)
             {
-                _logger.LogInformation("Log {LogId} no longer in Queued state ({Status}) - skipping", log.Id.ToString().SanitizeUntrustedString(), log.Status?.ToString().SanitizeUntrustedString());
+                _logger.LogInformation("Log {LogId} no longer in Queued state ({Status}) - skipping", log.Id.ToString().SanitizeUntrustedString(), log.Status?.ToString()?.SanitizeUntrustedString());
                 return;
             }
 
