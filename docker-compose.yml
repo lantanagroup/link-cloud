@@ -68,7 +68,7 @@ services:
     networks:
       - link-nw
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/fhir/metadata"]
+      test: [ "CMD", "java", "/app/HealthCheck.java", "http://localhost:8080/fhir/metadata" ]
       interval: 10s
       timeout: 5s
       retries: 5
