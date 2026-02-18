@@ -19,7 +19,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.Security
         /// <remarks>
         /// Security: Removes control characters (0-31, 127) that could be used for log injection.
         /// </remarks>
-        public static string SanitizeUntrustedString(this string originalString)
+        public static string? SanitizeUntrustedString(this string? originalString)
         {
             if (originalString is null) return null;
             StringBuilder builder = new StringBuilder();
