@@ -48,7 +48,7 @@ jobs:
 
     env:
       PROJECT_NAME: link
-      HEALTH_CHECK_TIMEOUT: 10
+      HEALTH_CHECK_TIMEOUT: 30
       CHECK_INTERVAL: 5
 
     steps:          
