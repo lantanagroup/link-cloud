@@ -248,4 +248,17 @@ public class StringSecurityExtensionsTest
         // Assert
         Assert.Equal("Test End", result);
     }
+
+    [Fact]
+    public void SanitizeUntrustedString_HandlesNull()
+    {
+        // Arrange
+        string? input = null;
+
+        // Act
+        var result = input.SanitizeUntrustedString();
+
+        // Assert
+        Assert.Null(result);
+    }
 }

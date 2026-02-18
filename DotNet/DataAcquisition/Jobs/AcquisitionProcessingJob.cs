@@ -365,7 +365,7 @@ public class AcquisitionProcessingJob : IJob
                 {
                     _logger.LogError(ex,
                         "An exception occurred while attempting to send Tail Kafka Messages for facility {facilityId}.",
-                        message.FacilityId.SanitizeUntrustedString());
+                        message.FacilityId?.SanitizeUntrustedString());
                 }
 
             }
