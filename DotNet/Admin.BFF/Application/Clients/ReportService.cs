@@ -215,7 +215,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
-            var relativeUrl = $"api/schedules/{HtmlInputSanitizer.Sanitize(reportScheduleId)}";
+            var relativeUrl = $"api/schedules/{Uri.EscapeDataString(reportScheduleId ?? string.Empty)}";
 
             var response = await _client.GetAsync(relativeUrl, cancellationToken);
 
