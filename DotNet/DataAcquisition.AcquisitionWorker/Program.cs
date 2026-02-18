@@ -8,12 +8,8 @@ using LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
-using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
-using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Health;
-using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Jobs;
-using Quartz.Spi;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -32,11 +28,7 @@ var secretManagerEnabled = builder.Configuration.GetValue<bool>("SecretManagemen
 
 builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName, configureRedis: true, configureSecretManager: secretManagerEnabled);
 
-builder.Services.RegisterQuartzDatabase(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection));
-
-//Register Quartz Job Factory and SFTP Acquisition Job
-builder.Services.AddSingleton<IJobFactory, QuartzJobFactory>();
-builder.Services.AddTransient<SftpAcquisitionProcessingJob>();
+builder.Services.AddTransient<SftpAcquisitionHandler>();
 
 builder.Services.AddTransient<IDataAcquisitionServiceMetrics, DataAcquisitionServiceMetrics>();
 builder.Services.AddTransient<ICreateSystemToken, CreateSystemToken>();
@@ -61,8 +53,8 @@ if (!consumerSettings?.DisableConsumer ?? true)
     builder.Services.AddHostedService<ReadyToAcquireListener>();
 }
 
-//Add SFTP Acquisition Scheduling Service
-builder.Services.AddHostedService<SftpAcquisitionScheduleService>();
+//Add SFTP Acquisition Service
+builder.Services.AddHostedService<SftpAcquisitionService>();
 
 // TODO: Retry consumer services temporarily disabled for LNK-4038
 if (!consumerSettings?.DisableRetryConsumer ?? true)
