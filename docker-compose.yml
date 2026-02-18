@@ -55,6 +55,14 @@ services:
       - hapi.fhir.subscription_enabled=false
       - hapi.fhir.client_id_strategy=ANY
       - hapi.fhir.server_id_strategy=UUID
+      - spring.main.lazy-initialization=true
+      - hapi.fhir.openapi_enabled=false
+      - hapi.fhir.lastn_enabled=false
+      - hapi.fhir.graphql_enabled=false
+      - hapi.fhir.bulk_export_enabled=false
+      - hapi.fhir.binary_storage_enabled=false
+      - hapi.fhir.validation.requests_enabled=false
+      - hapi.fhir.validation.responses_enabled=false
     volumes:
       - fhir_data:/data
       - ./Java/hapi/src/main/java/com/lantanagroup/link/hapi/HealthCheck.java:/app/HealthCheck.java
