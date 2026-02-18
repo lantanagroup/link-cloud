@@ -52,7 +52,6 @@ public class AcquisitionProcessingJob : IJob
             using var scope = _serviceScopeFactory.CreateScope();
             var dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
             
-            _logger.LogInformation("Checking for stalled queued logs...");
             int failedCount = await dataAcquisitionLogQueries.FailStalledQueuedLogsAsync(15, cancellationToken);
             
             if (failedCount > 0)

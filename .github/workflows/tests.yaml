@@ -48,8 +48,8 @@ jobs:
 
     env:
       PROJECT_NAME: link
-      HEALTH_CHECK_TIMEOUT: 10
-      CHECK_INTERVAL: 5
+      HEALTH_CHECK_TIMEOUT: 60
+      CHECK_INTERVAL: 10
 
     steps:          
       - name: Checkout code
@@ -68,12 +68,19 @@ jobs:
         run: docker compose up --no-build -d
 
       - name: Wait for services to start
-        run: sleep 30
+        run: sleep 10
 
       - name: Wait for Services to Become Healthy
         run: |
           chmod +x Scripts/check_health.sh
           Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
+
+      - name: Upload Logs on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: service-logs
+          path: service-logs/
 
       - name: Run Backend E2E Tests
         run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=SmokeTest" --logger "trx;LogFileName=test-results.trx"
