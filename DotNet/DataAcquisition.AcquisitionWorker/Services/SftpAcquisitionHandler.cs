@@ -11,20 +11,17 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.Extensions.Options;
-using Quartz;
 
-namespace LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Jobs;
+namespace LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
 
-// [DisallowConcurrentExecution]
-public class SftpAcquisitionProcessingJob(
-    ILogger<SftpAcquisitionProcessingJob> logger,
+public class SftpAcquisitionHandler(
+    ILogger<SftpAcquisitionHandler> logger,
     IServiceScopeFactory serviceScopeFactory,
     IOptions<SftpAcquisitionSettings> settings)
-    : IJob
 {
-    public async Task Execute(IJobExecutionContext context)
+    public async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        logger.LogDebug("SftpAcquisitionProcessingJob starting execution");
+        logger.LogDebug("SftpAcquisitionHandler starting execution");
 
         try
         {
@@ -42,19 +39,19 @@ public class SftpAcquisitionProcessingJob(
                 var pendingLogs = await logQueries.GetPendingLogsAsync(
                     acquisitionType,
                     settings.Value.MaxBatchSize,
-                    context.CancellationToken);
+                    cancellationToken);
 
                 // Also get failed logs eligible for retry
                 var retryLogs = await logQueries.GetFailedLogsForRetryAsync(
                     acquisitionType,
                     settings.Value.MaxRetryAttempts,
                     settings.Value.MaxBatchSize,
-                    context.CancellationToken);
+                    cancellationToken);
 
                 allLogs.AddRange(pendingLogs);
                 allLogs.AddRange(retryLogs);
             }
-            
+
             if (allLogs.Count == 0)
             {
                 logger.LogDebug("No pending SFTP acquisition logs to process");
@@ -85,7 +82,7 @@ public class SftpAcquisitionProcessingJob(
                 var options = new ParallelOptions
                 {
                     MaxDegreeOfParallelism = settings.Value.MaxConcurrency,
-                    CancellationToken = context.CancellationToken
+                    CancellationToken = cancellationToken
                 };
 
                 // Parallelize across facilities, but process logs within each facility sequentially with a shared session
@@ -105,16 +102,16 @@ public class SftpAcquisitionProcessingJob(
                 // Process each facility's logs with a shared session
                 foreach (var facilityGroup in logsByFacility)
                 {
-                    context.CancellationToken.ThrowIfCancellationRequested();
-                    await ProcessFacilityLogsAsync(facilityGroup.Key, facilityGroup.ToList(), scope.ServiceProvider, context.CancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await ProcessFacilityLogsAsync(facilityGroup.Key, facilityGroup.ToList(), scope.ServiceProvider, cancellationToken);
                 }
             }
 
-            logger.LogInformation("SftpAcquisitionProcessingJob completed processing");
+            logger.LogInformation("SftpAcquisitionHandler completed processing");
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error in SftpAcquisitionProcessingJob execution");
+            logger.LogError(ex, "Error in SftpAcquisitionHandler execution");
             throw;
         }
     }
