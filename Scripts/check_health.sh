@@ -54,6 +54,10 @@ while true; do
       echo "🔍 DUMPING LOGS FOR UNHEALTHY SERVICE: $container"
       docker logs "$container" > "service-logs/${container}.log" 2>&1
       cat "service-logs/${container}.log"
+      
+      echo ""
+      echo "📋 DOCKER INSPECT (Health State): $container"
+      docker inspect --format '{{json .State.Health}}' "$container"
       echo "------------------------------------------------"
     done
 
