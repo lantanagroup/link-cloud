@@ -14,6 +14,9 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
         IEntityRepository<ResourceReferenceType> ResourceReferenceTypeRepository { get; set; }
         IEntityRepository<FhirQueryResourceType> FhirQueryResourceTypeRepository { get; set; }
         IEntityRepository<DataAcquisitionLog> DataAcquisitionLogRepository { get; set; }
+        IEntityRepository<LocationConfiguration> LocationConfigurationRepository { get; set; }
+        IEntityRepository<LocationCondition> LocationConditionRepository { get; set; }
+
         Task SaveChangesAsync();
     }
     public class Database : IDatabase
@@ -27,6 +30,8 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
         public IEntityRepository<ReferenceResources> ReferenceResourcesRepository { get; set; }
         public IEntityRepository<FhirQueryResourceType> FhirQueryResourceTypeRepository { get; set; }
         public IEntityRepository<DataAcquisitionLog> DataAcquisitionLogRepository { get; set; }
+        public IEntityRepository<LocationConfiguration> LocationConfigurationRepository { get; set; }
+        public IEntityRepository<LocationCondition> LocationConditionRepository { get; set; }
 
         public Database(
             DataAcquisitionDbContext context,
@@ -37,7 +42,9 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
             IEntityRepository<QueryPlan> queryPlans,
             IEntityRepository<DataAcquisitionLog> dataAcquisitionLogRepository,
             IEntityRepository<ResourceReferenceType> resourceReferenceTypeRepository,
-            IEntityRepository<FhirQueryResourceType> fhirQueryResourceTypeRepository)
+            IEntityRepository<FhirQueryResourceType> fhirQueryResourceTypeRepository,
+            IEntityRepository<LocationConfiguration> locationConfigurationRepository,
+            IEntityRepository<LocationCondition> locationConditionRepository)
         {
             _context = context;
             QueryPlanRepository = queryPlans;
@@ -48,6 +55,8 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
             DataAcquisitionLogRepository = dataAcquisitionLogRepository;
             ResourceReferenceTypeRepository = resourceReferenceTypeRepository;
             FhirQueryResourceTypeRepository = fhirQueryResourceTypeRepository;
+            LocationConfigurationRepository = locationConfigurationRepository;
+            LocationConditionRepository = locationConditionRepository;
         }
 
         public async Task SaveChangesAsync()

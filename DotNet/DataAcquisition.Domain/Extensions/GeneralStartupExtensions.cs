@@ -1,7 +1,4 @@
-﻿using System.Diagnostics;
-using System.Net;
-using System.Reflection;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Queries;
 using FluentValidation;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.ParameterFactories;
@@ -46,6 +43,9 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Settings.Configuration;
 using Serilog.Sinks.SystemConsole.Themes;
+using System.Diagnostics;
+using System.Net;
+using System.Reflection;
 using IHostingEnvironment = Microsoft.Extensions.Hosting.IHostingEnvironment;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
@@ -219,6 +219,8 @@ public static class GeneralStartupExtensions
         services.AddTransient<IEntityRepository<FhirQuery>, EntityRepository<FhirQuery, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<DataAcquisitionLog>, EntityRepository<DataAcquisitionLog, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<LocationConfiguration>, EntityRepository<LocationConfiguration, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<LocationCondition>, EntityRepository<LocationCondition, DataAcquisitionDbContext>>();
 
         //Database
         services.AddScoped<IDatabase, Database>();
@@ -233,6 +235,8 @@ public static class GeneralStartupExtensions
         services.AddTransient<IFhirQueryQueries, FhirQueryQueries>();
         services.AddTransient<IQueryPlanQueries, QueryPlanQueries>();
         services.AddTransient<IReferenceResourcesQueries, ReferenceResourcesQueries>();
+        services.AddScoped<ILocationConfigurationQueries, LocationConfigurationQueries>();
+
 
         //Managers
         services.AddTransient<IFhirQueryConfigurationManager, FhirQueryConfigurationManager>();
@@ -241,6 +245,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IReferenceResourcesManager, ReferenceResourcesManager>();
         services.AddTransient<IFhirQueryManager, FhirQueryManager>();
         services.AddTransient<IDataAcquisitionLogManager, DataAcquisitionLogManager>();
+        services.AddScoped<ILocationConfigurationManager, LocationConfigurationManager>();
     }
 
     public static void RegisterServices(this IServiceCollection services)

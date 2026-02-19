@@ -54,9 +54,8 @@ namespace IntegrationTests.DataAcquisition
             var assemblyVersion = Assembly.GetExecutingAssembly()
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
 
-            // Setup ServiceInformation with the correct connection string
             builder.SetupServiceInformation(
-                "DataAcquisitionService", // Replace with your actual service name constant if available
+                "DataAcquisitionService",
                 assemblyVersion
             );
 
@@ -65,7 +64,7 @@ namespace IntegrationTests.DataAcquisition
                 options.UseSqlite(sqliteConnectionString);
             });
 
-            // Register generic repositories for all required entities
+            // Register generic repositories for ALL entities (including the new Location ones)
             builder.Services.AddScoped<IEntityRepository<DataAcquisitionLog>, EntityRepository<DataAcquisitionLog, DataAcquisitionDbContext>>();
             builder.Services.AddScoped<IEntityRepository<FhirQueryConfiguration>, EntityRepository<FhirQueryConfiguration, DataAcquisitionDbContext>>();
             builder.Services.AddScoped<IEntityRepository<FhirListConfiguration>, EntityRepository<FhirListConfiguration, DataAcquisitionDbContext>>();
@@ -75,16 +74,25 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddTransient<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
             builder.Services.AddTransient<IEntityRepository<ResourceReferenceType>, EntityRepository<ResourceReferenceType, DataAcquisitionDbContext>>();
 
-            // Register IDatabase implementation
+            // NEW: LocationConfiguration repositories
+            builder.Services.AddScoped<IEntityRepository<LocationConfiguration>, EntityRepository<LocationConfiguration, DataAcquisitionDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<LocationCondition>, EntityRepository<LocationCondition, DataAcquisitionDbContext>>();
+
+            // Register IDatabase implementation (it will now receive the new repositories via constructor injection)
             builder.Services.AddScoped<IDatabase, Database>();
+
             builder.Services.AddScoped<IQueryPlanValidator, QueryPlanValidator>();
             builder.Services.AddTransient<IDataAcquisitionLogService, DataAcquisitionLogService>();
 
-            // Register managers                    
+            // Register managers
             builder.Services.AddScoped<IQueryPlanManager, QueryPlanManager>();
             builder.Services.AddScoped<IFhirListQueryConfigurationManager, FhirListQueryConfigurationManager>();
             builder.Services.AddScoped<IDataAcquisitionLogManager, DataAcquisitionLogManager>();
             builder.Services.AddScoped<IFhirQueryConfigurationManager, FhirQueryConfigurationManager>();
+
+            // NEW: LocationConfiguration manager & queries
+            builder.Services.AddScoped<ILocationConfigurationManager, LocationConfigurationManager>();
+            builder.Services.AddScoped<ILocationConfigurationQueries, LocationConfigurationQueries>();
 
             // Register queries
             builder.Services.AddScoped<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();
@@ -108,7 +116,6 @@ namespace IntegrationTests.DataAcquisition
 
             builder.Services.AddTransient<ICreateSystemToken, CreateSystemToken>();
             builder.Services.AddTransient<ITenantApiService, TenantApiService>();
-
 
             builder.Services.AddHttpClient();
 
