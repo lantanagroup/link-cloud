@@ -1,12 +1,11 @@
-﻿using System;
-using Microsoft.EntityFrameworkCore.Migrations;
+﻿using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace DataAcquisition.Domain.Migrations
 {
     /// <inheritdoc />
-    public partial class AddLocationConfiguraitonTables : Migration
+    public partial class AddLocationConfigurationTables : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -17,7 +16,7 @@ namespace DataAcquisition.Domain.Migrations
                 {
                     ConfigId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    FacilityId = table.Column<int>(type: "int", nullable: false),
+                    FacilityId = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
                     Description = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
                     IsActive = table.Column<bool>(type: "bit", nullable: true, defaultValue: true),
                     CreatedOn = table.Column<DateTime>(type: "datetime", nullable: true, defaultValueSql: "(getutcdate())"),
@@ -64,11 +63,8 @@ namespace DataAcquisition.Domain.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "LocationCondition");
-
-            migrationBuilder.DropTable(
-                name: "LocationConfiguration");
+            migrationBuilder.DropTable(name: "LocationCondition");
+            migrationBuilder.DropTable(name: "LocationConfiguration");
         }
     }
 }

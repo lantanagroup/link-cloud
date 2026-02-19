@@ -11,11 +11,11 @@ public interface ILocationConfigurationManager
 
     Task<LocationConfigurationModel> UpdateByIdAsync(int configId, UpdateLocationConfigurationModel model);
 
-    Task<LocationConfigurationModel> UpdateByFacilityIdAsync(int facilityId, UpdateLocationConfigurationModel model);
+    Task<LocationConfigurationModel> UpdateByFacilityIdAsync(string facilityId, UpdateLocationConfigurationModel model);
 
     Task DeleteByIdAsync(int configId);
 
-    Task DeleteByFacilityIdAsync(int facilityId);
+    Task DeleteByFacilityIdAsync(string facilityId);
 }
 
 public class LocationConfigurationManager : ILocationConfigurationManager
@@ -68,7 +68,7 @@ public class LocationConfigurationManager : ILocationConfigurationManager
         return ProjectToModel(entity);
     }
 
-    public async Task<LocationConfigurationModel> UpdateByFacilityIdAsync(int facilityId, UpdateLocationConfigurationModel model)
+    public async Task<LocationConfigurationModel> UpdateByFacilityIdAsync(string facilityId, UpdateLocationConfigurationModel model)
     {
         var entities = await _database.LocationConfigurationRepository
             .FindAsync(c => c.FacilityId == facilityId);
@@ -99,7 +99,7 @@ public class LocationConfigurationManager : ILocationConfigurationManager
         }
     }
 
-    public async Task DeleteByFacilityIdAsync(int facilityId)
+    public async Task DeleteByFacilityIdAsync(string facilityId)
     {
         // IMPORTANT: Delete ALL configurations for this facility
         var entities = await _database.LocationConfigurationRepository

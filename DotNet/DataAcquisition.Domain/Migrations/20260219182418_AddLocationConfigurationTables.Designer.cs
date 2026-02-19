@@ -13,7 +13,7 @@ namespace DataAcquisition.Domain.Migrations
 {
     [DbContext(typeof(DataAcquisitionDbContext))]
     [Migration("20260219182418_AddLocationConfiguraitonTables")]
-    partial class AddLocationConfiguraitonTables
+    partial class AddLocationConfigurationTables
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

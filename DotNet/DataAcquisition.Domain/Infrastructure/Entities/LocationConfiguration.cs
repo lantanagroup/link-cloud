@@ -16,7 +16,9 @@ public partial class LocationConfiguration
     [Key]
     public int ConfigId { get; set; }
 
-    public int FacilityId { get; set; }
+    [Required]
+    [StringLength(255)]
+    public string FacilityId { get; set; }
 
     [StringLength(500)]
     public string Description { get; set; }

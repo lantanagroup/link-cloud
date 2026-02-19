@@ -9,7 +9,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 public interface ILocationConfigurationQueries
 {
     Task<LocationConfigurationModel> GetByIdAsync(int configId);
-    Task<LocationConfigurationModel> GetByFacilityIdAsync(int facilityId);
+    Task<LocationConfigurationModel> GetByFacilityIdAsync(string facilityId);
     Task<PagedConfigModel<LocationConfigurationModel>> SearchAsync(
         LocationConfigurationSearchModel search,
         int pageNumber = 1,
@@ -49,7 +49,7 @@ public class LocationConfigurationQueries : ILocationConfigurationQueries
             .FirstOrDefaultAsync();
     }
 
-    public async Task<LocationConfigurationModel> GetByFacilityIdAsync(int facilityId)
+    public async Task<LocationConfigurationModel> GetByFacilityIdAsync(string facilityId)
     {
         return await _context.LocationConfigurations
             .Where(c => c.FacilityId == facilityId)
@@ -83,8 +83,8 @@ public class LocationConfigurationQueries : ILocationConfigurationQueries
         if (search.ConfigId.HasValue)
             query = query.Where(c => c.ConfigId == search.ConfigId.Value);
 
-        if (search.FacilityId.HasValue)
-            query = query.Where(c => c.FacilityId == search.FacilityId.Value);
+        if (!string.IsNullOrEmpty(search.FacilityId))
+            query = query.Where(c => c.FacilityId == search.FacilityId);
 
         if (search.IsActive.HasValue)
             query = query.Where(c => c.IsActive == search.IsActive.Value);

@@ -240,6 +240,10 @@ public class DataAcquisitionDbContext : DbContext
         {
             entity.HasKey(e => e.ConfigId).HasName("PK_LocationConfiguration_ConfigId");
 
+            entity.Property(e => e.FacilityId)
+                .IsRequired()
+                .HasMaxLength(255);
+
             entity.Property(e => e.CreatedOn).HasDefaultValueSql("(getutcdate())");
             entity.Property(e => e.IsActive).HasDefaultValue(true);
             entity.Property(e => e.ModifiedOn).HasDefaultValueSql("(getutcdate())");

@@ -824,81 +824,83 @@ namespace DataAcquisition.Domain.Migrations
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.LocationCondition", b =>
-                {
-                    b.Property<int>("ConditionId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("ConditionId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ConditionId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ConditionId"));
 
-                    b.Property<int>("ConfigId")
-                        .HasColumnType("int");
+                b.Property<int>("ConfigId")
+                    .HasColumnType("int");
 
-                    b.Property<DateTime?>("CreatedOn")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
-                        .HasDefaultValueSql("(getutcdate())");
+                b.Property<DateTime?>("CreatedOn")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("datetime")
+                    .HasDefaultValueSql("(getutcdate())");
 
-                    b.Property<string>("FhirPath")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                b.Property<string>("FhirPath")
+                    .IsRequired()
+                    .HasMaxLength(500)
+                    .HasColumnType("nvarchar(500)");
 
-                    b.Property<int?>("Priority")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(1);
+                b.Property<int?>("Priority")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int")
+                    .HasDefaultValue(1);
 
-                    b.Property<DateTime?>("ModifiedOn")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
-                        .HasDefaultValueSql("(getutcdate())");
+                b.Property<DateTime?>("ModifiedOn")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("datetime")
+                    .HasDefaultValueSql("(getutcdate())");
 
-                    b.HasKey("ConditionId")
-                        .HasName("PK_LocationCondition_ConditionId");
+                b.HasKey("ConditionId")
+                    .HasName("PK_LocationCondition_ConditionId");
 
-                    b.HasIndex(new[] { "ConfigId" }, "IX_LocationConditions_ConfigId");
+                b.HasIndex(new[] { "ConfigId" }, "IX_LocationConditions_ConfigId");
 
-                    b.ToTable("LocationCondition");
-                });
+                b.ToTable("LocationCondition");
+            });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.LocationConfiguration", b =>
-                {
-                    b.Property<int>("ConfigId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("ConfigId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ConfigId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ConfigId"));
 
-                    b.Property<DateTime?>("CreatedOn")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
-                        .HasDefaultValueSql("(getutcdate())");
+                b.Property<DateTime?>("CreatedOn")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("datetime")
+                    .HasDefaultValueSql("(getutcdate())");
 
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                b.Property<string>("Description")
+                    .HasMaxLength(500)
+                    .HasColumnType("nvarchar(500)");
 
-                    b.Property<int>("FacilityId")
-                        .HasColumnType("int");
+                b.Property<string>("FacilityId")               
+                    .IsRequired()
+                    .HasMaxLength(255)
+                    .HasColumnType("nvarchar(255)");
 
-                    b.Property<bool?>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
+                b.Property<bool?>("IsActive")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("bit")
+                    .HasDefaultValue(true);
 
-                    b.Property<DateTime?>("ModifiedOn")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
-                        .HasDefaultValueSql("(getutcdate())");
+                b.Property<DateTime?>("ModifiedOn")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("datetime")
+                    .HasDefaultValueSql("(getutcdate())");
 
-                    b.HasKey("ConfigId")
-                        .HasName("PK_LocationConfiguration_ConfigId");
+                b.HasKey("ConfigId")
+                    .HasName("PK_LocationConfiguration_ConfigId");
 
-                    b.HasIndex(new[] { "FacilityId" }, "IX_LocationConfigurations_FacilityId");
+                b.HasIndex(new[] { "FacilityId" }, "IX_LocationConfigurations_FacilityId");
 
-                    b.ToTable("LocationConfiguration");
-                });
+                b.ToTable("LocationConfiguration");
+            });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.QueryPlan", b =>
                 {

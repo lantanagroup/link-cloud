@@ -6,7 +6,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 public class LocationConfigurationModel
 {
     public int ConfigId { get; set; }
-    public int FacilityId { get; set; }
+    public required string FacilityId { get; set; }
     public string? Description { get; set; }
     public bool IsActive { get; set; }
     public DateTime CreatedOn { get; set; }

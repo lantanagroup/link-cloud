@@ -6,7 +6,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 public class LocationConfigurationSearchModel
 {
     public int? ConfigId { get; set; }
-    public int? FacilityId { get; set; }
+    public string? FacilityId { get; set; }
     public bool? IsActive { get; set; }
     public string? DescriptionContains { get; set; }
 }
