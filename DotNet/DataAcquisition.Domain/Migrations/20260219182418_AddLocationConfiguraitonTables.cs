@@ -1,0 +1,74 @@
+﻿using System;
+using Microsoft.EntityFrameworkCore.Migrations;
+
+#nullable disable
+
+namespace DataAcquisition.Domain.Migrations
+{
+    /// <inheritdoc />
+    public partial class AddLocationConfiguraitonTables : Migration
+    {
+        /// <inheritdoc />
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.CreateTable(
+                name: "LocationConfiguration",
+                columns: table => new
+                {
+                    ConfigId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    FacilityId = table.Column<int>(type: "int", nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    IsActive = table.Column<bool>(type: "bit", nullable: true, defaultValue: true),
+                    CreatedOn = table.Column<DateTime>(type: "datetime", nullable: true, defaultValueSql: "(getutcdate())"),
+                    ModifiedOn = table.Column<DateTime>(type: "datetime", nullable: true, defaultValueSql: "(getutcdate())")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_LocationConfiguration_ConfigId", x => x.ConfigId);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "LocationCondition",
+                columns: table => new
+                {
+                    ConditionId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    ConfigId = table.Column<int>(type: "int", nullable: false),
+                    FhirPath = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
+                    Priority = table.Column<int>(type: "int", nullable: true, defaultValue: 1),
+                    CreatedOn = table.Column<DateTime>(type: "datetime", nullable: true, defaultValueSql: "(getutcdate())"),
+                    ModifiedOn = table.Column<DateTime>(type: "datetime", nullable: true, defaultValueSql: "(getutcdate())")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_LocationCondition_ConditionId", x => x.ConditionId);
+                    table.ForeignKey(
+                        name: "FK_LocationCondition_ConfigId",
+                        column: x => x.ConfigId,
+                        principalTable: "LocationConfiguration",
+                        principalColumn: "ConfigId");
+                });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_LocationConditions_ConfigId",
+                table: "LocationCondition",
+                column: "ConfigId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_LocationConfigurations_FacilityId",
+                table: "LocationConfiguration",
+                column: "FacilityId");
+        }
+
+        /// <inheritdoc />
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.DropTable(
+                name: "LocationCondition");
+
+            migrationBuilder.DropTable(
+                name: "LocationConfiguration");
+        }
+    }
+}

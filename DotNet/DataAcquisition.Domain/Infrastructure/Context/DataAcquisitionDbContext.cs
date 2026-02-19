@@ -24,6 +24,8 @@ public class DataAcquisitionDbContext : DbContext
     {
     }
 
+    public DbSet<LocationCondition> LocationConditions { get; set; }
+    public DbSet<LocationConfiguration> LocationConfigurations { get; set; }
     public DbSet<FhirQueryConfiguration> FhirQueryConfigurations { get; set; }
     public DbSet<FhirListConfiguration> FhirListConfigurations { get; set; }
     public DbSet<QueryPlan> QueryPlans { get; set; }
@@ -218,6 +220,30 @@ public class DataAcquisitionDbContext : DbContext
         modelBuilder.Entity<ResourceReferenceType>()
             .Property(b => b.QueryPhase)
             .HasConversion(new EnumToStringConverter<QueryPhase>());
+
+        //-------------------LocationCondition-------------------
+        modelBuilder.Entity<LocationCondition>(entity =>
+        {
+            entity.HasKey(e => e.ConditionId).HasName("PK_LocationCondition_ConditionId");
+
+            entity.Property(e => e.CreatedOn).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.Priority).HasDefaultValue(1);
+            entity.Property(e => e.ModifiedOn).HasDefaultValueSql("(getutcdate())");
+
+            entity.HasOne(d => d.Config).WithMany(p => p.LocationConditions)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_LocationCondition_ConfigId");
+        });
+
+        //-------------------LocationConfiguration-------------------
+        modelBuilder.Entity<LocationConfiguration>(entity =>
+        {
+            entity.HasKey(e => e.ConfigId).HasName("PK_LocationConfiguration_ConfigId");
+
+            entity.Property(e => e.CreatedOn).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.ModifiedOn).HasDefaultValueSql("(getutcdate())");
+        });
 
         // Prefix and schema can be passed as parameters
         // Adds Quartz.NET SqlServer schema to EntityFrameworkCore

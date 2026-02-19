@@ -4,6 +4,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DataAcquisition.Domain.Migrations
 {
     [DbContext(typeof(DataAcquisitionDbContext))]
-    partial class DataAcquisitionDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260219182418_AddLocationConfiguraitonTables")]
+    partial class AddLocationConfiguraitonTables
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -834,7 +837,7 @@ namespace DataAcquisition.Domain.Migrations
                     b.Property<int>("ConfigId")
                         .HasColumnType("int");
 
-                    b.Property<DateTime?>("CreatedOn")
+                    b.Property<DateTime?>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime")
                         .HasDefaultValueSql("(getutcdate())");
@@ -849,7 +852,7 @@ namespace DataAcquisition.Domain.Migrations
                         .HasColumnType("int")
                         .HasDefaultValue(1);
 
-                    b.Property<DateTime?>("ModifiedOn")
+                    b.Property<DateTime?>("UpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime")
                         .HasDefaultValueSql("(getutcdate())");
@@ -870,7 +873,7 @@ namespace DataAcquisition.Domain.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ConfigId"));
 
-                    b.Property<DateTime?>("CreatedOn")
+                    b.Property<DateTime?>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime")
                         .HasDefaultValueSql("(getutcdate())");
@@ -887,7 +890,7 @@ namespace DataAcquisition.Domain.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(true);
 
-                    b.Property<DateTime?>("ModifiedOn")
+                    b.Property<DateTime?>("UpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime")
                         .HasDefaultValueSql("(getutcdate())");
@@ -1107,7 +1110,7 @@ namespace DataAcquisition.Domain.Migrations
                         .WithMany("LocationConditions")
                         .HasForeignKey("ConfigId")
                         .IsRequired()
-                        .HasConstraintName("FK_LocationCondition_ConfigId");
+                        .HasConstraintName("FK_LocationConfiguration_ConfigigID");
 
                     b.Navigation("Config");
                 });
