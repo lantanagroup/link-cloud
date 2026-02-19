@@ -364,7 +364,7 @@ public class AcquisitionProcessingJob : IJob
                 {
                     _logger.LogError(ex,
                         "An exception occurred while attempting to send Tail Kafka Messages for facility {facilityId}.",
-                        message.FacilityId);
+                        message.FacilityId?.SanitizeUntrustedString());
                 }
 
             }
@@ -395,7 +395,7 @@ public class AcquisitionProcessingJob : IJob
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to parse traceparent: {TraceParentId}", traceParentId);
+                _logger.LogWarning(ex, "Failed to parse traceparent: {TraceParentId}", traceParentId?.SanitizeUntrustedString());
             }
         }
         return parentContext;
