@@ -49,6 +49,8 @@ public class SecurityHelper {
             .requestMatchers(HttpMethod.GET, "/info").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/*/info").permitAll()
             .requestMatchers(HttpMethod.GET, "/api-docs/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/v3/api-docs/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/swagger-ui.html").permitAll()
             .requestMatchers(HttpMethod.GET, "/swagger-ui/**").permitAll()
             //requestMatchers("/api/**").access("hasRole('LinkUser') and hasAuthority('IsLinkAdmin')").and().exceptionHandling(ex -> ex.authenticationEntryPoint(point)  - done in the specific end points using annotations for more granular control
             .requestMatchers("/api/**").authenticated().and().exceptionHandling(ex -> ex.authenticationEntryPoint(point))
