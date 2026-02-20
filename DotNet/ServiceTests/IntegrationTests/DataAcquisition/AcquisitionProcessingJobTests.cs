@@ -9,6 +9,8 @@ using LantanaGroup.Link.DataAcquisition.Jobs;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using Moq;
 using Quartz;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
