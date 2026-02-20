@@ -1,8 +1,8 @@
 # Ignore Maven build output directory
-*/target/
+**/target/
 
 # Ignore Maven configuration directory
-.mvn/
+**/.mvn/
 
 # Ignore IDE files
 .idea/
@@ -19,7 +19,16 @@ Thumbs.db
 .git/
 .gitignore
 
+# Ignore Docker files
+**/.dockerignore
+**/Dockerfile
+
+# Ignore documentation
+**/README.md
+
 # Ignore other files that might be generated during build
+**/bin/
+**/obj/
 *.class
 *.jar
 *.war
