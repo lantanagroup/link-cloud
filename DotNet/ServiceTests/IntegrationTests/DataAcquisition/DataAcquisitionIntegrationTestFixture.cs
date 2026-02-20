@@ -5,6 +5,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -118,6 +119,15 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
             builder.Services.AddHttpClient();
+
+            builder.Services.Configure<AcquisitionWorkerProcessorSettings>(options =>
+            {
+                options.MaxConcurrentAcquisitions = 8;
+                options.WorkChannelCapacity = 200;
+                options.MaxBatchesPerFacilityPerRun = 40;
+                options.MaxBatchesFailStalledPerRun = 20;
+                options.TimeBudgetPerRunSeconds = 20;
+            });
 
             builder.Services.AddOpenTelemetry()
                 .WithTracing(tracerBuilder => tracerBuilder
