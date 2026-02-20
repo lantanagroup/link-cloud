@@ -213,6 +213,11 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         // Since we are using a generic repository, we might need to fall back to a manual query or range update
         
         var logs = await _database.DataAcquisitionLogRepository.FindAsync(x => logIds.Contains(x.Id), cancellationToken);
+
+        if (logs.Count == 0)
+        {
+            throw new NotFoundException($"Data acquisition logs with IDs {string.Join(", ", logIds)} not found.");
+        }
         
         foreach (var entity in logs)
         {
