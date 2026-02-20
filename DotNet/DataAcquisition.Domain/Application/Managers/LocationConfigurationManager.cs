@@ -11,7 +11,7 @@ public interface ILocationConfigurationManager
 
     Task<LocationConfigurationModel> UpdateByIdAsync(int configId, UpdateLocationConfigurationModel model);
 
-    Task<LocationConfigurationModel> UpdateByFacilityIdAsync(string facilityId, UpdateLocationConfigurationModel model);
+    Task<List<LocationConfigurationModel>> UpdateByFacilityIdAsync(string facilityId, UpdateLocationConfigurationModel model);
 
     Task DeleteByIdAsync(int configId);
 
@@ -68,7 +68,7 @@ public class LocationConfigurationManager : ILocationConfigurationManager
         return ProjectToModel(entity);
     }
 
-    public async Task<LocationConfigurationModel> UpdateByFacilityIdAsync(string facilityId, UpdateLocationConfigurationModel model)
+    public async Task<List<LocationConfigurationModel>> UpdateByFacilityIdAsync(string facilityId, UpdateLocationConfigurationModel model)
     {
         var entities = await _database.LocationConfigurationRepository
             .FindAsync(c => c.FacilityId == facilityId);
@@ -85,8 +85,7 @@ public class LocationConfigurationManager : ILocationConfigurationManager
 
         await _database.SaveChangesAsync();
 
-        // Return the first updated one (you can change this if you prefer returning a list)
-        return ProjectToModel(entities.First());
+        return entities.Select(ProjectToModel).ToList();
     }
 
     public async Task DeleteByIdAsync(int configId)
@@ -101,7 +100,7 @@ public class LocationConfigurationManager : ILocationConfigurationManager
 
     public async Task DeleteByFacilityIdAsync(string facilityId)
     {
-        // IMPORTANT: Delete ALL configurations for this facility
+        // Delete ALL configurations for this facility
         var entities = await _database.LocationConfigurationRepository
             .FindAsync(c => c.FacilityId == facilityId);
 
@@ -116,7 +115,6 @@ public class LocationConfigurationManager : ILocationConfigurationManager
         await _database.SaveChangesAsync();
     }
 
-    // Helper to avoid code duplication for update logic
     private void ApplyUpdateToEntity(LocationConfiguration entity, UpdateLocationConfigurationModel model)
     {
         if (model.Description != null)
@@ -149,7 +147,6 @@ public class LocationConfigurationManager : ILocationConfigurationManager
         }
     }
 
-    // Private projection (EF entity never leaves this class)
     private static LocationConfigurationModel ProjectToModel(LocationConfiguration entity)
     {
         return new LocationConfigurationModel
