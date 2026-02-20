@@ -17,10 +17,11 @@ parameters:
     - DEVOPS
 
 variables:
-- group: kafka_topics
+- group: kafka_topics # variable group `kafka_topics`
 
   # GitHub Topics File
-  TOPICS_URL: "https://raw.githubusercontent.com/lantanagroup/link-cloud/dev/topics.txt"
+- name: TOPICS_URL
+  value: "https://raw.githubusercontent.com/lantanagroup/link-cloud/dev/topics.txt"
 
 # REST URL
 - name: restUrl
