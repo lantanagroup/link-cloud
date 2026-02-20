@@ -104,7 +104,7 @@ public class LocationConfigurationManagerTests : IClassFixture<DataAcquisitionIn
 
         var result = await manager.UpdateByFacilityIdAsync("Multi-Facility", updateModel);
 
-        Assert.Equal("All Updated", result.Description);
+        Assert.All(result, x => x.Description.Equals("All Updated"));
     }
 
     [Fact]
