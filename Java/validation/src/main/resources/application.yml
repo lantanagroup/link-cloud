@@ -1,5 +1,5 @@
 service-information:
-  service-name: Validation Service
+  service-name: Link Validation Service
 
 loki:
   enabled: true
