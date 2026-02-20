@@ -35,14 +35,14 @@ variables:
     value:  '$(devops-rest-url)'
 
 stages:
-- stage: Sync-Kafka-Topics
+- stage: Sync_Kafka_Topics_${{ parameters.environment }}
   jobs:
-  - job: Sync-Kafka-Topics
+  - job: Sync_Kafka_Topics_${{ parameters.environment }}
     steps:
       - checkout: none
 
       - task: Bash@3
-        displayName: "Sync-Kafka-Topics"
+        displayName: "Sync_Kafka_Topics_${{ parameters.environment }}"
         inputs:
           targetType: 'inline'
           script: |
