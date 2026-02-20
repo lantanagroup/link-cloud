@@ -87,7 +87,7 @@ public interface IDataAcquisitionLogQueries
     Task<bool> TrySetLogStatusAsync(long logId, List<RequestStatus> validCurrentStatuses, RequestStatus newStatus,
         CancellationToken cancellationToken = default);
 
-    Task<int> FailStalledQueuedLogsAsync(int stallMinutes, CancellationToken cancellationToken = default);
+    Task<int> FailStalledQueuedLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default);
 
     Task<DataAcquisitionLogModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog,
         CancellationToken cancellationToken = default);
@@ -186,13 +186,17 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
         try
         {
-            // Group and aggregate in SQL
-            var query = _dbContext.DataAcquisitionLogs
+            // Optimization: Filter logs that definitely haven't had their tail sent yet
+            // and have the necessary identifiers for grouping.
+            var baseQuery = _dbContext.DataAcquisitionLogs
                 .Where(log =>
+                    !log.TailSent &&
                     log.ReportTrackingId != null &&
                     log.CorrelationId != null &&
                     log.ReportStartDate != null &&
-                    log.ReportEndDate != null)
+                    log.ReportEndDate != null);
+
+            var query = baseQuery
                 .GroupBy(log => new
                 {
                     log.FacilityId,
@@ -202,25 +206,35 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     log.ReportEndDate,
                     log.QueryPhase,
                 })
-                .Where(g => g.All(log =>
-                    log.Status != null && completedOrFailedStatuses.Contains(log.Status.Value) && !log.TailSent))
-                .Select(g => new TailingMessageModel
+                .Select(g => new
                 {
-                    FacilityId = g.Key.FacilityId ?? string.Empty,
-                    CorrelationId = g.Key.CorrelationId ?? string.Empty,
+                    g.Key,
+                    // Use Sum or Min/Max logic instead of g.All to avoid correlated subqueries
+                    TotalCount = g.Count(),
+                    FinishedCount = g.Count(log => log.Status != null && completedOrFailedStatuses.Contains(log.Status.Value)),
                     LogIds = g.Select(x => x.Id).ToList(),
-                    TraceParentId =
-                        g.Where(x => x.TraceId != null).OrderBy(x => x.Id).Select(x => x.TraceId).FirstOrDefault() ??
-                        string.Empty,
+                    TraceParentId = g.Where(x => x.TraceId != null).OrderBy(x => x.Id).Select(x => x.TraceId).FirstOrDefault(),
+                    PatientId = g.Select(x => x.PatientId).FirstOrDefault(),
+                    ReportableEvent = g.Select(x => x.ReportableEvent).FirstOrDefault(),
+                    ScheduledReport = g.Select(x => x.ScheduledReport).FirstOrDefault()
+                })
+                // Only groups where ALL logs are finished
+                .Where(x => x.TotalCount == x.FinishedCount)
+                .Select(x => new TailingMessageModel
+                {
+                    FacilityId = x.Key.FacilityId ?? string.Empty,
+                    CorrelationId = x.Key.CorrelationId ?? string.Empty,
+                    LogIds = x.LogIds,
+                    TraceParentId = x.TraceParentId ?? string.Empty,
                     ResourceAcquired = new ResourceAcquired
                     {
-                        PatientId = g.Select(x => x.PatientId).FirstOrDefault() ?? string.Empty,
-                        QueryType = g.Select(x => x.QueryPhase.ToString()).FirstOrDefault() ?? string.Empty,
-                        ReportableEvent = g.Select(x => x.ReportableEvent).FirstOrDefault() ?? default,
+                        PatientId = x.PatientId ?? string.Empty,
+                        QueryType = x.Key.QueryPhase.ToString() ?? string.Empty,
+                        ReportableEvent = x.ReportableEvent ?? default,
                         AcquisitionComplete = true,
                         ScheduledReports = new List<ScheduledReport>
                         {
-                            g.FirstOrDefault().ScheduledReport
+                            x.ScheduledReport
                         }
                     }
                 });
@@ -362,39 +376,55 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             cancellationToken);
     }
 
-    public async Task<int> FailStalledQueuedLogsAsync(int stallMinutes, CancellationToken cancellationToken = default)
+    public async Task<int> FailStalledQueuedLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default)
     {
         var stallThreshold = DateTime.UtcNow.AddMinutes(-stallMinutes);
+        int totalProcessed = 0;
+        int batchesProcessed = 0;
+        const int batchSize = 500;
 
-        using var transaction = await _dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead,cancellationToken);
-        try
+        while (batchesProcessed < maxBatches)
         {
-            var stalledLogs = await _dbContext.DataAcquisitionLogs
-                .Where(l => l.Status == RequestStatus.Queued && l.ModifyDate <= stallThreshold)
-                .ToListAsync(cancellationToken);
-
-            if (stalledLogs.Count == 0)
+            using var transaction = await _dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken);
+            try
             {
+                var stalledBatch = await _dbContext.DataAcquisitionLogs
+                    .Where(l => l.Status == RequestStatus.Queued && l.ModifyDate <= stallThreshold)
+                    .Take(batchSize)
+                    .ToListAsync(cancellationToken);
+
+                if (stalledBatch.Count == 0)
+                {
+                    await transaction.CommitAsync(cancellationToken);
+                    break;
+                }
+
+                foreach (var log in stalledBatch)
+                {
+                    log.Status = RequestStatus.Failed;
+                    log.ModifyDate = DateTime.UtcNow;
+                    log.Notes.Add($"[{DateTime.UtcNow}] Request failed due to being in Queued status for more than {stallMinutes} minutes.");
+                }
+
+                await _dbContext.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
-                return 0;
+                totalProcessed += stalledBatch.Count;
+                batchesProcessed++;
             }
-
-            foreach (var log in stalledLogs)
+            catch (Exception ex)
             {
-                log.Status = RequestStatus.Failed;
-                log.ModifyDate = DateTime.UtcNow;
-                log.Notes.Add($"[{DateTime.UtcNow}] Request failed due to being in Queued status for more than {stallMinutes} minutes.");
+                await transaction.RollbackAsync(cancellationToken);
+                _logger.LogError(ex, "Failed to process a batch of stalled logs. Error: {Message}", ex.Message);
+                throw;
             }
+        }
 
-            var result = await _dbContext.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return result;
-        }
-        catch (Exception)
+        if (batchesProcessed >= maxBatches)
         {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
+            _logger.LogInformation("FailStalledQueuedLogs reached max batch limit of {maxBatches}. Yielding to next run.", maxBatches);
         }
+
+        return totalProcessed;
     }
 
     public async Task<PagedConfigModel<DataAcquisitionLogModel>> SearchAsync(SearchDataAcquisitionLogRequest model,
@@ -815,7 +845,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             throw new DataAcquisitionLogNotFoundException($"Data acquisition log with ID {updateLog.Id} not found.");
         }
 
-        // 2. Apply updates (This is still atomic when SaveChangesAsync is called)
+        // 2. Apply updates
         if (updateLog.RetryAttempts is not null)
             existingLog.RetryAttempts = updateLog.RetryAttempts;
 
@@ -843,6 +873,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         existingLog.ModifyDate = DateTime.UtcNow;
 
         // 3. Save changes
+        _dbContext.DataAcquisitionLogs.Update(existingLog);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return await GetAsync(updateLog.Id.Value, cancellationToken);
