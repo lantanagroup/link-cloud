@@ -3,7 +3,7 @@
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 [ExcludeFromCodeCoverage]
-public class LocationConditionModel
+public class OrganizationLocationConditionModel
 {
     public int ConditionId { get; set; }
     public string? FhirPath { get; set; }

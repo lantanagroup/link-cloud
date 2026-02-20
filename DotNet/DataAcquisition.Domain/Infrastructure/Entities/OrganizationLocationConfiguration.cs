@@ -9,9 +9,9 @@ using IndexAttribute = Microsoft.EntityFrameworkCore.IndexAttribute;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
-[Table("LocationConfiguration")]
+[Table("OrganizationLocationConfiguration")]
 [Index("FacilityId", Name = "IX_LocationConfigurations_FacilityId")]
-public partial class LocationConfiguration
+public partial class OrganizationLocationConfiguration
 {
     [Key]
     public int ConfigId { get; set; }
@@ -32,5 +32,5 @@ public partial class LocationConfiguration
     public DateTime? ModifiedOn { get; set; }
 
     [InverseProperty("Config")]
-    public virtual ICollection<LocationCondition> LocationConditions { get; set; } = new List<LocationCondition>();
+    public virtual ICollection<OrganizationLocationCondition> LocationConditions { get; set; } = new List<OrganizationLocationCondition>();
 }

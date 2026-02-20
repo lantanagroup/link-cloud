@@ -74,9 +74,9 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddTransient<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
             builder.Services.AddTransient<IEntityRepository<ResourceReferenceType>, EntityRepository<ResourceReferenceType, DataAcquisitionDbContext>>();
 
-            // NEW: LocationConfiguration repositories
-            builder.Services.AddScoped<IEntityRepository<LocationConfiguration>, EntityRepository<LocationConfiguration, DataAcquisitionDbContext>>();
-            builder.Services.AddScoped<IEntityRepository<LocationCondition>, EntityRepository<LocationCondition, DataAcquisitionDbContext>>();
+            // NEW: OrganizationLocationConfiguration repositories
+            builder.Services.AddScoped<IEntityRepository<OrganizationLocationConfiguration>, EntityRepository<OrganizationLocationConfiguration, DataAcquisitionDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<OrganizationLocationCondition>, EntityRepository<OrganizationLocationCondition, DataAcquisitionDbContext>>();
 
             // Register IDatabase implementation (it will now receive the new repositories via constructor injection)
             builder.Services.AddScoped<IDatabase, Database>();
@@ -90,9 +90,9 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddScoped<IDataAcquisitionLogManager, DataAcquisitionLogManager>();
             builder.Services.AddScoped<IFhirQueryConfigurationManager, FhirQueryConfigurationManager>();
 
-            // NEW: LocationConfiguration manager & queries
-            builder.Services.AddScoped<ILocationConfigurationManager, LocationConfigurationManager>();
-            builder.Services.AddScoped<ILocationConfigurationQueries, LocationConfigurationQueries>();
+            // NEW: OrganizationLocationConfiguration manager & queries
+            builder.Services.AddScoped<IOrganizationLocationConfigurationManager, OrganizationLocationConfigurationManager>();
+            builder.Services.AddScoped<IOrganizationLocationConfigurationQueries, OrganizationLocationConfigurationQueries>();
 
             // Register queries
             builder.Services.AddScoped<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();

@@ -219,8 +219,8 @@ public static class GeneralStartupExtensions
         services.AddTransient<IEntityRepository<FhirQuery>, EntityRepository<FhirQuery, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<DataAcquisitionLog>, EntityRepository<DataAcquisitionLog, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<LocationConfiguration>, EntityRepository<LocationConfiguration, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<LocationCondition>, EntityRepository<LocationCondition, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<OrganizationLocationConfiguration>, EntityRepository<OrganizationLocationConfiguration, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<OrganizationLocationCondition>, EntityRepository<OrganizationLocationCondition, DataAcquisitionDbContext>>();
 
         //Database
         services.AddScoped<IDatabase, Database>();
@@ -235,7 +235,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IFhirQueryQueries, FhirQueryQueries>();
         services.AddTransient<IQueryPlanQueries, QueryPlanQueries>();
         services.AddTransient<IReferenceResourcesQueries, ReferenceResourcesQueries>();
-        services.AddScoped<ILocationConfigurationQueries, LocationConfigurationQueries>();
+        services.AddScoped<IOrganizationLocationConfigurationQueries, OrganizationLocationConfigurationQueries>();
 
 
         //Managers
@@ -245,7 +245,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IReferenceResourcesManager, ReferenceResourcesManager>();
         services.AddTransient<IFhirQueryManager, FhirQueryManager>();
         services.AddTransient<IDataAcquisitionLogManager, DataAcquisitionLogManager>();
-        services.AddScoped<ILocationConfigurationManager, LocationConfigurationManager>();
+        services.AddScoped<IOrganizationLocationConfigurationManager, OrganizationLocationConfigurationManager>();
     }
 
     public static void RegisterServices(this IServiceCollection services)

@@ -6,30 +6,30 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
-public interface ILocationConfigurationQueries
+public interface IOrganizationLocationConfigurationQueries
 {
-    Task<LocationConfigurationModel> GetByIdAsync(int configId);
-    Task<LocationConfigurationModel> GetByFacilityIdAsync(string facilityId);
-    Task<PagedConfigModel<LocationConfigurationModel>> SearchAsync(
-        LocationConfigurationSearchModel search,
+    Task<OrganizationLocationConfigurationModel> GetByIdAsync(int configId);
+    Task<OrganizationLocationConfigurationModel> GetByFacilityIdAsync(string facilityId);
+    Task<PagedConfigModel<OrganizationLocationConfigurationModel>> SearchAsync(
+        OrganizationLocationConfigurationSearchModel search,
         int pageNumber = 1,
         int pageSize = 10);
 }
 
-public class LocationConfigurationQueries : ILocationConfigurationQueries
+public class OrganizationLocationConfigurationQueries : IOrganizationLocationConfigurationQueries
 {
     private readonly DataAcquisitionDbContext _context;
 
-    public LocationConfigurationQueries(DataAcquisitionDbContext context)
+    public OrganizationLocationConfigurationQueries(DataAcquisitionDbContext context)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
-    public async Task<LocationConfigurationModel> GetByIdAsync(int configId)
+    public async Task<OrganizationLocationConfigurationModel> GetByIdAsync(int configId)
     {
         return await _context.LocationConfigurations
             .Where(c => c.ConfigId == configId)
-            .Select(c => new LocationConfigurationModel
+            .Select(c => new OrganizationLocationConfigurationModel
             {
                 ConfigId = c.ConfigId,
                 FacilityId = c.FacilityId,
@@ -37,7 +37,7 @@ public class LocationConfigurationQueries : ILocationConfigurationQueries
                 IsActive = c.IsActive ?? false,
                 CreatedOn = c.CreatedOn ?? DateTime.UtcNow,
                 ModifiedOn = c.ModifiedOn ?? DateTime.UtcNow,
-                Conditions = c.LocationConditions.Select(cond => new LocationConditionModel
+                Conditions = c.LocationConditions.Select(cond => new OrganizationLocationConditionModel
                 {
                     ConditionId = cond.ConditionId,
                     FhirPath = cond.FhirPath,
@@ -49,11 +49,11 @@ public class LocationConfigurationQueries : ILocationConfigurationQueries
             .FirstOrDefaultAsync();
     }
 
-    public async Task<LocationConfigurationModel> GetByFacilityIdAsync(string facilityId)
+    public async Task<OrganizationLocationConfigurationModel> GetByFacilityIdAsync(string facilityId)
     {
         return await _context.LocationConfigurations
             .Where(c => c.FacilityId == facilityId)
-            .Select(c => new LocationConfigurationModel
+            .Select(c => new OrganizationLocationConfigurationModel
             {
                 ConfigId = c.ConfigId,
                 FacilityId = c.FacilityId,
@@ -61,7 +61,7 @@ public class LocationConfigurationQueries : ILocationConfigurationQueries
                 IsActive = c.IsActive ?? false,
                 CreatedOn = c.CreatedOn ?? DateTime.UtcNow,
                 ModifiedOn = c.ModifiedOn ?? DateTime.UtcNow,
-                Conditions = c.LocationConditions.Select(cond => new LocationConditionModel
+                Conditions = c.LocationConditions.Select(cond => new OrganizationLocationConditionModel
                 {
                     ConditionId = cond.ConditionId,
                     FhirPath = cond.FhirPath,
@@ -73,8 +73,8 @@ public class LocationConfigurationQueries : ILocationConfigurationQueries
             .FirstOrDefaultAsync();
     }
 
-    public async Task<PagedConfigModel<LocationConfigurationModel>> SearchAsync(
-        LocationConfigurationSearchModel search,
+    public async Task<PagedConfigModel<OrganizationLocationConfigurationModel>> SearchAsync(
+        OrganizationLocationConfigurationSearchModel search,
         int pageNumber = 1,
         int pageSize = 10)
     {
@@ -99,7 +99,7 @@ public class LocationConfigurationQueries : ILocationConfigurationQueries
             .ThenBy(c => c.ConfigId)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
-            .Select(c => new LocationConfigurationModel
+            .Select(c => new OrganizationLocationConfigurationModel
             {
                 ConfigId = c.ConfigId,
                 FacilityId = c.FacilityId,
@@ -107,7 +107,7 @@ public class LocationConfigurationQueries : ILocationConfigurationQueries
                 IsActive = c.IsActive ?? false,
                 CreatedOn = c.CreatedOn ?? DateTime.UtcNow,
                 ModifiedOn = c.ModifiedOn ?? DateTime.UtcNow,
-                Conditions = c.LocationConditions.Select(cond => new LocationConditionModel
+                Conditions = c.LocationConditions.Select(cond => new OrganizationLocationConditionModel
                 {
                     ConditionId = cond.ConditionId,
                     FhirPath = cond.FhirPath,
@@ -118,6 +118,6 @@ public class LocationConfigurationQueries : ILocationConfigurationQueries
             })
             .ToListAsync();
 
-        return new PagedConfigModel<LocationConfigurationModel>(items, new PaginationMetadata(pageSize, pageNumber, totalCount));
+        return new PagedConfigModel<OrganizationLocationConfigurationModel>(items, new PaginationMetadata(pageSize, pageNumber, totalCount));
     }
 }

@@ -5,31 +5,31 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
-public interface ILocationConfigurationManager
+public interface IOrganizationLocationConfigurationManager
 {
-    Task<LocationConfigurationModel> CreateAsync(CreateLocationConfigurationModel model);
+    Task<OrganizationLocationConfigurationModel> CreateAsync(CreateOrganizationLocationConfigurationModel model);
 
-    Task<LocationConfigurationModel> UpdateByIdAsync(int configId, UpdateLocationConfigurationModel model);
+    Task<OrganizationLocationConfigurationModel> UpdateByIdAsync(int configId, UpdateOrganizationLocationConfigurationModel model);
 
-    Task<List<LocationConfigurationModel>> UpdateByFacilityIdAsync(string facilityId, UpdateLocationConfigurationModel model);
+    Task<List<OrganizationLocationConfigurationModel>> UpdateByFacilityIdAsync(string facilityId, UpdateOrganizationLocationConfigurationModel model);
 
     Task DeleteByIdAsync(int configId);
 
     Task DeleteByFacilityIdAsync(string facilityId);
 }
 
-public class LocationConfigurationManager : ILocationConfigurationManager
+public class OrganizationLocationConfigurationManager : IOrganizationLocationConfigurationManager
 {
     private readonly IDatabase _database;
 
-    public LocationConfigurationManager(IDatabase database)
+    public OrganizationLocationConfigurationManager(IDatabase database)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
     }
 
-    public async Task<LocationConfigurationModel> CreateAsync(CreateLocationConfigurationModel model)
+    public async Task<OrganizationLocationConfigurationModel> CreateAsync(CreateOrganizationLocationConfigurationModel model)
     {
-        var entity = new LocationConfiguration
+        var entity = new OrganizationLocationConfiguration
         {
             FacilityId = model.FacilityId,
             Description = model.Description,
@@ -40,7 +40,7 @@ public class LocationConfigurationManager : ILocationConfigurationManager
 
         foreach (var cond in model.Conditions)
         {
-            entity.LocationConditions.Add(new LocationCondition
+            entity.LocationConditions.Add(new OrganizationLocationCondition
             {
                 FhirPath = cond.FhirPath,
                 Priority = cond.Priority,
@@ -55,11 +55,11 @@ public class LocationConfigurationManager : ILocationConfigurationManager
         return ProjectToModel(entity);
     }
 
-    public async Task<LocationConfigurationModel> UpdateByIdAsync(int configId, UpdateLocationConfigurationModel model)
+    public async Task<OrganizationLocationConfigurationModel> UpdateByIdAsync(int configId, UpdateOrganizationLocationConfigurationModel model)
     {
         var entity = await _database.LocationConfigurationRepository.GetAsync(configId);
         if (entity == null)
-            throw new KeyNotFoundException($"LocationConfiguration with ConfigId {configId} not found.");
+            throw new KeyNotFoundException($"OrganizationLocationConfiguration with ConfigId {configId} not found.");
 
         ApplyUpdateToEntity(entity, model);
         _database.LocationConfigurationRepository.Update(entity);
@@ -68,13 +68,13 @@ public class LocationConfigurationManager : ILocationConfigurationManager
         return ProjectToModel(entity);
     }
 
-    public async Task<List<LocationConfigurationModel>> UpdateByFacilityIdAsync(string facilityId, UpdateLocationConfigurationModel model)
+    public async Task<List<OrganizationLocationConfigurationModel>> UpdateByFacilityIdAsync(string facilityId, UpdateOrganizationLocationConfigurationModel model)
     {
         var entities = await _database.LocationConfigurationRepository
             .FindAsync(c => c.FacilityId == facilityId);
 
         if (entities.Count == 0)
-            throw new KeyNotFoundException($"No LocationConfiguration found for FacilityId {facilityId}");
+            throw new KeyNotFoundException($"No OrganizationLocationConfiguration found for FacilityId {facilityId}");
 
         // Update ALL configs for this facility (common pattern when multiples are allowed)
         foreach (var entity in entities)
@@ -115,7 +115,7 @@ public class LocationConfigurationManager : ILocationConfigurationManager
         await _database.SaveChangesAsync();
     }
 
-    private void ApplyUpdateToEntity(LocationConfiguration entity, UpdateLocationConfigurationModel model)
+    private void ApplyUpdateToEntity(OrganizationLocationConfiguration entity, UpdateOrganizationLocationConfigurationModel model)
     {
         if (model.Description != null)
             entity.Description = model.Description;
@@ -136,7 +136,7 @@ public class LocationConfigurationManager : ILocationConfigurationManager
 
             foreach (var cond in model.Conditions)
             {
-                entity.LocationConditions.Add(new LocationCondition
+                entity.LocationConditions.Add(new OrganizationLocationCondition
                 {
                     FhirPath = cond.FhirPath,
                     Priority = cond.Priority,
@@ -147,9 +147,9 @@ public class LocationConfigurationManager : ILocationConfigurationManager
         }
     }
 
-    private static LocationConfigurationModel ProjectToModel(LocationConfiguration entity)
+    private static OrganizationLocationConfigurationModel ProjectToModel(OrganizationLocationConfiguration entity)
     {
-        return new LocationConfigurationModel
+        return new OrganizationLocationConfigurationModel
         {
             ConfigId = entity.ConfigId,
             FacilityId = entity.FacilityId,
@@ -157,7 +157,7 @@ public class LocationConfigurationManager : ILocationConfigurationManager
             IsActive = entity.IsActive ?? false,
             CreatedOn = entity.CreatedOn ?? DateTime.UtcNow,
             ModifiedOn = entity.ModifiedOn ?? DateTime.UtcNow,
-            Conditions = entity.LocationConditions.Select(c => new LocationConditionModel
+            Conditions = entity.LocationConditions.Select(c => new OrganizationLocationConditionModel
             {
                 ConditionId = c.ConditionId,
                 FhirPath = c.FhirPath,

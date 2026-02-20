@@ -9,11 +9,11 @@ namespace IntegrationTests.DataAcquisition.Queries;
 
 [Collection("DataAcquisitionIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class LocationConfigurationQueriesTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+public class OrganizationLocationConfigurationQueriesTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
 {
     private readonly DataAcquisitionIntegrationTestFixture _fixture;
 
-    public LocationConfigurationQueriesTests(DataAcquisitionIntegrationTestFixture fixture)
+    public OrganizationLocationConfigurationQueriesTests(DataAcquisitionIntegrationTestFixture fixture)
     {
         _fixture = fixture;
     }
@@ -26,15 +26,15 @@ public class LocationConfigurationQueriesTests : IClassFixture<DataAcquisitionIn
         await dbContext.Database.EnsureDeletedAsync();
         await dbContext.Database.EnsureCreatedAsync();
 
-        var manager = scope.ServiceProvider.GetRequiredService<ILocationConfigurationManager>();
-        var created = await manager.CreateAsync(new CreateLocationConfigurationModel
+        var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationManager>();
+        var created = await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel
         {
             FacilityId = "Get-By-Id-Test",
             Description = "Test GetById",
-            Conditions = new List<CreateLocationConditionModel> { new() { FhirPath = "identifier.value = '10'" } }
+            Conditions = new List<CreateOrganizationLocationConditionModel> { new() { FhirPath = "identifier.value = '10'" } }
         });
 
-        var queries = scope.ServiceProvider.GetRequiredService<ILocationConfigurationQueries>();
+        var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationQueries>();
         var result = await queries.GetByIdAsync(created.ConfigId);
 
         Assert.NotNull(result);
@@ -51,10 +51,10 @@ public class LocationConfigurationQueriesTests : IClassFixture<DataAcquisitionIn
         await dbContext.Database.EnsureDeletedAsync();
         await dbContext.Database.EnsureCreatedAsync();
 
-        var manager = scope.ServiceProvider.GetRequiredService<ILocationConfigurationManager>();
-        await manager.CreateAsync(new CreateLocationConfigurationModel { FacilityId = "Get-By-Facility", Description = "Facility Test" });
+        var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationManager>();
+        await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel { FacilityId = "Get-By-Facility", Description = "Facility Test" });
 
-        var queries = scope.ServiceProvider.GetRequiredService<ILocationConfigurationQueries>();
+        var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationQueries>();
         var result = await queries.GetByFacilityIdAsync("Get-By-Facility");
 
         Assert.NotNull(result);
@@ -70,12 +70,12 @@ public class LocationConfigurationQueriesTests : IClassFixture<DataAcquisitionIn
         await dbContext.Database.EnsureDeletedAsync();
         await dbContext.Database.EnsureCreatedAsync();
 
-        var manager = scope.ServiceProvider.GetRequiredService<ILocationConfigurationManager>();
-        await manager.CreateAsync(new CreateLocationConfigurationModel { FacilityId = "Facility-A" });
-        await manager.CreateAsync(new CreateLocationConfigurationModel { FacilityId = "Facility-B" });
+        var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationManager>();
+        await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel { FacilityId = "Facility-A" });
+        await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel { FacilityId = "Facility-B" });
 
-        var queries = scope.ServiceProvider.GetRequiredService<ILocationConfigurationQueries>();
-        var result = await queries.SearchAsync(new LocationConfigurationSearchModel(), pageNumber: 1, pageSize: 10);
+        var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationQueries>();
+        var result = await queries.SearchAsync(new OrganizationLocationConfigurationSearchModel(), pageNumber: 1, pageSize: 10);
 
         Assert.Equal(2, result.Records.Count);
         Assert.Equal(2, result.Metadata.TotalCount);
@@ -89,13 +89,13 @@ public class LocationConfigurationQueriesTests : IClassFixture<DataAcquisitionIn
         await dbContext.Database.EnsureDeletedAsync();
         await dbContext.Database.EnsureCreatedAsync();
 
-        var manager = scope.ServiceProvider.GetRequiredService<ILocationConfigurationManager>();
-        await manager.CreateAsync(new CreateLocationConfigurationModel { FacilityId = "Facility-300", Description = "Nebraska", IsActive = true });
-        await manager.CreateAsync(new CreateLocationConfigurationModel { FacilityId = "Facility-400", Description = "Michigan", IsActive = false });
+        var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationManager>();
+        await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel { FacilityId = "Facility-300", Description = "Nebraska", IsActive = true });
+        await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel { FacilityId = "Facility-400", Description = "Michigan", IsActive = false });
 
-        var queries = scope.ServiceProvider.GetRequiredService<ILocationConfigurationQueries>();
+        var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationQueries>();
 
-        var result = await queries.SearchAsync(new LocationConfigurationSearchModel
+        var result = await queries.SearchAsync(new OrganizationLocationConfigurationSearchModel
         {
             FacilityId = "Facility-300",
             IsActive = true,
@@ -114,12 +114,12 @@ public class LocationConfigurationQueriesTests : IClassFixture<DataAcquisitionIn
         await dbContext.Database.EnsureDeletedAsync();
         await dbContext.Database.EnsureCreatedAsync();
 
-        var manager = scope.ServiceProvider.GetRequiredService<ILocationConfigurationManager>();
+        var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationManager>();
         for (int i = 1; i <= 25; i++)
-            await manager.CreateAsync(new CreateLocationConfigurationModel { FacilityId = $"Facility-{i}" });
+            await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel { FacilityId = $"Facility-{i}" });
 
-        var queries = scope.ServiceProvider.GetRequiredService<ILocationConfigurationQueries>();
-        var result = await queries.SearchAsync(new LocationConfigurationSearchModel(), pageNumber: 2, pageSize: 10);
+        var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationQueries>();
+        var result = await queries.SearchAsync(new OrganizationLocationConfigurationSearchModel(), pageNumber: 2, pageSize: 10);
 
         Assert.Equal(10, result.Records.Count);
         Assert.Equal(25, result.Metadata.TotalCount);

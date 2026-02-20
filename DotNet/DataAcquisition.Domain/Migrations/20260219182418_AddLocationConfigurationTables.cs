@@ -11,7 +11,7 @@ namespace DataAcquisition.Domain.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "LocationConfiguration",
+                name: "OrganizationLocationConfiguration",
                 columns: table => new
                 {
                     ConfigId = table.Column<int>(type: "int", nullable: false)
@@ -28,7 +28,7 @@ namespace DataAcquisition.Domain.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "LocationCondition",
+                name: "OrganizationLocationCondition",
                 columns: table => new
                 {
                     ConditionId = table.Column<int>(type: "int", nullable: false)
@@ -45,26 +45,26 @@ namespace DataAcquisition.Domain.Migrations
                     table.ForeignKey(
                         name: "FK_LocationCondition_ConfigId",
                         column: x => x.ConfigId,
-                        principalTable: "LocationConfiguration",
+                        principalTable: "OrganizationLocationConfiguration",
                         principalColumn: "ConfigId");
                 });
 
             migrationBuilder.CreateIndex(
                 name: "IX_LocationConditions_ConfigId",
-                table: "LocationCondition",
+                table: "OrganizationLocationCondition",
                 column: "ConfigId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_LocationConfigurations_FacilityId",
-                table: "LocationConfiguration",
+                table: "OrganizationLocationConfiguration",
                 column: "FacilityId");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(name: "LocationCondition");
-            migrationBuilder.DropTable(name: "LocationConfiguration");
+            migrationBuilder.DropTable(name: "OrganizationLocationCondition");
+            migrationBuilder.DropTable(name: "OrganizationLocationConfiguration");
         }
     }
 }

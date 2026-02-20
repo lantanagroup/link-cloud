@@ -24,8 +24,8 @@ public class DataAcquisitionDbContext : DbContext
     {
     }
 
-    public DbSet<LocationCondition> LocationConditions { get; set; }
-    public DbSet<LocationConfiguration> LocationConfigurations { get; set; }
+    public DbSet<OrganizationLocationCondition> LocationConditions { get; set; }
+    public DbSet<OrganizationLocationConfiguration> LocationConfigurations { get; set; }
     public DbSet<FhirQueryConfiguration> FhirQueryConfigurations { get; set; }
     public DbSet<FhirListConfiguration> FhirListConfigurations { get; set; }
     public DbSet<QueryPlan> QueryPlans { get; set; }
@@ -221,8 +221,8 @@ public class DataAcquisitionDbContext : DbContext
             .Property(b => b.QueryPhase)
             .HasConversion(new EnumToStringConverter<QueryPhase>());
 
-        //-------------------LocationCondition-------------------
-        modelBuilder.Entity<LocationCondition>(entity =>
+        //-------------------OrganizationLocationCondition-------------------
+        modelBuilder.Entity<OrganizationLocationCondition>(entity =>
         {
             entity.HasKey(e => e.ConditionId).HasName("PK_LocationCondition_ConditionId");
 
@@ -235,8 +235,8 @@ public class DataAcquisitionDbContext : DbContext
                 .HasConstraintName("FK_LocationCondition_ConfigId");
         });
 
-        //-------------------LocationConfiguration-------------------
-        modelBuilder.Entity<LocationConfiguration>(entity =>
+        //-------------------OrganizationLocationConfiguration-------------------
+        modelBuilder.Entity<OrganizationLocationConfiguration>(entity =>
         {
             entity.HasKey(e => e.ConfigId).HasName("PK_LocationConfiguration_ConfigId");
 

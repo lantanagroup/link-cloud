@@ -3,7 +3,7 @@
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 [ExcludeFromCodeCoverage]
-public class LocationConfigurationModel
+public class OrganizationLocationConfigurationModel
 {
     public int ConfigId { get; set; }
     public required string FacilityId { get; set; }
@@ -11,5 +11,5 @@ public class LocationConfigurationModel
     public bool IsActive { get; set; }
     public DateTime CreatedOn { get; set; }
     public DateTime ModifiedOn { get; set; }
-    public List<LocationConditionModel> Conditions { get; set; } = new();
+    public List<OrganizationLocationConditionModel> Conditions { get; set; } = new();
 }

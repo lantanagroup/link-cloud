@@ -3,7 +3,7 @@
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 
 [ExcludeFromCodeCoverage]
-public class LocationConfigurationSearchModel
+public class OrganizationLocationConfigurationSearchModel
 {
     public int? ConfigId { get; set; }
     public string? FacilityId { get; set; }

@@ -826,7 +826,7 @@ namespace DataAcquisition.Domain.Migrations
                     b.ToTable("FhirQueryResourceType");
                 });
 
-            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.LocationCondition", b =>
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.OrganizationLocationCondition", b =>
                 {
                     b.Property<int>("ConditionId")
                         .ValueGeneratedOnAdd()
@@ -862,10 +862,10 @@ namespace DataAcquisition.Domain.Migrations
 
                     b.HasIndex(new[] { "ConfigId" }, "IX_LocationConditions_ConfigId");
 
-                    b.ToTable("LocationCondition");
+                    b.ToTable("OrganizationLocationCondition");
                 });
 
-            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.LocationConfiguration", b =>
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.OrganizationLocationConfiguration", b =>
                 {
                     b.Property<int>("ConfigId")
                         .ValueGeneratedOnAdd()
@@ -900,7 +900,7 @@ namespace DataAcquisition.Domain.Migrations
 
                     b.HasIndex(new[] { "FacilityId" }, "IX_LocationConfigurations_FacilityId");
 
-                    b.ToTable("LocationConfiguration");
+                    b.ToTable("OrganizationLocationConfiguration");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.QueryPlan", b =>
@@ -1104,9 +1104,9 @@ namespace DataAcquisition.Domain.Migrations
                     b.Navigation("FhirQuery");
                 });
 
-            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.LocationCondition", b =>
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.OrganizationLocationCondition", b =>
                 {
-                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.LocationConfiguration", "Config")
+                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.OrganizationLocationConfiguration", "Config")
                         .WithMany("LocationConditions")
                         .HasForeignKey("ConfigId")
                         .IsRequired()
@@ -1164,7 +1164,7 @@ namespace DataAcquisition.Domain.Migrations
                     b.Navigation("ResourceReferenceTypes");
                 });
 
-            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.LocationConfiguration", b =>
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.OrganizationLocationConfiguration", b =>
                 {
                     b.Navigation("LocationConditions");
                 });

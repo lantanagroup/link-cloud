@@ -10,19 +10,19 @@ namespace IntegrationTests.DataAcquisition.Managers;
 
 [Collection("DataAcquisitionIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class LocationConfigurationManagerTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+public class OrganizationLocationConfigurationManagerTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
 {
     private readonly DataAcquisitionIntegrationTestFixture _fixture;
 
-    public LocationConfigurationManagerTests(DataAcquisitionIntegrationTestFixture fixture)
+    public OrganizationLocationConfigurationManagerTests(DataAcquisitionIntegrationTestFixture fixture)
     {
         _fixture = fixture;
     }
 
-    private ILocationConfigurationManager CreateManager(IServiceScope scope)
+    private IOrganizationLocationConfigurationManager CreateManager(IServiceScope scope)
     {
         var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
-        return new LocationConfigurationManager(database);
+        return new OrganizationLocationConfigurationManager(database);
     }
 
     [Fact]
@@ -35,12 +35,12 @@ public class LocationConfigurationManagerTests : IClassFixture<DataAcquisitionIn
 
         var manager = CreateManager(scope);
 
-        var createModel = new CreateLocationConfigurationModel
+        var createModel = new CreateOrganizationLocationConfigurationModel
         {
             FacilityId = "Nebraska-001",
             Description = "Nebraska Epic Config",
             IsActive = true,
-            Conditions = new List<CreateLocationConditionModel>
+            Conditions = new List<CreateOrganizationLocationConditionModel>
             {
                 new() { FhirPath = "identifier.exists(system = 'urn:oid:1.2.840.114350.1.13.310.2.7.2.696570' and value = '10')", Priority = 1 }
             }
@@ -65,17 +65,17 @@ public class LocationConfigurationManagerTests : IClassFixture<DataAcquisitionIn
         await dbContext.Database.EnsureCreatedAsync();
 
         var manager = CreateManager(scope);
-        var created = await manager.CreateAsync(new CreateLocationConfigurationModel
+        var created = await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel
         {
             FacilityId = "Test-Update-Id",
             Description = "Old Description"
         });
 
-        var updateModel = new UpdateLocationConfigurationModel
+        var updateModel = new UpdateOrganizationLocationConfigurationModel
         {
             Description = "New Description",
             IsActive = false,
-            Conditions = new List<UpdateLocationConditionModel>
+            Conditions = new List<UpdateOrganizationLocationConditionModel>
             {
                 new() { FhirPath = "managingOrganization.reference = 'Organization/123'", Priority = 1 }
             }
@@ -97,10 +97,10 @@ public class LocationConfigurationManagerTests : IClassFixture<DataAcquisitionIn
         await dbContext.Database.EnsureCreatedAsync();
 
         var manager = CreateManager(scope);
-        await manager.CreateAsync(new CreateLocationConfigurationModel { FacilityId = "Multi-Facility", Description = "Config A" });
-        await manager.CreateAsync(new CreateLocationConfigurationModel { FacilityId = "Multi-Facility", Description = "Config B" });
+        await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel { FacilityId = "Multi-Facility", Description = "Config A" });
+        await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel { FacilityId = "Multi-Facility", Description = "Config B" });
 
-        var updateModel = new UpdateLocationConfigurationModel { Description = "All Updated" };
+        var updateModel = new UpdateOrganizationLocationConfigurationModel { Description = "All Updated" };
 
         var result = await manager.UpdateByFacilityIdAsync("Multi-Facility", updateModel);
 
@@ -116,11 +116,11 @@ public class LocationConfigurationManagerTests : IClassFixture<DataAcquisitionIn
         await dbContext.Database.EnsureCreatedAsync();
 
         var manager = CreateManager(scope);
-        var created = await manager.CreateAsync(new CreateLocationConfigurationModel { FacilityId = "Delete-By-Id" });
+        var created = await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel { FacilityId = "Delete-By-Id" });
 
         await manager.DeleteByIdAsync(created.ConfigId);
 
-        var queries = scope.ServiceProvider.GetRequiredService<ILocationConfigurationQueries>();
+        var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationQueries>();
         Assert.Null(await queries.GetByIdAsync(created.ConfigId));
     }
 
@@ -133,13 +133,13 @@ public class LocationConfigurationManagerTests : IClassFixture<DataAcquisitionIn
         await dbContext.Database.EnsureCreatedAsync();
 
         var manager = CreateManager(scope);
-        await manager.CreateAsync(new CreateLocationConfigurationModel { FacilityId = "Delete-All" });
-        await manager.CreateAsync(new CreateLocationConfigurationModel { FacilityId = "Delete-All" });
+        await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel { FacilityId = "Delete-All" });
+        await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel { FacilityId = "Delete-All" });
 
         await manager.DeleteByFacilityIdAsync("Delete-All");
 
-        var queries = scope.ServiceProvider.GetRequiredService<ILocationConfigurationQueries>();
-        var search = await queries.SearchAsync(new LocationConfigurationSearchModel { FacilityId = "Delete-All" });
+        var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationQueries>();
+        var search = await queries.SearchAsync(new OrganizationLocationConfigurationSearchModel { FacilityId = "Delete-All" });
         Assert.Empty(search.Records);
     }
 
@@ -150,6 +150,6 @@ public class LocationConfigurationManagerTests : IClassFixture<DataAcquisitionIn
         var manager = CreateManager(scope);
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            manager.UpdateByIdAsync(99999, new UpdateLocationConfigurationModel()));
+            manager.UpdateByIdAsync(99999, new UpdateOrganizationLocationConfigurationModel()));
     }
 }
