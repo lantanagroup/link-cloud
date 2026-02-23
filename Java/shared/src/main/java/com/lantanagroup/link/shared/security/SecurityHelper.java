@@ -47,8 +47,6 @@ public class SecurityHelper {
             requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
             .requestMatchers(HttpMethod.GET, "/health").permitAll()
             .requestMatchers(HttpMethod.GET, "/info").permitAll()
-            .requestMatchers(HttpMethod.GET, "/api/*/info").permitAll()
-            .requestMatchers(HttpMethod.GET, "/api-docs/**").permitAll()
             .requestMatchers(HttpMethod.GET, "/v3/api-docs/**").permitAll()
             .requestMatchers(HttpMethod.GET, "/swagger-ui.html").permitAll()
             .requestMatchers(HttpMethod.GET, "/swagger-ui/**").permitAll()
