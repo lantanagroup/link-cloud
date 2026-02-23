@@ -30,9 +30,16 @@ builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName, configureRedis: 
 
 builder.Services.AddTransient<SftpAcquisitionHandler>();
 
+//register worker processor config
+builder.Services.Configure<AcquisitionWorkerProcessorSettings>(
+    builder.Configuration.GetSection("AcquisitionWorkerProcessorSettings"));
+
 builder.Services.AddTransient<IDataAcquisitionServiceMetrics, DataAcquisitionServiceMetrics>();
 builder.Services.AddTransient<ICreateSystemToken, CreateSystemToken>();
 builder.Services.AddSingleton(TimeProvider.System);
+
+builder.Services.AddSingleton<AcquisitionProcessorBackgroundService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<AcquisitionProcessorBackgroundService>());
 
 //Add CORS
 builder.Services.AddLinkCorsService(options => {
@@ -55,15 +62,6 @@ if (!consumerSettings?.DisableConsumer ?? true)
 
 //Add SFTP Acquisition Service
 builder.Services.AddHostedService<SftpAcquisitionService>();
-
-// TODO: Retry consumer services temporarily disabled for LNK-4038
-if (!consumerSettings?.DisableRetryConsumer ?? true)
-{
-
-    //builder.Services.AddSingleton(new RetryListenerSettings(DataAcquisitionWorkerConstants.ServiceName, [KafkaTopic.ReadyToAcquire.GetStringValue()]));
-    //builder.Services.AddHostedService<RetryListener>();
-    //builder.Services.AddHostedService<RetryScheduleService>();
-}
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>

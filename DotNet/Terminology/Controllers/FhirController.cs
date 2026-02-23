@@ -62,12 +62,12 @@ public class FhirController(FhirService fhirService) : Controller
     /// nor <paramref name="summary"/> are provided.
     /// </returns>
     [HttpGet("ValueSet")]
-    public ActionResult<Bundle> GetValueSets([FromQuery] string url,
+    public ActionResult<Bundle> GetValueSets([FromQuery] string? url,
         [FromQuery(Name = "_summary")] SummaryType? summary)
     {
         try
         {
-            return Ok(fhirService.GetValueSets(url.Sanitize(), summary));
+            return Ok(fhirService.GetValueSets(url?.Sanitize(), summary));
         }
         catch (ArgumentException ex)
         {
@@ -156,11 +156,11 @@ public class FhirController(FhirService fhirService) : Controller
     /// nor <paramref name="summary"/> is provided.
     /// </returns>
     [HttpGet("CodeSystem")]
-    public ActionResult<Bundle> GetCodeSystems([FromQuery] string url, [FromQuery(Name = "_summary")] SummaryType? summary)
+    public ActionResult<Bundle> GetCodeSystems([FromQuery] string? url, [FromQuery(Name = "_summary")] SummaryType? summary)
     {
         try
         {
-            return Ok(fhirService.GetCodeSystems(url.Sanitize(), summary));
+            return Ok(fhirService.GetCodeSystems(url?.Sanitize(), summary));
         }
         catch (ArgumentException ex)
         {

@@ -1,0 +1,74 @@
+﻿<h2 mat-dialog-title>Package Details</h2>
+
+<div mat-dialog-content>
+  @if (loading) {
+    <div class="loading">
+      <mat-progress-spinner mode="indeterminate" diameter="40"></mat-progress-spinner>
+    </div>
+  }
+  @else if (errorMessage) {
+    <div class="error">{{ errorMessage }}</div>
+  }
+  @else if (details) {
+    <div class="header">
+      <div class="title">
+        <mat-icon>inventory_2</mat-icon>
+        <div>
+          <div class="name">{{ details.name }}</div>
+          <div class="meta">ID: {{ details.id }} | Version: {{ details.version }}</div>
+        </div>
+      </div>
+    </div>
+
+    <mat-tab-group>
+      <mat-tab label="Resources">
+        <div class="resources">
+          @if (resourcesData.data.length === 0) {
+            <div class="empty">No resources found in this package.</div>
+          }
+          @else {
+            <table mat-table [dataSource]="resourcesData" class="mat-elevation-z2">
+              <ng-container matColumnDef="resourceType">
+                <th mat-header-cell *matHeaderCellDef>Type</th>
+                <td mat-cell *matCellDef="let r">{{ r.resourceType }}</td>
+              </ng-container>
+
+              <ng-container matColumnDef="id">
+                <th mat-header-cell *matHeaderCellDef>ID</th>
+                <td mat-cell *matCellDef="let r">{{ r.id }}</td>
+              </ng-container>
+
+              <ng-container matColumnDef="name">
+                <th mat-header-cell *matHeaderCellDef>Name</th>
+                <td mat-cell *matCellDef="let r">{{ r.name }}</td>
+              </ng-container>
+
+              <ng-container matColumnDef="version">
+                <th mat-header-cell *matHeaderCellDef>Version</th>
+                <td mat-cell *matCellDef="let r">{{ r.version }}</td>
+              </ng-container>
+
+              <ng-container matColumnDef="url">
+                <th mat-header-cell *matHeaderCellDef>URL</th>
+                <td mat-cell *matCellDef="let r">{{ r.url }}</td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+            </table>
+          }
+        </div>
+      </mat-tab>
+      <mat-tab label="TX Dependencies">
+        <app-tx-dependencies [package]="data.package"></app-tx-dependencies>
+      </mat-tab>
+    </mat-tab-group>
+  }
+</div>
+
+<div mat-dialog-actions align="end">
+  <button mat-button mat-dialog-close>
+    <mat-icon>close</mat-icon>
+    Close
+  </button>
+</div>

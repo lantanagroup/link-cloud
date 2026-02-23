@@ -41,11 +41,8 @@ public class PatientListsAcquiredListener : BackgroundService
         _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentNullException(nameof(transientExceptionHandler));
         _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
 
-
-        _transientExceptionHandler.ServiceName = CensusConstants.ServiceName;
-        _transientExceptionHandler.Topic = nameof(KafkaTopic.CernerPatientsAcquired) + "-Retry";
-        _nonTransientExceptionHandler.ServiceName = CensusConstants.ServiceName;
-        _nonTransientExceptionHandler.Topic = nameof(KafkaTopic.CernerPatientsAcquired) + "-Error";
+        _transientExceptionHandler.Topic = nameof(KafkaTopic.PatientListsAcquired) + "-Retry";
+        _nonTransientExceptionHandler.Topic = nameof(KafkaTopic.PatientListsAcquired) + "-Error";
     }
 
     public override async Task StartAsync(CancellationToken cancellationToken)

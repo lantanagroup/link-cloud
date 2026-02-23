@@ -80,8 +80,21 @@ spring:
       retry-backoff-ms: 3000
 
 link:
+  info-route: /api/measureeval/info
   reportability-predicate: com.lantanagroup.link.measureeval.reportability.IsInInitialPopulation
   cql-debug: false
+
+  report:
+    base-url: http://localhost:5110
+    routes:
+      submission-model:
+        path: /api/Report/Bundle/Patient
+        query:
+          - facilityId={facilityId}
+          - patientId={patientId}
+          - reportScheduleId={reportId}
+      report-schedules:
+        path: /api/schedules/{reportId}
 
 secret-management:
   key-vault-uri: ''
@@ -89,3 +102,7 @@ secret-management:
 authentication:
   anonymous: false
   authority: 'https://localhost:7004'
+
+internal-blob-storage:
+  connection-string: ''
+  blob-container-name: ''

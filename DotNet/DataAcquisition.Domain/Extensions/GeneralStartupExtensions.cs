@@ -1,6 +1,7 @@
 ﻿using Azure.Identity;
 using System.Diagnostics;
 using System.Net;
+using System.Reflection;
 using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Queries;
 using FluentValidation;
@@ -31,6 +32,7 @@ using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Caching;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -64,10 +66,18 @@ public static class GeneralStartupExtensions
         bool? configureRedis = false,
         bool? configureSecretManager = false)
     {
-        // load external configuration source (if specified)
-        builder.AddExternalConfiguration(serviceName);
+        var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
 
-        builder.Configuration.RegisterMonitoring(builder.Logging, builder.Services, serviceName);
+        var serviceInformation = builder.SetupServiceInformation(serviceName, assemblyVersion);
+
+        // load external configuration source (if specified)
+        builder.AddExternalConfiguration(serviceInformation.ServiceConfigName);
+
+        //Add Quartz scheduler with SQL persistence
+        var connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
+        builder.Services.RegisterQuartzDatabase(connectionString);
+        
+        builder.Configuration.RegisterMonitoring(builder.Logging, builder.Services);
         builder.Services.RegisterConfigs(builder.Configuration);
         builder.RegisterEntityFramework();
 
@@ -89,7 +99,7 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterManagers();
         builder.Services.RegisterServices();
         builder.Services.RegisterFactories(builder.Configuration);
-        builder.Services.RegisterTelemetry(builder.Configuration, builder.Environment, serviceName);
+        builder.Services.RegisterTelemetry(builder.Configuration, builder.Environment, serviceInformation.ServiceConfigName);
         builder.Services.RegisterProblemDetails((IHostingEnvironment)builder.Environment);
     }
 
@@ -110,21 +120,6 @@ public static class GeneralStartupExtensions
 
         // Use Serilog as the logging provider
         logging.AddSerilog(Log.Logger, dispose: true);
-
-        var serviceInformation = configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-        services.Configure<ServiceInformation>(configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation));
-
-        if (serviceInformation != null)
-        {
-            ServiceActivitySource.Initialize(serviceName, serviceInformation);
-            Log.Information("ServiceActivitySource initialized with name: {ServiceName}, version: {Version}",
-            ServiceActivitySource.ServiceName,
-            serviceInformation.Version);
-        }
-        else
-        {
-            throw new NullReferenceException("Service Information was null.");
-        }
     }
 
     public static void RegisterConfigs(this IServiceCollection services, IConfigurationManager configuration)
@@ -231,7 +226,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IEntityRepository<SftpConfiguration>, EntityRepository<SftpConfiguration, DataAcquisitionDbContext>>();
 
         //Database
-        services.AddTransient<IDatabase, Database>();
+        services.AddScoped<IDatabase, Database>();
     }
 
     public static void RegisterManagers(this IServiceCollection services)
@@ -319,6 +314,7 @@ public static class GeneralStartupExtensions
 
         //Validation
         services.AddValidatorsFromAssemblyContaining<UpdateDataAcquisitionLogModelValidator>();
+        services.AddScoped<IQueryPlanValidator, QueryPlanValidator>();
 
         //Factories - Producer
         var kafkaConnection = configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>() ?? throw new Exception("Missing Kafka Connection Settings");

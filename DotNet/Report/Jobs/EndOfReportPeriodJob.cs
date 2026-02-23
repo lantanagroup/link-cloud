@@ -3,13 +3,12 @@ using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
-using LantanaGroup.Link.Report.Entities.Enums;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Quartz;
-using static LantanaGroup.Link.Report.KafkaProducers.ReadyForValidationProducer;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Jobs
@@ -22,22 +21,19 @@ namespace LantanaGroup.Link.Report.Jobs
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ReadyForValidationProducer _readyForValidationProducer;
         private readonly DataAcquisitionRequestedProducer _dataAcqProducer;
-        private readonly ReportManifestProducer _reportManifestProducer;
 
         public EndOfReportPeriodJob(
             ILogger<EndOfReportPeriodJob> logger,
-            [FromKeyedServices("MongoScheduler")] ISchedulerFactory schedulerFactory,
+            ISchedulerFactory schedulerFactory,
             IServiceScopeFactory serviceScopeFactory,
             DataAcquisitionRequestedProducer dataAcqProducer,
-            ReadyForValidationProducer readyForValidationProducer,
-            ReportManifestProducer reportManifestProducer)
+            ReadyForValidationProducer readyForValidationProducer)
         {
             _logger = logger;
             _schedulerFactory = schedulerFactory;
             _serviceScopeFactory = serviceScopeFactory;
             _dataAcqProducer = dataAcqProducer;
             _readyForValidationProducer = readyForValidationProducer;
-            _reportManifestProducer = reportManifestProducer;
         }
 
         public async Task Execute(IJobExecutionContext context)
@@ -46,13 +42,13 @@ namespace LantanaGroup.Link.Report.Jobs
             try
             {
                 // Get the schedule ID from the job data map
-                JobDataMap jobDataMap = context.JobDetail.JobDataMap;
-                string? scheduleId = jobDataMap.GetString("ReportScheduleId");
+                var jobDataMap = context.JobDetail.JobDataMap;
+                string? scheduleId = jobDataMap.GetObject<string>("ReportScheduleId");
 
                 if (string.IsNullOrEmpty(scheduleId))
                 {
                     // Fallback: try to get from trigger data map
-                    scheduleId = context.Trigger.JobDataMap?.GetString("ReportScheduleId");
+                    scheduleId = context.Trigger.JobDataMap?.GetObject<string>("ReportScheduleId");
                 }
 
                 if (string.IsNullOrEmpty(scheduleId))
@@ -64,22 +60,27 @@ namespace LantanaGroup.Link.Report.Jobs
                 using var scope = _serviceScopeFactory.CreateScope();
                 var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
                 var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+                var reportManifestProducer = scope.ServiceProvider.GetRequiredService<ReportManifestProducer>();
 
                 // Fetch the schedule from the database
                 schedule = await database.ReportScheduledRepository.GetAsync(scheduleId);
-
+                
                 if (schedule == null)
                 {
+                    _logger.LogWarning("ReportSchedule {ScheduleId} not found", scheduleId);
                     return;
                 }
 
-                _logger.LogInformation("Executing EndOfReportPeriodJob for MeasureReportScheduleModel {ScheduleId}", schedule.Id);
-
-                var manifestProduced = await _reportManifestProducer.Produce(schedule);
+                _logger.LogInformation("Executing EndOfReportPeriodJob for ScheduleId {ScheduleId}", schedule.Id);
+                
+                var manifestProduced = await reportManifestProducer.Produce(schedule);
 
                 if (!manifestProduced)
                 {
-                    var patientsToEvaluate = await database.SubmissionEntryRepository.AnyAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.PendingEvaluation, CancellationToken.None);
+                    var patientsToEvaluate = await database.ReportEntryRepository.AnyAsync(
+                        x => x.ReportScheduleId == schedule.Id && x.ReportingStatus == ReportingStatus.PatientIdentified,
+                        CancellationToken.None
+                    );
 
                     if (patientsToEvaluate)
                     {
@@ -89,28 +90,7 @@ namespace LantanaGroup.Link.Report.Jobs
                         }
                         catch (ProduceException<string, DataAcquisitionRequestedValue> ex)
                         {
-                            _logger.LogError(ex, "An error was encountered generating a Data Acquisition Requested event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
-                        }
-                    }
-
-                    var needsValidation = (await database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.ReadyForValidation && x.ValidationStatus != ValidationStatus.Requested)).ToList();
-
-                    if (needsValidation.Any())
-                    {
-                        try
-                        {
-                            await _readyForValidationProducer.Produce(needsValidation.Select(v => new ProduceValidationModel()
-                            {
-                                ReportScheduleId = schedule.Id,
-                                FacilityId = v.FacilityId,
-                                ReportTypes = schedule.ReportTypes,
-                                PatientId = v.PatientId,
-                                PayloadUri = v.PayloadUri
-                            }).ToList());
-                        }
-                        catch (ProduceException<string, string> ex)
-                        {
-                            _logger.LogError(ex, "An error was encountered generating a Ready For Validation event.\n\tFacilityId: {facilityId}\n\t", schedule.FacilityId);
+                            _logger.LogError(ex, "Error generating Data Acquisition Requested event for FacilityId {FacilityId}", schedule.FacilityId);
                         }
                     }
                 }
@@ -118,13 +98,14 @@ namespace LantanaGroup.Link.Report.Jobs
                 schedule.Status = ScheduleStatus.EndOfPeriod;
                 schedule.EndOfReportPeriodJobHasRun = true;
                 await reportScheduledManager.UpdateAsync(schedule, CancellationToken.None);
-
+                
                 // remove the job from the scheduler
                 await MeasureReportScheduleService.DeleteJob(schedule, await _schedulerFactory.GetScheduler());
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Exception encountered during EndOfReportPeriodJob execution");
+
                 if (schedule != null)
                 {
                     await MeasureReportScheduleService.RescheduleJob(schedule, await _schedulerFactory.GetScheduler());

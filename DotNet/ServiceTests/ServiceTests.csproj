@@ -10,12 +10,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="UnitTests\Normalization\**" />
-    <EmbeddedResource Remove="UnitTests\Normalization\**" />
-    <None Remove="UnitTests\Normalization\**" />
-  </ItemGroup>
-
-  <ItemGroup>
     <None Remove="Resources\indMeasureReport.json" />
   </ItemGroup>
 
@@ -59,6 +53,7 @@
     <ProjectReference Include="..\DataAcquisition\DataAcquisition.csproj" />
     <ProjectReference Include="..\Normalization\Normalization.csproj" />
     <ProjectReference Include="..\Report\Report.csproj" />
+    <ProjectReference Include="..\Shared\Shared.csproj" />
     <ProjectReference Include="..\Tenant\Tenant.csproj" />
   </ItemGroup>
 

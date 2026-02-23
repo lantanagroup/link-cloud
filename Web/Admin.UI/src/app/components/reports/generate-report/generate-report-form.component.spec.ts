@@ -1,7 +1,7 @@
-import {ComponentFixture, TestBed, fakeAsync, tick, waitForAsync, flushMicrotasks} from '@angular/core/testing';
+import {ComponentFixture, fakeAsync, flushMicrotasks, TestBed, tick, waitForAsync} from '@angular/core/testing';
 import {GenerateReportFormComponent} from './generate-report-form.component';
 import {FormBuilder, ReactiveFormsModule} from '@angular/forms';
-import {async, of, throwError} from 'rxjs';
+import {of, throwError} from 'rxjs';
 import {MatSnackBar} from '@angular/material/snack-bar';
 import {TenantService} from '../../../services/gateway/tenant/tenant.service';
 import {MeasureDefinitionService} from '../../../services/gateway/measure-definition/measure.service';
@@ -80,6 +80,7 @@ describe('GenerateReportFormComponent', () => {
 
     it('should initialize the form with default values and controls', () => {
       expect(component.generateReportForm.contains('facilityId')).toBeTrue();
+      expect(component.generateReportForm.contains('reportingCadence')).toBeTrue();
       expect(component.generateReportForm.contains('startDate')).toBeTrue();
       expect(component.generateReportForm.contains('endDate')).toBeTrue();
       expect(component.generateReportForm.contains('reportTypes')).toBeTrue();
@@ -129,6 +130,41 @@ describe('GenerateReportFormComponent', () => {
       endDateControl.setValue(new Date());
       expect(startDateControl.valid).toBeTrue();
       expect(endDateControl.valid).toBeTrue();
+    });
+
+    it('should sync end date with start date when cadence is Daily', () => {
+      component.reportingCadenceControl.setValue('Daily');
+      const testDate = new Date(2026, 1, 1);
+      component.startDateControl.setValue(testDate);
+      expect(component.endDateControl.value).toEqual(testDate);
+      expect(component.endDateControl.disabled).toBeTrue();
+    });
+
+    it('should set monthly range correctly in chosenMonthHandler', () => {
+      component.reportingCadenceControl.setValue('Monthly');
+      const normalizedMonth = new Date(2026, 5, 1); // June 2026
+      const mockPicker = jasmine.createSpyObj('MatDatepicker', ['close']);
+      component.chosenMonthHandler(normalizedMonth, mockPicker);
+
+      const startDate: Date = component.startDateControl.value;
+      const endDate: Date = component.endDateControl.value;
+
+      expect(startDate.getFullYear()).toBe(2026);
+      expect(startDate.getMonth()).toBe(5);
+      expect(startDate.getDate()).toBe(1);
+
+      expect(endDate.getFullYear()).toBe(2026);
+      expect(endDate.getMonth()).toBe(5);
+      // Last day of June is 30
+      expect(endDate.getDate()).toBe(30);
+
+      expect(mockPicker.close).toHaveBeenCalled();
+      expect(component.endDateControl.disabled).toBeTrue();
+    });
+
+    it('should enable end date when cadence is Custom', () => {
+      component.reportingCadenceControl.setValue('Custom');
+      expect(component.endDateControl.enabled).toBeTrue();
     });
   });
 

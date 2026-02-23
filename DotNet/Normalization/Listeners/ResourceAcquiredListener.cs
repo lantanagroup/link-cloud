@@ -1,7 +1,6 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
@@ -18,7 +17,6 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Utilities;
-using Microsoft.Extensions.Options;
 using System.Text;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
@@ -36,6 +34,7 @@ public class ResourceAcquiredListener : BackgroundService
     private bool _cancelled = false;
     private readonly INormalizationServiceMetrics _metrics;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ServiceInformation _serviceInformation;
 
     private readonly CopyPropertyOperationService _copyPropertyOperationService;
     private readonly CodeMapOperationService _codeMapOperationService;
@@ -44,7 +43,7 @@ public class ResourceAcquiredListener : BackgroundService
 
     public ResourceAcquiredListener(
         ILogger<ResourceAcquiredListener> logger,
-        IOptions<ServiceInformation> serviceInformation,
+        ServiceInformation serviceInformation,
         IServiceScopeFactory scopeFactory,
         IKafkaConsumerFactory<string, ResourceAcquiredMessage> consumerFactory,
         IDeadLetterExceptionHandler<string, string> consumeExceptionHandler,
@@ -60,18 +59,20 @@ public class ResourceAcquiredListener : BackgroundService
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
         _consumeExceptionHandler = consumeExceptionHandler ?? throw new ArgumentNullException(nameof(consumeExceptionHandler));
-        _consumeExceptionHandler.ServiceName = serviceInformation.Value.ServiceName;
+
         _consumeExceptionHandler.Topic = $"{nameof(KafkaTopic.ResourceAcquired)}-Error";
         _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentNullException(nameof(deadLetterExceptionHandler));
-        _deadLetterExceptionHandler.ServiceName = serviceInformation.Value.ServiceName;
+
         _deadLetterExceptionHandler.Topic = $"{nameof(KafkaTopic.ResourceAcquired)}-Error";
         _transientExceptionHandler = transientExceptionHandler;
-        _transientExceptionHandler.ServiceName = serviceInformation.Value.ServiceName;
+
         _transientExceptionHandler.Topic = KafkaTopic.ResourceAcquiredRetry.GetStringValue();
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
 
         _scopeFactory = scopeFactory;
         _producer = producer ?? throw new ArgumentNullException(nameof(producer));
+
+        _serviceInformation = serviceInformation ?? throw new ArgumentNullException(nameof(serviceInformation));
 
         _copyPropertyOperationService = copyPropertyOperationService;
         _codeMapOperationService = codeMapOperationService ?? throw new ArgumentNullException(nameof(codeMapOperationService));
@@ -88,7 +89,7 @@ public class ResourceAcquiredListener : BackgroundService
     {
         using var kafkaConsumer = _consumerFactory.CreateConsumer(new ConsumerConfig
         {
-            GroupId = NormalizationConstants.ServiceName,
+            GroupId = _serviceInformation.ServiceConfigName,
             EnableAutoCommit = false
         });
 
@@ -224,16 +225,7 @@ public class ResourceAcquiredListener : BackgroundService
                     {
                         _logger.LogError(ex, $"Failed to process Patient Event.");
 
-                        var auditValue = new Shared.Application.Models.Kafka.AuditEventMessage
-                        {
-                            FacilityId = message.Message.Key,
-                            Action = AuditEventType.Query,
-                            ServiceName = NormalizationConstants.ServiceName,
-                            EventDate = DateTime.UtcNow,
-                            Notes = $"Data Acquisition processing failure \nException Message: {ex}",
-                        };
-
-                        _transientExceptionHandler.HandleException(message, new TransientException("Data Acquisition Exception thrown: " + ex.Message), message.Message.Key);
+                        _transientExceptionHandler.HandleException(message, new TransientException("Normalization Exception thrown: " + ex.Message), message.Message.Key);
                     }
                     finally
                     {
@@ -296,7 +288,16 @@ public class ResourceAcquiredListener : BackgroundService
             Headers = headers,
             Value = resourceNormalizedMessage
         };
-        await _producer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
+
+        try
+        {
+            await _producer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
+        }
+        catch (ProduceException<string, ResourceNormalizedMessage> ex)
+        {
+            _logger.LogError(ex, "Failed to produce ResourceNormalized message. FacilityId: {FacilityId}, CorrelationId: {CorrelationId}, FhirResourceType: {fhirResourceType}, ResourceId: {resourceId}", facilityId, correlationId, resource?.TypeName, resource?.Id);
+            throw new TransientException($"Failed to produce ResourceNormalized message: {ex.Message}", ex);
+        }
     }
 
     public void Cancel()

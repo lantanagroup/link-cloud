@@ -1,3 +1,6 @@
+using System.Diagnostics;
+using System.Reflection;
+using System.Text.Json.Serialization;
 using Census.Domain.Entities;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
@@ -17,6 +20,7 @@ using LantanaGroup.Link.Census.Listeners;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Health;
@@ -35,17 +39,10 @@ using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.OpenApi.Models;
-using Quartz;
-using Quartz.Impl;
-using Quartz.Spi;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
-using System.Collections.Specialized;
-using System.Diagnostics;
-using System.Reflection;
 using PatientEvent = LantanaGroup.Link.Census.Domain.Entities.POI.PatientEvent;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -59,67 +56,70 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
-    // load external configuration source (if specified)
+    // Load external configuration source (if specified)
     builder.AddExternalConfiguration(CensusConstants.ServiceName);
 
-    var serviceInformation = builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.ServiceInformation).Get<ServiceInformation>();
-    if (serviceInformation != null)
+    var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+    var serviceInformation = builder.SetupServiceInformation(CensusConstants.ServiceName, assemblyVersion);
+
+    if(serviceInformation == null)
     {
-        ServiceActivitySource.Initialize(serviceInformation);
-    }
-    else
-    {
-        throw new NullReferenceException("Service Information was null.");
+        throw new InvalidOperationException("Service information could not be loaded properly.");
     }
 
-    // Add configuration settings
+    // Configuration settings
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.AddSingleton(builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>());
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
+    builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetSection(nameof(ConsumerSettings)));
+    var consumerSettings = builder.Configuration.GetSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
 
-    IConfigurationSection consumerSettingsSection = builder.Configuration.GetSection(nameof(ConsumerSettings));
-    builder.Services.Configure<ConsumerSettings>(consumerSettingsSection);
-    var consumerSettings = consumerSettingsSection.Get<ConsumerSettings>();
-
-    // Add EF Core
+    // EF Core and Interceptors
     builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
+    var dbProvider = builder.Configuration.GetValue<string>(CensusConstants.AppSettings.DatabaseProvider);
+    string? databaseConnectionString = null;
+
+    if (dbProvider == ConfigurationConstants.AppSettings.SqlServerDatabaseProvider)
+    {
+        databaseConnectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
+
+        if (string.IsNullOrEmpty(databaseConnectionString))
+            throw new InvalidOperationException("Database connection string is null or empty.");
+
+        // Quartz Scheduler with SQL persistence
+        builder.Services.RegisterQuartzDatabase(databaseConnectionString);
+    }
+
     builder.Services.AddDbContext<CensusContext>((sp, options) =>
     {
         var updateBaseEntityInterceptor = sp.GetService<UpdateBaseEntityInterceptor>();
-        switch (builder.Configuration.GetValue<string>(CensusConstants.AppSettings.DatabaseProvider))
+        switch (dbProvider)
         {
             case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
-                string? connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
-                if (string.IsNullOrEmpty(connectionString))
-                    throw new InvalidOperationException("Database connection string is null or empty.");
+                options.UseSqlServer(databaseConnectionString, sqlOptions =>
+                {
+                    sqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+                })
+                .AddInterceptors(updateBaseEntityInterceptor);
 
-                options.UseSqlServer(connectionString,
-                        sqlServerOptionsAction: sqlOptions =>
-                        {
-                            // Ensure JSON capabilities are enabled
-                            sqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
-                        })
-                   .AddInterceptors(updateBaseEntityInterceptor);
-                options.UseSqlServer(connectionString)
-                       .AddInterceptors(updateBaseEntityInterceptor);
                 break;
             default:
                 throw new InvalidOperationException($"Database provider not supported. Attempting to find section named: {CensusConstants.AppSettings.DatabaseProvider}");
         }
     });
 
-    // Add services
+    // Core Services
     builder.Services.AddHttpClient();
     builder.Services.AddControllers().AddJsonOptions(options =>
     {
-        options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+        options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
         options.JsonSerializerOptions.ForFhir();
     });
     builder.Services.AddGrpcReflection();
 
-    // Add Kafka consumers and producers
+    // Kafka Consumers and Producers
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientListMessage>, KafkaConsumerFactory<string, PatientListMessage>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, CernerPatientsAcquired>, KafkaConsumerFactory<string, CernerPatientsAcquired>>();
@@ -135,30 +135,29 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.RegisterKafkaProducer<string, Null>(kafkaConnection, new ProducerConfig());
     builder.Services.RegisterKafkaProducer<string, LantanaGroup.Link.Census.Application.Models.Messages.PatientEvent>(kafkaConnection, new ProducerConfig());
 
-
-    // Add factories
+    // Factories
     builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
 
-    // Add repositories
+    // Repositories
     builder.Services.AddTransient<IBaseEntityRepository<CensusConfigEntity>, CensusEntityRepository<CensusConfigEntity>>();
     builder.Services.AddTransient<IBaseEntityRepository<PatientEvent>, CensusEntityRepository<PatientEvent>>();
     builder.Services.AddTransient<IBaseEntityRepository<PatientEncounter>, CensusEntityRepository<PatientEncounter>>();
+    builder.Services.AddScoped<ICensusSchedulingRepository, CensusSchedulingRepository>();
 
-    // Add managers
+    // Managers
     builder.Services.AddTransient<ICensusConfigManager, CensusConfigManager>();
     builder.Services.AddTransient<IPatientEventManager, PatientEventManager>();
     builder.Services.AddTransient<IPatientEventQueries, PatientEventQueries>();
     builder.Services.AddTransient<IPatientEncounterQueries, PatientEncounterQueries>();
     builder.Services.AddTransient<IPatientEncounterManager, PatientEncounterManager>();
 
-
-    //Services
+    // Application Services
     builder.Services.AddScoped<IPatientListService, PatientListService>();
     builder.Services.AddScoped<ICernerListService, CernerListService>();
     builder.Services.AddTransient<IEventProducerService<LantanaGroup.Link.Census.Application.Models.Messages.PatientEvent>, EventProducerService<LantanaGroup.Link.Census.Application.Models.Messages.PatientEvent>>();
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
-    // Add exception handlers
+    // Exception Handlers
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientListMessage>, DeadLetterExceptionHandler<string, PatientListMessage>>();
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, CernerPatientsAcquired>, DeadLetterExceptionHandler<string, CernerPatientsAcquired>>();
@@ -166,43 +165,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITransientExceptionHandler<string, PatientListMessage>, TransientExceptionHandler<string, PatientListMessage>>();
     builder.Services.AddTransient<ITransientExceptionHandler<string, CernerPatientsAcquired>, TransientExceptionHandler<string, CernerPatientsAcquired>>();
 
-    // Quartz
-    var quartzProps = new NameValueCollection
-    {
-        ["quartz.scheduler.instanceName"] = "CensusScheduler",
-        ["quartz.scheduler.instanceId"] = "AUTO",
-        ["quartz.jobStore.clustered"] = "true",
-        ["quartz.jobStore.type"] = "Quartz.Impl.AdoJobStore.JobStoreTX, Quartz",
-        ["quartz.jobStore.driverDelegateType"] = "Quartz.Impl.AdoJobStore.SqlServerDelegate, Quartz",
-        ["quartz.jobStore.tablePrefix"] = "quartz.QRTZ_",
-        ["quartz.jobStore.dataSource"] = "default",
-        ["quartz.dataSource.default.connectionString"] = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection),
-        ["quartz.dataSource.default.provider"] = "SqlServer",
-        ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
-        ["quartz.threadPool.threadCount"] = "5",
-        ["quartz.jobStore.useProperties"] = "false",
-        ["quartz.serializer.type"] = "json"
-    };
-
-    builder.Services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
-    builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
-
-    // Add Quartz schedulers
-    builder.Services.AddQuartz(q =>
-    {
-
-        q.UseMicrosoftDependencyInjectionJobFactory();
-    });
-	
-    builder.Services.AddSingleton<IJobFactory, JobFactory>();
     builder.Services.AddTransient<SchedulePatientListRetrieval>();
     builder.Services.AddTransient<RetryJob>();
 
-    builder.Services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
-    builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
-
-    // Add hosted services
-    builder.Services.AddScoped<ICensusSchedulingRepository, CensusSchedulingRepository>();
+    // Hosted Services (avoid duplicate registrations)
     if (consumerSettings == null || !consumerSettings.DisableConsumer)
     {
         builder.Services.AddHostedService<PatientListsAcquiredListener>();
@@ -211,11 +177,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
     {
         builder.Services.AddHostedService<ScheduleService>();
-        builder.Services.AddSingleton(new RetryListenerSettings(CensusConstants.ServiceName, [KafkaTopic.PatientListsAcquiredRetry.GetStringValue()]));
+        builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceName, [KafkaTopic.PatientListsAcquiredRetry.GetStringValue()]));
         builder.Services.AddHostedService<RetryListener>();
     }
 
-    // Add Link Security
+    // Security
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
     builder.Services.AddLinkBearerServiceAuthentication(options =>
     {
@@ -227,13 +193,13 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
     });
 
-    // Add health checks
+    // Health Checks
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, CensusConstants.ServiceName).GetHealthCheckOptions();
     builder.Services.AddHealthChecks()
         .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
-    // Add Swagger
+    // Swagger
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(c =>
     {
@@ -270,7 +236,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         c.DocumentFilter<HealthChecksFilter>();
     });
 
-    // Add problem details
+    // Problem Details
     builder.Services.AddProblemDetails(options =>
     {
         options.CustomizeProblemDetails = ctx =>
@@ -292,23 +258,12 @@ static void RegisterServices(WebApplicationBuilder builder)
         };
     });
 
-
-    builder.Services.AddHostedService<PatientListsAcquiredListener>();
-
-
-    if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
-    {
-        builder.Services.AddHostedService<ScheduleService>();
-        builder.Services.AddSingleton(new RetryListenerSettings(CensusConstants.ServiceName, [KafkaTopic.PatientListsAcquiredRetry.GetStringValue()]));
-        builder.Services.AddHostedService<RetryListener>();
-    }
-
-    //Add CORS
+    // CORS
     builder.Services.AddLinkCorsService(options => {
         options.Environment = builder.Environment;
     });
 
-    // Add telemetry
+    // Telemetry
     builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {
         options.Environment = builder.Environment;
@@ -316,6 +271,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.ServiceVersion = serviceInformation.Version;
     });
 
+    // Metrics
     builder.Services.AddSingleton<ICensusServiceMetrics, CensusServiceMetrics>();
 
     // Logging using Serilog

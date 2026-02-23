@@ -1,4 +1,4 @@
-import {Component, OnInit, Input, ViewChild} from '@angular/core';
+import {Component, Input, OnInit, ViewChild} from '@angular/core';
 
 import {ActivatedRoute, RouterLink} from '@angular/router';
 import {TenantService} from 'src/app/services/gateway/tenant/tenant.service';
@@ -77,7 +77,6 @@ import {IQueryDispatchConfiguration} from "../../../interfaces/query-dispatch/qu
 import {
   DeleteConfirmationDialogComponent
 } from "../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
-import { concatMap } from 'rxjs';
 
 
 @Component({
@@ -396,9 +395,10 @@ export class FacilityEditComponent implements OnInit {
   showDataAcqQueryPlanDialog(): void {
     this.dialog.open(QueryPlanConfigDialogComponent,
       {
-        width: '75%',
+        width: '90%',
+        maxWidth: '1200px',
         data: {
-          dialogTitle: 'Fhir Query Plan Configuration',
+          dialogTitle: 'Query Plan',
           formMode: this.showNoDataAcqQueryPlanConfigAlert ? FormMode.Create : FormMode.Edit,
           viewOnly: false,
           dataAcqQueryPlanConfig: this.dataAcqQueryPlanConfig
@@ -660,8 +660,8 @@ export class FacilityEditComponent implements OnInit {
           planName: '',
           ehrDescription: '',
           lookBack: '',
-          initialQueries: '',
-          supplementalQueries: '',
+          initialQueries: {},
+          supplementalQueries: {},
           type: type
         } as IQueryPlanModel;
         this.showNoDataAcqQueryPlanConfigAlert = true;
@@ -898,10 +898,10 @@ export class FacilityEditComponent implements OnInit {
                   this.dataAcqQueryPlanConfig = {
                     ehrDescription: "",
                     id: "",
-                    initialQueries: "",
+                    initialQueries: {},
                     lookBack: "",
                     planName: "",
-                    supplementalQueries: "",
+                    supplementalQueries: {},
                     type: "Discharge",
                     facilityId: this.facilityId
                   };
@@ -912,10 +912,10 @@ export class FacilityEditComponent implements OnInit {
                 this.dataAcqQueryPlanConfig = {
                   ehrDescription: "",
                   id: "",
-                  initialQueries: "",
+                  initialQueries: {},
                   lookBack: "",
                   planName: "",
-                  supplementalQueries: "",
+                  supplementalQueries: {},
                   type: "Discharge",
                   facilityId: this.facilityId
                 };

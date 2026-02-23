@@ -16,7 +16,6 @@ using LantanaGroup.Link.Tenant.Data.Entities;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Services;
-using LantanaGroup.Link.Tenant.Utils;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -99,13 +98,15 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="sortOrder"></param>
         /// <param name="pageSize"></param>
         /// <param name="pageNumber"></param>
+        /// <param name="includeDeleted"></param>
         /// <returns></returns>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<FacilityModel>))]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet(Name = "GetFacilities")]
         public async Task<ActionResult<PagedConfigModel<FacilityModel>>> GetFacilities(string? facilityId,
-            string? facilityName, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1,
+            string? facilityName, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1, 
+            bool includeDeleted = false,
             CancellationToken cancellationToken = default)
         {
             facilityId = facilityId?.Sanitize();
@@ -127,7 +128,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities");
 
             var searchModel = new FacilitySearchModel { FacilityId = facilityId, FacilityName = facilityName };
-            var pagedFacilityConfigModelDto = await _facilityQueries.PagedSearchAsync(searchModel, sortBy, sortOrder.Value, pageSize, pageNumber, cancellationToken);
+            var pagedFacilityConfigModelDto = await _facilityQueries.PagedSearchAsync(searchModel, sortBy, sortOrder.Value, pageSize, pageNumber, includeDeleted, cancellationToken);
 
             if (pagedFacilityConfigModelDto.Records.Count == 0)
             {
@@ -145,7 +146,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("list")]
-        public async Task<IActionResult> GetFacilityList([FromQuery] string? search)
+        public async Task<IActionResult> GetFacilityList([FromQuery] string? search, bool includeDeleted = false)
         {
             try
             {
@@ -154,6 +155,10 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 {
                     searchModel.FacilityName = search;
                     searchModel.FacilityNameContains = true;
+                    if (!includeDeleted)
+                    {
+                        searchModel.IsDeleted = false;
+                    }
                 }
 
                 var facilities = await _facilityQueries.SearchAsync(searchModel, HttpContext.RequestAborted);
@@ -172,7 +177,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 _logger.LogError(ex, "Exception Encountered in FacilityController.GetFacilityList");
                 return Problem("An error occurred while getting all facilities", null, 500);
             }
@@ -377,9 +382,89 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             return NoContent();
         }
+        
+        [HttpDelete("softDelete/{facilityId}")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> SoftDeleteFacility(string facilityId, CancellationToken cancellationToken)
+        {
+            facilityId = facilityId?.Sanitize();
+
+            var existingModel = await _facilityQueries.GetAsync(facilityId, null, cancellationToken);
+            if (existingModel == null)
+                return BadRequest($"Facility with Id: {facilityId} Not Found");
+
+            try
+            {
+                await _facilityManager.SoftDeleteAsync(facilityId, cancellationToken);
+            }
+            catch (ApplicationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Exception encountered in FacilityController.SoftDeleteFacility");
+                return Problem("An error occurred while soft deleting the facility", null, 500);
+            }
+
+            // Delete all scheduled jobs (Monthly, Weekly, Daily) for the soft-deleted facility
+            // Jobs will be recreated when the facility is restored via the restore endpoint
+            using (ServiceActivitySource.Instance.StartActivity("Delete Jobs for Facility"))
+            {
+                await _scheduleService.DeleteJobsForFacility(facilityId, cancellationToken: cancellationToken);
+            }
+
+            return NoContent();
+        }
 
         /// <summary>
-        /// Generat
+        /// Restores a soft-deleted facility configuration.
+        /// </summary>
+        /// <param name="facilityId"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        [HttpPatch("restore/{facilityId}")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> RestoreFacility(string facilityId, CancellationToken cancellationToken)
+        {
+            facilityId = facilityId?.Sanitize();
+
+            var existingModel = await _facilityQueries.GetAsync(facilityId, null, cancellationToken, includeDeleted: true);
+            if (existingModel == null)
+                return BadRequest($"Facility with Id: {facilityId} Not Found");
+
+            try
+            {
+                await _facilityManager.RestoreAsync(facilityId, cancellationToken);
+            }
+            catch (ApplicationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Exception encountered in FacilityController.RestoreFacility");
+                return Problem("An error occurred while restoring the facility", null, 500);
+            }
+
+            // Re-create scheduled jobs for the restored facility
+            using (ServiceActivitySource.Instance.StartActivity("Restore Jobs for Facility"))
+            {
+                var facilityEntity = _mapperDtoToModel.Map<FacilityModel, Facility>(existingModel);
+                await _scheduleService.AddJobsForFacility(facilityEntity, cancellationToken);
+            }
+
+            return NoContent();
+        }
+
+        /// <summary>
+        /// Generate
         /// </summary>
         /// <param name="facilityId"></param>
         /// <param name="request"></param>
@@ -502,13 +587,9 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 var httpClient = _httpClient.CreateClient();
                 httpClient.Timeout = TimeSpan.FromSeconds(30);
 
-                var baseUrl = new Uri(_serviceRegistry.ReportServiceApiUrl.TrimEnd('/') + "/Report/Schedule");
+                var baseUrl = new Uri(_serviceRegistry.ReportServiceApiUrl.TrimEnd('/') + "/schedules");
 
-                var requestUrl = QueryHelpers.AddQueryString(baseUrl.ToString(), new Dictionary<string, string?>
-                { 
-                    ["facilityId"] = HtmlInputSanitizer.SanitizeAndRemove(facilityId),
-                    ["reportScheduleId"] = HtmlInputSanitizer.SanitizeAndRemove(request.ReportId) }
-                );
+                var requestUrl = $"{baseUrl}/{HtmlInputSanitizer.SanitizeAndRemove(request.ReportId)}";
 
                 if (!_linkBearerServiceOptions.Value.AllowAnonymous)
                 {

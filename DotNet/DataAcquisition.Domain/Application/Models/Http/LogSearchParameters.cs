@@ -1,6 +1,6 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+﻿using System.ComponentModel.DataAnnotations;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
-using System.ComponentModel.DataAnnotations;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
 public class LogSearchParameters : GenericLogSearchParameters
@@ -11,8 +11,9 @@ public class LogSearchParameters : GenericLogSearchParameters
     public string? ResourceId { get; set; }
     public QueryPhase? QueryPhase { get; set; }
     public FhirQueryType? QueryType { get; set; }
-    public RequestStatus? Status { get; set; }
+    public List<RequestStatus>? Statuses { get; set; }
     public AcquisitionPriority? Priority { get; set; }
+    public string? ResourceType { get; set; }
 }
 
 public class SftpLogSearchParameters : GenericLogSearchParameters
