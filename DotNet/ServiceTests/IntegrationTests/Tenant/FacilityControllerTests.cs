@@ -167,6 +167,90 @@ public class FacilityControllerTests
     }
 
     [Fact]
+    public async Task SoftDeleteFacility_Success()
+    {
+        var facilityId = Guid.NewGuid().ToString();
+        var facilityName = $"Soft Delete Controller Test {facilityId}";
+        var facility = new Facility
+        {
+            FacilityId = facilityId,
+            FacilityName = facilityName,
+            TimeZone = "America/Chicago",
+            ScheduledReports = new ScheduledReportModel { Daily = new string[] { }, Weekly = new string[] { }, Monthly = new string[] { } }
+        };
+        await _fixture.ServiceProvider.GetRequiredService<IFacilityManager>().CreateAsync(facility, CancellationToken.None);
+
+        var result = await _controller.SoftDeleteFacility(facilityId, CancellationToken.None);
+        Assert.IsType<NoContentResult>(result);
+    }
+
+    [Fact]
+    public async Task SoftDeleteFacility_FacilityNotFound_ReturnsBadRequest()
+    {
+        var nonExistentFacilityId = Guid.NewGuid().ToString();
+
+        var result = await _controller.SoftDeleteFacility(nonExistentFacilityId, CancellationToken.None);
+
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Contains("Not Found", badRequestResult.Value?.ToString());
+    }
+
+    [Fact]
+    public async Task RestoreFacility_Success()
+    {
+        var facilityId = Guid.NewGuid().ToString();
+        var facilityName = $"Restore Controller Test {facilityId}";
+        var facility = new Facility
+        {
+            FacilityId = facilityId,
+            FacilityName = facilityName,
+            TimeZone = "America/Chicago",
+            ScheduledReports = new ScheduledReportModel { Daily = new string[] { }, Weekly = new string[] { }, Monthly = new string[] { } }
+        };
+        var manager = _fixture.ServiceProvider.GetRequiredService<IFacilityManager>();
+        await manager.CreateAsync(facility, CancellationToken.None);
+
+        // Soft delete the facility first
+        await manager.SoftDeleteAsync(facilityId, CancellationToken.None);
+
+        // Restore the facility
+        var result = await _controller.RestoreFacility(facilityId, CancellationToken.None);
+        Assert.IsType<NoContentResult>(result);
+    }
+
+    [Fact]
+    public async Task RestoreFacility_FacilityNotFound_ReturnsBadRequest()
+    {
+        var nonExistentFacilityId = Guid.NewGuid().ToString();
+
+        var result = await _controller.RestoreFacility(nonExistentFacilityId, CancellationToken.None);
+
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Contains("Not Found", badRequestResult.Value?.ToString());
+    }
+
+    [Fact]
+    public async Task RestoreFacility_FacilityNotDeleted_ReturnsBadRequest()
+    {
+        var facilityId = Guid.NewGuid().ToString();
+        var facilityName = $"Restore Not Deleted Test {facilityId}";
+        var facility = new Facility
+        {
+            FacilityId = facilityId,
+            FacilityName = facilityName,
+            TimeZone = "America/Chicago",
+            ScheduledReports = new ScheduledReportModel { Daily = new string[] { }, Weekly = new string[] { }, Monthly = new string[] { } }
+        };
+        await _fixture.ServiceProvider.GetRequiredService<IFacilityManager>().CreateAsync(facility, CancellationToken.None);
+
+        // Try to restore a facility that is not deleted
+        var result = await _controller.RestoreFacility(facilityId, CancellationToken.None);
+
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Contains("is not deleted", badRequestResult.Value?.ToString());
+    }
+
+    [Fact]
     public async Task GenerateAdHocReport_Success()
     {
         var facilityId = Guid.NewGuid().ToString();

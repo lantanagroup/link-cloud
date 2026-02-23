@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
@@ -9,6 +9,8 @@ using LantanaGroup.Link.DataAcquisition.Jobs;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using Moq;
 using Quartz;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
@@ -21,10 +23,12 @@ namespace IntegrationTests.DataAcquisition;
 public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
 {
     private readonly DataAcquisitionIntegrationTestFixture _fixture;
+    private readonly IOptions<AcquisitionWorkerProcessorSettings> _settings;
 
     public AcquisitionProcessingJobTests(DataAcquisitionIntegrationTestFixture fixture)
     {
         _fixture = fixture;
+        _settings = Options.Create(new AcquisitionWorkerProcessorSettings());
     }
 
     [Fact]
@@ -70,7 +74,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ResourceAcquired>>();
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer);
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
 
         var jobContextMock = new Mock<IJobExecutionContext>();
         jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
@@ -127,7 +131,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer);
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
 
         var jobContextMock = new Mock<IJobExecutionContext>();
         jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
@@ -193,7 +197,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer);
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
 
         var jobContextMock = new Mock<IJobExecutionContext>();
         jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
@@ -278,7 +282,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer);
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
 
         var jobContextMock = new Mock<IJobExecutionContext>();
         jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
@@ -370,7 +374,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer);
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
 
         var jobContextMock = new Mock<IJobExecutionContext>();
         jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
@@ -451,7 +455,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer);
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
 
         var jobContextMock = new Mock<IJobExecutionContext>();
         jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
@@ -584,7 +588,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer);
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
 
         var jobContextMock = new Mock<IJobExecutionContext>();
         jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
@@ -670,7 +674,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer);
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
 
         var jobContextMock = new Mock<IJobExecutionContext>();
         jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
@@ -751,7 +755,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer);
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
 
         var jobContextMock = new Mock<IJobExecutionContext>();
         jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
@@ -830,7 +834,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer);
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
 
         var jobContextMock = new Mock<IJobExecutionContext>();
         jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
@@ -905,7 +909,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer);
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
 
         var jobContextMock = new Mock<IJobExecutionContext>();
         jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);

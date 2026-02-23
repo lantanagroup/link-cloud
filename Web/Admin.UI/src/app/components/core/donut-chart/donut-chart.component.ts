@@ -1,5 +1,15 @@
-
-import { AfterViewInit, Component, ElementRef, Input, OnChanges, OnDestroy, SimpleChanges, ViewChild } from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  EventEmitter,
+  Input,
+  OnChanges,
+  OnDestroy,
+  Output,
+  SimpleChanges,
+  ViewChild
+} from '@angular/core';
 import * as d3 from 'd3';
 
 @Component({
@@ -8,12 +18,14 @@ import * as d3 from 'd3';
   templateUrl: './donut-chart.component.html',
   styleUrl: './donut-chart.component.scss'
 })
-export class DonutChartComponent implements AfterViewInit, OnChanges, OnDestroy { 
+export class DonutChartComponent implements AfterViewInit, OnChanges, OnDestroy {
 
   @Input() data: Record<string, number> = {};
+  @Input() enableSelection: boolean = false;
+  @Output() sliceSelected = new EventEmitter<string>();
   @ViewChild('container', { static: true }) container!: ElementRef;
   @ViewChild('chart', { static: true }) chart!: ElementRef<SVGSVGElement>;
-  
+
   private resizeObserver!: ResizeObserver;
 
   ngAfterViewInit(): void {
@@ -32,7 +44,7 @@ export class DonutChartComponent implements AfterViewInit, OnChanges, OnDestroy 
       this.renderChart(rect.width, rect.height);
     }
   }
-  
+
   private renderChart(width: number, height: number): void {
     const svg = d3.select(this.chart.nativeElement);
     svg.selectAll('*').remove(); // clear chart
@@ -63,7 +75,13 @@ export class DonutChartComponent implements AfterViewInit, OnChanges, OnDestroy 
       .attr('d', arc)
       .attr('fill', d => color(d.data[0]))
       .attr('stroke', 'white')
-      .attr('stroke-width', 2);
+      .attr('stroke-width', 2)
+      .style('cursor', this.enableSelection ? 'pointer' : 'default')
+      .on('click', (_event, d) => {
+        if (this.enableSelection) {
+          this.sliceSelected.emit(d.data[0]);
+        }
+      });
 
     const labelArc = d3.arc<d3.PieArcDatum<[string, number]>>()
       .innerRadius((radius + innerRadius) / 2)

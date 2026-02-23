@@ -1,0 +1,56 @@
+.query-edit-form {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+
+  mat-form-field {
+    flex: 1;
+    min-width: 200px;
+  }
+}
+
+.parameters-section {
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 16px;
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+
+    h3 {
+      margin: 0;
+    }
+  }
+}
+
+.parameter-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+
+  mat-form-field {
+    flex: 1;
+    min-width: 150px;
+  }
+
+  .small-field {
+    flex: 0 0 120px;
+    min-width: 120px;
+  }
+
+  button {
+    margin-top: 8px;
+  }
+}

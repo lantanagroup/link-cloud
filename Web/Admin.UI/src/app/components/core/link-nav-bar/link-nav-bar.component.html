@@ -2,15 +2,20 @@
   <ul class="subnav-menu">
     @for (item of subnavItems; track item) {
       <li class="subnav-item" [class.dropdown]="item.children"
-        [class.active]="item.children && isChildRouteActive(item.children)">
-        <!-- Top-level item -->
-        @if (!item.children) {
-          <a [routerLink]="[item.path!]" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+        [class.active]="(item.path && isRouteActive(item.path)) || (item.children && isChildRouteActive(item.children))">
+        <!-- Top-level item with path -->
+        @if (item.path) {
+          <a [routerLink]="[item.path]" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
             {{ item.label }}
+            @if (item.children) {
+              <div class="dropdown-icon">
+                <vd-icon filePath="../../../assets/icons/chevron-default.svg"></vd-icon>
+              </div>
+            }
           </a>
         }
-        <!-- Dropdown item -->
-        @if (item.children) {
+        <!-- Dropdown toggle without path -->
+        @if (!item.path && item.children) {
           <a role="button"
             tabindex="0"
             [attr.aria-haspopup]="true"
@@ -20,6 +25,8 @@
               <vd-icon filePath="../../../assets/icons/chevron-default.svg"></vd-icon>
             </div>
           </a>
+        }
+        @if (item.children) {
           <ul class="dropdown-menu">
             @for (child of item.children; track child) {
               <li>

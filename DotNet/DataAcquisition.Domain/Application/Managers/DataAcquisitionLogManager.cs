@@ -15,6 +15,8 @@ public interface IDataAcquisitionLogManager
 {
     Task<DataAcquisitionLogModel> CreateAsync(CreateDataAcquisitionLogModel log, CancellationToken cancellationToken = default);
     Task<DataAcquisitionLogModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default);
+    Task UpdateBatchAsync(IEnumerable<DataAcquisitionLog> logs, CancellationToken cancellationToken = default);
+    Task<List<DataAcquisitionLog>> GetLogsByIdsAsync(List<long> ids, CancellationToken cancellationToken = default);
     Task DeleteAsync(long id, CancellationToken cancellationToken = default);
     Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(List<long> logIds, string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default);
     Task ThrottleFacilityAcquisitions(string facilityId, DateTime executionDate, CancellationToken cancellationToken = default);
@@ -175,10 +177,26 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         }
 
         existingLog.ModifyDate = DateTime.UtcNow;
-
+        _database.DataAcquisitionLogRepository.Update(existingLog);
         await _database.DataAcquisitionLogRepository.SaveChangesAsync(cancellationToken);
 
         return DataAcquisitionLogModel.FromDomain(existingLog);
+    }
+
+    public async Task<List<DataAcquisitionLog>> GetLogsByIdsAsync(List<long> ids, CancellationToken cancellationToken = default)
+    {
+        return await _database.DataAcquisitionLogRepository.FindAsync(x => ids.Contains(x.Id), cancellationToken);
+    }
+
+    public async Task UpdateBatchAsync(IEnumerable<DataAcquisitionLog> logs, CancellationToken cancellationToken = default)
+    {
+        using var activity = Activity.Current?.Source.StartActivity();
+        foreach (var log in logs)
+        {
+            log.ModifyDate = DateTime.UtcNow;
+            _database.DataAcquisitionLogRepository.Update(log);
+        }
+        await _database.DataAcquisitionLogRepository.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<List<DataAcquisitionLog>> GetPendingRequests(CancellationToken cancellationToken = default)
@@ -189,21 +207,27 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(List<long> logIds, string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default)
     {
-        foreach (var logId in logIds)
+        if (logIds == null || logIds.Count == 0) return;
+
+        // Use ExecuteUpdateAsync for a high-performance batch update if available on the repository/context
+        // Since we are using a generic repository, we might need to fall back to a manual query or range update
+        
+        var logs = await _database.DataAcquisitionLogRepository.FindAsync(x => logIds.Contains(x.Id), cancellationToken);
+
+        if (logs.Count == 0)
         {
-            var entity = await _database.DataAcquisitionLogRepository.GetAsync(logId);
-
-            if (entity == null)
-            {
-                throw new NotFoundException($"Data acquisition log with ID {logId} not found.");
-            }
-
+            throw new NotFoundException($"Data acquisition logs with IDs {string.Join(", ", logIds)} not found.");
+        }
+        
+        foreach (var entity in logs)
+        {
             entity.TailSent = true;
             entity.ModifyDate = DateTime.UtcNow;
             entity.Notes ??= new();
             entity.Notes.Add("Tail Message Sent");
-            await _database.DataAcquisitionLogRepository.SaveChangesAsync();
         }
+        
+        await _database.DataAcquisitionLogRepository.SaveChangesAsync(cancellationToken);
     }
 
     public async Task ThrottleFacilityAcquisitions(string facilityId, DateTime executionDate, CancellationToken cancellationToken = default)
@@ -226,7 +250,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                 log.ExecutionDate = executionDate;
             }
 
-            await _database.DataAcquisitionLogRepository.SaveChangesAsync();
+            await _database.DataAcquisitionLogRepository.SaveChangesAsync(cancellationToken);
 
             lastId = toThrottle.Max(l => l.Id);
         }

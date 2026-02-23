@@ -39,7 +39,7 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
         /// <summary>
         /// Default allowed methods
         /// </summary>
-        public string[] DefaultAllowedMethods { get; } = ["GET", "POST", "PUT", "DELETE", "OPTIONS"];
+        public string[] DefaultAllowedMethods { get; } = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"];
 
         /// <summary>
         /// Default allowed exposed headers
