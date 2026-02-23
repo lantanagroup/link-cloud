@@ -1,10 +1,10 @@
-import { Component, OnInit } from '@angular/core';
-import { MonitorService } from '../monitor.service';
-import { MatTableDataSource, MatTableModule } from '@angular/material/table';
-import { ILinkServiceHealthSummary } from './link-service-health-summary.interface';
-import { MatToolbarModule } from '@angular/material/toolbar';
-import { CommonModule } from '@angular/common';
-import { MatIconModule } from '@angular/material/icon';
+import {Component, OnInit} from '@angular/core';
+import {MonitorService} from '../monitor.service';
+import {MatTableDataSource, MatTableModule} from '@angular/material/table';
+import {ILinkServiceHealthSummary} from './link-service-health-summary.interface';
+import {MatToolbarModule} from '@angular/material/toolbar';
+import {CommonModule} from '@angular/common';
+import {MatIconModule} from '@angular/material/icon';
 import {IServiceInfoModel, ServiceInfoService} from "../service-info.service";
 
 @Component({
@@ -58,9 +58,14 @@ export class LinkHealthCheckComponent implements OnInit {
   getServiceInfos(): void {
     this.serviceInfoService.getServiceInfos().subscribe({
       next: (response: IServiceInfoModel[]) => {
-        this.serviceInfos = response.sort((a, b) =>
-          a.serviceName.localeCompare(b.serviceName)
-        );
+        this.serviceInfos = response.map(s => ({
+          ...s,
+          serviceName: s.serviceName ?? 'Unknown'
+        })).sort((a, b) => {
+          if (a.serviceName === 'Unknown' && b.serviceName !== 'Unknown') return 1;
+          if (a.serviceName !== 'Unknown' && b.serviceName === 'Unknown') return -1;
+          return a.serviceName.localeCompare(b.serviceName);
+        });
         this.serviceInfosDataSource.data = this.serviceInfos;
       },
       error: (error) => {

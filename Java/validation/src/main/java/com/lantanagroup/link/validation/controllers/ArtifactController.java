@@ -104,6 +104,11 @@ public class ArtifactController {
     @Operation(summary = "Creates or updates an artifact")
     @PutMapping("/{type}/{name}")
     public void saveArtifact(@PathVariable ArtifactType type, @PathVariable String name, @RequestBody byte[] content) {
+        try {
+            artifactService.validateArtifact(type, name, content);
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid artifact: " + e.getMessage(), e);
+        }
         artifactService.saveArtifact(type, name, content);
     }
 

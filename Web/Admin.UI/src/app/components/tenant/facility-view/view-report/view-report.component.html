@@ -201,7 +201,12 @@
           <!-- Patient ID Column -->
           <ng-container matColumnDef="id">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Patient ID</th>
-            <td mat-cell *matCellDef="let element">{{element.patientId}}</td>
+            <td mat-cell *matCellDef="let element">
+              {{element.patientId}}
+              <a [routerLink]="['/tenant/acquisition-log']" [queryParams]="{ reportId: reportId, patientId: element.patientId }" matTooltip="View Acquisition Logs" class="patient-log-link">
+                <fa-icon [icon]="faFileLines"></fa-icon>
+              </a>
+            </td>
           </ng-container>
 
           <!-- Measure Column -->

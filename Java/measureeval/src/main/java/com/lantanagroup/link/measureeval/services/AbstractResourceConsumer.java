@@ -230,7 +230,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                         measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(patientStatus, report, measureReport, null, null);
                     }
                 }
-                case SUPPLEMENTAL -> blobStorageService.storePatientInBlobStorage(patientStatus, measureReport);
+                case SUPPLEMENTAL -> blobStorageService.storePatientInBlobStorage(patientStatus, report, measureReport);
                 default -> throw new IllegalStateException(String.format("Unexpected query type: %s", value.getQueryType()));
             }
         }
