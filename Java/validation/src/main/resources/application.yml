@@ -104,6 +104,7 @@ authentication:
   authority: 'https://localhost:7004'
 
 link:
+  info-route: /api/validation/info
   terminology-service-url: ''
   report:
     base-url: http://localhost:5110
