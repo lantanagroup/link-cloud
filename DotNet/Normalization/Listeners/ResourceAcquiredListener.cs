@@ -295,7 +295,7 @@ public class ResourceAcquiredListener : BackgroundService
         }
         catch (ProduceException<string, ResourceNormalizedMessage> ex)
         {
-            _logger.LogError(ex, "Failed to produce ResourceNormalized message. FacilityId: {FacilityId}, CorrelationId: {CorrelationId}, FhirResourceType: {fhirResourceType}, ResourceId: {resourceId}", facilityId, correlationId, resource.TypeName, resource.Id);
+            _logger.LogError(ex, "Failed to produce ResourceNormalized message. FacilityId: {FacilityId}, CorrelationId: {CorrelationId}, FhirResourceType: {fhirResourceType}, ResourceId: {resourceId}", facilityId, correlationId, resource?.TypeName, resource?.Id);
             throw new TransientException($"Failed to produce ResourceNormalized message: {ex.Message}", ex);
         }
     }

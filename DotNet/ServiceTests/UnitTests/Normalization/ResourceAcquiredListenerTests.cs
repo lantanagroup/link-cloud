@@ -121,4 +121,72 @@ public class ResourceAcquiredListenerTests
                 It.IsAny<Func<It.IsAnyType, Exception, string>>()),
             Times.Once);
     }
+
+    [Fact]
+    public async Task ProduceResourceNormalizedMessage_ShouldThrowTransientException_WhenProduceExceptionOccursAndResourceIsNull()
+    {
+        // Arrange
+        var listener = new ResourceAcquiredListener(
+            _loggerMock.Object,
+            _serviceInformationMock.Object,
+            _scopeFactoryMock.Object,
+            _consumerFactoryMock.Object,
+            _consumeExceptionHandlerMock.Object,
+            _deadLetterExceptionHandlerMock.Object,
+            _transientExceptionHandlerMock.Object,
+            _metricsMock.Object,
+            _producerMock.Object,
+            _copyPropertyOperationServiceMock.Object,
+            _codeMapOperationServiceMock.Object,
+            _conditionalTransformOperationServiceMock.Object,
+            _copyLocationOperationServiceMock.Object);
+
+        var facilityId = "TestFacility";
+        var correlationId = "TestCorrelationId";
+        DomainResource resource = null; // This is the case we want to test
+        var messageValueNull = new ResourceAcquiredMessage
+        {
+            PatientId = "TestPatient",
+            QueryType = "TestQuery",
+            ScheduledReports = new List<ScheduledReport> { new ScheduledReport { ReportTypes = new List<string> { "TestReport" } } },
+            ReportableEvent = "TestEvent",
+            AcquisitionComplete = true // Typical for null resource
+        };
+
+        var consumeResultNull = new ConsumeResult<string, ResourceAcquiredMessage>
+        {
+            Message = new Message<string, ResourceAcquiredMessage>
+            {
+                Key = facilityId,
+                Value = messageValueNull
+            }
+        };
+
+        var produceExceptionNull = new ProduceException<string, ResourceNormalizedMessage>(
+            new Error(ErrorCode.Local_Application, "Test Kafka Error"),
+            new DeliveryResult<string, ResourceNormalizedMessage>());
+
+        _producerMock
+            .Setup(p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<string, ResourceNormalizedMessage>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(produceExceptionNull);
+
+        // Act & Assert
+        var methodInfo = typeof(ResourceAcquiredListener).GetMethod("ProduceResourceNormalizedMessage", BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.NotNull(methodInfo);
+
+        var task = (Task)methodInfo.Invoke(listener, new object[] { consumeResultNull, facilityId, correlationId, resource });
+        
+        var exception = await Assert.ThrowsAsync<TransientException>(() => task);
+        Assert.Contains("Failed to produce ResourceNormalized message", exception.Message);
+        Assert.Same(produceExceptionNull, exception.InnerException);
+
+        _loggerMock.Verify(
+            x => x.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("Failed to produce ResourceNormalized message")),
+                produceExceptionNull,
+                It.IsAny<Func<It.IsAnyType, Exception, string>>()),
+            Times.Once);
+    }
 }
