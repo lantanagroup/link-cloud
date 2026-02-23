@@ -80,6 +80,7 @@ spring:
       retry-backoff-ms: 3000
 
 link:
+  info-route: /api/measureeval/info
   reportability-predicate: com.lantanagroup.link.measureeval.reportability.IsInInitialPopulation
   cql-debug: false
 
