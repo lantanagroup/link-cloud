@@ -125,17 +125,24 @@ namespace LantanaGroup.Link.Census.Listeners
                 throw new DeadLetterException($"{ClassName}: CernerPatientsAcquired event value segment missing");
             }
 
+            _logger.LogDebug("Consuming Event (Facility = {FacilityId})", result.Message.Key);
+
             using var scope = _scopeFactory.CreateScope();
             var cernerListService = scope.ServiceProvider.GetRequiredService<ICernerListService>();
 
             var dischargeEvents = await cernerListService.ProcessDischarges(result.Message.Key, result.Message.Value, cancellationToken);
 
-            if (dischargeEvents.Count() > 0) 
+            if (dischargeEvents != null) 
             {
                 await _eventProducerService.ProduceEventsAsync(result.Message.Key, dischargeEvents, cancellationToken);
             }
 
-            await cernerListService.ProcessAdmits(result.Message.Key, result.Message.Value, cancellationToken);
+            var processedEvents = await cernerListService.ProcessAdmits(result.Message.Key, result.Message.Value, cancellationToken);
+
+            if (processedEvents != null)
+            {
+                await _eventProducerService.ProduceEventsAsync(result.Message.Key, processedEvents, cancellationToken);
+            }
         }
     }
 }
