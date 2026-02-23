@@ -5,6 +5,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
@@ -48,7 +49,8 @@ public class QueryPlanManager : IQueryPlanManager
 
         // Remove carriage return and line feed characters that can break log structure.
         return value.Replace("\r", string.Empty)
-                    .Replace("\n", string.Empty);
+                    .Replace("\n", string.Empty)
+                    .SanitizeUntrustedString();
     }
 
     /// <summary>
