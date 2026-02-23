@@ -34,7 +34,7 @@ public class OrganizationLocationConfigurationQueries : IOrganizationLocationCon
                 ConfigId = c.ConfigId,
                 FacilityId = c.FacilityId,
                 Description = c.Description,
-                IsActive = c.IsActive ?? false,
+                IsActive = c.IsActive,
                 CreatedOn = c.CreatedOn ?? DateTime.UtcNow,
                 ModifiedOn = c.ModifiedOn ?? DateTime.UtcNow,
                 Conditions = c.LocationConditions.Select(cond => new OrganizationLocationConditionModel
@@ -58,7 +58,7 @@ public class OrganizationLocationConfigurationQueries : IOrganizationLocationCon
                 ConfigId = c.ConfigId,
                 FacilityId = c.FacilityId,
                 Description = c.Description,
-                IsActive = c.IsActive ?? false,
+                IsActive = c.IsActive,
                 CreatedOn = c.CreatedOn ?? DateTime.UtcNow,
                 ModifiedOn = c.ModifiedOn ?? DateTime.UtcNow,
                 Conditions = c.LocationConditions.Select(cond => new OrganizationLocationConditionModel
@@ -104,7 +104,7 @@ public class OrganizationLocationConfigurationQueries : IOrganizationLocationCon
                 ConfigId = c.ConfigId,
                 FacilityId = c.FacilityId,
                 Description = c.Description,
-                IsActive = c.IsActive ?? false,
+                IsActive = c.IsActive,
                 CreatedOn = c.CreatedOn ?? DateTime.UtcNow,
                 ModifiedOn = c.ModifiedOn ?? DateTime.UtcNow,
                 Conditions = c.LocationConditions.Select(cond => new OrganizationLocationConditionModel

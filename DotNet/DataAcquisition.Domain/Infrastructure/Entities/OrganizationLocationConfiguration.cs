@@ -23,7 +23,7 @@ public partial class OrganizationLocationConfiguration
     [StringLength(500)]
     public string Description { get; set; }
 
-    public bool? IsActive { get; set; }
+    public bool IsActive { get; set; }
 
     [Column(TypeName = "datetime")]
     public DateTime? CreatedOn { get; set; }

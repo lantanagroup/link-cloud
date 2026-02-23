@@ -154,7 +154,7 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
             ConfigId = entity.ConfigId,
             FacilityId = entity.FacilityId,
             Description = entity.Description,
-            IsActive = entity.IsActive ?? false,
+            IsActive = entity.IsActive,
             CreatedOn = entity.CreatedOn ?? DateTime.UtcNow,
             ModifiedOn = entity.ModifiedOn ?? DateTime.UtcNow,
             Conditions = entity.LocationConditions.Select(c => new OrganizationLocationConditionModel

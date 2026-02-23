@@ -884,10 +884,10 @@ namespace DataAcquisition.Domain.Migrations
                     .HasMaxLength(255)
                     .HasColumnType("nvarchar(255)");
 
-                b.Property<bool?>("IsActive")
+                b.Property<bool>("IsActive")
                     .ValueGeneratedOnAdd()
                     .HasColumnType("bit")
-                    .HasDefaultValue(true);
+                    .HasDefaultValue(false);
 
                 b.Property<DateTime?>("ModifiedOn")
                     .ValueGeneratedOnAdd()
