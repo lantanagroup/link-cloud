@@ -41,12 +41,12 @@ public class SecurityHelper {
         return http.build();
     }
 */
-  public static SecurityFilterChain build(HttpSecurity http, JwtAuthenticationEntryPoint point, JwtAuthenticationFilter authFilter) throws Exception {
+  public static SecurityFilterChain build(HttpSecurity http, JwtAuthenticationEntryPoint point, JwtAuthenticationFilter authFilter, String infoRoute) throws Exception {
     http.csrf(AbstractHttpConfigurer::disable).addFilterBefore(authFilter, UsernamePasswordAuthenticationFilter.class)
             .authorizeRequests().
             requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
             .requestMatchers(HttpMethod.GET, "/health").permitAll()
-            .requestMatchers(HttpMethod.GET, "/info").permitAll()
+            .requestMatchers(HttpMethod.GET, infoRoute).permitAll()
             .requestMatchers(HttpMethod.GET, "/v3/api-docs/**").permitAll()
             .requestMatchers(HttpMethod.GET, "/swagger-ui.html").permitAll()
             .requestMatchers(HttpMethod.GET, "/swagger-ui/**").permitAll()
