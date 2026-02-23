@@ -200,17 +200,9 @@ public class DataAcquisitionDbContext : DbContext
                     nameof(DataAcquisitionLog.ScheduledReport)
                 );
 
-            entity.HasIndex(e => new { e.ReportTrackingId, e.ExecutionDate, e.Id })
-                .HasDatabaseName("IX_DataAcquisitionLogs_ReportTrackingId_ExecutionDate_Id")
-                .IncludeProperties(
-                    nameof(DataAcquisitionLog.FacilityId),
-                    nameof(DataAcquisitionLog.Priority),
-                    nameof(DataAcquisitionLog.PatientId),
-                    nameof(DataAcquisitionLog.FhirVersion),
-                    nameof(DataAcquisitionLog.QueryType),
-                    nameof(DataAcquisitionLog.QueryPhase),
-                    nameof(DataAcquisitionLog.Status)
-                );
+            entity.HasIndex(e => new { e.TailSent, e.FacilityId, e.ReportTrackingId, e.CorrelationId, e.ReportStartDate, e.ReportEndDate, e.QueryPhase })
+                .HasDatabaseName("IX_DataAcquisitionLogs_Tailing_Optimization")
+                .HasFilter("[TailSent] = 0 AND [ReportTrackingId] IS NOT NULL AND [CorrelationId] IS NOT NULL AND [ReportStartDate] IS NOT NULL AND [ReportEndDate] IS NOT NULL");
         });
 
         //-------------------ResourceReferenceType-------------------

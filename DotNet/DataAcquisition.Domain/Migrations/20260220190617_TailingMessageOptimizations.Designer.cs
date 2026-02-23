@@ -4,6 +4,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,13 +12,15 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DataAcquisition.Domain.Migrations
 {
     [DbContext(typeof(DataAcquisitionDbContext))]
-    partial class DataAcquisitionDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260220190617_TailingMessageOptimizations")]
+    partial class TailingMessageOptimizations
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.24")
+                .HasAnnotation("ProductVersion", "8.0.23")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -671,11 +674,6 @@ namespace DataAcquisition.Domain.Migrations
                         .HasDatabaseName("IX_DataAcquisitionLogs_Tailing_Optimization")
                         .HasFilter("[TailSent] = 0 AND [ReportTrackingId] IS NOT NULL AND [CorrelationId] IS NOT NULL AND [ReportStartDate] IS NOT NULL AND [ReportEndDate] IS NOT NULL");
 
-                    b.HasIndex("FacilityId", "Status", "ExecutionDate", "Id")
-                        .HasDatabaseName("IX_DataAcquisitionLogs_Facility_Status_ExecutionDate_Id");
-
-                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("FacilityId", "Status", "ExecutionDate", "Id"), new[] { "Priority", "IsCensus", "PatientId", "ReportableEvent", "ReportTrackingId", "CorrelationId", "FhirVersion", "QueryType", "QueryPhase", "TraceId", "RetryAttempts", "CompletionDate", "CompletionTimeMilliseconds", "ResourceAcquiredIds", "Notes", "ScheduledReport" });
-
                     b.ToTable("DataAcquisitionLog");
                 });
 
@@ -826,85 +824,6 @@ namespace DataAcquisition.Domain.Migrations
 
                     b.ToTable("FhirQueryResourceType");
                 });
-
-            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.OrganizationLocationCondition", b =>
-            {
-                b.Property<int>("ConditionId")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("int");
-
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ConditionId"));
-
-                b.Property<int>("ConfigId")
-                    .HasColumnType("int");
-
-                b.Property<DateTime?>("CreatedOn")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("datetime")
-                    .HasDefaultValueSql("(getutcdate())");
-
-                b.Property<string>("FhirPath")
-                    .IsRequired()
-                    .HasMaxLength(500)
-                    .HasColumnType("nvarchar(500)");
-
-                b.Property<int?>("Priority")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("int")
-                    .HasDefaultValue(1);
-
-                b.Property<DateTime?>("ModifiedOn")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("datetime")
-                    .HasDefaultValueSql("(getutcdate())");
-
-                b.HasKey("ConditionId")
-                    .HasName("PK_LocationCondition_ConditionId");
-
-                b.HasIndex(new[] { "ConfigId" }, "IX_LocationConditions_ConfigId");
-
-                b.ToTable("OrganizationLocationCondition");
-            });
-
-            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.OrganizationLocationConfiguration", b =>
-            {
-                b.Property<int>("ConfigId")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("int");
-
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ConfigId"));
-
-                b.Property<DateTime?>("CreatedOn")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("datetime")
-                    .HasDefaultValueSql("(getutcdate())");
-
-                b.Property<string>("Description")
-                    .HasMaxLength(500)
-                    .HasColumnType("nvarchar(500)");
-
-                b.Property<string>("FacilityId")               
-                    .IsRequired()
-                    .HasMaxLength(255)
-                    .HasColumnType("nvarchar(255)");
-
-                b.Property<bool>("IsActive")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("bit")
-                    .HasDefaultValue(false);
-
-                b.Property<DateTime?>("ModifiedOn")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("datetime")
-                    .HasDefaultValueSql("(getutcdate())");
-
-                b.HasKey("ConfigId")
-                    .HasName("PK_LocationConfiguration_ConfigId");
-
-                b.HasIndex(new[] { "FacilityId" }, "IX_LocationConfigurations_FacilityId");
-
-                b.ToTable("OrganizationLocationConfiguration");
-            });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.QueryPlan", b =>
                 {
@@ -1107,17 +1026,6 @@ namespace DataAcquisition.Domain.Migrations
                     b.Navigation("FhirQuery");
                 });
 
-            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.OrganizationLocationCondition", b =>
-                {
-                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.OrganizationLocationConfiguration", "Config")
-                        .WithMany("LocationConditions")
-                        .HasForeignKey("ConfigId")
-                        .IsRequired()
-                        .HasConstraintName("FK_LocationCondition_ConfigId");
-
-                    b.Navigation("Config");
-                });
-
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.ReferenceResources", b =>
                 {
                     b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog", "DataAcquisitionLog")
@@ -1165,11 +1073,6 @@ namespace DataAcquisition.Domain.Migrations
                     b.Navigation("FhirQueryResourceTypes");
 
                     b.Navigation("ResourceReferenceTypes");
-                });
-
-            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.OrganizationLocationConfiguration", b =>
-                {
-                    b.Navigation("LocationConditions");
                 });
 #pragma warning restore 612, 618
         }
