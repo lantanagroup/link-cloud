@@ -11,10 +11,9 @@ parameters:
   displayName: Select the Kafka Topics environment to update?
   type: string
   values:
-    # - DEV
-    # - TEST
-    # - QA
-    - DEVOPS
+    - DEV
+    - TEST
+    - QA
 
 variables:
 - group: kafka_topics # variable group `kafka_topics`
@@ -31,8 +30,6 @@ variables:
     value:  '$(test-rest-url)'
   ${{ if eq(parameters.environment, 'QA') }}:
     value:  '$(qa-rest-url)'
-  ${{ if eq(parameters.environment, 'DEVOPS') }}:
-    value:  '$(devops-rest-url)'
 
 stages:
 - stage: Sync_Kafka_Topics_${{ parameters.environment }}
