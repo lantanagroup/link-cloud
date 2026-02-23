@@ -19,10 +19,9 @@ public partial class OrganizationLocationCondition
     public int ConfigId { get; set; }
 
     [Required]
-    [StringLength(500)]
     public string FhirPath { get; set; }
 
-    public int? Priority { get; set; }
+    public int Priority { get; set; } = 1;
 
     [Column(TypeName = "datetime")]
     public DateTime? CreatedOn { get; set; }

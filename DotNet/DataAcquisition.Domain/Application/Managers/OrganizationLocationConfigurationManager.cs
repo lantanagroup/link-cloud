@@ -161,7 +161,7 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
             {
                 ConditionId = c.ConditionId,
                 FhirPath = c.FhirPath,
-                Priority = c.Priority ?? 1,
+                Priority = c.Priority,
                 CreatedOn = c.CreatedOn ?? DateTime.UtcNow,
                 ModifiedOn = c.ModifiedOn ?? DateTime.UtcNow
             }).ToList()

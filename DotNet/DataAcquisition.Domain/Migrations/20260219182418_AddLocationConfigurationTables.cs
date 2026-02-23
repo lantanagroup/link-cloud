@@ -34,8 +34,8 @@ namespace DataAcquisition.Domain.Migrations
                     ConditionId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     ConfigId = table.Column<int>(type: "int", nullable: false),
-                    FhirPath = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
-                    Priority = table.Column<int>(type: "int", nullable: true, defaultValue: 1),
+                    FhirPath = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Priority = table.Column<int>(type: "int", nullable: false, defaultValue: 1),
                     CreatedOn = table.Column<DateTime>(type: "datetime", nullable: true, defaultValueSql: "(getutcdate())"),
                     ModifiedOn = table.Column<DateTime>(type: "datetime", nullable: true, defaultValueSql: "(getutcdate())")
                 },

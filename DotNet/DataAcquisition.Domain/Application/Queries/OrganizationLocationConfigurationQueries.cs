@@ -41,7 +41,7 @@ public class OrganizationLocationConfigurationQueries : IOrganizationLocationCon
                 {
                     ConditionId = cond.ConditionId,
                     FhirPath = cond.FhirPath,
-                    Priority = cond.Priority ?? 1,
+                    Priority = cond.Priority,
                     CreatedOn = cond.CreatedOn ?? DateTime.UtcNow,
                     ModifiedOn = cond.ModifiedOn ?? DateTime.UtcNow
                 }).ToList()
@@ -65,7 +65,7 @@ public class OrganizationLocationConfigurationQueries : IOrganizationLocationCon
                 {
                     ConditionId = cond.ConditionId,
                     FhirPath = cond.FhirPath,
-                    Priority = cond.Priority ?? 1,
+                    Priority = cond.Priority,
                     CreatedOn = cond.CreatedOn ?? DateTime.UtcNow,
                     ModifiedOn = cond.ModifiedOn ?? DateTime.UtcNow
                 }).ToList()
@@ -108,7 +108,7 @@ public class OrganizationLocationConfigurationQueries : IOrganizationLocationCon
                 {
                     ConditionId = cond.ConditionId,
                     FhirPath = cond.FhirPath,
-                    Priority = cond.Priority ?? 1,
+                    Priority = cond.Priority,
                     CreatedOn = cond.CreatedOn ?? DateTime.UtcNow,
                     ModifiedOn = cond.ModifiedOn ?? DateTime.UtcNow
                 }).ToList()
