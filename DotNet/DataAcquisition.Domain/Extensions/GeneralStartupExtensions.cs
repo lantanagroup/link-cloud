@@ -77,7 +77,7 @@ public static class GeneralStartupExtensions
         var connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
         builder.Services.RegisterQuartzDatabase(connectionString);
         
-        builder.Configuration.RegisterMonitoring(builder.Logging, builder.Services);
+        builder.Configuration.RegisterMonitoring(builder.Logging, builder.Services, serviceName);
         builder.Services.RegisterConfigs(builder.Configuration);
         builder.RegisterEntityFramework();
 
