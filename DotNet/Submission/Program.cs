@@ -1,3 +1,4 @@
+using System.Reflection;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
@@ -34,7 +35,6 @@ using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
 using Submission.Data;
-using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
@@ -141,7 +141,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddControllers();
 
     //Add Quartz scheduler with SQL persistence
-    builder.Services.RegisterQuartzDatabase(serviceInformation.ConnectionString);
+    string? connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
+    builder.Services.RegisterQuartzDatabase(connectionString);
 
     // Add hosted services
     builder.Services.AddHostedService<SubmitPayloadListener>();

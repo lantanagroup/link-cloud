@@ -1,13 +1,5 @@
 import {Component, EventEmitter, OnDestroy, OnInit, Output} from '@angular/core';
-import {
-  FormArray,
-  FormBuilder,
-  FormControl,
-  FormGroup,
-  FormsModule,
-  ReactiveFormsModule,
-  Validators
-} from '@angular/forms';
+import {FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators} from '@angular/forms';
 import {CommonModule} from "@angular/common";
 import {MatSnackBar, MatSnackBarModule} from "@angular/material/snack-bar";
 import {MatFormFieldModule} from "@angular/material/form-field";
@@ -21,9 +13,7 @@ import {MatIconModule} from "@angular/material/icon";
 import {MatExpansionModule} from "@angular/material/expansion";
 import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
 import {MatDatepickerModule} from "@angular/material/datepicker";
-import {
-  IAdHocReportRequest
-} from "../../../interfaces/tenant/facility-config-model.interface";
+import {IAdHocReportRequest} from "../../../interfaces/tenant/facility-config-model.interface";
 import {TenantService} from "../../../services/gateway/tenant/tenant.service";
 import {MeasureDefinitionService} from "../../../services/gateway/measure-definition/measure.service";
 import {
@@ -34,12 +24,12 @@ import {
   debounceTime,
   distinctUntilChanged,
   firstValueFrom,
-  forkJoin,
   map,
   Observable,
   of,
   startWith,
-  Subject, takeUntil,
+  Subject,
+  takeUntil,
   tap
 } from "rxjs";
 import {MatCheckboxModule} from "@angular/material/checkbox";
@@ -114,6 +104,7 @@ export class GenerateReportFormComponent implements OnInit, OnDestroy {
         updateOn: 'blur'
       }),
       bypassSubmission: [false],
+      reportingCadence: ['Custom'],
       startDate: ['', Validators.required],
       endDate: ['', Validators.required],
       reportTypes: ['', Validators.required],
@@ -136,6 +127,26 @@ export class GenerateReportFormComponent implements OnInit, OnDestroy {
       map(results => Object.entries(results || {}).map(([facilityId, facilityName]) => ({facilityId, facilityName}))),
       tap(facilities => (this.facilities = facilities))
     );
+
+    this.reportingCadenceControl.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(cadence => {
+      if (cadence === 'Daily') {
+        this.endDateControl.disable();
+        if (this.startDateControl.value) {
+          this.endDateControl.setValue(this.startDateControl.value);
+        }
+      } else if (cadence === 'Monthly') {
+        this.endDateControl.disable();
+      } else {
+        this.endDateControl.enable();
+      }
+    });
+
+    this.startDateControl.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(startDate => {
+      const cadence = this.reportingCadenceControl.value;
+      if (cadence === 'Daily') {
+        this.endDateControl.setValue(startDate);
+      }
+    });
 
     this.generateReportForm.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => {
       this.formValueChanged.emit(this.generateReportForm.invalid);
@@ -188,6 +199,10 @@ export class GenerateReportFormComponent implements OnInit, OnDestroy {
 
   get facilityInputControl(): FormControl {
     return this.generateReportForm.get('facilityInput') as FormControl;
+  }
+
+  get reportingCadenceControl(): FormControl {
+    return this.generateReportForm.get('reportingCadence') as FormControl;
   }
 
   get startDateControl(): FormControl {
@@ -251,7 +266,7 @@ export class GenerateReportFormComponent implements OnInit, OnDestroy {
             verticalPosition: 'top'
           });
           this.lastGeneratedReport = {facilityId: this.facilityIdControl.value, reportId: response.reportId};
-          this.resetForm();
+          this.router.navigate([`tenant/facility/${this.facilityIdControl.value}/report/${response.reportId}`]);
         },
         error: (err) => {
           // Display error message
@@ -289,6 +304,26 @@ export class GenerateReportFormComponent implements OnInit, OnDestroy {
 
   compareReportTypes(object1: any, object2: any) {
     return (object1 && object2) && object1 === object2;
+  }
+
+  chosenMonthHandler(normalizedMonth: Date, datepicker: any) {
+    if (this.reportingCadenceControl.value !== 'Monthly') {
+      return;
+    }
+    const ctrlValue = new Date();
+    ctrlValue.setFullYear(normalizedMonth.getFullYear());
+    ctrlValue.setMonth(normalizedMonth.getMonth());
+    ctrlValue.setDate(1);
+    ctrlValue.setHours(0, 0, 0, 0);
+    this.startDateControl.setValue(ctrlValue);
+
+    const endValue = new Date(ctrlValue);
+    endValue.setMonth(ctrlValue.getMonth() + 1);
+    endValue.setDate(0);
+    endValue.setHours(0, 0, 0, 0);
+    this.endDateControl.setValue(endValue);
+
+    datepicker.close();
   }
 
   // Add patient name to array

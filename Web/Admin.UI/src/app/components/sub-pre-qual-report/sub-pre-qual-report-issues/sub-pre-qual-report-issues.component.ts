@@ -1,23 +1,28 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import {Component, OnDestroy, OnInit} from '@angular/core';
 
-import { ActivatedRoute, RouterLink, RouterLinkActive } from '@angular/router';
-import { CommonModule } from '@angular/common';
-import { FacilityViewService } from '../../tenant/facility-view/facility-view.service';
-import { IValidationIssue, IValidationIssueCategorySummary, IReportListSummary, IValidationIssueCategory } from '../../tenant/facility-view/report-view.interface';
-import { SubPreQualReportIssuesTableComponent } from '../sub-pre-qual-report-issues-table/sub-pre-qual-report-issues-table.component';
-import { SubPreQualReportMetaComponent } from '../sub-pre-qual-report-meta/sub-pre-qual-report-meta.component';
-import { SubPreQualReportSummaryComponent } from '../sub-pre-qual-report-summary/sub-pre-qual-report-summary.component';
-import { Subscription } from 'rxjs';
-import { MatTabsModule } from '@angular/material/tabs';
-import { MatIconModule } from '@angular/material/icon';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import {ActivatedRoute, RouterLink, RouterLinkActive} from '@angular/router';
+import {CommonModule} from '@angular/common';
+import {FacilityViewService} from '../../tenant/facility-view/facility-view.service';
+import {
+  IReportListSummary,
+  IValidationIssue,
+  IValidationIssueCategory,
+  IValidationIssueCategorySummary
+} from '../../tenant/facility-view/report-view.interface';
+import {
+  SubPreQualReportIssuesTableComponent
+} from '../sub-pre-qual-report-issues-table/sub-pre-qual-report-issues-table.component';
+import {SubPreQualReportMetaComponent} from '../sub-pre-qual-report-meta/sub-pre-qual-report-meta.component';
+import {Subscription} from 'rxjs';
+import {MatTabsModule} from '@angular/material/tabs';
+import {MatIconModule} from '@angular/material/icon';
+import {MatProgressSpinnerModule} from '@angular/material/progress-spinner';
 
 @Component({
   selector: 'app-sub-pre-qual-report-issues',
   imports: [
     CommonModule,
     SubPreQualReportMetaComponent,
-    SubPreQualReportSummaryComponent,
     SubPreQualReportIssuesTableComponent,
     MatTabsModule,
     RouterLink,

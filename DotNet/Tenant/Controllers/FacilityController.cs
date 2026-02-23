@@ -383,7 +383,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             return NoContent();
         }
         
-        [HttpDelete("soft/{facilityId}")]
+        [HttpDelete("softDelete/{facilityId}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -410,10 +410,54 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 return Problem("An error occurred while soft deleting the facility", null, 500);
             }
 
-            using (ServiceActivitySource.Instance.StartActivity("Soft Delete Jobs for Facility"))
+            // Delete all scheduled jobs (Monthly, Weekly, Daily) for the soft-deleted facility
+            // Jobs will be recreated when the facility is restored via the restore endpoint
+            using (ServiceActivitySource.Instance.StartActivity("Delete Jobs for Facility"))
             {
-                // Optional: you might want to disable scheduled jobs instead of deleting
                 await _scheduleService.DeleteJobsForFacility(facilityId, cancellationToken: cancellationToken);
+            }
+
+            return NoContent();
+        }
+
+        /// <summary>
+        /// Restores a soft-deleted facility configuration.
+        /// </summary>
+        /// <param name="facilityId"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        [HttpPatch("restore/{facilityId}")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> RestoreFacility(string facilityId, CancellationToken cancellationToken)
+        {
+            facilityId = facilityId?.Sanitize();
+
+            var existingModel = await _facilityQueries.GetAsync(facilityId, null, cancellationToken, includeDeleted: true);
+            if (existingModel == null)
+                return BadRequest($"Facility with Id: {facilityId} Not Found");
+
+            try
+            {
+                await _facilityManager.RestoreAsync(facilityId, cancellationToken);
+            }
+            catch (ApplicationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Exception encountered in FacilityController.RestoreFacility");
+                return Problem("An error occurred while restoring the facility", null, 500);
+            }
+
+            // Re-create scheduled jobs for the restored facility
+            using (ServiceActivitySource.Instance.StartActivity("Restore Jobs for Facility"))
+            {
+                var facilityEntity = _mapperDtoToModel.Map<FacilityModel, Facility>(existingModel);
+                await _scheduleService.AddJobsForFacility(facilityEntity, cancellationToken);
             }
 
             return NoContent();
@@ -543,13 +587,9 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 var httpClient = _httpClient.CreateClient();
                 httpClient.Timeout = TimeSpan.FromSeconds(30);
 
-                var baseUrl = new Uri(_serviceRegistry.ReportServiceApiUrl.TrimEnd('/') + "/Report/Schedule");
+                var baseUrl = new Uri(_serviceRegistry.ReportServiceApiUrl.TrimEnd('/') + "/schedules");
 
-                var requestUrl = QueryHelpers.AddQueryString(baseUrl.ToString(), new Dictionary<string, string?>
-                { 
-                    ["facilityId"] = HtmlInputSanitizer.SanitizeAndRemove(facilityId),
-                    ["reportScheduleId"] = HtmlInputSanitizer.SanitizeAndRemove(request.ReportId) }
-                );
+                var requestUrl = $"{baseUrl}/{HtmlInputSanitizer.SanitizeAndRemove(request.ReportId)}";
 
                 if (!_linkBearerServiceOptions.Value.AllowAnonymous)
                 {

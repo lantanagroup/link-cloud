@@ -379,6 +379,164 @@ namespace UnitTests.Tenant
             _mockCreateSystemToken.Verify(t => t.ExecuteAsync("key", 2), Times.Once);
         }
 
+        #region SoftDelete Tests
+
+        [Fact]
+        public async Task SoftDeleteAsync_SuccessfulSoftDelete_SetsIsDeletedTrue()
+        {
+            var facilityId = "FacilityId";
+            var facility = CreateValidFacility();
+            facility.FacilityId = facilityId;
+            facility.IsDeleted = false;
+
+            _mockRepository.Setup(r => r.FirstOrDefaultAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Facility, bool>>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(facility);
+
+            _mockRepository.Setup(r => r.Update(It.IsAny<Facility>()));
+
+            _mockRepository.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
+
+            var result = await _facilityManager.SoftDeleteAsync(facilityId);
+
+            Assert.Equal(facilityId, result);
+            _mockRepository.Verify(r => r.Update(It.Is<Facility>(f => f.IsDeleted == true)), Times.Once);
+            _mockRepository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task SoftDeleteAsync_FacilityNotFound_ThrowsApplicationException()
+        {
+            var facilityId = "NonExistentFacility";
+
+            _mockRepository.Setup(r => r.FirstOrDefaultAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Facility, bool>>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((Facility)null);
+
+            var exception = await Assert.ThrowsAsync<ApplicationException>(() => _facilityManager.SoftDeleteAsync(facilityId));
+            Assert.Contains("Not Found", exception.Message);
+        }
+
+        [Fact]
+        public async Task SoftDeleteAsync_UpdatesModifyDate()
+        {
+            var facilityId = "FacilityId";
+            var facility = CreateValidFacility();
+            facility.FacilityId = facilityId;
+            var originalModifyDate = facility.ModifyDate;
+
+            _mockRepository.Setup(r => r.FirstOrDefaultAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Facility, bool>>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(facility);
+
+            _mockRepository.Setup(r => r.Update(It.IsAny<Facility>()));
+
+            _mockRepository.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
+
+            await _facilityManager.SoftDeleteAsync(facilityId);
+
+            _mockRepository.Verify(r => r.Update(It.Is<Facility>(f => f.ModifyDate > originalModifyDate || f.ModifyDate != null)), Times.Once);
+        }
+
+        #endregion
+
+        #region Restore Tests
+
+        [Fact]
+        public async Task RestoreAsync_SuccessfulRestore_SetsIsDeletedFalse()
+        {
+            var facilityId = "FacilityId";
+            var facility = CreateValidFacility();
+            facility.FacilityId = facilityId;
+            facility.IsDeleted = true;
+
+            _mockRepository.Setup(r => r.FirstOrDefaultAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Facility, bool>>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(facility);
+
+            _mockRepository.Setup(r => r.Update(It.IsAny<Facility>()));
+
+            _mockRepository.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
+
+            var result = await _facilityManager.RestoreAsync(facilityId);
+
+            Assert.Equal(facilityId, result);
+            _mockRepository.Verify(r => r.Update(It.Is<Facility>(f => f.IsDeleted == false)), Times.Once);
+            _mockRepository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task RestoreAsync_FacilityNotFound_ThrowsApplicationException()
+        {
+            var facilityId = "NonExistentFacility";
+
+            _mockRepository.Setup(r => r.FirstOrDefaultAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Facility, bool>>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((Facility)null);
+
+            var exception = await Assert.ThrowsAsync<ApplicationException>(() => _facilityManager.RestoreAsync(facilityId));
+            Assert.Contains("Not Found", exception.Message);
+        }
+
+        [Fact]
+        public async Task RestoreAsync_FacilityNotDeleted_ThrowsApplicationException()
+        {
+            var facilityId = "FacilityId";
+            var facility = CreateValidFacility();
+            facility.FacilityId = facilityId;
+            facility.IsDeleted = false;
+
+            _mockRepository.Setup(r => r.FirstOrDefaultAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Facility, bool>>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(facility);
+
+            var exception = await Assert.ThrowsAsync<ApplicationException>(() => _facilityManager.RestoreAsync(facilityId));
+            Assert.Contains("is not deleted", exception.Message);
+        }
+
+        [Fact]
+        public async Task RestoreAsync_UpdatesModifyDate()
+        {
+            var facilityId = "FacilityId";
+            var facility = CreateValidFacility();
+            facility.FacilityId = facilityId;
+            facility.IsDeleted = true;
+            var originalModifyDate = facility.ModifyDate;
+
+            _mockRepository.Setup(r => r.FirstOrDefaultAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Facility, bool>>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(facility);
+
+            _mockRepository.Setup(r => r.Update(It.IsAny<Facility>()));
+
+            _mockRepository.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
+
+            await _facilityManager.RestoreAsync(facilityId);
+
+            _mockRepository.Verify(r => r.Update(It.Is<Facility>(f => f.ModifyDate > originalModifyDate || f.ModifyDate != null)), Times.Once);
+        }
+
+        [Fact]
+        public async Task RestoreAsync_WithCancellationToken_PassesTokenToRepository()
+        {
+            var facilityId = "FacilityId";
+            var facility = CreateValidFacility();
+            facility.FacilityId = facilityId;
+            facility.IsDeleted = true;
+            var cancellationToken = new CancellationToken();
+
+            _mockRepository.Setup(r => r.FirstOrDefaultAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Facility, bool>>>(), cancellationToken))
+                .ReturnsAsync(facility);
+
+            _mockRepository.Setup(r => r.Update(It.IsAny<Facility>()));
+
+            _mockRepository.Setup(r => r.SaveChangesAsync(cancellationToken))
+                .Returns(Task.CompletedTask);
+
+            await _facilityManager.RestoreAsync(facilityId, cancellationToken);
+
+            _mockRepository.Verify(r => r.SaveChangesAsync(cancellationToken), Times.Once);
+        }
+
+        #endregion
+
         private static Facility CreateValidFacility(Guid? id = null)
         {
             return new Facility

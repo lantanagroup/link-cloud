@@ -2,9 +2,10 @@
 import io
 import json
 import os
-import requests
 import sys
 import zipfile
+
+import requests
 
 
 def tenant_exists(admin_bff_url, tenant_name, admin_bff_token=None):
@@ -434,6 +435,8 @@ def main():
     parser.add_argument('--skip-norm-ops', action='store_true', help='Skip creating normalization operations (default: false)')
     parser.add_argument('--skip-query-plan', action='store_true', help='Skip creating query plan (default: false)')
     parser.add_argument('--skip-query-config', action='store_true', help='Skip creating query config (default: false)')
+    parser.add_argument('--skip-measure-load', action='store_true',
+                        help='Skip loading measure definitions from GitHub (default: false)')
     parser.add_argument('--github-measure-repo', default=os.environ.get('GITHUB_MEASURE_REPO'),
                         help='GitHub repository in format owner/repo (e.g., account/repo) (default: GITHUB_MEASURE_REPO env var)')
     parser.add_argument('--github-measure-version', default=os.environ.get('GITHUB_MEASURE_VERSION'),
@@ -458,6 +461,7 @@ def main():
     print(f"GitHub measure repo: {args.github_measure_repo}")
     print(f"GitHub measure version: {args.github_measure_version}")
     print(f"GitHub PAT: {'***' if args.github_pat else 'Not provided'}")
+    print(f"Skip measure load: {args.skip_measure_load}")
     print("----------------------\n")
 
     admin_bff_url = args.admin_bff_base_url.rstrip('/')
@@ -470,7 +474,7 @@ def main():
     if not args.skip_init_categories:
         init_categories(admin_bff_url, admin_bff_token)
 
-    if args.github_measure_repo and args.github_measure_version:
+    if not args.skip_measure_load and args.github_measure_repo and args.github_measure_version:
         load_measure(admin_bff_url, args.github_measure_repo, args.github_measure_version, args.github_pat,
                      admin_bff_token)
 

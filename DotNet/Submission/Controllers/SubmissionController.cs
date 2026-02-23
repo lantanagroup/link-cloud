@@ -71,7 +71,7 @@ public class SubmissionController(
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
         
-        string reportUrl = $"{serviceRegistry.Value.ReportServiceApiUrl.TrimEnd('/')}/Report/summaries/{sanitizedFacilityId}?reportId={sanitizedReportId.SanitizeAndRemove()}";
+        string reportUrl = $"{serviceRegistry.Value.ReportServiceApiUrl.TrimEnd('/')}/schedules/{sanitizedReportId.SanitizeAndRemove()}";
         var reportResponse = await client.GetAsync(reportUrl);
 
         if (!reportResponse.IsSuccessStatusCode)

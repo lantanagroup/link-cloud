@@ -1,3 +1,4 @@
+using System.Net;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
@@ -12,7 +13,6 @@ using LantanaGroup.Link.Shared.Settings;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Net;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -72,7 +72,7 @@ public class LogController : Controller
             try
             {
                 var allowedSortBy = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                    { "ExecutionDate", "FacilityId", "PatientId", "QueryType", "QueryPhase", "Status", "Priority" };
+                    { "ExecutionDate", "CreateDate", "FacilityId", "PatientId", "QueryType", "QueryPhase", "Status", "Priority", "Id", "RetryAttempts" };
                 
                 if (!allowedSortBy.Contains(queryParameters.SortBy))
                 {
@@ -93,8 +93,9 @@ public class LogController : Controller
                         ResourceId = resourceId,
                         QueryPhase = queryParameters.QueryPhase,
                         QueryType = queryParameters.QueryType,
-                        RequestStatus = queryParameters.Status,
+                        RequestStatuses = queryParameters.Statuses,
                         AcquisitionPriority = queryParameters.Priority,
+                        ResourceType = queryParameters.ResourceType,
                         PageNumber = queryParameters.PageNumber,
                         PageSize = queryParameters.PageSize,
                         SortBy = queryParameters.SortBy,
@@ -309,6 +310,46 @@ public class LogController : Controller
     }
 
     /// <summary>
+    /// Get data acquisition log status counts for a report.
+    /// </summary>
+    /// <param name="reportId"></param>
+    /// <param name="patientId"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    [HttpGet("report/{reportId}/status-counts")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DataAcquisitionLogStatusStatistics))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<DataAcquisitionLogStatusStatistics>> GetReportStatusCounts(
+        [FromRoute] string reportId,
+        [FromQuery] string? patientId = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(reportId))
+        {
+            return BadRequest($"{nameof(reportId)} cannot be null or empty.");
+        }
+
+        reportId = HtmlInputSanitizer.Sanitize(reportId).SanitizeAndRemove();
+        patientId = string.IsNullOrWhiteSpace(patientId)
+            ? null
+            : HtmlInputSanitizer.Sanitize(patientId).SanitizeAndRemove();
+
+        try
+        {
+            var statistics = await _logQueries.GetDataAcquisitionLogStatusStatisticsByReportAsync(reportId, patientId, cancellationToken);
+
+            return Ok(statistics);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetReportStatusCounts"), ex, "An exception occurred while attempting to get report status counts with a report id of {id}", reportId.Sanitize());
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
     /// Update a data acquisition log entry.
     /// </summary>
     /// <remarks>
@@ -463,6 +504,102 @@ public class LogController : Controller
         catch (Exception ex)
         {
             _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "Process"), ex, "An Exception occurred while attempting to process a log with a id of {id}", id);
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Process multiple data acquisition log entries.
+    /// </summary>
+    /// <returns>
+    /// A response indicating the result of the processing.
+    /// </returns>
+    [HttpPost("process-bulk")]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> ProcessBulk([FromBody] List<long> ids, CancellationToken cancellationToken = default)
+    {
+        if (ids == null || !ids.Any())
+        {
+            return BadRequest("IDs cannot be null or empty.");
+        }
+
+        try
+        {
+            await _logService.StartRetrievalProcessBulk(ids, cancellationToken);
+
+            return Accepted();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "ProcessBulk"), ex, "An Exception occurred while attempting to process logs in bulk.");
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Process data acquisition log entries based on search criteria.
+    /// </summary>
+    /// <returns>
+    /// A response indicating the result of the processing.
+    /// </returns>
+    [HttpPost("process-by-filter")]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> ProcessByFilter([FromBody] LogSearchParameters queryParameters, CancellationToken cancellationToken = default)
+    {
+        if (queryParameters == null)
+        {
+            return BadRequest("Query parameters are required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(queryParameters.FacilityId) &&
+            string.IsNullOrWhiteSpace(queryParameters.PatientId) &&
+            string.IsNullOrWhiteSpace(queryParameters.ReportId) &&
+            string.IsNullOrWhiteSpace(queryParameters.ResourceId) &&
+            !queryParameters.QueryPhase.HasValue &&
+            !queryParameters.QueryType.HasValue &&
+            (queryParameters.Statuses == null || !queryParameters.Statuses.Any()) &&
+            !queryParameters.Priority.HasValue &&
+            string.IsNullOrWhiteSpace(queryParameters.ResourceType))
+        {
+            return BadRequest("At least one filter criteria must be provided.");
+        }
+
+        try
+        {
+            var facilityId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.FacilityId);
+            var patientId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.PatientId);
+            var reportId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ReportId);
+            var resourceId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ResourceId);
+
+            var result = await _logQueries.SearchAsync(
+                new SearchDataAcquisitionLogRequest
+                {
+                    FacilityId = facilityId,
+                    PatientId = patientId,
+                    ReportTrackingId = reportId,
+                    ResourceId = resourceId,
+                    QueryPhase = queryParameters.QueryPhase,
+                    QueryType = queryParameters.QueryType,
+                    RequestStatuses = queryParameters.Statuses,
+                    AcquisitionPriority = queryParameters.Priority,
+                    ResourceType = queryParameters.ResourceType,
+                    PageNumber = 1,
+                    PageSize = int.MaxValue // Get all matching IDs
+                }, cancellationToken);
+
+            if (result.Records != null && result.Records.Any())
+            {
+                var ids = result.Records.Select(r => r.Id).ToList();
+                await _logService.StartRetrievalProcessBulk(ids, cancellationToken);
+            }
+
+            return Accepted();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "ProcessByFilter"), ex, "An Exception occurred while attempting to process logs by filter.");
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }

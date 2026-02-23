@@ -8,5 +8,6 @@
         public DateTime EndDate { get; set; } = default;
         public DateTime? SubmitReportDateTime { get; set; }
         public List<string> Measures { get; set; } = [];
+        public string? PayloadRootUri { get; set; }
     }
 }

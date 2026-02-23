@@ -5,6 +5,8 @@
 @use 'styles/custom-themes/purple-green.scss';
 @use 'custom-themes/zelda-blue-theme.scss' as zeldaBlue;
 @use 'ngx-toastr/toastr';
+@use 'styles/link-table.scss';
+@use 'styles/core.scss';
 
 /* Account for the height of the fixed position toolbar */
 html, body { height: calc(100vh - 64px); }

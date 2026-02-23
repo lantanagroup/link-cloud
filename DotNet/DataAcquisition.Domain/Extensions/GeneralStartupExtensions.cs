@@ -1,4 +1,7 @@
-﻿using Confluent.Kafka;
+﻿using System.Diagnostics;
+using System.Net;
+using System.Reflection;
+using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Queries;
 using FluentValidation;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.ParameterFactories;
@@ -39,14 +42,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Quartz;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Settings.Configuration;
 using Serilog.Sinks.SystemConsole.Themes;
-using System.Diagnostics;
-using System.Net;
-using System.Reflection;
 using IHostingEnvironment = Microsoft.Extensions.Hosting.IHostingEnvironment;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
@@ -61,11 +60,12 @@ public static class GeneralStartupExtensions
 
         var serviceInformation = builder.SetupServiceInformation(serviceName, assemblyVersion);
 
-        //Add Quartz scheduler with SQL persistence
-        builder.Services.RegisterQuartzDatabase(serviceInformation.ConnectionString);
-
         // load external configuration source (if specified)
         builder.AddExternalConfiguration(serviceInformation.ServiceConfigName);
+
+        //Add Quartz scheduler with SQL persistence
+        var connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
+        builder.Services.RegisterQuartzDatabase(connectionString);
         
         builder.Configuration.RegisterMonitoring(builder.Logging, builder.Services);
         builder.Services.RegisterConfigs(builder.Configuration);
@@ -221,7 +221,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
 
         //Database
-        services.AddTransient<IDatabase, Database>();
+        services.AddScoped<IDatabase, Database>();
     }
 
     public static void RegisterManagers(this IServiceCollection services)

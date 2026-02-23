@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
+﻿using System.Diagnostics;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Responses;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
@@ -7,25 +8,20 @@ using Link.Authorization.Infrastructure;
 using Link.Authorization.Policies;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
-using OpenTelemetry.Trace;
-using System.Diagnostics;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 {
-    public class BearerServiceEndpoints : IApi
+    public class BearerServiceEndpoints(
+        ILogger<BearerServiceEndpoints> logger,
+        IOptions<LinkTokenServiceSettings> tokenServiceConfig,
+        ICreateLinkBearerToken createLinkBearerToken,
+        IRefreshSigningKey refreshSigningKey)
+        : IApi
     {
-        private readonly ILogger<BearerServiceEndpoints> _logger;
-        private readonly IOptions<LinkTokenServiceSettings> _tokenServiceconfig;
-        private readonly ICreateLinkBearerToken _createLinkBearerToken;
-        private readonly IRefreshSigningKey _refreshSigningKey;
-
-        public BearerServiceEndpoints(ILogger<BearerServiceEndpoints> logger, IOptions<LinkTokenServiceSettings> tokenServiceconfig, ICreateLinkBearerToken createLinkBearerToken, IRefreshSigningKey refreshSigningKey)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _tokenServiceconfig = tokenServiceconfig ?? throw new ArgumentNullException(nameof(tokenServiceconfig));
-            _createLinkBearerToken = createLinkBearerToken ?? throw new ArgumentNullException(nameof(createLinkBearerToken));
-            _refreshSigningKey = refreshSigningKey ?? throw new ArgumentNullException(nameof(refreshSigningKey));            
-        }
+        private readonly ILogger<BearerServiceEndpoints> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        private readonly IOptions<LinkTokenServiceSettings> _tokenServiceconfig = tokenServiceConfig ?? throw new ArgumentNullException(nameof(tokenServiceConfig));
+        private readonly ICreateLinkBearerToken _createLinkBearerToken = createLinkBearerToken ?? throw new ArgumentNullException(nameof(createLinkBearerToken));
+        private readonly IRefreshSigningKey _refreshSigningKey = refreshSigningKey ?? throw new ArgumentNullException(nameof(refreshSigningKey));
 
         public void RegisterEndpoints(WebApplication app)
         {

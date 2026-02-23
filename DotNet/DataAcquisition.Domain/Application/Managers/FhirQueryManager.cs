@@ -1,13 +1,9 @@
 ﻿using DataAcquisition.Domain.Application.Models;
-using DnsClient.Protocol;
-using Hl7.Fhir.Model;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LinqKit;
 using Microsoft.Extensions.Logging;
-using System.Linq.Expressions;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Results;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
@@ -69,47 +65,71 @@ public class FhirQueryManager : IFhirQueryManager
 
     public async Task<FhirQuery> UpdateAsync(FhirQueryModel model, CancellationToken cancellationToken = default)
     {
-        var query = await _database.FhirQueryRepository.SingleOrDefaultAsync(q => q.Id == model.Id && q.FacilityId == model.FacilityId);
+        var query = await _database.FhirQueryRepository.SingleOrDefaultAsync(
+            q => q.Id == model.Id && q.FacilityId == model.FacilityId,
+            cancellationToken);
 
         if (query == null)
         {
             throw new ArgumentNullException(nameof(query));
         }
 
-        query.ResourceReferenceTypes = (await _database.ResourceReferenceTypeRepository.FindAsync(r => r.FhirQueryId == query.Id)).ToList();
-        query.ResourceReferenceTypes.ForEach(_database.ResourceReferenceTypeRepository.Remove);
-        query.ResourceReferenceTypes.Clear();
+        // Scalar fields: update only if provided (non-null / non-default)
+        if (model.QueryParameters?.Any() == true)
+            query.QueryParameters = model.QueryParameters.ToList();
 
-        query.FhirQueryResourceTypes = (await _database.FhirQueryResourceTypeRepository.FindAsync(r => r.FhirQueryId == query.Id)).ToList();
-        query.FhirQueryResourceTypes.ForEach(_database.FhirQueryResourceTypeRepository.Remove);
-        query.FhirQueryResourceTypes.Clear();
+        if (model.IdQueryParameterValues?.Any() == true)
+            query.IdQueryParameterValues = model.IdQueryParameterValues.ToList();
 
-        query.QueryParameters = model.QueryParameters;
-        query.IdQueryParameterValues = model.IdQueryParameterValues;
-        query.MeasureId = model.MeasureId;
-        query.IsReference = model.IsReference;
-        query.QueryType = model.QueryType;
+        if (model.MeasureId != null)
+            query.MeasureId = model.MeasureId;
 
-        query.ResourceReferenceTypes = model.ResourceReferenceTypes.Select(r => new ResourceReferenceType
+        if (model.IsReference.HasValue)
+            query.IsReference = model.IsReference.Value;
+
+       query.QueryType = model.QueryType;
+
+        if (model.Paged.HasValue)
+            query.Paged = model.Paged.Value;
+
+        if (model.DataAcquisitionLogId != default)
+            query.DataAcquisitionLogId = model.DataAcquisitionLogId;
+
+        // Collections: only replace if caller explicitly provides a non-empty list
+        // Otherwise leave untouched (critical for partial updates like reference collection)
+        if (model.ResourceReferenceTypes?.Any() == true)
         {
-            FacilityId = r.FacilityId,
-            FhirQueryId = query.Id,
-            QueryPhase = r.QueryPhase,
-            ResourceType = r.ResourceType,
-            CreateDate = DateTime.UtcNow
-        }).ToList();
+            // If you want to allow full replacement when explicitly sent
+            query.ResourceReferenceTypes.Clear();
+            foreach (var r in model.ResourceReferenceTypes)
+            {
+                query.ResourceReferenceTypes.Add(new ResourceReferenceType
+                {
+                    FacilityId = r.FacilityId,
+                    FhirQueryId = query.Id,
+                    QueryPhase = r.QueryPhase,
+                    ResourceType = r.ResourceType,
+                    CreateDate = DateTime.UtcNow
+                });
+            }
+        }
 
-        query.FhirQueryResourceTypes = model.ResourceTypes.Select(r => new FhirQueryResourceType
+        if (model.ResourceTypes?.Any() == true)
         {
-            FhirQueryId = query.Id,
-            ResourceType = r
-        }).ToList();
+            query.FhirQueryResourceTypes.Clear();
+            foreach (var r in model.ResourceTypes)
+            {
+                query.FhirQueryResourceTypes.Add(new FhirQueryResourceType
+                {
+                    FhirQueryId = query.Id,
+                    ResourceType = r
+                });
+            }
+        }
 
-        query.Paged = model.Paged;
-        query.DataAcquisitionLogId = model.DataAcquisitionLogId;
         query.ModifyDate = DateTime.UtcNow;
 
-        await _database.FhirQueryRepository.SaveChangesAsync();
+        await _database.FhirQueryRepository.SaveChangesAsync(cancellationToken);
         return query;
     }
 }

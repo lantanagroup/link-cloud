@@ -1,10 +1,11 @@
-﻿using Hl7.Fhir.Model;
+﻿using System.Diagnostics;
+using System.IO.Compression;
+using System.Net;
+using Hl7.Fhir.Model;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests;
 using Newtonsoft.Json.Linq;
 using RestSharp;
-using System.Diagnostics;
-using System.Net;
 using Xunit;
 using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
@@ -17,7 +18,10 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     private const int PollingIntervalSeconds = 5;
     private const int MaxRetryCount = 100;
     private static readonly RestClient AdminBffClient = new RestClient(TestConfig.AdminBffBase);
+    private static readonly RestClient LokiClient = new RestClient(TestConfig.LokiBaseUrl);
     private static readonly FhirDataLoader FhirDataLoader = new FhirDataLoader(TestConfig.ExternalFhirServerBase);
+
+    private DateTime _lastLokiQueryTime = DateTime.UtcNow;
 
     public async Task InitializeAsync()
     {
@@ -156,7 +160,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         request.AddJsonBody(body);
 
         var response = await AdminBffClient.ExecuteAsync(request);
-        Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Generate Report - Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+        Assert.True(response.StatusCode == HttpStatusCode.OK, $"Generate Report - Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
 
         Assert.True(response.ContentType != null, $"Expected Content-Type to be set but received {response.ContentType}");
         Assert.True(response.ContentType.Contains("application/json"), $"Expected Content-Type to be application/json but received {response.ContentType}");
@@ -187,7 +191,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     {
         var request = new RestRequest($"submission/{FacilityId}/{reportId}?external=true", Method.Get);
         var response = await AdminBffClient.ExecuteAsync(request);
-        Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Download Report - Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+        Assert.True(response.StatusCode == HttpStatusCode.OK, $"Download Report - Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
 
         Assert.True(response.ContentType?.Contains("application/zip"), $"Expected Content-Type to be application/zip but received {response.ContentType}");
 
@@ -204,7 +208,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         }
 
         using var zipStream = new MemoryStream(response.RawBytes ?? []);
-        using var archive = new System.IO.Compression.ZipArchive(zipStream, System.IO.Compression.ZipArchiveMode.Read);
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
         var jsonParser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
 
         foreach (var entry in archive.Entries)
@@ -237,7 +241,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             var request = new RestRequest("validation/artifact/$initialize", Method.Post);
             request.Timeout = TimeSpan.FromMinutes(5.0);
             var response = await AdminBffClient.ExecuteAsync(request);
-            Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK,
+            Assert.True(response.StatusCode == HttpStatusCode.OK,
                 $"Please Reset Your Docker Environment and ReRun. Initialize Validation Artifacts - Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}.");
         }, TimeSpan.FromMinutes(5.0), TimeSpan.FromMinutes(5.0));
     }
@@ -249,7 +253,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             var request = new RestRequest("validation/category/$initialize", Method.Post);
             request.Timeout = TimeSpan.FromMinutes(5.0);
             var response = await AdminBffClient.ExecuteAsync(request);
-            Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK,
+            Assert.True(response.StatusCode == HttpStatusCode.OK,
                 $"Please Reset Your Docker Environment and ReRun. Initialize Validation Categories - Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}.");
         }, TimeSpan.FromMinutes(5.0), TimeSpan.FromMinutes(5.0));
     }
@@ -276,7 +280,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
         var response = await AdminBffClient.ExecuteAsync(request);
 
-        Assert.True(response.StatusCode == System.Net.HttpStatusCode.Created, $"Expected HTTP 201 Created for facility creation but got {response.StatusCode}");
+        Assert.True(response.StatusCode == HttpStatusCode.Created, $"Expected HTTP 201 Created for facility creation but got {response.StatusCode}");
 
         return response;
     }
@@ -871,6 +875,60 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     #endregion
 
     /// <summary>
+    /// Scrapes Loki for error logs since the last check.
+    /// </summary>
+    private async Task ScrapeLokiErrorsAsync()
+    {
+        var start = _lastLokiQueryTime;
+        var end = DateTime.UtcNow;
+        _lastLokiQueryTime = end;
+
+        var startUnix = ((DateTimeOffset)start).ToUnixTimeMilliseconds() * 1000000;
+        var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
+
+        var query = "{app=\"link-cloud\"} |= \"Error\"";
+        var request = new RestRequest("/loki/api/v1/query_range");
+        request.AddParameter("query", query);
+        request.AddParameter("start", startUnix.ToString());
+        request.AddParameter("end", endUnix.ToString());
+
+        try
+        {
+            var response = await LokiClient.ExecuteAsync(request);
+            if (response.StatusCode == HttpStatusCode.OK && response.Content != null)
+            {
+                var jsonResponse = JObject.Parse(response.Content);
+                var results = jsonResponse["data"]?["result"] as JArray;
+                if (results != null)
+                {
+                    foreach (var result in results)
+                    {
+                        var stream = result["stream"];
+                        var component = stream?["component"]?.ToString() ?? "unknown";
+                        var values = result["values"] as JArray;
+                        if (values != null)
+                        {
+                            foreach (var value in values)
+                            {
+                                var logLine = value[1]?.ToString();
+                                output.WriteLine($"[LOKI ERROR][{component}] {logLine}");
+                            }
+                        }
+                    }
+                }
+            }
+            else if (response.StatusCode != 0 && response.StatusCode != HttpStatusCode.OK)
+            {
+                output.WriteLine($"Warning: Failed to scrape Loki: {response.StatusCode} {response.Content}");
+            }
+        }
+        catch (Exception ex)
+        {
+            output.WriteLine($"Warning: Exception while scraping Loki: {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// Asynchronously checks the submission status of a report.
     /// </summary>
     /// <param name="facilityId">The facility ID to query.</param>
@@ -882,35 +940,31 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
         for (var retry = 0; retry < MaxRetryCount; retry++)
         {
-            var request = new RestRequest($"/Report/summaries?facilityId={facilityId}", Method.Get);
+            await ScrapeLokiErrorsAsync();
+
+            var request = new RestRequest($"/schedules/{reportId}", Method.Get);
             var response = await AdminBffClient.ExecuteAsync(request);
 
             if (response.StatusCode == HttpStatusCode.OK && response.ContentType != null && response.ContentType.Contains("application/json") && response.Content != null)
             {
                 var jsonResponse = JObject.Parse(response.Content);
-                var records = jsonResponse["records"] as JArray;
 
-                if (records != null)
+                if (jsonResponse["status"]?.ToString() == "Submitted")
                 {
-                    var foundReport = records.FirstOrDefault(r => r["id"]?.ToString() == reportId);
-
-                    if (foundReport == null)
-                    {
-                        output.WriteLine("Report not found, yet.");
-                    }
-                    else if (bool.Parse(foundReport["submitted"]?.ToString() ?? "false"))
-                    {
-                        output.WriteLine("Report submitted.");
-                        return true;
-                    }
-                    else
-                    {
-                        output.WriteLine("Report not submitted, yet.");
-                    }
+                    output.WriteLine("Report submitted.");
+                    return true;
+                }
+                else
+                {
+                    output.WriteLine("Found Report, but is not submitted.");
                 }
             }
+            else 
+            {
+                output.WriteLine("Report not found.");
+            }
 
-            output.WriteLine($"Report is not submitted. Retrying in {PollingIntervalSeconds} seconds...");
+            output.WriteLine($"Retrying in {PollingIntervalSeconds} seconds...");
             await Task.Delay(PollingIntervalSeconds * 1000);
         }
         output.WriteLine($"Report {reportId} was not submitted after {MaxRetryCount} retries.");
@@ -919,7 +973,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     private async Task RetryUntilSuccess(Func<Task> action, TimeSpan timeout, TimeSpan delay)
     {
         var start = DateTime.UtcNow;
-        Exception lastException = null;
+        Exception? lastException = null;
 
         while (DateTime.UtcNow - start < timeout)
         {
@@ -934,6 +988,8 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
                 await Task.Delay(delay);
             }
         }
+
+        this.ScrapeLokiErrorsAsync();
 
         throw new TimeoutException($"Operation failed after retrying for {timeout.TotalSeconds} seconds.", lastException);
     }

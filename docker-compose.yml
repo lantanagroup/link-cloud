@@ -19,8 +19,8 @@ version: '3.4'
 ## audit: 8062
 ## admin-bff: 8063
 ## census: 8064
-## dataacquisition: 8065
-## dataacquisition.acquisitionworker: 8078
+## dataacq: 8065
+## dataacq-worker: 8078
 ## admin-ui: 8066
 ## measureeval: 8067
 ## normalization: 8068
@@ -37,7 +37,10 @@ services:
   ### FHIR Server (HAPI) - For testing
   ###########################################
   fhir_server:
-    image: hapiproject/hapi:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.hapi
+    image: link-fhir-server
     container_name: fhir-server
     ports:
       - "6157:8080"
@@ -55,13 +58,23 @@ services:
       - hapi.fhir.subscription_enabled=false
       - hapi.fhir.client_id_strategy=ANY
       - hapi.fhir.server_id_strategy=UUID
+      - spring.main.lazy-initialization=true
+      - hapi.fhir.openapi_enabled=false
+      - hapi.fhir.lastn_enabled=false
+      - hapi.fhir.graphql_enabled=false
+      - hapi.fhir.bulk_export_enabled=false
+      - hapi.fhir.binary_storage_enabled=false
+      - hapi.fhir.validation.requests_enabled=false
+      - hapi.fhir.validation.responses_enabled=false
     volumes:
       - fhir_data:/data
-      - ./Java/hapi/src/main/java/com/lantanagroup/link/hapi/HealthCheck.java:/app/HealthCheck.java
     networks:
       - link-nw
     healthcheck:
-      test: ["CMD", "java", "/app/HealthCheck.java", "http://localhost:8080/fhir/metadata"]
+      test: ["CMD", "wget", "-q", "--timeout=5", "--tries=1", "--spider", "http://localhost:8080/fhir/metadata"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
       start_period: 60s
       
   ###########################################
@@ -310,7 +323,7 @@ services:
       - link-nw
       
   kafka-ui:
-    image: provectuslabs/kafka-ui:latest
+    image: ghcr.io/kafbat/kafka-ui:latest
     container_name: kafka-ui
     ports:
       - 9095:8080
@@ -426,7 +439,7 @@ services:
         condition: service_healthy
       census:
         condition: service_healthy
-      dataacquisition:
+      dataacq:
         condition: service_healthy
       measureeval:
         condition: service_healthy
@@ -503,7 +516,7 @@ services:
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8064/health" ]
 
-  dataacquisition:
+  dataacq:
     image: link-dataacquisition
     container_name: link-dataacquisition
     environment:
@@ -538,7 +551,7 @@ services:
       interval: 5s
       retries: 10
 
-  dataacquisition.acquisitionworker:
+  dataacq-worker:
      image: link-dataacquisitionworker
      container_name: link-dataacquisitionworker
      environment:
@@ -563,7 +576,7 @@ services:
          condition: service_completed_successfully
        otel-collector:
          condition: service_started
-       dataacquisition:
+       dataacq:
          condition: service_healthy
        loki:
          condition: service_started
@@ -597,7 +610,11 @@ services:
     container_name: link-measureeval
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      spring.main.lazy-initialization: "true"
       spring.kafka.properties.sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";
+      internal-blob-storage.connection-string: ${AZURITE_CONNECTION_STRING}
+      internal-blob-storage.blob-container-name: ${INTERNAL_BLOB_CONTAINER_NAME}
+      link.report.base-url: http://report:8072
     ports:
       - "8067:8067"
     build:
@@ -610,9 +627,9 @@ services:
         condition: service_completed_successfully
       mongo:
         condition: service_healthy
-      dataacquisition:
+      dataacq:
         condition: service_healthy
-      dataacquisition.acquisitionworker:
+      dataacq-worker:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8067/health"]
@@ -793,6 +810,7 @@ services:
     container_name: link-validation
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      spring.main.lazy-initialization: "true"
       spring.datasource.password: ${LINK_DB_PASS}
       spring.kafka.properties.sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";
       internal-blob-storage.connection-string: ${AZURITE_CONNECTION_STRING}

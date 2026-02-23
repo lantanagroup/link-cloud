@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Shared.Application.Utilities;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+//max char length for enum values: 50
 public enum AcquisitionPriority
 {
     [StringValue("Normal")]

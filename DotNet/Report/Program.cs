@@ -1,3 +1,5 @@
+using System.Reflection;
+using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Extensions;
@@ -8,7 +10,6 @@ using LantanaGroup.Link.Report.Application.Options;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Domain.Queries;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.KafkaProducers;
@@ -48,19 +49,38 @@ using Reddoxx.Quartz.MongoDbJobStore.Locking;
 using Reddoxx.Quartz.MongoDbJobStore.Redlock;
 using Serilog;
 using Serilog.Enrichers.Span;
+using Serilog.Events;
 using Serilog.Exceptions;
 using StackExchange.Redis.Extensions.Core.Configuration;
 using StackExchange.Redis.Extensions.System.Text.Json;
-using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
 
+ConfigureLogging(builder);
 RegisterServices(builder);
 var app = builder.Build();
 SetupMiddleware(app);
 
 app.Run();
+
+static void ConfigureLogging(WebApplicationBuilder builder)
+{
+    // Create Serilog logger configuration
+    var loggerConfig = new LoggerConfiguration()
+        .ReadFrom.Configuration(builder.Configuration)
+        .Filter.ByExcluding("RequestPath like '/health%'")
+        .Filter.ByExcluding("RequestPath like '/swagger%'")
+        .Enrich.WithExceptionDetails()
+        .Enrich.FromLogContext()
+        .Enrich.WithSpan()
+        .Enrich.With<ActivityEnricher>();
+
+    Log.Logger = loggerConfig.CreateLogger();
+
+    // Add Serilog to the logging pipeline
+    builder.Logging.AddSerilog();
+}
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
@@ -76,17 +96,17 @@ static void RegisterServices(WebApplicationBuilder builder)
         cm.GetMemberMap(c => c.Id).SetSerializer(new GuidSerializer(GuidRepresentation.Standard));
     });
 
+    var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+    var serviceInformation = builder.SetupServiceInformation(ReportConstants.ServiceName, assemblyVersion);
+
+    // load external configuration source (if specified)
+    builder.AddExternalConfiguration(serviceInformation.ServiceConfigName);
+
     BsonSerializer.RegisterSerializer(objectSerializer);
 
     // Bind MongoConnection settings from configuration (e.g., appsettings.json)
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.Mongo));
     var mongoSettings = builder.Services.BuildServiceProvider().GetRequiredService<IOptions<MongoConnection>>().Value;
-    var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
-
-    var serviceInformation = builder.SetupServiceInformation(ReportConstants.ServiceName, assemblyVersion, mongoSettings.ConnectionString);
-
-    // load external configuration source (if specified)
-    builder.AddExternalConfiguration(serviceInformation.ServiceConfigName);
 
     builder.WebHost.ConfigureKestrel(options =>
     {
@@ -131,10 +151,22 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add the MongoDbContext to the DI container, using the shared client
     builder.Services.AddDbContext<MongoDbContext>((sp, options) =>
     {
+        var querySettings = builder.Configuration.GetRequiredSection(nameof(EnhancedQueryLoggingSettings)).Get<EnhancedQueryLoggingSettings>();
+
         var client = sp.GetRequiredService<IMongoClient>();
         var mongoSettings = sp.GetRequiredService<IOptions<MongoConnection>>().Value;
 
-        options.UseMongoDB(client, mongoSettings.DatabaseName);      
+        if (querySettings != null && querySettings.EnableEnhancedQueryLogging)
+        {
+            var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+            options.UseMongoDB(client, mongoSettings.DatabaseName)
+            .UseLoggerFactory(loggerFactory)
+            .EnableSensitiveDataLogging();
+        }
+        else
+        {
+            options.UseMongoDB(client, mongoSettings.DatabaseName);
+        }
     });
 
     builder.Services.AddHostedService<MongoIndexCreationService>();
@@ -143,7 +175,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHttpClient();
 
     // Add factories
-    builder.Services.AddTransient<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>, KafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
     builder.Services.AddTransient<ScheduledReportFactory>();
     builder.Services.AddTransient<MeasureReportSummaryFactory>();
 
@@ -154,6 +185,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientListMessage>, KafkaConsumerFactory<string, PatientListMessage>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, ValidationCompleteValue>, KafkaConsumerFactory<string, ValidationCompleteValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<Null, MeasureReportGeneratedValue>, KafkaConsumerFactory<Null, MeasureReportGeneratedValue>>();
 
     builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
 
@@ -162,26 +194,25 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Producers for Retry/Deadletter
     builder.Services.AddTransient<IKafkaProducerFactory<string, ReportScheduledValue>, KafkaProducerFactory<string, ReportScheduledValue>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>, KafkaProducerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, PatientListMessage>, KafkaProducerFactory<string, PatientListMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, KafkaProducerFactory<string, GenerateReportValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, ValidationCompleteValue>, KafkaProducerFactory<string, ValidationCompleteValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<Null, MeasureReportGeneratedValue>, KafkaProducerFactory<Null, MeasureReportGeneratedValue>>();
 
     // Add repositories
     builder.Services.AddTransient<IEntityRepository<ReportSchedule>, EntityRepository<ReportSchedule, MongoDbContext>>();
-    builder.Services.AddTransient<IEntityRepository<PatientSubmissionEntry>, EntityRepository<PatientSubmissionEntry, MongoDbContext>>();
-    builder.Services.AddTransient<IEntityRepository<ReportModel>, EntityRepository<ReportModel, MongoDbContext>>();
-    builder.Services.AddTransient<IEntityRepository<FhirResource>, EntityRepository<FhirResource, MongoDbContext>>();
-    builder.Services.AddTransient<IEntityRepository<PatientSubmissionEntryResourceMap>, EntityRepository<PatientSubmissionEntryResourceMap, MongoDbContext>>();
+    builder.Services.AddTransient<IEntityRepository<ReportEntry>, EntityRepository<ReportEntry, MongoDbContext>>();
+    builder.Services.AddTransient<IEntityRepository<ReportPopulation>, EntityRepository<ReportPopulation, MongoDbContext>>();
+    builder.Services.AddTransient<IEntityRepository<ReportResource>, EntityRepository<ReportResource, MongoDbContext>>();
     builder.Services.AddTransient<IDatabase, Database>();
 
     // Add Managers
     builder.Services.AddTransient<IReportScheduledManager, ReportScheduledManager>();
-    builder.Services.AddTransient<ISubmissionEntryManager, SubmissionEntryManager>();
-    builder.Services.AddTransient<ISubmissionEntryQueries, SubmissionEntryQueries>();
-    builder.Services.AddTransient<IResourceManager, ResourceManager>();
+    builder.Services.AddTransient<IReportEntryManager, ReportEntryManager>();
+    builder.Services.AddTransient<IReportPopulationManager, ReportPopulationManager>();
+    builder.Services.AddTransient<IReportResourceManager, ReportResourceManager>();
 
     // Add Link Security
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
@@ -268,7 +299,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Register listeners
     builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceConfigName, [
             KafkaTopic.ReportScheduledRetry.GetStringValue(),
-            KafkaTopic.ResourceEvaluatedRetry.GetStringValue(),
+            KafkaTopic.MeasureReportGeneratedRetry.GetStringValue(),
             KafkaTopic.PatientListsAcquiredRetry.GetStringValue(),
             KafkaTopic.GenerateReportRequestedRetry.GetStringValue(),
             KafkaTopic.PayloadSubmittedRetry.GetStringValue(),
@@ -277,13 +308,13 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<GenerateReportListener>();
-    builder.Services.AddHostedService<ResourceEvaluatedListener>();
     builder.Services.AddHostedService<ReportScheduledListener>();
     builder.Services.AddHostedService<PatientListsAcquiredListener>();
     builder.Services.AddHostedService<ValidationCompleteListener>();
     builder.Services.AddHostedService<PayloadSubmittedListener>();
+    builder.Services.AddHostedService<MeasureReportGeneratedListener>();
 
-    builder.Services.AddTransient<PatientReportSubmissionBundler>();
+    builder.Services.AddTransient<PatientAggregator>();
     builder.Services.AddTransient<MeasureReportAggregator>();
     builder.Services.AddTransient<ReportManifestProducer>();
     builder.Services.AddTransient<SubmitPayloadProducer>();
@@ -301,13 +332,14 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Exception Handling
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, GenerateReportValue>, DeadLetterExceptionHandler<string, GenerateReportValue>>();
     builder.Services.AddTransient<ITransientExceptionHandler<string, GenerateReportValue>, TransientExceptionHandler<string, GenerateReportValue>>();
-    
+
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, ReportScheduledValue>, DeadLetterExceptionHandler<string, ReportScheduledValue>>();
     builder.Services.AddTransient<ITransientExceptionHandler<string, ReportScheduledValue>, TransientExceptionHandler<string, ReportScheduledValue>>();
-    
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>, DeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>, TransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
-    
+
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<Null, MeasureReportGeneratedValue>, DeadLetterExceptionHandler<Null, MeasureReportGeneratedValue>>();
+
+    builder.Services.AddTransient<ITransientExceptionHandler<Null, MeasureReportGeneratedValue>, TransientExceptionHandler<Null, MeasureReportGeneratedValue>>();
+
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
 
     //PatientListsAcquired Listener
@@ -321,7 +353,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     //ValidationComplete Listener
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, ValidationCompleteValue>, DeadLetterExceptionHandler<string, ValidationCompleteValue>>();
     builder.Services.AddTransient<ITransientExceptionHandler<string, ValidationCompleteValue>, TransientExceptionHandler<string, ValidationCompleteValue>>();
-    
+
     builder.Services.AddTransient<IDeadLetterExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue>, DeadLetterExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue>>();
     builder.Services.AddTransient<ITransientExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue>, TransientExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue>>();
 
@@ -335,21 +367,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {
         options.Environment = builder.Environment;
-        options.ServiceName = serviceInformation.ServiceConfigName;
-        options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+        options.ServiceName = ReportConstants.ServiceName;
+        options.ServiceVersion = serviceInformation.Version;
     });
-
-    // Logging using Serilog
-    builder.Logging.AddSerilog();
-    Log.Logger = new LoggerConfiguration()
-        .ReadFrom.Configuration(builder.Configuration)
-        .Filter.ByExcluding("RequestPath like '/health%'")
-        .Filter.ByExcluding("RequestPath like '/swagger%'")
-        .Enrich.WithExceptionDetails()
-        .Enrich.FromLogContext()
-        .Enrich.WithSpan()
-        .Enrich.With<ActivityEnricher>()
-        .CreateLogger();
 
     builder.Services.AddSingleton<IReportServiceMetrics, ReportServiceMetrics>();
 }

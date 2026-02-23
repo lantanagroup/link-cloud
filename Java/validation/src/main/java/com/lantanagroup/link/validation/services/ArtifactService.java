@@ -6,6 +6,7 @@ import ca.uhn.fhir.rest.client.api.IGenericClient;
 import com.lantanagroup.link.validation.configs.LinkConfig;
 import com.lantanagroup.link.validation.entities.Artifact;
 import com.lantanagroup.link.validation.entities.ArtifactType;
+import com.lantanagroup.link.validation.models.PackageDetailsModel;
 import com.lantanagroup.link.validation.models.TerminologyDependency;
 import com.lantanagroup.link.validation.repositories.ArtifactRepository;
 import org.apache.commons.io.FilenameUtils;
@@ -36,10 +37,27 @@ public class ArtifactService {
         this.linkConfig = linkConfig;
     }
 
-    private void doSaveArtifact(ArtifactType type, String name, byte[] content) {
-        Artifact artifact = artifactRepository.findByTypeAndName(type, name).orElseGet(Artifact::new);
+    public Artifact getArtifact(ArtifactType type, String name, byte[] content) {
+        Artifact artifact = new Artifact();
         artifact.setType(type);
         artifact.setName(name);
+        artifact.setContent(content);
+        return artifact;
+    }
+
+    /**
+     * Attempt to load the artifact into validation support.
+     * Failure should (hopefully) result in an unhandled exception thrown to the caller.
+     */
+    public void validateArtifact(ArtifactType type, String name, byte[] content) throws IOException {
+        Artifact artifact = getArtifact(type, name, content);
+        ArtifactValidationSupport validationSupport = createValidationSupport();
+        validationSupport.addArtifact(artifact);
+    }
+
+    private void doSaveArtifact(ArtifactType type, String name, byte[] content) {
+        Artifact artifact = artifactRepository.findByTypeAndName(type, name)
+                .orElseGet(() -> getArtifact(type, name, content));
         artifact.setContent(content);
         artifactRepository.save(artifact);
     }
@@ -80,13 +98,18 @@ public class ArtifactService {
     }
 
     public synchronized ArtifactValidationSupport getValidationSupport() throws IOException {
-        if (validationSupport == null) {
-            validationSupport = new ArtifactValidationSupport(fhirContext);
+        if (this.validationSupport == null) {
+            ArtifactValidationSupport validationSupport = createValidationSupport();
             for (Artifact artifact : artifactRepository.findAll()) {
                 validationSupport.addArtifact(artifact);
             }
+            this.validationSupport = validationSupport;
         }
-        return validationSupport;
+        return this.validationSupport;
+    }
+
+    protected ArtifactValidationSupport createValidationSupport() {
+        return new ArtifactValidationSupport(fhirContext);
     }
 
     public List<TerminologyDependency> getTerminologyDependencies() throws IOException {
@@ -102,7 +125,7 @@ public class ArtifactService {
             if (artifact == null) {
                 return Collections.emptyList();
             }
-            ArtifactValidationSupport packageSupport = new ArtifactValidationSupport(fhirContext);
+            ArtifactValidationSupport packageSupport = createValidationSupport();
             packageSupport.addArtifact(artifact);
             resources = packageSupport.fetchAllStructureDefinitions();
         } else {
@@ -116,7 +139,7 @@ public class ArtifactService {
                     if (sd.hasSnapshot()) {
                         for (ElementDefinition ed : sd.getSnapshot().getElement()) {
                             addBindingDependencies(sd, ed, dependencyMap);
-                            //addFixedPatternDependencies(sd, ed, dependencyMap);
+                            addFixedPatternDependencies(sd, ed, dependencyMap);
                         }
                     } else if (sd.hasDifferential()) {
                         for (ElementDefinition ed : sd.getDifferential().getElement()) {
@@ -162,6 +185,56 @@ public class ArtifactService {
         List<TerminologyDependency> results = new ArrayList<>(dependencyMap.values());
         results.sort(Comparator.comparing(TerminologyDependency::getUrl));
         return results;
+    }
+
+    public PackageDetailsModel getPackageDetails(String packageId) throws IOException {
+        Artifact artifact = artifactRepository.findByTypeAndName(ArtifactType.PACKAGE, packageId).orElse(null);
+        if (artifact == null) {
+            return null;
+        }
+
+        ArtifactValidationSupport packageSupport = createValidationSupport();
+        packageSupport.addArtifact(artifact);
+
+        PackageDetailsModel model = new PackageDetailsModel();
+
+        List<ImplementationGuide> igs = packageSupport.getImplementationGuides();
+        if (igs != null && !igs.isEmpty()) {
+            model.setId(igs.get(0).getIdElement().getIdPart());
+            model.setName(igs.get(0).getName());
+            model.setVersion(igs.get(0).getVersion());
+        }
+
+        List<PackageDetailsModel.Resource> resources = new ArrayList<>();
+        List<IBaseResource> conformanceResources = packageSupport.fetchAllConformanceResources();
+        if (conformanceResources != null) {
+            for (IBaseResource base : conformanceResources) {
+                String type = base.fhirType();
+                if (type.equals("StructureDefinition") || type.equals("CodeSystem") || type.equals("ValueSet")) {
+                    PackageDetailsModel.Resource resource = new PackageDetailsModel.Resource();
+                    resource.setResourceType(type);
+                    if (base instanceof MetadataResource mr) {
+                        resource.setId(mr.getIdElement().getIdPart());
+                        resource.setUrl(mr.getUrl());
+                        resource.setName(mr.getName());
+                        resource.setVersion(mr.getVersion());
+                    }
+                    resources.add(resource);
+                }
+            }
+        }
+
+        resources
+                .sort(
+                        Comparator.comparing(PackageDetailsModel.Resource::getResourceType)
+                                .thenComparing(
+                                        PackageDetailsModel.Resource::getId,
+                                        Comparator.nullsLast(Comparator.naturalOrder())
+                                )
+                );
+        model.setResources(resources);
+
+        return model;
     }
 
     private String getTerminologyBaseUrl() {
@@ -252,32 +325,15 @@ public class ArtifactService {
 
     private void addBindingDependencies(StructureDefinition sd, ElementDefinition ed, Map<String, TerminologyDependency> dependencyMap) {
         if (ed.hasBinding() && ed.getBinding().hasValueSet()) {
-            addDependency(ed.getBinding().getValueSet(), sd, ed, dependencyMap);
+            if (ed.getBinding().getStrength() == Enumerations.BindingStrength.REQUIRED || ed.getBinding().getStrength() == Enumerations.BindingStrength.EXTENSIBLE) {
+                addDependency(ed.getBinding().getValueSet(), sd, ed, dependencyMap);
+            }
         }
     }
 
     private void addFixedPatternDependencies(StructureDefinition sd, ElementDefinition ed, Map<String, TerminologyDependency> dependencyMap) {
-        if (ed.hasFixed()) {
-            addTypeDependencies(sd, ed, ed.getFixed(), dependencyMap);
-        }
-        if (ed.hasPattern()) {
-            addTypeDependencies(sd, ed, ed.getPattern(), dependencyMap);
-        }
-    }
-
-    private void addTypeDependencies(StructureDefinition sd, ElementDefinition ed, Type type, Map<String, TerminologyDependency> dependencyMap) {
-        if (type instanceof Coding coding) {
-            if (coding.hasSystem()) {
-                String dependency = coding.getSystem();
-                if (coding.hasVersion()) {
-                    dependency += "|" + coding.getVersion();
-                }
-                addDependency(dependency, sd, ed, dependencyMap);
-            }
-        } else if (type instanceof CodeableConcept codeableConcept) {
-            for (Coding coding : codeableConcept.getCoding()) {
-                addTypeDependencies(sd, ed, coding, dependencyMap);
-            }
+        if (ed.getPath().endsWith(".system") && ed.hasFixed() && ed.getFixed() instanceof UriType uriType) {
+            addDependency(uriType.getValue(), sd, ed, dependencyMap);
         }
     }
 
