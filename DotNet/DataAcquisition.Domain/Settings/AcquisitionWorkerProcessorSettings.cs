@@ -10,4 +10,7 @@ public class AcquisitionWorkerProcessorSettings
 {
     public int MaxConcurrentAcquisitions { get; set; } = 8;
     public int WorkChannelCapacity { get; set; } = 200;
+    public int MaxBatchesPerFacilityPerRun { get; set; } = 40;
+    public int MaxBatchesFailStalledPerRun { get; set; } = 20;
+    public int TimeBudgetPerRunSeconds { get; set; } = 20;
 }

@@ -28,6 +28,7 @@ public class DataAcquisitionLog
 
     public QueryPhase? QueryPhase { get; set; }
 
+    [MaxLength(50)]
     public RequestStatus? Status { get; set; }
 
     public DateTime? ExecutionDate { get; set; }
