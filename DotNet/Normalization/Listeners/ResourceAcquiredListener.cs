@@ -225,7 +225,7 @@ public class ResourceAcquiredListener : BackgroundService
                     {
                         _logger.LogError(ex, $"Failed to process Patient Event.");
 
-                        _transientExceptionHandler.HandleException(message, new TransientException("Data Acquisition Exception thrown: " + ex.Message), message.Message.Key);
+                        _transientExceptionHandler.HandleException(message, new TransientException("Normalization Exception thrown: " + ex.Message), message.Message.Key);
                     }
                     finally
                     {
