@@ -10,6 +10,7 @@ using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 
 namespace LantanaGroup.Link.Report.KafkaProducers
@@ -141,7 +142,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             catch (Exception ex)
             {
                 payloadUri = null;
-                _logger.LogError(ex, "Failed to upload report manifest to blob storage (ReportId = {ReportId}, FacilityId = {FacilityId}).", schedule.Id, schedule.FacilityId);
+                _logger.LogError(ex, "Failed to upload report manifest to blob storage (ReportId = {ReportId}, FacilityId = {FacilityId}).", schedule.Id.SanitizeUntrustedString(), schedule.FacilityId.SanitizeUntrustedString());
                 AuditEventMessage auditEvent = new()
                 {
                     FacilityId = schedule.FacilityId,
