@@ -269,7 +269,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         catch (ProduceException<string, EvaluationRequestedValue> ex)
                                         {
                                             _logger.LogError(ex, "An error was encountered generating an Evaluation Requested event.\n\tFacilityId: {facilityId}\n\tPatientId: {patientId}\n\tReportTrackingId: {reportTrackingId}",
-                                                facilityId, p, reportSchedule.Id);
+                                                facilityId?.SanitizeUntrustedString(), p?.SanitizeUntrustedString(), reportSchedule.Id?.SanitizeUntrustedString());
                                         }
                                     }
                                 }
