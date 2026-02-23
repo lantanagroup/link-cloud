@@ -78,13 +78,10 @@ public class OrganizationLocationConfigurationQueries : IOrganizationLocationCon
         int pageNumber = 1,
         int pageSize = 10)
     {
-        var query = _context.LocationConfigurations.AsQueryable();
+        var query = _context.LocationConfigurations.Where(c => c.FacilityId == search.FacilityId).AsQueryable();
 
         if (search.ConfigId.HasValue)
             query = query.Where(c => c.ConfigId == search.ConfigId.Value);
-
-        if (!string.IsNullOrEmpty(search.FacilityId))
-            query = query.Where(c => c.FacilityId == search.FacilityId);
 
         if (search.IsActive.HasValue)
             query = query.Where(c => c.IsActive == search.IsActive.Value);

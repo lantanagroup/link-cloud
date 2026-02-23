@@ -75,10 +75,15 @@ public class OrganizationLocationConfigurationQueriesTests : IClassFixture<DataA
         await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel { FacilityId = "Facility-B" });
 
         var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationQueries>();
-        var result = await queries.SearchAsync(new OrganizationLocationConfigurationSearchModel(), pageNumber: 1, pageSize: 10);
+        var result = await queries.SearchAsync(new OrganizationLocationConfigurationSearchModel() { FacilityId = "Facility-A" }, pageNumber: 1, pageSize: 10);
 
-        Assert.Equal(2, result.Records.Count);
-        Assert.Equal(2, result.Metadata.TotalCount);
+        Assert.Single(result.Records);
+        Assert.Equal(1, result.Metadata.TotalCount);
+
+        result = await queries.SearchAsync(new OrganizationLocationConfigurationSearchModel() { FacilityId = "Facility-B" }, pageNumber: 1, pageSize: 10);
+
+        Assert.Single(result.Records);
+        Assert.Equal(1, result.Metadata.TotalCount);
     }
 
     [Fact]
@@ -116,10 +121,10 @@ public class OrganizationLocationConfigurationQueriesTests : IClassFixture<DataA
 
         var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationManager>();
         for (int i = 1; i <= 25; i++)
-            await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel { FacilityId = $"Facility-{i}" });
+            await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel { FacilityId = $"Facility-Test" });
 
         var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationQueries>();
-        var result = await queries.SearchAsync(new OrganizationLocationConfigurationSearchModel(), pageNumber: 2, pageSize: 10);
+        var result = await queries.SearchAsync(new OrganizationLocationConfigurationSearchModel() { FacilityId = "Facility-Test" }, pageNumber: 2, pageSize: 10);
 
         Assert.Equal(10, result.Records.Count);
         Assert.Equal(25, result.Metadata.TotalCount);
