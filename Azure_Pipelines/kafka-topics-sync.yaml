@@ -115,10 +115,22 @@ stages:
             DESIRED_TOPIC_NAMES=$(echo "$DESIRED_TOPICS" | awk -F: '{print $1}')
 
             for TOPIC in $ALL_TOPICS; do
-              if ! echo "$DESIRED_TOPIC_NAMES" | grep -qx "$TOPIC"; then
+              # Skip Kafka internal/system topics
+              if [[ "$TOPIC" == _* ]]; then
+                echo "Skipping internal topic '$TOPIC'."
+                continue
+              fi
+
+              if ! echo "$DESIRED_TOPIC_NAMES" | grep -qxF "$TOPIC"; then
                 echo "Deleting topic '$TOPIC'..."
-                curl -s -u "$USERNAME:$PASSWORD" \
-                  -X DELETE "$REST_PROXY_URL/v3/clusters/$CLUSTER_ID/topics/$TOPIC"
+
+                DEL_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+                  -u "$USERNAME:$PASSWORD" \
+                  -X DELETE "$REST_PROXY_URL/v3/clusters/$CLUSTER_ID/topics/$TOPIC")
+
+                if [[ "$DEL_CODE" != "200" && "$DEL_CODE" != "204" ]]; then
+                  echo "WARNING: Failed to delete topic '$TOPIC' (HTTP $DEL_CODE)."
+                fi
               fi
             done
 
