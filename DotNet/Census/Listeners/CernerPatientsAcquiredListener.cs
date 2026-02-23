@@ -36,9 +36,7 @@ namespace LantanaGroup.Link.Census.Listeners
             _scopeFactory = scopeFactory;
             _eventProducerService = eventProducerService;
 
-            _transientExceptionHandler.ServiceName = CensusConstants.ServiceName;
             _transientExceptionHandler.Topic = nameof(KafkaTopic.CernerPatientsAcquired) + "-Retry";
-            _deadLetterExceptionHandler.ServiceName = CensusConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.CernerPatientsAcquired) + "-Error";
         }
 
