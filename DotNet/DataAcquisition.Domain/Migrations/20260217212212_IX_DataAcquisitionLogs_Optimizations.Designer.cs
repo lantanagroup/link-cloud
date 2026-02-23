@@ -4,6 +4,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DataAcquisition.Domain.Migrations
 {
     [DbContext(typeof(DataAcquisitionDbContext))]
-    partial class DataAcquisitionDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260217212212_IX_DataAcquisitionLogs_Optimizations")]
+    partial class IX_DataAcquisitionLogs_Optimizations
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -579,7 +582,7 @@ namespace DataAcquisition.Domain.Migrations
                         .HasColumnType("bigint");
 
                     b.Property<string>("CorrelationId")
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
@@ -662,14 +665,10 @@ namespace DataAcquisition.Domain.Migrations
 
                     SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("ExecutionDate", "Id"), new[] { "Priority", "FacilityId", "IsCensus", "PatientId", "ReportableEvent", "ReportTrackingId", "CorrelationId", "TraceId", "FhirVersion", "QueryType", "QueryPhase", "Status", "RetryAttempts", "CompletionDate", "CompletionTimeMilliseconds" });
 
-                    b.HasIndex("FacilityId", "Status", "ExecutionDate", "Id")
-                        .HasDatabaseName("IX_DataAcquisitionLogs_Facility_Status_ExecutionDate_Id");
+                    b.HasIndex("ReportTrackingId", "ExecutionDate", "Id")
+                        .HasDatabaseName("IX_DataAcquisitionLogs_ReportTrackingId_ExecutionDate_Id");
 
-                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("FacilityId", "Status", "ExecutionDate", "Id"), new[] { "Priority", "IsCensus", "PatientId", "ReportableEvent", "ReportTrackingId", "CorrelationId", "FhirVersion", "QueryType", "QueryPhase", "TraceId", "RetryAttempts", "CompletionDate", "CompletionTimeMilliseconds", "ResourceAcquiredIds", "Notes", "ScheduledReport" });
-
-                    b.HasIndex("TailSent", "FacilityId", "ReportTrackingId", "CorrelationId", "ReportStartDate", "ReportEndDate", "QueryPhase")
-                        .HasDatabaseName("IX_DataAcquisitionLogs_Tailing_Optimization")
-                        .HasFilter("[TailSent] = 0 AND [ReportTrackingId] IS NOT NULL AND [CorrelationId] IS NOT NULL AND [ReportStartDate] IS NOT NULL AND [ReportEndDate] IS NOT NULL");
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("ReportTrackingId", "ExecutionDate", "Id"), new[] { "FacilityId", "Priority", "PatientId", "FhirVersion", "QueryType", "QueryPhase", "Status" });
 
                     b.HasIndex("FacilityId", "Status", "ExecutionDate", "Id")
                         .HasDatabaseName("IX_DataAcquisitionLogs_Facility_Status_ExecutionDate_Id");

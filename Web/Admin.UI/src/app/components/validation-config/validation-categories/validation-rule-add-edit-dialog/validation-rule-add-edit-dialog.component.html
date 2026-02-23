@@ -25,7 +25,7 @@
 </div>
 <div class="vd-dialog__actions">
   <div class="action-button-group">
-    <vd-button mat-dialog-close condensed="true" variant="outline-neutral">Cancel</vd-button>
-    <vd-button condensed="true">Save</vd-button>
+    <vd-button mat-dialog-close condensed="true" variant="outline-neutral" aria-label="Cancel">Cancel</vd-button>
+    <vd-button (click)="onSave()" condensed="true" aria-label="Save">Save</vd-button>
   </div>
 </div>

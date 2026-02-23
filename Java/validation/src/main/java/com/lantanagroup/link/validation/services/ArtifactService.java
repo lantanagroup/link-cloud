@@ -37,10 +37,27 @@ public class ArtifactService {
         this.linkConfig = linkConfig;
     }
 
-    private void doSaveArtifact(ArtifactType type, String name, byte[] content) {
-        Artifact artifact = artifactRepository.findByTypeAndName(type, name).orElseGet(Artifact::new);
+    public Artifact getArtifact(ArtifactType type, String name, byte[] content) {
+        Artifact artifact = new Artifact();
         artifact.setType(type);
         artifact.setName(name);
+        artifact.setContent(content);
+        return artifact;
+    }
+
+    /**
+     * Attempt to load the artifact into validation support.
+     * Failure should (hopefully) result in an unhandled exception thrown to the caller.
+     */
+    public void validateArtifact(ArtifactType type, String name, byte[] content) throws IOException {
+        Artifact artifact = getArtifact(type, name, content);
+        ArtifactValidationSupport validationSupport = createValidationSupport();
+        validationSupport.addArtifact(artifact);
+    }
+
+    private void doSaveArtifact(ArtifactType type, String name, byte[] content) {
+        Artifact artifact = artifactRepository.findByTypeAndName(type, name)
+                .orElseGet(() -> getArtifact(type, name, content));
         artifact.setContent(content);
         artifactRepository.save(artifact);
     }
@@ -81,13 +98,14 @@ public class ArtifactService {
     }
 
     public synchronized ArtifactValidationSupport getValidationSupport() throws IOException {
-        if (validationSupport == null) {
-            validationSupport = createValidationSupport();
+        if (this.validationSupport == null) {
+            ArtifactValidationSupport validationSupport = createValidationSupport();
             for (Artifact artifact : artifactRepository.findAll()) {
                 validationSupport.addArtifact(artifact);
             }
+            this.validationSupport = validationSupport;
         }
-        return validationSupport;
+        return this.validationSupport;
     }
 
     protected ArtifactValidationSupport createValidationSupport() {
