@@ -65,10 +65,53 @@ button[color="warn"] {
   color: #e53935; // Custom red
 }
 
+.patient-list-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #1e88e5;
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.patient-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #1e88e5;
+  color: white;
+  font-size: 11px;
+  font-weight: bold;
+  border-radius: 10px;
+  padding: 1px 7px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.patient-action-btn {
+  min-width: 120px;
+}
+
+.patient-entry-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+}
+
+.patient-entry-field {
+  flex: 1;
+}
+
 .custom-height-button {
   height: 56px; /* Matches the height of Angular Material form field */
-  margin-left: 8px; /* Optional spacing between input and button */
-  box-sizing: border-box; /* Ensures padding doesn't affect height */
+  box-sizing: border-box;
 }
 
 .form-select {
@@ -164,6 +207,9 @@ button[color="warn"] {
 }
 
 .patient-count {
+  display: block;
   font-weight: bold;
   color: rgba(0, 0, 0, 0.6);
+  margin-top: 4px;
+  margin-bottom: 4px;
 }
