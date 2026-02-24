@@ -80,7 +80,7 @@ public class PayloadSubmittedListener(
                             var reportTrackingId = result.Message.Key.ReportScheduleId;
                             var reportSchedule = (await reportScheduledManager.FindAsync(x => x.Id == reportTrackingId, consumeCancellationToken)).Single();
 
-                            logger.LogDebug("Consuming Event (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", facilityId, result.Message.Value.PatientId, reportTrackingId);
+                            logger.LogDebug("Consuming PayloadSubmitted (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", facilityId, result.Message.Value.PatientId, reportTrackingId);
 
                             if (result.Message.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry)
                             {
