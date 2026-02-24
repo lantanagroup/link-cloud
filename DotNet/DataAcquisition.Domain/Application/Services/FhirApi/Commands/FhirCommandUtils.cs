@@ -2,7 +2,7 @@
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 
-internal class HeaderCapturingHandler : DelegatingHandler
+public class HeaderCapturingHandler : DelegatingHandler
 {
     public HttpResponseHeaders? LastResponseHeaders { get; private set; }
 
