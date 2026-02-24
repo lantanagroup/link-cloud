@@ -5,10 +5,10 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
-using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -23,8 +23,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Moq;
 using OpenTelemetry.Trace;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Queries;
 
 namespace IntegrationTests.DataAcquisition
 {

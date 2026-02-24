@@ -1,8 +1,8 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Queries;
 using Microsoft.Extensions.DependencyInjection;
 using Task = System.Threading.Tasks.Task;
 

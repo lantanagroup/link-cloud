@@ -1,7 +1,8 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
-namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Managers;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
 public interface IOrganizationLocationMappingManager
 {

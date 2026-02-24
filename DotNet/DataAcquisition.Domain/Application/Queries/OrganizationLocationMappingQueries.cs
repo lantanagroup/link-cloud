@@ -3,7 +3,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.EntityFrameworkCore;
 
-namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Queries;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
 public interface IOrganizationLocationMappingQueries
 {
