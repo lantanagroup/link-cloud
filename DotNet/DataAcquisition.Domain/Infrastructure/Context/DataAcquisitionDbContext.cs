@@ -26,6 +26,8 @@ public class DataAcquisitionDbContext : DbContext
 
     public DbSet<OrganizationLocationCondition> LocationConditions { get; set; }
     public DbSet<OrganizationLocationConfiguration> LocationConfigurations { get; set; }
+    public virtual DbSet<OrganizationLocationMapping> OrganizationLocationMappings { get; set; }
+
     public DbSet<FhirQueryConfiguration> FhirQueryConfigurations { get; set; }
     public DbSet<FhirListConfiguration> FhirListConfigurations { get; set; }
     public DbSet<QueryPlan> QueryPlans { get; set; }
@@ -239,6 +241,20 @@ public class DataAcquisitionDbContext : DbContext
             entity.Property(e => e.CreatedOn).HasDefaultValueSql("(getutcdate())");
             entity.Property(e => e.IsActive).HasDefaultValue(true);
             entity.Property(e => e.ModifiedOn).HasDefaultValueSql("(getutcdate())");
+        });
+
+        //-------------------OrganizationLocationMapping-------------------
+        modelBuilder.Entity<OrganizationLocationMapping>(entity =>
+        {
+            entity.HasKey(e => e.LocationMappingId).HasName("PK_OrganizationLocationMapping_LocationMappingId");
+
+            entity.HasIndex(e => e.PartOfId, "IX_LocationMapping_PartOfId").HasFilter("([PartOfId] IS NOT NULL)");
+
+            entity.Property(e => e.CreateDate).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.ModifiedDate).HasDefaultValueSql("(getutcdate())");
+
+            entity.HasOne(d => d.PartOf).WithMany(p => p.InversePartOf).HasConstraintName("FK_LocationMapping_PartOf");
         });
 
         // Prefix and schema can be passed as parameters
