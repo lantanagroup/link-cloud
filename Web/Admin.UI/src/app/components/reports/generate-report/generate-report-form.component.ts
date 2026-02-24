@@ -1,4 +1,4 @@
-import {Component, EventEmitter, OnDestroy, OnInit, Output} from '@angular/core';
+import {AfterViewInit, Component, EventEmitter, OnDestroy, OnInit, Output, ViewChild} from '@angular/core';
 import {FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators} from '@angular/forms';
 import {CommonModule} from "@angular/common";
 import {MatSnackBar, MatSnackBarModule} from "@angular/material/snack-bar";
@@ -12,6 +12,8 @@ import {MatButtonModule} from "@angular/material/button";
 import {MatIconModule} from "@angular/material/icon";
 import {MatExpansionModule} from "@angular/material/expansion";
 import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
+import {MatTableDataSource, MatTableModule} from "@angular/material/table";
+import {MatPaginator, MatPaginatorModule} from "@angular/material/paginator";
 import {MatDatepickerModule} from "@angular/material/datepicker";
 import {IAdHocReportRequest} from "../../../interfaces/tenant/facility-config-model.interface";
 import {TenantService} from "../../../services/gateway/tenant/tenant.service";
@@ -69,20 +71,28 @@ import {fromZonedTime} from 'date-fns-tz';
     FileUploadComponent,
     FaIconComponent,
     MatAutocompleteTrigger,
-    MatAutocomplete
+    MatAutocomplete,
+    MatTableModule,
+    MatPaginatorModule
   ],
   templateUrl: './generate-report-form.component.html',
   styleUrls: ['./generate-report-form.component.scss']
 })
-export class GenerateReportFormComponent implements OnInit, OnDestroy {
+export class GenerateReportFormComponent implements OnInit, OnDestroy, AfterViewInit {
 
   generateReportForm: FormGroup;
   facilities: Array<{ facilityId: string, facilityName: string }> = [];
   reportTypes: string[] = [];
   patients: string[] = [];
+  dataSource = new MatTableDataSource<string>();
+  displayedColumns = ['patient', 'delete'];
+  searchFilter = '';
+  isFileLoading = false;
   formSubmitted = false; // Flag to track form submission
   errorMessage: string = '';
   lastGeneratedReport: { facilityId: string, reportId: string } | null = null;
+
+  @ViewChild(MatPaginator) paginator!: MatPaginator;
 
   private destroy$ = new Subject<void>();
 
@@ -158,6 +168,22 @@ export class GenerateReportFormComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
+  ngAfterViewInit(): void {
+    this.dataSource.paginator = this.paginator;
+    this.dataSource.filterPredicate = (data: string, filter: string) =>
+      data.toLowerCase().includes(filter);
+  }
+
+  applyFilter(filterValue: string): void {
+    this.searchFilter = filterValue;
+    this.dataSource.filter = filterValue.trim().toLowerCase();
+  }
+
+  clearFilter(): void {
+    this.searchFilter = '';
+    this.dataSource.filter = '';
+  }
+
   onFacilityInputBlur() {
     setTimeout(() => {
       const inputVal = this.facilityInputControl.value?.trim();
@@ -221,9 +247,19 @@ export class GenerateReportFormComponent implements OnInit, OnDestroy {
     return this.generateReportForm.get('reportTypes') as FormControl;
   }
 
-  // Remove patient name by index
-  removePatient(index: number): void {
-    this.patients.splice(index, 1);
+  clearAllPatients(): void {
+    this.patients = [];
+    this.dataSource.data = [];
+    this.clearFilter();
+  }
+
+  // Remove patient by ID value (index-independent so it works with filtered/paginated views)
+  removePatient(patientId: string): void {
+    const idx = this.patients.indexOf(patientId);
+    if (idx !== -1) {
+      this.patients.splice(idx, 1);
+      this.dataSource.data = [...this.patients];
+    }
   }
 
   toNoTimeZoneDateString(date: Date): string {
@@ -290,6 +326,7 @@ export class GenerateReportFormComponent implements OnInit, OnDestroy {
 
   private resetForm() {
     this.patients = [];
+    this.dataSource.data = [];
     this.generateReportForm.controls['startDate'].reset();
     this.generateReportForm.controls['endDate'].reset();
     this.generateReportForm.controls['facilityId'].reset();
@@ -338,6 +375,7 @@ export class GenerateReportFormComponent implements OnInit, OnDestroy {
         );
         if (newPatients.length > 0) {
           this.patients.push(...newPatients); // Add to array
+          this.dataSource.data = [...this.patients];
         } else if (enteredPatients.length > 0 && newPatients.length === 0) {
           this.snackBar.open('All patient IDs already added', '', {
             duration: 2000,
@@ -351,7 +389,6 @@ export class GenerateReportFormComponent implements OnInit, OnDestroy {
 
   loadFile(file: any) {
     const reader = new FileReader();
-    reader.readAsText(file);
     const fileName = file.name.toLowerCase();
     if (fileName.endsWith('.csv')) {
       this.errorMessage = '';
@@ -359,6 +396,8 @@ export class GenerateReportFormComponent implements OnInit, OnDestroy {
       this.errorMessage = 'Please upload a valid CSV file (with .csv extension).';
       return;
     }
+    this.isFileLoading = true;
+    reader.readAsText(file);
     reader.onload = () => {
       const csvData = reader.result as string;
       Papa.parse(csvData, {
@@ -366,10 +405,13 @@ export class GenerateReportFormComponent implements OnInit, OnDestroy {
         skipEmptyLines: true,
         complete: (result) => {
           this.patients = (result.data as string[][]).map(row => row[0]);
+          this.dataSource.data = [...this.patients];
+          this.isFileLoading = false;
         },
       });
     };
     reader.onerror = () => {
+      this.isFileLoading = false;
       throw new Error('Error reading the file.');
     };
   }
@@ -389,7 +431,7 @@ export class GenerateReportFormComponent implements OnInit, OnDestroy {
   }
 
   get canGenerateReport(): boolean {
-    if (this.generateReportForm.invalid) {
+    if (this.generateReportForm.invalid || this.isFileLoading) {
       return false;
     }
 
