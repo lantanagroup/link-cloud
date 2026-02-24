@@ -1,4 +1,6 @@
-﻿using Hl7.Fhir.Model;
+﻿using System.Net;
+using System.Net.Http.Headers;
+using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
@@ -11,8 +13,6 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Net;
-using System.Net.Http.Headers;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
@@ -57,6 +57,14 @@ public class SearchFhirCommand : ISearchFhirCommand
         _authenticationRetrievalService = authenticationRetrievalService ?? throw new ArgumentNullException(nameof(authenticationRetrievalService));
     }
 
+    protected virtual (HttpClient client, HeaderCapturingHandler handler) CreateHttpClientWithHandler()
+    {
+        var innerHandler = new HttpClientHandler();
+        var headerCapturingHandler = new HeaderCapturingHandler { InnerHandler = innerHandler };
+        var httpClientWithHandler = new HttpClient(headerCapturingHandler);
+        return (httpClientWithHandler, headerCapturingHandler);
+    }
+
     public async IAsyncEnumerable<Bundle> ExecuteAsync(SearchFhirCommandRequest request, CancellationToken cancellationToken = default)
     {
         using var _ = _metrics.MeasureDataRequestDuration([
@@ -76,10 +84,7 @@ public class SearchFhirCommand : ISearchFhirCommand
 
         using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.queryConfig.GetMaxConcurrentRequestsOrDefault(), _distributedLockSettings.Expiration, cancellationToken))
         {
-            // Create a new handler chain using a DelegatingHandler around a base HttpClientHandler
-            var innerHandler = new HttpClientHandler();
-            var headerCapturingHandler = new HeaderCapturingHandler { InnerHandler = innerHandler };
-            var httpClientWithHandler = new HttpClient(headerCapturingHandler);
+            var (httpClientWithHandler, headerCapturingHandler) = CreateHttpClientWithHandler();
 
             var fhirClient = new FhirClient(request.queryConfig.FhirServerBaseUrl, httpClientWithHandler, new FhirClientSettings
             {
@@ -162,10 +167,7 @@ public class SearchFhirCommand : ISearchFhirCommand
 
         using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.queryConfig.GetMaxConcurrentRequestsOrDefault(), _distributedLockSettings.Expiration, cancellationToken))
         {
-            // Create a new handler chain using a DelegatingHandler around a base HttpClientHandler
-            var innerHandler = new HttpClientHandler();
-            var headerCapturingHandler = new HeaderCapturingHandler { InnerHandler = innerHandler };
-            var httpClientWithHandler = new HttpClient(headerCapturingHandler);
+            var (httpClientWithHandler, headerCapturingHandler) = CreateHttpClientWithHandler();
 
             var fhirClient = new FhirClient(request.queryConfig.FhirServerBaseUrl, httpClientWithHandler, new FhirClientSettings
             {
@@ -181,7 +183,14 @@ public class SearchFhirCommand : ISearchFhirCommand
             Bundle resultBundle;
             try
             {
-                resultBundle = await fhirClient.SearchAsync(request.searchParams, request.resourceType.ToString(), cancellationToken);
+                if (request.queryType == FhirQueryType.SearchPost)
+                {
+                    resultBundle = await fhirClient.SearchUsingPostAsync(request.searchParams, request.resourceType.ToString(), cancellationToken);
+                }
+                else
+                {
+                    resultBundle = await fhirClient.SearchAsync(request.searchParams, request.resourceType.ToString(), cancellationToken);
+                }
             }
             catch (FhirOperationException ex) when (ex.Status == HttpStatusCode.TooManyRequests)
             {
