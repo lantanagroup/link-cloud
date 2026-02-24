@@ -169,6 +169,16 @@
         </div>
       }
       <div class="input-container" [class.hidden]="selectedFormControl.value === 'censusPatients'">
+        <div class="loaded-patients-header">
+          <span class="loaded-patients-title">Loaded Patients</span>
+          @if (patients.length > 0) {
+            @if (searchFilter) {
+              <span class="patient-count">Showing {{ dataSource.filteredData.length }} of {{ patients.length }}</span>
+            } @else {
+              <span class="patient-count">{{ patients.length }} patient IDs</span>
+            }
+          }
+        </div>
         @if (patients.length > 0) {
           <div class="patient-search-bar">
             <mat-form-field appearance="outline" class="search-field">
@@ -187,11 +197,6 @@
               <mat-icon>delete_sweep</mat-icon> Delete All
             </button>
           </div>
-          @if (searchFilter) {
-            <span class="patient-count">Showing {{ dataSource.filteredData.length }} of {{ patients.length }}</span>
-          } @else {
-            <span class="patient-count">Total Patient IDs: {{ patients.length }}</span>
-          }
         }
 
         <!-- Always in DOM so ngAfterViewInit can connect the paginator before data arrives -->
