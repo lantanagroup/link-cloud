@@ -370,9 +370,9 @@ export class GenerateReportFormComponent implements OnInit, OnDestroy, AfterView
       if (patientNameControl?.valid) {
         let enteredPatients = this.parseString(patientNameControl.value);
         // Filter out duplicates before adding to the array
-        const newPatients = enteredPatients.filter(patient =>
+        const newPatients = [...new Set(enteredPatients.filter(patient =>
           !this.patients.includes(patient) && patient.length > 0
-        );
+        ))];
         if (newPatients.length > 0) {
           this.patients.push(...newPatients); // Add to array
           this.dataSource.data = [...this.patients];
@@ -404,7 +404,8 @@ export class GenerateReportFormComponent implements OnInit, OnDestroy, AfterView
         header: false,
         skipEmptyLines: true,
         complete: (result) => {
-          this.patients = (result.data as string[][]).map(row => row[0]);
+          const rawIds = (result.data as string[][]).map(row => row[0].trim()).filter(id => id.length > 0);
+          this.patients = [...new Set(rawIds)];
           this.dataSource.data = [...this.patients];
           this.isFileLoading = false;
         },
