@@ -23,6 +23,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Moq;
 using OpenTelemetry.Trace;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Queries;
 
 namespace IntegrationTests.DataAcquisition
 {
@@ -75,9 +77,10 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddTransient<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
             builder.Services.AddTransient<IEntityRepository<ResourceReferenceType>, EntityRepository<ResourceReferenceType, DataAcquisitionDbContext>>();
 
-            // NEW: OrganizationLocationConfiguration repositories
+            // OrganizationLocationConfiguration repositories
             builder.Services.AddScoped<IEntityRepository<OrganizationLocationConfiguration>, EntityRepository<OrganizationLocationConfiguration, DataAcquisitionDbContext>>();
             builder.Services.AddScoped<IEntityRepository<OrganizationLocationCondition>, EntityRepository<OrganizationLocationCondition, DataAcquisitionDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<OrganizationLocationMapping>, EntityRepository<OrganizationLocationMapping, DataAcquisitionDbContext>>();
 
             // Register IDatabase implementation (it will now receive the new repositories via constructor injection)
             builder.Services.AddScoped<IDatabase, Database>();
@@ -91,9 +94,11 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddScoped<IDataAcquisitionLogManager, DataAcquisitionLogManager>();
             builder.Services.AddScoped<IFhirQueryConfigurationManager, FhirQueryConfigurationManager>();
 
-            // NEW: OrganizationLocationConfiguration manager & queries
+            // OrganizationLocationConfiguration manager & queries
             builder.Services.AddScoped<IOrganizationLocationConfigurationManager, OrganizationLocationConfigurationManager>();
             builder.Services.AddScoped<IOrganizationLocationConfigurationQueries, OrganizationLocationConfigurationQueries>();
+            builder.Services.AddScoped<IOrganizationLocationMappingManager, OrganizationLocationMappingManager>();
+            builder.Services.AddScoped<IOrganizationLocationMappingQueries, OrganizationLocationMappingQueries>();
 
             // Register queries
             builder.Services.AddScoped<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();

@@ -16,6 +16,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
         IEntityRepository<DataAcquisitionLog> DataAcquisitionLogRepository { get; set; }
         IEntityRepository<OrganizationLocationConfiguration> LocationConfigurationRepository { get; set; }
         IEntityRepository<OrganizationLocationCondition> LocationConditionRepository { get; set; }
+        IEntityRepository<OrganizationLocationMapping> LocationMappingRepository { get; set; }
 
         Task SaveChangesAsync();
     }
@@ -32,6 +33,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
         public IEntityRepository<DataAcquisitionLog> DataAcquisitionLogRepository { get; set; }
         public IEntityRepository<OrganizationLocationConfiguration> LocationConfigurationRepository { get; set; }
         public IEntityRepository<OrganizationLocationCondition> LocationConditionRepository { get; set; }
+        public IEntityRepository<OrganizationLocationMapping> LocationMappingRepository { get; set; }
 
         public Database(
             DataAcquisitionDbContext context,
@@ -44,7 +46,8 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
             IEntityRepository<ResourceReferenceType> resourceReferenceTypeRepository,
             IEntityRepository<FhirQueryResourceType> fhirQueryResourceTypeRepository,
             IEntityRepository<OrganizationLocationConfiguration> locationConfigurationRepository,
-            IEntityRepository<OrganizationLocationCondition> locationConditionRepository)
+            IEntityRepository<OrganizationLocationCondition> locationConditionRepository,
+            IEntityRepository<OrganizationLocationMapping> locationMappingRepository)
         {
             _context = context;
             QueryPlanRepository = queryPlans;
@@ -57,6 +60,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
             FhirQueryResourceTypeRepository = fhirQueryResourceTypeRepository;
             LocationConfigurationRepository = locationConfigurationRepository;
             LocationConditionRepository = locationConditionRepository;
+            LocationMappingRepository = locationMappingRepository;
         }
 
         public async Task SaveChangesAsync()
