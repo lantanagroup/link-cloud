@@ -1,6 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 
-namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 [ExcludeFromCodeCoverage]
 public class CreateOrganizationLocationConfigurationModel
