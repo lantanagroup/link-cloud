@@ -75,7 +75,7 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddTransient<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
             builder.Services.AddTransient<IEntityRepository<ResourceReferenceType>, EntityRepository<ResourceReferenceType, DataAcquisitionDbContext>>();
 
-            // NEW: OrganizationLocationConfiguration repositories
+            // OrganizationLocationConfiguration repositories
             builder.Services.AddScoped<IEntityRepository<OrganizationLocationConfiguration>, EntityRepository<OrganizationLocationConfiguration, DataAcquisitionDbContext>>();
             builder.Services.AddScoped<IEntityRepository<OrganizationLocationCondition>, EntityRepository<OrganizationLocationCondition, DataAcquisitionDbContext>>();
 
@@ -91,7 +91,7 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddScoped<IDataAcquisitionLogManager, DataAcquisitionLogManager>();
             builder.Services.AddScoped<IFhirQueryConfigurationManager, FhirQueryConfigurationManager>();
 
-            // NEW: OrganizationLocationConfiguration manager & queries
+            // OrganizationLocationConfiguration manager & queries
             builder.Services.AddScoped<IOrganizationLocationConfigurationManager, OrganizationLocationConfigurationManager>();
             builder.Services.AddScoped<IOrganizationLocationConfigurationQueries, OrganizationLocationConfigurationQueries>();
 
