@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
+using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
@@ -11,28 +12,29 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
-    public class PatientListsAcquiredListener : BackgroundService
+    public class PatientEventListener : BackgroundService
     {
-        private readonly ILogger<PatientListsAcquiredListener> _logger;
-        private readonly IKafkaConsumerFactory<string, PatientListMessage> _kafkaConsumerFactory;
-        private readonly ITransientExceptionHandler<string, PatientListMessage> _transientExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<string, PatientListMessage> _deadLetterExceptionHandler;
+        private readonly ILogger<PatientEventListener> _logger;
+        private readonly IKafkaConsumerFactory<string, PatientEventValue> _kafkaConsumerFactory;
+        private readonly ITransientExceptionHandler<string, PatientEventValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<string, PatientEventValue> _deadLetterExceptionHandler;
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ServiceInformation _serviceInformation;
 
         private string Name => this.GetType().Name;
 
-        public PatientListsAcquiredListener(
-            ILogger<PatientListsAcquiredListener> logger, 
-            IKafkaConsumerFactory<string, PatientListMessage> kafkaConsumerFactory,
-            ITransientExceptionHandler<string, PatientListMessage> transientExceptionHandler,
-            IDeadLetterExceptionHandler<string, PatientListMessage> deadLetterExceptionHandler, 
+        public PatientEventListener(
+            ILogger<PatientEventListener> logger, 
+            IKafkaConsumerFactory<string, PatientEventValue> kafkaConsumerFactory,
+            ITransientExceptionHandler<string, PatientEventValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<string, PatientEventValue> deadLetterExceptionHandler, 
             IServiceScopeFactory serviceScopeFactory, ServiceInformation serviceInformation)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -43,14 +45,13 @@ namespace LantanaGroup.Link.Report.Listeners
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
-            _transientExceptionHandler.Topic = KafkaTopic.PatientListsAcquiredRetry.GetStringValue();
-
-            _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.PatientListsAcquired) + "-Error";
+            _transientExceptionHandler.Topic = KafkaTopic.PatientEventRetry.GetStringValue();
+            _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.PatientEvent) + "-Error";
         }
 
         protected override System.Threading.Tasks.Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            return Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
+            return System.Threading.Tasks.Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
         }
 
         private async void StartConsumerLoop(CancellationToken cancellationToken)
@@ -65,9 +66,9 @@ namespace LantanaGroup.Link.Report.Listeners
 
             try
             {
-                consumer.Subscribe(nameof(KafkaTopic.PatientListsAcquired));
+                consumer.Subscribe(nameof(KafkaTopic.PatientEvent));
 
-                _logger.LogInformation("Started PatientListsAcquired consumer for topic '{Topic}' at {StartTime}", nameof(KafkaTopic.PatientListsAcquired), DateTime.UtcNow);
+                _logger.LogInformation("Started PatientEvent consumer for topic '{Topic}' at {StartTime}", nameof(KafkaTopic.PatientEvent), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -91,13 +92,22 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
 
                                 var key = result.Message.Key;
-                                var value = result.Message.Value.PatientLists;
+                                var value = result.Message.Value;
                                 facilityId = key;
 
-                                if (string.IsNullOrWhiteSpace(key) || value == null || value.Any(x => x.PatientIds == null))
+                                if (string.IsNullOrWhiteSpace(key) || value == null)
                                 {
-                                    throw new DeadLetterException("Invalid Patient Id's Acquired Event");
+                                    throw new DeadLetterException("Invalid Patient Event");
                                 }
+
+                                if (value.EventType != PatientEvents.Admit.ToString())
+                                {
+                                    _logger.LogInformation("Patient {PatientId} has event type of {EventType}. Ignoring.", HtmlInputSanitizer.Sanitize(value.PatientId), HtmlInputSanitizer.Sanitize(value.EventType));
+                                    consumer.Commit(result);
+                                    return;
+                                }
+
+                                _logger.LogInformation("Consuming Admit PatientEvent (FacilityId: {facilityId}, PatientId: {PatientId})", HtmlInputSanitizer.Sanitize(facilityId), HtmlInputSanitizer.Sanitize(value.PatientId));
 
                                 var scheduledReports = await database.ReportScheduledRepository.FindAsync(x => x.FacilityId == key && x.EndOfReportPeriodJobHasRun == false, cancellationToken);
 
@@ -108,42 +118,36 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 foreach (var scheduledReport in scheduledReports)
                                 {
-                                    foreach (var patientListItem in value)
+                                    var entry = await reportEntryManager.SingleOrDefaultAsync(e => e.ReportScheduleId == scheduledReport.Id && e.PatientId == value.PatientId, consumeCancellationToken);
+
+                                    if (entry == null)
                                     {
-                                        foreach (var pId in patientListItem.PatientIds)
+                                        entry = new ReportEntry()
                                         {
-                                            var patientId = pId.Split('/').Last();
-                                            var entry = await reportEntryManager.SingleOrDefaultAsync(e => e.ReportScheduleId == scheduledReport.Id && e.PatientId == patientId, consumeCancellationToken);
+                                            PatientId = value.PatientId,
+                                            FacilityId = scheduledReport.FacilityId,
+                                            CreateDate = DateTime.Now,
+                                            ReportingStatus = ReportingStatus.PatientIdentified,
+                                            ReportScheduleId = scheduledReport.Id
+                                        };
+                                        await reportEntryManager.AddAsync(entry, cancellationToken);
+                                    }
 
-                                            if (entry == null)
-                                            {
-                                                entry = new ReportEntry()
-                                                {
-                                                    PatientId = patientId,
-                                                    FacilityId = scheduledReport.FacilityId,
-                                                    CreateDate = DateTime.Now,
-                                                    ReportingStatus = ReportingStatus.PatientIdentified,
-                                                    ReportScheduleId = scheduledReport.Id
-                                                };
-                                                await reportEntryManager.AddAsync(entry, cancellationToken);
-                                            }
+                                    foreach (var reportType in scheduledReport.ReportTypes)
+                                    {
+                                        var measureReportEntry = entry.MeasureReportList.Where(x => x.ReportType == reportType).FirstOrDefault();
 
-                                            foreach (var reportType in scheduledReport.ReportTypes)
-                                            {
-                                                var measureReportEntry = entry.MeasureReportList.Where(x => x.ReportType == reportType).FirstOrDefault();
-
-                                                if (measureReportEntry != null) {
-                                                    continue;
-                                                }
-
-                                                entry.MeasureReportList.Add(new EvaluatedMeasureReport()
-                                                {
-                                                    ReportType = reportType
-                                                });
-
-                                                await reportEntryManager.UpdateAsync(entry);
-                                            }
+                                        if (measureReportEntry != null)
+                                        {
+                                            continue;
                                         }
+
+                                        entry.MeasureReportList.Add(new EvaluatedMeasureReport()
+                                        {
+                                            ReportType = reportType
+                                        });
+
+                                        await reportEntryManager.UpdateAsync(entry);
                                     }
                                 }
                             }

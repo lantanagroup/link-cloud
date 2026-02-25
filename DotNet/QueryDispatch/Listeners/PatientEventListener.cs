@@ -97,7 +97,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     PatientEventValue value = consumeResult.Message.Value;
 
-                                    if (value.EventType != "Discharge") {
+                                    if (value.EventType != PatientEvents.Discharge.ToString()) {
                                         _logger.LogInformation("Patient {PatientId} has event type of {EventType}. Ignoring.", HtmlInputSanitizer.Sanitize(value.PatientId), HtmlInputSanitizer.Sanitize(value.EventType));
                                         _patientEventConsumer.Commit(consumeResult);
                                         return;
