@@ -1,6 +1,9 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Results;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.EntityFrameworkCore;
+using System.Diagnostics;
 
 namespace DataAcquisition.Domain.Application.Queries
 {
@@ -20,6 +23,12 @@ namespace DataAcquisition.Domain.Application.Queries
 
         public async Task<FhirQueryResultModel> GetFhirQueriesAsync(string facilityId, string? correlationId = null, string? patientId = null, string? resourceType = null, CancellationToken cancellationToken = default)
         {
+            using var activity = ServiceActivitySource.Instance.StartActivity("FhirQueryQueries.GetFhirQueriesAsync");
+            activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+            activity?.SetTag(DiagnosticNames.CorrelationId, correlationId);
+            activity?.SetTag(DiagnosticNames.PatientId, patientId);
+            activity?.SetTag(DiagnosticNames.ResourceType, resourceType);
+
             if (string.IsNullOrWhiteSpace(facilityId))
             {
                 throw new ArgumentNullException(nameof(facilityId));
