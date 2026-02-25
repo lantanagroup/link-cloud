@@ -45,6 +45,7 @@ import {FaIconComponent} from "@fortawesome/angular-fontawesome";
 import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocomplete";
 import {faSearch} from "@fortawesome/free-solid-svg-icons";
 import {fromZonedTime} from 'date-fns-tz';
+import {TextFieldModule} from '@angular/cdk/text-field';
 
 
 @Component({
@@ -73,7 +74,8 @@ import {fromZonedTime} from 'date-fns-tz';
     MatAutocompleteTrigger,
     MatAutocomplete,
     MatTableModule,
-    MatPaginatorModule
+    MatPaginatorModule,
+    TextFieldModule
   ],
   templateUrl: './generate-report-form.component.html',
   styleUrls: ['./generate-report-form.component.scss']
@@ -170,8 +172,10 @@ export class GenerateReportFormComponent implements OnInit, OnDestroy, AfterView
 
   ngAfterViewInit(): void {
     this.dataSource.paginator = this.paginator;
-    this.dataSource.filterPredicate = (data: string, filter: string) =>
-      data.toLowerCase().includes(filter);
+    this.dataSource.filterPredicate = (data: string, filter: string) => {
+      const terms = filter.split(',').map(t => t.trim()).filter(t => t.length > 0);
+      return terms.length === 0 || terms.some(term => data.toLowerCase().includes(term));
+    };
   }
 
   applyFilter(filterValue: string): void {
@@ -291,7 +295,7 @@ export class GenerateReportFormComponent implements OnInit, OnDestroy, AfterView
         'startDate': startUtc,
         'endDate': endUtc,
         'reportTypes': this.reportTypesControl.value,
-        'patientIds': this.patients
+        'patientIds': this.selectedFormControl.value === 'censusPatients' ? [] : this.patients
       };
       this.tenantService.generateAdHocReport(this.facilityIdControl.value, adHocReportRequest).subscribe({
         next: (response: IReportGenerationResponse) => {
@@ -418,11 +422,8 @@ export class GenerateReportFormComponent implements OnInit, OnDestroy, AfterView
   }
 
   parseString(patient: string): string[] {
-    let enteredPatients: string[] = [];
-    if (patient) {
-      enteredPatients = patient.split(',').map(item => item.trim());
-    }
-    return enteredPatients;
+    if (!patient) return [];
+    return patient.split(/[\n,]/).map(item => item.trim()).filter(item => item.length > 0);
   }
 
   navToReport() {

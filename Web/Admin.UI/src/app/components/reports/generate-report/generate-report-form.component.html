@@ -109,16 +109,32 @@
 
     <div class="row">
       <mat-radio-group formControlName="selectedForm">
-        <mat-radio-button value="fileUpload">File Upload</mat-radio-button>
-        <mat-radio-button value="manualPatients">Enter Patients</mat-radio-button>
+        <mat-radio-button value="fileUpload">
+          Upload CSV
+          @if (patients.length > 0) {
+            <span class="patient-badge">{{ patients.length }}</span>
+          }
+        </mat-radio-button>
+        <mat-radio-button value="manualPatients">
+          Enter Patient IDs
+          @if (patients.length > 0) {
+            <span class="patient-badge">{{ patients.length }}</span>
+          }
+        </mat-radio-button>
         <mat-radio-button value="censusPatients">Use Census</mat-radio-button>
       </mat-radio-group>
+      @if (patients.length > 0 && selectedFormControl.value !== 'censusPatients') {
+        <div class="patient-list-info">
+          <mat-icon>info</mat-icon>
+          {{ patients.length }} patients loaded — shared between Upload CSV and Enter Patient IDs. Switching to Use Census will not use this list.
+        </div>
+      }
     </div>
     <!-- File Upload Form -->
     <div class="row">
       @if (selectedFormControl.value === 'fileUpload') {
-        <div>
-          <h3>File Upload</h3>
+        <div class="full-width">
+          <h3>Upload CSV</h3>
           <file-upload (fileChange)="loadFile($event)">Upload</file-upload>
           @if (isFileLoading) {
             <div class="file-loading">
@@ -134,36 +150,50 @@
         </div>
       }
 
-      <!-- Census Patients Form -->
+      <!-- Enter Patients Form -->
       @if (selectedFormControl.value === 'manualPatients') {
-        <div>
-          <h3>Census Patients</h3>
-          <div>
-            <mat-form-field appearance="outline">
-              <input matInput formControlName="patients" placeholder="Enter comma-delimited string of patients"/>
+        <div class="full-width">
+          <h3>Enter Patient IDs</h3>
+          <div class="patient-entry-row">
+            <mat-form-field appearance="outline" class="patient-entry-field">
+              <mat-label>Patient IDs</mat-label>
+              <textarea matInput cdkTextareaAutosize cdkAutosizeMinRows="3"
+                        formControlName="patients"
+                        placeholder="e.g. Patient1, Patient2&#10;or one per line"></textarea>
+              <mat-hint>Comma or newline separated — click Add to add them</mat-hint>
             </mat-form-field>
-            <button mat-raised-button color="primary" type="button" class="custom-height-button" (click)="addPatient()">
-              Add
+            <button mat-raised-button color="primary" type="button" class="custom-height-button patient-action-btn" (click)="addPatient()">
+              <mat-icon>add</mat-icon> Add
             </button>
           </div>
         </div>
       }
-      <div class="input-container">
+      <div class="input-container" [class.hidden]="selectedFormControl.value === 'censusPatients'">
+        <div class="loaded-patients-header">
+          <span class="loaded-patients-title">Loaded Patients</span>
+          @if (patients.length > 0) {
+            @if (searchFilter) {
+              <span class="patient-count">Showing {{ dataSource.filteredData.length }} of {{ patients.length }}</span>
+            } @else {
+              <span class="patient-count">{{ patients.length }} patient IDs</span>
+            }
+          }
+        </div>
         @if (patients.length > 0) {
           <div class="patient-search-bar">
             <mat-form-field appearance="outline" class="search-field">
-              <mat-label>Search patients</mat-label>
+              <mat-label>Filter by Patient IDs</mat-label>
               <input matInput
                      [value]="searchFilter"
                      (input)="applyFilter($any($event.target).value)"
-                     placeholder="Filter by patient ID" />
+                     placeholder="e.g. Patient1, Patient2" />
               @if (searchFilter) {
                 <button matSuffix mat-icon-button aria-label="Clear" (click)="clearFilter()">
                   <mat-icon>close</mat-icon>
                 </button>
               }
             </mat-form-field>
-            <button mat-stroked-button color="warn" type="button" (click)="clearAllPatients()">
+            <button mat-stroked-button color="warn" type="button" class="patient-action-btn" (click)="clearAllPatients()">
               <mat-icon>delete_sweep</mat-icon> Delete All
             </button>
           </div>
@@ -197,9 +227,6 @@
     </div>
     <!-- Button -->
     <div class="generate-report-actions">
-      @if (patients.length > 0) {
-        <span class="patient-count">Total Patients: {{ patients.length }}</span>
-      }
       <button type="button" mat-raised-button color="primary" [disabled]="!canGenerateReport"
         (click)="generateReport()">Generate Report
       </button>
