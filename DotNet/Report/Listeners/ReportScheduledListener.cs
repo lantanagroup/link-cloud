@@ -17,7 +17,6 @@ namespace LantanaGroup.Link.Report.Listeners
 {
     public class ReportScheduledListener : BackgroundService
     {
-
         private readonly ILogger<ReportScheduledListener> _logger;
         private readonly IKafkaConsumerFactory<string, ReportScheduledValue> _kafkaConsumerFactory;
         private readonly ITransientExceptionHandler<string, ReportScheduledValue> _transientExceptionHandler;
@@ -41,11 +40,8 @@ namespace LantanaGroup.Link.Report.Listeners
             _serviceScopeFactory = serviceScopeFactory;
             _serviceInformation = serviceInformation;
 
-            _transientExceptionHandler = transientExceptionHandler ??
-                                               throw new ArgumentException(nameof(_deadLetterExceptionHandler));
-
-            _deadLetterExceptionHandler = deadLetterExceptionHandler ??
-                                               throw new ArgumentException(nameof(_deadLetterExceptionHandler));
+            _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
+            _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
             _transientExceptionHandler.Topic = nameof(KafkaTopic.ReportScheduled) + "-Retry";
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ReportScheduled) + "-Error";
@@ -57,7 +53,6 @@ namespace LantanaGroup.Link.Report.Listeners
         {
             return Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
         }
-
 
         private async void StartConsumerLoop(CancellationToken cancellationToken)
         {
@@ -80,99 +75,8 @@ namespace LantanaGroup.Link.Report.Listeners
                     {
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
-                            if (result == null)
-                            {
-                                _logger.LogWarning("ReportScheduled event is null. Commiting and moving on.");
-                                consumer.Commit();
-                                return;
-                            }
-
-                            try
-                            {
-                                var key = result.Message.Key;
-                                var value = result.Message.Value;
-
-                                if (!value.IsValid())
-                                {
-                                    throw new DeadLetterException("Invalid Report Scheduled event");
-                                }
-
-                                using var scope = _serviceScopeFactory.CreateScope();
-                                var reportScheduleManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
-
-                                facilityId = key;
-                                var startDate = value.StartDate.UtcDateTime;
-                                var endDate = value.EndDate.UtcDateTime;
-                                var frequency = value.Frequency;
-                                var reportTypes = value.ReportTypes;
-                                var reportId = value.ReportTrackingId;
-
-                                // Check if this already exists
-                                ReportSchedule? existing = null;
-
-                                if (!string.IsNullOrEmpty(reportId))
-                                {
-                                    _logger.LogDebug($"Report ID is not null. Checking if the report already exists.");
-                                    existing = await reportScheduleManager.SingleOrDefaultAsync(
-                                        x => x.Id == reportId, consumeCancellationToken);
-                                }
-                                else
-                                {
-                                    _logger.LogDebug($"Report ID is null. Generating a new ID.");
-                                    reportId = Guid.NewGuid().ToString();
-                                }
-
-                                ReportSchedule? reportSchedule;
-                                if (existing != null) 
-                                {
-                                    _logger.LogError("Report with id {ReportId} already exists. Creating dead letter for event/message.", reportId);
-                                    throw new DeadLetterException($"Report with id {reportId} already exists.");
-                                }
-                                else
-                                {
-                                    _logger.LogInformation("Report with id {ReportId} does not exist... Creating.", reportId);
-                                    reportSchedule = new ReportSchedule
-                                    {
-                                        Id = reportId,
-                                        FacilityId = facilityId,
-                                        ReportStartDate = startDate,
-                                        ReportEndDate = endDate,
-                                        Frequency = frequency,
-                                        ReportTypes = reportTypes,
-                                        Status = ScheduleStatus.Scheduled,
-                                        CreateDate = DateTime.UtcNow
-                                    };
-                                    var reportName = _blobStorageService.GetReportName(reportSchedule);
-                                    reportSchedule.PayloadRootUri = _blobStorageService.GetUri(reportName)?.ToString();
-
-                                    reportSchedule = await reportScheduleManager.AddAsync(reportSchedule, consumeCancellationToken);
-
-                                    await MeasureReportScheduleService.CreateJobAndTrigger(reportSchedule,
-                                        await _schedulerFactory.GetScheduler(consumeCancellationToken));
-                                }
-                            }
-                            catch (DeadLetterException ex)
-                            {
-                                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
-                            }
-                            catch (TransientException ex)
-                            {
-                                _transientExceptionHandler.HandleException(result, ex, facilityId);
-                            }
-                            catch (TimeoutException ex)
-                            {
-                                var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [{string.Join(", ", consumer.Subscription)}] at offset: {result.TopicPartitionOffset}";
-                                var transientException = new TransientException(exceptionMessage, ex);
-                                _transientExceptionHandler.HandleException(result, transientException, facilityId);
-                            }
-                            catch (Exception ex)
-                            {
-                                _transientExceptionHandler.HandleException(result, ex, facilityId);
-                            }
-                            finally
-                            {
-                                consumer.Commit(result);
-                            }
+                            await ProcessMessageAsync(result, consumeCancellationToken);
+                            consumer.Commit(result);
                         }, cancellationToken);
 
                     }
@@ -204,7 +108,92 @@ namespace LantanaGroup.Link.Report.Listeners
                 _logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
                 consumer.Close();
             }
+        }
 
+        public async Task ProcessMessageAsync(ConsumeResult<string, ReportScheduledValue> result, CancellationToken cancellationToken)
+        {
+            string facilityId = string.Empty;
+            try
+            {
+                if (result == null)
+                {
+                    _logger.LogWarning("ReportScheduled event is null. Commiting and moving on.");
+                    return;
+                }
+
+                var key = result.Message.Key;
+                var value = result.Message.Value;
+
+                if (!value.IsValid())
+                {
+                    throw new DeadLetterException("Invalid Report Scheduled event");
+                }
+
+                using var scope = _serviceScopeFactory.CreateScope();
+                var reportScheduleManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+                facilityId = key;
+                var startDate = value.StartDate.UtcDateTime;
+                var endDate = value.EndDate.UtcDateTime;
+                var frequency = value.Frequency;
+                var reportTypes = value.ReportTypes;
+                var reportId = value.ReportTrackingId;
+
+                ReportSchedule? existing = null;
+
+                if (!string.IsNullOrEmpty(reportId))
+                {
+                    existing = await reportScheduleManager.SingleOrDefaultAsync(x => x.Id == reportId, cancellationToken);
+                }
+                else
+                {
+                    reportId = Guid.NewGuid().ToString();
+                }
+
+                ReportSchedule? reportSchedule;
+                if (existing != null)
+                {
+                    throw new DeadLetterException($"Report with id {reportId} already exists.");
+                }
+                else
+                {
+                    reportSchedule = new ReportSchedule
+                    {
+                        Id = reportId,
+                        FacilityId = facilityId,
+                        ReportStartDate = startDate,
+                        ReportEndDate = endDate,
+                        Frequency = frequency,
+                        ReportTypes = reportTypes,
+                        Status = ScheduleStatus.Scheduled,
+                        CreateDate = DateTime.UtcNow
+                    };
+                    var reportName = _blobStorageService.GetReportName(reportSchedule);
+                    reportSchedule.PayloadRootUri = _blobStorageService.GetUri(reportName)?.ToString();
+
+                    reportSchedule = await reportScheduleManager.AddAsync(reportSchedule, cancellationToken);
+
+                    await MeasureReportScheduleService.CreateJobAndTrigger(reportSchedule, await _schedulerFactory.GetScheduler(cancellationToken));
+                }
+            }
+            catch (DeadLetterException ex)
+            {
+                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
+            }
+            catch (TransientException ex)
+            {
+                _transientExceptionHandler.HandleException(result, ex, facilityId);
+            }
+            catch (TimeoutException ex)
+            {
+                var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [ReportScheduled] at offset: {result.TopicPartitionOffset}";
+                var transientException = new TransientException(exceptionMessage, ex);
+                _transientExceptionHandler.HandleException(result, transientException, facilityId);
+            }
+            catch (Exception ex)
+            {
+                _transientExceptionHandler.HandleException(result, ex, facilityId);
+            }
         }
 
         private static string GetFacilityIdFromHeader(Headers headers)

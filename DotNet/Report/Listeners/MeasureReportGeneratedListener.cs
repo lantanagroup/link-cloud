@@ -158,6 +158,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
         public async Task ProcessMessageAsync(ConsumeResult<Null, MeasureReportGeneratedValue> result, string facilityId, CancellationToken cancellationToken)
         {
+
             if (result.Message.Value == null)
             {
                 throw new DeadLetterException($"{Name}: MeasureReportGenerated event value segment missing");
@@ -251,7 +252,8 @@ namespace LantanaGroup.Link.Report.Listeners
                 await reportPopulationManager.UpdateAsyncWithAggregateResult(populationModel, aggregateMeasureReport, cancellationToken);
             }
 
-            if (reportEntry.MeasureReportList.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable)) {
+            if (reportEntry.MeasureReportList.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable))
+            {
                 await reportEntryManager.UpdateAsyncNotReportableEntry(reportEntry, cancellationToken);
                 return;
             }
@@ -269,6 +271,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 _logger.LogError(ex, "An error was encountered producing a ReadyForValidation (ReportId = {reportId}, FacilityId = {facilityId}, PatientId = {patientId}).", schedule.Id, schedule.FacilityId, messageValue.PatientId);
                 throw new DeadLetterException(ex.Message);
             }
+
         }
     }
 }
