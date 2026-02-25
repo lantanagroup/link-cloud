@@ -1,12 +1,13 @@
-﻿using Confluent.Kafka;
+﻿using System.Text;
+using Confluent.Kafka;
 using Hl7.Fhir.Model;
-using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
-using System.Text;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.Logging;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 
@@ -17,12 +18,12 @@ public interface IBundleEventService<EventKey, EventValue, EventRequest>
     Task GenerateEventAsync(Bundle bundle, EventRequest request, CancellationToken cancellationToken = default);
 }
 
-public class BundleResourceAcquiredEventService : IBundleEventService<string, ResourceAcquired, ResourceAcquiredMessageGenerationRequest>
+public class BundleResourceAcquiredEventService : IBundleEventService<ResourceKey, ResourceAcquired, ResourceAcquiredMessageGenerationRequest>
 {
     private readonly ILogger<BundleResourceAcquiredEventService> _logger;
-    private readonly IProducer<string, ResourceAcquired> _producer;
+    private readonly IProducer<ResourceKey, ResourceAcquired> _producer;
 
-    public BundleResourceAcquiredEventService(ILogger<BundleResourceAcquiredEventService> logger, IProducer<string, ResourceAcquired> producer)
+    public BundleResourceAcquiredEventService(ILogger<BundleResourceAcquiredEventService> logger, IProducer<ResourceKey, ResourceAcquired> producer)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _producer = producer ?? throw new ArgumentNullException(nameof(producer));
@@ -36,9 +37,13 @@ public class BundleResourceAcquiredEventService : IBundleEventService<string, Re
             {
                 await _producer.ProduceAsync(
                     KafkaTopic.ResourceAcquired.ToString(),
-                    new Message<string, ResourceAcquired>
+                    new Message<ResourceKey, ResourceAcquired>
                     {
-                        Key = request.facilityId,
+                        Key = new ResourceKey
+                        {
+                            FacilityId = request.facilityId,
+                            CorrelationId = request.correlationId
+                        },
                         Headers = new Headers
                         {
                             new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(request.correlationId))

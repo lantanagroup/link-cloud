@@ -1,4 +1,6 @@
-﻿using DataAcquisition.Domain.Application.Models;
+﻿using System.Net;
+using Confluent.Kafka;
+using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Rest;
 using Hl7.Fhir.Support;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
@@ -12,11 +14,9 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Comm
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Moq;
-using System.Net;
-using System.Collections.Frozen;
-using System.Collections.Generic;
-using System.Linq;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
@@ -70,9 +70,9 @@ public class FhirApiServiceTests
         var mockLogQueries = new Mock<IDataAcquisitionLogQueries>();
         mockLogQueries.Setup(q => q.CheckIfReferenceResourceHasBeenSent(
             It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new System.Exception("DB failure"));
+            .ThrowsAsync(new Exception("DB failure"));
 
-        await Assert.ThrowsAsync<System.Exception>(() =>
+        await Assert.ThrowsAsync<Exception>(() =>
             mockLogQueries.Object.CheckIfReferenceResourceHasBeenSent("ref4", "report4", "fac4", "corr4", CancellationToken.None));
     }
 
@@ -85,7 +85,7 @@ public class FhirApiServiceTests
         var referenceResourceService = new Mock<IReferenceResourceService>();
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var readFhirCommand = new Mock<IReadFhirCommand>();
-        var kafkaProducer = new Mock<Confluent.Kafka.IProducer<string, ResourceAcquired>>();
+        var kafkaProducer = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
 
         var service = new FhirApiService(
             referenceResourceManager.Object,
@@ -100,7 +100,7 @@ public class FhirApiServiceTests
 
         // Act: Use reflection to invoke the private InsertDateExtension method
         typeof(FhirApiService)
-            .GetMethod("InsertDateExtension", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+            .GetMethod("InsertDateExtension", BindingFlags.NonPublic | BindingFlags.Instance)
             .Invoke(service, new object[] { resource });
 
         // Assert: meta.extension contains the expected extension
@@ -123,7 +123,7 @@ public class FhirApiServiceTests
         var referenceResourceService = new Mock<IReferenceResourceService>();
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var readFhirCommand = new Mock<IReadFhirCommand>();
-        var kafkaProducer = new Mock<Confluent.Kafka.IProducer<string, ResourceAcquired>>();
+        var kafkaProducer = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
 
         var service = new FhirApiService(
             referenceResourceManager.Object,
@@ -170,18 +170,18 @@ public class FhirApiServiceTests
         var referenceResourceService = new Mock<IReferenceResourceService>();
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var readFhirCommand = new Mock<IReadFhirCommand>();
-        var kafkaProducer = new Mock<Confluent.Kafka.IProducer<string, ResourceAcquired>>();
+        var kafkaProducer = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
 
         // Prepare a shared resource (e.g., Location) with no patient context
-        var location = new Hl7.Fhir.Model.Location
+        var location = new Location
         {
             Id = "loc-1"
         };
-        var bundle = new Hl7.Fhir.Model.Bundle
+        var bundle = new Bundle
         {
-            Entry = new List<Hl7.Fhir.Model.Bundle.EntryComponent>
+            Entry = new List<Bundle.EntryComponent>
             {
-                new Hl7.Fhir.Model.Bundle.EntryComponent { Resource = location }
+                new Bundle.EntryComponent { Resource = location }
             }
         };
 
@@ -197,13 +197,13 @@ public class FhirApiServiceTests
         kafkaProducer
             .Setup(x => x.ProduceAsync(
                 It.IsAny<string>(),
-                It.IsAny<Confluent.Kafka.Message<string, ResourceAcquired>>(),
+                It.IsAny<Message<ResourceKey, ResourceAcquired>>(),
                 It.IsAny<CancellationToken>()))
-            .Callback<string, Confluent.Kafka.Message<string, ResourceAcquired>, CancellationToken>((topic, msg, ct) =>
+            .Callback<string, Message<ResourceKey, ResourceAcquired>, CancellationToken>((topic, msg, ct) =>
             {
                 producedMessage = msg.Value;
             })
-            .ReturnsAsync(new Confluent.Kafka.DeliveryResult<string, ResourceAcquired>());
+            .ReturnsAsync(new DeliveryResult<ResourceKey, ResourceAcquired>());
 
         var service = new FhirApiService(
             referenceResourceManager.Object,
@@ -219,7 +219,7 @@ public class FhirApiServiceTests
             FacilityId = "fac-1",
             CorrelationId = "corr-1",
             QueryPhase = QueryPhase.Initial,
-            ScheduledReport = new LantanaGroup.Link.Shared.Application.Models.ScheduledReport(),
+            ScheduledReport = new ScheduledReport(),
             ReportableEvent = ReportableEvent.Adhoc
         };
 
@@ -236,7 +236,7 @@ public class FhirApiServiceTests
         };
 
         // Act
-        await service.ExecuteSearch(log, fhirQuery, fhirQueryConfig, Hl7.Fhir.Model.ResourceType.Location);
+        await service.ExecuteSearch(log, fhirQuery, fhirQueryConfig, ResourceType.Location);
 
         // Assert: Kafka message was produced and PatientId is null
         Assert.NotNull(producedMessage);
@@ -245,7 +245,7 @@ public class FhirApiServiceTests
 
     }
 
-    private static async IAsyncEnumerable<Hl7.Fhir.Model.Bundle> GetBundleAsync(Hl7.Fhir.Model.Bundle bundle)
+    private static async IAsyncEnumerable<Bundle> GetBundleAsync(Bundle bundle)
     {
         yield return bundle;
         await Task.CompletedTask;

@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Tests.E2ETests;
 using Newtonsoft.Json.Linq;
 using RestSharp;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
@@ -62,7 +63,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             else
             {
                 output.WriteLine("🔴  Facility was not successfully created. Create_SingleMeasureAdHocTestFacility() - FAILED");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
         }
         public void Create_SingleMeasureCensusConfiguration_AdHoc()
@@ -100,12 +101,12 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             if (responseCodeString == "Unauthorized")
             {
                 output.WriteLine("🔴  Census was NOT successfully created. Create_SingleMeasureCensusConfiguration_AdHoc() - Please reauthenticate.");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
             else
             {
                 output.WriteLine("🔴  Census was not successfully configured. Create_SingleMeasureCensusConfiguration_AdHoc() - FAILED");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
         }
         public void Create_SingleMeasureQueryDispatchConfig_AdHoc()
@@ -148,12 +149,12 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             if (responseCodeString == "ServiceUnavailable")
             {
                 output.WriteLine("🔴  Config was NOT successfully created. Create_SingleMeasureQueryDispatchConfig_AdHoc() - The Service is unavailable, please alert dev team.");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
             else
             {
                 output.WriteLine("🔴  Config was not successfully created. Create_SingleMeasureQueryDispatchConfig_AdHoc() - FAILED");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
         }
         public void Create_SingleMeasure_FHIRQueryConfigByFacility_AdHoc()
@@ -196,17 +197,17 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             if (responseCodeString == "Unauthorized")
             {
                 output.WriteLine("🔴  Query was NOT successfully configured. Please reauthenticate. Create_SingleMeasure_FHIRQueryConfigByFacility_AdHoc() FAILED");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
                 output.WriteLine("🔴  Query was NOT successfully configured. The Service is unavailable, please alert dev team. Create_SingleMeasure_FHIRQueryConfigByFacility_AdHoc() FAILED");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
             else
             {
                 output.WriteLine("🔴  Query was not successfully configured. Create_SingleMeasure_FHIRQueryConfigByFacility_AdHoc() FAILED");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
         }
         public void Create_SingleMeasure_MontlhyQueryPlanByFacility_AdHoc()
@@ -254,7 +255,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                     ""1"": {
                       ""QueryConfigType"": ""Reference"",
                       ""ResourceType"": ""Location"",
-                      ""OperationType"": 1,
+                      ""OperationType"": 2,
                       ""Paged"": 100
                     }
                   },
@@ -416,19 +417,19 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                     ""7"": {
                       ""QueryConfigType"": ""Reference"",
                       ""ResourceType"": ""Medication"",
-                      ""OperationType"": 1,
+                      ""OperationType"": 2,
                       ""Paged"": 100
                     },
                     ""8"": {
                       ""QueryConfigType"": ""Reference"",
                       ""ResourceType"": ""Specimen"",
-                      ""OperationType"": 1,
+                      ""OperationType"": 2,
                       ""Paged"": 100
                     },
                     ""9"": {
                       ""QueryConfigType"": ""Reference"",
                       ""ResourceType"": ""Device"",
-                      ""OperationType"": 1,
+                      ""OperationType"": 2,
                       ""Paged"": 100
                     }
                   }
@@ -451,17 +452,17 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             if (responseCodeString == "Unauthorized")
             {
                 output.WriteLine("🔴  MONTHLY Query Plan was NOT successfully created. Please reauthenticate. Create_SingleMeasure_MontlhyQueryPlanByFacility_AdHoc() FAILED");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
                 output.WriteLine("🔴 MONTHLY Query Plan was NOT successfully created. The Service is unavailable, please alert dev team. Create_SingleMeasure_MontlhyQueryPlanByFacility_AdHoc() FAILED");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
             else
             {
                 output.WriteLine("🔴  MONTHLY Query Plan was not successfully created. Create_SingleMeasure_MontlhyQueryPlanByFacility_AdHoc() FAILED");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
         }
         public void Create_SingleMeasure_DischargeQueryPlanByFacility_AdHoc()
@@ -509,7 +510,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                     ""1"": {
                       ""QueryConfigType"": ""Reference"",
                       ""ResourceType"": ""Location"",
-                      ""OperationType"": 1,
+                      ""OperationType"": 2,
                       ""Paged"": 100
                     }
                   },
@@ -671,19 +672,19 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
                     ""7"": {
                       ""QueryConfigType"": ""Reference"",
                       ""ResourceType"": ""Medication"",
-                      ""OperationType"": 1,
+                      ""OperationType"": 2,
                       ""Paged"": 100
                     },
                     ""8"": {
                       ""QueryConfigType"": ""Reference"",
                       ""ResourceType"": ""Specimen"",
-                      ""OperationType"": 1,
+                      ""OperationType"": 2,
                       ""Paged"": 100
                     },
                     ""9"": {
                       ""QueryConfigType"": ""Reference"",
                       ""ResourceType"": ""Device"",
-                      ""OperationType"": 1,
+                      ""OperationType"": 2,
                       ""Paged"": 100
                     }
                   }
@@ -706,17 +707,17 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             if (responseCodeString == "Unauthorized")
             {
                 output.WriteLine("🔴  Query Plan was NOT successfully created. Please reauthenticate. Create_SingleMeasure_DischargeQueryPlanByFacility_AdHoc() - FAILED");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
                 output.WriteLine("🔴  Query Plan was NOT successfully created. The Service is unavailable, please alert dev team. Create_SingleMeasure_DischargeQueryPlanByFacility_AdHoc() FAILED");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
             else
             {
                 output.WriteLine("🔴  DISCHARGE Query Plan was not successfully created. Create_SingleMeasure_DischargeQueryPlanByFacility_AdHoc() FAILED");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
         }
         public void Create_SingleMeasureFHIRQueryListByFacility_AdHoc()
@@ -785,17 +786,17 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             if (responseCodeString == "Unauthorized")
             {
                 output.WriteLine("🔴  Query List was NOT successfully created. Please reauthenticate. Create_SingleMeasureFHIRQueryListByFacility_AdHoc() FAILED");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
                 output.WriteLine("🔴  Query List was NOT successfully created. The Service is unavailable, please alert dev team. Create_SingleMeasureFHIRQueryListByFacility_AdHoc() FAILED");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
             else
             {
                 output.WriteLine("🔴  Query List was not successfully created. Create_SingleMeasureFHIRQueryListByFacility_AdHoc() FAILED");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
         }
         public void Create_SingleMeasureFacilityNormalizationConfig_AdHoc()
@@ -947,17 +948,17 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             if (responseCodeString == "Unauthorized")
             {
                 output.WriteLine("🔴  Normalization Config was NOT successfully scheduled. Please reauthenticate.");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
                 output.WriteLine("🔴  Normalization Config was NOT successfully scheduled. The Service is unavailable, please alert dev team.");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
             else
             {
                 output.WriteLine("🔴  Normalization Config was not successfully configured.");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
         }    //unused at the moment.
         public void GenerateSingleMeasureAdHocReport_ACH()
@@ -1000,17 +1001,17 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             if (responseCodeString == "Unauthorized")
             {
                 output.WriteLine("🔴  AdHoc Report was NOT successfully scheduled. GenerateSingleMeasureAdHocReport_ACH() - Please reauthenticate.");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
             if (responseCodeString == "ServiceUnavailable")
             {
                 output.WriteLine("🔴  AdHoc Report was NOT successfully scheduled. GenerateSingleMeasureAdHocReport_ACH() - The Service is unavailable, please alert dev team.");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
             else
             {
                 output.WriteLine("🔴  AdHoc Report was not successfully configured. GenerateSingleMeasureAdHocReport_ACH() - FAILED");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
         }
         public void GETSingleMeasureAdHocSubmissionDownloadReport()
@@ -1036,12 +1037,12 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             if (responseCodeString == "Unauthorized")
             {
                 output.WriteLine("🔴  AdHoc report was NOT downloaded. GETSingleMeasureAdHocSubmissionDownloadReport() - Check to make sure you are properly authenticated.");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
             if (responseCodeString == "BadRequest")
             {
                 output.WriteLine("🔴  AdHoc report was NOT downloaded. GETSingleMeasureAdHocSubmissionDownloadReport() - Please check the GETSubmissionDownloadReport request");
-                Xunit.Assert.Fail();
+                Assert.Fail();
             }
         }
         public void GETSingleMeasureAdHocFacilityValidationResultsForReport()
@@ -1092,15 +1093,15 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             if (responseCodeString == "Unauthorized")
             {
                 output.WriteLine("[ERROR] The Get Validation Report request was NOT successful. GETSingleMeasureAdHocFacilityValidationResultsForReport() - Authentication failed.");
-                Xunit.Assert.Fail("Unauthorized request.");
+                Assert.Fail("Unauthorized request.");
             }
             if (responseCodeString == "BadRequest")
             {
                 output.WriteLine("[ERROR] The Get Validation Report request was NOT successful. GETSingleMeasureAdHocFacilityValidationResultsForReport() - Please verify the request parameters.");
-                Xunit.Assert.Fail("Bad request.");
+                Assert.Fail("Bad request.");
             }
             output.WriteLine($"[ERROR] Unexpected response: {responseCodeString}");
-            Xunit.Assert.Fail($"Unexpected validation report response: {responseCodeString}");
+            Assert.Fail($"Unexpected validation report response: {responseCodeString}");
         }
         #endregion
     }

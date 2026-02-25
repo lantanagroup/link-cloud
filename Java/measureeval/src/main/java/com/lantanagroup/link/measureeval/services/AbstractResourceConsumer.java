@@ -11,6 +11,7 @@ import com.lantanagroup.link.shared.exceptions.ValidationException;
 import com.lantanagroup.link.shared.kafka.AsyncListener;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
+import com.lantanagroup.link.shared.kafka.records.ResourceKey;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
@@ -35,7 +36,7 @@ import java.util.stream.Collectors;
 
 import static io.opentelemetry.api.common.AttributeKey.stringKey;
 
-public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord> extends AsyncListener<String, T> {
+public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord> extends AsyncListener<ResourceKey, T> {
     private static final Logger logger = LoggerFactory.getLogger(AbstractResourceConsumer.class);
     private static final Logger performanceLogger =LoggerFactory.getLogger(
             "com.lantanagroup.link.performance." + AbstractResourceConsumer.class.getSimpleName());
@@ -75,7 +76,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     }
 
     @Override
-    protected void process(ConsumerRecord<String, T> record) {
+    protected void process(ConsumerRecord<ResourceKey, T> record) {
         String correlationId = Headers.getCorrelationId(record.headers());
 
         StopWatch totalStopWatch = new StopWatch();
@@ -93,10 +94,11 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             taskStopWatch.stop();
 
             taskStopWatch.start("validateRecord");
-            String facilityId = record.key();
-            if (facilityId == null || facilityId.isEmpty()) {
+            ResourceKey key = record.key();
+            if (key == null || key.getFacilityId() == null || key.getFacilityId().isEmpty()) {
                 throw new ValidationException("Facility ID is null or empty.");
             }
+            String facilityId = key.getFacilityId();
             T value = record.value();
             if (value.getResource() == null && !value.isAcquisitionComplete()) {
                 throw new ValidationException("Record Resource is null and AcquisitionComplete is false.");
@@ -122,7 +124,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
 
             logger.trace("Beginning patient status update");
 
-            PatientReportingEvaluationStatus patientStatus = patientStatusCache.computeIfAbsent(correlationId, key -> {
+            PatientReportingEvaluationStatus patientStatus = patientStatusCache.computeIfAbsent(correlationId, k -> {
                 taskStopWatch.start("retrieveOrCreatePatientStatus");
                 PatientReportingEvaluationStatus _patientStatus = Objects.requireNonNullElseGet(
                         retrievePatientStatus(facilityId, correlationId),
