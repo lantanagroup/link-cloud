@@ -9,6 +9,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Diagnostics;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
@@ -33,12 +36,21 @@ public class ReferenceResourcesQueries : IReferenceResourcesQueries
 
     public async Task<ReferenceResourcesModel?> GetAsync(string resourceId, string facilityId, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("ReferenceResourcesQueries.GetAsync");
+        activity?.SetTag(DiagnosticNames.ResourceId, resourceId);
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+
         var entity = await _database.ReferenceResourcesRepository.FirstOrDefaultAsync(x => x.ResourceId == resourceId && x.FacilityId == facilityId, cancellationToken);
         return entity != null ? ReferenceResourcesModel.FromDomain(entity) : null;
     }
 
     public async Task<PagedConfigModel<ReferenceResourcesModel>> SearchAsync(SearchReferenceResourcesModel model, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("ReferenceResourcesQueries.SearchAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
+        activity?.SetTag(DiagnosticNames.ResourceId, model.ResourceId);
+        activity?.SetTag(DiagnosticNames.ResourceType, model.ResourceType);
+
         ArgumentNullException.ThrowIfNull(model);
 
         var query = _dbContext.ReferenceResources.AsNoTracking().AsQueryable();
