@@ -84,13 +84,13 @@ public class QueryPlanManager : IQueryPlanManager
 
     public async Task<QueryPlanModel> AddAsync(CreateQueryPlanModel model, CancellationToken cancellationToken = default)
     {
-        using var activity = ServiceActivitySource.Instance.StartActivity("QueryPlanManager.AddAsync");
-        activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
-
         if (model == null)
         {
             throw new ArgumentNullException(nameof(model), "CreateQueryPlanModel cannot be null.");
         }
+
+        using var activity = ServiceActivitySource.Instance.StartActivity("QueryPlanManager.AddAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
 
         // Perform comprehensive validation
         var validationResult = _validator.ValidateQueryPlan(model.InitialQueries, model.SupplementalQueries);
@@ -141,13 +141,13 @@ public class QueryPlanManager : IQueryPlanManager
 
     public async Task<QueryPlanModel> UpdateAsync(UpdateQueryPlanModel model, CancellationToken cancellationToken = default)
     {
-        using var activity = ServiceActivitySource.Instance.StartActivity("QueryPlanManager.UpdateAsync");
-        activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
-
         if (model == null)
         {
             throw new ArgumentNullException(nameof(model), "UpdateQueryPlanModel cannot be null.");
         }
+
+        using var activity = ServiceActivitySource.Instance.StartActivity("QueryPlanManager.UpdateAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
 
         // Perform comprehensive validation
         var validationResult = _validator.ValidateQueryPlan(model.InitialQueries, model.SupplementalQueries);

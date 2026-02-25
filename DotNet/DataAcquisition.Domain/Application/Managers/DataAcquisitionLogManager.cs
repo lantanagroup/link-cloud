@@ -182,6 +182,11 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             existingLog.Notes = updateLog.Notes;
         }
 
+        if (updateLog.QueryType is not null)
+        {
+            existingLog.QueryType = updateLog.QueryType;
+        }
+
         if (updateLog.Status is not null)
         {
             existingLog.Status = updateLog.Status.Value;

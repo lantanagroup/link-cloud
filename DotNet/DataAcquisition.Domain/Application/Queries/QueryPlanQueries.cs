@@ -66,10 +66,10 @@ public class QueryPlanQueries : IQueryPlanQueries
 
     public async Task<PagedConfigModel<QueryPlanModel>> SearchAsync(SearchQueryPlanModel model, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(model);
+
         using var activity = ServiceActivitySource.Instance.StartActivity("QueryPlanQueries.SearchAsync");
         activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
-
-        ArgumentNullException.ThrowIfNull(model);
 
         var query = _dbContext.QueryPlans.AsNoTracking().AsQueryable();
 

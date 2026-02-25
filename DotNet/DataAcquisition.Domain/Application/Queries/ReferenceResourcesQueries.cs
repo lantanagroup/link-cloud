@@ -46,12 +46,12 @@ public class ReferenceResourcesQueries : IReferenceResourcesQueries
 
     public async Task<PagedConfigModel<ReferenceResourcesModel>> SearchAsync(SearchReferenceResourcesModel model, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(model);
+
         using var activity = ServiceActivitySource.Instance.StartActivity("ReferenceResourcesQueries.SearchAsync");
         activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
         activity?.SetTag(DiagnosticNames.ResourceId, model.ResourceId);
         activity?.SetTag(DiagnosticNames.ResourceType, model.ResourceType);
-
-        ArgumentNullException.ThrowIfNull(model);
 
         var query = _dbContext.ReferenceResources.AsNoTracking().AsQueryable();
 
