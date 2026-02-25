@@ -1,4 +1,4 @@
-import {Component, EventEmitter, Input, Output} from '@angular/core';
+import {Component, ElementRef, EventEmitter, Input, Output, ViewChild} from '@angular/core';
 import {MatFormFieldModule} from '@angular/material/form-field';
 
 import {MatButtonModule} from '@angular/material/button';
@@ -27,6 +27,7 @@ export class FileUploadComponent {
   disabled: boolean = false;
 
   @Output() fileChange = new EventEmitter<any>();
+  @ViewChild('fileUpload') fileUploadInput!: ElementRef<HTMLInputElement>;
 
 
   onClick(fileUpload: HTMLInputElement) {
@@ -36,6 +37,7 @@ export class FileUploadComponent {
   clearFile() {
     this.fileName = "";
     this.file = null;
+    this.fileUploadInput.nativeElement.value = '';
     this.fileChange.emit(null);
   }
 
