@@ -2,7 +2,10 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
@@ -25,6 +28,12 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
 
     public async Task<ReferenceResourcesModel> CreateAsync(CreateReferenceResourcesModel model, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("ReferenceResourcesManager.CreateAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
+        activity?.SetTag(DiagnosticNames.ReportId, model.DataAcquisitionLogId);
+        activity?.SetTag(DiagnosticNames.ResourceId, model.ResourceId);
+        activity?.SetTag(DiagnosticNames.ResourceType, model.ResourceType);
+
         if (model == null)
         {
             throw new ArgumentNullException(nameof(model));
@@ -50,6 +59,10 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
 
     public async Task<ReferenceResourcesModel> UpdateAsync(UpdateReferenceResourcesModel model, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("ReferenceResourcesManager.UpdateAsync");
+        activity?.SetTag(DiagnosticNames.ResourceId, model.Id);
+        activity?.SetTag(DiagnosticNames.ResourceType, model.ResourceType);
+
         if (model == null)
         {
             throw new ArgumentNullException(nameof(model));

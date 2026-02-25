@@ -13,6 +13,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Diagnostics;
@@ -61,6 +62,12 @@ public class FhirApiService : IFhirApiService
     #region Interface Implementation
     public async Task<IReadOnlyCollection<string>> ExecuteRead(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, ResourceType resourceType, FhirQueryConfigurationModel fhirQueryConfiguration, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("FhirApiService.ExecuteRead");
+        activity?.SetTag(DiagnosticNames.FacilityId, log.FacilityId);
+        activity?.SetTag(DiagnosticNames.CorrelationId, log.CorrelationId);
+        activity?.SetTag(DiagnosticNames.ReportId, log.ReportTrackingId);
+        activity?.SetTag(DiagnosticNames.ResourceType, resourceType.ToString());
+
         var resourceIds = new List<string>();
         List<string> resourceIdsToAcquire =
             fhirQuery.IsReference.GetValueOrDefault()
@@ -76,6 +83,13 @@ public class FhirApiService : IFhirApiService
 
     private async Task<IReadOnlyCollection<string>> ExecuteRead(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, ResourceType resourceType, string resourceIdToAcquire, FhirQueryConfigurationModel fhirQueryConfiguration, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("FhirApiService.ExecuteReadInternal");
+        activity?.SetTag(DiagnosticNames.FacilityId, log.FacilityId);
+        activity?.SetTag(DiagnosticNames.CorrelationId, log.CorrelationId);
+        activity?.SetTag(DiagnosticNames.ReportId, log.Id);
+        activity?.SetTag(DiagnosticNames.ResourceType, resourceType.ToString());
+        activity?.SetTag(DiagnosticNames.ResourceId, resourceIdToAcquire);
+
         var resourceIds = new List<string>();
 
         try
@@ -135,6 +149,12 @@ public class FhirApiService : IFhirApiService
 
     public async Task<IReadOnlyCollection<string>> ExecuteSearch(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, FhirQueryConfigurationModel fhirQueryConfiguration, ResourceType resourceType, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("FhirApiService.ExecuteSearch");
+        activity?.SetTag(DiagnosticNames.FacilityId, log.FacilityId);
+        activity?.SetTag(DiagnosticNames.CorrelationId, log.CorrelationId);
+        activity?.SetTag(DiagnosticNames.ReportId, log.Id);
+        activity?.SetTag(DiagnosticNames.ResourceType, resourceType.ToString());
+
         if (log == null) throw new ArgumentNullException(nameof(log));
         if (fhirQuery == null) throw new ArgumentNullException(nameof(fhirQuery));
         if (fhirQueryConfiguration == null) throw new ArgumentNullException(nameof(fhirQueryConfiguration));
@@ -169,6 +189,12 @@ public class FhirApiService : IFhirApiService
     #region Private Methods
     private async Task<List<string>> ExecutePagingSearch(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, SearchParams searchParams, FhirQueryConfigurationModel fhirQueryConfiguration, ResourceType resourceType, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("FhirApiService.ExecutePagingSearch");
+        activity?.SetTag(DiagnosticNames.FacilityId, log.FacilityId);
+        activity?.SetTag(DiagnosticNames.CorrelationId, log.CorrelationId);
+        activity?.SetTag(DiagnosticNames.ReportId, log.Id);
+        activity?.SetTag(DiagnosticNames.ResourceType, resourceType.ToString());
+
         var resourceIds = new List<string>();
         try
         {

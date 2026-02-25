@@ -16,6 +16,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
@@ -424,11 +425,11 @@ public class PatientDataService : IPatientDataService
                 ActivityKind.Internal,
                 parentContext);
 
-            activity?.SetTag("link.log_id", log.Id.ToString());
-            activity?.SetTag("link.facility_id", log.FacilityId);
-            activity?.SetTag("link.correlation_id", log.CorrelationId ?? string.Empty);
-            activity?.SetTag("link.report_tracking_id", log.ReportTrackingId ?? string.Empty);
-            activity?.SetTag("link.patient_id", log.PatientId?.Sanitize());
+            activity?.SetTag(DiagnosticNames.ReportId, log.Id.ToString());
+            activity?.SetTag(DiagnosticNames.FacilityId, log.FacilityId);
+            activity?.SetTag(DiagnosticNames.CorrelationId, log.CorrelationId ?? string.Empty);
+            activity?.SetTag(DiagnosticNames.ReportTrackingId, log.ReportTrackingId ?? string.Empty);
+            activity?.SetTag(DiagnosticNames.PatientId, log.PatientId?.Sanitize());
 
             //check if log is flagged as a reference, if yes, check if all non-reference logs for a facility, correlationId, and reportTrackingId are marked as 'Completed'
             if (log.FhirQuery is not null && log.FhirQuery.Any(x => x.IsReference.HasValue && x.IsReference.Value))
