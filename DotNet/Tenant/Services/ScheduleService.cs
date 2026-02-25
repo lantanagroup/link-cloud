@@ -42,7 +42,7 @@ namespace LantanaGroup.Link.Tenant.Services
             using (var scope = _scopeFactory.CreateScope())
             {
                 var context = scope.ServiceProvider.GetRequiredService<TenantDbContext>();
-                var facilities = await context.Facilities.ToListAsync(cancellationToken);
+                var facilities = await context.Facilities.Where(f => !f.IsDeleted).ToListAsync(cancellationToken);
                 foreach (Facility facility in facilities)
                 {
                     if (string.IsNullOrEmpty(facility.TimeZone))
