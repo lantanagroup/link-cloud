@@ -216,17 +216,17 @@ public class ResourceAcquiredListener : BackgroundService
                     }
                     catch (DeadLetterException ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(message, ex, message.Key.FacilityId);
+                        _deadLetterExceptionHandler.HandleException(message, ex, message.Key?.FacilityId ?? string.Empty);
                     }
                     catch (TransientException ex)
                     {
-                        _transientExceptionHandler.HandleException(message, ex, message.Key.FacilityId);
+                        _transientExceptionHandler.HandleException(message, ex, message.Key?.FacilityId ?? string.Empty);
                     }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, $"Failed to process Patient Event.");
 
-                        _transientExceptionHandler.HandleException(message, new TransientException("Normalization Exception thrown: " + ex.Message), message.Message.Key.FacilityId);
+                        _transientExceptionHandler.HandleException(message, new TransientException("Normalization Exception thrown: " + ex.Message), message.Key?.FacilityId ?? string.Empty);
                     }
                     finally
                     {
