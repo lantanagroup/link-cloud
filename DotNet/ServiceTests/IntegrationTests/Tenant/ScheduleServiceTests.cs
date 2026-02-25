@@ -201,6 +201,87 @@ namespace IntegrationTests.Tenant
         }
 
         [Fact]
+        public async Task StartAsync_DoesNotCreateJobsForSoftDeletedFacilities()
+        {
+            var scheduler = await _schedulerFactory.GetScheduler();
+            await scheduler.Clear();
+
+            _dbContext.Facilities.RemoveRange(_dbContext.Facilities.ToList());
+            await _dbContext.SaveChangesAsync();
+
+            var softDeletedFacility = new Facility
+            {
+                FacilityId = "SoftDeletedFacility",
+                FacilityName = "Soft Deleted Facility",
+                TimeZone = "America/Chicago",
+                IsDeleted = true,
+                ScheduledReports = new ScheduledReportModel
+                {
+                    Daily = new string[] { "Report1" },
+                    Weekly = new string[] { },
+                    Monthly = new string[] { }
+                }
+            };
+            _dbContext.Facilities.Add(softDeletedFacility);
+            await _dbContext.SaveChangesAsync();
+
+            await _service.StartAsync(CancellationToken.None);
+
+            var jobKeys = await scheduler.GetJobKeys(GroupMatcher<JobKey>.GroupEquals(nameof(KafkaTopic.ReportScheduled)));
+
+            Assert.Empty(jobKeys);
+        }
+
+        [Fact]
+        public async Task StartAsync_OnlyCreatesJobsForActiveFacilities()
+        {
+            var scheduler = await _schedulerFactory.GetScheduler();
+            await scheduler.Clear();
+
+            _dbContext.Facilities.RemoveRange(_dbContext.Facilities.ToList());
+            await _dbContext.SaveChangesAsync();
+
+            var activeFacility = new Facility
+            {
+                FacilityId = "ActiveFacility",
+                FacilityName = "Active Facility",
+                TimeZone = "America/Chicago",
+                IsDeleted = false,
+                ScheduledReports = new ScheduledReportModel
+                {
+                    Daily = new string[] { "DailyReport" },
+                    Weekly = new string[] { },
+                    Monthly = new string[] { }
+                }
+            };
+
+            var softDeletedFacility = new Facility
+            {
+                FacilityId = "SoftDeletedFacility2",
+                FacilityName = "Soft Deleted Facility 2",
+                TimeZone = "America/New_York",
+                IsDeleted = true,
+                ScheduledReports = new ScheduledReportModel
+                {
+                    Daily = new string[] { "Report1" },
+                    Weekly = new string[] { "Report2" },
+                    Monthly = new string[] { "Report3" }
+                }
+            };
+
+            _dbContext.Facilities.AddRange(activeFacility, softDeletedFacility);
+            await _dbContext.SaveChangesAsync();
+
+            await _service.StartAsync(CancellationToken.None);
+
+            var jobKeys = await scheduler.GetJobKeys(GroupMatcher<JobKey>.GroupEquals(nameof(KafkaTopic.ReportScheduled)));
+
+            Assert.Single(jobKeys);
+            Assert.Contains(jobKeys, j => j.Name == "ActiveFacility-Daily");
+            Assert.DoesNotContain(jobKeys, j => j.Name.StartsWith("SoftDeletedFacility2"));
+        }
+
+        [Fact]
         public async Task CreateJobAndTrigger_UsesCorrectCronAndTimeZone()
         {
             var scheduler = await _schedulerFactory.GetScheduler();
