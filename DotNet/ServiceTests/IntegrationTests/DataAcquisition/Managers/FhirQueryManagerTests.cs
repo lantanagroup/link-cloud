@@ -33,57 +33,6 @@ namespace IntegrationTests.DataAcquisition.Managers
             return new FhirQueryManager(logger, database);
         }
 
-        [Fact]
-        public async System.Threading.Tasks.Task UpdateAsync_PropagatesQueryTypeToParentLog()
-        {
-            using var scope = _fixture.ServiceProvider.CreateScope();
-
-            var dalManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
-            var logQueries = scope.ServiceProvider.GetRequiredService<LantanaGroup.Link.DataAcquisition.Domain.Application.Queries.IDataAcquisitionLogQueries>();
-
-            var createModel = new CreateDataAcquisitionLogModel
-            {
-                FacilityId = "FacilityA",
-                CorrelationId = System.Guid.NewGuid().ToString(),
-                ScheduledReport = new ScheduledReport { ReportTrackingId = "Rpt-1", StartDate = System.DateTime.UtcNow.AddDays(-1), EndDate = System.DateTime.UtcNow },
-                QueryPhase = QueryPhase.Initial,
-                QueryType = FhirQueryType.Read,
-                Status = RequestStatusEnum.Pending,
-                Priority = AcquisitionPriority.Normal,
-                FhirQuery =
-                [
-                    new CreateFhirQueryModel
-                    {
-                        FacilityId = "FacilityA",
-                        IsReference = false,
-                        Paged = 25,
-                        QueryType = FhirQueryType.Read,
-                        QueryParameters = ["_id=abc"],
-                        ResourceTypes = [ ResourceType.Patient ],
-                        ResourceReferenceTypes = []
-                    }
-                ]
-            };
-
-            var log = await dalManager.CreateAsync(createModel);
-            Assert.NotNull(log);
-            Assert.Equal(FhirQueryType.Read, log.QueryType);
-            Assert.Single(log.FhirQuery);
-
-            var fhirQuery = log.FhirQuery.First();
-
-            var fqManager = CreateManager(scope);
-            await fqManager.UpdateAsync(new FhirQueryModel
-            {
-                Id = fhirQuery.Id,
-                FacilityId = log.FacilityId,
-                QueryType = FhirQueryType.Search
-            });
-
-            var refreshed = await logQueries.GetAsync(log.Id);
-            Assert.NotNull(refreshed);
-            Assert.Equal(FhirQueryType.Search, refreshed!.QueryType);
-            Assert.Equal(FhirQueryType.Search, refreshed.FhirQuery!.First().QueryType);
-        }
+        // Placeholder for future FhirQueryManager tests.
     }
 }

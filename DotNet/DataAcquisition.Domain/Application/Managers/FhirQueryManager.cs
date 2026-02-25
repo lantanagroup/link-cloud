@@ -102,24 +102,7 @@ public class FhirQueryManager : IFhirQueryManager
             query.Paged = model.Paged.Value;
 
         if (model.DataAcquisitionLogId != default)
-        {
             query.DataAcquisitionLogId = model.DataAcquisitionLogId;
-            var log = await _database.DataAcquisitionLogRepository.GetAsync(query.DataAcquisitionLogId, cancellationToken);
-            if (log != null)
-            {
-                log.QueryType = query.QueryType;
-                _database.DataAcquisitionLogRepository.Update(log);
-            }
-        }
-        else
-        {
-            var log = await _database.DataAcquisitionLogRepository.GetAsync(query.DataAcquisitionLogId, cancellationToken);
-            if (log != null)
-            {
-                log.QueryType = query.QueryType;
-                _database.DataAcquisitionLogRepository.Update(log);
-            }
-        }
 
         // Collections: only replace if caller explicitly provides a non-empty list
         // Otherwise leave untouched (critical for partial updates like reference collection)
