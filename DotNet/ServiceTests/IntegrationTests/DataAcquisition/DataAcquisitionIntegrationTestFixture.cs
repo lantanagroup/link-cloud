@@ -75,7 +75,9 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddScoped<IEntityRepository<QueryPlan>, EntityRepository<QueryPlan, DataAcquisitionDbContext>>();
             builder.Services.AddTransient<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
             builder.Services.AddTransient<IEntityRepository<ResourceReferenceType>, EntityRepository<ResourceReferenceType, DataAcquisitionDbContext>>();
-
+            builder.Services.AddScoped<IEntityRepository<SftpAcquisitionLog>, EntityRepository<SftpAcquisitionLog, DataAcquisitionDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<SftpConfiguration>, EntityRepository<SftpConfiguration, DataAcquisitionDbContext>>();
+ 
             // Register IDatabase implementation
             builder.Services.AddScoped<IDatabase, Database>();
             builder.Services.AddScoped<IQueryPlanValidator, QueryPlanValidator>();
@@ -86,6 +88,8 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddScoped<IFhirListQueryConfigurationManager, FhirListQueryConfigurationManager>();
             builder.Services.AddScoped<IDataAcquisitionLogManager, DataAcquisitionLogManager>();
             builder.Services.AddScoped<IFhirQueryConfigurationManager, FhirQueryConfigurationManager>();
+            builder.Services.AddScoped<IFhirQueryManager, FhirQueryManager>();
+            builder.Services.AddScoped<IReferenceResourcesManager, ReferenceResourcesManager>();
 
             // Register queries
             builder.Services.AddScoped<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();
@@ -106,41 +110,6 @@ namespace IntegrationTests.DataAcquisition
                     CheckIfTenantExists = false
                 };
             });
-
-            // Register generic repositories for all required entities
-            services.AddScoped<IEntityRepository<DataAcquisitionLog>, EntityRepository<DataAcquisitionLog, DataAcquisitionDbContext>>();
-            services.AddScoped<IEntityRepository<FhirQueryConfiguration>, EntityRepository<FhirQueryConfiguration, DataAcquisitionDbContext>>();
-            services.AddScoped<IEntityRepository<FhirListConfiguration>, EntityRepository<FhirListConfiguration, DataAcquisitionDbContext>>();
-            services.AddScoped<IEntityRepository<FhirQuery>, EntityRepository<FhirQuery, DataAcquisitionDbContext>>();
-            services.AddScoped<IEntityRepository<ReferenceResources>, EntityRepository<ReferenceResources, DataAcquisitionDbContext>>();
-            services.AddScoped<IEntityRepository<QueryPlan>, EntityRepository<QueryPlan, DataAcquisitionDbContext>>();
-            services.AddTransient<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
-            services.AddTransient<IEntityRepository<ResourceReferenceType>, EntityRepository<ResourceReferenceType, DataAcquisitionDbContext>>();
-            services.AddScoped<IEntityRepository<SftpAcquisitionLog>, EntityRepository<SftpAcquisitionLog, DataAcquisitionDbContext>>();
-            services.AddScoped<IEntityRepository<SftpConfiguration>, EntityRepository<SftpConfiguration, DataAcquisitionDbContext>>();
-
-            // Register IDatabase implementation
-            services.AddScoped<LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase, LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Database>();
-
-            services.AddTransient<IDataAcquisitionLogService, DataAcquisitionLogService>();
-
-            // Register managers                    
-            services.AddScoped<IQueryPlanManager, QueryPlanManager>();
-            services.AddScoped<IFhirListQueryConfigurationManager, FhirListQueryConfigurationManager>();
-            services.AddScoped<IDataAcquisitionLogManager, DataAcquisitionLogManager>();
-            services.AddScoped<IFhirQueryConfigurationManager, FhirQueryConfigurationManager>();
-
-            // Register queries
-            services.AddScoped<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();
-            services.AddScoped<IFhirQueryQueries, FhirQueryQueries>();
-            services.AddScoped<IFhirQueryConfigurationQueries, FhirQueryConfigurationQueries>();
-            services.AddScoped<IFhirQueryListConfigurationQueries, FhirQueryListConfigurationQueries>();
-            services.AddScoped<IQueryPlanQueries, QueryPlanQueries>();
-            services.AddTransient<IReferenceResourcesQueries, ReferenceResourcesQueries>();
-
-            // Mock Kafka producers for integration tests
-            services.AddSingleton<IProducer<long, ReadyToAcquire>>(ReadyToAcquireProducerMock.Object);
-            services.AddSingleton<IProducer<string, ResourceAcquired>>(ResourceAcquiredProducerMock.Object);
 
             builder.Services.AddTransient<ICreateSystemToken, CreateSystemToken>();
             builder.Services.AddTransient<ITenantApiService, TenantApiService>();
