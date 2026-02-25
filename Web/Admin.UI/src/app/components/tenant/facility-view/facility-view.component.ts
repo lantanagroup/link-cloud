@@ -18,6 +18,7 @@ import {LoadingService} from 'src/app/services/loading.service';
 import {forkJoin, Subscription} from 'rxjs';
 import {ResubmitDialogComponent} from "./resubmit-dialog.component";
 import {MatDialog} from "@angular/material/dialog";
+import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
 import {IPagedReportSchedule, IReportSchedule} from "../../../interfaces/report/report-schedule.interface";
 import {MatCell, MatCellDef} from "@angular/material/table";
 import { FormsModule } from "@angular/forms";
@@ -38,7 +39,8 @@ import { ReportService } from "../../../services/gateway/report/report.service";
     MatCardModule,
     FormsModule,
     MatTableModule,
-    MatSortModule
+    MatSortModule,
+    MatSnackBarModule
   ],
   templateUrl: './facility-view.component.html',
   styleUrl: './facility-view.component.scss'
@@ -61,6 +63,8 @@ export class FacilityViewComponent implements OnInit {
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
 
   highlightedRowId: string | null = null;
+  highlightedRowIds = new Set<string>();
+  private beforeResubmitIds: Set<string> | null = null;
 
   showDeleted: boolean = false;
 
@@ -75,7 +79,8 @@ export class FacilityViewComponent implements OnInit {
     private facilityViewService: FacilityViewService,
     private loadingService: LoadingService,
     private reportService: ReportService,
-    private dialog: MatDialog) {
+    private dialog: MatDialog,
+    private snackBar: MatSnackBar) {
   }
 
   ngOnInit(): void {
@@ -162,6 +167,14 @@ export class FacilityViewComponent implements OnInit {
         this.paginationMetadata = data.metadata;
         this.paginationMetadata.pageNumber = data.metadata.pageNumber - 1; // Convert back to 0-based
         this.loadingService.isLoading.next(false);
+        if (this.beforeResubmitIds) {
+          const newIds = data.records.filter(r => !this.beforeResubmitIds!.has(r.id)).map(r => r.id);
+          this.highlightedRowIds = new Set(newIds);
+          this.beforeResubmitIds = null;
+          if (newIds.length > 0) {
+            setTimeout(() => this.highlightedRowIds = new Set(), 4000);
+          }
+        }
       },
       error: (error) => {
         console.error('Error loading report schedules:', error);
@@ -234,12 +247,26 @@ export class FacilityViewComponent implements OnInit {
       // Call your service and pass bypass flag
       this.tenantService.regenerateReport(facilityId, reportId, bypassSubmission)
         .subscribe({
-          next: response => {
-            // refresh list or show toast
-            this.onRefresh();
+          next: () => {
+            this.snackBar.open('Report resubmitted. The list will refresh in 5 seconds…', '', {
+              duration: 5000,
+              horizontalPosition: 'end',
+              verticalPosition: 'top',
+              panelClass: 'resubmit-snackbar'
+            });
+            setTimeout(() => {
+              this.beforeResubmitIds = new Set(this.reportSchedules.map(r => r.id));
+              this.loadReportSchedules();
+            }, 5000);
           },
           error: err => {
             console.error('Resubmit failed', err);
+            this.snackBar.open('Failed to resubmit report. Please try again.', '', {
+              duration: 3500,
+              horizontalPosition: 'end',
+              verticalPosition: 'top',
+              panelClass: 'error-snackbar'
+            });
           }
         });
     });

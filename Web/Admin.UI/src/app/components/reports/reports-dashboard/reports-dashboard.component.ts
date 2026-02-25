@@ -4,6 +4,7 @@ import {MatToolbarModule} from '@angular/material/toolbar';
 import {MatIconModule} from '@angular/material/icon';
 import {MatButtonModule} from '@angular/material/button';
 import {MatDialog} from '@angular/material/dialog';
+import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
 import {MatTableDataSource, MatTableModule} from '@angular/material/table';
 import {MatPaginator, MatPaginatorModule, PageEvent} from '@angular/material/paginator';
 import {MatSort, MatSortModule, Sort} from '@angular/material/sort';
@@ -36,7 +37,8 @@ import {MatCheckbox} from "@angular/material/checkbox";
     RouterLink,
     FontAwesomeModule,
     FormsModule,
-    MatCheckbox
+    MatCheckbox,
+    MatSnackBarModule
   ],
   templateUrl: './reports-dashboard.component.html',
   styleUrls: ['./reports-dashboard.component.scss']
@@ -55,6 +57,8 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
 
   dataSource = new MatTableDataSource<IReportSchedule>([]);
   reportSchedules: IReportSchedule[] = [];
+  highlightedRowIds = new Set<string>();
+  private beforeResubmitIds: Set<string> | null = null;
 
   currentSortBy: string = 'CreateDate';
   currentSortOrder: number = 1; // 1 = Descending, 0 = Ascending
@@ -65,7 +69,8 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
     private reportService: ReportService,
     private loadingService: LoadingService,
     private dialog: MatDialog,
-    private tenantService: TenantService,) {
+    private tenantService: TenantService,
+    private snackBar: MatSnackBar) {
   }
 
   ngOnInit(): void {
@@ -113,6 +118,14 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
         this.paginationMetadata = data.metadata;
         this.paginationMetadata.pageNumber = data.metadata.pageNumber - 1; // Convert back to 0-based
         this.loadingService.isLoading.next(false);
+        if (this.beforeResubmitIds) {
+          const newIds = data.records.filter(r => !this.beforeResubmitIds!.has(r.id)).map(r => r.id);
+          this.highlightedRowIds = new Set(newIds);
+          this.beforeResubmitIds = null;
+          if (newIds.length > 0) {
+            setTimeout(() => this.highlightedRowIds = new Set(), 4000);
+          }
+        }
       },
       error: (error) => {
         console.error('Error loading report schedules:', error);
@@ -182,12 +195,26 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
       // Call your service and pass bypass flag
       this.tenantService.regenerateReport(facilityId, reportId, bypassSubmission)
         .subscribe({
-          next: response => {
-            // refresh list or show toast
-            this.onRefresh();
+          next: () => {
+            this.snackBar.open('Report resubmitted. The list will refresh in 5 seconds…', '', {
+              duration: 5000,
+              horizontalPosition: 'end',
+              verticalPosition: 'top',
+              panelClass: 'resubmit-snackbar'
+            });
+            setTimeout(() => {
+              this.beforeResubmitIds = new Set(this.reportSchedules.map(r => r.id));
+              this.loadReportSchedules();
+            }, 5000);
           },
           error: err => {
             console.error('Resubmit failed', err);
+            this.snackBar.open('Failed to resubmit report. Please try again.', '', {
+              duration: 3500,
+              horizontalPosition: 'end',
+              verticalPosition: 'top',
+              panelClass: 'error-snackbar'
+            });
           }
         });
     });

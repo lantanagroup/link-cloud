@@ -613,28 +613,18 @@ namespace LantanaGroup.Link.Tenant.Controllers
                     throw new Exception(
                         $"Report Service Call unsuccessful: StatusCode: {response.StatusCode} | Response: {await response.Content.ReadAsStringAsync(CancellationToken.None)} | Query URL: {requestUrl}");
                 }
-
-                var reportScheduleSummary =
-                    (ReportScheduleSummaryModel?)await response.Content.ReadFromJsonAsync(
-                        typeof(ReportScheduleSummaryModel), CancellationToken.None);
-
-                if (reportScheduleSummary == null)
-                {
-                    return Problem("No ReportSchedule found for the provided ReportScheduleId",
-                        statusCode: (int)HttpStatusCode.NotFound);
-                }
-
+                
                 var producerConfig = new ProducerConfig();
 
                 using var producer = _adHocKafkaProducerFactory.CreateProducer(producerConfig);
 
                 var message = new Message<string, GenerateReportValue>
                 {
-                    Key = reportScheduleSummary.FacilityId,
+                    Key = facilityId,
                     Headers = new Headers(),
                     Value = new GenerateReportValue()
                     {
-                        ReportId = reportScheduleSummary.ReportId,
+                        ReportId = request.ReportId,
                         AdhocReportId = reportId,
                         Regenerate = true,
                         BypassSubmission = request.BypassSubmission ?? false
