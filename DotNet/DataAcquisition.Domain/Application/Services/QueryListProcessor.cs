@@ -17,6 +17,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.Extensions.Logging;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
@@ -90,6 +91,11 @@ public class QueryListProcessor : IQueryListProcessor
         CancellationToken cancellationToken = default
         )
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("QueryListProcessor.ExecuteFacilityValidationRequest");
+        activity?.SetTag(DiagnosticNames.FacilityId, request.FacilityId);
+        activity?.SetTag(DiagnosticNames.CorrelationId, request.CorrelationId);
+        activity?.SetTag(DiagnosticNames.QueryType, queryPlanType);
+
         var resources = new List<Resource>();
         List<ResourceReference> referenceResources = new List<ResourceReference>();
         foreach (var query in queryList)
