@@ -62,7 +62,6 @@ export class FacilityViewComponent implements OnInit {
   reportSchedules: IReportSchedule[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
 
-  highlightedRowId: string | null = null;
   highlightedRowIds = new Set<string>();
   private beforeResubmitIds: Set<string> | null = null;
 

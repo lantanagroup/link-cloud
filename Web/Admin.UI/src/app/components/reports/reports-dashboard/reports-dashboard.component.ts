@@ -49,6 +49,8 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
 
   private subscription: Subscription | undefined;
   private readonly PAGE_SIZE_KEY = 'reportsDashboardPageSize';
+  private highlightClearTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private refreshTimeoutId: ReturnType<typeof setTimeout> | null = null;
   defaultPageNumber: number = 0;
   defaultPageSize: number = 10;
   paginationMetadata: PaginationMetadata = new PaginationMetadata();
@@ -88,6 +90,12 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
     if (this.subscription) {
       this.subscription.unsubscribe();
     }
+    if (this.highlightClearTimeoutId !== null) {
+      clearTimeout(this.highlightClearTimeoutId);
+    }
+    if (this.refreshTimeoutId !== null) {
+      clearTimeout(this.refreshTimeoutId);
+    }
   }
 
   getColumns(): string[] {
@@ -123,7 +131,7 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
           this.highlightedRowIds = new Set(newIds);
           this.beforeResubmitIds = null;
           if (newIds.length > 0) {
-            setTimeout(() => this.highlightedRowIds = new Set(), 4000);
+            this.highlightClearTimeoutId = setTimeout(() => this.highlightedRowIds = new Set(), 4000);
           }
         }
       },
@@ -202,7 +210,7 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
               verticalPosition: 'top',
               panelClass: 'resubmit-snackbar'
             });
-            setTimeout(() => {
+            this.refreshTimeoutId = setTimeout(() => {
               this.beforeResubmitIds = new Set(this.reportSchedules.map(r => r.id));
               this.loadReportSchedules();
             }, 3000);
