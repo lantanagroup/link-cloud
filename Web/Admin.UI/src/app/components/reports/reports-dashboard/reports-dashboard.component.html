@@ -135,7 +135,7 @@
 
         <!-- Header and Row Definitions -->
         <tr mat-header-row *matHeaderRowDef="getColumns()"></tr>
-        <tr mat-row *matRowDef="let row; columns: getColumns();" [class.deleted-row]="row.isDeleted"></tr>
+        <tr mat-row *matRowDef="let row; columns: getColumns();" [class.deleted-row]="row.isDeleted" [class.new-row]="highlightedRowIds.has(row.id)"></tr>
 
         <!-- No Data Row -->
         <tr class="mat-row" *matNoDataRow>

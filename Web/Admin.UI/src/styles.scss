@@ -43,6 +43,18 @@ $color-variants: primary, secondary, tertiary, error, success, warning;
   }
 }
 
+::ng-deep .mat-mdc-snack-bar-container.resubmit-snackbar {
+  --mdc-snackbar-container-color: #1b5e20 !important;
+  --mdc-snackbar-supporting-text-color: #ffffff !important;
+
+  border-radius: 8px !important;
+  border-left: 5px solid #69f0ae !important;
+  font-weight: 500;
+  font-size: 15px;
+  min-width: 380px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+}
+
 ::ng-deep .mat-mdc-snack-bar-container.error-snackbar {
   --mdc-snackbar-container-color: #750022 !important;
   --mdc-snackbar-supporting-text-color: #ffffff !important;
