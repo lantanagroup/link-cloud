@@ -5,12 +5,14 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
@@ -59,6 +61,13 @@ public class SearchFhirCommand : ISearchFhirCommand
 
     public async IAsyncEnumerable<Bundle> ExecuteAsync(SearchFhirCommandRequest request, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("SearchFhirCommand.ExecuteAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, request.facilityId);
+        activity?.SetTag(DiagnosticNames.CorrelationId, request.correlationId);
+        activity?.SetTag(DiagnosticNames.PatientId, request.patientId);
+        activity?.SetTag(DiagnosticNames.QueryType, request.queryPhase?.ToString());
+        activity?.SetTag(DiagnosticNames.ResourceType, request.resourceType.ToString());
+
         using var _ = _metrics.MeasureDataRequestDuration([
                 new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, request.facilityId),
                 new KeyValuePair<string, object?>(DiagnosticNames.PatientId, request.patientId),
@@ -152,6 +161,13 @@ public class SearchFhirCommand : ISearchFhirCommand
 
     public async Task<Bundle> ExecuteNonPagingAsync(SearchFhirCommandRequest request, CancellationToken cancellationToken)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("SearchFhirCommand.ExecuteNonPagingAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, request.facilityId);
+        activity?.SetTag(DiagnosticNames.CorrelationId, request.correlationId);
+        activity?.SetTag(DiagnosticNames.PatientId, request.patientId);
+        activity?.SetTag(DiagnosticNames.QueryType, request.queryPhase?.ToString());
+        activity?.SetTag(DiagnosticNames.ResourceType, request.resourceType.ToString());
+
         using var _ = _metrics.MeasureDataRequestDuration([
                 new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, request.facilityId),
                 new KeyValuePair<string, object?>(DiagnosticNames.PatientId, request.patientId),

@@ -42,6 +42,7 @@
         public const string SpecimenType = "specimen.type";
         public const string ServiceRequestCategory = "service.request.category";
         public const string Measures = "report.measures";
+        public const string Duration = "duration";
 
         //Diagnostic tags Searching
         public const string SearchText = "search.text";
