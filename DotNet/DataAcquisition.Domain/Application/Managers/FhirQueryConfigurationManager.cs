@@ -5,6 +5,10 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using Microsoft.EntityFrameworkCore;
+using System.Diagnostics;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
@@ -29,6 +33,9 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
     
     public async Task<AuthenticationConfigurationModel> CreateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("FhirQueryConfigurationManager.CreateAuthenticationConfiguration");
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+
         var queryResult = await _database.FhirQueryConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId);
 
         if (queryResult == null)
@@ -48,6 +55,9 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
 
     public async Task<AuthenticationConfigurationModel> UpdateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("FhirQueryConfigurationManager.UpdateAuthenticationConfiguration");
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+
         var queryResult = await _database.FhirQueryConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId);
 
         if (queryResult == null)
@@ -61,6 +71,9 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
 
     public async Task DeleteAuthenticationConfiguration(string facilityId, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("FhirQueryConfigurationManager.DeleteAuthenticationConfiguration");
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+
         var entity = await _database.FhirQueryConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId);
 
         if (entity == null)
@@ -72,6 +85,9 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
 
     public async Task<FhirQueryConfigurationModel> CreateAsync(CreateFhirQueryConfigurationModel model, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("FhirQueryConfigurationManager.CreateAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
+
         var existingEntity = await _database.FhirQueryConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == model.FacilityId);
 
         if (existingEntity != null)
@@ -110,6 +126,9 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
 
     public async Task<FhirQueryConfigurationModel> UpdateAsync(UpdateFhirQueryConfigurationModel model, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("FhirQueryConfigurationManager.UpdateAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
+
         var existingEntity = await _database.FhirQueryConfigurationRepository.SingleOrDefaultAsync(q => q.FacilityId == model.FacilityId);
 
         if (existingEntity == null)
@@ -139,6 +158,9 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
 
     public async Task<bool> DeleteAsync(string facilityId, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("FhirQueryConfigurationManager.DeleteAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+
         var entity = await _database.FhirQueryConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId);
 
         if (entity == null)

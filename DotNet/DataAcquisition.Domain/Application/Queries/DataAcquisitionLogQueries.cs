@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
@@ -110,6 +111,11 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     public async Task<List<string>> GetResourceIdsForReportPatient(string correlationId, string facilityId,
         string resourceType, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetResourceIdsForReportPatient");
+        activity?.SetTag(DiagnosticNames.CorrelationId, correlationId);
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+        activity?.SetTag(DiagnosticNames.ResourceType, resourceType);
+
         if (!Enum.TryParse<ResourceType>(resourceType, out var parsedResourceType))
         {
             _logger.LogError("Failed to parse resource type: {ResourceType}", resourceType);
@@ -145,6 +151,9 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
     public async Task<DataAcquisitionLogModel?> GetAsync(long id, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetAsync");
+        activity?.SetTag(DiagnosticNames.ReportId, id);
+
         var entity = await _dbContext.DataAcquisitionLogs
             .Include(l => l.FhirQueries)
             .ThenInclude(q => q.FhirQueryResourceTypes)
@@ -159,6 +168,11 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     public async Task<int> GetCountOfNonRefLogsIncompleteAsync(string facilityId, string reportTrackingId,
         string correlationId, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetCountOfNonRefLogsIncompleteAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+        activity?.SetTag(DiagnosticNames.ReportTrackingId, reportTrackingId);
+        activity?.SetTag(DiagnosticNames.CorrelationId, correlationId);
+
         if (string.IsNullOrWhiteSpace(facilityId))
             throw new ArgumentNullException(nameof(facilityId), "Facility ID cannot be null or empty.");
 
@@ -258,6 +272,9 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     public async Task<IPagedModel<QueryLogSummaryModel>> SearchQueryLogSummaryAsync(
         SearchDataAcquisitionLogRequest request, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.SearchQueryLogSummaryAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, request.FacilityId);
+
         ArgumentNullException.ThrowIfNull(request);
 
         var query = BuildSearchQuery(request);
@@ -360,6 +377,9 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         RequestStatus newStatus,
         CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.TrySetLogStatusAsync");
+        activity?.SetTag(DiagnosticNames.ReportId, logId);
+
         int rowsAffected = await _dbContext.DataAcquisitionLogs
             .Where(l => l.Id == logId && l.Status != null && validCurrentStatuses.Contains(l.Status.Value))
             .ExecuteUpdateAsync(setters => setters
@@ -430,6 +450,9 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     public async Task<PagedConfigModel<DataAcquisitionLogModel>> SearchAsync(SearchDataAcquisitionLogRequest model,
         CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.SearchAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
+
         var query = BuildSearchQuery(model);
         query = ApplySort(query, model.SortBy, model.SortOrder);
 
@@ -521,6 +544,9 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     public async Task<DataAcquisitionLogStatistics> GetDataAcquisitionLogStatisticsByReportAsync(string reportId,
         CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetDataAcquisitionLogStatisticsByReportAsync");
+        activity?.SetTag(DiagnosticNames.ReportId, reportId);
+
         var logs = (await SearchAsync(new SearchDataAcquisitionLogRequest
         {
             ReportTrackingId = reportId,

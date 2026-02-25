@@ -176,8 +176,7 @@ public class ReferenceResourceService : IReferenceResourceService
                 Id = fhirQueryId,
                 FacilityId = facilityId,
                 IdQueryParameterValues = updatedIds,
-                // FhirQueryManager.UpdateAsync will load the rest from the database
-                // We're ONLY updating IdQueryParameterValues
+                QueryType = referenceLogResult.FhirQuery.First().QueryType
             };
 
             // UpdateAsync will load the full entity fresh and update it

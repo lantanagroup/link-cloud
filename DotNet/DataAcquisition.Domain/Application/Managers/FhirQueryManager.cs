@@ -2,8 +2,11 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LinqKit;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
@@ -25,6 +28,9 @@ public class FhirQueryManager : IFhirQueryManager
 
     public async Task<FhirQuery> CreateAsync(CreateFhirQueryModel model, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("FhirQueryManager.CreateAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
+
         if(string.IsNullOrEmpty(model.FacilityId))
         {
             throw new ArgumentNullException("FacilityId cannot be null");
@@ -65,6 +71,9 @@ public class FhirQueryManager : IFhirQueryManager
 
     public async Task<FhirQuery> UpdateAsync(FhirQueryModel model, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("FhirQueryManager.UpdateAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
+
         var query = await _database.FhirQueryRepository.SingleOrDefaultAsync(
             q => q.Id == model.Id && q.FacilityId == model.FacilityId,
             cancellationToken);

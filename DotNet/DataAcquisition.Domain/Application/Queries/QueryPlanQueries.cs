@@ -8,6 +8,9 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Reflection;
 
@@ -37,18 +40,26 @@ public class QueryPlanQueries : IQueryPlanQueries
 
     public async Task<QueryPlanModel?> GetAsync(string facilityId, Frequency type, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("QueryPlanQueries.GetAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+
         var entity = await _database.QueryPlanRepository.FirstOrDefaultAsync(q => q.FacilityId == facilityId && q.Type == type);
         return entity != null ? QueryPlanModel.FromDomain(entity) : null;
     }
 
     public async Task<List<QueryPlanModel>> FindAsync(Expression<Func<QueryPlan, bool>> predicate, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("QueryPlanQueries.FindAsync");
+
         var entities = await _database.QueryPlanRepository.FindAsync(predicate);
         return entities.Select(QueryPlanModel.FromDomain).ToList();
     }
 
     public async Task<List<string>> GetPlanNamesAsync(string facilityId, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("QueryPlanQueries.GetPlanNamesAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+
         var plans = await _database.QueryPlanRepository.FindAsync(q => q.FacilityId == facilityId);
         return plans.Select(q => q.PlanName).Distinct().ToList();
     }
@@ -56,6 +67,9 @@ public class QueryPlanQueries : IQueryPlanQueries
     public async Task<PagedConfigModel<QueryPlanModel>> SearchAsync(SearchQueryPlanModel model, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(model);
+
+        using var activity = ServiceActivitySource.Instance.StartActivity("QueryPlanQueries.SearchAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
 
         var query = _dbContext.QueryPlans.AsNoTracking().AsQueryable();
 

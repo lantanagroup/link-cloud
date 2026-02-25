@@ -6,6 +6,8 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 
@@ -37,6 +39,10 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task<DataAcquisitionLogModel> CreateAsync(CreateDataAcquisitionLogModel model, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.CreateAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
+        activity?.SetTag(DiagnosticNames.CorrelationId, model.CorrelationId);
+
         if(model.ScheduledReport == null)
         {
             throw new ArgumentNullException("Required property ScheduledReport must not be null");
@@ -101,6 +107,9 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task DeleteAsync(long id, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.DeleteAsync");
+        activity?.SetTag(DiagnosticNames.ReportId, id);
+
         if (id == default)
         {
             throw new InvalidOperationException(nameof(id));
@@ -120,8 +129,9 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task<DataAcquisitionLogModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default)
     {
-        using var activity = Activity.Current?.Source.StartActivity();
-        
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.UpdateAsync");
+        activity?.SetTag(DiagnosticNames.ReportId, updateLog.Id);
+
         if (updateLog.Id is null or 0)
         {
             activity?.SetStatus(ActivityStatusCode.Error, "Log ID cannot be zero or null");
@@ -164,6 +174,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         if (updateLog.CompletionTimeMilliseconds is not null)
         {
             existingLog.CompletionTimeMilliseconds = updateLog.CompletionTimeMilliseconds;
+            activity?.SetTag(DiagnosticNames.Duration, updateLog.CompletionTimeMilliseconds);
         }
 
         if (updateLog.Notes is not null)
@@ -190,7 +201,8 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task UpdateBatchAsync(IEnumerable<DataAcquisitionLog> logs, CancellationToken cancellationToken = default)
     {
-        using var activity = Activity.Current?.Source.StartActivity();
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.UpdateBatchAsync");
+
         foreach (var log in logs)
         {
             log.ModifyDate = DateTime.UtcNow;
@@ -207,6 +219,11 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(List<long> logIds, string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.UpdateTailFlagForFacilityCorrelationIdReportTrackingId");
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+        activity?.SetTag(DiagnosticNames.CorrelationId, correlationId);
+        activity?.SetTag(DiagnosticNames.ReportTrackingId, reportTrackingId);
+
         if (logIds == null || logIds.Count == 0) return;
 
         // Use ExecuteUpdateAsync for a high-performance batch update if available on the repository/context
@@ -232,6 +249,9 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task ThrottleFacilityAcquisitions(string facilityId, DateTime executionDate, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.ThrottleFacilityAcquisitions");
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+
         long? lastId = null;
         var batchSize = 1000;
         while (true)

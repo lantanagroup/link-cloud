@@ -86,6 +86,8 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddScoped<IFhirListQueryConfigurationManager, FhirListQueryConfigurationManager>();
             builder.Services.AddScoped<IDataAcquisitionLogManager, DataAcquisitionLogManager>();
             builder.Services.AddScoped<IFhirQueryConfigurationManager, FhirQueryConfigurationManager>();
+            builder.Services.AddScoped<IFhirQueryManager, FhirQueryManager>();
+            builder.Services.AddScoped<IReferenceResourcesManager, ReferenceResourcesManager>();
 
             // Register queries
             builder.Services.AddScoped<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();

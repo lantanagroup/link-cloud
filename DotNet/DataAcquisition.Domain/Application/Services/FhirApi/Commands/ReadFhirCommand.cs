@@ -4,10 +4,13 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 
@@ -51,6 +54,11 @@ public class ReadFhirCommand : IReadFhirCommand
 
     public async Task<DomainResource> ExecuteAsync(ReadFhirCommandRequest request, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("ReadFhirCommand.ExecuteAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, request.facilityId);
+        activity?.SetTag(DiagnosticNames.ResourceType, request.resourceType.ToString());
+        activity?.SetTag(DiagnosticNames.ResourceId, request.resourceId);
+
         if (string.IsNullOrWhiteSpace(request.resourceId))
             throw new ArgumentNullException(nameof(request.resourceId), "Resource ID cannot be null or empty.");
 
