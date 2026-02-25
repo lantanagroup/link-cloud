@@ -14,7 +14,6 @@ parameters:
     - DEV
     - TEST
     - QA
-    - DEVOPS
 
 variables:
 - group: kafka_topics # variable group `kafka_topics`
@@ -31,8 +30,6 @@ variables:
     value:  '$(test-rest-url)'
   ${{ if eq(parameters.environment, 'QA') }}:
     value:  '$(qa-rest-url)'
-  ${{ if eq(parameters.environment, 'DEVOPS') }}:
-    value:  '$(devops-rest-url)'
 
 stages:
 - stage: Sync_Kafka_Topics_${{ parameters.environment }}
