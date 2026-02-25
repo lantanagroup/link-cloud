@@ -14,6 +14,7 @@ parameters:
     - DEV
     - TEST
     - QA
+    - DEVOPS
 
 variables:
 - group: kafka_topics # variable group `kafka_topics`
@@ -30,6 +31,8 @@ variables:
     value:  '$(test-rest-url)'
   ${{ if eq(parameters.environment, 'QA') }}:
     value:  '$(qa-rest-url)'
+  ${{ if eq(parameters.environment, 'DEVOPS') }}:
+    value:  '$(devops-rest-url)'
 
 stages:
 - stage: Sync_Kafka_Topics_${{ parameters.environment }}
@@ -91,15 +94,25 @@ stages:
               STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
                 -u "$USERNAME:$PASSWORD" \
                 "$REST_PROXY_URL/v3/clusters/$CLUSTER_ID/topics/$TOPIC")
-
-              if [[ "$STATUS_CODE" == "404" ]]; then
+              if [[ "$STATUS_CODE" == "200" ]]; then
+                echo "Topic '$TOPIC' already exists."
+              elif [[ "$STATUS_CODE" == "404" ]]; then
+                if ! [[ "$PARTITIONS" =~ ^[0-9]+$ && "$REPLICAS" =~ ^[0-9]+$ ]]; then
+                  echo "ERROR: Invalid partitions/replicas for topic '$TOPIC': '$PARTITIONS'/'$REPLICAS'"
+                  exit 1
+                fi
                 echo "Creating topic '$TOPIC'..."
-                curl -s -u "$USERNAME:$PASSWORD" \
+                CREATE_CODE=$(curl -s -o /dev/null -w "%{http_code}" -u "$USERNAME:$PASSWORD" \
                   -X POST "$REST_PROXY_URL/v3/clusters/$CLUSTER_ID/topics" \
                   -H "Content-Type: application/json" \
-                  -d "{\"topic_name\": \"$TOPIC\", \"partitions_count\": $PARTITIONS, \"replication_factor\": $REPLICAS}"
+                  -d "{\"topic_name\": \"$TOPIC\", \"partitions_count\": $PARTITIONS, \"replication_factor\": $REPLICAS}")
+                if [[ "$CREATE_CODE" != "200" && "$CREATE_CODE" != "201" ]]; then
+                  echo "ERROR: Failed to create topic '$TOPIC' (HTTP $CREATE_CODE)."
+                  exit 1
+                fi
               else
-                echo "Topic '$TOPIC' already exists."
+                echo "ERROR: Unexpected status $STATUS_CODE checking topic '$TOPIC'."
+                exit 1
               fi
               echo
             done <<< "$DESIRED_TOPICS"
