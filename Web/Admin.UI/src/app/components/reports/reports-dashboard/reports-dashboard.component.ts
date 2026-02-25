@@ -196,8 +196,8 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
       this.tenantService.regenerateReport(facilityId, reportId, bypassSubmission)
         .subscribe({
           next: () => {
-            this.snackBar.open('Report resubmitted. The list will refresh in 5 seconds…', '', {
-              duration: 5000,
+            this.snackBar.open('Report resubmitted. The list will refresh in 3 seconds…', '', {
+              duration: 3000,
               horizontalPosition: 'end',
               verticalPosition: 'top',
               panelClass: 'resubmit-snackbar'
@@ -205,7 +205,7 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
             setTimeout(() => {
               this.beforeResubmitIds = new Set(this.reportSchedules.map(r => r.id));
               this.loadReportSchedules();
-            }, 5000);
+            }, 3000);
           },
           error: err => {
             console.error('Resubmit failed', err);
