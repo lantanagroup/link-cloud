@@ -41,7 +41,7 @@
 	  <PackageReference Include="JWT" Version="10.*" />
 	  <PackageReference Include="LinqKit" Version="1.*" />
 	  <PackageReference Include="Azure.Identity" Version="1.*" />
-	  <PackageReference Include="System.Text.Json" Version="8.*" />
+   <PackageReference Include="System.Text.Json" Version="10.0.1" />
   </ItemGroup>
 
 

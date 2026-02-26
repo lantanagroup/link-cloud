@@ -1,4 +1,6 @@
 ﻿using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
+using Microsoft.Extensions.Options;
 using Quartz;
 
 namespace LantanaGroup.Link.DataAcquisition.Jobs;
@@ -10,10 +12,12 @@ public class AcquisitionProcessingScheduleService : IHostedService
     public const string DAILY = "Daily";
 
     private readonly ISchedulerFactory _schedulerFactory;
+    private readonly IOptions<AcquisitionJobSettings> _settings;
 
-    public AcquisitionProcessingScheduleService(ISchedulerFactory schedulerFactory)
+    public AcquisitionProcessingScheduleService(ISchedulerFactory schedulerFactory, IOptions<AcquisitionJobSettings> settings)
     {
         _schedulerFactory = schedulerFactory;
+        _settings = settings;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -31,7 +35,7 @@ public class AcquisitionProcessingScheduleService : IHostedService
             .Create()
             .ForJob(job.Key)
             .WithIdentity("Acquisition Processing Trigger", job.Key.Group)
-            .WithCronSchedule("0/30 * * * * ?") // every 30 seconds
+            .WithCronSchedule(_settings.Value.CronSchedule) // every 30 seconds
             .WithDescription("Acquisition Processing Trigger")
             .Build();
 

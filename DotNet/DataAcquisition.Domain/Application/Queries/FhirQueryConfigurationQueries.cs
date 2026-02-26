@@ -29,7 +29,7 @@ public class FhirQueryConfigurationQueries : IFhirQueryConfigurationQueries
         using var activity = ServiceActivitySource.Instance.StartActivity("FhirQueryConfigurationQueries.GetAuthenticationConfigurationByFacilityId");
         activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
 
-        var result = await (from fl in _database.FhirQueryConfigurations
+        var result = await (from fl in _database.FhirQueryConfigurations.AsNoTracking()
                             where fl.FacilityId == facilityId
                             select AuthenticationConfigurationModel.FromDomain(fl.Authentication)).SingleOrDefaultAsync();
 
@@ -41,7 +41,7 @@ public class FhirQueryConfigurationQueries : IFhirQueryConfigurationQueries
         using var activity = ServiceActivitySource.Instance.StartActivity("FhirQueryConfigurationQueries.GetByFacilityIdAsync");
         activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
 
-        var result = await (from fl in _database.FhirQueryConfigurations
+        var result = await (from fl in _database.FhirQueryConfigurations.AsNoTracking()
                             where fl.FacilityId == facilityId
                             select FhirQueryConfigurationModel.FromDomain(fl)).SingleOrDefaultAsync();
 

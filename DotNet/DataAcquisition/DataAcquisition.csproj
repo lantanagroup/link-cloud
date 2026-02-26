@@ -64,7 +64,7 @@
 		
 		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
 		
-		<PackageReference Include="System.Text.Json" Version="8.*" />
+		<PackageReference Include="System.Text.Json" Version="10.0.1" />
 	</ItemGroup>
 
 	<ItemGroup>
