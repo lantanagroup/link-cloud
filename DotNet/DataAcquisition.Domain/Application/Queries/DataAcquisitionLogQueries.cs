@@ -425,20 +425,20 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         {
             int batchCount = await _deadlockRetryPolicy.ExecuteAsync(async () =>
             {
+                var stalledBatch = await _dbContext.DataAcquisitionLogs.AsNoTracking()
+                    .Where(l => l.Status == RequestStatus.Queued && l.ModifyDate <= stallThreshold)
+                    .Take(batchSize)
+                    .ToListAsync(cancellationToken);
+
+                if (stalledBatch.Count == 0)
+                {
+                    return 0;
+                }
+                
                 using var transaction = await _dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken);
+                
                 try
                 {
-                    var stalledBatch = await _dbContext.DataAcquisitionLogs
-                        .Where(l => l.Status == RequestStatus.Queued && l.ModifyDate <= stallThreshold)
-                        .Take(batchSize)
-                        .ToListAsync(cancellationToken);
-
-                    if (stalledBatch.Count == 0)
-                    {
-                        await transaction.CommitAsync(cancellationToken);
-                        return 0;
-                    }
-
                     foreach (var log in stalledBatch)
                     {
                         log.Status = RequestStatus.Failed;
@@ -841,7 +841,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     {
         designagtedExecutionTime ??= DateTime.UtcNow;
 
-        var query = from log in _dbContext.DataAcquisitionLogs
+        var query = from log in _dbContext.DataAcquisitionLogs.AsNoTracking()
             where log.FacilityId == facilityId
                   && (lastId == null || log.Id > lastId)
                   && (log.ExecutionDate == null || log.ExecutionDate <= designagtedExecutionTime)
