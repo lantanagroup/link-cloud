@@ -5,9 +5,11 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 
@@ -17,7 +19,7 @@ public interface IDataAcquisitionLogManager
 {
     Task<DataAcquisitionLogModel> CreateAsync(CreateDataAcquisitionLogModel log, CancellationToken cancellationToken = default);
     Task<DataAcquisitionLogModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default);
-    Task UpdateBatchAsync(IEnumerable<DataAcquisitionLog> logs, CancellationToken cancellationToken = default);
+    Task<int> UpdateStatusBatchAsync(IEnumerable<long> ids, RequestStatus newStatus, string? note = null, CancellationToken cancellationToken = default);
     Task<List<DataAcquisitionLog>> GetLogsByIdsAsync(List<long> ids, CancellationToken cancellationToken = default);
     Task DeleteAsync(long id, CancellationToken cancellationToken = default);
     Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(List<long> logIds, string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default);
@@ -28,12 +30,14 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 {
     public readonly ILogger<DataAcquisitionLogManager> _logger;
     public readonly IDatabase _database;
+    private readonly DataAcquisitionDbContext _dbContext;
     private readonly IDataAcquisitionLogQueries _logQueries;
 
-    public DataAcquisitionLogManager(ILogger<DataAcquisitionLogManager> logger, IDatabase database, IDataAcquisitionLogQueries logQueries)
+    public DataAcquisitionLogManager(ILogger<DataAcquisitionLogManager> logger, IDatabase database, DataAcquisitionDbContext dbContext, IDataAcquisitionLogQueries logQueries)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _database = database ?? throw new ArgumentNullException(nameof(database));
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _logQueries = logQueries;
     }
 
@@ -199,16 +203,18 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         return await _database.DataAcquisitionLogRepository.FindAsync(x => ids.Contains(x.Id), cancellationToken);
     }
 
-    public async Task UpdateBatchAsync(IEnumerable<DataAcquisitionLog> logs, CancellationToken cancellationToken = default)
+    public async Task<int> UpdateStatusBatchAsync(IEnumerable<long> ids, RequestStatus newStatus, string? note = null, CancellationToken cancellationToken = default)
     {
-        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.UpdateBatchAsync");
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.UpdateStatusBatchAsync");
 
-        foreach (var log in logs)
-        {
-            log.ModifyDate = DateTime.UtcNow;
-            _database.DataAcquisitionLogRepository.Update(log);
-        }
-        await _database.DataAcquisitionLogRepository.SaveChangesAsync(cancellationToken);
+        // High-speed bulk update without fetching entities. 
+        // Note: The 'note' parameter is currently ignored to maintain performance and avoid LINQ translation errors with JSON collections.
+        return await _dbContext.DataAcquisitionLogs
+            .Where(l => ids.Contains(l.Id))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(l => l.Status, newStatus)
+                .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                cancellationToken);
     }
 
     public async Task<List<DataAcquisitionLog>> GetPendingRequests(CancellationToken cancellationToken = default)

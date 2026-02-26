@@ -212,6 +212,12 @@ public class DataAcquisitionDbContext : DbContext
                     nameof(DataAcquisitionLog.ScheduledReport)
                 );
 
+            entity.HasIndex(e => new { e.Status, e.ModifyDate })
+                .HasDatabaseName("IX_DataAcquisitionLogs_Status_ModifyDate");
+
+            entity.HasIndex(e => new { e.Status, e.ExecutionDate })
+                .HasDatabaseName("IX_DataAcquisitionLogs_Status_ExecutionDate");
+
             entity.HasIndex(e => new { e.TailSent, e.FacilityId, e.ReportTrackingId, e.CorrelationId, e.ReportStartDate, e.ReportEndDate, e.QueryPhase })
                 .HasDatabaseName("IX_DataAcquisitionLogs_Tailing_Optimization")
                 .HasFilter("[TailSent] = 0 AND [ReportTrackingId] IS NOT NULL AND [CorrelationId] IS NOT NULL AND [ReportStartDate] IS NOT NULL AND [ReportEndDate] IS NOT NULL");

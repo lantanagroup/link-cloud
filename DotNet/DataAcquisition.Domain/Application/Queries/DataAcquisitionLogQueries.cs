@@ -417,66 +417,18 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     public async Task<int> FailStalledQueuedLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default)
     {
         var stallThreshold = DateTime.UtcNow.AddMinutes(-stallMinutes);
-        int totalProcessed = 0;
-        int batchesProcessed = 0;
-        const int batchSize = 500;
 
-        while (batchesProcessed < maxBatches)
+        // High-speed bulk update without fetching entities or using transactions.
+        // This avoids LINQ translation errors with JSON collections and minimizes lock duration.
+        return await _deadlockRetryPolicy.ExecuteAsync(async () =>
         {
-            int batchCount = await _deadlockRetryPolicy.ExecuteAsync(async () =>
-            {
-                var stalledBatch = await _dbContext.DataAcquisitionLogs.AsNoTracking()
-                    .Where(l => l.Status == RequestStatus.Queued && l.ModifyDate <= stallThreshold)
-                    .Take(batchSize)
-                    .ToListAsync(cancellationToken);
-
-                if (stalledBatch.Count == 0)
-                {
-                    return 0;
-                }
-                
-                using var transaction = await _dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken);
-                
-                try
-                {
-                    foreach (var log in stalledBatch)
-                    {
-                        log.Status = RequestStatus.Failed;
-                        log.ModifyDate = DateTime.UtcNow;
-                        log.Notes.Add($"[{DateTime.UtcNow}] Request failed due to being in Queued status for more than {stallMinutes} minutes.");
-                    }
-
-                    await _dbContext.SaveChangesAsync(cancellationToken);
-                    await transaction.CommitAsync(cancellationToken);
-                    return stalledBatch.Count;
-                }
-                catch (Exception ex)
-                {
-                    await transaction.RollbackAsync(cancellationToken);
-                    // Only log if it's NOT a deadlock (Polly will handle deadlocks)
-                    if (ex is not SqlException sqlEx || sqlEx.Number != 1205)
-                    {
-                        _logger.LogError(ex, "Failed to process a batch of stalled logs. Error: {Message}", ex.Message);
-                    }
-                    throw;
-                }
-            });
-
-            if (batchCount == 0)
-            {
-                break;
-            }
-
-            totalProcessed += batchCount;
-            batchesProcessed++;
-        }
-
-        if (batchesProcessed >= maxBatches)
-        {
-            _logger.LogInformation("FailStalledQueuedLogs reached max batch limit of {maxBatches}. Yielding to next run.", maxBatches);
-        }
-
-        return totalProcessed;
+            return await _dbContext.DataAcquisitionLogs
+                .Where(l => l.Status == RequestStatus.Queued && l.ModifyDate <= stallThreshold)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(l => l.Status, RequestStatus.Failed)
+                    .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                    cancellationToken);
+        });
     }
 
     public async Task<PagedConfigModel<DataAcquisitionLogModel>> SearchAsync(SearchDataAcquisitionLogRequest model,
