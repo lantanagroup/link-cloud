@@ -1,4 +1,6 @@
-﻿using Confluent.Kafka;
+﻿using System.Diagnostics;
+using System.Text;
+using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
@@ -7,11 +9,10 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Options;
 using Quartz;
-using System.Diagnostics;
-using System.Text;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using Task = System.Threading.Tasks.Task;
 
@@ -23,7 +24,7 @@ public class AcquisitionProcessingJob : IJob
     private readonly ILogger<AcquisitionProcessingJob> _logger;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly IProducer<long, ReadyToAcquire> _readyToAcquireProducer;
-    private readonly IProducer<string, ResourceAcquired> _resourceAcquiredProducer;
+    private readonly IProducer<ResourceKey, ResourceAcquired> _resourceAcquiredProducer;
     private readonly AcquisitionWorkerProcessorSettings _settings;
     private const int BatchSize = 25;
 
@@ -31,7 +32,7 @@ public class AcquisitionProcessingJob : IJob
         ILogger<AcquisitionProcessingJob> logger,
         IServiceScopeFactory serviceScopeFactory,
         IProducer<long, ReadyToAcquire> readyToAcquireProducer,
-        IProducer<string, ResourceAcquired> resourceAcquiredProducer,
+        IProducer<ResourceKey, ResourceAcquired> resourceAcquiredProducer,
         IOptions<AcquisitionWorkerProcessorSettings> settings)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -342,9 +343,13 @@ public class AcquisitionProcessingJob : IJob
                     
                     await _resourceAcquiredProducer.ProduceAsync(
                         KafkaTopic.ResourceAcquired.ToString(),
-                        new Message<string, ResourceAcquired>
+                        new Message<ResourceKey, ResourceAcquired>
                         {
-                            Key = message.FacilityId,
+                            Key = new ResourceKey
+                            {
+                                FacilityId = message.FacilityId,
+                                CorrelationId = message.CorrelationId
+                            },
                             Headers = headers,
                             Value = message.ResourceAcquired
                         }, cancellationToken);

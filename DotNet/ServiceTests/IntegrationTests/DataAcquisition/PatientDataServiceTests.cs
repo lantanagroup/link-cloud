@@ -18,6 +18,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
@@ -38,7 +39,7 @@ public class PatientDataServiceTests
     private readonly Mock<IFhirQueryConfigurationQueries> _mockFhirQueryQueries;
     private readonly Mock<IQueryPlanManager> _mockQueryPlanManager;
     private readonly Mock<IQueryPlanQueries> _mockQueryPlanQueries;
-    private readonly Mock<IProducer<string, ResourceAcquired>> _mockKafkaProducer;
+    private readonly Mock<IProducer<ResourceKey, ResourceAcquired>> _mockKafkaProducer;
     private readonly Mock<IQueryListProcessor> _mockQueryListProcessor;
     private readonly Mock<IReadFhirCommand> _mockReadFhirCommand;
     private readonly Mock<ISearchFhirCommand> _mockSearchFhirCommand;
@@ -61,7 +62,7 @@ public class PatientDataServiceTests
         _mockFhirQueryQueries = new Mock<IFhirQueryConfigurationQueries>();
         _mockQueryPlanManager = new Mock<IQueryPlanManager>();
         _mockQueryPlanQueries = new Mock<IQueryPlanQueries>();
-        _mockKafkaProducer = new Mock<IProducer<string, ResourceAcquired>>();
+        _mockKafkaProducer = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
         _mockQueryListProcessor = new Mock<IQueryListProcessor>();
         _mockReadFhirCommand = new Mock<IReadFhirCommand>();
         _mockSearchFhirCommand = new Mock<ISearchFhirCommand>();
@@ -113,9 +114,9 @@ public class PatientDataServiceTests
             PatientId = "patient-123",
             ReportableEvent = ReportableEvent.Discharge,
             QueryType = "Initial",
-            ScheduledReports = new List<LantanaGroup.Link.Shared.Application.Models.ScheduledReport>
+            ScheduledReports = new List<ScheduledReport>
             {
-                new LantanaGroup.Link.Shared.Application.Models.ScheduledReport
+                new ScheduledReport
                 {
                     ReportTypes = new List<string> { "measure-1" },
                     Frequency = Frequency.Discharge,
@@ -212,9 +213,9 @@ public class PatientDataServiceTests
             PatientId = "patient-123",
             ReportableEvent = ReportableEvent.Discharge,
             QueryType = "Initial",
-            ScheduledReports = new List<LantanaGroup.Link.Shared.Application.Models.ScheduledReport>
+            ScheduledReports = new List<ScheduledReport>
             {
-                new LantanaGroup.Link.Shared.Application.Models.ScheduledReport
+                new ScheduledReport
                 {
                     ReportTypes = new List<string> { "measure-1" },
                     Frequency = Frequency.Discharge,
@@ -320,7 +321,7 @@ public class PatientDataServiceTests
                 QueryType = FhirQueryType.Read,
                 FhirQueryResourceTypes = new List<FhirQueryResourceType>
                 {
-                    new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient }
+                    new FhirQueryResourceType() { ResourceType = ResourceType.Patient }
                 },
                 QueryParameters = new List<string>(),
                 ResourceReferenceTypes = new List<ResourceReferenceType>()
@@ -360,7 +361,7 @@ public class PatientDataServiceTests
             .Setup(x => x.ExecuteRead(
                 It.IsAny<DataAcquisitionLogModel>(),
                 It.IsAny<FhirQueryModel>(),
-                It.IsAny<Hl7.Fhir.Model.ResourceType>(),
+                It.IsAny<ResourceType>(),
                 It.IsAny<FhirQueryConfigurationModel>(),
                 cancellationToken))
             .ReturnsAsync(new[] { "Patient/patient-1" });
