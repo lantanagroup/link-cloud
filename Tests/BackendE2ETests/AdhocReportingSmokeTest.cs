@@ -392,14 +392,14 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
                 {
                     ["QueryConfigType"] = "Reference",
                     ["ResourceType"] = "Location",
-                    ["OperationType"] = 1,
+                    ["OperationType"] = 2,
                     ["Paged"] = 100
                 },
                 ["3"] = new JObject
                 {
                     ["QueryConfigType"] = "Reference",
                     ["ResourceType"] = "Medication",
-                    ["OperationType"] = 1,
+                    ["OperationType"] = 2,
                     ["Paged"] = 100
                 }
             },
@@ -561,14 +561,14 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
                 {
                     ["QueryConfigType"] = "Reference",
                     ["ResourceType"] = "Device",
-                    ["OperationType"] = 1,
+                    ["OperationType"] = 2,
                     ["Paged"] = 100
                 },
                 ["7"] = new JObject
                 {
                     ["QueryConfigType"] = "Reference",
                     ["ResourceType"] = "Specimen",
-                    ["OperationType"] = 1,
+                    ["OperationType"] = 2,
                     ["Paged"] = 100
                 }
             }
@@ -633,14 +633,14 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
                 {
                     ["QueryConfigType"] = "Reference",
                     ["ResourceType"] = "Location",
-                    ["OperationType"] = 1,
+                    ["OperationType"] = 2,
                     ["Paged"] = 100
                 },
                 ["3"] = new JObject
                 {
                     ["QueryConfigType"] = "Reference",
                     ["ResourceType"] = "Medication",
-                    ["OperationType"] = 1,
+                    ["OperationType"] = 2,
                     ["Paged"] = 100
                 }
             },
@@ -802,14 +802,14 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
                 {
                     ["QueryConfigType"] = "Reference",
                     ["ResourceType"] = "Device",
-                    ["OperationType"] = 1,
+                    ["OperationType"] = 2,
                     ["Paged"] = 100
                 },
                 ["7"] = new JObject
                 {
                     ["QueryConfigType"] = "Reference",
                     ["ResourceType"] = "Specimen",
-                    ["OperationType"] = 1,
+                    ["OperationType"] = 2,
                     ["Paged"] = 100
                 }
             }

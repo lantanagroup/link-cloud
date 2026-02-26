@@ -17,6 +17,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.Extensions.Logging;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
@@ -52,7 +53,7 @@ public class QueryListProcessor : IQueryListProcessor
 {
     private readonly ILogger<QueryListProcessor> _logger;
     private readonly IFhirApiService _fhirRepo;
-    private readonly IProducer<string, ResourceAcquired> _kafkaProducer;
+    private readonly IProducer<ResourceKey, ResourceAcquired> _kafkaProducer;
     private readonly IReferenceResourceService _referenceResourceService;
     private readonly ProducerConfig _producerConfig;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
@@ -62,7 +63,7 @@ public class QueryListProcessor : IQueryListProcessor
     public QueryListProcessor(
         ILogger<QueryListProcessor> logger,
         IFhirApiService fhirRepo,
-        IProducer<string, ResourceAcquired> kafkaProducer,
+        IProducer<ResourceKey, ResourceAcquired> kafkaProducer,
         IReferenceResourceService referenceResourceService,
         IDataAcquisitionLogManager dataAcquisitionLogManager,
         IDataAcquisitionLogQueries dataAcquisitionLogQueries,

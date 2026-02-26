@@ -5,14 +5,15 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
-using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Services.Security.Token;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
@@ -39,12 +40,12 @@ namespace IntegrationTests.DataAcquisition
         private readonly string _dbPath;
 
         public Mock<IProducer<long, ReadyToAcquire>> ReadyToAcquireProducerMock { get; private set; }
-        public Mock<IProducer<string, ResourceAcquired>> ResourceAcquiredProducerMock { get; private set; }
+        public Mock<IProducer<ResourceKey, ResourceAcquired>> ResourceAcquiredProducerMock { get; private set; }
 
         public DataAcquisitionIntegrationTestFixture()
         {
             ReadyToAcquireProducerMock = new Mock<IProducer<long, ReadyToAcquire>>();
-            ResourceAcquiredProducerMock = new Mock<IProducer<string, ResourceAcquired>>();
+            ResourceAcquiredProducerMock = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
 
             _dbPath = Path.Combine(Path.GetTempPath(), $"testdb_{Guid.NewGuid()}.db");
             var sqliteConnectionString = $"Data Source={_dbPath};";
@@ -101,7 +102,7 @@ namespace IntegrationTests.DataAcquisition
 
             // Mock Kafka producers for integration tests
             builder.Services.AddSingleton<IProducer<long, ReadyToAcquire>>(ReadyToAcquireProducerMock.Object);
-            builder.Services.AddSingleton<IProducer<string, ResourceAcquired>>(ResourceAcquiredProducerMock.Object);
+            builder.Services.AddSingleton<IProducer<ResourceKey, ResourceAcquired>>(ResourceAcquiredProducerMock.Object);
 
             builder.Services.Configure<ServiceRegistry>(options =>
             {
