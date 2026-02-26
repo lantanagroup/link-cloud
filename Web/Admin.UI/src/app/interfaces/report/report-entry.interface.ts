@@ -7,6 +7,7 @@ export interface IReportEntry {
   patientId: string;
   reportingStatus: ReportingStatus;
   submissionStatus?: SubmissionStatus;
+  submitReportDateTime?: Date;
   aggregateReportUri: string;
   aggregateReportBlobName: string;
   measureReportList: IEvaluatedMeasureReport[];

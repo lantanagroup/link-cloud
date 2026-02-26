@@ -126,8 +126,8 @@
         <ng-container matColumnDef="reportStartDate">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Reporting Period</th>
           <td mat-cell *matCellDef="let element">
-            <div><strong>Start:</strong> {{ element.reportStartDate | date:'short' }}</div>
-            <div><strong>End:</strong> {{ element.reportEndDate | date:'short' }}</div>
+            <div><strong>Start:</strong> {{ element.reportStartDate | date:'M/d/yy HH:mm' }}</div>
+            <div><strong>End:</strong> {{ element.reportEndDate | date:'M/d/yy HH:mm' }}</div>
           </td>
         </ng-container>
 
@@ -172,8 +172,8 @@
               <span *ngIf="element.status === 'EndOfPeriod'" class="status-endOfPeriod">End of Period</span>
               <span *ngIf="element.status === 'Submitted'" class="status-submitted">Submitted</span>
             </div>
-            <div style="margin-top:5px" *ngIf="element.submitDate">{{element.submitDate | date:'short'}}</div>
-            <div style="margin-top:5px" *ngIf="!element.submitDate">{{element.createDate | date:'short'}}</div>
+            <div style="margin-top:5px" *ngIf="element.submitDate" [matTooltip]="element.submitDate | date:'M/d/yy h:mm:ss a'">{{element.submitDate | date:'M/d/yy HH:mm'}}</div>
+            <div style="margin-top:5px" *ngIf="!element.submitDate" [matTooltip]="element.createDate | date:'M/d/yy h:mm:ss a'">{{element.createDate | date:'M/d/yy HH:mm'}}</div>
           </td>
         </ng-container>
 
