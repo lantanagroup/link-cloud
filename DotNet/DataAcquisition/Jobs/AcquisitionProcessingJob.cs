@@ -124,7 +124,7 @@ public class AcquisitionProcessingJob : IJob
                     if (!requests.Any()) break;
 
                     var logIds = requests.Select(r => r.Id).ToList();
-                    await dataAcquisitionLogManager.UpdateStatusBatchAsync(logIds, RequestStatus.Failed, $"[{DateTime.UtcNow}] Request FAILED due to missing FhirQueryConfiguration. FacilityId: {facilityId}.", cancellationToken);
+                    await dataAcquisitionLogManager.UpdateStatusBatchAsync(logIds, RequestStatus.Failed, cancellationToken);
 
                     lastMissingConfigId = requests.Last().Id;
                     batchesProcessedMissing++;
@@ -176,7 +176,7 @@ public class AcquisitionProcessingJob : IJob
 
                 if (maxRetriesReachedIds.Any())
                 {
-                    await dataAcquisitionLogManager.UpdateStatusBatchAsync(maxRetriesReachedIds, RequestStatus.MaxRetriesReached, $"[{DateTime.UtcNow}] Maximum retry attempts ({DataAcquisitionLog.MaxRetryAttempts}) reached for request.", cancellationToken);
+                    await dataAcquisitionLogManager.UpdateStatusBatchAsync(maxRetriesReachedIds, RequestStatus.MaxRetriesReached, cancellationToken);
                 }
 
                 if (retryableLogIds.Any())
@@ -186,7 +186,7 @@ public class AcquisitionProcessingJob : IJob
                     // However, some might be Pending (RetryAttempts 0) and some Failed (RetryAttempts > 0)
                     
                     // To keep it simple and safe for now, let's at least bulk update the status to Ready
-                    await dataAcquisitionLogManager.UpdateStatusBatchAsync(retryableLogIds, RequestStatus.Ready, $"[{DateTime.UtcNow}] Processing request.", cancellationToken);
+                    await dataAcquisitionLogManager.UpdateStatusBatchAsync(retryableLogIds, RequestStatus.Ready, cancellationToken);
                 }
 
                 foreach (var request in requests)
@@ -219,7 +219,7 @@ public class AcquisitionProcessingJob : IJob
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error producing ReadyToAcquire message for log id: {logId}", request.Id);
-                        await dataAcquisitionLogManager.UpdateStatusBatchAsync([request.Id], RequestStatus.Failed, $"[{DateTime.UtcNow}] Failed to produce ReadyToAcquire message: {ex.Message}", cancellationToken);
+                        await dataAcquisitionLogManager.UpdateStatusBatchAsync([request.Id], RequestStatus.Failed, cancellationToken);
                     }
                 }
                 _readyToAcquireProducer.Flush(cancellationToken);

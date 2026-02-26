@@ -19,7 +19,7 @@ public interface IDataAcquisitionLogManager
 {
     Task<DataAcquisitionLogModel> CreateAsync(CreateDataAcquisitionLogModel log, CancellationToken cancellationToken = default);
     Task<DataAcquisitionLogModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default);
-    Task<int> UpdateStatusBatchAsync(IEnumerable<long> ids, RequestStatus newStatus, string? note = null, CancellationToken cancellationToken = default);
+    Task<int> UpdateStatusBatchAsync(IEnumerable<long> ids, RequestStatus newStatus, CancellationToken cancellationToken = default);
     Task<List<DataAcquisitionLog>> GetLogsByIdsAsync(List<long> ids, CancellationToken cancellationToken = default);
     Task DeleteAsync(long id, CancellationToken cancellationToken = default);
     Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(List<long> logIds, string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default);
@@ -203,12 +203,11 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         return await _database.DataAcquisitionLogRepository.FindAsync(x => ids.Contains(x.Id), cancellationToken);
     }
 
-    public async Task<int> UpdateStatusBatchAsync(IEnumerable<long> ids, RequestStatus newStatus, string? note = null, CancellationToken cancellationToken = default)
+    public async Task<int> UpdateStatusBatchAsync(IEnumerable<long> ids, RequestStatus newStatus, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.UpdateStatusBatchAsync");
 
         // High-speed bulk update without fetching entities. 
-        // Note: The 'note' parameter is currently ignored to maintain performance and avoid LINQ translation errors with JSON collections.
         return await _dbContext.DataAcquisitionLogs
             .Where(l => ids.Contains(l.Id))
             .ExecuteUpdateAsync(setters => setters
