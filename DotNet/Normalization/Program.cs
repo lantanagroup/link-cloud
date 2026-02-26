@@ -23,6 +23,7 @@ using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
@@ -71,20 +72,24 @@ static void RegisterServices(WebApplicationBuilder builder)
     // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
 
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
-    builder.Services.AddTransient<IKafkaConsumerFactory<string, ResourceAcquiredMessage>, KafkaConsumerFactory<string, ResourceAcquiredMessage>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<ResourceKey, ResourceAcquiredMessage>, KafkaConsumerFactory<ResourceKey, ResourceAcquiredMessage>>();
 
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, string>, KafkaProducerFactory<ResourceKey, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, ResourceAcquiredMessage>, KafkaProducerFactory<string, ResourceAcquiredMessage>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, ResourceNormalizedMessage>, KafkaProducerFactory<string, ResourceNormalizedMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourceAcquiredMessage>, KafkaProducerFactory<ResourceKey, ResourceAcquiredMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourceNormalizedMessage>, KafkaProducerFactory<ResourceKey, ResourceNormalizedMessage>>();
 
-    builder.Services.RegisterKafkaProducer<string, ResourceNormalizedMessage>(kafkaConnection: builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
-        config: new ProducerConfig() { CompressionType = CompressionType.Zstd });
+    builder.Services.RegisterKafkaProducer<ResourceKey, ResourceNormalizedMessage>(
+        builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
+        new ProducerConfig() { CompressionType = CompressionType.Zstd });
     builder.Services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection: builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>(), new ProducerConfig());
 
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<ResourceKey, string>, DeadLetterExceptionHandler<ResourceKey, string>>();
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, ResourceAcquiredMessage>, DeadLetterExceptionHandler<string, ResourceAcquiredMessage>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<string, ResourceAcquiredMessage>, TransientExceptionHandler<string, ResourceAcquiredMessage>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<ResourceKey, ResourceAcquiredMessage>, DeadLetterExceptionHandler<ResourceKey, ResourceAcquiredMessage>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<ResourceKey, ResourceAcquiredMessage>, TransientExceptionHandler<ResourceKey, ResourceAcquiredMessage>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<string, string>, TransientExceptionHandler<string, string>>();
 
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 

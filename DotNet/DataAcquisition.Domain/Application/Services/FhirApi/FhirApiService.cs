@@ -1,4 +1,8 @@
-﻿using Confluent.Kafka;
+﻿using System.Diagnostics;
+using System.Net;
+using System.Text;
+using System.Text.Json;
+using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
@@ -13,13 +17,10 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Utilities;
-using System.Diagnostics;
-using System.Net;
-using System.Text;
-using System.Text.Json;
 using DateTime = System.DateTime;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
@@ -41,7 +42,7 @@ public class FhirApiService : IFhirApiService
     private readonly IReferenceResourceService _referenceResourceService;
     private readonly IReadFhirCommand _readFhirCommand;
     private readonly ISearchFhirCommand _searchFhirCommand;
-    private readonly IProducer<string, ResourceAcquired> _kafkaProducer;
+    private readonly IProducer<ResourceKey, ResourceAcquired> _kafkaProducer;
 
     public FhirApiService(
         IReferenceResourcesManager referenceResourceManager,
@@ -49,7 +50,7 @@ public class FhirApiService : IFhirApiService
         IReferenceResourceService referenceResourceService,
         ISearchFhirCommand searchFhirCommand,
         IReadFhirCommand readFhirCommand,
-        IProducer<string, ResourceAcquired> kafkaProducer)
+        IProducer<ResourceKey, ResourceAcquired> kafkaProducer)
     {
         _referenceResourceManager = referenceResourceManager;
         _referenceResourcesQueries = referenceResourcesQueries;
@@ -120,7 +121,7 @@ public class FhirApiService : IFhirApiService
             await GenerateResourceAcquiredMessage(new ResourceAcquired
             {
                 Resource = resource,
-                ScheduledReports = new List<Shared.Application.Models.ScheduledReport> { log.ScheduledReport },
+                ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
                 PatientId = !fhirQuery.IsReference ?? false ? log.PatientId : null,
                 QueryType = log.QueryPhase.ToString(),
                 ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
@@ -230,7 +231,7 @@ public class FhirApiService : IFhirApiService
                     await GenerateResourceAcquiredMessage(new ResourceAcquired
                     {
                         Resource = resource,
-                        ScheduledReports = new List<Shared.Application.Models.ScheduledReport> { log.ScheduledReport },
+                        ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
                         PatientId = !fhirQuery.IsReference ?? false ? log.PatientId : null,
                         QueryType = log.QueryPhase.ToString(),
                         ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
@@ -311,9 +312,13 @@ public class FhirApiService : IFhirApiService
 
         await _kafkaProducer.ProduceAsync(
             KafkaTopic.ResourceAcquired.ToString(),
-            new Message<string, ResourceAcquired>
+            new Message<ResourceKey, ResourceAcquired>
             {
-                Key = facilityId,
+                Key = new ResourceKey
+                {
+                    FacilityId = facilityId,
+                    CorrelationId = correlationId
+                },
                 Headers = new Headers
                 {
                 new Header(DataAcquisitionConstants.HeaderNames.CorrelationId,
