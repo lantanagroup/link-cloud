@@ -420,38 +420,16 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     {
         var stallThreshold = DateTime.UtcNow.AddMinutes(-stallMinutes);
 
+        // High-speed bulk update without fetching entities or using transactions.
+        // This avoids LINQ translation errors with JSON collections and minimizes lock duration.
         return await _deadlockRetryPolicy.ExecuteAsync(async () =>
         {
-            using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
-            try
-            {
-                var stalledLogIds = await _dbContext.DataAcquisitionLogs.AsNoTracking()
-                    .Where(l => l.Status == RequestStatus.Queued && l.ModifyDate <= stallThreshold)
-                    .OrderBy(l => l.ModifyDate)
-                    .Take(maxBatches * 100) // limit to avoid massive memory usage but allow multiple batches
-                    .Select(l => l.Id)
-                    .ToListAsync(cancellationToken);
-
-                if (!stalledLogIds.Any())
-                {
-                    return 0;
-                }
-
-                int rowsAffected = await _dbContext.DataAcquisitionLogs
-                    .Where(l => stalledLogIds.Contains(l.Id) && l.Status == RequestStatus.Queued)
-                    .ExecuteUpdateAsync(setters => setters
-                        .SetProperty(l => l.Status, RequestStatus.Failed)
-                        .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
-                        cancellationToken);
-
-                await transaction.CommitAsync(cancellationToken);
-                return rowsAffected;
-            }
-            catch (Exception)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                throw;
-            }
+            return await _dbContext.DataAcquisitionLogs
+                .Where(l => l.Status == RequestStatus.Queued && l.ModifyDate <= stallThreshold)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(l => l.Status, RequestStatus.Failed)
+                    .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                    cancellationToken);
         });
     }
 
