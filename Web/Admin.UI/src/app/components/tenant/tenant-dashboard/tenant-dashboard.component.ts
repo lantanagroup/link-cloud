@@ -225,6 +225,7 @@ export class TenantDashboardComponent implements OnInit {
         error: (err) => {
           console.error('Deletion failed', err);
           this.snackBar.open('Failed to delete', 'Close', { duration: 3000 });
+          this.getFacilities();
         }
       });
     });
@@ -274,6 +275,7 @@ export class TenantDashboardComponent implements OnInit {
         error: (err) => {
           console.error('Restore failed', err);
           this.snackBar.open('Failed to restore facility', 'Close', { duration: 3000 });
+          this.getFacilities();
         }
       });
     });

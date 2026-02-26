@@ -1,4 +1,4 @@
-import {Component, OnInit} from '@angular/core';
+import {Component, OnDestroy, OnInit, ViewChild} from '@angular/core';
 import {Location} from '@angular/common';
 import {ActivatedRoute, Router, RouterLink} from "@angular/router";
 import {MatCardModule} from "@angular/material/card";
@@ -45,8 +45,11 @@ import { ReportService } from "../../../services/gateway/report/report.service";
   templateUrl: './facility-view.component.html',
   styleUrl: './facility-view.component.scss'
 })
-export class FacilityViewComponent implements OnInit {
+export class FacilityViewComponent implements OnInit, OnDestroy {
+  @ViewChild(MatSort, { static: false }) sort!: MatSort;
+
   private subscription: Subscription | undefined;
+  private refreshTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   faRotate = faRotate;
   faArrowLeft = faArrowLeft;
@@ -63,7 +66,7 @@ export class FacilityViewComponent implements OnInit {
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
 
   highlightedRowIds = new Set<string>();
-  private beforeResubmitIds: Set<string> | null = null;
+  private pendingHighlight = false;
 
   showDeleted: boolean = false;
 
@@ -119,10 +122,13 @@ export class FacilityViewComponent implements OnInit {
     if (this.subscription) {
       this.subscription.unsubscribe();
     }
+    if (this.refreshTimeoutId !== null) {
+      clearTimeout(this.refreshTimeoutId);
+    }
   }
 
   getColumns(): string[] {
-    const cols = ['id', 'facilityId', 'reportStartDate', 'frequency', 'reportTypes', 'patientsInCensus', 'patientsInIP', 'status', 'action'];
+    const cols = ['id', 'facilityId', 'reportStartDate', 'createDate', 'frequency', 'reportTypes', 'patientsInCensus', 'patientsInIP', 'status', 'action'];
     if (this.showDeleted) cols.push('isDeleted');
     return cols;
   }
@@ -145,6 +151,9 @@ export class FacilityViewComponent implements OnInit {
   }
 
   loadReportSchedules(): void {
+    if (!this.pendingHighlight) {
+      this.highlightedRowIds = new Set();
+    }
     this.loadingService.isLoading.next(true);
     this.reportService.searchReportSchedules(
       this.facilityId,
@@ -166,13 +175,9 @@ export class FacilityViewComponent implements OnInit {
         this.paginationMetadata = data.metadata;
         this.paginationMetadata.pageNumber = data.metadata.pageNumber - 1; // Convert back to 0-based
         this.loadingService.isLoading.next(false);
-        if (this.beforeResubmitIds) {
-          const newIds = data.records.filter(r => !this.beforeResubmitIds!.has(r.id)).map(r => r.id);
-          this.highlightedRowIds = new Set(newIds);
-          this.beforeResubmitIds = null;
-          if (newIds.length > 0) {
-            setTimeout(() => this.highlightedRowIds = new Set(), 4000);
-          }
+        if (this.pendingHighlight && data.records.length > 0) {
+          this.pendingHighlight = false;
+          this.highlightedRowIds = new Set([data.records[0].id]);
         }
       },
       error: (error) => {
@@ -208,6 +213,7 @@ export class FacilityViewComponent implements OnInit {
         'id': 'Id',
         'facilityId': 'FacilityId',
         'reportStartDate': 'ReportStartDate',
+        'createDate': 'CreateDate',
         'frequency': 'Frequency',
         'status': 'Status'
       };
@@ -253,8 +259,12 @@ export class FacilityViewComponent implements OnInit {
               verticalPosition: 'top',
               panelClass: 'resubmit-snackbar'
             });
-            setTimeout(() => {
-              this.beforeResubmitIds = new Set(this.reportSchedules.map(r => r.id));
+            this.refreshTimeoutId = setTimeout(() => {
+              this.paginationMetadata.pageNumber = 0;
+              this.currentSortBy = 'CreateDate';
+              this.currentSortOrder = 1;
+              this.sort?.sort({ id: '', start: 'asc', disableClear: false });
+              this.pendingHighlight = true;
               this.loadReportSchedules();
             }, 3000);
           },
