@@ -4,5 +4,5 @@ public class AcquisitionJobSettings
 {
     public const string SectionName = "AcquisitionJobSettings";
 
-    public string CronSchedule { get; set; } = "0/30 * * * * ?";
+    public string CronSchedule { get; set; } = "0/10 * * * * ?";
 }
