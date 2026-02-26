@@ -8,6 +8,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
@@ -45,15 +46,22 @@ public class DataAcquisitionDbContext : DbContext
             jsonOptions.Converters.Add(new ParameterConverter());
             jsonOptions.Converters.Add(new JsonStringEnumConverter());
 
+            var queryConfigComparer = new ValueComparer<Dictionary<string, IQueryConfig>>(
+                (c1, c2) => JsonSerializer.Serialize(c1, jsonOptions) == JsonSerializer.Serialize(c2, jsonOptions),
+                c => c == null ? 0 : JsonSerializer.Serialize(c, jsonOptions).GetHashCode(),
+                c => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(JsonSerializer.Serialize(c, jsonOptions), jsonOptions));
+
             entity.Property(b => b.InitialQueries)
                 .HasConversion(
                     v => JsonSerializer.Serialize(v, jsonOptions),
-                    v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, jsonOptions));
+                    v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, jsonOptions))
+                .Metadata.SetValueComparer(queryConfigComparer);
 
             entity.Property(b => b.SupplementalQueries)
                     .HasConversion(
                         v => JsonSerializer.Serialize(v, jsonOptions),
-                        v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, jsonOptions));
+                        v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, jsonOptions))
+                    .Metadata.SetValueComparer(queryConfigComparer);
         });
 
         //-------------------FhirQueryConfiguration-------------------
@@ -79,10 +87,16 @@ public class DataAcquisitionDbContext : DbContext
                 v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
                 v => JsonSerializer.Deserialize<AuthenticationConfiguration>(v, new JsonSerializerOptions()));
 
+            var ehrPatientListComparer = new ValueComparer<List<EhrPatientList>>(
+                (c1, c2) => c1.SequenceEqual(c2),
+                c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                c => c.ToList());
+
             entity.Property(p => p.EHRPatientLists)
             .HasConversion(
                 v => JsonSerializer.Serialize(v, new JsonSerializerOptions { Converters = { new JsonStringEnumConverter() } }),
-                v => JsonSerializer.Deserialize<List<EhrPatientList>>(v, new JsonSerializerOptions { Converters = { new JsonStringEnumConverter() } }));
+                v => JsonSerializer.Deserialize<List<EhrPatientList>>(v, new JsonSerializerOptions { Converters = { new JsonStringEnumConverter() } }))
+            .Metadata.SetValueComparer(ehrPatientListComparer);
         });
 
         //-------------------ReferenceResources-------------------
