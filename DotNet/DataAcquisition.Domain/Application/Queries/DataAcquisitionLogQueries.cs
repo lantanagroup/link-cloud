@@ -111,9 +111,11 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
+        var random = new Random();
         _deadlockRetryPolicy = Policy
             .Handle<SqlException>(ex => ex.Number == 1205) // SQL Deadlock error number
-            .WaitAndRetryAsync(5, retryAttempt => TimeSpan.FromMilliseconds(Math.Pow(2, retryAttempt) * 100),
+            .WaitAndRetryAsync(5, retryAttempt => 
+                TimeSpan.FromMilliseconds(Math.Pow(2, retryAttempt) * 100) + TimeSpan.FromMilliseconds(random.Next(0, 100)),
                 (exception, timeSpan, retryCount, context) =>
                 {
                     _logger.LogWarning(exception, "Deadlock detected (retry {RetryCount}). Retrying in {SleepDuration}ms...", retryCount, timeSpan.TotalMilliseconds);
