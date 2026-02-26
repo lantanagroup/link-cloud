@@ -31,10 +31,10 @@ namespace LantanaGroup.Link.Report.Listeners
         private string Name => this.GetType().Name;
 
         public PatientEventListener(
-            ILogger<PatientEventListener> logger, 
+            ILogger<PatientEventListener> logger,
             IKafkaConsumerFactory<string, PatientEventValue> kafkaConsumerFactory,
             ITransientExceptionHandler<string, PatientEventValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<string, PatientEventValue> deadLetterExceptionHandler, 
+            IDeadLetterExceptionHandler<string, PatientEventValue> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory, ServiceInformation serviceInformation)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -161,7 +161,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (Exception ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - PatientListsAcquired Exception thrown: " + ex.Message), facilityId);
+                                _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - PatientEvent Exception thrown: " + ex.Message), facilityId);
                             }
                             finally
                             {
@@ -187,7 +187,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error encountered in PatientListsAcquiredListener");
+                        _logger.LogError(ex, "Error encountered in PatientEventListener");
                         consumer.Commit();
                     }
                 }
