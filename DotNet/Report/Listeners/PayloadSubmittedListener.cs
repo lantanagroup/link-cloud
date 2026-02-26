@@ -1,21 +1,18 @@
+using System.Text;
 using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-//using Hl7.Fhir.Model;
-using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
-using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
-using System.Text;
+//using Hl7.Fhir.Model;
 
 namespace LantanaGroup.Link.Report.Listeners;
 
@@ -87,6 +84,7 @@ public class PayloadSubmittedListener(
                                 var reportEntry = await database.ReportEntryRepository.FirstAsync(e => e.PatientId == result.Message.Value.PatientId && e.ReportScheduleId == result.Message.Key.ReportScheduleId);
 
                                 reportEntry.SubmissionStatus = SubmissionStatus.Submitted;
+                                reportEntry.SubmitReportDateTime = DateTime.UtcNow;
                                 reportEntry.ModifyDate = DateTime.UtcNow;
                                 database.ReportEntryRepository.Update(reportEntry);
                                 await database.SaveChangesAsync();

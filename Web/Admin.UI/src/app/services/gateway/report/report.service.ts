@@ -163,8 +163,8 @@ export class ReportService {
     facilityId?: string,
     patientId?: string,
     reportScheduleId?: string,
-    reportingStatus?: ReportingStatus,
-    submissionStatus?: SubmissionStatus,
+    reportingStatuses?: ReportingStatus[],
+    submissionStatuses?: SubmissionStatus[],
     submissionStatusIsNull?: boolean,
     reportType?: string,
     sortBy?: string,
@@ -185,11 +185,15 @@ export class ReportService {
     if (reportScheduleId) {
       params = params.set('reportScheduleId', reportScheduleId);
     }
-    if (reportingStatus !== undefined && reportingStatus !== null) {
-      params = params.set('reportingStatus', reportingStatus);
+    if (reportingStatuses && reportingStatuses.length > 0) {
+      reportingStatuses.forEach(status => {
+        params = params.append('reportingStatuses', status);
+      });
     }
-    if (submissionStatus !== undefined && submissionStatus !== null) {
-      params = params.set('submissionStatus', submissionStatus);
+    if (submissionStatuses && submissionStatuses.length > 0) {
+      submissionStatuses.forEach(status => {
+        params = params.append('submissionStatuses', status);
+      });
     }
     if (submissionStatusIsNull) {
       params = params.set('submissionStatusIsNull', 'true');

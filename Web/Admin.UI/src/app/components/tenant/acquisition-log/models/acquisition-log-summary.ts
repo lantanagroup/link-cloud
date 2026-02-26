@@ -12,6 +12,7 @@ export interface AcquisitionLogSummary {
     queryType: string;
     executionDate: Date;
     createDate: Date;
+    completionDate?: Date;
     retryAttempts: number;
     status: string;
     reportIds: string[];

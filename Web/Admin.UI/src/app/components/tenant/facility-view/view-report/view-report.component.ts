@@ -16,6 +16,9 @@ import {MatButtonModule} from '@angular/material/button';
 import {MatTooltipModule} from '@angular/material/tooltip';
 import {MatTableDataSource, MatTableModule} from '@angular/material/table';
 import {MatSortModule, Sort} from '@angular/material/sort';
+import {MatSelectModule} from '@angular/material/select';
+import {MatFormFieldModule} from '@angular/material/form-field';
+import {MatInputModule} from '@angular/material/input';
 
 import {FontAwesomeModule} from '@fortawesome/angular-fontawesome';
 import {
@@ -62,6 +65,9 @@ import {
     MatTooltipModule,
     MatTableModule,
     MatSortModule,
+    MatSelectModule,
+    MatFormFieldModule,
+    MatInputModule,
     RouterLink,
     RouterLinkActive,
     ViewReportTableCommandComponent,
@@ -102,15 +108,15 @@ export class ViewReportComponent implements OnInit {
   sortOrder: 'ascending' | 'descending' | null = null;
   measureReports: IMeasureReportSummary[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
-  displayedColumns: string[] = ['id', 'measure', 'resourceCount', 'reportingStatus', 'submissionStatus', 'action'];
+  displayedColumns: string[] = ['id', 'measure', 'resourceCount', 'reportingStatus', 'submissionStatus', 'submitReportDateTime', 'action'];
   dataSource = new MatTableDataSource<IReportEntry>([]);
 
   //filters
   patientFilter: string = '';
   reportFilter: string = '';
   selectedMeasureFilter: string = 'any';
-  selectedReportStatusFilter: ReportingStatus | 'any' = 'any';
-  selectedSubmissionStatusFilter: SubmissionStatus | 'any' | 'pending' = 'any';
+  selectedReportStatusFilter: ReportingStatus[] = [];
+  selectedSubmissionStatusFilters: Array<SubmissionStatus | 'pending'> = [];
   measures: string[] = [];
   reportStatuses: ReportingStatus[] = [
     ReportingStatus.PatientIdentified,
@@ -181,13 +187,14 @@ export class ViewReportComponent implements OnInit {
     // Build filter parameters
     const patientId = this.patientFilter || undefined;
     const reportScheduleId = this.reportFilter || this.reportId;
-    const reportingStatus = this.selectedReportStatusFilter !== 'any'
-      ? this.selectedReportStatusFilter as ReportingStatus
+    const reportingStatuses = this.selectedReportStatusFilter.length > 0
+      ? this.selectedReportStatusFilter
       : undefined;
-    const submissionStatusIsNull = this.selectedSubmissionStatusFilter === 'pending';
-    const submissionStatus = this.selectedSubmissionStatusFilter !== 'any' && !submissionStatusIsNull
-      ? this.selectedSubmissionStatusFilter as SubmissionStatus
-      : undefined;
+
+    const submissionStatusIsNull = this.selectedSubmissionStatusFilters.includes('pending');
+    const submissionStatuses = this.selectedSubmissionStatusFilters
+      .filter(s => s !== 'pending') as SubmissionStatus[];
+
     const reportType = this.selectedMeasureFilter !== 'any'
       ? this.selectedMeasureFilter
       : undefined;
@@ -196,8 +203,8 @@ export class ViewReportComponent implements OnInit {
       this.facilityId,
       patientId,
       reportScheduleId,
-      reportingStatus,
-      submissionStatus,
+      reportingStatuses,
+      submissionStatuses.length > 0 ? submissionStatuses : undefined,
       submissionStatusIsNull,
       reportType,
       this.sortBy || undefined,
@@ -271,8 +278,8 @@ export class ViewReportComponent implements OnInit {
     this.patientFilter = '';
     this.reportFilter = '';
     this.selectedMeasureFilter = 'any';
-    this.selectedReportStatusFilter = 'any';
-    this.selectedSubmissionStatusFilter = 'any';
+    this.selectedReportStatusFilter = [];
+    this.selectedSubmissionStatusFilters = [];
     this.paginationMetadata.pageNumber = 0;
     this.sortBy = null;
     this.sortOrder = null;
@@ -354,20 +361,20 @@ export class ViewReportComponent implements OnInit {
       return;
     }
 
-    this.selectedReportStatusFilter = status;
+    this.selectedReportStatusFilter = [status];
     this.paginationMetadata.pageNumber = 0;
     this.loadReportEntries();
   }
 
   onSubmissionStatusSliceSelected(label: string): void {
     if (this.isPendingSubmissionLabel(label)) {
-      this.selectedSubmissionStatusFilter = 'pending';
+      this.selectedSubmissionStatusFilters = ['pending'];
     } else {
       const status = this.findSubmissionStatusByLabel(label);
       if (status === null) {
         return;
       }
-      this.selectedSubmissionStatusFilter = status;
+      this.selectedSubmissionStatusFilters = [status];
     }
 
     this.paginationMetadata.pageNumber = 0;

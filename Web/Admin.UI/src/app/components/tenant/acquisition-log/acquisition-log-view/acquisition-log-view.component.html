@@ -287,6 +287,10 @@
               Scheduled
               <fa-icon [icon]="getSortIcon('executionDate')"></fa-icon>
             </th>
+            <th scope="col" class="header-column sortable" (click)="onSort('completionDate')">
+              Completed
+              <fa-icon [icon]="getSortIcon('completionDate')"></fa-icon>
+            </th>
             <th scope="col" class="header-column sortable" (click)="onSort('status')">
               Status
               <fa-icon [icon]="getSortIcon('status')"></fa-icon>
@@ -355,11 +359,14 @@
                 <td class="data-col table-cell">{{log.retryAttempts || 0}}</td>
                 <td class="data-col table-cell">{{log.queryPhase}}</td>
                 <td class="data-col table-cell">{{log.queryType}}</td>
-                <td class="data-col table-cell" [matTooltip]="log.createDate | date:'MM/dd/yyyy HH:mm:ss'">
+                <td class="data-col table-cell" [matTooltip]="log.createDate | date:'M/d/yy h:mm:ss a'">
                   {{log.createDate | date:'M/d/yy HH:mm'}}
                 </td>
-                <td class="data-col table-cell" [matTooltip]="log.executionDate | date:'MM/dd/yyyy HH:mm:ss'">
+                <td class="data-col table-cell" [matTooltip]="log.executionDate | date:'M/d/yy h:mm:ss a'">
                   {{log.executionDate | date:'M/d/yy HH:mm'}}
+                </td>
+                <td class="data-col table-cell" [matTooltip]="log.completionDate | date:'M/d/yy h:mm:ss a'">
+                  {{log.completionDate | date:'M/d/yy HH:mm'}}
                 </td>
                 <td class="table-cell">
                   <span [ngClass]="{

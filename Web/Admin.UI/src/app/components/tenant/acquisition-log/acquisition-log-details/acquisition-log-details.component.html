@@ -92,7 +92,7 @@
       <div style="flex: 1;">
         <div class="data-label inline-label">
           Scheduled For:
-          <span class="data-value" style="display: inline;" [matTooltip]="acquisitionLog?.executionDate | date:'MM/dd/yyyy HH:mm:ss'">
+          <span class="data-value" style="display: inline;" [matTooltip]="acquisitionLog?.executionDate | date:'M/d/yy h:mm:ss a'">
             {{acquisitionLog?.executionDate | date:'M/d/yy HH:mm'}}
           </span>
         </div>
@@ -100,7 +100,7 @@
       <div style="flex: 1;">
         <div class="data-label inline-label">
           Completed On:
-          <span class="data-value" style="display: inline;" [matTooltip]="acquisitionLog?.completionDate | date:'MM/dd/yyyy HH:mm:ss'">
+          <span class="data-value" style="display: inline;" [matTooltip]="acquisitionLog?.completionDate | date:'M/d/yy h:mm:ss a'">
             {{acquisitionLog?.completionDate | date:'M/d/yy HH:mm'}}
           </span>
         </div>
