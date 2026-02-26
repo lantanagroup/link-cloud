@@ -69,6 +69,12 @@
           </td>
         </ng-container>
 
+        <!-- Created Date Column -->
+        <ng-container matColumnDef="createDate">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Created Date</th>
+          <td mat-cell *matCellDef="let element">{{ element.createDate | date:'short' }}</td>
+        </ng-container>
+
         <!-- Report Types Column -->
         <ng-container matColumnDef="reportTypes">
           <th mat-header-cell *matHeaderCellDef>Measures</th>
@@ -111,7 +117,6 @@
               <span *ngIf="element.status === 'Submitted'" class="status-submitted">Submitted</span>
             </div>
             <div style="margin-top:5px" *ngIf="element.submitDate">{{element.submitDate | date:'short'}}</div>
-            <div style="margin-top:5px" *ngIf="!element.submitDate">{{element.createDate | date:'short'}}</div>
           </td>
         </ng-container>
 
