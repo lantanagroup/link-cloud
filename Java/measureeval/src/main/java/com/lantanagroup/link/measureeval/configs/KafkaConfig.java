@@ -9,6 +9,7 @@ import com.lantanagroup.link.measureeval.services.ResourceNormalizedConsumer;
 import com.lantanagroup.link.shared.kafka.AsyncListener;
 import com.lantanagroup.link.shared.kafka.Properties;
 import com.lantanagroup.link.shared.kafka.Topics;
+import com.lantanagroup.link.shared.kafka.records.ResourceKey;
 import io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingConsumerInterceptor;
 import io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingProducerInterceptor;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -61,10 +62,10 @@ public class KafkaConfig {
     @Bean
     public Deserializer<?> keyDeserializer(ObjectMapper objectMapper) {
         Map<String, Deserializer<?>> deserializers = Map.of(
-                Topics.RESOURCE_ACQUIRED_ERROR, new StringDeserializer(),
-                Topics.RESOURCE_NORMALIZED, new StringDeserializer(),
-                Topics.RESOURCE_NORMALIZED_ERROR, new StringDeserializer(),
-                Topics.RESOURCE_NORMALIZED_RETRY, new StringDeserializer(),
+                Topics.RESOURCE_ACQUIRED_ERROR, new JsonDeserializer<>(ResourceKey.class, objectMapper),
+                Topics.RESOURCE_NORMALIZED, new JsonDeserializer<>(ResourceKey.class, objectMapper),
+                Topics.RESOURCE_NORMALIZED_ERROR, new JsonDeserializer<>(ResourceKey.class, objectMapper),
+                Topics.RESOURCE_NORMALIZED_RETRY, new JsonDeserializer<>(ResourceKey.class, objectMapper),
                 Topics.EVALUATION_REQUESTED, new StringDeserializer(),
                 Topics.EVALUATION_REQUESTED_ERROR, new StringDeserializer(),
                 Topics.EVALUATION_REQUESTED_RETRY, new StringDeserializer());
