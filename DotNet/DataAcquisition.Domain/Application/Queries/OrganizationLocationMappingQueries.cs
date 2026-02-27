@@ -182,7 +182,7 @@ public class OrganizationLocationMappingQueries : IOrganizationLocationMappingQu
             children.Add(new LocationHierarchyNode
             {
                 Mapping = mapping,
-                Depth = 0 // will be overwritten when attached
+                Depth = 0 
             });
         }
 
@@ -196,7 +196,7 @@ public class OrganizationLocationMappingQueries : IOrganizationLocationMappingQu
         if (!childrenLookup.TryGetValue(parent.Mapping.LocationId!, out var childNodes))
             return;
 
-        // Sort children by name for consistent, predictable tree order (improvement over original)
+        // Sort children by name for consistent, predictable tree order
         foreach (var child in childNodes.OrderBy(c => c.Mapping.LocationName))
         {
             child.Depth = depth;
@@ -220,7 +220,7 @@ public class OrganizationLocationMappingQueries : IOrganizationLocationMappingQu
             path.Add(new LocationHierarchyNode
             {
                 Mapping = current,
-                Depth = path.Count   // temporary
+                Depth = path.Count 
             });
 
             if (string.IsNullOrEmpty(current.PartOfValue) ||
@@ -232,7 +232,6 @@ public class OrganizationLocationMappingQueries : IOrganizationLocationMappingQu
 
         path.Reverse();
 
-        // Fix depths so root = 0 (this was a bug in the original implementation)
         for (int i = 0; i < path.Count; i++)
         {
             path[i].Depth = i;

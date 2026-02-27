@@ -18,6 +18,8 @@ public class OrganizationLocationMappingQueriesTests : IClassFixture<DataAcquisi
         _fixture = fixture;
     }
 
+    #region Original Tests (unchanged)
+
     [Fact]
     public async Task GetByIdAsync_Exists_ReturnsModel()
     {
@@ -126,4 +128,218 @@ public class OrganizationLocationMappingQueriesTests : IClassFixture<DataAcquisi
         Assert.Equal(5, result.Records.Count);
         Assert.Equal(15, result.Metadata.TotalCount);
     }
+
+    #endregion
+
+    #region Hierarchy Test Data Setup
+
+    /// <summary>
+    /// Creates a realistic, multi-branch healthcare location hierarchy (4 levels deep, 13 locations)
+    /// with branching, multiple roots, and names chosen to exercise alphabetical child sorting.
+    /// </summary>
+    private async Task SetupRobustHierarchyTestDataAsync(IOrganizationLocationMappingManager manager, string facilityId = "Hierarchy-Test-Fac")
+    {
+        var data = new List<(string LocationId, string LocationName, string? PartOfValue)>
+        {
+            ("ORG-ROOT", "Hospital Main", null),
+            ("BLDG-A", "Building A", "ORG-ROOT"),
+            ("BLDG-B", "Building B", "ORG-ROOT"),
+            ("CLINIC-OUT", "Outpatient Clinic", "ORG-ROOT"),
+            ("FLR-A1", "Floor 1-A", "BLDG-A"),
+            ("FLR-A2", "Floor 2-A", "BLDG-A"),
+            ("FLR-B1", "Floor 1-B", "BLDG-B"),
+            ("WARD-A11", "Ward A1-1", "FLR-A1"),
+            ("WARD-A12", "Ward A1-2", "FLR-A1"),
+            ("WARD-A21", "Ward A2-1", "FLR-A2"),
+            ("WARD-B11", "Ward B1-1", "FLR-B1"),
+            ("STANDALONE-1", "Standalone Location", null),
+            ("STANDALONE-2", "Child of Standalone", "STANDALONE-1")
+        };
+
+        foreach (var (locId, name, partOf) in data)
+        {
+            await manager.CreateAsync(new CreateOrganizationLocationMappingModel
+            {
+                FacilityId = facilityId,
+                LocationId = locId,
+                LocationName = name,
+                PartOfValue = partOf,
+                IsOrgLocation = true,
+                IsActive = true
+            });
+        }
+    }
+
+    #endregion
+
+    #region New Hierarchy Tests
+
+    [Fact]
+    public async Task GetHierarchyUpAsync_FromDeepLeaf_ReturnsCorrectPathWithProperDepths()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
+        await SetupRobustHierarchyTestDataAsync(manager);
+
+        var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
+        var path = await queries.GetHierarchyUpAsync("Hierarchy-Test-Fac", "WARD-A11");
+
+        Assert.Equal(4, path.Count);
+
+        Assert.Equal("ORG-ROOT", path[0].Mapping.LocationId);
+        Assert.Equal("BLDG-A", path[1].Mapping.LocationId);
+        Assert.Equal("FLR-A1", path[2].Mapping.LocationId);
+        Assert.Equal("WARD-A11", path[3].Mapping.LocationId);
+
+        for (int i = 0; i < path.Count; i++)
+            Assert.Equal(i, path[i].Depth);
+    }
+
+    [Fact]
+    public async Task GetHierarchyUpAsync_FromRoot_ReturnsSingleRootNode()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
+        await SetupRobustHierarchyTestDataAsync(manager);
+
+        var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
+        var path = await queries.GetHierarchyUpAsync("Hierarchy-Test-Fac", "ORG-ROOT");
+
+        Assert.Single(path);
+        Assert.Equal(0, path[0].Depth);
+        Assert.Equal("ORG-ROOT", path[0].Mapping.LocationId);
+        Assert.True(path[0].IsRoot);
+    }
+
+    [Fact]
+    public async Task GetHierarchyUpAsync_NonExistentLocation_ReturnsEmptyList()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
+        await SetupRobustHierarchyTestDataAsync(manager);
+
+        var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
+        var path = await queries.GetHierarchyUpAsync("Hierarchy-Test-Fac", "NON-EXISTENT");
+
+        Assert.Empty(path);
+    }
+
+    [Fact]
+    public async Task GetFullSubtreeAsync_FromRoot_ReturnsCompleteTreeWithChildrenSortedByName()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
+        await SetupRobustHierarchyTestDataAsync(manager);
+
+        var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
+        var tree = await queries.GetFullSubtreeAsync("Hierarchy-Test-Fac", "ORG-ROOT");
+
+        Assert.NotNull(tree);
+        Assert.Equal("ORG-ROOT", tree.Mapping.LocationId);
+        Assert.Equal(0, tree.Depth);
+
+        // Root children sorted by LocationName: "Building A", "Building B", "Outpatient Clinic"
+        Assert.Equal(3, tree.Children.Count);
+        Assert.Equal("BLDG-A", tree.Children[0].Mapping.LocationId);
+        Assert.Equal("BLDG-B", tree.Children[1].Mapping.LocationId);
+        Assert.Equal("CLINIC-OUT", tree.Children[2].Mapping.LocationId);
+
+        // Deeper verification
+        var buildingA = tree.Children[0];
+        Assert.Equal(2, buildingA.Children.Count);
+        Assert.Equal("FLR-A1", buildingA.Children[0].Mapping.LocationId); // Floor 1-A before Floor 2-A
+    }
+
+    [Fact]
+    public async Task GetFullSubtreeAsync_FromMidLevelChild_ReturnsFullTreeFromUltimateRoot()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
+        await SetupRobustHierarchyTestDataAsync(manager);
+
+        var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
+        var tree = await queries.GetFullSubtreeAsync("Hierarchy-Test-Fac", "WARD-A11");
+
+        Assert.NotNull(tree);
+        Assert.Equal("ORG-ROOT", tree.Mapping.LocationId); // Always returns from true root
+
+        var wardNode = FindNode(tree, "WARD-A11");
+        Assert.NotNull(wardNode);
+        Assert.Equal(3, wardNode.Depth); // Root(0) → BLDG-A(1) → FLR-A1(2) → WARD-A11(3)
+    }
+
+    [Fact]
+    public async Task GetFullSubtreeAsync_FromStandaloneRoot_ReturnsIsolatedTree()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
+        await SetupRobustHierarchyTestDataAsync(manager);
+
+        var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
+        var tree = await queries.GetFullSubtreeAsync("Hierarchy-Test-Fac", "STANDALONE-1");
+
+        Assert.NotNull(tree);
+        Assert.Equal("STANDALONE-1", tree.Mapping.LocationId);
+        Assert.Single(tree.Children); // Contains STANDALONE-2
+        Assert.Equal("STANDALONE-2", tree.Children[0].Mapping.LocationId);
+    }
+
+    [Fact]
+    public async Task GetFullSubtreeAsync_NonExistentLocation_ReturnsNull()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
+        await SetupRobustHierarchyTestDataAsync(manager);
+
+        var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
+        var result = await queries.GetFullSubtreeAsync("Hierarchy-Test-Fac", "NONEXISTENT-XYZ");
+
+        Assert.Null(result);
+    }
+
+    /// <summary>
+    /// Recursive helper to locate a node anywhere in the returned tree (used for mid-level assertions).
+    /// </summary>
+    private LocationHierarchyNode? FindNode(LocationHierarchyNode node, string locationId)
+    {
+        if (node.Mapping.LocationId == locationId)
+            return node;
+
+        foreach (var child in node.Children)
+        {
+            var found = FindNode(child, locationId);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    #endregion
 }
