@@ -42,6 +42,8 @@ static void RegisterServices(WebApplicationBuilder builder)
 {
     var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
 
+    builder.Services.Configure<AcquisitionJobSettings>(builder.Configuration.GetSection(AcquisitionJobSettings.SectionName));
+
     builder.RegisterAll(DataAcquisitionConstants.ServiceName, true);
 
     builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();

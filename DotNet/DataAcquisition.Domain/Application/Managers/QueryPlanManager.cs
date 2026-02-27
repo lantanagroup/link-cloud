@@ -5,7 +5,11 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Logging;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using System.Diagnostics;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
@@ -48,7 +52,8 @@ public class QueryPlanManager : IQueryPlanManager
 
         // Remove carriage return and line feed characters that can break log structure.
         return value.Replace("\r", string.Empty)
-                    .Replace("\n", string.Empty);
+                    .Replace("\n", string.Empty)
+                    .SanitizeUntrustedString();
     }
 
     /// <summary>
@@ -83,6 +88,9 @@ public class QueryPlanManager : IQueryPlanManager
         {
             throw new ArgumentNullException(nameof(model), "CreateQueryPlanModel cannot be null.");
         }
+
+        using var activity = ServiceActivitySource.Instance.StartActivity("QueryPlanManager.AddAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
 
         // Perform comprehensive validation
         var validationResult = _validator.ValidateQueryPlan(model.InitialQueries, model.SupplementalQueries);
@@ -138,6 +146,9 @@ public class QueryPlanManager : IQueryPlanManager
             throw new ArgumentNullException(nameof(model), "UpdateQueryPlanModel cannot be null.");
         }
 
+        using var activity = ServiceActivitySource.Instance.StartActivity("QueryPlanManager.UpdateAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
+
         // Perform comprehensive validation
         var validationResult = _validator.ValidateQueryPlan(model.InitialQueries, model.SupplementalQueries);
 
@@ -184,6 +195,9 @@ public class QueryPlanManager : IQueryPlanManager
 
     public async Task DeleteAsync(string facilityId, Frequency type, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("QueryPlanManager.DeleteAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+
         var entity = await _database.QueryPlanRepository.SingleOrDefaultAsync(
             q => q.FacilityId == facilityId && q.Type == type);
 
@@ -202,6 +216,9 @@ public class QueryPlanManager : IQueryPlanManager
 
     public async Task DeleteAllQueryPlansAsync(string facilityId, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("QueryPlanManager.DeleteAllQueryPlansAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+
         var allPlans = await _database.QueryPlanRepository.GetAllAsync(cancellationToken);
         var facilityPlans = allPlans.Where(q => q.FacilityId == facilityId).ToList();
 

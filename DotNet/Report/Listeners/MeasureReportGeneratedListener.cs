@@ -20,6 +20,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Settings;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
@@ -171,7 +172,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             var messageValue = result.Message.Value;
 
-            _logger.LogDebug("Consuming Event (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId}, ReportType = {ReportType})", messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId, messageValue.ReportType);
+            _logger.LogDebug("Consuming MeasureReportGenerated (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId}, ReportType = {ReportType})", messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId, messageValue.ReportType);
 
             using var scope = _serviceScopeFactory.CreateScope();
             var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
@@ -268,7 +269,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An error was encountered producing a ReadyForValidation (ReportId = {reportId}, FacilityId = {facilityId}, PatientId = {patientId}).", schedule.Id, schedule.FacilityId, messageValue.PatientId);
+                _logger.LogError(ex, "An error was encountered producing a ReadyForValidation (ReportId = {reportId}, FacilityId = {facilityId}, PatientId = {patientId}).", schedule.Id.SanitizeUntrustedString(), schedule.FacilityId.SanitizeUntrustedString(), messageValue.PatientId.SanitizeUntrustedString());
                 throw new DeadLetterException(ex.Message);
             }
 

@@ -1,4 +1,6 @@
-﻿using Confluent.Kafka;
+﻿using System.Text;
+using System.Text.Json;
+using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
@@ -14,11 +16,10 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Utilities;
-using System.Text;
-using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Normalization.Listeners;
@@ -26,11 +27,11 @@ namespace LantanaGroup.Link.Normalization.Listeners;
 public class ResourceAcquiredListener : BackgroundService
 {
     private readonly ILogger<ResourceAcquiredListener> _logger;
-    private readonly IKafkaConsumerFactory<string, ResourceAcquiredMessage> _consumerFactory;
-    private readonly IProducer<string, ResourceNormalizedMessage> _producer;
-    private readonly IDeadLetterExceptionHandler<string, string> _consumeExceptionHandler;
-    private readonly IDeadLetterExceptionHandler<string, ResourceAcquiredMessage> _deadLetterExceptionHandler;
-    private readonly ITransientExceptionHandler<string, ResourceAcquiredMessage> _transientExceptionHandler;
+    private readonly IKafkaConsumerFactory<ResourceKey, ResourceAcquiredMessage> _consumerFactory;
+    private readonly IProducer<ResourceKey, ResourceNormalizedMessage> _producer;
+    private readonly IDeadLetterExceptionHandler<ResourceKey, string> _consumeExceptionHandler;
+    private readonly IDeadLetterExceptionHandler<ResourceKey, ResourceAcquiredMessage> _deadLetterExceptionHandler;
+    private readonly ITransientExceptionHandler<ResourceKey, ResourceAcquiredMessage> _transientExceptionHandler;
     private bool _cancelled = false;
     private readonly INormalizationServiceMetrics _metrics;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -45,12 +46,12 @@ public class ResourceAcquiredListener : BackgroundService
         ILogger<ResourceAcquiredListener> logger,
         ServiceInformation serviceInformation,
         IServiceScopeFactory scopeFactory,
-        IKafkaConsumerFactory<string, ResourceAcquiredMessage> consumerFactory,
-        IDeadLetterExceptionHandler<string, string> consumeExceptionHandler,
-        IDeadLetterExceptionHandler<string, ResourceAcquiredMessage> deadLetterExceptionHandler,
-        ITransientExceptionHandler<string, ResourceAcquiredMessage> transientExceptionHandler,
+        IKafkaConsumerFactory<ResourceKey, ResourceAcquiredMessage> consumerFactory,
+        IDeadLetterExceptionHandler<ResourceKey, string> consumeExceptionHandler,
+        IDeadLetterExceptionHandler<ResourceKey, ResourceAcquiredMessage> deadLetterExceptionHandler,
+        ITransientExceptionHandler<ResourceKey, ResourceAcquiredMessage> transientExceptionHandler,
         INormalizationServiceMetrics metrics,
-        IProducer<string, ResourceNormalizedMessage> producer,
+        IProducer<ResourceKey, ResourceNormalizedMessage> producer,
         CopyPropertyOperationService copyPropertyOperationService,
         CodeMapOperationService codeMapOperationService,
         ConditionalTransformOperationService conditionalTransformOperationService,
@@ -82,7 +83,7 @@ public class ResourceAcquiredListener : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        await System.Threading.Tasks.Task.Run(() => StartConsumerLoop(cancellationToken), cancellationToken);
+        await Task.Run(() => StartConsumerLoop(cancellationToken), cancellationToken);
     }
 
     private async Task StartConsumerLoop(CancellationToken cancellationToken)
@@ -97,7 +98,7 @@ public class ResourceAcquiredListener : BackgroundService
 
         while (!cancellationToken.IsCancellationRequested && !_cancelled)
         {
-            ConsumeResult<string, ResourceAcquiredMessage>? message = default;
+            ConsumeResult<ResourceKey, ResourceAcquiredMessage>? message = default;
             try
             {                
                 await kafkaConsumer.ConsumeWithInstrumentation(async (result, CancellationToken) =>
@@ -106,7 +107,7 @@ public class ResourceAcquiredListener : BackgroundService
                     {
                         message = result;
 
-                        if (message.Key == null || string.IsNullOrWhiteSpace(message.Key))
+                        if (message.Key == null || string.IsNullOrWhiteSpace(message.Key.FacilityId))
                         {
                             throw new DeadLetterException("Message Key (FacilityId) is null or empty.");
                         }
@@ -215,26 +216,17 @@ public class ResourceAcquiredListener : BackgroundService
                     }
                     catch (DeadLetterException ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(message, ex, message.Key);
+                        _deadLetterExceptionHandler.HandleException(message, ex, message.Key?.FacilityId ?? string.Empty);
                     }
                     catch (TransientException ex)
                     {
-                        _transientExceptionHandler.HandleException(message, ex, message.Key);
+                        _transientExceptionHandler.HandleException(message, ex, message.Key?.FacilityId ?? string.Empty);
                     }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, $"Failed to process Patient Event.");
 
-                        var auditValue = new Shared.Application.Models.Kafka.AuditEventMessage
-                        {
-                            FacilityId = message.Message.Key,
-                            Action = AuditEventType.Query,
-                            ServiceName = NormalizationConstants.ServiceName,
-                            EventDate = DateTime.UtcNow,
-                            Notes = $"Data Acquisition processing failure \nException Message: {ex}",
-                        };
-
-                        _transientExceptionHandler.HandleException(message, new TransientException("Data Acquisition Exception thrown: " + ex.Message), message.Message.Key);
+                        _transientExceptionHandler.HandleException(message, new TransientException("Normalization Exception thrown: " + ex.Message), message.Key?.FacilityId ?? string.Empty);
                     }
                     finally
                     {
@@ -253,7 +245,19 @@ public class ResourceAcquiredListener : BackgroundService
                     throw new OperationCanceledException(ex.Error.Reason, ex);
                 }
 
-                string facilityId = Encoding.UTF8.GetString(ex.ConsumerRecord?.Message?.Key ?? []);
+                string facilityId = string.Empty;
+                if (ex.ConsumerRecord?.Message?.Key != null)
+                {
+                    try
+                    {
+                        var key = JsonSerializer.Deserialize<ResourceKey>(ex.ConsumerRecord.Message.Key);
+                        facilityId = key?.FacilityId ?? string.Empty;
+                    }
+                    catch
+                    {
+                        // ignore
+                    }
+                }
 
                 _consumeExceptionHandler.HandleConsumeException(ex, facilityId);
                 TopicPartitionOffset? offset = ex.ConsumerRecord?.TopicPartitionOffset;
@@ -273,7 +277,7 @@ public class ResourceAcquiredListener : BackgroundService
     }
 
 
-    private async Task ProduceResourceNormalizedMessage(ConsumeResult<string, ResourceAcquiredMessage>? message, string facilityId, string correlationId, DomainResource? resource = null)
+    private async Task ProduceResourceNormalizedMessage(ConsumeResult<ResourceKey, ResourceAcquiredMessage>? message, string facilityId, string correlationId, DomainResource? resource = null)
     {
         var serializedResource = JsonSerializer.SerializeToElement(resource, LinkFhirSerializerOptions.ForFhirLenientSerialization);
 
@@ -291,13 +295,26 @@ public class ResourceAcquiredListener : BackgroundService
             ScheduledReports = message.Message.Value.ScheduledReports,
             ReportableEvent = message.Message.Value.ReportableEvent
         };
-        Message<string, ResourceNormalizedMessage> produceMessage = new Message<string, ResourceNormalizedMessage>
+        Message<ResourceKey, ResourceNormalizedMessage> produceMessage = new Message<ResourceKey, ResourceNormalizedMessage>
         {
-            Key = facilityId,
+            Key = new ResourceKey
+            {
+                FacilityId = facilityId,
+                CorrelationId = correlationId
+            },
             Headers = headers,
             Value = resourceNormalizedMessage
         };
-        await _producer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
+
+        try
+        {
+            await _producer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
+        }
+        catch (ProduceException<ResourceKey, ResourceNormalizedMessage> ex)
+        {
+            _logger.LogError(ex, "Failed to produce ResourceNormalized message. FacilityId: {FacilityId}, CorrelationId: {CorrelationId}, FhirResourceType: {fhirResourceType}, ResourceId: {resourceId}", facilityId, correlationId, resource?.TypeName, resource?.Id);
+            throw new TransientException($"Failed to produce ResourceNormalized message: {ex.Message}", ex);
+        }
     }
 
     public void Cancel()
@@ -305,16 +322,20 @@ public class ResourceAcquiredListener : BackgroundService
         this._cancelled = true;
     }
 
-    private (string facilityId, string correlationId) ExtractFacilityIdAndCorrelationIdFromMessage(Message<string, ResourceAcquiredMessage> message)
+    private (string facilityId, string correlationId) ExtractFacilityIdAndCorrelationIdFromMessage(Message<ResourceKey, ResourceAcquiredMessage> message)
     {
-        var facilityId = message.Key;
-        var cIBytes = message.Headers.FirstOrDefault(x => x.Key == NormalizationConstants.HeaderNames.CorrelationId)?.GetValueBytes();
+        var facilityId = message.Key.FacilityId;
+        var correlationId = message.Key.CorrelationId;
 
-        if (cIBytes == null || cIBytes.Length == 0)
-            throw new MissingCorrelationIdException();
+        if (string.IsNullOrWhiteSpace(correlationId))
+        {
+            var cIBytes = message.Headers.FirstOrDefault(x => x.Key == NormalizationConstants.HeaderNames.CorrelationId)?.GetValueBytes();
 
+            if (cIBytes == null || cIBytes.Length == 0)
+                throw new MissingCorrelationIdException();
 
-        var correlationId = Encoding.UTF8.GetString(cIBytes);
+            correlationId = Encoding.UTF8.GetString(cIBytes);
+        }
 
         return (facilityId, correlationId);
     }

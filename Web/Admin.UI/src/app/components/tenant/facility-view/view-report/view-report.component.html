@@ -96,8 +96,8 @@
             @case ('Submitted') { <span class="status-submitted">Submitted</span> }
           }
         </span>
-        <div style="margin-top:5px">
-          {{(reportSummary.submitDate || reportSummary.createDate) | date:'short'}}
+        <div style="margin-top:5px" *ngIf="reportSummary">
+          {{(reportSummary.submitDate || reportSummary.createDate) | date:'M/d/yy HH:mm'}}
         </div>
 
       </div>
@@ -142,46 +142,39 @@
         <div class="filter-bar-row">
           <div class="filter-bar-col">
             <div class="filter-bar-item">
-              <label>
-                Patient Id
-              </label>
-              <input id="patientId" type="text" [(ngModel)]="patientFilter" (keydown.enter)="onPatientIdChange()" placeholder="Enter Patient Id">
+              <mat-form-field appearance="outline" class="full-width compact-filter">
+                <mat-label>Patient Id</mat-label>
+                <input id="patientId" matInput type="text" [(ngModel)]="patientFilter" (keydown.enter)="onPatientIdChange()" placeholder="Enter Patient Id">
+              </mat-form-field>
             </div>
-            <!--<div class="filter-bar-item">
-              <label>
-                Report Id
-              </label>
-              <input id="reportId" type="text" [(ngModel)]="reportFilter" (keydown.enter)="onReportIdChange()" placeholder="Enter report Id">
-            </div>-->
             <div class="filter-bar-item">
-              <label>
-                Measure
-              </label>
-              <select id="measureFilter" [(ngModel)]="selectedMeasureFilter" (change)="onMeasureFilterChange($event)">
-                <option value="any">Any</option>
-                <option *ngFor="let measure of measures" [value]="measure">{{measure}}</option>
-              </select>
+              <mat-form-field appearance="outline" class="full-width compact-filter">
+                <mat-label>Measure</mat-label>
+                <mat-select id="measureFilter" [(ngModel)]="selectedMeasureFilter" (selectionChange)="onMeasureFilterChange($event)" placeholder="Any">
+                  <mat-option value="any">Any</mat-option>
+                  <mat-option *ngFor="let measure of measures" [value]="measure">{{measure}}</mat-option>
+                </mat-select>
+              </mat-form-field>
             </div>
           </div>
 
           <div class="filter-bar-col">
             <div class="filter-bar-item">
-              <label>
-                Report Status
-              </label>
-              <select id="reportStatusFilter" [(ngModel)]="selectedReportStatusFilter" (change)="onReportStatusFilterChange($event)">
-                <option value="any">Any</option>
-                <option *ngFor="let status of reportStatuses" [value]="status">{{getReportingStatusText(status)}}</option>
-              </select>
+              <mat-form-field appearance="outline" class="full-width compact-filter">
+                <mat-label>Report Status</mat-label>
+                <mat-select id="reportStatusFilter" [(ngModel)]="selectedReportStatusFilter" (selectionChange)="onReportStatusFilterChange($event)" multiple placeholder="Any">
+                  <mat-option *ngFor="let status of reportStatuses" [value]="status">{{getReportingStatusText(status)}}</mat-option>
+                </mat-select>
+              </mat-form-field>
             </div>
             <div class="filter-bar-item">
-              <label>
-                Submission Status
-              </label>
-              <select id="validationStatusFilter" [(ngModel)]="selectedSubmissionStatusFilter" (change)="onSubmissionStatusFilterChange($event)">
-                <option value="any">Any</option>
-                <option *ngFor="let status of submissionStatuses" [value]="status">{{getSubmissionStatusFilterText(status)}}</option>
-              </select>
+              <mat-form-field appearance="outline" class="full-width compact-filter">
+                <mat-label>Submission Status</mat-label>
+                <mat-select id="submissionStatusFilter" [(ngModel)]="selectedSubmissionStatusFilters" (selectionChange)="onSubmissionStatusFilterChange($event)" multiple placeholder="Any">
+                  <mat-option value="pending">Pending Submission</mat-option>
+                  <mat-option *ngFor="let status of submissionStatuses" [value]="status">{{getSubmissionStatusFilterText(status)}}</mat-option>
+                </mat-select>
+              </mat-form-field>
             </div>
           </div>
 
@@ -247,6 +240,17 @@
               <span [ngClass]="getSubmissionStatusClass(element.submissionStatus)">
                 {{getSubmissionStatusText(element.submissionStatus)}}
               </span>
+            </td>
+          </ng-container>
+
+          <!-- Submitted Date/Time Column -->
+          <ng-container matColumnDef="submitReportDateTime">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Submitted</th>
+            <td mat-cell *matCellDef="let element">
+              <span *ngIf="element.submitReportDateTime" [matTooltip]="element.submitReportDateTime | date:'M/d/yy h:mm:ss a'">
+                {{element.submitReportDateTime | date:'M/d/yy HH:mm'}}
+              </span>
+              <span *ngIf="!element.submitReportDateTime">-</span>
             </td>
           </ng-container>
 
