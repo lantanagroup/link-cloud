@@ -112,14 +112,14 @@ public class PayloadSubmittedListener(
             logger.LogDebug("Consuming PayloadSubmitted (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", facilityId, result.Message.Value.PatientId, reportTrackingId);
 
             if (result.Message.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry)
-                            {
-                                var reportEntry = await database.ReportEntryRepository.FirstAsync(e => e.PatientId == result.Message.Value.PatientId && e.ReportScheduleId == result.Message.Key.ReportScheduleId);
+            {
+                var reportEntry = await database.ReportEntryRepository.FirstAsync(e => e.PatientId == result.Message.Value.PatientId && e.ReportScheduleId == result.Message.Key.ReportScheduleId);
 
-                                reportEntry.SubmissionStatus = SubmissionStatus.Submitted;
-                                reportEntry.SubmitReportDateTime = DateTime.UtcNow;
-                                reportEntry.ModifyDate = DateTime.UtcNow;
-                                database.ReportEntryRepository.Update(reportEntry);
-                                await database.SaveChangesAsync();
+                reportEntry.SubmissionStatus = SubmissionStatus.Submitted;
+                reportEntry.SubmitReportDateTime = DateTime.UtcNow;
+                reportEntry.ModifyDate = DateTime.UtcNow;
+                database.ReportEntryRepository.Update(reportEntry);
+                await database.SaveChangesAsync();
 
                 await reportManifestProducer.Produce(reportSchedule, correlationId);
             }

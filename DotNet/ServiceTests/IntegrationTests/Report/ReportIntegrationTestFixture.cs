@@ -1,7 +1,9 @@
-﻿using Confluent.Kafka;
+﻿using Azure.Storage.Blobs;
+using Confluent.Kafka;
 using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Report.Application.Options;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Managers;
@@ -10,7 +12,9 @@ using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Listeners;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -27,8 +31,6 @@ using Moq;
 using Quartz;
 using Testcontainers.Azurite;
 using Testcontainers.MongoDb;
-using Azure.Storage.Blobs;
-using LantanaGroup.Link.Report.Application.Options;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report
@@ -74,6 +76,19 @@ namespace IntegrationTests.Report
         public Mock<ITransientExceptionHandler<Null, MeasureReportGeneratedValue>> MeasureReportGeneratedTransientHandlerMock { get; } = new();
         public Mock<IDeadLetterExceptionHandler<Null, MeasureReportGeneratedValue>> MeasureReportGeneratedDeadLetterHandlerMock { get; } = new();
 
+        public Mock<IKafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>> PayloadSubmittedConsumerFactoryMock { get; } = new();
+        public Mock<ITransientExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue>> PayloadSubmittedTransientHandlerMock { get; } = new();
+        public Mock<IDeadLetterExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue>> PayloadSubmittedDeadLetterHandlerMock { get; } = new();
+
+        public Mock<IKafkaConsumerFactory<string, ValidationCompleteValue>> ValidationCompleteConsumerFactoryMock { get; } = new();
+        public Mock<ITransientExceptionHandler<string, ValidationCompleteValue>> ValidationCompleteTransientHandlerMock { get; } = new();
+        public Mock<IDeadLetterExceptionHandler<string, ValidationCompleteValue>> ValidationCompleteDeadLetterHandlerMock { get; } = new();
+
+        public Mock<ICreateSystemToken> CreateSystemTokenMock { get; } = new();
+        public Mock<IProducer<string, EvaluationRequestedValue>> EvaluationRequestedProducerMock { get; } = new();
+        public Mock<IKafkaConsumerFactory<string, GenerateReportValue>> GenerateReportConsumerFactoryMock { get; } = new();
+        public Mock<ITransientExceptionHandler<string, GenerateReportValue>> GenerateReportTransientHandlerMock { get; } = new();
+        public Mock<IDeadLetterExceptionHandler<string, GenerateReportValue>> GenerateReportDeadLetterHandlerMock { get; } = new();
 
         public string MongoConnectionString => _mongoContainer.GetConnectionString() + "&replicaSet=rs0";
         public string AzuriteConnectionString => _azuriteContainer.GetConnectionString();
@@ -176,12 +191,31 @@ namespace IntegrationTests.Report
             builder.Services.AddSingleton<ITransientExceptionHandler<Null, MeasureReportGeneratedValue>>(MeasureReportGeneratedTransientHandlerMock.Object);
             builder.Services.AddSingleton<IDeadLetterExceptionHandler<Null, MeasureReportGeneratedValue>>(MeasureReportGeneratedDeadLetterHandlerMock.Object);
 
+            builder.Services.AddSingleton<ICreateSystemToken>(CreateSystemTokenMock.Object);
+            builder.Services.AddSingleton<IProducer<string, EvaluationRequestedValue>>(EvaluationRequestedProducerMock.Object);
+
+            builder.Services.AddSingleton<IKafkaConsumerFactory<string, GenerateReportValue>>(GenerateReportConsumerFactoryMock.Object);
+            builder.Services.AddSingleton<ITransientExceptionHandler<string, GenerateReportValue>>(GenerateReportTransientHandlerMock.Object);
+            builder.Services.AddSingleton<IDeadLetterExceptionHandler<string, GenerateReportValue>>(GenerateReportDeadLetterHandlerMock.Object);
+
+            builder.Services.AddSingleton<IKafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>(PayloadSubmittedConsumerFactoryMock.Object);
+            builder.Services.AddSingleton<ITransientExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue>>(PayloadSubmittedTransientHandlerMock.Object);
+            builder.Services.AddSingleton<IDeadLetterExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue>>(PayloadSubmittedDeadLetterHandlerMock.Object);
+
+            builder.Services.AddSingleton<IKafkaConsumerFactory<string, ValidationCompleteValue>>(ValidationCompleteConsumerFactoryMock.Object);
+            builder.Services.AddSingleton<ITransientExceptionHandler<string, ValidationCompleteValue>>(ValidationCompleteTransientHandlerMock.Object);
+            builder.Services.AddSingleton<IDeadLetterExceptionHandler<string, ValidationCompleteValue>>(ValidationCompleteDeadLetterHandlerMock.Object);
+
             builder.Services.AddTransient<PatientListsAcquiredListener>();
             builder.Services.AddTransient<ReportScheduledListener>();
             builder.Services.AddTransient<MeasureReportGeneratedListener>();
             builder.Services.AddTransient<PayloadSubmittedListener>();
             builder.Services.AddTransient<ValidationCompleteListener>();
             builder.Services.AddTransient<GenerateReportListener>();
+
+            builder.Services.Configure<ServiceRegistry>(opts => opts.CensusServiceUrl = "http://localhost:8080");
+            builder.Services.Configure<LinkTokenServiceSettings>(opts => opts.SigningKey = "test-signing-key");
+            builder.Services.Configure<BackendAuthenticationServiceExtension.LinkBearerServiceOptions>(opts => opts.AllowAnonymous = true);
 
             _host = builder.Build();
             await _host.StartAsync();
