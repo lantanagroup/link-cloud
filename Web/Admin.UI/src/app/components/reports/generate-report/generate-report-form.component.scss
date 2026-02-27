@@ -47,6 +47,28 @@
 
 .input-container {
   width: 100%;
+  margin-top: 24px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  padding: 16px;
+  background-color: #fafafa;
+}
+
+.loaded-patients-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.loaded-patients-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .header-cell {
@@ -65,10 +87,53 @@ button[color="warn"] {
   color: #e53935; // Custom red
 }
 
+.patient-list-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #1e88e5;
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.patient-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #1e88e5;
+  color: white;
+  font-size: 11px;
+  font-weight: bold;
+  border-radius: 10px;
+  padding: 1px 7px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.patient-action-btn {
+  min-width: 120px;
+}
+
+.patient-entry-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+}
+
+.patient-entry-field {
+  flex: 1;
+}
+
 .custom-height-button {
   height: 56px; /* Matches the height of Angular Material form field */
-  margin-left: 8px; /* Optional spacing between input and button */
-  box-sizing: border-box; /* Ensures padding doesn't affect height */
+  box-sizing: border-box;
 }
 
 .form-select {
@@ -120,4 +185,53 @@ button[color="warn"] {
 
 .clear-btn {
   margin-right: 8px; /* adjust as needed, e.g. 4px, 12px */
+}
+
+.file-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 14px;
+}
+
+.hidden {
+  display: none;
+}
+
+.patient-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+
+  .search-field {
+    flex: 1;
+  }
+}
+
+.patient-table {
+  width: 100%;
+
+  .mat-mdc-header-cell,
+  .mat-mdc-cell {
+    padding: 0 20px;
+  }
+}
+
+.generate-report-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 50px;
+}
+
+.patient-count {
+  display: block;
+  font-weight: bold;
+  color: rgba(0, 0, 0, 0.6);
+  margin-top: 4px;
+  margin-bottom: 4px;
 }

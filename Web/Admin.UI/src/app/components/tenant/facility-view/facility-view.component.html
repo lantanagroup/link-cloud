@@ -126,9 +126,15 @@
         <ng-container matColumnDef="reportStartDate">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Reporting Period</th>
           <td mat-cell *matCellDef="let element">
-            <div><strong>Start:</strong> {{ element.reportStartDate | date:'short' }}</div>
-            <div><strong>End:</strong> {{ element.reportEndDate | date:'short' }}</div>
+            <div><strong>Start:</strong> {{ element.reportStartDate | date:'M/d/yy HH:mm' }}</div>
+            <div><strong>End:</strong> {{ element.reportEndDate | date:'M/d/yy HH:mm' }}</div>
           </td>
+        </ng-container>
+
+        <!-- Created Date Column -->
+        <ng-container matColumnDef="createDate">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Created Date</th>
+          <td mat-cell *matCellDef="let element">{{ element.createDate | date:'short' }}</td>
         </ng-container>
 
         <!-- Report Types Column -->
@@ -172,8 +178,8 @@
               <span *ngIf="element.status === 'EndOfPeriod'" class="status-endOfPeriod">End of Period</span>
               <span *ngIf="element.status === 'Submitted'" class="status-submitted">Submitted</span>
             </div>
-            <div style="margin-top:5px" *ngIf="element.submitDate">{{element.submitDate | date:'short'}}</div>
-            <div style="margin-top:5px" *ngIf="!element.submitDate">{{element.createDate | date:'short'}}</div>
+            <div style="margin-top:5px" *ngIf="element.submitDate" [matTooltip]="element.submitDate | date:'M/d/yy h:mm:ss a'">{{element.submitDate | date:'M/d/yy HH:mm'}}</div>
+            <div style="margin-top:5px" *ngIf="!element.submitDate" [matTooltip]="element.createDate | date:'M/d/yy h:mm:ss a'">{{element.createDate | date:'M/d/yy HH:mm'}}</div>
           </td>
         </ng-container>
 
@@ -197,7 +203,7 @@
 
         <!-- Header and Row Definitions -->
         <tr mat-header-row *matHeaderRowDef="getColumns()"></tr>
-        <tr mat-row *matRowDef="let row; columns: getColumns();" [class.deleted-row]="row.isDeleted"></tr>
+        <tr mat-row *matRowDef="let row; columns: getColumns();" [class.deleted-row]="row.isDeleted" [class.new-row]="highlightedRowIds.has(row.id)"></tr>
 
         <!-- No Data Row -->
         <tr class="mat-row" *matNoDataRow>

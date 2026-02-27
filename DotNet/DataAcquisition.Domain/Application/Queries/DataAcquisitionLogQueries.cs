@@ -1,4 +1,8 @@
 using System.Diagnostics;
+using Polly;
+using Polly.Retry;
+using Microsoft.Data.SqlClient;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
@@ -98,6 +102,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     private readonly IDatabase _database;
     private readonly DataAcquisitionDbContext _dbContext;
     private readonly ILogger<DataAcquisitionLogQueries> _logger;
+    private readonly AsyncRetryPolicy _deadlockRetryPolicy;
 
     public DataAcquisitionLogQueries(IDatabase database, DataAcquisitionDbContext dbContext,
         ILogger<DataAcquisitionLogQueries> logger)
@@ -105,11 +110,26 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+        var random = new Random();
+        _deadlockRetryPolicy = Policy
+            .Handle<SqlException>(ex => ex.Number == 1205) // SQL Deadlock error number
+            .WaitAndRetryAsync(5, retryAttempt => 
+                TimeSpan.FromMilliseconds(Math.Pow(2, retryAttempt) * 100) + TimeSpan.FromMilliseconds(random.Next(0, 100)),
+                (exception, timeSpan, retryCount, context) =>
+                {
+                    _logger.LogWarning(exception, "Deadlock detected (retry {RetryCount}). Retrying in {SleepDuration}ms...", retryCount, timeSpan.TotalMilliseconds);
+                });
     }
 
     public async Task<List<string>> GetResourceIdsForReportPatient(string correlationId, string facilityId,
         string resourceType, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetResourceIdsForReportPatient");
+        activity?.SetTag(DiagnosticNames.CorrelationId, correlationId);
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+        activity?.SetTag(DiagnosticNames.ResourceType, resourceType);
+
         if (!Enum.TryParse<ResourceType>(resourceType, out var parsedResourceType))
         {
             _logger.LogError("Failed to parse resource type: {ResourceType}", resourceType);
@@ -145,6 +165,9 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
     public async Task<DataAcquisitionLogModel?> GetAsync(long id, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetAsync");
+        activity?.SetTag(DiagnosticNames.ReportId, id);
+
         var entity = await _dbContext.DataAcquisitionLogs
             .Include(l => l.FhirQueries)
             .ThenInclude(q => q.FhirQueryResourceTypes)
@@ -159,6 +182,11 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     public async Task<int> GetCountOfNonRefLogsIncompleteAsync(string facilityId, string reportTrackingId,
         string correlationId, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetCountOfNonRefLogsIncompleteAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+        activity?.SetTag(DiagnosticNames.ReportTrackingId, reportTrackingId);
+        activity?.SetTag(DiagnosticNames.CorrelationId, correlationId);
+
         if (string.IsNullOrWhiteSpace(facilityId))
             throw new ArgumentNullException(nameof(facilityId), "Facility ID cannot be null or empty.");
 
@@ -168,14 +196,17 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         if (string.IsNullOrWhiteSpace(correlationId))
             throw new ArgumentNullException(nameof(correlationId), "Correlation ID cannot be null or empty.");
 
-        return await (from l in _dbContext.DataAcquisitionLogs
-            where l.FacilityId == facilityId
-                  && l.ReportTrackingId == reportTrackingId
-                  && l.CorrelationId == correlationId
-                  && !(l.Status == RequestStatus.Completed || l.Status == RequestStatus.MaxRetriesReached)
-                  && !l.TailSent
-                  && l.FhirQueries.Any(fq => fq.IsReference == false)
-            select l).CountAsync();
+        return await _deadlockRetryPolicy.ExecuteAsync(async () =>
+        {
+            return await (from l in _dbContext.DataAcquisitionLogs.AsNoTracking()
+                where l.FacilityId == facilityId
+                      && l.ReportTrackingId == reportTrackingId
+                      && l.CorrelationId == correlationId
+                      && !(l.Status == RequestStatus.Completed || l.Status == RequestStatus.MaxRetriesReached)
+                      && !l.TailSent
+                      && l.FhirQueries.Any(fq => fq.IsReference == false)
+                select l).CountAsync(cancellationToken);
+        });
     }
 
     public async Task<IEnumerable<TailingMessageModel>> GetTailingMessages(
@@ -188,7 +219,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         {
             // Optimization: Filter logs that definitely haven't had their tail sent yet
             // and have the necessary identifiers for grouping.
-            var baseQuery = _dbContext.DataAcquisitionLogs
+            var baseQuery = _dbContext.DataAcquisitionLogs.AsNoTracking()
                 .Where(log =>
                     !log.TailSent &&
                     log.ReportTrackingId != null &&
@@ -258,6 +289,9 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     public async Task<IPagedModel<QueryLogSummaryModel>> SearchQueryLogSummaryAsync(
         SearchDataAcquisitionLogRequest request, CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.SearchQueryLogSummaryAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, request.FacilityId);
+
         ArgumentNullException.ThrowIfNull(request);
 
         var query = BuildSearchQuery(request);
@@ -360,14 +394,20 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         RequestStatus newStatus,
         CancellationToken cancellationToken = default)
     {
-        int rowsAffected = await _dbContext.DataAcquisitionLogs
-            .Where(l => l.Id == logId && l.Status != null && validCurrentStatuses.Contains(l.Status.Value))
-            .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(l => l.Status, newStatus)
-                    .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
-                cancellationToken);
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.TrySetLogStatusAsync");
+        activity?.SetTag(DiagnosticNames.ReportId, logId);
 
-        return rowsAffected > 0;
+        return await _deadlockRetryPolicy.ExecuteAsync(async () =>
+        {
+            int rowsAffected = await _dbContext.DataAcquisitionLogs
+                .Where(l => l.Id == logId && l.Status != null && validCurrentStatuses.Contains(l.Status.Value))
+                .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(l => l.Status, newStatus)
+                        .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                    cancellationToken);
+
+            return rowsAffected > 0;
+        });
     }
 
     public async Task<bool> TrySetLogToQueuedAsync(long logId, CancellationToken cancellationToken)
@@ -379,57 +419,26 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     public async Task<int> FailStalledQueuedLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default)
     {
         var stallThreshold = DateTime.UtcNow.AddMinutes(-stallMinutes);
-        int totalProcessed = 0;
-        int batchesProcessed = 0;
-        const int batchSize = 500;
 
-        while (batchesProcessed < maxBatches)
+        // High-speed bulk update without fetching entities or using transactions.
+        // This avoids LINQ translation errors with JSON collections and minimizes lock duration.
+        return await _deadlockRetryPolicy.ExecuteAsync(async () =>
         {
-            using var transaction = await _dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken);
-            try
-            {
-                var stalledBatch = await _dbContext.DataAcquisitionLogs
-                    .Where(l => l.Status == RequestStatus.Queued && l.ModifyDate <= stallThreshold)
-                    .Take(batchSize)
-                    .ToListAsync(cancellationToken);
-
-                if (stalledBatch.Count == 0)
-                {
-                    await transaction.CommitAsync(cancellationToken);
-                    break;
-                }
-
-                foreach (var log in stalledBatch)
-                {
-                    log.Status = RequestStatus.Failed;
-                    log.ModifyDate = DateTime.UtcNow;
-                    log.Notes.Add($"[{DateTime.UtcNow}] Request failed due to being in Queued status for more than {stallMinutes} minutes.");
-                }
-
-                await _dbContext.SaveChangesAsync(cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-                totalProcessed += stalledBatch.Count;
-                batchesProcessed++;
-            }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                _logger.LogError(ex, "Failed to process a batch of stalled logs. Error: {Message}", ex.Message);
-                throw;
-            }
-        }
-
-        if (batchesProcessed >= maxBatches)
-        {
-            _logger.LogInformation("FailStalledQueuedLogs reached max batch limit of {maxBatches}. Yielding to next run.", maxBatches);
-        }
-
-        return totalProcessed;
+            return await _dbContext.DataAcquisitionLogs
+                .Where(l => l.Status == RequestStatus.Queued && l.ModifyDate <= stallThreshold)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(l => l.Status, RequestStatus.Failed)
+                    .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                    cancellationToken);
+        });
     }
 
     public async Task<PagedConfigModel<DataAcquisitionLogModel>> SearchAsync(SearchDataAcquisitionLogRequest model,
         CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.SearchAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
+
         var query = BuildSearchQuery(model);
         query = ApplySort(query, model.SortBy, model.SortOrder);
 
@@ -521,6 +530,9 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     public async Task<DataAcquisitionLogStatistics> GetDataAcquisitionLogStatisticsByReportAsync(string reportId,
         CancellationToken cancellationToken = default)
     {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetDataAcquisitionLogStatisticsByReportAsync");
+        activity?.SetTag(DiagnosticNames.ReportId, reportId);
+
         var logs = (await SearchAsync(new SearchDataAcquisitionLogRequest
         {
             ReportTrackingId = reportId,
@@ -695,7 +707,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     public async Task<List<string>> GetFacilitiesWithPendingAndRetryableFailedRequests(
         CancellationToken cancellationToken = default)
     {
-        return await _dbContext.DataAcquisitionLogs
+        return await _dbContext.DataAcquisitionLogs.AsNoTracking()
             .Where(l => l.Status == RequestStatus.Pending || l.Status == RequestStatus.Failed)
             .Select(l => l.FacilityId)
             .Distinct()
@@ -757,10 +769,10 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     }
 
     private static IQueryable<DataAcquisitionLog> ApplySort(IQueryable<DataAcquisitionLog> query, string? sortBy,
-        SortOrder sortOrder)
+        LantanaGroup.Link.Shared.Application.Enums.SortOrder sortOrder)
     {
         var normalizedSortBy = sortBy?.Trim().ToLowerInvariant();
-        var descending = sortOrder == SortOrder.Descending;
+        var descending = sortOrder == LantanaGroup.Link.Shared.Application.Enums.SortOrder.Descending;
 
         return normalizedSortBy switch
         {
@@ -783,7 +795,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     {
         designagtedExecutionTime ??= DateTime.UtcNow;
 
-        var query = from log in _dbContext.DataAcquisitionLogs
+        var query = from log in _dbContext.DataAcquisitionLogs.AsNoTracking()
             where log.FacilityId == facilityId
                   && (lastId == null || log.Id > lastId)
                   && (log.ExecutionDate == null || log.ExecutionDate <= designagtedExecutionTime)
@@ -835,47 +847,50 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             throw new InvalidOperationException("Log ID cannot be zero or null");
         }
 
-        // 1. Fetch the existing entity
-        var existingLog = await _dbContext.DataAcquisitionLogs
-            .FirstOrDefaultAsync(l => l.Id == updateLog.Id, cancellationToken);
-
-        if (existingLog is null)
+        return await _deadlockRetryPolicy.ExecuteAsync(async () =>
         {
-            activity?.SetStatus(ActivityStatusCode.Error, "Data acquisition log not found");
-            throw new DataAcquisitionLogNotFoundException($"Data acquisition log with ID {updateLog.Id} not found.");
-        }
+            // 1. Fetch the existing entity
+            var existingLog = await _dbContext.DataAcquisitionLogs
+                .FirstOrDefaultAsync(l => l.Id == updateLog.Id, cancellationToken);
 
-        // 2. Apply updates
-        if (updateLog.RetryAttempts is not null)
-            existingLog.RetryAttempts = updateLog.RetryAttempts;
+            if (existingLog is null)
+            {
+                activity?.SetStatus(ActivityStatusCode.Error, "Data acquisition log not found");
+                throw new DataAcquisitionLogNotFoundException($"Data acquisition log with ID {updateLog.Id} not found.");
+            }
 
-        if (updateLog.ResourceAcquiredIds is not null && updateLog.ResourceAcquiredIds.Count > 0)
-            existingLog.ResourceAcquiredIds = updateLog.ResourceAcquiredIds;
+            // 2. Apply updates
+            if (updateLog.RetryAttempts is not null)
+                existingLog.RetryAttempts = updateLog.RetryAttempts;
 
-        if (updateLog.TraceId is not null)
-            existingLog.TraceId = updateLog.TraceId;
+            if (updateLog.ResourceAcquiredIds is not null && updateLog.ResourceAcquiredIds.Count > 0)
+                existingLog.ResourceAcquiredIds = updateLog.ResourceAcquiredIds;
 
-        if (updateLog.ExecutionDate is not null)
-            existingLog.ExecutionDate = updateLog.ExecutionDate;
+            if (updateLog.TraceId is not null)
+                existingLog.TraceId = updateLog.TraceId;
 
-        if (updateLog.CompletionDate is not null)
-            existingLog.CompletionDate = updateLog.CompletionDate;
+            if (updateLog.ExecutionDate is not null)
+                existingLog.ExecutionDate = updateLog.ExecutionDate;
 
-        if (updateLog.CompletionTimeMilliseconds is not null)
-            existingLog.CompletionTimeMilliseconds = updateLog.CompletionTimeMilliseconds;
+            if (updateLog.CompletionDate is not null)
+                existingLog.CompletionDate = updateLog.CompletionDate;
 
-        if (updateLog.Notes is not null)
-            existingLog.Notes = updateLog.Notes;
+            if (updateLog.CompletionTimeMilliseconds is not null)
+                existingLog.CompletionTimeMilliseconds = updateLog.CompletionTimeMilliseconds;
 
-        if (updateLog.Status is not null)
-            existingLog.Status = updateLog.Status.Value;
+            if (updateLog.Notes is not null)
+                existingLog.Notes = updateLog.Notes;
 
-        existingLog.ModifyDate = DateTime.UtcNow;
+            if (updateLog.Status is not null)
+                existingLog.Status = updateLog.Status.Value;
 
-        // 3. Save changes
-        _dbContext.DataAcquisitionLogs.Update(existingLog);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+            existingLog.ModifyDate = DateTime.UtcNow;
 
-        return await GetAsync(updateLog.Id.Value, cancellationToken);
+            // 3. Save changes
+            _dbContext.DataAcquisitionLogs.Update(existingLog);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            return await GetAsync(updateLog.Id.Value, cancellationToken);
+        });
     }
 }

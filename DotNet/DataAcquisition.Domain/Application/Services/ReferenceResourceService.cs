@@ -12,6 +12,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
 using Task = System.Threading.Tasks.Task;
@@ -46,7 +47,7 @@ public class ReferenceResourceService : IReferenceResourceService
     private readonly ILogger<ReferenceResourceService> _logger;
     private readonly IReferenceResourcesManager _referenceResourcesManager;
     private readonly IReferenceResourcesQueries _referenceResourcesQueries;
-    private readonly IProducer<string, ResourceAcquired> _kafkaProducer;
+    private readonly IProducer<ResourceKey, ResourceAcquired> _kafkaProducer;
     private readonly IDataAcquisitionServiceMetrics _metrics;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
     private readonly IDataAcquisitionLogQueries _dataAcquisitionLogQueries;
@@ -57,7 +58,7 @@ public class ReferenceResourceService : IReferenceResourceService
         ILogger<ReferenceResourceService> logger,
         IReferenceResourcesManager referenceResourcesManager,
         IReferenceResourcesQueries referenceResourcesQueries,
-        IProducer<string, ResourceAcquired> kafkaProducer,
+        IProducer<ResourceKey, ResourceAcquired> kafkaProducer,
         IDataAcquisitionServiceMetrics metrics,
         IDataAcquisitionLogManager dataAcquisitionLogManager,
         IDataAcquisitionLogQueries dataAcquisitionLogQueries,
@@ -176,8 +177,7 @@ public class ReferenceResourceService : IReferenceResourceService
                 Id = fhirQueryId,
                 FacilityId = facilityId,
                 IdQueryParameterValues = updatedIds,
-                // FhirQueryManager.UpdateAsync will load the rest from the database
-                // We're ONLY updating IdQueryParameterValues
+                QueryType = referenceLogResult.FhirQuery.First().QueryType
             };
 
             // UpdateAsync will load the full entity fresh and update it
