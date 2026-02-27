@@ -137,54 +137,15 @@ public class OrganizationLocationMappingQueries : IOrganizationLocationMappingQu
         return new PagedConfigModel<OrganizationLocationMappingModel>(items, new PaginationMetadata(pageSize, pageNumber, totalCount));
     }
 
-    public async Task<List<LocationHierarchyNode>> GetHierarchyUpAsync(string facilityId, string locationId)
+    #region Hierarchy Methods
+
+    private async Task<Dictionary<string, OrganizationLocationMappingModel>> LoadAllFacilityMappingsAsync(string facilityId)
     {
-        var path = new List<LocationHierarchyNode>();
-        var visited = new HashSet<string>();
+        if (string.IsNullOrWhiteSpace(facilityId))
+            throw new ArgumentException("FacilityId is required.");
 
-        string currentId = locationId;
-
-        while (!string.IsNullOrEmpty(currentId) && !visited.Contains(currentId))
-        {
-            visited.Add(currentId);
-
-            var mapping = await GetByFacilityIdAndLocationIdAsync(facilityId, currentId);
-            if (mapping == null) break;
-
-            path.Add(new LocationHierarchyNode
-            {
-                Mapping = mapping,
-                Depth = path.Count
-            });
-
-            currentId = mapping.PartOfValue;
-        }
-
-        path.Reverse();
-        return path;
-    }
-
-    public async Task<LocationHierarchyNode> GetFullSubtreeAsync(string facilityId, string locationId)
-    {
-        var hierarchyUp = await GetHierarchyUpAsync(facilityId, locationId);
-        if (hierarchyUp.Count == 0) return null;
-
-        var rootMapping = hierarchyUp[0].Mapping;
-
-        var rootNode = new LocationHierarchyNode
-        {
-            Mapping = rootMapping,
-            Depth = 0
-        };
-
-        await BuildSubtreeRecursiveAsync(rootNode, facilityId);
-        return rootNode;
-    }
-
-    private async Task BuildSubtreeRecursiveAsync(LocationHierarchyNode node, string facilityId)
-    {
-        var children = await _context.OrganizationLocationMappings
-            .Where(m => m.FacilityId == facilityId && m.PartOfValue == node.Mapping.LocationId)
+        return await _context.OrganizationLocationMappings
+            .Where(m => m.FacilityId == facilityId)
             .Select(m => new OrganizationLocationMappingModel
             {
                 LocationMappingId = m.LocationMappingId,
@@ -199,18 +160,123 @@ public class OrganizationLocationMappingQueries : IOrganizationLocationMappingQu
                 ModifiedDate = m.ModifiedDate,
                 IsActive = m.IsActive
             })
-            .ToListAsync();
+            .ToDictionaryAsync(m => m.LocationId!);
+    }
 
-        foreach (var child in children)
+    private Dictionary<string, List<LocationHierarchyNode>> BuildChildrenLookup(
+        Dictionary<string, OrganizationLocationMappingModel> allMappings)
+    {
+        var lookup = new Dictionary<string, List<LocationHierarchyNode>>(allMappings.Count);
+
+        foreach (var mapping in allMappings.Values)
         {
-            var childNode = new LocationHierarchyNode
-            {
-                Mapping = child,
-                Depth = node.Depth + 1
-            };
+            if (string.IsNullOrEmpty(mapping.PartOfValue))
+                continue;
 
-            node.Children.Add(childNode);
-            await BuildSubtreeRecursiveAsync(childNode, facilityId);
+            if (!lookup.TryGetValue(mapping.PartOfValue, out var children))
+            {
+                children = new List<LocationHierarchyNode>();
+                lookup[mapping.PartOfValue] = children;
+            }
+
+            children.Add(new LocationHierarchyNode
+            {
+                Mapping = mapping,
+                Depth = 0 // will be overwritten when attached
+            });
+        }
+
+        return lookup;
+    }
+
+    private void AttachChildrenRecursive(LocationHierarchyNode parent,
+        Dictionary<string, List<LocationHierarchyNode>> childrenLookup,
+        int depth)
+    {
+        if (!childrenLookup.TryGetValue(parent.Mapping.LocationId!, out var childNodes))
+            return;
+
+        // Sort children by name for consistent, predictable tree order (improvement over original)
+        foreach (var child in childNodes.OrderBy(c => c.Mapping.LocationName))
+        {
+            child.Depth = depth;
+            parent.Children.Add(child);
+            AttachChildrenRecursive(child, childrenLookup, depth + 1);
         }
     }
+
+    public async Task<List<LocationHierarchyNode>> GetHierarchyUpAsync(string facilityId, string locationId)
+    {
+        var allMappings = await LoadAllFacilityMappingsAsync(facilityId);
+
+        if (!allMappings.TryGetValue(locationId, out var current))
+            return new List<LocationHierarchyNode>();
+
+        var path = new List<LocationHierarchyNode>();
+        var visited = new HashSet<string>();
+
+        while (current != null && visited.Add(current.LocationId!))
+        {
+            path.Add(new LocationHierarchyNode
+            {
+                Mapping = current,
+                Depth = path.Count   // temporary
+            });
+
+            if (string.IsNullOrEmpty(current.PartOfValue) ||
+                !allMappings.TryGetValue(current.PartOfValue, out current))
+            {
+                break;
+            }
+        }
+
+        path.Reverse();
+
+        // Fix depths so root = 0 (this was a bug in the original implementation)
+        for (int i = 0; i < path.Count; i++)
+        {
+            path[i].Depth = i;
+        }
+
+        return path;
+    }
+
+    public async Task<LocationHierarchyNode> GetFullSubtreeAsync(string facilityId, string locationId)
+    {
+        var allMappings = await LoadAllFacilityMappingsAsync(facilityId);
+
+        if (!allMappings.TryGetValue(locationId, out _))
+            return null!;
+
+        // Walk up to find the true root of this location's hierarchy
+        string currentId = locationId;
+        var visited = new HashSet<string>();
+
+        while (visited.Add(currentId))
+        {
+            if (!allMappings.TryGetValue(currentId, out var mapping) ||
+                string.IsNullOrEmpty(mapping.PartOfValue) ||
+                !allMappings.ContainsKey(mapping.PartOfValue))
+            {
+                break;
+            }
+            currentId = mapping.PartOfValue;
+        }
+
+        if (!allMappings.TryGetValue(currentId, out var rootMapping))
+            return null!;
+
+        var rootNode = new LocationHierarchyNode
+        {
+            Mapping = rootMapping,
+            Depth = 0
+        };
+
+        var childrenLookup = BuildChildrenLookup(allMappings);
+        AttachChildrenRecursive(rootNode, childrenLookup, 1);
+
+        return rootNode;
+    }
+
+    #endregion
 }
