@@ -64,7 +64,6 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     ActivityTraceFlags.Recorded);
 
                 ActivitySource activitySource = ServiceActivitySource.Instance ?? _fallbackActivitySource;
-
                 
                 using var activity = activitySource.StartActivity(
                     "ProduceDataAcquisitionRequested", 
