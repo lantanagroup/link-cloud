@@ -221,6 +221,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<OrganizationLocationConfiguration>, EntityRepository<OrganizationLocationConfiguration, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<OrganizationLocationCondition>, EntityRepository<OrganizationLocationCondition, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<OrganizationLocationMapping>, EntityRepository<OrganizationLocationMapping, DataAcquisitionDbContext>>();
 
         //Database
         services.AddScoped<IDatabase, Database>();
@@ -236,6 +237,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IQueryPlanQueries, QueryPlanQueries>();
         services.AddTransient<IReferenceResourcesQueries, ReferenceResourcesQueries>();
         services.AddScoped<IOrganizationLocationConfigurationQueries, OrganizationLocationConfigurationQueries>();
+        services.AddScoped<IOrganizationLocationMappingQueries, OrganizationLocationMappingQueries>();
 
 
         //Managers
@@ -246,6 +248,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IFhirQueryManager, FhirQueryManager>();
         services.AddTransient<IDataAcquisitionLogManager, DataAcquisitionLogManager>();
         services.AddScoped<IOrganizationLocationConfigurationManager, OrganizationLocationConfigurationManager>();
+        services.AddScoped<IOrganizationLocationMappingManager, OrganizationLocationMappingManager>();
     }
 
     public static void RegisterServices(this IServiceCollection services)
