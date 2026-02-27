@@ -32,7 +32,7 @@
     <PackageReference Include="FluentValidation.AspNetCore" Version="11.*" />
     <PackageReference Include="Google.Protobuf" Version="3.*" />
     <PackageReference Include="Hl7.Fhir.R4" Version="5.*" />
-    <PackageReference Include="HtmlSanitizer" Version="8.*" />
+    <PackageReference Include="HtmlSanitizer" Version="9.*" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.*" />
     <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.*" />
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="8.*" />
@@ -61,14 +61,14 @@
     <PackageReference Include="StackExchange.Redis" Version="2.*" />
     <PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="9.*" />
     <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="6.*" />
-    <PackageReference Include="System.Text.Encodings.Web" Version="8.*" />
+    <PackageReference Include="System.Text.Encodings.Web" Version="10.0.1" />
 	<PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.*" />
 	<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.*">
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 	</PackageReference>
 	<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.*" />
-	<PackageReference Include="System.Text.Json" Version="8.*" />
+	<PackageReference Include="System.Text.Json" Version="10.0.1" />
 	<PackageReference Include="Workleap.Extensions.Configuration.Substitution" Version="1.2.25" />
   </ItemGroup>
 	

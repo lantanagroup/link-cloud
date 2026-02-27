@@ -35,8 +35,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             string? facilityId,
             string? patientId,
             string? reportScheduleId,
-            ReportingStatus? reportingStatus,
-            SubmissionStatus? submissionStatus,
+            List<ReportingStatus>? reportingStatuses,
+            List<SubmissionStatus>? submissionStatuses,
             bool submissionStatusIsNull,
             string? reportType,
             string? sortBy,
@@ -157,8 +157,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             string? facilityId,
             string? patientId,
             string? reportScheduleId,
-            ReportingStatus? reportingStatus,
-            SubmissionStatus? submissionStatus,
+            List<ReportingStatus>? reportingStatuses,
+            List<SubmissionStatus>? submissionStatuses,
             bool submissionStatusIsNull,
             string? reportType,
             string? sortBy,
@@ -184,18 +184,26 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 predicate = predicate.And(q => q.ReportScheduleId == reportScheduleId);
             }
 
-            if (reportingStatus.HasValue)
+            if (reportingStatuses != null && reportingStatuses.Count > 0)
             {
-                predicate = predicate.And(q => q.ReportingStatus == reportingStatus.Value);
+                predicate = predicate.And(q => reportingStatuses.Contains(q.ReportingStatus));
             }
 
+            Expression<Func<ReportEntry, bool>>? submissionPredicate = null;
             if (submissionStatusIsNull)
             {
-                predicate = predicate.And(q => q.SubmissionStatus == null);
+                submissionPredicate = x => x.SubmissionStatus == null;
             }
-            else if (submissionStatus.HasValue)
+
+            if (submissionStatuses != null && submissionStatuses.Count > 0)
             {
-                predicate = predicate.And(q => q.SubmissionStatus == submissionStatus.Value);
+                Expression<Func<ReportEntry, bool>> p = x => x.SubmissionStatus != null && submissionStatuses.Contains(x.SubmissionStatus.Value);
+                submissionPredicate = submissionPredicate == null ? p : submissionPredicate.Or(p);
+            }
+
+            if (submissionPredicate != null)
+            {
+                predicate = predicate.And(submissionPredicate);
             }
 
             if (!string.IsNullOrWhiteSpace(reportType))

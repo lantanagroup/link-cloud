@@ -261,7 +261,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IPatientCensusService, PatientCensusService>();
         services.AddTransient<IReferenceResourceService, ReferenceResourceService>();
         services.AddTransient<IQueryListProcessor, QueryListProcessor>();
-        services.AddTransient<IBundleEventService<string, ResourceAcquired, ResourceAcquiredMessageGenerationRequest>, BundleResourceAcquiredEventService>();
+        services.AddTransient<IBundleEventService<ResourceKey, ResourceAcquired, ResourceAcquiredMessageGenerationRequest>, BundleResourceAcquiredEventService>();
         services.AddTransient<IDataAcquisitionLogService, DataAcquisitionLogService>();
 
         //Data Pull Commands
@@ -289,7 +289,7 @@ public static class GeneralStartupExtensions
         services.RegisterKafkaProducer<string, string>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, DataAcquisitionRequested>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, PatientCensusScheduled>(kafkaConnection, producerConfig);
-        services.RegisterKafkaProducer<string, ResourceAcquired>(kafkaConnection, producerConfig);
+        services.RegisterKafkaProducer<ResourceKey, ResourceAcquired>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, PatientListMessage>(kafkaConnection, producerConfig, null, new IndentedJsonSerializer<PatientListMessage>());
         services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<long, ReadyToAcquire>(kafkaConnection, producerConfig);
@@ -299,7 +299,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
         services.AddTransient<IKafkaProducerFactory<string, DataAcquisitionRequested>, KafkaProducerFactory<string, DataAcquisitionRequested>>();
         services.AddTransient<IKafkaProducerFactory<string, PatientCensusScheduled>, KafkaProducerFactory<string, PatientCensusScheduled>>();
-        services.AddTransient<IKafkaProducerFactory<string, ResourceAcquired>, KafkaProducerFactory<string, ResourceAcquired>>();
+        services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourceAcquired>, KafkaProducerFactory<ResourceKey, ResourceAcquired>>();
         services.AddTransient<IKafkaProducerFactory<string, PatientListMessage>, KafkaProducerFactory<string, PatientListMessage>>();
         services.AddTransient<IKafkaProducerFactory<long, ReadyToAcquire>, KafkaProducerFactory<long, ReadyToAcquire>>();
 

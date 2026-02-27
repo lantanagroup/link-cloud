@@ -34,8 +34,9 @@ public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionInteg
     {
         var logger = new Mock<ILogger<DataAcquisitionLogManager>>().Object;
         var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
-        return new DataAcquisitionLogManager(logger, database, queries);
+        return new DataAcquisitionLogManager(logger, database, dbContext, queries);
     }
 
     [Fact]

@@ -1,4 +1,4 @@
-import {Component, OnInit} from '@angular/core';
+import {Component, OnDestroy, OnInit, ViewChild} from '@angular/core';
 import {Location} from '@angular/common';
 import {ActivatedRoute, Router, RouterLink} from "@angular/router";
 import {MatCardModule} from "@angular/material/card";
@@ -18,6 +18,7 @@ import {LoadingService} from 'src/app/services/loading.service';
 import {forkJoin, Subscription} from 'rxjs';
 import {ResubmitDialogComponent} from "./resubmit-dialog.component";
 import {MatDialog} from "@angular/material/dialog";
+import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
 import {IPagedReportSchedule, IReportSchedule} from "../../../interfaces/report/report-schedule.interface";
 import {MatCell, MatCellDef} from "@angular/material/table";
 import { FormsModule } from "@angular/forms";
@@ -38,13 +39,17 @@ import { ReportService } from "../../../services/gateway/report/report.service";
     MatCardModule,
     FormsModule,
     MatTableModule,
-    MatSortModule
+    MatSortModule,
+    MatSnackBarModule
   ],
   templateUrl: './facility-view.component.html',
   styleUrl: './facility-view.component.scss'
 })
-export class FacilityViewComponent implements OnInit {
+export class FacilityViewComponent implements OnInit, OnDestroy {
+  @ViewChild(MatSort, { static: false }) sort!: MatSort;
+
   private subscription: Subscription | undefined;
+  private refreshTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   faRotate = faRotate;
   faArrowLeft = faArrowLeft;
@@ -60,7 +65,8 @@ export class FacilityViewComponent implements OnInit {
   reportSchedules: IReportSchedule[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
 
-  highlightedRowId: string | null = null;
+  highlightedRowIds = new Set<string>();
+  private pendingHighlight = false;
 
   showDeleted: boolean = false;
 
@@ -75,7 +81,8 @@ export class FacilityViewComponent implements OnInit {
     private facilityViewService: FacilityViewService,
     private loadingService: LoadingService,
     private reportService: ReportService,
-    private dialog: MatDialog) {
+    private dialog: MatDialog,
+    private snackBar: MatSnackBar) {
   }
 
   ngOnInit(): void {
@@ -115,10 +122,13 @@ export class FacilityViewComponent implements OnInit {
     if (this.subscription) {
       this.subscription.unsubscribe();
     }
+    if (this.refreshTimeoutId !== null) {
+      clearTimeout(this.refreshTimeoutId);
+    }
   }
 
   getColumns(): string[] {
-    const cols = ['id', 'facilityId', 'reportStartDate', 'frequency', 'reportTypes', 'patientsInCensus', 'patientsInIP', 'status', 'action'];
+    const cols = ['id', 'facilityId', 'reportStartDate', 'createDate', 'frequency', 'reportTypes', 'patientsInCensus', 'patientsInIP', 'status', 'action'];
     if (this.showDeleted) cols.push('isDeleted');
     return cols;
   }
@@ -141,6 +151,9 @@ export class FacilityViewComponent implements OnInit {
   }
 
   loadReportSchedules(): void {
+    if (!this.pendingHighlight) {
+      this.highlightedRowIds = new Set();
+    }
     this.loadingService.isLoading.next(true);
     this.reportService.searchReportSchedules(
       this.facilityId,
@@ -162,6 +175,10 @@ export class FacilityViewComponent implements OnInit {
         this.paginationMetadata = data.metadata;
         this.paginationMetadata.pageNumber = data.metadata.pageNumber - 1; // Convert back to 0-based
         this.loadingService.isLoading.next(false);
+        if (this.pendingHighlight && data.records.length > 0) {
+          this.pendingHighlight = false;
+          this.highlightedRowIds = new Set([data.records[0].id]);
+        }
       },
       error: (error) => {
         console.error('Error loading report schedules:', error);
@@ -196,6 +213,7 @@ export class FacilityViewComponent implements OnInit {
         'id': 'Id',
         'facilityId': 'FacilityId',
         'reportStartDate': 'ReportStartDate',
+        'createDate': 'CreateDate',
         'frequency': 'Frequency',
         'status': 'Status'
       };
@@ -234,12 +252,30 @@ export class FacilityViewComponent implements OnInit {
       // Call your service and pass bypass flag
       this.tenantService.regenerateReport(facilityId, reportId, bypassSubmission)
         .subscribe({
-          next: response => {
-            // refresh list or show toast
-            this.onRefresh();
+          next: () => {
+            this.snackBar.open('Report resubmitted. The list will refresh in 3 seconds…', '', {
+              duration: 3000,
+              horizontalPosition: 'end',
+              verticalPosition: 'top',
+              panelClass: 'resubmit-snackbar'
+            });
+            this.refreshTimeoutId = setTimeout(() => {
+              this.paginationMetadata.pageNumber = 0;
+              this.currentSortBy = 'CreateDate';
+              this.currentSortOrder = 1;
+              this.sort?.sort({ id: '', start: 'asc', disableClear: false });
+              this.pendingHighlight = true;
+              this.loadReportSchedules();
+            }, 3000);
           },
           error: err => {
             console.error('Resubmit failed', err);
+            this.snackBar.open('Failed to resubmit report. Please try again.', '', {
+              duration: 3500,
+              horizontalPosition: 'end',
+              verticalPosition: 'top',
+              panelClass: 'error-snackbar'
+            });
           }
         });
     });

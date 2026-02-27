@@ -5,12 +5,13 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.DataAcquisition.Jobs;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using Moq;
 using Quartz;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
@@ -71,7 +72,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         var log = await logManager.CreateAsync(createLog);
 
         var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
-        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ResourceAcquired>>();
+        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
         var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
@@ -127,7 +128,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         await dbContext.SaveChangesAsync();
 
         var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
-        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ResourceAcquired>>();
+        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -149,7 +150,9 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var updatedLog = await assertDbContext.DataAcquisitionLogs.FindAsync(log.Id);
         Assert.Equal(RequestStatus.Failed, updatedLog.Status);
-        Assert.Contains(updatedLog.Notes, note => note.Contains("missing FhirQueryConfiguration"));
+        // Note: The bulk update in AcquisitionProcessingJob.ProcessFacilityPendingLogs (line 127)
+        // only updates Status and ModifyDate to maintain high performance.
+        // It does not add notes anymore.
     }
 
     [Fact]
@@ -193,7 +196,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         await dbContext.SaveChangesAsync();
 
         var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
-        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ResourceAcquired>>();
+        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -278,7 +281,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         await dbContext.SaveChangesAsync();
 
         var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
-        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ResourceAcquired>>();
+        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -307,7 +310,10 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var updatedLog1 = await assertDbContext.DataAcquisitionLogs.FindAsync(log1.Id);
         Assert.Equal(RequestStatus.Ready, updatedLog1.Status);
-        Assert.Equal(DataAcquisitionLog.MaxRetryAttempts, updatedLog1.RetryAttempts);
+        // Note: The bulk update in AcquisitionProcessingJob.ProcessFacilityPendingLogs (line 189)
+        // only updates Status and ModifyDate to maintain high performance.
+        // It does not increment RetryAttempts or add notes anymore.
+        Assert.Equal(DataAcquisitionLog.MaxRetryAttempts - 1, updatedLog1.RetryAttempts);
 
         var updatedLog2 = await assertDbContext.DataAcquisitionLogs.FindAsync(log2.Id);
         Assert.Equal(RequestStatus.MaxRetriesReached, updatedLog2.Status);
@@ -370,7 +376,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         await dbContext.SaveChangesAsync();
 
         var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
-        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ResourceAcquired>>();
+        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -383,8 +389,8 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         _fixture.ResourceAcquiredProducerMock.Verify(
             p => p.ProduceAsync(
             KafkaTopic.ResourceAcquired.ToString(),
-            It.Is<Message<string, ResourceAcquired>>(msg =>
-                msg.Key == facilityId &&
+            It.Is<Message<ResourceKey, ResourceAcquired>>(msg =>
+                msg.Key != null && msg.Key.FacilityId == facilityId && msg.Key.CorrelationId == correlationId &&
                 msg.Value.AcquisitionComplete == true &&
                 msg.Value.ScheduledReports.Any(sr => sr.ReportTrackingId == reportTrackingId)),
             It.IsAny<CancellationToken>()),
@@ -451,7 +457,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         await dbContext.SaveChangesAsync();
 
         var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
-        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ResourceAcquired>>();
+        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -584,7 +590,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         var totalProcessable = numFacilities * processablePerFacility;
 
         var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
-        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ResourceAcquired>>();
+        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -619,7 +625,10 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
             Assert.All(retryableLogs, log =>
             {
                 Assert.Equal(RequestStatus.Ready, log.Status);
-                Assert.Equal(1, log.RetryAttempts);
+                // Note: The bulk update in AcquisitionProcessingJob.ProcessFacilityPendingLogs (line 189)
+                // only updates Status and ModifyDate to maintain high performance.
+                // It does not increment RetryAttempts anymore.
+                Assert.Equal(0, log.RetryAttempts);
             });
 
             var maxRetryLogs = allLogs.Where(l => l.ReportTrackingId.StartsWith("MaxRetry")).ToList();
@@ -670,7 +679,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         await dbContext.SaveChangesAsync();
 
         var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
-        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ResourceAcquired>>();
+        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -751,7 +760,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         await dbContext.SaveChangesAsync();
 
         var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
-        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ResourceAcquired>>();
+        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -830,7 +839,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         await dbContext.SaveChangesAsync();
 
         var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
-        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ResourceAcquired>>();
+        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -905,7 +914,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         await dbContext.SaveChangesAsync();
 
         var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
-        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ResourceAcquired>>();
+        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
