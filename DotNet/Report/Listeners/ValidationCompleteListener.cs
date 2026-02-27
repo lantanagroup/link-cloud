@@ -177,7 +177,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 throw new DeadLetterException($"{Name}: Received message without correlation ID (ReportId = {reportId}, FacilityId = {facilityId}).");
             }
 
-            _logger.LogDebug("{Name}: Consuming Event (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", Name, facilityId, value.PatientId, reportId);
+            _logger.LogDebug("Consuming ValidationComplete (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", facilityId, value.PatientId, reportId);
 
             var correlationIdStr = Encoding.UTF8.GetString(headerValue);
             var reportEntry = await reportEntryManager.GetEntry(schedule.Id, value.PatientId, cancellationToken);
