@@ -137,7 +137,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 var scheduledReports = await database.ReportScheduledRepository.FindAsync(x => x.FacilityId == key && x.EndOfReportPeriodJobHasRun == false, cancellationToken);
 
-                if (!scheduledReports?.Any() ?? false)
+                if (scheduledReports == null || !scheduledReports.Any())
                 {
                     throw new TransientException($"{Name}: No Scheduled Reports found for facilityId: {key}");
                 }
