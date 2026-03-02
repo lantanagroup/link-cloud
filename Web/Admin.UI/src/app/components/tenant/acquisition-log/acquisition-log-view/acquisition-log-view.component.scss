@@ -27,6 +27,7 @@ $completed-status: #047832;
 $failed-status: #a1030eb3;
 $failed-maxRetry-status: #a10303ff;
 $skipped-status: #ffbf00;
+$inoperable-status: #7e22ce;
 
 .status-pending {
     @extend .log-status;
@@ -87,6 +88,15 @@ $skipped-status: #ffbf00;
   background-color: color.adjust($skipped-status, $lightness: 60%);
   color: $skipped-status;
   box-shadow: 0 0 0 1px color.adjust($skipped-status, $lightness: -10%);
+  padding: 6px 6px;
+  border-radius: 0.375rem;
+}
+
+.status-inoperable {
+  @extend .log-status;
+  background-color: color.adjust($inoperable-status, $lightness: 60%);
+  color: $inoperable-status;
+  box-shadow: 0 0 0 1px color.adjust($inoperable-status, $lightness: -10%);
   padding: 6px 6px;
   border-radius: 0.375rem;
 }

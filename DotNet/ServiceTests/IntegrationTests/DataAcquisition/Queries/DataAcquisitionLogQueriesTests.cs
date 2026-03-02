@@ -217,6 +217,204 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
     }
 
     [Fact]
+    public async Task GetTailingMessages_WithMixedStatusesIncludingOpOutcome_ReturnsTailingMessage()
+    {
+        // Arrange
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        // Reset database for this test
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var correlationId = Guid.NewGuid().ToString();
+        var facilityId = "TestFacility";
+        var reportTrackingId = "TestReportId";
+
+        var scheduledReport = new ScheduledReport
+        {
+            ReportTrackingId = reportTrackingId,
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow
+        };
+
+        var startDate = DateTime.UtcNow.AddDays(-1);
+        var endDate = DateTime.UtcNow;
+
+        // Log 1: Completed
+        var log1 = new DataAcquisitionLog
+        {
+            FhirVersion = "test",
+            TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId,
+            CorrelationId = correlationId,
+            ReportTrackingId = reportTrackingId,
+            Status = RequestStatus.Completed,
+            TailSent = false,
+            QueryPhase = QueryPhase.Initial,
+            PatientId = "Patient/123",
+            ReportStartDate = startDate,
+            ReportEndDate = endDate,
+            ScheduledReport = scheduledReport
+        };
+        dbContext.DataAcquisitionLogs.Add(log1);
+
+        // Log 2: Inoperable
+        var log2 = new DataAcquisitionLog
+        {
+            FhirVersion = "test",
+            TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId,
+            CorrelationId = correlationId,
+            ReportTrackingId = reportTrackingId,
+            Status = RequestStatus.Inoperable,
+            TailSent = false,
+            QueryPhase = QueryPhase.Initial,
+            PatientId = "Patient/123",
+            ReportStartDate = startDate,
+            ReportEndDate = endDate,
+            ScheduledReport = scheduledReport
+        };
+        dbContext.DataAcquisitionLogs.Add(log2);
+
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        // Act
+        var result = await queries.GetTailingMessages();
+
+        // Assert
+        Assert.Single(result);
+        var tailingMessage = result.First();
+        Assert.Equal(facilityId, tailingMessage.FacilityId);
+        Assert.Equal(correlationId, tailingMessage.CorrelationId);
+        Assert.True(tailingMessage.ResourceAcquired.AcquisitionComplete);
+        Assert.Contains(log1.Id, tailingMessage.LogIds);
+        Assert.Contains(log2.Id, tailingMessage.LogIds);
+    }
+
+    [Fact]
+    public async Task GetCountOfNonRefLogsIncompleteAsync_WithInoperable_ReturnsCorrectCount()
+    {
+        // Arrange
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        // Reset database for this test
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var correlationId = Guid.NewGuid().ToString();
+        var facilityId = "TestFacility";
+        var reportTrackingId = "TestReportId";
+
+        // Add log with Inoperable status (should be considered complete)
+        var log1 = new DataAcquisitionLog
+        {
+            FhirVersion = "test",
+            TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId,
+            CorrelationId = correlationId,
+            ReportTrackingId = reportTrackingId,
+            Status = RequestStatus.Inoperable,
+            TailSent = false,
+            FhirQueries = new List<FhirQuery>
+            {
+                new FhirQuery { FacilityId = facilityId, IsReference = false }
+            }
+        };
+        dbContext.DataAcquisitionLogs.Add(log1);
+
+        // Add a truly incomplete log
+        var incompleteLog = new DataAcquisitionLog
+        {
+            FhirVersion = "test",
+            TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId,
+            CorrelationId = correlationId,
+            ReportTrackingId = reportTrackingId,
+            Status = RequestStatus.Pending,
+            TailSent = false,
+            FhirQueries = new List<FhirQuery>
+            {
+                new FhirQuery { FacilityId = facilityId, IsReference = false }
+            }
+        };
+        dbContext.DataAcquisitionLogs.Add(incompleteLog);
+
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        // Act
+        var count = await queries.GetCountOfNonRefLogsIncompleteAsync(facilityId, reportTrackingId, correlationId);
+
+        // Assert
+        // Only incompleteLog should be counted
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public async Task GetTailingMessages_WithInoperable_ReturnsEligibleTailingMessages()
+    {
+        // Arrange
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        // Reset database for this test
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var correlationId = Guid.NewGuid().ToString();
+        var facilityId = "TestFacility";
+        var reportTrackingId = "TestReportId";
+
+        var scheduledReport = new ScheduledReport
+        {
+            ReportTrackingId = reportTrackingId,
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow
+        };
+
+        var startDate = DateTime.UtcNow.AddDays(-1);
+        var endDate = DateTime.UtcNow;
+
+        // Add log with Inoperable status
+        var log1 = new DataAcquisitionLog
+        {
+            FhirVersion = "test",
+            TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId,
+            CorrelationId = correlationId,
+            ReportTrackingId = reportTrackingId,
+            Status = RequestStatus.Inoperable,
+            TailSent = false,
+            QueryPhase = QueryPhase.Initial,
+            PatientId = "Patient/123",
+            ReportStartDate = startDate,
+            ReportEndDate = endDate,
+            ScheduledReport = scheduledReport
+        };
+        dbContext.DataAcquisitionLogs.Add(log1);
+
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        // Act
+        var result = await queries.GetTailingMessages();
+
+        // Assert
+        // The log with Inoperable should be considered finished
+        Assert.Single(result);
+        var message = result.First();
+        Assert.Equal(facilityId, message.FacilityId);
+        Assert.Equal(correlationId, message.CorrelationId);
+        Assert.Contains(log1.Id, message.LogIds);
+    }
+
+    [Fact]
     public async Task GetCompleteLogAsync_ReturnsLogWithRelatedEntities()
     {
         // Arrange
@@ -763,6 +961,71 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         Assert.True(statistics.RequestStatusCounts.ContainsKey(RequestStatus.Completed));
         Assert.True(statistics.ResourceTypeCounts.ContainsKey("Patient"));
         Assert.True(statistics.ResourceTypeCompletionTimeMilliseconds.ContainsKey("Patient"));
+    }
+
+    [Fact]
+    public async Task GetDataAcquisitionLogStatisticsByReportAsync_IncludesInoperable()
+    {
+        // Arrange
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        // Reset database for this test
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var reportTrackingId = "StatReportId";
+        var facilityId = "TestFacility";
+
+        var log = new DataAcquisitionLog
+        {
+            FhirVersion = "test",
+            TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId,
+            Status = RequestStatus.Inoperable,
+            CorrelationId = Guid.NewGuid().ToString(),
+            ReportTrackingId = reportTrackingId,
+            PatientId = "Patient/123",
+            ReportStartDate = DateTime.UtcNow.AddDays(-1),
+            ReportEndDate = DateTime.UtcNow,
+            CompletionTimeMilliseconds = 150,
+            QueryPhase = QueryPhase.Initial,
+            QueryType = FhirQueryType.Read,
+            ScheduledReport = new ScheduledReport
+            {
+                ReportTrackingId = reportTrackingId,
+                StartDate = DateTime.UtcNow.AddDays(-1),
+                EndDate = DateTime.UtcNow
+            },
+            ResourceAcquiredIds = new List<string>(),
+            FhirQueries = new List<FhirQuery>
+            {
+                new FhirQuery 
+                {   MeasureId = "test", 
+                    FacilityId = facilityId, 
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> 
+                    {  
+                        new FhirQueryResourceType() 
+                        { 
+                            ResourceType = Hl7.Fhir.Model.ResourceType.Patient
+                        } 
+                    } 
+                }
+            }
+        };
+        dbContext.DataAcquisitionLogs.Add(log);
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        // Act
+        var statistics = await queries.GetDataAcquisitionLogStatisticsByReportAsync(reportTrackingId);
+
+        // Assert
+        Assert.NotNull(statistics);
+        Assert.Equal(1, statistics.TotalLogs);
+        Assert.True(statistics.RequestStatusCounts.ContainsKey(RequestStatus.Inoperable));
+        Assert.Equal(1, statistics.RequestStatusCounts[RequestStatus.Inoperable]);
     }
 
     [Fact]

@@ -601,6 +601,27 @@ public class PatientDataService : IPatientDataService
                 }, cancellationToken);
             }
         }
+        catch (OpOutcomeException ex)
+        {
+            _logger.LogWarning(ex, "OperationOutcome encountered for facility {FacilityId}", log.FacilityId.Sanitize());
+
+            log.Notes ??= new List<string>();
+            log.Status = RequestStatus.Inoperable;
+            log.CompletionDate = DateTime.UtcNow;
+
+            await _dataAcquisitionLogQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
+            {
+                Id = log.Id,
+                RetryAttempts = log.RetryAttempts,
+                ResourceAcquiredIds = log.ResourceAcquiredIds,
+                CompletionDate = log.CompletionDate,
+                CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                TraceId = log.TraceId,
+                ExecutionDate = log.ExecutionDate,
+                Notes = log.Notes,
+                Status = log.Status,
+            }, cancellationToken);
+        }
         catch (ProcessingDelayException ex)
         {
             log!.Notes ??= new List<string>();
