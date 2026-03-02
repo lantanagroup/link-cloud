@@ -76,7 +76,7 @@ export class AuditDashboardComponent implements OnInit {
   facilityFilterOptions: Record<string, string> = {};
   selectedFacilityFilter: string = 'Any';
   selectedServiceFilter: string = 'Any';
-  actionFilterOptions = ["Create", "Update", "Delete", "Query", "Submission"];
+  actionFilterOptions = ["Create", "Update", "Delete", "Query", "Submission","Restore"];
   selectedActionFilter: string = 'Any';
 
   serviceFilterOptions : Record<string, string> = {
