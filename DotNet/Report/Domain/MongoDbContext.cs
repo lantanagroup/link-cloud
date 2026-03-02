@@ -1,6 +1,5 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Entities;
-using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.EntityFrameworkCore;
 using MongoDB.Driver;
@@ -12,7 +11,7 @@ namespace LantanaGroup.Link.Report.Domain;
 
 public class MongoDbContext : DbContext
 {
-    public IMongoDatabase MongoDatabase { get; }
+    public virtual IMongoDatabase MongoDatabase { get; }
     private readonly ILogger<MongoDbContext> _logger;
 
     public MongoDbContext(DbContextOptions<MongoDbContext> options, IMongoDatabase mongoDatabase, ILogger<MongoDbContext> logger)

@@ -5,7 +5,6 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Logging;
-using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Text;
 

@@ -1,25 +1,22 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
+using Hl7.Fhir.Support;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
-using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
-using LantanaGroup.Link.Shared.Application.Services.Security;
 using Task = System.Threading.Tasks.Task;
-using Hl7.Fhir.Support;
-using Hl7.Fhir.Serialization;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -32,8 +29,6 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ITransientExceptionHandler<string, ValidationCompleteValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, ValidationCompleteValue> _deadLetterExceptionHandler;
         private readonly SubmitPayloadProducer _submitPayloadProducer;
-        private readonly BlobStorageService _blobStorageService;
-        private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
 
         private string Name => this.GetType().Name;
 
@@ -45,21 +40,18 @@ namespace LantanaGroup.Link.Report.Listeners
             SubmitPayloadProducer submitPayloadProducer,
             IServiceScopeFactory serviceScopeFactory,
             ServiceInformation serviceInformation,
-            BlobStorageService blobStorageService,
-            AuditableEventOccurredProducer auditableEventOccurredProducer)
+            BlobStorageService blobStorageService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _serviceScopeFactory = serviceScopeFactory;
             _serviceInformation = serviceInformation;
             _submitPayloadProducer = submitPayloadProducer;
-            _blobStorageService = blobStorageService;
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
             _transientExceptionHandler.Topic = nameof(KafkaTopic.ValidationComplete) + "-Retry";
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ValidationComplete) + "-Error";
-            _auditableEventOccurredProducer = auditableEventOccurredProducer;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
