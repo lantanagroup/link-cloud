@@ -22,7 +22,6 @@ using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
@@ -51,6 +50,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add Data Protection
     builder.Services.AddDataProtection()
         .SetApplicationName(builder.Configuration.GetValue<string>("DataProtection:KeyRing") ?? "Link");
+    builder.Services.Configure<AcquisitionJobSettings>(builder.Configuration.GetSection(AcquisitionJobSettings.SectionName));
+    
 
     builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
 

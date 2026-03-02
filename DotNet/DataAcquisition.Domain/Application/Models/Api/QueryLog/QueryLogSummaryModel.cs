@@ -19,6 +19,7 @@ public record QueryLogSummaryModel
     public QueryPhase? QueryPhase { get; init; }
     public DateTime? ExecutionDate { get; init; }
     public DateTime CreateDate { get; init; }
+    public DateTime? CompletionDate { get; init; }
     public int? RetryAttempts { get; init; }
     public RequestStatus? Status { get; init; }
 
@@ -48,6 +49,7 @@ public record QueryLogSummaryModel
             QueryPhase = log.QueryPhase,
             ExecutionDate = log.ExecutionDate,
             CreateDate = log.CreateDate,
+            CompletionDate = log.CompletionDate,
             RetryAttempts = log.RetryAttempts,
             Status = log.Status
         };
