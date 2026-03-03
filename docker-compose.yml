@@ -172,7 +172,7 @@ services:
     networks:
       - link-nw
 
-  # ← NEW: MongoDB as a single-node replica set (required for Quartz transactions)
+  # MongoDB as a single-node replica set (required for Quartz transactions)
   mongo:
     image: mongo:6-jammy
     command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
