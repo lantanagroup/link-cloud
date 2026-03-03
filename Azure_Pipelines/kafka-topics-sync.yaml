@@ -1,7 +1,8 @@
 # Pipeline that will create\delete Kafka Topics in a Kafka Cluster from .txt file on link-cloud Repo
 
-trigger:
-  none
+trigger: none
+
+pr: none
 
 pool:
   vmImage: ubuntu-latest
@@ -10,6 +11,7 @@ parameters:
 - name: environment
   displayName: Select the Kafka Topics environment to update?
   type: string
+  default: DEV
   values:
     - DEV
     - TEST
