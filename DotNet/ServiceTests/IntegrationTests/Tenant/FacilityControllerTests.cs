@@ -185,14 +185,14 @@ public class FacilityControllerTests
     }
 
     [Fact]
-    public async Task SoftDeleteFacility_FacilityNotFound_ReturnsBadRequest()
+    public async Task SoftDeleteFacility_FacilityNotFound_ReturnsNotFound()
     {
         var nonExistentFacilityId = Guid.NewGuid().ToString();
 
         var result = await _controller.SoftDeleteFacility(nonExistentFacilityId, CancellationToken.None);
 
-        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
-        Assert.Contains("Not Found", badRequestResult.Value?.ToString());
+        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Contains("Not Found", notFoundResult.Value?.ToString());
     }
 
     [Fact]
@@ -219,14 +219,14 @@ public class FacilityControllerTests
     }
 
     [Fact]
-    public async Task RestoreFacility_FacilityNotFound_ReturnsBadRequest()
+    public async Task RestoreFacility_FacilityNotFound_ReturnsNotFound()
     {
         var nonExistentFacilityId = Guid.NewGuid().ToString();
 
         var result = await _controller.RestoreFacility(nonExistentFacilityId, CancellationToken.None);
 
-        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
-        Assert.Contains("Not Found", badRequestResult.Value?.ToString());
+        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Contains("Not Found", notFoundResult.Value?.ToString());
     }
 
     [Fact]
