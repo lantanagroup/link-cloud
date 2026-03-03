@@ -321,6 +321,66 @@ public class FacilityControllerTests
         Assert.Equal(200, objectResult.StatusCode);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task GenerateAdHocReport_EmptyFacilityId_ReturnsBadRequest(string facilityId)
+    {
+        var request = new AdHocReportRequest
+        {
+            ReportTypes = new List<string> { "TestReport" },
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow,
+            PatientIds = new List<string>(),
+            BypassSubmission = false
+        };
+
+        var result = await _controller.GenerateAdHocReport(facilityId, request);
+        var actionResult = result.Result as IActionResult;
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult);
+        Assert.Contains("FacilityId must be provided", badRequestResult.Value?.ToString());
+    }
+
+    [Fact]
+    public async Task GenerateAdHocReport_FacilityNotFound_ReturnsNotFound()
+    {
+        var request = new AdHocReportRequest
+        {
+            ReportTypes = new List<string> { "TestReport" },
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow,
+            PatientIds = new List<string>(),
+            BypassSubmission = false
+        };
+
+        var result = await _controller.GenerateAdHocReport(Guid.NewGuid().ToString(), request);
+        var actionResult = result.Result as IActionResult;
+        Assert.IsType<NotFoundObjectResult>(actionResult);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task RegenerateReport_EmptyFacilityId_ReturnsBadRequest(string facilityId)
+    {
+        var request = new RegenerateReportRequest { ReportId = "test-report-id", BypassSubmission = false };
+
+        var result = await _controller.RegenerateReport(facilityId, request);
+        var actionResult = result.Result as IActionResult;
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult);
+        Assert.Contains("FacilityId must be provided", badRequestResult.Value?.ToString());
+    }
+
+    [Fact]
+    public async Task RegenerateReport_FacilityNotFound_ReturnsNotFound()
+    {
+        var request = new RegenerateReportRequest { ReportId = "test-report-id", BypassSubmission = false };
+
+        var result = await _controller.RegenerateReport(Guid.NewGuid().ToString(), request);
+        var actionResult = result.Result as IActionResult;
+        Assert.IsType<NotFoundObjectResult>(actionResult);
+    }
+
     private class StubHttpMessageHandler : HttpMessageHandler
     {
         private readonly HttpResponseMessage _response;
