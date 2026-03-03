@@ -7,6 +7,7 @@ using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using Microsoft.Extensions.Logging;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
@@ -43,6 +44,7 @@ public class FhirApiService : IFhirApiService
     private readonly IReadFhirCommand _readFhirCommand;
     private readonly ISearchFhirCommand _searchFhirCommand;
     private readonly IProducer<ResourceKey, ResourceAcquired> _kafkaProducer;
+    private readonly ILogger<FhirApiService> _logger;
 
     public FhirApiService(
         IReferenceResourcesManager referenceResourceManager,
@@ -50,7 +52,8 @@ public class FhirApiService : IFhirApiService
         IReferenceResourceService referenceResourceService,
         ISearchFhirCommand searchFhirCommand,
         IReadFhirCommand readFhirCommand,
-        IProducer<ResourceKey, ResourceAcquired> kafkaProducer)
+        IProducer<ResourceKey, ResourceAcquired> kafkaProducer,
+        ILogger<FhirApiService> logger)
     {
         _referenceResourceManager = referenceResourceManager;
         _referenceResourcesQueries = referenceResourcesQueries;
@@ -58,6 +61,7 @@ public class FhirApiService : IFhirApiService
         _searchFhirCommand = searchFhirCommand;
         _readFhirCommand = readFhirCommand;
         _kafkaProducer = kafkaProducer;
+        _logger = logger;
     }
 
     #region Interface Implementation
@@ -139,10 +143,16 @@ public class FhirApiService : IFhirApiService
             {
                 return resourceIds;
             }
-            if (ex.Outcome != null)
+
+            if (ex.Status == HttpStatusCode.NotFound || ex.Status == HttpStatusCode.Gone || ex.Outcome != null)
             {
-                string json = JsonSerializer.Serialize(ex.Outcome, _options);
-                (log.Notes ?? []).Add($"OperationOutcome returned for HTTP {ex.Status}: {json}");
+                string note = ex.Outcome != null 
+                    ? $"OperationOutcome returned for HTTP {ex.Status}: {JsonSerializer.Serialize(ex.Outcome, _options)}"
+                    : $"HTTP {ex.Status} returned for Read operation.";
+                
+                log.Notes ??= new List<string>();
+                log.Notes.Add(note);
+                throw new OpOutcomeException(note, ex);
             }
             throw;
         }
@@ -215,7 +225,27 @@ public class FhirApiService : IFhirApiService
 
                 await _referenceResourceService.ProcessReferences(log, refResources, cancellationToken);
 
-                var resources = bundle.Entry.Select(e => e.Resource).ToList();
+                var resources = bundle.Entry
+                    .Where(e => e.Resource != null && e.Resource.TypeName != "OperationOutcome")
+                    .Select(e => e.Resource)
+                    .ToList();
+
+                var outcomes = bundle.Entry
+                    .Where(e => e.Resource is OperationOutcome)
+                    .Select(e => (OperationOutcome)e.Resource)
+                    .ToList();
+
+                if (outcomes.Any())
+                {
+                    log.Notes ??= new List<string>();
+                    foreach (var outcome in outcomes)
+                    {
+                        string outcomeNote = $"OperationOutcome found in search bundle: {JsonSerializer.Serialize(outcome, _options)}";
+                        log.Notes.Add(outcomeNote);
+                        _logger.LogInformation("OperationOutcome found in successful search bundle for log {LogId}: {outcomeNote}", log.Id, outcomeNote);
+                    }
+                }
+
                 resourceIds.AddRange(resources.Select(r => $"{r.TypeName}/{r.Id}"));
 
                 foreach (var resource in resources)
@@ -247,10 +277,16 @@ public class FhirApiService : IFhirApiService
         }
         catch (FhirOperationException ex)
         {
-            if (ex.Outcome != null)
+            if (ex.Status == HttpStatusCode.NotFound || ex.Status == HttpStatusCode.Gone || ex.Outcome != null)
             {
-                string json = JsonSerializer.Serialize(ex.Outcome, _options);
-                (log.Notes ?? []).Add($"OperationOutcome returned for HTTP {ex.Status}: {json}");
+                string note = ex.Outcome != null
+                    ? $"OperationOutcome returned for HTTP {ex.Status}: {JsonSerializer.Serialize(ex.Outcome, _options)}"
+                    : $"HTTP {ex.Status} returned for Search operation.";
+
+                log.Notes ??= new List<string>();
+                log.Notes.Add(note);
+                _logger.LogWarning("Expected FHIR error encountered for search: {note}", note);
+                throw new OpOutcomeException(note, ex);
             }
             throw;
         }

@@ -37,8 +37,8 @@
     <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.*" />
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="8.*" />
     <PackageReference Include="Microsoft.Extensions.Configuration.AzureAppConfiguration" Version="7.*" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.3" />
-    <PackageReference Include="Microsoft.Extensions.Telemetry" Version="8.*" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Telemetry" Version="10.1.0" />
     <PackageReference Include="MongoDB.Driver" Version="3.*" />
     <PackageReference Include="OpenTelemetry" Version="1.15.0" />
     <PackageReference Include="OpenTelemetry.Api" Version="1.15.0" />
