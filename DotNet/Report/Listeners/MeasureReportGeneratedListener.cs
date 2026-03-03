@@ -120,7 +120,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (Exception ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - MeasureReportGenerated Exception thrown: " + ex.Message), facilityId);
+                                _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - MeasureReportGenerated Exception thrown: " + ex.Message, ex), facilityId);
                             }
                             finally
                             {
@@ -228,7 +228,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
             catch (Exception ex)
             {
-                throw new DeadLetterException(ex.Message);
+                throw new DeadLetterException(ex.Message, ex);
             }
 
             var elapsed = Stopwatch.GetElapsedTime(startTime);
@@ -270,7 +270,7 @@ namespace LantanaGroup.Link.Report.Listeners
             catch (Exception ex)
             {
                 _logger.LogError(ex, "An error was encountered producing a ReadyForValidation (ReportId = {reportId}, FacilityId = {facilityId}, PatientId = {patientId}).", schedule.Id.SanitizeUntrustedString(), schedule.FacilityId.SanitizeUntrustedString(), messageValue.PatientId.SanitizeUntrustedString());
-                throw new DeadLetterException(ex.Message);
+                throw new DeadLetterException(ex.Message, ex);
             }
 
         }
