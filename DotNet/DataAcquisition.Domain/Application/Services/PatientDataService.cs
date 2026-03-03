@@ -665,7 +665,7 @@ public class PatientDataService : IPatientDataService
             log.RetryAttempts ??= 0;
 
             log.ExecutionDate = DateTime.UtcNow.Add(ex.RetryAfter);
-            log.Status = RequestStatus.Pending; //Don't count this as a failure
+            log.Status = RequestStatus.Failed; //Don't count this as a failure
             log.Notes.Add(
                 $"[{DateTime.UtcNow}] Throttled (429): Retrying after {ex.RetryAfter.TotalSeconds}s. Attempt {log.RetryAttempts}.");
 
