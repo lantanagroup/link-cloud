@@ -374,6 +374,152 @@ public class PatientDataServiceTests
     }
 
     [Fact]
+    public async Task ExecuteLogRequest_HandlesOpOutcomeException_404_SetsCompletedStatus()
+    {
+        // Arrange
+        var request = new AcquisitionRequest(1, "facilityId");
+        var cancellationToken = CancellationToken.None;
+
+        var log = new DataAcquisitionLog
+        {
+            Id = 1,
+            FacilityId = "facilityId",
+            Status = RequestStatus.Queued,
+            FhirQueries = new List<FhirQuery>
+            {
+                new FhirQuery
+                {
+                    QueryType = FhirQueryType.Read,
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType>
+                    {
+                        new FhirQueryResourceType() { ResourceType = ResourceType.Patient }
+                    },
+                    QueryParameters = new List<string>(),
+                    ResourceReferenceTypes = new List<ResourceReferenceType>()
+                }
+            },
+            ScheduledReport = new ScheduledReport(),
+            PatientId = "patient-1",
+            CorrelationId = "corr-1"
+        };
+
+        var model = DataAcquisitionLogModel.FromDomain(log);
+
+        var fhirQueryConfig = new FhirQueryConfigurationModel
+        {
+            FacilityId = "facilityId",
+            FhirServerBaseUrl = "http://example.com"
+        };
+
+        _mockLogQueries
+            .Setup(q => q.GetAsync(1, cancellationToken))
+            .ReturnsAsync(model);
+
+        _mockFhirQueryQueries
+            .Setup(m => m.GetByFacilityIdAsync("facilityId", cancellationToken))
+            .ReturnsAsync(fhirQueryConfig);
+        
+        _mockLogQueries
+            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
+            .ReturnsAsync(true);
+
+        _mockFhirApiService
+            .Setup(x => x.ExecuteRead(
+                It.IsAny<DataAcquisitionLogModel>(),
+                It.IsAny<FhirQueryModel>(),
+                It.IsAny<ResourceType>(),
+                It.IsAny<FhirQueryConfigurationModel>(),
+                cancellationToken))
+            .ThrowsAsync(new OpOutcomeException("OperationOutcome encountered", new Hl7.Fhir.Rest.FhirOperationException("test", System.Net.HttpStatusCode.NotFound)));
+
+        UpdateDataAcquisitionLogModel updatedModel = null;
+        _mockLogQueries
+            .Setup(manager => manager.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), cancellationToken))
+            .Callback<UpdateDataAcquisitionLogModel, CancellationToken>((m, ct) => updatedModel = m)
+            .ReturnsAsync(model);
+
+        // Act
+        await _service.ExecuteLogRequest(request, cancellationToken);
+
+        // Assert
+        Assert.NotNull(updatedModel);
+        Assert.Equal(RequestStatus.Completed, updatedModel.Status);
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_HandlesOpOutcomeException_500_SetsPendingStatus()
+    {
+        // Arrange
+        var request = new AcquisitionRequest(1, "facilityId");
+        var cancellationToken = CancellationToken.None;
+
+        var log = new DataAcquisitionLog
+        {
+            Id = 1,
+            FacilityId = "facilityId",
+            Status = RequestStatus.Queued,
+            FhirQueries = new List<FhirQuery>
+            {
+                new FhirQuery
+                {
+                    QueryType = FhirQueryType.Read,
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType>
+                    {
+                        new FhirQueryResourceType() { ResourceType = ResourceType.Patient }
+                    },
+                    QueryParameters = new List<string>(),
+                    ResourceReferenceTypes = new List<ResourceReferenceType>()
+                }
+            },
+            ScheduledReport = new ScheduledReport(),
+            PatientId = "patient-1",
+            CorrelationId = "corr-1"
+        };
+
+        var model = DataAcquisitionLogModel.FromDomain(log);
+
+        var fhirQueryConfig = new FhirQueryConfigurationModel
+        {
+            FacilityId = "facilityId",
+            FhirServerBaseUrl = "http://example.com"
+        };
+
+        _mockLogQueries
+            .Setup(q => q.GetAsync(1, cancellationToken))
+            .ReturnsAsync(model);
+
+        _mockFhirQueryQueries
+            .Setup(m => m.GetByFacilityIdAsync("facilityId", cancellationToken))
+            .ReturnsAsync(fhirQueryConfig);
+        
+        _mockLogQueries
+            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
+            .ReturnsAsync(true);
+
+        _mockFhirApiService
+            .Setup(x => x.ExecuteRead(
+                It.IsAny<DataAcquisitionLogModel>(),
+                It.IsAny<FhirQueryModel>(),
+                It.IsAny<ResourceType>(),
+                It.IsAny<FhirQueryConfigurationModel>(),
+                cancellationToken))
+            .ThrowsAsync(new OpOutcomeException("OperationOutcome encountered", new Hl7.Fhir.Rest.FhirOperationException("test", System.Net.HttpStatusCode.InternalServerError)));
+
+        UpdateDataAcquisitionLogModel updatedModel = null;
+        _mockLogQueries
+            .Setup(manager => manager.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), cancellationToken))
+            .Callback<UpdateDataAcquisitionLogModel, CancellationToken>((m, ct) => updatedModel = m)
+            .ReturnsAsync(model);
+
+        // Act
+        await _service.ExecuteLogRequest(request, cancellationToken);
+
+        // Assert
+        Assert.NotNull(updatedModel);
+        Assert.Equal(RequestStatus.Pending, updatedModel.Status);
+    }
+
+    [Fact]
     public async Task ExecuteLogRequest_ShouldThrowException_WhenRequestIsNull()
     {
         // Arrange
@@ -786,10 +932,10 @@ public class PatientDataServiceTests
         // Act
         await _service.ExecuteLogRequest(request, cancellationToken);
 
-        // Assert: Log updated with delay (ExecutionDate ~30s from now), Pending status, retry incremented
+        // Assert: Log updated with delay (ExecutionDate ~30s from now), Failed status, retry incremented
         _mockLogQueries.Verify(m => m.UpdateAsync(
             It.Is<UpdateDataAcquisitionLogModel>(u =>
-                u.Status == RequestStatus.Pending &&
+                u.Status == RequestStatus.Failed &&
                 u.RetryAttempts == 0 &&
                 u.ExecutionDate >= DateTime.UtcNow.AddSeconds(20) &&  // Widened range to account for execution time
                 u.ExecutionDate <= DateTime.UtcNow.AddSeconds(40) &&
@@ -854,7 +1000,7 @@ public class PatientDataServiceTests
         // Assert: Log rescheduled ~2min from now
         _mockLogQueries.Verify(m => m.UpdateAsync(
             It.Is<UpdateDataAcquisitionLogModel>(u =>
-                u.Status == RequestStatus.Pending &&
+                u.Status == RequestStatus.Failed &&
                 u.RetryAttempts == 0 &&
                 u.ExecutionDate >= DateTime.UtcNow.AddMinutes(1.9) &&  // Approximate
                 u.ExecutionDate <= DateTime.UtcNow.AddMinutes(2.1) &&
@@ -913,11 +1059,11 @@ public class PatientDataServiceTests
 
         // Act
         await _service.ExecuteLogRequest(request, cancellationToken);
-
-        // Assert: Log rescheduled ~60s from now, Pending, retry=1, note reflects default delay
+        
+        // Assert: Log rescheduled ~60s from now, Failed, retry=0, note reflects default delay
         _mockLogQueries.Verify(m => m.UpdateAsync(
             It.Is<UpdateDataAcquisitionLogModel>(u =>
-                u.Status == RequestStatus.Pending &&
+                u.Status == RequestStatus.Failed &&
                 u.RetryAttempts == 0 &&
                 u.ExecutionDate >= DateTime.UtcNow.AddSeconds(55) &&  // Approx for 60s, allowing execution variance
                 u.ExecutionDate <= DateTime.UtcNow.AddSeconds(65) &&
