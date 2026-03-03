@@ -21,6 +21,7 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using System.Net;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using StringComparison = System.StringComparison;
@@ -606,8 +607,19 @@ public class PatientDataService : IPatientDataService
             _logger.LogWarning(ex, "OperationOutcome encountered for facility {FacilityId}", log.FacilityId.Sanitize());
 
             log.Notes ??= new List<string>();
-            log.Status = RequestStatus.Completed;
-            log.CompletionDate = DateTime.UtcNow;
+
+            if (ex.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Gone)
+            {
+                log.Status = RequestStatus.Completed;
+                log.CompletionDate = DateTime.UtcNow;
+            }
+            else
+            {
+                log.RetryAttempts ??= 0;
+                log.RetryAttempts++;
+                log.Status = RequestStatus.Pending;
+                log.Notes.Add($"[{DateTime.UtcNow}] OperationOutcome encountered (HTTP {ex.StatusCode}): Retrying. Attempt {log.RetryAttempts}.");
+            }
 
             await _dataAcquisitionLogQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
             {

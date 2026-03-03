@@ -1,12 +1,16 @@
 using System;
+using System.Net;
 using Hl7.Fhir.Rest;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions
 {
     public class OpOutcomeException : FhirOperationException
     {
+        public HttpStatusCode? StatusCode { get; }
+
         public OpOutcomeException(string message, FhirOperationException innerException) : base(message, innerException.Status, innerException.Outcome)
         {
+            StatusCode = innerException.Status;
             Data.Add("InnerException", innerException);
         }
 
