@@ -729,7 +729,6 @@ services:
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       InternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
       InternalBlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
-      Redis__Password: ${REDIS_PASS}   # ← you can remove this line after Option A
     ports:
       - "8072:8072"
     build:
