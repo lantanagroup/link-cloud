@@ -358,7 +358,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             if (existingModel == null)
             {
-                return BadRequest($"Facility with Id: {facilityId} Not Found");
+                return NotFound($"Facility with Id: {facilityId} Not Found");
             }
 
             try
@@ -394,7 +394,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             var existingModel = await _facilityQueries.GetAsync(facilityId, null, cancellationToken);
             if (existingModel == null)
-                return BadRequest($"Facility with Id: {facilityId} Not Found");
+                return NotFound($"Facility with Id: {facilityId} Not Found");
 
             try
             {
@@ -437,7 +437,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             var existingModel = await _facilityQueries.GetAsync(facilityId, null, cancellationToken, includeDeleted: true);
             if (existingModel == null)
-                return BadRequest($"Facility with Id: {facilityId} Not Found");
+                return NotFound($"Facility with Id: {facilityId} Not Found");
 
             try
             {
@@ -475,10 +475,14 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [HttpPost("{facilityId}/AdHocReport")]
         public async Task<ActionResult<GenerateAdhocReportResponse>> GenerateAdHocReport(string facilityId, AdHocReportRequest request)
         {
-            if (string.IsNullOrEmpty(facilityId) ||
-                await _facilityQueries.GetAsync(facilityId, null, CancellationToken.None) == null)
+            if (string.IsNullOrWhiteSpace(facilityId))
             {
-                return BadRequest("Facility does not exist.");
+                return BadRequest("FacilityId must be provided.");
+            }
+
+            if (await _facilityQueries.GetAsync(facilityId, null, CancellationToken.None) == null)
+            {
+                return NotFound("Facility does not exist.");
             }
 
             if (request.ReportTypes == null || request.ReportTypes.Count == 0)
@@ -569,10 +573,14 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [HttpPost("{facilityId}/RegenerateReport")]
         public async Task<ActionResult<GenerateAdhocReportResponse>> RegenerateReport(string facilityId, RegenerateReportRequest request)
         {
-            if (string.IsNullOrEmpty(facilityId) ||
-                await _facilityQueries.GetAsync(facilityId, null, CancellationToken.None) == null)
+            if (string.IsNullOrWhiteSpace(facilityId))
             {
-                return BadRequest("Facility does not exist.");
+                return BadRequest("FacilityId must be provided.");
+            }
+
+            if (await _facilityQueries.GetAsync(facilityId, null, CancellationToken.None) == null)
+            {
+                return NotFound("Facility does not exist.");
             }
 
             if (string.IsNullOrEmpty(request.ReportId))
