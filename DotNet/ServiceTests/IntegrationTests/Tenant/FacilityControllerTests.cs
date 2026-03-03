@@ -185,14 +185,14 @@ public class FacilityControllerTests
     }
 
     [Fact]
-    public async Task SoftDeleteFacility_FacilityNotFound_ReturnsBadRequest()
+    public async Task SoftDeleteFacility_FacilityNotFound_ReturnsNotFound()
     {
         var nonExistentFacilityId = Guid.NewGuid().ToString();
 
         var result = await _controller.SoftDeleteFacility(nonExistentFacilityId, CancellationToken.None);
 
-        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
-        Assert.Contains("Not Found", badRequestResult.Value?.ToString());
+        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Contains("Not Found", notFoundResult.Value?.ToString());
     }
 
     [Fact]
@@ -219,14 +219,14 @@ public class FacilityControllerTests
     }
 
     [Fact]
-    public async Task RestoreFacility_FacilityNotFound_ReturnsBadRequest()
+    public async Task RestoreFacility_FacilityNotFound_ReturnsNotFound()
     {
         var nonExistentFacilityId = Guid.NewGuid().ToString();
 
         var result = await _controller.RestoreFacility(nonExistentFacilityId, CancellationToken.None);
 
-        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
-        Assert.Contains("Not Found", badRequestResult.Value?.ToString());
+        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Contains("Not Found", notFoundResult.Value?.ToString());
     }
 
     [Fact]
@@ -319,6 +319,66 @@ public class FacilityControllerTests
         var actionResult = result.Result as IActionResult;
         var objectResult = Assert.IsType<OkObjectResult>(actionResult);
         Assert.Equal(200, objectResult.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task GenerateAdHocReport_EmptyFacilityId_ReturnsBadRequest(string facilityId)
+    {
+        var request = new AdHocReportRequest
+        {
+            ReportTypes = new List<string> { "TestReport" },
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow,
+            PatientIds = new List<string>(),
+            BypassSubmission = false
+        };
+
+        var result = await _controller.GenerateAdHocReport(facilityId, request);
+        var actionResult = result.Result as IActionResult;
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult);
+        Assert.Contains("FacilityId must be provided", badRequestResult.Value?.ToString());
+    }
+
+    [Fact]
+    public async Task GenerateAdHocReport_FacilityNotFound_ReturnsNotFound()
+    {
+        var request = new AdHocReportRequest
+        {
+            ReportTypes = new List<string> { "TestReport" },
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow,
+            PatientIds = new List<string>(),
+            BypassSubmission = false
+        };
+
+        var result = await _controller.GenerateAdHocReport(Guid.NewGuid().ToString(), request);
+        var actionResult = result.Result as IActionResult;
+        Assert.IsType<NotFoundObjectResult>(actionResult);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task RegenerateReport_EmptyFacilityId_ReturnsBadRequest(string facilityId)
+    {
+        var request = new RegenerateReportRequest { ReportId = "test-report-id", BypassSubmission = false };
+
+        var result = await _controller.RegenerateReport(facilityId, request);
+        var actionResult = result.Result as IActionResult;
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult);
+        Assert.Contains("FacilityId must be provided", badRequestResult.Value?.ToString());
+    }
+
+    [Fact]
+    public async Task RegenerateReport_FacilityNotFound_ReturnsNotFound()
+    {
+        var request = new RegenerateReportRequest { ReportId = "test-report-id", BypassSubmission = false };
+
+        var result = await _controller.RegenerateReport(Guid.NewGuid().ToString(), request);
+        var actionResult = result.Result as IActionResult;
+        Assert.IsType<NotFoundObjectResult>(actionResult);
     }
 
     private class StubHttpMessageHandler : HttpMessageHandler
