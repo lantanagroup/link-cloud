@@ -932,10 +932,10 @@ public class PatientDataServiceTests
         // Act
         await _service.ExecuteLogRequest(request, cancellationToken);
 
-        // Assert: Log updated with delay (ExecutionDate ~30s from now), Pending status, retry incremented
+        // Assert: Log updated with delay (ExecutionDate ~30s from now), Failed status, retry incremented
         _mockLogQueries.Verify(m => m.UpdateAsync(
             It.Is<UpdateDataAcquisitionLogModel>(u =>
-                u.Status == RequestStatus.Pending &&
+                u.Status == RequestStatus.Failed &&
                 u.RetryAttempts == 0 &&
                 u.ExecutionDate >= DateTime.UtcNow.AddSeconds(20) &&  // Widened range to account for execution time
                 u.ExecutionDate <= DateTime.UtcNow.AddSeconds(40) &&
@@ -1000,7 +1000,7 @@ public class PatientDataServiceTests
         // Assert: Log rescheduled ~2min from now
         _mockLogQueries.Verify(m => m.UpdateAsync(
             It.Is<UpdateDataAcquisitionLogModel>(u =>
-                u.Status == RequestStatus.Pending &&
+                u.Status == RequestStatus.Failed &&
                 u.RetryAttempts == 0 &&
                 u.ExecutionDate >= DateTime.UtcNow.AddMinutes(1.9) &&  // Approximate
                 u.ExecutionDate <= DateTime.UtcNow.AddMinutes(2.1) &&
@@ -1059,11 +1059,11 @@ public class PatientDataServiceTests
 
         // Act
         await _service.ExecuteLogRequest(request, cancellationToken);
-
-        // Assert: Log rescheduled ~60s from now, Pending, retry=1, note reflects default delay
+        
+        // Assert: Log rescheduled ~60s from now, Failed, retry=0, note reflects default delay
         _mockLogQueries.Verify(m => m.UpdateAsync(
             It.Is<UpdateDataAcquisitionLogModel>(u =>
-                u.Status == RequestStatus.Pending &&
+                u.Status == RequestStatus.Failed &&
                 u.RetryAttempts == 0 &&
                 u.ExecutionDate >= DateTime.UtcNow.AddSeconds(55) &&  // Approx for 60s, allowing execution variance
                 u.ExecutionDate <= DateTime.UtcNow.AddSeconds(65) &&
