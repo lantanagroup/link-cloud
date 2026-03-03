@@ -1,337 +1,345 @@
-﻿using Confluent.Kafka;
+﻿using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Specialized;
+using Confluent.Kafka;
 using LantanaGroup.Link.Report.Application.Models;
-using LantanaGroup.Link.Report.Core;
-using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
-using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Listeners;
-using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
-using LantanaGroup.Link.Shared.Application.Error.Interfaces;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Models.Tenant;
-using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Moq;
-using System.Linq.Expressions;
 using System.Text;
-using Xunit.Abstractions;
+using Xunit;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report
 {
     [Collection("ReportIntegrationTests")]
-    [Trait("Category", "IntegrationTests")]
-    public class ValidationCompleteListenerTests
+    public class ValidationCompleteListenerTests : IClassFixture<ReportIntegrationTestFixture>
     {
-        //TODO: To be worked on in LNK-4722
-        //private readonly ReportIntegrationTestFixture _fixture;
-        //private readonly ITestOutputHelper _output;
+        private readonly ReportIntegrationTestFixture _fixture;
 
-        //public ValidationCompleteListenerTests(ReportIntegrationTestFixture fixture, ITestOutputHelper output)
-        //{
-        //    _fixture = fixture;
-        //    _output = output;
-        //}
+        public ValidationCompleteListenerTests(ReportIntegrationTestFixture fixture)
+        {
+            _fixture = fixture;
+        }
 
-        //private ValidationCompleteListener CreateListener(IServiceScope scope, Mock<IServiceScopeFactory> mockScopeFactory = null)
-        //{
-        //    return new ValidationCompleteListener(
-        //        scope.ServiceProvider.GetRequiredService<ILogger<ValidationCompleteListener>>(),
-        //        scope.ServiceProvider.GetRequiredService<IKafkaConsumerFactory<string, ValidationCompleteValue>>(),
-        //        scope.ServiceProvider.GetRequiredService<ITransientExceptionHandler<string, ValidationCompleteValue>>(),
-        //        scope.ServiceProvider.GetRequiredService<IDeadLetterExceptionHandler<string, ValidationCompleteValue>>(),
-        //        scope.ServiceProvider.GetRequiredService<SubmitPayloadProducer>(),
-        //        mockScopeFactory?.Object ?? scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>(),
-        //        scope.ServiceProvider.GetRequiredService<ServiceInformation>(),
-        //        scope.ServiceProvider.GetRequiredService<BlobStorageService>(),
-        //        scope.ServiceProvider.GetRequiredService<PatientReportSubmissionBundler>(),
-        //        scope.ServiceProvider.GetRequiredService<ReportManifestProducer>(),
-        //        scope.ServiceProvider.GetRequiredService<AuditableEventOccurredProducer>());
-        //}
+        [Fact]
+        public async Task ProcessMessageAsync_NullResult_ThrowsNullReferenceException()
+        {
+            using var scope = _fixture.ScopeFactory.CreateScope();
+            var listener = scope.ServiceProvider.GetRequiredService<ValidationCompleteListener>();
 
-        //private async Task<(ReportSchedule schedule, List<PatientSubmissionEntry> entries)> SetupDatabaseAsync(IServiceScope scope, string facilityId = "TestFacility", List<string> reportTypes = null, List<(string patientId, string reportType, PatientSubmissionStatus status, MeasureReport measureReport)> entryData = null)
-        //{
-        //    var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+            var consumeResult = (ConsumeResult<string, ValidationCompleteValue>)null!;
 
-        //    reportTypes ??= new List<string> { "TestReport" };
-        //    entryData ??= new List<(string, string, PatientSubmissionStatus, MeasureReport)> { ("Patient1", "TestReport", PatientSubmissionStatus.ValidationRequested, null) };
+            await Assert.ThrowsAsync<NullReferenceException>(
+                () => listener.ProcessMessageAsync(consumeResult, CancellationToken.None));
+        }
 
-        //    var reportStartDate = DateTime.Parse("2024-01-01").ToUniversalTime();
-        //    var reportEndDate = DateTime.Parse("2024-01-31").ToUniversalTime();
+        [Fact]
+        public async Task ProcessMessageAsync_MissingCorrelationId_ThrowsDeadLetterException()
+        {
+            using var scope = _fixture.ScopeFactory.CreateScope();
+            var listener = scope.ServiceProvider.GetRequiredService<ValidationCompleteListener>();
+            var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
 
-        //    var schedule = new ReportSchedule
-        //    {
-        //        Id = Guid.NewGuid().ToString(),
-        //        FacilityId = facilityId,
-        //        ReportStartDate = reportStartDate,
-        //        ReportEndDate = reportEndDate,
-        //        ReportTypes = reportTypes,
-        //        Frequency = Frequency.Monthly,
-        //        PayloadRootUri = "test://payload/root"
-        //    };
-        //    await database.ReportScheduledRepository.AddAsync(schedule);
+            var facilityId = "test-facility-validation";
+            var reportId = Guid.NewGuid().ToString();
+            var patientId = "pat-001";
 
-        //    var entries = new List<PatientSubmissionEntry>();
-        //    foreach (var (patientId, reportType, status, measureReport) in entryData)
-        //    {
-        //        var entry = new PatientSubmissionEntry
-        //        {
-        //            Id = Guid.NewGuid().ToString(),
-        //            FacilityId = schedule.FacilityId,
-        //            ReportScheduleId = schedule.Id,
-        //            PatientId = patientId,
-        //            ReportType = reportType,
-        //            Status = status,
-        //            PayloadUri = $"test://payload/{patientId}"
-        //        };
-        //        if (measureReport != null)
-        //        {
-        //            entry.MeasureReport = measureReport;
-        //        }
-        //        await database.SubmissionEntryRepository.AddAsync(entry);
-        //        entries.Add(entry);
-        //    }
+            var schedule = new ReportSchedule
+            {
+                Id = reportId,
+                FacilityId = facilityId,
+                ReportStartDate = DateTime.UtcNow.AddDays(-30),
+                ReportEndDate = DateTime.UtcNow.AddDays(30),
+                Frequency = Frequency.Monthly,
+                ReportTypes = new List<string> { "DE-111" },
+                Status = ScheduleStatus.Scheduled,
+                CreateDate = DateTime.UtcNow
+            };
+            await reportScheduledManager.AddAsync(schedule, CancellationToken.None);
 
-        //    await database.SaveChangesAsync();
+            var value = new ValidationCompleteValue
+            {
+                PatientId = patientId,
+                IsValid = true,
+                ReportTrackingId = reportId
+            };
 
-        //    return (schedule, entries);
-        //}
+            var consumeResult = new ConsumeResult<string, ValidationCompleteValue>
+            {
+                Message = new Message<string, ValidationCompleteValue>
+                {
+                    Key = facilityId,
+                    Value = value,
+                    Headers = new Headers()
+                }
+            };
 
-        //private ConsumeResult<string, ValidationCompleteValue> CreateConsumeResult(string facilityId, string reportTrackingId, string patientId, bool isValid, bool hasCorrelationId = true)
-        //{
-        //    var headers = new Headers();
-        //    if (hasCorrelationId)
-        //    {
-        //        headers.Add("X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()));
-        //    }
+            var exception = await Assert.ThrowsAsync<DeadLetterException>(
+                () => listener.ProcessMessageAsync(consumeResult, CancellationToken.None));
 
-        //    var message = new Message<string, ValidationCompleteValue>
-        //    {
-        //        Key = facilityId,
-        //        Value = new ValidationCompleteValue { ReportTrackingId = reportTrackingId, PatientId = patientId, IsValid = isValid },
-        //        Headers = headers
-        //    };
-        //    return new ConsumeResult<string, ValidationCompleteValue> { Message = message, Topic = nameof(KafkaTopic.ValidationComplete) };
-        //}
+            Assert.Contains("without correlation ID", exception.Message);
+        }
 
-        //private void AssertEntryStatusAndValidation(PatientSubmissionEntry updatedEntry, PatientSubmissionStatus expectedStatus, ValidationStatus expectedValidationStatus, string expectedPayloadUri = null)
-        //{
-        //    Assert.NotNull(updatedEntry);
-        //    Assert.Equal(expectedStatus, updatedEntry.Status);
-        //    Assert.Equal(expectedValidationStatus, updatedEntry.ValidationStatus);
-        //    if (expectedPayloadUri != null)
-        //    {
-        //        Assert.Equal(expectedPayloadUri, updatedEntry.PayloadUri);
-        //    }
-        //}
+        [Fact]
+        public async Task ProcessMessageAsync_NoScheduleFound_ThrowsDeadLetterException()
+        {
+            using var scope = _fixture.ScopeFactory.CreateScope();
+            var listener = scope.ServiceProvider.GetRequiredService<ValidationCompleteListener>();
 
-        //private void AssertProducerMocks(Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> submitMock, Times timesEntry, Times timesSchedule, ReportSchedule schedule, string patientId, string payloadUri)
-        //{
-        //    submitMock.Verify(p => p.Produce(
-        //        nameof(KafkaTopic.SubmitPayload),
-        //        It.Is<Message<SubmitPayloadKey, SubmitPayloadValue>>(m =>
-        //            m.Key.FacilityId == schedule.FacilityId &&
-        //            m.Key.ReportScheduleId == schedule.Id &&
-        //            m.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry &&
-        //            m.Value.PatientId == patientId &&
-        //            m.Value.PayloadUri == payloadUri),
-        //        It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()), timesEntry);
+            var facilityId = "test-facility-validation";
+            var reportId = Guid.NewGuid().ToString();
+            var patientId = "pat-001";
 
-        //    submitMock.Verify(p => p.Produce(
-        //        nameof(KafkaTopic.SubmitPayload),
-        //        It.Is<Message<SubmitPayloadKey, SubmitPayloadValue>>(m =>
-        //            m.Key.FacilityId == schedule.FacilityId &&
-        //            m.Key.ReportScheduleId == schedule.Id &&
-        //            m.Value.PayloadType == PayloadType.ReportSchedule &&
-        //            m.Value.PayloadUri != null &&
-        //            m.Value.PayloadUri.EndsWith("manifest.ndjson")),
-        //        It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()), timesSchedule);
-        //}
+            var value = new ValidationCompleteValue
+            {
+                PatientId = patientId,
+                IsValid = true,
+                ReportTrackingId = reportId
+            };
 
-        //[Fact]
-        //public async Task ProcessMessageAsync_ValidValidation_UpdatesStatusAndProducesSubmitPayload()
-        //{
-        //    _fixture.ResetMocks();
-        //    //await _fixture.ClearDatabaseAsync();
+            var headers = new Headers { { "X-Correlation-Id", Encoding.UTF8.GetBytes("corr-123") } };
 
-        //    using var scope = _fixture.ServiceProvider.CreateScope();
+            var consumeResult = new ConsumeResult<string, ValidationCompleteValue>
+            {
+                Message = new Message<string, ValidationCompleteValue>
+                {
+                    Key = facilityId,
+                    Value = value,
+                    Headers = headers
+                }
+            };
 
-        //    ReportIntegrationTestFixture.TenantApiServiceMock.Setup(t => t.GetFacilityConfig(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-        //        .ReturnsAsync(new FacilityModel { FacilityName = "TestFacilityName" });
+            var exception = await Assert.ThrowsAsync<DeadLetterException>(
+                () => listener.ProcessMessageAsync(consumeResult, CancellationToken.None));
 
-        //    var expectedManifestUri = new Uri("http://example.com/manifest.ndjson");
-        //    ReportIntegrationTestFixture.BlobStorageMock.Setup(b => b.UploadManifestAsync(It.IsAny<ReportSchedule>(), It.IsAny<IEnumerable<Resource>>(), It.IsAny<CancellationToken>()))
-        //        .ReturnsAsync(expectedManifestUri);
+            Assert.Contains("No scheduled report record was found", exception.Message);
+        }
 
-        //    var (schedule, entries) = await SetupDatabaseAsync(scope);
-        //    var entry = entries.First();
+        [Fact]
+        public async Task ProcessMessageAsync_NoReportEntryFound_ThrowsDeadLetterException()
+        {
+            using var scope = _fixture.ScopeFactory.CreateScope();
+            var listener = scope.ServiceProvider.GetRequiredService<ValidationCompleteListener>();
+            var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
 
-        //    var listener = CreateListener(scope);
+            var facilityId = "test-facility-validation";
+            var reportId = Guid.NewGuid().ToString();
+            var patientId = "pat-001";
 
-        //    var consumeResult = CreateConsumeResult(schedule.FacilityId, schedule.Id, entry.PatientId, true);
+            var schedule = new ReportSchedule
+            {
+                Id = reportId,
+                FacilityId = facilityId,
+                ReportStartDate = DateTime.UtcNow.AddDays(-30),
+                ReportEndDate = DateTime.UtcNow.AddDays(30),
+                Frequency = Frequency.Monthly,
+                ReportTypes = new List<string> { "DE-111" },
+                Status = ScheduleStatus.Scheduled,
+                CreateDate = DateTime.UtcNow
+            };
+            await reportScheduledManager.AddAsync(schedule, CancellationToken.None);
 
-        //    await listener.ProcessMessageAsync(consumeResult, default);
+            var value = new ValidationCompleteValue
+            {
+                PatientId = patientId,
+                IsValid = true,
+                ReportTrackingId = reportId
+            };
 
-        //    using var assertScope = _fixture.ServiceProvider.CreateScope();
-        //    var assertDatabase = assertScope.ServiceProvider.GetRequiredService<IDatabase>();
+            var headers = new Headers { { "X-Correlation-Id", Encoding.UTF8.GetBytes("corr-123") } };
 
-        //    var updatedEntry = await assertDatabase.SubmissionEntryRepository.FirstOrDefaultAsync(e => e.Id == entry.Id);
-        //    AssertEntryStatusAndValidation(updatedEntry, PatientSubmissionStatus.ValidationComplete, ValidationStatus.Passed);
+            var consumeResult = new ConsumeResult<string, ValidationCompleteValue>
+            {
+                Message = new Message<string, ValidationCompleteValue>
+                {
+                    Key = facilityId,
+                    Value = value,
+                    Headers = headers
+                }
+            };
 
-        //    AssertProducerMocks(ReportIntegrationTestFixture.SubmitPayloadProducerMock, Times.Once(), Times.Once(), schedule, entry.PatientId, updatedEntry.PayloadUri);
-        //}
+            var exception = await Assert.ThrowsAsync<DeadLetterException>(
+                () => listener.ProcessMessageAsync(consumeResult, CancellationToken.None));
 
+            Assert.Contains("No patient report entry records were found", exception.Message);
+        }
 
-        //[Fact]
-        //public async Task ProcessMessageAsync_InvalidValidation_AddsOutcomeUpdatesBlobAndProducesSubmitPayload()
-        //{
-        //    _fixture.ResetMocks();
-        //    //await _fixture.ClearDatabaseAsync();
+        [Fact]
+        public async Task ProcessMessageAsync_ValidValidation_UpdatesEntryAndProducesSubmitPayload()
+        {
+            _fixture.SubmitPayloadKafkaProducerMock.Reset();
 
-        //    using var scope = _fixture.ServiceProvider.CreateScope();
+            using var scope = _fixture.ScopeFactory.CreateScope();
+            var listener = scope.ServiceProvider.GetRequiredService<ValidationCompleteListener>();
+            var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+            var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
 
-        //    // NEW: Setup TenantApiServiceMock
-        //    ReportIntegrationTestFixture.TenantApiServiceMock.Setup(t => t.GetFacilityConfig(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-        //        .ReturnsAsync(new FacilityModel { FacilityName = "TestFacilityName" });
+            var facilityId = "test-facility-validation";
+            var reportId = Guid.NewGuid().ToString();
+            var patientId = "pat-001";
 
-        //    var measureReport = new MeasureReport
-        //    {
-        //        Id = Guid.NewGuid().ToString(),
-        //        Measure = "TestMeasure",
-        //        Status = MeasureReport.MeasureReportStatus.Complete,
-        //        Type = MeasureReport.MeasureReportType.Individual,
-        //        Period = new Period { Start = "2024-01-01", End = "2024-01-31" }  // Added to fix null period error
-        //    };
+            var schedule = new ReportSchedule
+            {
+                Id = reportId,
+                FacilityId = facilityId,
+                ReportStartDate = DateTime.UtcNow.AddDays(-30),
+                ReportEndDate = DateTime.UtcNow.AddDays(30),
+                Frequency = Frequency.Monthly,
+                ReportTypes = new List<string> { "DE-111" },
+                Status = ScheduleStatus.Scheduled,
+                CreateDate = DateTime.UtcNow
+            };
+            await reportScheduledManager.AddAsync(schedule, CancellationToken.None);
 
-        //    var entryData = new List<(string, string, PatientSubmissionStatus, MeasureReport)>
-        //    {
-        //        ("Patient1", "TestReport", PatientSubmissionStatus.ValidationRequested, measureReport)
-        //    };
+            var entry = new ReportEntry
+            {
+                PatientId = patientId,
+                ReportScheduleId = reportId,
+                FacilityId = facilityId,
+                ReportingStatus = ReportingStatus.PatientIdentified,
+                SubmissionStatus = SubmissionStatus.Submitting,
+                CreateDate = DateTime.UtcNow,
+                AggregateReportBlobName = "test-aggregate.ndjson",
+                AggregateReportUri = "https://blob.example.com/test-aggregate.ndjson"
+            };
+            await reportEntryManager.AddAsync(entry, CancellationToken.None);
 
-        //    var (schedule, entries) = await SetupDatabaseAsync(scope, entryData: entryData);
+            var value = new ValidationCompleteValue
+            {
+                PatientId = patientId,
+                IsValid = true,
+                ReportTrackingId = reportId
+            };
 
-        //    var entry = entries.First();
+            var headers = new Headers { { "X-Correlation-Id", Encoding.UTF8.GetBytes("corr-123") } };
 
-        //    var reportName = ReportHelpers.GetReportName(schedule.Id, schedule.FacilityId, schedule.ReportTypes, schedule.ReportStartDate);
-        //    var bundleName = $"patient-{entry.PatientId}.ndjson";
-        //    var blobName = $"{reportName}/{bundleName}";
+            var consumeResult = new ConsumeResult<string, ValidationCompleteValue>
+            {
+                Message = new Message<string, ValidationCompleteValue>
+                {
+                    Key = facilityId,
+                    Value = value,
+                    Headers = headers
+                }
+            };
 
-        //    // Parse the BlobEndpoint from the connection string
-        //    string connectionString = _fixture.AzuriteConnectionString;
-        //    var parts = connectionString.Split(';');
-        //    var blobEndpointPart = parts.FirstOrDefault(p => p.StartsWith("BlobEndpoint="));
-        //    var blobEndpoint = blobEndpointPart?.Substring("BlobEndpoint=".Length);
-        //    var expectedUri = $"{blobEndpoint}/report-test-container/{blobName}";
-        //    var expectedManifestUri = $"{blobEndpoint}/report-test-container/{reportName}/manifest.ndjson";  // NEW
+            await listener.ProcessMessageAsync(consumeResult, CancellationToken.None);
 
-        //    ReportIntegrationTestFixture.BlobStorageMock.Setup(b => b.UploadAsync(It.IsAny<ReportSchedule>(), It.IsAny<PatientSubmissionModel>(), It.IsAny<CancellationToken>()))
-        //        .ReturnsAsync(new Uri(expectedUri));
-        //    ReportIntegrationTestFixture.BlobStorageMock.Setup(b => b.UploadManifestAsync(It.IsAny<ReportSchedule>(), It.IsAny<IEnumerable<Resource>>(), It.IsAny<CancellationToken>()))
-        //        .ReturnsAsync(new Uri(expectedManifestUri));
+            using var verifyScope = _fixture.ScopeFactory.CreateScope();
+            var verifyEntryManager = verifyScope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+            var updatedEntry = await verifyEntryManager.SingleOrDefaultAsync(e => e.PatientId == patientId && e.ReportScheduleId == reportId);
 
-        //    var listener = CreateListener(scope);
+            Assert.Equal(ReportingStatus.PassedValidation, updatedEntry.ReportingStatus);
+            Assert.Equal(SubmissionStatus.Submitting, updatedEntry.SubmissionStatus);
 
-        //    var consumeResult = CreateConsumeResult(schedule.FacilityId, schedule.Id, entry.PatientId, false);
+            _fixture.SubmitPayloadKafkaProducerMock.Verify(
+                p => p.Produce(
+                    It.IsAny<string>(),
+                    It.Is<Message<SubmitPayloadKey, SubmitPayloadValue>>(m =>
+                        m.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry &&
+                        m.Value.PatientId == patientId),
+                    It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()),
+                Times.Once);
+        }
 
-        //    await listener.ProcessMessageAsync(consumeResult, default);
+        [Fact]
+        public async Task ProcessMessageAsync_InvalidValidation_UpdatesEntryAndProducesSubmitPayload()
+        {
+            _fixture.SubmitPayloadKafkaProducerMock.Reset();
 
-        //    // NEW: Fresh assert scope
-        //    using var assertScope = _fixture.ServiceProvider.CreateScope();
-        //    var assertDatabase = assertScope.ServiceProvider.GetRequiredService<IDatabase>();
-        //    var assertQueries = assertScope.ServiceProvider.GetRequiredService<ISubmissionEntryQueries>();
+            using var scope = _fixture.ScopeFactory.CreateScope();
+            var listener = scope.ServiceProvider.GetRequiredService<ValidationCompleteListener>();
+            var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+            var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
 
-        //    var updatedData = await assertQueries.GetPatientReportData(schedule.FacilityId, schedule.Id, entry.PatientId, cancellationToken: CancellationToken.None);
-        //    var updatedEntry = updatedData.ReportData[schedule.ReportTypes[0]].Entry;
+            var facilityId = "test-facility-validation";
+            var reportId = Guid.NewGuid().ToString();
+            var patientId = "pat-001";
 
-        //    AssertEntryStatusAndValidation(updatedEntry, PatientSubmissionStatus.ValidationComplete, ValidationStatus.Failed, expectedUri);
+            var schedule = new ReportSchedule
+            {
+                Id = reportId,
+                FacilityId = facilityId,
+                ReportStartDate = DateTime.UtcNow.AddDays(-30),
+                ReportEndDate = DateTime.UtcNow.AddDays(30),
+                Frequency = Frequency.Monthly,
+                ReportTypes = new List<string> { "DE-111" },
+                Status = ScheduleStatus.Scheduled,
+                CreateDate = DateTime.UtcNow
+            };
+            await reportScheduledManager.AddAsync(schedule, CancellationToken.None);
 
-        //    Assert.Contains(updatedData.ReportData[schedule.ReportTypes[0]].Resources, cr => cr.ResourceType == "OperationOutcome");
+            var entry = new ReportEntry
+            {
+                PatientId = patientId,
+                ReportScheduleId = reportId,
+                FacilityId = facilityId,
+                ReportingStatus = ReportingStatus.PatientIdentified,
+                SubmissionStatus = SubmissionStatus.Submitting,
+                CreateDate = DateTime.UtcNow,
+                AggregateReportBlobName = "test-aggregate.ndjson",
+                AggregateReportUri = "https://blob.example.com/test-aggregate.ndjson"
+            };
+            await reportEntryManager.AddAsync(entry, CancellationToken.None);
 
-        //    var createdResource = await assertDatabase.ResourceRepository.FirstOrDefaultAsync(r =>
-        //        r.FacilityId == schedule.FacilityId && r.PatientId == entry.PatientId && r.ResourceType == "OperationOutcome");
-        //    Assert.NotNull(createdResource);
-        //    Assert.IsType<OperationOutcome>(createdResource.Resource);
-        //    Assert.Equal("Patient has failed Validation", ((OperationOutcome)createdResource.Resource).Issue.First().Diagnostics);
+            await CreateAppendBlobForTest(entry.AggregateReportBlobName);
 
-        //    AssertProducerMocks(ReportIntegrationTestFixture.SubmitPayloadProducerMock, Times.Once(), Times.Once(), schedule, entry.PatientId, expectedUri);
-        //}
+            var value = new ValidationCompleteValue
+            {
+                PatientId = patientId,
+                IsValid = false,
+                ReportTrackingId = reportId
+            };
 
-        //[Fact]
-        //public async Task ProcessMessageAsync_NoScheduleFound_ThrowsDeadLetterException()
-        //{
-        //    using var scope = _fixture.ServiceProvider.CreateScope();
+            var headers = new Headers { { "X-Correlation-Id", Encoding.UTF8.GetBytes("corr-123") } };
 
-        //    var mockScopeFactory = new Mock<IServiceScopeFactory>();
-        //    var mockScope = new Mock<IServiceScope>();
-        //    var mockServiceProvider = new Mock<IServiceProvider>();
-        //    mockScope.Setup(s => s.ServiceProvider).Returns(mockServiceProvider.Object);
-        //    mockServiceProvider.Setup(sp => sp.GetService(typeof(IReportScheduledManager))).Returns(new Mock<IReportScheduledManager>().Object);
-        //    mockServiceProvider.Setup(sp => sp.GetService(It.Is<Type>(t => t != typeof(IReportScheduledManager)))).Returns<Type>(t => scope.ServiceProvider.GetService(t));
-        //    mockScopeFactory.Setup(f => f.CreateScope()).Returns(mockScope.Object);
-        //    var reportScheduledManagerMock = mockServiceProvider.Object.GetService<IReportScheduledManager>();
-        //    Mock.Get(reportScheduledManagerMock).Setup(m => m.SingleOrDefaultAsync(It.IsAny<Expression<Func<ReportSchedule, bool>>>(), It.IsAny<CancellationToken>())).ReturnsAsync((ReportSchedule)null);
+            var consumeResult = new ConsumeResult<string, ValidationCompleteValue>
+            {
+                Message = new Message<string, ValidationCompleteValue>
+                {
+                    Key = facilityId,
+                    Value = value,
+                    Headers = headers
+                }
+            };
 
-        //    var listener = CreateListener(scope, mockScopeFactory);
+            await listener.ProcessMessageAsync(consumeResult, CancellationToken.None);
 
-        //    var consumeResult = CreateConsumeResult("TestFacility", "nonexistent", "Patient1", true);
+            using var verifyScope = _fixture.ScopeFactory.CreateScope();
+            var verifyEntryManager = verifyScope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+            var updatedEntry = await verifyEntryManager.SingleOrDefaultAsync(e => e.PatientId == patientId && e.ReportScheduleId == reportId);
 
-        //    var exception = await Assert.ThrowsAsync<DeadLetterException>(() => listener.ProcessMessageAsync(consumeResult, default));
-        //    Assert.Contains("No ReportSchedule found", exception.Message);
-        //}
+            Assert.Equal(ReportingStatus.FailedValidation, updatedEntry.ReportingStatus);
+            Assert.Equal(SubmissionStatus.Submitting, updatedEntry.SubmissionStatus);
 
-        //[Fact]
-        //public async Task ProcessMessageAsync_TimeoutException_ThrowsTimeoutException()
-        //{
-        //    using var scope = _fixture.ServiceProvider.CreateScope();
+            _fixture.SubmitPayloadKafkaProducerMock.Verify(
+                p => p.Produce(
+                    It.IsAny<string>(),
+                    It.Is<Message<SubmitPayloadKey, SubmitPayloadValue>>(m =>
+                        m.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry &&
+                        m.Value.PatientId == patientId),
+                    It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()),
+                Times.Once);
+        }
 
-        //    var mockScopeFactory = new Mock<IServiceScopeFactory>();
-        //    var mockScope = new Mock<IServiceScope>();
-        //    var mockServiceProvider = new Mock<IServiceProvider>();
-        //    mockScope.Setup(s => s.ServiceProvider).Returns(mockServiceProvider.Object);
-        //    mockServiceProvider.Setup(sp => sp.GetService(typeof(IReportScheduledManager))).Returns(new Mock<IReportScheduledManager>().Object);
-        //    mockServiceProvider.Setup(sp => sp.GetService(It.Is<Type>(t => t != typeof(IReportScheduledManager)))).Returns<Type>(t => scope.ServiceProvider.GetService(t));
-        //    mockScopeFactory.Setup(f => f.CreateScope()).Returns(mockScope.Object);
-        //    var reportScheduledManagerMock = mockServiceProvider.Object.GetService<IReportScheduledManager>();
-        //    Mock.Get(reportScheduledManagerMock).Setup(m => m.SingleOrDefaultAsync(It.IsAny<Expression<Func<ReportSchedule, bool>>>(), It.IsAny<CancellationToken>())).ThrowsAsync(new TimeoutException());
+        private async Task CreateAppendBlobForTest(string blobName)
+        {
+            var containerClient = new BlobContainerClient(_fixture.AzuriteConnectionString, "report-test-container");
+            var appendBlobClient = containerClient.GetAppendBlobClient(blobName);
 
-        //    var listener = CreateListener(scope, mockScopeFactory);
+            await appendBlobClient.CreateIfNotExistsAsync();
 
-        //    var consumeResult = CreateConsumeResult("TestFacility", "testid", "Patient1", true);
-
-        //    await Assert.ThrowsAsync<TimeoutException>(() => listener.ProcessMessageAsync(consumeResult, default));
-        //}
-
-        //[Fact]
-        //public async Task ProcessMessageAsync_GeneralException_ThrowsException()
-        //{
-        //    _fixture.ResetMocks();
-        //    //await _fixture.ClearDatabaseAsync();
-
-        //    using var scope = _fixture.ServiceProvider.CreateScope();
-
-        //    var mockScopeFactory = new Mock<IServiceScopeFactory>();
-        //    var mockScope = new Mock<IServiceScope>();
-        //    var mockServiceProvider = new Mock<IServiceProvider>();
-        //    mockScope.Setup(s => s.ServiceProvider).Returns(mockServiceProvider.Object);
-        //    mockServiceProvider.Setup(sp => sp.GetService(typeof(IReportScheduledManager))).Returns(new Mock<IReportScheduledManager>().Object);
-        //    mockServiceProvider.Setup(sp => sp.GetService(It.Is<Type>(t => t != typeof(IReportScheduledManager)))).Returns<Type>(t => scope.ServiceProvider.GetService(t));
-        //    mockScopeFactory.Setup(f => f.CreateScope()).Returns(mockScope.Object);
-        //    var reportScheduledManagerMock = mockServiceProvider.Object.GetService<IReportScheduledManager>();
-        //    Mock.Get(reportScheduledManagerMock).Setup(m => m.SingleOrDefaultAsync(It.IsAny<Expression<Func<ReportSchedule, bool>>>(), It.IsAny<CancellationToken>())).ThrowsAsync(new Exception("Test error"));
-
-        //    var listener = CreateListener(scope, mockScopeFactory);
-
-        //    var consumeResult = CreateConsumeResult("TestFacility", "testid", "Patient1", true);
-
-        //    var exception = await Assert.ThrowsAsync<Exception>(() => listener.ProcessMessageAsync(consumeResult, default));
-        //    Assert.Equal("Test error", exception.Message);
-        //}
+            string initialContent = "{\"resourceType\":\"Bundle\",\"id\":\"initial\"}\n";
+            var bytes = Encoding.UTF8.GetBytes(initialContent);
+            using var stream = new MemoryStream(bytes);
+            await appendBlobClient.AppendBlockAsync(stream);
+        }
     }
 }
