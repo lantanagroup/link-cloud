@@ -1,4 +1,3 @@
-using System.Reflection;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using Hl7.Fhir.Serialization;
@@ -45,14 +44,10 @@ using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Serializers;
 using MongoDB.Driver;
 using Quartz;
-using Reddoxx.Quartz.MongoDbJobStore.Locking;
-using Reddoxx.Quartz.MongoDbJobStore.Redlock;
 using Serilog;
 using Serilog.Enrichers.Span;
-using Serilog.Events;
 using Serilog.Exceptions;
-using StackExchange.Redis.Extensions.Core.Configuration;
-using StackExchange.Redis.Extensions.System.Text.Json;
+using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
@@ -276,13 +271,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         c.DocumentFilter<HealthChecksFilter>();
     });
 
-    // Add Redis
-    var redisConfiguration = new RedisConfiguration
-    {
-        ConnectionString = $"{builder.Configuration.GetConnectionString("Redis")},password={builder.Configuration["Redis:Password"]}",
-    };
-    builder.Services.AddStackExchangeRedisExtensions<SystemTextJsonSerializer>(new[] { redisConfiguration });
-
     // Add Quartz schedulers
     // 1. MongoDB scheduler
     builder.Services.AddQuartz();
@@ -327,7 +315,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
-    builder.Services.AddSingleton<IQuartzJobStoreLockingManager, DistributedLocksQuartzLockingManager>();
 
     // Exception Handling
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, GenerateReportValue>, DeadLetterExceptionHandler<string, GenerateReportValue>>();
