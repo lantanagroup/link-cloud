@@ -21,6 +21,7 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using System.Net;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using StringComparison = System.StringComparison;
@@ -601,6 +602,38 @@ public class PatientDataService : IPatientDataService
                 }, cancellationToken);
             }
         }
+        catch (OpOutcomeException ex)
+        {
+            _logger.LogWarning(ex, "OperationOutcome encountered for facility {FacilityId}", log.FacilityId.Sanitize());
+
+            log.Notes ??= new List<string>();
+
+            if (ex.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Gone)
+            {
+                log.Status = RequestStatus.Completed;
+                log.CompletionDate = DateTime.UtcNow;
+            }
+            else
+            {
+                log.RetryAttempts ??= 0;
+                log.RetryAttempts++;
+                log.Status = RequestStatus.Failed;
+                log.Notes.Add($"[{DateTime.UtcNow}] OperationOutcome encountered (HTTP {ex.StatusCode}): Retrying. Attempt {log.RetryAttempts}.");
+            }
+
+            await _dataAcquisitionLogQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
+            {
+                Id = log.Id,
+                RetryAttempts = log.RetryAttempts,
+                ResourceAcquiredIds = log.ResourceAcquiredIds,
+                CompletionDate = log.CompletionDate,
+                CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                TraceId = log.TraceId,
+                ExecutionDate = log.ExecutionDate,
+                Notes = log.Notes,
+                Status = log.Status,
+            }, cancellationToken);
+        }
         catch (ProcessingDelayException ex)
         {
             log!.Notes ??= new List<string>();
@@ -632,7 +665,7 @@ public class PatientDataService : IPatientDataService
             log.RetryAttempts ??= 0;
 
             log.ExecutionDate = DateTime.UtcNow.Add(ex.RetryAfter);
-            log.Status = RequestStatus.Pending; //Don't count this as a failure
+            log.Status = RequestStatus.Failed; //Don't count this as a failure
             log.Notes.Add(
                 $"[{DateTime.UtcNow}] Throttled (429): Retrying after {ex.RetryAfter.TotalSeconds}s. Attempt {log.RetryAttempts}.");
 
