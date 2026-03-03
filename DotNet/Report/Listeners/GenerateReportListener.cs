@@ -28,7 +28,6 @@ namespace LantanaGroup.Link.Report.Listeners
 {
     public class GenerateReportListener : BackgroundService
     {
-
         private readonly ILogger<GenerateReportListener> _logger;
         private readonly IKafkaConsumerFactory<string, GenerateReportValue> _kafkaConsumerFactory;
         private readonly ITransientExceptionHandler<string, GenerateReportValue> _transientExceptionHandler;
@@ -67,12 +66,8 @@ namespace LantanaGroup.Link.Report.Listeners
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
 
-            _transientExceptionHandler = transientExceptionHandler ??
-                                               throw new ArgumentException(nameof(_deadLetterExceptionHandler));
-
-            _deadLetterExceptionHandler = deadLetterExceptionHandler ??
-                                               throw new ArgumentException(nameof(_deadLetterExceptionHandler));
-
+            _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
+            _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
             _transientExceptionHandler.Topic = nameof(KafkaTopic.GenerateReportRequested) + "-Retry";
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.GenerateReportRequested) + "-Error";
@@ -91,7 +86,6 @@ namespace LantanaGroup.Link.Report.Listeners
         {
             return Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
         }
-
 
         private async Task StartConsumerLoop(CancellationToken cancellationToken)
         {
@@ -117,137 +111,148 @@ namespace LantanaGroup.Link.Report.Listeners
                     {
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
-                            if (result == null)
+                            await ProcessMessageAsync(result, consumeCancellationToken);
+                            consumer.Commit(result);
+                        }, cancellationToken);
+
+                    }
+                    catch (ConsumeException ex)
+                    {
+                        _logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+
+                        if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
+                        {
+                            throw new OperationCanceledException(ex.Error.Reason, ex);
+                        }
+
+                        facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
+
+                        _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
+
+                        var offset = ex.ConsumerRecord?.TopicPartitionOffset;
+                        consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error encountered in GenerateReportListener");
+                        consumer.Commit();
+                    }
+                }
+            }
+            catch (OperationCanceledException oce)
+            {
+                _logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
+                consumer.Close();
+                consumer.Dispose();
+            }
+        }
+
+        public async Task ProcessMessageAsync(ConsumeResult<string, GenerateReportValue> result, CancellationToken cancellationToken)
+        {
+            string facilityId = string.Empty;
+            try
+            {
+                if (result == null)
+                {
+                    return;
+                }
+
+                var reportScheduledManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportScheduledManager>();
+                var reportEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportEntryManager>();
+
+                var key = result.Message.Key;
+                var value = result.Message.Value;
+                var startDate = value.StartDate;
+                var endDate = value.EndDate;
+                var reportTypes = value.ReportTypes;
+                var reportId = value.ReportId ?? Guid.NewGuid().ToString();
+
+                facilityId = key;
+
+                if (string.IsNullOrWhiteSpace(facilityId))
+                {
+                    throw new DeadLetterException($"{Name}: FacilityId is null or empty.");
+                }
+
+                if (value is { Regenerate: true, ReportId: not null })
+                {
+                    var existing = await reportScheduledManager.SingleOrDefaultAsync(x => x.Id == value.ReportId, cancellationToken);
+
+                    if (existing == null)
+                    {
+                        throw new DeadLetterException("No ReportSchedule found for the provided ID: " + HtmlInputSanitizer.Sanitize(value.ReportId));
+                    }
+
+                    startDate = existing.ReportStartDate;
+                    endDate = existing.ReportEndDate;
+                    reportTypes = existing.ReportTypes;
+                }
+                else
+                {
+                    if (reportTypes == null || reportTypes.Count == 0)
+                    {
+                        throw new DeadLetterException($"{Name}: ReportTypes is null or empty.");
+                    }
+
+                    if (startDate == null || endDate == null)
+                    {
+                        throw new DeadLetterException("Start and End dates must be provided.");
+                    }
+                    if (endDate <= startDate)
+                    {
+                        throw new DeadLetterException("End date must be after start date.");
+                    }
+                }
+
+                startDate = new DateTime(startDate.Value.Year, startDate.Value.Month, startDate.Value.Day, startDate.Value.Hour, startDate.Value.Minute, startDate.Value.Second, DateTimeKind.Utc);
+                endDate = new DateTime(endDate.Value.Year, endDate.Value.Month, endDate.Value.Day, endDate.Value.Hour, endDate.Value.Minute, endDate.Value.Second, DateTimeKind.Utc);
+
+                bool isCensus = !value.Regenerate && (value.PatientIds == null || value.PatientIds.Count == 0);
+
+                var reportSchedule = new ReportSchedule
+                {
+                    Id = value.AdhocReportId,
+                    FacilityId = facilityId,
+                    ReportStartDate = startDate.Value,
+                    ReportEndDate = endDate.Value,
+                    Frequency = Frequency.Adhoc,
+                    AdHocType = isCensus ? AdHocType.Census : AdHocType.Manual,
+                    ReportTypes = reportTypes,
+                    EndOfReportPeriodJobHasRun = true,
+                    EnableSubmission = !value.BypassSubmission,
+                    CreateDate = DateTime.UtcNow
+                };
+                var reportName = _blobStorageService.GetReportName(reportSchedule);
+                reportSchedule.PayloadRootUri = _blobStorageService.GetUri(reportName)?.ToString();
+
+                await reportScheduledManager.AddAsync(reportSchedule, cancellationToken);
+
+                if (value.Regenerate)
+                {
+                    var scheduledReports = await reportEntryManager.FindAsync(p => p.ReportScheduleId == reportId, cancellationToken);
+                    var patientEntries = scheduledReports.Select(p => p.PatientId).Distinct();
+
+                    foreach (var p in patientEntries)
+                    {
+                        var newEntry = new ReportEntry()
+                        {
+                            PatientId = p,
+                            ReportingStatus = ReportingStatus.PatientIdentified,
+                            ReportScheduleId = reportSchedule.Id,
+                            FacilityId = facilityId,
+                            CreateDate = DateTime.UtcNow
+                        };
+
+                        foreach (var reportType in reportTypes)
+                        {
+                            newEntry.MeasureReportList.Add(new EvaluatedMeasureReport()
                             {
-                                consumer.Commit();
-                                return;
-                            }
+                                Status = MeasureReportStatus.EntryCreated,
+                                ReportType = reportType
+                            });
+                        }
 
-                            var reportScheduledManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportScheduledManager>();
-                            var reportEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportEntryManager>();
-
-                            try
-                            {
-                                var key = result.Message.Key;
-                                var value = result.Message.Value;
-                                var startDate = value.StartDate;
-                                var endDate = value.EndDate;
-                                var reportTypes = value.ReportTypes;
-                                var reportId = value.ReportId ?? Guid.NewGuid().ToString();
-
-                                facilityId = key;
-
-                                if (string.IsNullOrWhiteSpace(facilityId))
-                                {
-                                    throw new DeadLetterException(
-                                        $"{Name}: FacilityId is null or empty.");
-                                }
-
-                                //If we are re-running an existing report, fetch the details from the database and replace the Values retrieved from the message
-                                if (value is { Regenerate: true, ReportId: not null })
-                                {
-                                    _logger.LogDebug(
-                                        "Finding existing report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, value.ReportId, DateTime.UtcNow);
-                                    var existing = await reportScheduledManager.SingleOrDefaultAsync(x => x.Id == value.ReportId, consumeCancellationToken);
-
-                                    if (existing == null)
-                                    {
-                                        throw new DeadLetterException("No ReportSchedule found for the provided ID: " + HtmlInputSanitizer.Sanitize(value.ReportId));
-                                    }
-
-                                    startDate = existing.ReportStartDate;
-                                    endDate = existing.ReportEndDate;
-                                    reportTypes = existing.ReportTypes;
-                                }
-                                else //Otherwise validate the values from the message
-                                {
-                                    if (reportTypes == null || reportTypes.Count == 0)
-                                    {
-                                        throw new DeadLetterException(
-                                            $"{Name}: ReportTypes is null or empty.");
-                                    }
-
-                                    if (startDate == null || endDate == null)
-                                    {
-                                        throw new DeadLetterException("Start and End dates must be provided.");
-                                    }
-                                    if (endDate <= startDate)
-                                    {
-                                        throw new DeadLetterException("End date must be after start date.");
-                                    }
-                                }
-
-                                startDate = new DateTime(
-                                    startDate.Value.Year,
-                                    startDate.Value.Month,
-                                    startDate.Value.Day,
-                                    startDate.Value.Hour,
-                                    startDate.Value.Minute,
-                                    startDate.Value.Second,
-                                    DateTimeKind.Utc
-                                );
-
-                                endDate = new DateTime(
-                                    endDate.Value.Year,
-                                    endDate.Value.Month,
-                                    endDate.Value.Day,
-                                    endDate.Value.Hour,
-                                    endDate.Value.Minute,
-                                    endDate.Value.Second,
-                                    DateTimeKind.Utc
-                                );
-
-                                bool isCensus = !value.Regenerate && (value.PatientIds == null || value.PatientIds.Count == 0);
-                                
-                                // Create ReportSchedule for AdHoc Report
-                                var reportSchedule = new ReportSchedule
-                                {
-                                    Id = value.AdhocReportId,
-                                    FacilityId = facilityId,
-                                    ReportStartDate = startDate.Value,
-                                    ReportEndDate = endDate.Value,
-                                    Frequency = Frequency.Adhoc,
-                                    AdHocType = isCensus ? AdHocType.Census : AdHocType.Manual,
-                                    ReportTypes = reportTypes,
-                                    EndOfReportPeriodJobHasRun = true,
-                                    EnableSubmission = !value.BypassSubmission,
-                                    CreateDate = DateTime.UtcNow
-                                };
-                                var reportName = _blobStorageService.GetReportName(reportSchedule);
-                                reportSchedule.PayloadRootUri = _blobStorageService.GetUri(reportName)?.ToString();
-
-                                await reportScheduledManager.AddAsync(reportSchedule, cancellationToken);
-                                
-                                if (value.Regenerate)
-                                {
-                                    _logger.LogInformation("Re-generating report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, reportId, DateTime.UtcNow);
-
-                                    var scheduledReports = await reportEntryManager.FindAsync(p => p.ReportScheduleId == reportId, cancellationToken);
-                                    var patientEntries = scheduledReports.Select(p => p.PatientId).Distinct();
-
-                                    _logger.LogDebug("Found {PatientCount} patients to re-generate for facility {FacilityId} from {StartDate} to {EndDate} with ID {ReportId}", patientEntries.Count(), facilityId, startDate, endDate, reportId);
-
-                                    foreach (var p in patientEntries)
-                                    {
-                                        var newEntry = new ReportEntry()
-                                        {
-                                            PatientId = p,
-                                            ReportingStatus = ReportingStatus.PatientIdentified,
-                                            ReportScheduleId = reportSchedule.Id,
-                                            FacilityId = facilityId,
-                                            CreateDate = DateTime.UtcNow
-                                        };
-
-                                        foreach (var reportType in reportTypes)
-                                        {
-                                            newEntry.MeasureReportList.Add(new EvaluatedMeasureReport()
-                                            {
-                                                Status = MeasureReportStatus.EntryCreated,
-                                                ReportType = reportType
-                                            });
-                                        }
-
-                                        await reportEntryManager.AddAsync(newEntry, cancellationToken);
+                        await reportEntryManager.AddAsync(newEntry, cancellationToken);
 
                                         try
                                         {
@@ -285,96 +290,49 @@ namespace LantanaGroup.Link.Report.Listeners
                                             await GetPatientList(facilityId, startDate.Value, endDate.Value);
                                     }
 
-                                    _logger.LogDebug("Found {PatientCount} patients to re-generate for facility {FacilityId} from {StartDate} to {EndDate}", value.PatientIds.Count, facilityId, startDate, endDate);
-
-                                    foreach (var patient in value.PatientIds)
-                                    {
-                                        var newEntry = new ReportEntry()
-                                        {
-                                            PatientId = patient,
-                                            ReportingStatus = ReportingStatus.PatientIdentified,
-                                            ReportScheduleId = reportSchedule.Id,
-                                            FacilityId = facilityId,
-                                            CreateDate = DateTime.UtcNow
-                                        };
-
-                                        //For each patient and report type, Create Submission Entries for each Patient and Report Type
-                                        foreach (var reportType in reportTypes)
-                                        {
-                                            newEntry.MeasureReportList.Add(new EvaluatedMeasureReport()
-                                            {
-                                                Status = MeasureReportStatus.EntryCreated,
-                                                ReportType = reportType
-                                            });
-                                        }
-
-                                        await reportEntryManager.AddAsync(newEntry, cancellationToken);
-                                    }
-
-                                    try
-                                    {
-                                        //Submit a Data Acquisition Request for each patient
-                                        await _dataAcqProducer.Produce(reportSchedule, value.PatientIds);
-                                    }
-                                    catch (ProduceException<string, DataAcquisitionRequestedValue> ex)
-                                    {
-                                        _logger.LogError(ex, "An error was encountered generating a Data Acquisition Requested event.\n\tFacilityId: {facilityId}\n\t", facilityId);
-                                    }
-                                }
-                            }
-                            catch (DeadLetterException ex)
-                            {
-                                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
-                            }
-                            catch (TransientException ex)
-                            {
-                                _transientExceptionHandler.HandleException(result, ex, facilityId);
-                            }
-                            catch (TimeoutException ex)
-                            {
-                                var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [{string.Join(", ", consumer.Subscription)}] at offset: {result.TopicPartitionOffset}";
-                                var transientException = new TransientException(exceptionMessage, ex);
-                                _transientExceptionHandler.HandleException(result, transientException, facilityId);
-                            }
-                            catch (Exception ex)
-                            {
-                                _transientExceptionHandler.HandleException(result, ex, facilityId);
-                            }
-                            finally
-                            {
-                                consumer.Commit(result);
-                            }
-                        }, cancellationToken);
-
-                    }
-                    catch (ConsumeException ex)
+                    foreach (var patient in value.PatientIds)
                     {
-                        _logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
-
-                        if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
+                        var newEntry = new ReportEntry()
                         {
-                            throw new OperationCanceledException(ex.Error.Reason, ex);
+                            PatientId = patient,
+                            ReportingStatus = ReportingStatus.PatientIdentified,
+                            ReportScheduleId = reportSchedule.Id,
+                            FacilityId = facilityId,
+                            CreateDate = DateTime.UtcNow
+                        };
+
+                        foreach (var reportType in reportTypes)
+                        {
+                            newEntry.MeasureReportList.Add(new EvaluatedMeasureReport()
+                            {
+                                Status = MeasureReportStatus.EntryCreated,
+                                ReportType = reportType
+                            });
                         }
 
-                        facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
-
-                        _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
-
-                        var offset = ex.ConsumerRecord?.TopicPartitionOffset;
-                        consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
+                        await reportEntryManager.AddAsync(newEntry, cancellationToken);
                     }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error encountered in GenerateReportListener");
-                        consumer.Commit();
-                    }
+
+                    await _dataAcqProducer.Produce(reportSchedule, value.PatientIds);
                 }
             }
-            catch (OperationCanceledException oce)
+            catch (DeadLetterException ex)
             {
-                _logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
-                consumer.Close();
-                consumer.Dispose();
+                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
+            }
+            catch (TransientException ex)
+            {
+                _transientExceptionHandler.HandleException(result, ex, facilityId);
+            }
+            catch (TimeoutException ex)
+            {
+                var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [GenerateReportRequested] at offset: {result.TopicPartitionOffset}";
+                var transientException = new TransientException(exceptionMessage, ex);
+                _transientExceptionHandler.HandleException(result, transientException, facilityId);
+            }
+            catch (Exception ex)
+            {
+                _transientExceptionHandler.HandleException(result, ex, facilityId);
             }
         }
 
@@ -390,7 +348,6 @@ namespace LantanaGroup.Link.Report.Listeners
 
             if (!_linkBearerServiceOptions.Value.AllowAnonymous)
             {
-                //Add link token
                 var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 5);
                 httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
@@ -403,19 +360,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 throw new TransientException("Response from Census service is not successful: " + censusContent);
 
             List? admittedPatients;
-            try
-            {
-                admittedPatients =
-                    JsonSerializer.Deserialize<List>(
-                        censusContent,
-                        LinkFhirSerializerOptions.ForFhirLenientSerialization);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error deserializing admitted patients from Census service response.");
-                _logger.LogDebug("Census service response: {CensusContent}", censusContent);
-                throw new TransientException("Error deserializing admitted patients from Census service response: " + ex.Message + Environment.NewLine + ex.StackTrace, ex.InnerException);
-            }
+            admittedPatients = JsonSerializer.Deserialize<List>(censusContent, LinkFhirSerializerOptions.ForFhirLenientSerialization);
 
             return admittedPatients?.Entry?.Select(p => p.Item.Reference.Split('/').Last()).Distinct().ToList() ?? new List<string>();
         }

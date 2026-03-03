@@ -1,6 +1,4 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Report.Domain;
-using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
