@@ -20,11 +20,11 @@ variables:
 
 parameters:
 - name: previous_release
-  displayName: "What is the Tag of the Previous Release? (i.e. : v0.2.0-beta.1)"
+  displayName: "What is the Tag or Commit SHA of the Previous Release? (i.e. : v0.2.0-beta.1)"
   type: string
 
 - name: current_release
-  displayName: "What is the Tag of the Current Release? (i.e. : v0.2.0-beta.2)"
+  displayName: "What is the Tag or Commit SHA of the Current Release? (i.e. : v0.2.0-beta.2)"
   type: string
 
 #####################
@@ -360,7 +360,7 @@ stages:
         displayName: Apply Account DB Schema
         inputs:
           azureSubscription: "NHSNLink Resource Manager"
-          ServerName: 'link-db.database.windows.net'
+          ServerName: '$(link-db_server)'
           DatabaseName: 'link-test-botw-account'
           SqlUsername: '$(link-db_username)'
           SqlPassword: '$(link-db_pass)'
@@ -378,7 +378,7 @@ stages:
         displayName: Apply audit DB Schema
         inputs:
           azureSubscription: "NHSNLink Resource Manager"
-          ServerName: 'link-db.database.windows.net'
+          ServerName: '$(link-db_server)'
           DatabaseName: 'link-test-botw-audit'
           SqlUsername: '$(link-db_username)'
           SqlPassword: '$(link-db_pass)'
@@ -396,7 +396,7 @@ stages:
         displayName: Apply census DB Schema
         inputs:
           azureSubscription: "NHSNLink Resource Manager"
-          ServerName: 'link-db.database.windows.net'
+          ServerName: '$(link-db_server)'
           DatabaseName: 'link-test-botw-census'
           SqlUsername: '$(link-db_username)'
           SqlPassword: '$(link-db_pass)'
@@ -414,7 +414,7 @@ stages:
         displayName: Apply data DB Schema
         inputs:
           azureSubscription: "NHSNLink Resource Manager"
-          ServerName: 'link-db.database.windows.net'
+          ServerName: '$(link-db_server)'
           DatabaseName: 'link-test-botw-data'
           SqlUsername: '$(link-db_username)'
           SqlPassword: '$(link-db_pass)'
@@ -432,7 +432,7 @@ stages:
         displayName: Apply normalization DB Schema
         inputs:
           azureSubscription: "NHSNLink Resource Manager"
-          ServerName: 'link-db.database.windows.net'
+          ServerName: '$(link-db_server)'
           DatabaseName: 'link-test-botw-normalization'
           SqlUsername: '$(link-db_username)'
           SqlPassword: '$(link-db_pass)'
@@ -450,7 +450,7 @@ stages:
         displayName: Apply querydispatch DB Schema
         inputs:
           azureSubscription: "NHSNLink Resource Manager"
-          ServerName: 'link-db.database.windows.net'
+          ServerName: '$(link-db_server)'
           DatabaseName: 'link-test-botw-querydispatch'
           SqlUsername: '$(link-db_username)'
           SqlPassword: '$(link-db_pass)'
@@ -468,7 +468,7 @@ stages:
         displayName: Apply submission DB Schema
         inputs:
           azureSubscription: "NHSNLink Resource Manager"
-          ServerName: 'link-db.database.windows.net'
+          ServerName: '$(link-db_server)'
           DatabaseName: 'link-test-botw-submission'
           SqlUsername: '$(link-db_username)'
           SqlPassword: '$(link-db_pass)'
@@ -486,7 +486,7 @@ stages:
         displayName: Apply tenant DB Schema
         inputs:
           azureSubscription: "NHSNLink Resource Manager"
-          ServerName: 'link-db.database.windows.net'
+          ServerName: '$(link-db_server)'
           DatabaseName: 'link-test-botw-tenant'
           SqlUsername: '$(link-db_username)'
           SqlPassword: '$(link-db_pass)'
@@ -504,7 +504,7 @@ stages:
         displayName: Apply validation DB Schema
         inputs:
           azureSubscription: "NHSNLink Resource Manager"
-          ServerName: 'link-db.database.windows.net'
+          ServerName: '$(link-db_server)'
           DatabaseName: 'link-test-botw-validation'
           SqlUsername: '$(link-db_username)'
           SqlPassword: '$(link-db_pass)'
@@ -536,7 +536,7 @@ stages:
         displayName: Apply Account DB Schema
         inputs:
           azureSubscription: "NHSNLink Resource Manager"
-          ServerName: 'link-db.database.windows.net'
+          ServerName: '$(link-db_server)'
           DatabaseName: 'link-qa-botw-account'
           SqlUsername: '$(link-db_username)'
           SqlPassword: '$(link-db_pass)'
@@ -554,7 +554,7 @@ stages:
         displayName: Apply audit DB Schema
         inputs:
           azureSubscription: "NHSNLink Resource Manager"
-          ServerName: 'link-db.database.windows.net'
+          ServerName: '$(link-db_server)'
           DatabaseName: 'link-qa-botw-audit'
           SqlUsername: '$(link-db_username)'
           SqlPassword: '$(link-db_pass)'
@@ -572,7 +572,7 @@ stages:
         displayName: Apply census DB Schema
         inputs:
           azureSubscription: "NHSNLink Resource Manager"
-          ServerName: 'link-db.database.windows.net'
+          ServerName: '$(link-db_server)'
           DatabaseName: 'link-qa-botw-census'
           SqlUsername: '$(link-db_username)'
           SqlPassword: '$(link-db_pass)'
@@ -590,7 +590,7 @@ stages:
         displayName: Apply data DB Schema
         inputs:
           azureSubscription: "NHSNLink Resource Manager"
-          ServerName: 'link-db.database.windows.net'
+          ServerName: '$(link-db_server)'
           DatabaseName: 'link-qa-botw-data'
           SqlUsername: '$(link-db_username)'
           SqlPassword: '$(link-db_pass)'
@@ -608,7 +608,7 @@ stages:
         displayName: Apply normalization DB Schema
         inputs:
           azureSubscription: "NHSNLink Resource Manager"
-          ServerName: 'link-db.database.windows.net'
+          ServerName: '$(link-db_server)'
           DatabaseName: 'link-qa-botw-normalization'
           SqlUsername: '$(link-db_username)'
           SqlPassword: '$(link-db_pass)'
@@ -626,7 +626,7 @@ stages:
         displayName: Apply querydispatch DB Schema
         inputs:
           azureSubscription: "NHSNLink Resource Manager"
-          ServerName: 'link-db.database.windows.net'
+          ServerName: '$(link-db_server)'
           DatabaseName: 'link-qa-botw-querydispatch'
           SqlUsername: '$(link-db_username)'
           SqlPassword: '$(link-db_pass)'
@@ -644,7 +644,7 @@ stages:
         displayName: Apply submission DB Schema
         inputs:
           azureSubscription: "NHSNLink Resource Manager"
-          ServerName: 'link-db.database.windows.net'
+          ServerName: '$(link-db_server)'
           DatabaseName: 'link-qa-botw-submission'
           SqlUsername: '$(link-db_username)'
           SqlPassword: '$(link-db_pass)'
@@ -662,7 +662,7 @@ stages:
         displayName: Apply tenant DB Schema
         inputs:
           azureSubscription: "NHSNLink Resource Manager"
-          ServerName: 'link-db.database.windows.net'
+          ServerName: '$(link-db_server)'
           DatabaseName: 'link-qa-botw-tenant'
           SqlUsername: '$(link-db_username)'
           SqlPassword: '$(link-db_pass)'
@@ -680,7 +680,7 @@ stages:
         displayName: Apply validation DB Schema
         inputs:
           azureSubscription: "NHSNLink Resource Manager"
-          ServerName: 'link-db.database.windows.net'
+          ServerName: '$(link-db_server)'
           DatabaseName: 'link-qa-botw-validation'
           SqlUsername: '$(link-db_username)'
           SqlPassword: '$(link-db_pass)'
