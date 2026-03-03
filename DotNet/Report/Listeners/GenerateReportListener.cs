@@ -290,7 +290,9 @@ namespace LantanaGroup.Link.Report.Listeners
                                             await GetPatientList(facilityId, startDate.Value, endDate.Value);
                                     }
 
-                    foreach (var patient in value.PatientIds)
+                    var patientIds = value.PatientIds.Distinct().ToList();
+
+                    foreach (var patient in patientIds)
                     {
                         var newEntry = new ReportEntry()
                         {
@@ -313,7 +315,7 @@ namespace LantanaGroup.Link.Report.Listeners
                         await reportEntryManager.AddAsync(newEntry, cancellationToken);
                     }
 
-                    await _dataAcqProducer.Produce(reportSchedule, value.PatientIds);
+                    await _dataAcqProducer.Produce(reportSchedule, patientIds);
                 }
             }
             catch (DeadLetterException ex)
