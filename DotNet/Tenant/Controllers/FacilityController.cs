@@ -358,7 +358,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             if (existingModel == null)
             {
-                return BadRequest($"Facility with Id: {facilityId} Not Found");
+                return NotFound($"Facility with Id: {facilityId} Not Found");
             }
 
             try
@@ -394,7 +394,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             var existingModel = await _facilityQueries.GetAsync(facilityId, null, cancellationToken);
             if (existingModel == null)
-                return BadRequest($"Facility with Id: {facilityId} Not Found");
+                return NotFound($"Facility with Id: {facilityId} Not Found");
 
             try
             {
@@ -437,7 +437,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             var existingModel = await _facilityQueries.GetAsync(facilityId, null, cancellationToken, includeDeleted: true);
             if (existingModel == null)
-                return BadRequest($"Facility with Id: {facilityId} Not Found");
+                return NotFound($"Facility with Id: {facilityId} Not Found");
 
             try
             {
@@ -478,7 +478,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             if (string.IsNullOrEmpty(facilityId) ||
                 await _facilityQueries.GetAsync(facilityId, null, CancellationToken.None) == null)
             {
-                return BadRequest("Facility does not exist.");
+                return NotFound("Facility does not exist.");
             }
 
             if (request.ReportTypes == null || request.ReportTypes.Count == 0)
@@ -572,7 +572,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             if (string.IsNullOrEmpty(facilityId) ||
                 await _facilityQueries.GetAsync(facilityId, null, CancellationToken.None) == null)
             {
-                return BadRequest("Facility does not exist.");
+                return NotFound("Facility does not exist.");
             }
 
             if (string.IsNullOrEmpty(request.ReportId))
