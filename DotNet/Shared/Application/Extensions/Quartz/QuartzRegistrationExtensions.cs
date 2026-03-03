@@ -25,6 +25,7 @@ public static class QuartzRegistrationExtensions
                     sqlServerOptions.TablePrefix = "quartz.QRTZ_";
                 });
                 c.UseSystemTextJsonSerializer();
+                c.UseClustering();
             });
         });
     }
