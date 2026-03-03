@@ -11,6 +11,7 @@ parameters:
 - name: environment
   displayName: Select the Kafka Topics environment to update?
   type: string
+  default: DEV
   values:
     - DEV
     - TEST
