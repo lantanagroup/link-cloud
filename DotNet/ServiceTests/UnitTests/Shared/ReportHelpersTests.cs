@@ -1,6 +1,6 @@
 ﻿using LantanaGroup.Link.Shared.Application.Utilities;
 
-namespace ServiceTests.UnitTests.Shared
+namespace UnitTests.Shared
 {
     public class ReportHelpersTests
     {

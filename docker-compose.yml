@@ -169,12 +169,13 @@ services:
     depends_on:
       mssql:
         condition: service_healthy
-        
     networks:
       - link-nw
-      
+
+  # MongoDB as a single-node replica set (required for Quartz transactions)
   mongo:
     image: mongo:6-jammy
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
     ports:
       - '17017:27017'
     container_name: mongo
@@ -187,8 +188,26 @@ services:
       interval: 5s
       timeout: 5s
       retries: 3
-      start_period: 5s
+      start_period: 10s
 
+  mongo_init:
+    image: mongo:6-jammy
+    container_name: mongo-init
+    depends_on:
+      mongo:
+        condition: service_healthy
+    command: >
+      bash -c '
+        sleep 10 &&
+        mongosh --host mongo:27017 --eval "
+          rs.initiate({
+            _id: \"rs0\",
+            members: [{ _id: 0, host: \"mongo:27017\" }]
+          })
+        "
+      '
+    networks:
+      - link-nw
       
   ###########################################
   ### Telemetry
@@ -710,7 +729,6 @@ services:
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       InternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
       InternalBlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
-      Redis__Password: ${REDIS_PASS}
     ports:
       - "8072:8072"
     build:
@@ -725,6 +743,8 @@ services:
         condition: service_completed_successfully
       mongo:
         condition: service_healthy
+      mongo_init:
+        condition: service_completed_successfully
       otel-collector:
         condition: service_started
       loki:

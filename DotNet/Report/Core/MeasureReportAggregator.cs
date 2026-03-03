@@ -1,14 +1,7 @@
-﻿using Azure.Messaging.EventGrid.SystemEvents;
-using Azure.Storage.Blobs;
-using Azure.Storage.Blobs.Specialized;
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.Report.Application.Options;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Entities;
-using LantanaGroup.Link.Report.Services;
-using Microsoft.Extensions.Options;
-using Serilog;
 using System.Collections.Immutable;
 
 namespace LantanaGroup.Link.Report.Core;

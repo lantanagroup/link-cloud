@@ -44,7 +44,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _auditableEventOccurredProducer = auditableEventOccurredProducer;
         }
 
-        public async Task<List<Resource>> Generate(ReportSchedule schedule)
+        public virtual async Task<List<Resource>> Generate(ReportSchedule schedule)
         {
             var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
             var reportEntries = await database.ReportEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
@@ -96,7 +96,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             return manifestResources;
         }
 
-        public async Task<Bundle> GenerateAsBundle(ReportSchedule schedule)
+        public virtual async Task<Bundle> GenerateAsBundle(ReportSchedule schedule)
         {
             List<Resource> resources = await Generate(schedule);
             Bundle bundle = new()
@@ -112,7 +112,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             return bundle;
         }
 
-        public async Task<bool> Produce(ReportSchedule schedule, string correlationId = null)
+        public virtual async Task<bool> Produce(ReportSchedule schedule, string correlationId = null)
         {
             if (!schedule.EndOfReportPeriodJobHasRun) {
                 return false;
