@@ -217,7 +217,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
     }
 
     [Fact]
-    public async Task GetTailingMessages_WithMixedStatusesIncludingOpOutcome_ReturnsTailingMessage()
+    public async Task GetTailingMessages_WithMixedStatusesIncludingCompletedOpOutcome_ReturnsTailingMessage()
     {
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
@@ -259,7 +259,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         };
         dbContext.DataAcquisitionLogs.Add(log1);
 
-        // Log 2: Inoperable
+        // Log 2: Completed (used to be Inoperable)
         var log2 = new DataAcquisitionLog
         {
             FhirVersion = "test",
@@ -267,7 +267,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             FacilityId = facilityId,
             CorrelationId = correlationId,
             ReportTrackingId = reportTrackingId,
-            Status = RequestStatus.Inoperable,
+            Status = RequestStatus.Completed,
             TailSent = false,
             QueryPhase = QueryPhase.Initial,
             PatientId = "Patient/123",
@@ -295,7 +295,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
     }
 
     [Fact]
-    public async Task GetCountOfNonRefLogsIncompleteAsync_WithInoperable_ReturnsCorrectCount()
+    public async Task GetCountOfNonRefLogsIncompleteAsync_WithCompleted_ReturnsCorrectCount()
     {
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
@@ -309,7 +309,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var facilityId = "TestFacility";
         var reportTrackingId = "TestReportId";
 
-        // Add log with Inoperable status (should be considered complete)
+        // Add log with Completed status (should be considered complete)
         var log1 = new DataAcquisitionLog
         {
             FhirVersion = "test",
@@ -317,7 +317,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             FacilityId = facilityId,
             CorrelationId = correlationId,
             ReportTrackingId = reportTrackingId,
-            Status = RequestStatus.Inoperable,
+            Status = RequestStatus.Completed,
             TailSent = false,
             FhirQueries = new List<FhirQuery>
             {
@@ -356,7 +356,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
     }
 
     [Fact]
-    public async Task GetTailingMessages_WithInoperable_ReturnsEligibleTailingMessages()
+    public async Task GetTailingMessages_WithCompleted_ReturnsEligibleTailingMessages()
     {
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
@@ -380,7 +380,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var startDate = DateTime.UtcNow.AddDays(-1);
         var endDate = DateTime.UtcNow;
 
-        // Add log with Inoperable status
+        // Add log with Completed status
         var log1 = new DataAcquisitionLog
         {
             FhirVersion = "test",
@@ -388,7 +388,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             FacilityId = facilityId,
             CorrelationId = correlationId,
             ReportTrackingId = reportTrackingId,
-            Status = RequestStatus.Inoperable,
+            Status = RequestStatus.Completed,
             TailSent = false,
             QueryPhase = QueryPhase.Initial,
             PatientId = "Patient/123",
@@ -406,7 +406,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var result = await queries.GetTailingMessages();
 
         // Assert
-        // The log with Inoperable should be considered finished
+        // The log with Completed should be considered finished
         Assert.Single(result);
         var message = result.First();
         Assert.Equal(facilityId, message.FacilityId);
@@ -964,7 +964,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
     }
 
     [Fact]
-    public async Task GetDataAcquisitionLogStatisticsByReportAsync_IncludesInoperable()
+    public async Task GetDataAcquisitionLogStatisticsByReportAsync_IncludesCompleted()
     {
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
@@ -982,7 +982,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             FhirVersion = "test",
             TraceId = Guid.NewGuid().ToString(),
             FacilityId = facilityId,
-            Status = RequestStatus.Inoperable,
+            Status = RequestStatus.Completed,
             CorrelationId = Guid.NewGuid().ToString(),
             ReportTrackingId = reportTrackingId,
             PatientId = "Patient/123",
@@ -1024,8 +1024,8 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         // Assert
         Assert.NotNull(statistics);
         Assert.Equal(1, statistics.TotalLogs);
-        Assert.True(statistics.RequestStatusCounts.ContainsKey(RequestStatus.Inoperable));
-        Assert.Equal(1, statistics.RequestStatusCounts[RequestStatus.Inoperable]);
+        Assert.True(statistics.RequestStatusCounts.ContainsKey(RequestStatus.Completed));
+        Assert.Equal(1, statistics.RequestStatusCounts[RequestStatus.Completed]);
     }
 
     [Fact]

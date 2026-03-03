@@ -606,7 +606,7 @@ public class PatientDataService : IPatientDataService
             _logger.LogWarning(ex, "OperationOutcome encountered for facility {FacilityId}", log.FacilityId.Sanitize());
 
             log.Notes ??= new List<string>();
-            log.Status = RequestStatus.Inoperable;
+            log.Status = RequestStatus.Completed;
             log.CompletionDate = DateTime.UtcNow;
 
             await _dataAcquisitionLogQueries.UpdateAsync(new UpdateDataAcquisitionLogModel

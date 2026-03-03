@@ -374,7 +374,7 @@ public class PatientDataServiceTests
     }
 
     [Fact]
-    public async Task ExecuteLogRequest_HandlesOpOutcomeException_SetsInoperableStatus()
+    public async Task ExecuteLogRequest_HandlesOpOutcomeException_SetsCompletedStatus()
     {
         // Arrange
         var request = new AcquisitionRequest(1, "facilityId");
@@ -443,7 +443,7 @@ public class PatientDataServiceTests
 
         // Assert
         Assert.NotNull(updatedModel);
-        Assert.Equal(RequestStatus.Inoperable, updatedModel.Status);
+        Assert.Equal(RequestStatus.Completed, updatedModel.Status);
     }
 
     [Fact]
