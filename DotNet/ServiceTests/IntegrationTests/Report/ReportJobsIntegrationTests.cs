@@ -1,11 +1,9 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Report.Domain.Enums;
-using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Shared.Application.Enums;
-using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,150 +13,170 @@ using Quartz;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
-namespace IntegrationTests.Report
+namespace IntegrationTests.Report;
+
+[Collection("ReportIntegrationTests")]
+public class EndOfReportPeriodJobTests
 {
-    [Collection("ReportIntegrationTests")]
-    public class ReportJobsIntegrationTests : IClassFixture<ReportIntegrationTestFixture>
+    private readonly ReportIntegrationTestFixture _fixture;
+
+    public EndOfReportPeriodJobTests(ReportIntegrationTestFixture fixture)
     {
-        private readonly ReportIntegrationTestFixture _fixture;
+        _fixture = fixture;
+    }
 
-        public ReportJobsIntegrationTests(ReportIntegrationTestFixture fixture)
+    [Fact]
+    public async Task Execute_UpdatesScheduleStatusAndDeletesJob()
+    {
+        using var scope = _fixture.ScopeFactory.CreateScope();
+        var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+        var scheduleId = System.Guid.NewGuid().ToString();
+        var facilityId = "test-facility";
+
+        var schedule = new ReportSchedule
         {
-            _fixture = fixture;
-        }
+            Id = scheduleId,
+            FacilityId = facilityId,
+            ReportStartDate = System.DateTime.UtcNow.AddDays(-30),
+            ReportEndDate = System.DateTime.UtcNow.AddDays(-1),
+            Status = ScheduleStatus.Scheduled,
+            EndOfReportPeriodJobHasRun = false
+        };
+        await database.ReportScheduledRepository.AddAsync(schedule);
+        await database.ReportPopulationRepository.SaveChangesAsync();
 
-        private Mock<IJobExecutionContext> CreateJobContext(string scheduleId)
+        _fixture.TenantApiServiceMock.Setup(t => t.GetFacilityConfig(Moq.It.IsAny<string>(), Moq.It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new FacilityModel { FacilityId = facilityId });
+
+        _fixture.SubmitPayloadKafkaProducerMock
+            .Setup(p => p.ProduceAsync(
+                Moq.It.IsAny<string>(),
+                Moq.It.IsAny<Message<SubmitPayloadKey, SubmitPayloadValue>>(),
+                Moq.It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new DeliveryResult<SubmitPayloadKey, SubmitPayloadValue>
+            {
+                Status = PersistenceStatus.Persisted
+            });
+
+        _fixture.AuditableEventKafkaProducerMock
+            .Setup(p => p.ProduceAsync(
+                Moq.It.IsAny<string>(),
+                Moq.It.IsAny<Message<string, AuditEventMessage>>(),
+                Moq.It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new DeliveryResult<string, AuditEventMessage>
+            {
+                Status = PersistenceStatus.Persisted
+            });
+
+        _fixture.DataAcquisitionRequestedKafkaProducerMock
+            .Setup(p => p.ProduceAsync(
+                Moq.It.IsAny<string>(),
+                Moq.It.IsAny<Message<string, DataAcquisitionRequestedValue>>(),
+                Moq.It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(new DeliveryResult<string, DataAcquisitionRequestedValue>
+            {
+                Status = PersistenceStatus.Persisted
+            });
+
+        var jobDataMap = new JobDataMap
         {
-            var context = new Mock<IJobExecutionContext>();
-            var jobDetail = new Mock<IJobDetail>();
+            { "ReportScheduleId", JsonSerializer.Serialize(scheduleId) }
+        };
 
-            // Store as JSON string so JobDataMap.GetObject<string> can deserialize it
-            var dataMap = new JobDataMap
-            {
-                { "ReportScheduleId", JsonSerializer.Serialize(scheduleId) }
-            };
+        var jobKey = new JobKey("test-end-of-period-job", "test-group");
 
-            jobDetail.Setup(j => j.JobDataMap).Returns(dataMap);
-            context.Setup(c => c.JobDetail).Returns(jobDetail.Object);
-            context.Setup(c => c.Trigger.JobDataMap).Returns(new JobDataMap());
+        var jobDetailMock = new Mock<IJobDetail>();
+        jobDetailMock.Setup(j => j.JobDataMap).Returns(jobDataMap);
+        jobDetailMock.Setup(j => j.Key).Returns(jobKey);
+        jobDetailMock.Setup(j => j.Description).Returns("End of Report Period Job");
 
-            return context;
-        }
+        var triggerMock = new Mock<ITrigger>();
+        triggerMock.Setup(t => t.JobDataMap).Returns(new JobDataMap());
 
-        [Fact]
-        public async Task Execute_ManifestProducedSuccessfully_UpdatesScheduleAndDeletesJob()
+        var contextMock = new Mock<IJobExecutionContext>();
+        contextMock.Setup(c => c.JobDetail).Returns(jobDetailMock.Object);
+        contextMock.Setup(c => c.Trigger).Returns(triggerMock.Object);
+
+        var job = new EndOfReportPeriodJob(
+            scope.ServiceProvider.GetRequiredService<ILogger<EndOfReportPeriodJob>>(),
+            _fixture.QuartzJobHelperMock.Object,
+            _fixture.ScopeFactory,
+            scope.ServiceProvider.GetRequiredService<DataAcquisitionRequestedProducer>());
+
+        await job.Execute(contextMock.Object);
+
+        _fixture.QuartzJobHelperMock.Verify(q => q.DeleteJob(
+            jobKey.Name,
+            jobKey.Group,
+            Moq.It.IsAny<System.Threading.CancellationToken>()),
+            Moq.Times.Once());
+
+        using var assertScope = _fixture.ScopeFactory.CreateScope();
+        var assertDatabase = assertScope.ServiceProvider.GetRequiredService<IDatabase>();
+        var updatedSchedule = await assertDatabase.ReportScheduledRepository.GetAsync(scheduleId);
+
+        Assert.Equal(ScheduleStatus.EndOfPeriod, updatedSchedule.Status);
+        Assert.True(updatedSchedule.EndOfReportPeriodJobHasRun);
+    }
+
+    [Fact]
+    public async Task Execute_OnException_ReschedulesJob()
+    {
+        using var scope = _fixture.ScopeFactory.CreateScope();
+        var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+        var scheduleId = System.Guid.NewGuid().ToString();
+
+        var schedule = new ReportSchedule
         {
-            _fixture.SubmitPayloadKafkaProducerMock.Reset();
-            _fixture.SchedulerFactoryMock.Reset();
-            _fixture.TenantApiServiceMock.Setup(x => x.GetFacilityConfig(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new FacilityModel { FacilityName = "Test Facility" });
+            Id = scheduleId,
+            FacilityId = "test-facility-error",
+            ReportStartDate = System.DateTime.UtcNow.AddDays(-30),
+            ReportEndDate = System.DateTime.UtcNow.AddDays(-1),
+            Status = ScheduleStatus.Scheduled
+        };
+        await database.ReportScheduledRepository.AddAsync(schedule);
+        await database.ReportPopulationRepository.SaveChangesAsync();
 
-            var schedulerMock = new Mock<IScheduler>();
-            _fixture.SchedulerFactoryMock.Setup(f => f.GetScheduler(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(schedulerMock.Object);
-
-            using var scope = _fixture.ScopeFactory.CreateScope();
-            var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
-
-            var scheduleId = Guid.NewGuid().ToString();
-            var schedule = new ReportSchedule
-            {
-                Id = scheduleId,
-                FacilityId = "test-facility",
-                ReportStartDate = DateTime.UtcNow.AddDays(-30),
-                ReportEndDate = DateTime.UtcNow.AddDays(30),
-                Frequency = Frequency.Monthly,
-                ReportTypes = new List<string> { "DE-111" },
-                Status = ScheduleStatus.Scheduled,
-                EndOfReportPeriodJobHasRun = true,
-                CreateDate = DateTime.UtcNow
-            };
-            await reportScheduledManager.AddAsync(schedule, CancellationToken.None);
-
-            var job = new EndOfReportPeriodJob(
-                Mock.Of<ILogger<EndOfReportPeriodJob>>(),
-                _fixture.SchedulerFactoryMock.Object,
-                _fixture.ScopeFactory,
-                scope.ServiceProvider.GetRequiredService<DataAcquisitionRequestedProducer>(),
-                scope.ServiceProvider.GetRequiredService<ReadyForValidationProducer>());
-
-            var context = CreateJobContext(scheduleId);
-
-            await job.Execute(context.Object);
-
-            using var verifyScope = _fixture.ScopeFactory.CreateScope();
-            var verifyManager = verifyScope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
-            var updated = await verifyManager.SingleOrDefaultAsync(x => x.Id == scheduleId);
-
-            Assert.Equal(ScheduleStatus.EndOfPeriod, updated.Status);
-            Assert.True(updated.EndOfReportPeriodJobHasRun);
-        }
-
-        [Fact]
-        public async Task Execute_ManifestNotProducedAndPatientsExist_ProducesDataAcquisitionThenUpdatesSchedule()
+        var jobDataMap = new JobDataMap
         {
-            _fixture.DataAcquisitionRequestedKafkaProducerMock.Reset();
-            _fixture.SchedulerFactoryMock.Reset();
-            _fixture.TenantApiServiceMock.Setup(x => x.GetFacilityConfig(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new FacilityModel { FacilityName = "Test Facility" });
+            { "ReportScheduleId", JsonSerializer.Serialize(scheduleId) }
+        };
 
-            var schedulerMock = new Mock<IScheduler>();
-            _fixture.SchedulerFactoryMock.Setup(f => f.GetScheduler(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(schedulerMock.Object);
+        var jobKey = new JobKey("test-end-of-period-error-job", "test-group");
 
-            using var scope = _fixture.ScopeFactory.CreateScope();
-            var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
-            var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+        var jobDetailMock = new Mock<IJobDetail>();
+        jobDetailMock.Setup(j => j.JobDataMap).Returns(jobDataMap);
+        jobDetailMock.Setup(j => j.Key).Returns(jobKey);
+        jobDetailMock.Setup(j => j.Description).Returns("End of Report Period Job");
 
-            var scheduleId = Guid.NewGuid().ToString();
-            var schedule = new ReportSchedule
-            {
-                Id = scheduleId,
-                FacilityId = "test-facility",
-                ReportStartDate = DateTime.UtcNow.AddDays(-30),
-                ReportEndDate = DateTime.UtcNow.AddDays(30),
-                Frequency = Frequency.Monthly,
-                ReportTypes = new List<string> { "DE-111" },
-                Status = ScheduleStatus.Scheduled,
-                EndOfReportPeriodJobHasRun = true,
-                CreateDate = DateTime.UtcNow
-            };
-            await reportScheduledManager.AddAsync(schedule, CancellationToken.None);
+        var triggerMock = new Mock<ITrigger>();
+        triggerMock.Setup(t => t.JobDataMap).Returns(new JobDataMap());
 
-            var entry = new ReportEntry
-            {
-                PatientId = "pat-001",
-                ReportScheduleId = scheduleId,
-                FacilityId = "test-facility",
-                ReportingStatus = ReportingStatus.PatientIdentified,
-                CreateDate = DateTime.UtcNow
-            };
-            await reportEntryManager.AddAsync(entry, CancellationToken.None);
+        var contextMock = new Mock<IJobExecutionContext>();
+        contextMock.Setup(c => c.JobDetail).Returns(jobDetailMock.Object);
+        contextMock.Setup(c => c.Trigger).Returns(triggerMock.Object);
 
-            var job = new EndOfReportPeriodJob(
-                Mock.Of<ILogger<EndOfReportPeriodJob>>(),
-                _fixture.SchedulerFactoryMock.Object,
-                _fixture.ScopeFactory,
-                scope.ServiceProvider.GetRequiredService<DataAcquisitionRequestedProducer>(),
-                scope.ServiceProvider.GetRequiredService<ReadyForValidationProducer>());
+        _fixture.QuartzJobHelperMock.Setup(q => q.DeleteJob(
+            Moq.It.IsAny<string>(),
+            Moq.It.IsAny<string>(),
+            Moq.It.IsAny<System.Threading.CancellationToken>()))
+            .ThrowsAsync(new System.Exception("Simulated delete failure"));
 
-            var context = CreateJobContext(scheduleId);
+        var job = new EndOfReportPeriodJob(
+            scope.ServiceProvider.GetRequiredService<ILogger<EndOfReportPeriodJob>>(),
+            _fixture.QuartzJobHelperMock.Object,
+            _fixture.ScopeFactory,
+            scope.ServiceProvider.GetRequiredService<DataAcquisitionRequestedProducer>());
 
-            await job.Execute(context.Object);
+        await job.Execute(contextMock.Object);
 
-            _fixture.DataAcquisitionRequestedKafkaProducerMock.Verify(
-                p => p.Produce(
-                    It.IsAny<string>(),
-                    It.Is<Message<string, DataAcquisitionRequestedValue>>(m => m.Key == "test-facility"),
-                    It.IsAny<Action<DeliveryReport<string, DataAcquisitionRequestedValue>>>()),
-                Times.Once);
-
-            using var verifyScope = _fixture.ScopeFactory.CreateScope();
-            var verifyManager = verifyScope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
-            var updated = await verifyManager.SingleOrDefaultAsync(x => x.Id == scheduleId);
-
-            Assert.Equal(ScheduleStatus.EndOfPeriod, updated.Status);
-        }
-
+        _fixture.QuartzJobHelperMock.Verify(q => q.RescheduleJob<EndOfReportPeriodJob>(
+            Moq.It.IsAny<string>(),
+            Moq.It.IsAny<System.Collections.Generic.IDictionary<string, object>>(),
+            Moq.It.IsAny<System.DateTimeOffset>(),
+            Moq.It.IsAny<string>(),
+            Moq.It.IsAny<string>(),
+            Moq.It.IsAny<System.Threading.CancellationToken>()),
+            Moq.Times.AtLeastOnce());
     }
 }
