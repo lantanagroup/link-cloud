@@ -156,7 +156,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         }
     });
 
-    builder.Services.AddSingleton<IQuartzJobHelper, QuartzJobHelper>();
+    builder.Services.AddScoped<IQuartzJobHelper, QuartzJobHelper>();
 
     builder.Services.AddHostedService<MongoIndexCreationService>();
 
