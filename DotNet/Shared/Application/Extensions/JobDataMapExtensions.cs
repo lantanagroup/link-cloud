@@ -30,10 +30,9 @@ public static class JobDataMapExtensions
 
     /// <summary>
     /// Retrieves a value from the JobDataMap.
-    /// Supports both native Quartz storage (strings, primitives) and JSON-serialized complex objects.
+    /// Supports both native Quartz storage and JSON-serialized objects.
+    /// Automatically unwraps JSON-quoted strings when retrieving as string.
     /// </summary>
-    /// <typeparam name="T">Type to retrieve</typeparam>
-    /// <returns>The value or default if not found or conversion fails</returns>
     public static T? GetObject<T>(this JobDataMap map, string key)
     {
         if (!map.ContainsKey(key))
@@ -41,24 +40,42 @@ public static class JobDataMapExtensions
 
         var storedValue = map[key];
 
+        if (typeof(T) == typeof(string))
+        {
+            if (storedValue is string rawValue && !string.IsNullOrEmpty(rawValue))
+            {
+                try
+                {
+                    string? deserialized = JsonSerializer.Deserialize<string>(rawValue);
+                    if (deserialized != null)
+                        return (T)(object)deserialized;
+                }
+                catch
+                {
+                }
+
+                string result = rawValue;
+                if (result.Length >= 2 && result[0] == '"' && result[^1] == '"')
+                {
+                    result = result[1..^1];
+                }
+                return (T)(object)result;
+            }
+            return default;
+        }
+
         if (storedValue is T directValue)
             return directValue;
 
-        if (storedValue is string jsonString && !string.IsNullOrEmpty(jsonString))
+        if (storedValue is string storedString && !string.IsNullOrEmpty(storedString))
         {
-            if (typeof(T) == typeof(string))
-                return (T)(object)jsonString;
-
             try
             {
-                return JsonSerializer.Deserialize<T>(jsonString);
+                return JsonSerializer.Deserialize<T>(storedString);
             }
-            catch (JsonException)
+            catch
             {
-                if (typeof(T) == typeof(string))
-                    return (T)(object)jsonString;
-
-                throw;
+                return default;
             }
         }
 

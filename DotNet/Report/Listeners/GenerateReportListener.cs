@@ -235,12 +235,6 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 await reportScheduledManager.AddAsync(reportSchedule, cancellationToken);
 
-                await _quartzJobHelper.ScheduleJob<EndOfReportPeriodJob>(new Dictionary<string, object>
-                    {
-                        { "ReportScheduleId", reportSchedule.Id },
-                        { "FacilityId", reportSchedule.FacilityId }
-                    }, reportSchedule.ReportEndDate, reportSchedule.Id, ReportConstants.MeasureReportSubmissionScheduler.Group, $"{reportSchedule.Id}-{reportSchedule.ReportEndDate}");
-
                 if (value.Regenerate)
                 {
                     var scheduledReports = await reportEntryManager.FindAsync(p => p.ReportScheduleId == reportId, cancellationToken);
