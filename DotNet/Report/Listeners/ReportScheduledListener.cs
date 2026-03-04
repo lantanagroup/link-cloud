@@ -131,6 +131,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 using var scope = _serviceScopeFactory.CreateScope();
                 var reportScheduleManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+                var reportPopulationManager = scope.ServiceProvider.GetRequiredService<IReportPopulationManager>();
 
                 facilityId = key;
                 var startDate = value.StartDate.UtcDateTime;
@@ -172,6 +173,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     reportSchedule.PayloadRootUri = _blobStorageService.GetUri(reportName)?.ToString();
 
                     reportSchedule = await reportScheduleManager.AddAsync(reportSchedule, cancellationToken);
+                    await reportPopulationManager.AddWithReportScheduleAsync(reportSchedule, cancellationToken);
 
                     await MeasureReportScheduleService.CreateJobAndTrigger(reportSchedule, await _schedulerFactory.GetScheduler(cancellationToken));
                 }

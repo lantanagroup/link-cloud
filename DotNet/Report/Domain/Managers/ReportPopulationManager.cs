@@ -13,6 +13,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         Task<ReportPopulation> AddAsync(ReportPopulation entry,
             CancellationToken cancellationToken);
+        Task<List<ReportPopulation>> AddWithReportScheduleAsync(ReportSchedule reportSchedule, CancellationToken cancellationToken);
         Task<ReportPopulation> UpdateAsyncWithAggregateResult(ReportPopulation populationModel, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken);
 
         Task<ReportPopulation> AddAsyncWithAggregateResult(string facilityId, string reportId, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken);
@@ -43,6 +44,36 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             await _database.SaveChangesAsync();
 
             return entry;
+        }
+
+        public async Task<List<ReportPopulation>> AddWithReportScheduleAsync(ReportSchedule reportSchedule, CancellationToken cancellationToken)
+        {
+            List<ReportPopulation> reportPopulations = new List<ReportPopulation>();
+
+            foreach (var reportType in reportSchedule.ReportTypes)
+            {
+                ReportPopulation newPopulation = new ReportPopulation()
+                {
+                    CreateDate = DateTime.UtcNow,
+                    FacilityId = reportSchedule.FacilityId,
+                    ReportType = reportType,
+                    ReportScheduleId = reportSchedule.Id,
+                    GroupPopulations = new List<GroupPopulation>()
+                    {
+                        new GroupPopulation() { 
+                            PopulationId = "initial-population",
+                            TotalPopulationCount = 0
+                        }
+                    }
+                };
+
+                reportPopulations.Add(newPopulation);
+            }
+
+            await _database.ReportPopulationRepository.AddRangeAsync(reportPopulations);
+            await _database.SaveChangesAsync();
+
+            return reportPopulations;
         }
 
         public async Task<ReportPopulation> AddAsyncWithAggregateResult(string facilityId, string reportId, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken)
@@ -82,6 +113,11 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task<ReportPopulation> UpdateAsyncWithAggregateResult(ReportPopulation populationModel, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken)
         {
+            if (string.IsNullOrWhiteSpace(populationModel.Measure))
+            {
+                populationModel.Measure = aggregateResult.Measure;
+            }
+
             foreach (var measureReportpopulation in aggregateResult.PopulationList)
             {
                 var group = populationModel.GroupPopulations.FirstOrDefault(x => x.PopulationId == measureReportpopulation.PopulationId);
