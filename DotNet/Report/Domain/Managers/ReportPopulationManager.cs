@@ -48,6 +48,12 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task<List<ReportPopulation>> AddWithReportScheduleAsync(ReportSchedule reportSchedule, CancellationToken cancellationToken)
         {
+            /*
+             * Daniel - 3/2026: Adding this function to build the population list when a reportScheduled event is consumed. This helps in a few ways:
+             *  1. In the case where all evaluated measure reports for a facility do not meet the criteria of the measure, a population record already exists with a count set to 0.
+             *  2. When generating a manifest, logic doesn't need to be added to figure out if there was a 0 count for any of the reported measures. 
+             * It's assumed that each developed measure will at least have 'initial-population' as a Population Id. This logic would need to change if that assumption is no longer true.
+            */
             List<ReportPopulation> reportPopulations = new List<ReportPopulation>();
 
             foreach (var reportType in reportSchedule.ReportTypes)
