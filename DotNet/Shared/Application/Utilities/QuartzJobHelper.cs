@@ -4,12 +4,12 @@ namespace LantanaGroup.Link.Shared.Application.Utilities;
 
 public interface IQuartzJobHelper
 {
-    Task ScheduleJob<TJob>(IDictionary<string, object> jobData, DateTimeOffset startAt, string identity, string group = "ReportJobs", string? description = null, CancellationToken ct = default)
+    Task ScheduleJob<TJob>(IDictionary<string, object> jobData, DateTimeOffset startAt, string identity, string group, string? description = null, CancellationToken ct = default)
         where TJob : IJob;
 
-    Task DeleteJob(string identity, string group = "ReportJobs", CancellationToken ct = default);
+    Task DeleteJob(string identity, string group, CancellationToken ct = default);
 
-    Task RescheduleJob<TJob>(string identity, IDictionary<string, object> jobData, DateTimeOffset newStartAt, string group = "ReportJobs", string? description = null, CancellationToken ct = default)
+    Task RescheduleJob<TJob>(string identity, IDictionary<string, object> jobData, DateTimeOffset newStartAt, string group, string? description = null, CancellationToken ct = default)
         where TJob : IJob;
 }
 
@@ -22,7 +22,7 @@ public class QuartzJobHelper : IQuartzJobHelper
         _schedulerFactory = schedulerFactory;
     }
 
-    public async Task ScheduleJob<TJob>(IDictionary<string, object> jobData, DateTimeOffset startAt, string identity, string group = "ReportJobs", string? description = null, CancellationToken ct = default)
+    public async Task ScheduleJob<TJob>(IDictionary<string, object> jobData, DateTimeOffset startAt, string identity, string group, string? description = null, CancellationToken ct = default)
         where TJob : IJob
     {
         var scheduler = await _schedulerFactory.GetScheduler(ct);
@@ -44,7 +44,7 @@ public class QuartzJobHelper : IQuartzJobHelper
         await scheduler.ScheduleJob(job, trigger, ct);
     }
 
-    public async Task DeleteJob(string identity, string group = "ReportJobs", CancellationToken ct = default)
+    public async Task DeleteJob(string identity, string group, CancellationToken ct = default)
     {
         var scheduler = await _schedulerFactory.GetScheduler(ct);
         var jobKey = new JobKey(identity, group);
