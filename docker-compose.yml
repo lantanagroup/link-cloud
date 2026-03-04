@@ -172,7 +172,6 @@ services:
     networks:
       - link-nw
 
-  # MongoDB as a single-node replica set (required for Quartz transactions)
   mongo:
     image: mongo:6-jammy
     command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
@@ -184,7 +183,7 @@ services:
     networks:
       - link-nw
     healthcheck:
-      test: ["CMD","mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 5s
       timeout: 5s
       retries: 3
@@ -200,10 +199,15 @@ services:
       bash -c '
         sleep 10 &&
         mongosh --host mongo:27017 --eval "
-          rs.initiate({
-            _id: \"rs0\",
-            members: [{ _id: 0, host: \"mongo:27017\" }]
-          })
+            if (rs.status().ok === 0) {
+              print(\"Initializing replica set...\");
+              rs.initiate({
+                _id: \"rs0\",
+                members: [{ _id: 0, host: \"mongo:27017\" }]
+              });
+            } else {
+              print(\"Replica set already initialized - skipping\");
+            }
         "
       '
     networks:
