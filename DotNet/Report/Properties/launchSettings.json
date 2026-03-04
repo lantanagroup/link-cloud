@@ -13,7 +13,7 @@
       "launchBrowser": false,
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Docker",
-        "MongoDB__ConnectionString": "mongodb://localhost:17017/",
+        "MongoDB__ConnectionString": "mongodb://localhost:17017/?replicaSet=rs0&directConnection=true",
         "MongoDB__DatabaseName": "link-report",
         "KafkaConnection__BootstrapServers__0": "localhost:9094",
         "InternalBlobStorage__ConnectionString": "",
