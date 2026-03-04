@@ -156,8 +156,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         }
     });
 
-    builder.Services.AddScoped<IQuartzJobHelper, QuartzJobHelper>();
-
     builder.Services.AddHostedService<MongoIndexCreationService>();
 
     builder.Services.AddHttpClient();
@@ -279,6 +277,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.WaitForJobsToComplete = true;
     });
 
+    builder.Services.AddSingleton<IQuartzJobHelper, QuartzJobHelper>();
     builder.Services.AddSingleton<IQuartzMongoDbJobStoreFactory, ReportQuartzMongoDbJobStoreFactory>();
 
     builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceConfigName, [
