@@ -254,41 +254,41 @@ namespace LantanaGroup.Link.Report.Listeners
 
                         await reportEntryManager.AddAsync(newEntry, cancellationToken);
 
-                                        try
-                                        {
-                                            await _evaluationProducer.ProduceAsync(nameof(KafkaTopic.EvaluationRequested), new Message<string, EvaluationRequestedValue>
-                                            {
-                                                Key = facilityId,
-                                                Value = new EvaluationRequestedValue
-                                                {
-                                                    PreviousReportId = value.ReportId,
-                                                    PatientId = p,
-                                                    ReportTrackingId = reportSchedule.Id
-                                                },
-                                                Headers = new Headers
+                        try
+                        {
+                            await _evaluationProducer.ProduceAsync(nameof(KafkaTopic.EvaluationRequested), new Message<string, EvaluationRequestedValue>
+                            {
+                                Key = facilityId,
+                                Value = new EvaluationRequestedValue
+                                {
+                                    PreviousReportId = value.ReportId,
+                                    PatientId = p,
+                                    ReportTrackingId = reportSchedule.Id
+                                },
+                                Headers = new Headers
                                             {
                                                 { "X-Correlation-Id", Encoding.ASCII.GetBytes(Guid.NewGuid().ToString()) }
                                             }
-                                            });
-                                        }
-                                        catch (ProduceException<string, EvaluationRequestedValue> ex)
-                                        {
-                                            _logger.LogError(ex, "An error was encountered generating an Evaluation Requested event.\n\tFacilityId: {facilityId}\n\tPatientId: {patientId}\n\tReportTrackingId: {reportTrackingId}",
-                                                facilityId?.SanitizeUntrustedString(), p?.SanitizeUntrustedString(), reportSchedule.Id?.SanitizeUntrustedString());
-                                        }
-                                    }
-                                }
-                                else
-                                {
-                                    _logger.LogInformation("Generating new Adhoc report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, reportSchedule.Id, DateTime.UtcNow);
-                                    
-                                    // Get Patient List if none was provided
-                                    if (value.PatientIds == null || value.PatientIds.Count == 0)
-                                    {
-                                        _logger.LogDebug("Getting Patient List from Census Service for facility {FacilityId} from {StartDate} to {EndDate}", facilityId, startDate, endDate);
-                                        value.PatientIds =
-                                            await GetPatientList(facilityId, startDate.Value, endDate.Value);
-                                    }
+                            });
+                        }
+                        catch (ProduceException<string, EvaluationRequestedValue> ex)
+                        {
+                            _logger.LogError(ex, "An error was encountered generating an Evaluation Requested event.\n\tFacilityId: {facilityId}\n\tPatientId: {patientId}\n\tReportTrackingId: {reportTrackingId}",
+                                facilityId?.SanitizeUntrustedString(), p?.SanitizeUntrustedString(), reportSchedule.Id?.SanitizeUntrustedString());
+                        }
+                    }
+                }
+                else
+                {
+                    _logger.LogInformation("Generating new Adhoc report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, reportSchedule.Id, DateTime.UtcNow);
+
+                    // Get Patient List if none was provided
+                    if (value.PatientIds == null || value.PatientIds.Count == 0)
+                    {
+                        _logger.LogDebug("Getting Patient List from Census Service for facility {FacilityId} from {StartDate} to {EndDate}", facilityId, startDate, endDate);
+                        value.PatientIds =
+                            await GetPatientList(facilityId, startDate.Value, endDate.Value);
+                    }
 
                     var patientIds = value.PatientIds.Distinct().ToList();
 
