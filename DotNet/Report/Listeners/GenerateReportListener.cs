@@ -5,8 +5,10 @@ using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
+using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
@@ -17,6 +19,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
@@ -34,6 +37,8 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IDeadLetterExceptionHandler<string, GenerateReportValue> _deadLetterExceptionHandler;
         private readonly ServiceRegistry _serviceRegistry;
         private readonly IServiceScopeFactory _serviceScopeFactory;
+
+        private readonly IQuartzJobHelper _quartzJobHelper;
 
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
@@ -60,6 +65,7 @@ namespace LantanaGroup.Link.Report.Listeners
             IProducer<string, EvaluationRequestedValue> evaluationProducer,
             BlobStorageService blobStorageService,
             ServiceInformation serviceInformation,
+            IQuartzJobHelper quartzJobHelper,
             IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -80,6 +86,8 @@ namespace LantanaGroup.Link.Report.Listeners
             _blobStorageService = blobStorageService;
             _serviceInformation = serviceInformation;
             _linkBearerServiceOptions = linkBearerServiceOptions;
+
+            _quartzJobHelper = quartzJobHelper;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -226,6 +234,12 @@ namespace LantanaGroup.Link.Report.Listeners
                 reportSchedule.PayloadRootUri = _blobStorageService.GetUri(reportName)?.ToString();
 
                 await reportScheduledManager.AddAsync(reportSchedule, cancellationToken);
+
+                await _quartzJobHelper.ScheduleJob<EndOfReportPeriodJob>(new Dictionary<string, object>
+                    {
+                        { "ReportScheduleId", reportSchedule.Id },
+                        { "FacilityId", reportSchedule.FacilityId }
+                    }, reportSchedule.ReportEndDate, reportSchedule.Id, ReportConstants.MeasureReportSubmissionScheduler.Group, $"{reportSchedule.Id}-{reportSchedule.ReportEndDate}");
 
                 if (value.Regenerate)
                 {
