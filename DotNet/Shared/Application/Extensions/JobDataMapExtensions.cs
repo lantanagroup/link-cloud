@@ -6,17 +6,21 @@ namespace LantanaGroup.Link.Shared.Application.Extensions;
 public static class JobDataMapExtensions
 {
     /// <summary>
-    /// Serializes the object to JSON and stores it as a string in the JobDataMap.
+    /// Stores an object in the JobDataMap.
+    /// Complex types are serialized to JSON.
+    /// Strings are stored directly for compatibility with Quartz native storage.
     /// </summary>
-    /// <typeparam name="T">The type of the object to store.</typeparam>
-    /// <param name="map">The JobDataMap instance.</param>
-    /// <param name="key">The key to store under.</param>
-    /// <param name="value">The object to serialize and store.</param>
     public static void PutObject<T>(this JobDataMap map, string key, T value)
     {
         if (value == null)
         {
-            map.Put(key, (string)null!);  // Store null if value is null
+            map.Put(key, (string)null!);
+            return;
+        }
+
+        if (typeof(T) == typeof(string))
+        {
+            map.Put(key, (string)(object)value!);
             return;
         }
 
@@ -25,22 +29,46 @@ public static class JobDataMapExtensions
     }
 
     /// <summary>
-    /// Retrieves a string from the JobDataMap and deserializes it to the specified type.
+    /// Retrieves a value from the JobDataMap.
+    /// Supports both native Quartz storage (strings, primitives) and JSON-serialized complex objects.
     /// </summary>
-    /// <typeparam name="T">The type to deserialize to.</typeparam>
-    /// <param name="map">The JobDataMap instance.</param>
-    /// <param name="key">The key to retrieve from.</param>
-    /// <returns>The deserialized object, or default(T) if not found or deserialization fails.</returns>
-    /// <exception cref="JsonException">Thrown if deserialization fails (e.g., invalid JSON).</exception>
-    public static T GetObject<T>(this JobDataMap map, string key)
+    /// <typeparam name="T">Type to retrieve</typeparam>
+    /// <returns>The value or default if not found or conversion fails</returns>
+    public static T? GetObject<T>(this JobDataMap map, string key)
     {
-        var json = map.GetString(key);
+        if (!map.ContainsKey(key))
+            return default;
 
-        if (string.IsNullOrEmpty(json))
+        var storedValue = map[key];
+
+        if (storedValue is T directValue)
+            return directValue;
+
+        if (storedValue is string jsonString && !string.IsNullOrEmpty(jsonString))
         {
-            return default!;
+            if (typeof(T) == typeof(string))
+                return (T)(object)jsonString;
+
+            try
+            {
+                return JsonSerializer.Deserialize<T>(jsonString);
+            }
+            catch (JsonException)
+            {
+                if (typeof(T) == typeof(string))
+                    return (T)(object)jsonString;
+
+                throw;
+            }
         }
 
-        return JsonSerializer.Deserialize<T>(json);
+        try
+        {
+            return (T)Convert.ChangeType(storedValue, typeof(T));
+        }
+        catch
+        {
+            return default;
+        }
     }
 }
