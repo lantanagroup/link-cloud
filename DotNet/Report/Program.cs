@@ -269,6 +269,7 @@ static void RegisterServices(WebApplicationBuilder builder)
                 c.CheckinInterval = TimeSpan.FromSeconds(7.5);
                 c.CheckinMisfireThreshold = TimeSpan.FromSeconds(7.5);
             });
+            store.UseSystemTextJsonSerializer();
         });
     });
 
