@@ -51,7 +51,7 @@ public class QuartzJobHelper : IQuartzJobHelper
         await scheduler.DeleteJob(jobKey, ct);
     }
 
-    public async Task RescheduleJob<TJob>(string identity, IDictionary<string, object> jobData, DateTimeOffset newStartAt, string group = "ReportJobs", string? description = null, CancellationToken ct = default)
+    public async Task RescheduleJob<TJob>(string identity, IDictionary<string, object> jobData, DateTimeOffset newStartAt, string group, string? description = null, CancellationToken ct = default)
         where TJob : IJob
     {
         await DeleteJob(identity, group, ct);
