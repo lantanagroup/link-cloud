@@ -193,25 +193,43 @@ services:
     image: mongo:6-jammy
     container_name: mongo-init
     depends_on:
-      mongo:
-        condition: service_healthy
+        mongo:
+            condition: service_healthy
     command: >
-      bash -c '
-        sleep 10 &&
-        mongosh --host mongo:27017 --eval "
-            if (rs.status().ok === 0) {
-              print(\"Initializing replica set...\");
-              rs.initiate({
-                _id: \"rs0\",
-                members: [{ _id: 0, host: \"mongo:27017\" }]
-              });
-            } else {
-              print(\"Replica set already initialized - skipping\");
-            }
-        "
-      '
+        bash -c '
+        echo "=== Starting MongoDB replica set initialization ===";
+        sleep 15;
+        
+        for i in {1..30}; do
+            echo "Attempt $i to initialize rs0...";
+            mongosh --host mongo:27017 --quiet --eval '\''
+            try {
+                var status = rs.status();
+                if (status.ok === 1) {
+                print("Replica set already initialized");
+                quit(0);
+                }
+            } catch(e) {}
+            
+            print("Initializing replica set...");
+            rs.initiate({
+                _id: "rs0",
+                members: [{ _id: 0, host: "mongo:27017" }]
+            });
+            print("Replica set initiated successfully");
+            quit(0);
+            '\'' && break || {
+            echo "Init failed (still starting up), retrying in 4s...";
+            sleep 4;
+            };
+        done
+        
+        echo "Waiting for primary election...";
+        sleep 10;
+        echo "=== Replica set setup completed ===";
+        '
     networks:
-      - link-nw
+        - link-nw
       
   ###########################################
   ### Telemetry
