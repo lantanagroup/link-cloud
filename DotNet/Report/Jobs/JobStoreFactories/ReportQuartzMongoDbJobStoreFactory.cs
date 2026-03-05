@@ -8,9 +8,10 @@ public class ReportQuartzMongoDbJobStoreFactory : IQuartzMongoDbJobStoreFactory
 {
     private readonly MongoDbContext _mongoDbContext;
 
-    public ReportQuartzMongoDbJobStoreFactory(MongoDbContext context)
+    public ReportQuartzMongoDbJobStoreFactory(IServiceScopeFactory serviceScopeFactory)
     {
-        _mongoDbContext = context;
+        using var scope = serviceScopeFactory.CreateScope();
+        _mongoDbContext = scope.ServiceProvider.GetRequiredService<MongoDbContext>();
     }
 
     public IMongoDatabase GetDatabase()
