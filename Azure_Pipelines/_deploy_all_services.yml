@@ -179,11 +179,12 @@ jobs:
     inputs:
       targetType: inline
       script: |
-        BRANCH="$(Build.SourceBranchName)"
-        SAFE_BRANCH=$(echo "$BRANCH" | tr '/' '-')
+        BRANCH="$(Build.SourceBranch)"
+        BRANCH=${BRANCH#refs/heads/}
+        SAFE_BRANCH_NAME=$(echo "$BRANCH" | tr '/' '-')
         echo "Branch: $BRANCH"
-        echo "Safe Branch: $SAFE_BRANCH"
-        echo "##vso[task.setvariable variable=SAFE_BRANCH]$SAFE_BRANCH"
+        echo "Safe Branch: $SAFE_BRANCH_NAME"
+        echo "##vso[task.setvariable variable=SAFE_BRANCH_NAME]$SAFE_BRANCH_NAME"
 
   - task: Kubernetes@1
     displayName: 'Deploy $(serviceName)'
