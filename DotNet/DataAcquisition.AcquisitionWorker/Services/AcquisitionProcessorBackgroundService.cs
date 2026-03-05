@@ -146,6 +146,9 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                 log.Notes.Add(safeMessage);
                 log.Status = RequestStatus.Failed;
 
+                log.RetryAttempts ??= 0;
+                log.RetryAttempts++;
+
                 await logQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {
                     Id = log.Id,
