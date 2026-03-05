@@ -5,8 +5,10 @@ using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
+using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
@@ -17,6 +19,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
@@ -28,13 +31,14 @@ namespace LantanaGroup.Link.Report.Listeners
 {
     public class GenerateReportListener : BackgroundService
     {
-
         private readonly ILogger<GenerateReportListener> _logger;
         private readonly IKafkaConsumerFactory<string, GenerateReportValue> _kafkaConsumerFactory;
         private readonly ITransientExceptionHandler<string, GenerateReportValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, GenerateReportValue> _deadLetterExceptionHandler;
         private readonly ServiceRegistry _serviceRegistry;
         private readonly IServiceScopeFactory _serviceScopeFactory;
+
+        private readonly IQuartzJobHelper _quartzJobHelper;
 
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
@@ -61,18 +65,15 @@ namespace LantanaGroup.Link.Report.Listeners
             IProducer<string, EvaluationRequestedValue> evaluationProducer,
             BlobStorageService blobStorageService,
             ServiceInformation serviceInformation,
+            IQuartzJobHelper quartzJobHelper,
             IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
 
-            _transientExceptionHandler = transientExceptionHandler ??
-                                               throw new ArgumentException(nameof(_deadLetterExceptionHandler));
-
-            _deadLetterExceptionHandler = deadLetterExceptionHandler ??
-                                               throw new ArgumentException(nameof(_deadLetterExceptionHandler));
-
+            _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
+            _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
             _transientExceptionHandler.Topic = nameof(KafkaTopic.GenerateReportRequested) + "-Retry";
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.GenerateReportRequested) + "-Error";
@@ -85,13 +86,14 @@ namespace LantanaGroup.Link.Report.Listeners
             _blobStorageService = blobStorageService;
             _serviceInformation = serviceInformation;
             _linkBearerServiceOptions = linkBearerServiceOptions;
+
+            _quartzJobHelper = quartzJobHelper;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
         {
             return Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
         }
-
 
         private async Task StartConsumerLoop(CancellationToken cancellationToken)
         {
@@ -117,233 +119,8 @@ namespace LantanaGroup.Link.Report.Listeners
                     {
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
-                            if (result == null)
-                            {
-                                consumer.Commit();
-                                return;
-                            }
-
-                            var reportScheduledManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportScheduledManager>();
-                            var reportEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportEntryManager>();
-
-                            try
-                            {
-                                var key = result.Message.Key;
-                                var value = result.Message.Value;
-                                var startDate = value.StartDate;
-                                var endDate = value.EndDate;
-                                var reportTypes = value.ReportTypes;
-                                var reportId = value.ReportId ?? Guid.NewGuid().ToString();
-
-                                facilityId = key;
-
-                                if (string.IsNullOrWhiteSpace(facilityId))
-                                {
-                                    throw new DeadLetterException(
-                                        $"{Name}: FacilityId is null or empty.");
-                                }
-
-                                //If we are re-running an existing report, fetch the details from the database and replace the Values retrieved from the message
-                                if (value is { Regenerate: true, ReportId: not null })
-                                {
-                                    _logger.LogDebug(
-                                        "Finding existing report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, value.ReportId, DateTime.UtcNow);
-                                    var existing = await reportScheduledManager.SingleOrDefaultAsync(x => x.Id == value.ReportId, consumeCancellationToken);
-
-                                    if (existing == null)
-                                    {
-                                        throw new DeadLetterException("No ReportSchedule found for the provided ID: " + HtmlInputSanitizer.Sanitize(value.ReportId));
-                                    }
-
-                                    startDate = existing.ReportStartDate;
-                                    endDate = existing.ReportEndDate;
-                                    reportTypes = existing.ReportTypes;
-                                }
-                                else //Otherwise validate the values from the message
-                                {
-                                    if (reportTypes == null || reportTypes.Count == 0)
-                                    {
-                                        throw new DeadLetterException(
-                                            $"{Name}: ReportTypes is null or empty.");
-                                    }
-
-                                    if (startDate == null || endDate == null)
-                                    {
-                                        throw new DeadLetterException("Start and End dates must be provided.");
-                                    }
-                                    if (endDate <= startDate)
-                                    {
-                                        throw new DeadLetterException("End date must be after start date.");
-                                    }
-                                }
-
-                                startDate = new DateTime(
-                                    startDate.Value.Year,
-                                    startDate.Value.Month,
-                                    startDate.Value.Day,
-                                    startDate.Value.Hour,
-                                    startDate.Value.Minute,
-                                    startDate.Value.Second,
-                                    DateTimeKind.Utc
-                                );
-
-                                endDate = new DateTime(
-                                    endDate.Value.Year,
-                                    endDate.Value.Month,
-                                    endDate.Value.Day,
-                                    endDate.Value.Hour,
-                                    endDate.Value.Minute,
-                                    endDate.Value.Second,
-                                    DateTimeKind.Utc
-                                );
-
-                                bool isCensus = !value.Regenerate && (value.PatientIds == null || value.PatientIds.Count == 0);
-                                
-                                // Create ReportSchedule for AdHoc Report
-                                var reportSchedule = new ReportSchedule
-                                {
-                                    Id = value.AdhocReportId,
-                                    FacilityId = facilityId,
-                                    ReportStartDate = startDate.Value,
-                                    ReportEndDate = endDate.Value,
-                                    Frequency = Frequency.Adhoc,
-                                    AdHocType = isCensus ? AdHocType.Census : AdHocType.Manual,
-                                    ReportTypes = reportTypes,
-                                    EndOfReportPeriodJobHasRun = true,
-                                    EnableSubmission = !value.BypassSubmission,
-                                    CreateDate = DateTime.UtcNow
-                                };
-                                var reportName = _blobStorageService.GetReportName(reportSchedule);
-                                reportSchedule.PayloadRootUri = _blobStorageService.GetUri(reportName)?.ToString();
-
-                                await reportScheduledManager.AddAsync(reportSchedule, cancellationToken);
-                                
-                                if (value.Regenerate)
-                                {
-                                    _logger.LogInformation("Re-generating report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, reportId, DateTime.UtcNow);
-
-                                    var scheduledReports = await reportEntryManager.FindAsync(p => p.ReportScheduleId == reportId, cancellationToken);
-                                    var patientEntries = scheduledReports.Select(p => p.PatientId).Distinct();
-
-                                    _logger.LogDebug("Found {PatientCount} patients to re-generate for facility {FacilityId} from {StartDate} to {EndDate} with ID {ReportId}", patientEntries.Count(), facilityId, startDate, endDate, reportId);
-
-                                    foreach (var p in patientEntries)
-                                    {
-                                        var newEntry = new ReportEntry()
-                                        {
-                                            PatientId = p,
-                                            ReportingStatus = ReportingStatus.PatientIdentified,
-                                            ReportScheduleId = reportSchedule.Id,
-                                            FacilityId = facilityId,
-                                            CreateDate = DateTime.UtcNow
-                                        };
-
-                                        foreach (var reportType in reportTypes)
-                                        {
-                                            newEntry.MeasureReportList.Add(new EvaluatedMeasureReport()
-                                            {
-                                                Status = MeasureReportStatus.EntryCreated,
-                                                ReportType = reportType
-                                            });
-                                        }
-
-                                        await reportEntryManager.AddAsync(newEntry, cancellationToken);
-
-                                        try
-                                        {
-                                            await _evaluationProducer.ProduceAsync(nameof(KafkaTopic.EvaluationRequested), new Message<string, EvaluationRequestedValue>
-                                            {
-                                                Key = facilityId,
-                                                Value = new EvaluationRequestedValue
-                                                {
-                                                    PreviousReportId = value.ReportId,
-                                                    PatientId = p,
-                                                    ReportTrackingId = reportSchedule.Id
-                                                },
-                                                Headers = new Headers
-                                            {
-                                                { "X-Correlation-Id", Encoding.ASCII.GetBytes(Guid.NewGuid().ToString()) }
-                                            }
-                                            });
-                                        }
-                                        catch (ProduceException<string, EvaluationRequestedValue> ex)
-                                        {
-                                            _logger.LogError(ex, "An error was encountered generating an Evaluation Requested event.\n\tFacilityId: {facilityId}\n\tPatientId: {patientId}\n\tReportTrackingId: {reportTrackingId}",
-                                                facilityId?.SanitizeUntrustedString(), p?.SanitizeUntrustedString(), reportSchedule.Id?.SanitizeUntrustedString());
-                                        }
-                                    }
-                                }
-                                else
-                                {
-                                    _logger.LogInformation("Generating new Adhoc report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, reportSchedule.Id, DateTime.UtcNow);
-                                    
-                                    // Get Patient List if none was provided
-                                    if (value.PatientIds == null || value.PatientIds.Count == 0)
-                                    {
-                                        _logger.LogDebug("Getting Patient List from Census Service for facility {FacilityId} from {StartDate} to {EndDate}", facilityId, startDate, endDate);
-                                        value.PatientIds =
-                                            await GetPatientList(facilityId, startDate.Value, endDate.Value);
-                                    }
-
-                                    _logger.LogDebug("Found {PatientCount} patients to re-generate for facility {FacilityId} from {StartDate} to {EndDate}", value.PatientIds.Count, facilityId, startDate, endDate);
-
-                                    foreach (var patient in value.PatientIds)
-                                    {
-                                        var newEntry = new ReportEntry()
-                                        {
-                                            PatientId = patient,
-                                            ReportingStatus = ReportingStatus.PatientIdentified,
-                                            ReportScheduleId = reportSchedule.Id,
-                                            FacilityId = facilityId,
-                                            CreateDate = DateTime.UtcNow
-                                        };
-
-                                        //For each patient and report type, Create Submission Entries for each Patient and Report Type
-                                        foreach (var reportType in reportTypes)
-                                        {
-                                            newEntry.MeasureReportList.Add(new EvaluatedMeasureReport()
-                                            {
-                                                Status = MeasureReportStatus.EntryCreated,
-                                                ReportType = reportType
-                                            });
-                                        }
-
-                                        await reportEntryManager.AddAsync(newEntry, cancellationToken);
-                                    }
-
-                                    try
-                                    {
-                                        //Submit a Data Acquisition Request for each patient
-                                        await _dataAcqProducer.Produce(reportSchedule, value.PatientIds);
-                                    }
-                                    catch (ProduceException<string, DataAcquisitionRequestedValue> ex)
-                                    {
-                                        _logger.LogError(ex, "An error was encountered generating a Data Acquisition Requested event.\n\tFacilityId: {facilityId}\n\t", facilityId);
-                                    }
-                                }
-                            }
-                            catch (DeadLetterException ex)
-                            {
-                                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
-                            }
-                            catch (TransientException ex)
-                            {
-                                _transientExceptionHandler.HandleException(result, ex, facilityId);
-                            }
-                            catch (TimeoutException ex)
-                            {
-                                var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [{string.Join(", ", consumer.Subscription)}] at offset: {result.TopicPartitionOffset}";
-                                var transientException = new TransientException(exceptionMessage, ex);
-                                _transientExceptionHandler.HandleException(result, transientException, facilityId);
-                            }
-                            catch (Exception ex)
-                            {
-                                _transientExceptionHandler.HandleException(result, ex, facilityId);
-                            }
-                            finally
-                            {
-                                consumer.Commit(result);
-                            }
+                            await ProcessMessageAsync(result, consumeCancellationToken);
+                            consumer.Commit(result);
                         }, cancellationToken);
 
                     }
@@ -378,6 +155,197 @@ namespace LantanaGroup.Link.Report.Listeners
             }
         }
 
+        public async Task ProcessMessageAsync(ConsumeResult<string, GenerateReportValue> result, CancellationToken cancellationToken)
+        {
+            string facilityId = string.Empty;
+            try
+            {
+                if (result == null)
+                {
+                    return;
+                }
+
+                var reportScheduledManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportScheduledManager>();
+                var reportEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportEntryManager>();
+
+                var key = result.Message.Key;
+                var value = result.Message.Value;
+                var startDate = value.StartDate;
+                var endDate = value.EndDate;
+                var reportTypes = value.ReportTypes;
+                var reportId = value.ReportId ?? Guid.NewGuid().ToString();
+
+                facilityId = key;
+
+                if (string.IsNullOrWhiteSpace(facilityId))
+                {
+                    throw new DeadLetterException($"{Name}: FacilityId is null or empty.");
+                }
+
+                if (value is { Regenerate: true, ReportId: not null })
+                {
+                    var existing = await reportScheduledManager.SingleOrDefaultAsync(x => x.Id == value.ReportId, cancellationToken);
+
+                    if (existing == null)
+                    {
+                        throw new DeadLetterException("No ReportSchedule found for the provided ID: " + HtmlInputSanitizer.Sanitize(value.ReportId));
+                    }
+
+                    startDate = existing.ReportStartDate;
+                    endDate = existing.ReportEndDate;
+                    reportTypes = existing.ReportTypes;
+                }
+                else
+                {
+                    if (reportTypes == null || reportTypes.Count == 0)
+                    {
+                        throw new DeadLetterException($"{Name}: ReportTypes is null or empty.");
+                    }
+
+                    if (startDate == null || endDate == null)
+                    {
+                        throw new DeadLetterException("Start and End dates must be provided.");
+                    }
+                    if (endDate <= startDate)
+                    {
+                        throw new DeadLetterException("End date must be after start date.");
+                    }
+                }
+
+                startDate = new DateTime(startDate.Value.Year, startDate.Value.Month, startDate.Value.Day, startDate.Value.Hour, startDate.Value.Minute, startDate.Value.Second, DateTimeKind.Utc);
+                endDate = new DateTime(endDate.Value.Year, endDate.Value.Month, endDate.Value.Day, endDate.Value.Hour, endDate.Value.Minute, endDate.Value.Second, DateTimeKind.Utc);
+
+                bool isCensus = !value.Regenerate && (value.PatientIds == null || value.PatientIds.Count == 0);
+
+                var reportSchedule = new ReportSchedule
+                {
+                    Id = value.AdhocReportId,
+                    FacilityId = facilityId,
+                    ReportStartDate = startDate.Value,
+                    ReportEndDate = endDate.Value,
+                    Frequency = Frequency.Adhoc,
+                    AdHocType = isCensus ? AdHocType.Census : AdHocType.Manual,
+                    ReportTypes = reportTypes,
+                    EndOfReportPeriodJobHasRun = true,
+                    EnableSubmission = !value.BypassSubmission,
+                    CreateDate = DateTime.UtcNow
+                };
+                var reportName = _blobStorageService.GetReportName(reportSchedule);
+                reportSchedule.PayloadRootUri = _blobStorageService.GetUri(reportName)?.ToString();
+
+                await reportScheduledManager.AddAsync(reportSchedule, cancellationToken);
+
+                if (value.Regenerate)
+                {
+                    var scheduledReports = await reportEntryManager.FindAsync(p => p.ReportScheduleId == reportId, cancellationToken);
+                    var patientEntries = scheduledReports.Select(p => p.PatientId).Distinct();
+
+                    foreach (var p in patientEntries)
+                    {
+                        var newEntry = new ReportEntry()
+                        {
+                            PatientId = p,
+                            ReportingStatus = ReportingStatus.PatientIdentified,
+                            ReportScheduleId = reportSchedule.Id,
+                            FacilityId = facilityId,
+                            CreateDate = DateTime.UtcNow
+                        };
+
+                        foreach (var reportType in reportTypes)
+                        {
+                            newEntry.MeasureReportList.Add(new EvaluatedMeasureReport()
+                            {
+                                Status = MeasureReportStatus.EntryCreated,
+                                ReportType = reportType
+                            });
+                        }
+
+                        await reportEntryManager.AddAsync(newEntry, cancellationToken);
+
+                        try
+                        {
+                            await _evaluationProducer.ProduceAsync(nameof(KafkaTopic.EvaluationRequested), new Message<string, EvaluationRequestedValue>
+                            {
+                                Key = facilityId,
+                                Value = new EvaluationRequestedValue
+                                {
+                                    PreviousReportId = value.ReportId,
+                                    PatientId = p,
+                                    ReportTrackingId = reportSchedule.Id
+                                },
+                                Headers = new Headers
+                                            {
+                                                { "X-Correlation-Id", Encoding.ASCII.GetBytes(Guid.NewGuid().ToString()) }
+                                            }
+                            });
+                        }
+                        catch (ProduceException<string, EvaluationRequestedValue> ex)
+                        {
+                            _logger.LogError(ex, "An error was encountered generating an Evaluation Requested event.\n\tFacilityId: {facilityId}\n\tPatientId: {patientId}\n\tReportTrackingId: {reportTrackingId}",
+                                facilityId?.SanitizeUntrustedString(), p?.SanitizeUntrustedString(), reportSchedule.Id?.SanitizeUntrustedString());
+                        }
+                    }
+                }
+                else
+                {
+                    _logger.LogInformation("Generating new Adhoc report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, reportSchedule.Id, DateTime.UtcNow);
+
+                    // Get Patient List if none was provided
+                    if (value.PatientIds == null || value.PatientIds.Count == 0)
+                    {
+                        _logger.LogDebug("Getting Patient List from Census Service for facility {FacilityId} from {StartDate} to {EndDate}", facilityId, startDate, endDate);
+                        value.PatientIds =
+                            await GetPatientList(facilityId, startDate.Value, endDate.Value);
+                    }
+
+                    var patientIds = value.PatientIds.Distinct().ToList();
+
+                    foreach (var patient in patientIds)
+                    {
+                        var newEntry = new ReportEntry()
+                        {
+                            PatientId = patient,
+                            ReportingStatus = ReportingStatus.PatientIdentified,
+                            ReportScheduleId = reportSchedule.Id,
+                            FacilityId = facilityId,
+                            CreateDate = DateTime.UtcNow
+                        };
+
+                        foreach (var reportType in reportTypes)
+                        {
+                            newEntry.MeasureReportList.Add(new EvaluatedMeasureReport()
+                            {
+                                Status = MeasureReportStatus.EntryCreated,
+                                ReportType = reportType
+                            });
+                        }
+
+                        await reportEntryManager.AddAsync(newEntry, cancellationToken);
+                    }
+
+                    await _dataAcqProducer.Produce(reportSchedule, patientIds);
+                }
+            }
+            catch (DeadLetterException ex)
+            {
+                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
+            }
+            catch (TransientException ex)
+            {
+                _transientExceptionHandler.HandleException(result, ex, facilityId);
+            }
+            catch (TimeoutException ex)
+            {
+                var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [GenerateReportRequested] at offset: {result.TopicPartitionOffset}";
+                var transientException = new TransientException(exceptionMessage, ex);
+                _transientExceptionHandler.HandleException(result, transientException, facilityId);
+            }
+            catch (Exception ex)
+            {
+                _transientExceptionHandler.HandleException(result, ex, facilityId);
+            }
+        }
+
         private async Task<List<string>> GetPatientList(string facilityId, DateTime startDate, DateTime enddate)
         {
             string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
@@ -390,7 +358,6 @@ namespace LantanaGroup.Link.Report.Listeners
 
             if (!_linkBearerServiceOptions.Value.AllowAnonymous)
             {
-                //Add link token
                 var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 5);
                 httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
@@ -403,19 +370,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 throw new TransientException("Response from Census service is not successful: " + censusContent);
 
             List? admittedPatients;
-            try
-            {
-                admittedPatients =
-                    JsonSerializer.Deserialize<List>(
-                        censusContent,
-                        LinkFhirSerializerOptions.ForFhirLenientSerialization);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error deserializing admitted patients from Census service response.");
-                _logger.LogDebug("Census service response: {CensusContent}", censusContent);
-                throw new TransientException("Error deserializing admitted patients from Census service response: " + ex.Message + Environment.NewLine + ex.StackTrace, ex.InnerException);
-            }
+            admittedPatients = JsonSerializer.Deserialize<List>(censusContent, LinkFhirSerializerOptions.ForFhirLenientSerialization);
 
             return admittedPatients?.Entry?.Select(p => p.Item.Reference.Split('/').Last()).Distinct().ToList() ?? new List<string>();
         }

@@ -1,13 +1,10 @@
-﻿using System.Linq.Expressions;
-using LantanaGroup.Link.Report.Application.Factory;
-using LantanaGroup.Link.Report.Domain.Enums;
+﻿using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
-using LantanaGroup.Link.Shared.Application.Utilities;
 using LinqKit;
+using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
 {
