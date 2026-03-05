@@ -172,7 +172,6 @@ services:
     networks:
       - link-nw
 
-  # MongoDB as a single-node replica set (required for Quartz transactions)
   mongo:
     image: mongo:6-jammy
     command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
@@ -184,7 +183,7 @@ services:
     networks:
       - link-nw
     healthcheck:
-      test: ["CMD","mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 5s
       timeout: 5s
       retries: 3
@@ -194,20 +193,33 @@ services:
     image: mongo:6-jammy
     container_name: mongo-init
     depends_on:
-      mongo:
-        condition: service_healthy
+        mongo:
+            condition: service_healthy
     command: >
-      bash -c '
-        sleep 10 &&
-        mongosh --host mongo:27017 --eval "
-          rs.initiate({
-            _id: \"rs0\",
-            members: [{ _id: 0, host: \"mongo:27017\" }]
-          })
-        "
-      '
+        bash -c '
+        echo "=== MongoDB Replica Set Setup ===";
+        sleep 6;
+
+        mongosh --host mongo:27017 --quiet --eval "
+            try {
+            if (rs.status().ok) {
+                print(\"? Replica set rs0 already initialized - skipping\");
+                quit(0);
+            }
+            } catch (err) {
+            print(\"?? Initializing replica set rs0...\");
+            rs.initiate({
+                _id: \"rs0\",
+                members: [{ _id: 0, host: \"mongo:27017\" }]
+            });
+            print(\"? Replica set initialized successfully\");
+            }
+        ";
+
+        echo "=== mongo_init completed ===";
+        '
     networks:
-      - link-nw
+        - link-nw
       
   ###########################################
   ### Telemetry
