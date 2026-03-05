@@ -936,7 +936,7 @@ public class PatientDataServiceTests
         _mockLogQueries.Verify(m => m.UpdateAsync(
             It.Is<UpdateDataAcquisitionLogModel>(u =>
                 u.Status == RequestStatus.Failed &&
-                u.RetryAttempts == 0 &&
+                u.RetryAttempts == 1 &&
                 u.ExecutionDate >= DateTime.UtcNow.AddSeconds(20) &&  // Widened range to account for execution time
                 u.ExecutionDate <= DateTime.UtcNow.AddSeconds(40) &&
                 u.Notes.Any(n => n.Contains("Throttled (429): Retrying after") && n.Contains("30"))  // Check for specific delay in note
@@ -1001,7 +1001,7 @@ public class PatientDataServiceTests
         _mockLogQueries.Verify(m => m.UpdateAsync(
             It.Is<UpdateDataAcquisitionLogModel>(u =>
                 u.Status == RequestStatus.Failed &&
-                u.RetryAttempts == 0 &&
+                u.RetryAttempts == 1 &&
                 u.ExecutionDate >= DateTime.UtcNow.AddMinutes(1.9) &&  // Approximate
                 u.ExecutionDate <= DateTime.UtcNow.AddMinutes(2.1) &&
                 u.Notes.Any(n => n.Contains("Throttled (429): Retrying after"))
@@ -1060,11 +1060,11 @@ public class PatientDataServiceTests
         // Act
         await _service.ExecuteLogRequest(request, cancellationToken);
         
-        // Assert: Log rescheduled ~60s from now, Failed, retry=0, note reflects default delay
+        // Assert: Log rescheduled ~60s from now, Failed, retry=1, note reflects default delay
         _mockLogQueries.Verify(m => m.UpdateAsync(
             It.Is<UpdateDataAcquisitionLogModel>(u =>
                 u.Status == RequestStatus.Failed &&
-                u.RetryAttempts == 0 &&
+                u.RetryAttempts == 1 &&
                 u.ExecutionDate >= DateTime.UtcNow.AddSeconds(55) &&  // Approx for 60s, allowing execution variance
                 u.ExecutionDate <= DateTime.UtcNow.AddSeconds(65) &&
                 u.Notes.Any(n => n.Contains("Throttled (429): Retrying after") && n.Contains("60"))
