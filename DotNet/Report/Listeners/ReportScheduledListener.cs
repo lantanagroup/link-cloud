@@ -2,15 +2,17 @@
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.Services;
+using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
-using Quartz;
 using System.Text;
 
 namespace LantanaGroup.Link.Report.Listeners
@@ -21,13 +23,13 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IKafkaConsumerFactory<string, ReportScheduledValue> _kafkaConsumerFactory;
         private readonly ITransientExceptionHandler<string, ReportScheduledValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, ReportScheduledValue> _deadLetterExceptionHandler;
-        private readonly ISchedulerFactory _schedulerFactory;
+        private readonly IQuartzJobHelper _quartzJobHelper;
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ServiceInformation _serviceInformation;
         private readonly BlobStorageService _blobStorageService;
 
         public ReportScheduledListener(ILogger<ReportScheduledListener> logger, IKafkaConsumerFactory<string, ReportScheduledValue> kafkaConsumerFactory,
-            ISchedulerFactory schedulerFactory,
+            IQuartzJobHelper quartzJobHelper,
             ITransientExceptionHandler<string, ReportScheduledValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<string, ReportScheduledValue> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory,
@@ -36,7 +38,7 @@ namespace LantanaGroup.Link.Report.Listeners
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
-            _schedulerFactory = schedulerFactory ?? throw new ArgumentException(nameof(schedulerFactory));
+            _quartzJobHelper = quartzJobHelper;
             _serviceScopeFactory = serviceScopeFactory;
             _serviceInformation = serviceInformation;
 
@@ -175,7 +177,11 @@ namespace LantanaGroup.Link.Report.Listeners
                     reportSchedule = await reportScheduleManager.AddAsync(reportSchedule, cancellationToken);
                     await reportPopulationManager.AddWithReportScheduleAsync(reportSchedule, cancellationToken);
 
-                    await MeasureReportScheduleService.CreateJobAndTrigger(reportSchedule, await _schedulerFactory.GetScheduler(cancellationToken));
+                    await _quartzJobHelper.ScheduleJob<EndOfReportPeriodJob>(new Dictionary<string, object>
+                    {
+                        { "ReportScheduleId", reportSchedule.Id },
+                        { "FacilityId", reportSchedule.FacilityId }
+                    }, reportSchedule.ReportEndDate, reportSchedule.Id, ReportConstants.MeasureReportSubmissionScheduler.Group, $"{reportSchedule.Id}-{reportSchedule.ReportEndDate}");
                 }
             }
             catch (DeadLetterException ex)

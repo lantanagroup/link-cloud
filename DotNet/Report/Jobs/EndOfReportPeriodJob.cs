@@ -4,10 +4,10 @@ using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.KafkaProducers;
-using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using Quartz;
 using Task = System.Threading.Tasks.Task;
 
@@ -17,23 +17,20 @@ namespace LantanaGroup.Link.Report.Jobs
     public class EndOfReportPeriodJob : IJob
     {
         private readonly ILogger<EndOfReportPeriodJob> _logger;
-        private readonly ISchedulerFactory _schedulerFactory;
+        private readonly IQuartzJobHelper _quartz;
         private readonly IServiceScopeFactory _serviceScopeFactory;
-        private readonly ReadyForValidationProducer _readyForValidationProducer;
         private readonly DataAcquisitionRequestedProducer _dataAcqProducer;
 
         public EndOfReportPeriodJob(
             ILogger<EndOfReportPeriodJob> logger,
-            ISchedulerFactory schedulerFactory,
+            IQuartzJobHelper quartz,
             IServiceScopeFactory serviceScopeFactory,
-            DataAcquisitionRequestedProducer dataAcqProducer,
-            ReadyForValidationProducer readyForValidationProducer)
+            DataAcquisitionRequestedProducer dataAcqProducer)
         {
             _logger = logger;
-            _schedulerFactory = schedulerFactory;
+            _quartz = quartz;
             _serviceScopeFactory = serviceScopeFactory;
             _dataAcqProducer = dataAcqProducer;
-            _readyForValidationProducer = readyForValidationProducer;
         }
 
         public async Task Execute(IJobExecutionContext context)
@@ -98,9 +95,10 @@ namespace LantanaGroup.Link.Report.Jobs
                 schedule.Status = ScheduleStatus.EndOfPeriod;
                 schedule.EndOfReportPeriodJobHasRun = true;
                 await reportScheduledManager.UpdateAsync(schedule, CancellationToken.None);
-                
-                // remove the job from the scheduler
-                await MeasureReportScheduleService.DeleteJob(schedule, await _schedulerFactory.GetScheduler());
+
+                await _quartz.DeleteJob(
+                    identity: context.JobDetail.Key.Name,
+                    group: context.JobDetail.Key.Group);
             }
             catch (Exception ex)
             {
@@ -108,7 +106,12 @@ namespace LantanaGroup.Link.Report.Jobs
 
                 if (schedule != null)
                 {
-                    await MeasureReportScheduleService.RescheduleJob(schedule, await _schedulerFactory.GetScheduler());
+                    await _quartz.RescheduleJob<EndOfReportPeriodJob>(
+                        identity: context.JobDetail.Key.Name,
+                        jobData: context.JobDetail.JobDataMap,
+                        newStartAt: schedule.ReportEndDate,
+                        group: context.JobDetail.Key.Group,
+                        description: context.JobDetail.Description);
                 }
             }
         }
