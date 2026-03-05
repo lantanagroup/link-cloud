@@ -2,7 +2,6 @@
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
-using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using System.Diagnostics;
@@ -65,7 +64,6 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     ActivityTraceFlags.Recorded);
 
                 ActivitySource activitySource = ServiceActivitySource.Instance ?? _fallbackActivitySource;
-
                 
                 using var activity = activitySource.StartActivity(
                     "ProduceDataAcquisitionRequested", 

@@ -617,7 +617,8 @@ public class PatientDataService : IPatientDataService
             {
                 log.RetryAttempts ??= 0;
                 log.RetryAttempts++;
-                log.Status = RequestStatus.Pending;
+
+                log.Status = RequestStatus.Failed;
                 log.Notes.Add($"[{DateTime.UtcNow}] OperationOutcome encountered (HTTP {ex.StatusCode}): Retrying. Attempt {log.RetryAttempts}.");
             }
 
@@ -641,7 +642,7 @@ public class PatientDataService : IPatientDataService
             log.RetryAttempts ??= 0;
             log.RetryAttempts++;
 
-            log.Status = RequestStatus.Pending;
+            log.Status = RequestStatus.Failed;
             log.Notes.Add(ex.Message);
 
             await _dataAcquisitionLogQueries.UpdateAsync(new UpdateDataAcquisitionLogModel

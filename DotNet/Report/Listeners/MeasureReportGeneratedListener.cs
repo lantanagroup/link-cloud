@@ -120,7 +120,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (Exception ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - MeasureReportGenerated Exception thrown: " + ex.Message), facilityId);
+                                _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - MeasureReportGenerated Exception thrown: " + ex.Message, ex), facilityId);
                             }
                             finally
                             {
@@ -159,6 +159,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
         public async Task ProcessMessageAsync(ConsumeResult<Null, MeasureReportGeneratedValue> result, string facilityId, CancellationToken cancellationToken)
         {
+
             if (result.Message.Value == null)
             {
                 throw new DeadLetterException($"{Name}: MeasureReportGenerated event value segment missing");
@@ -227,7 +228,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
             catch (Exception ex)
             {
-                throw new DeadLetterException(ex.Message);
+                throw new DeadLetterException(ex.Message, ex);
             }
 
             var elapsed = Stopwatch.GetElapsedTime(startTime);
@@ -252,7 +253,8 @@ namespace LantanaGroup.Link.Report.Listeners
                 await reportPopulationManager.UpdateAsyncWithAggregateResult(populationModel, aggregateMeasureReport, cancellationToken);
             }
 
-            if (reportEntry.MeasureReportList.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable)) {
+            if (reportEntry.MeasureReportList.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable))
+            {
                 await reportEntryManager.UpdateAsyncNotReportableEntry(reportEntry, cancellationToken);
                 return;
             }
@@ -268,8 +270,9 @@ namespace LantanaGroup.Link.Report.Listeners
             catch (Exception ex)
             {
                 _logger.LogError(ex, "An error was encountered producing a ReadyForValidation (ReportId = {reportId}, FacilityId = {facilityId}, PatientId = {patientId}).", schedule.Id.SanitizeUntrustedString(), schedule.FacilityId.SanitizeUntrustedString(), messageValue.PatientId.SanitizeUntrustedString());
-                throw new DeadLetterException(ex.Message);
+                throw new DeadLetterException(ex.Message, ex);
             }
+
         }
     }
 }

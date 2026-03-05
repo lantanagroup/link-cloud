@@ -1,11 +1,9 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
-using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -29,10 +27,10 @@ namespace LantanaGroup.Link.Report.Listeners
         private string Name => this.GetType().Name;
 
         public PatientListsAcquiredListener(
-            ILogger<PatientListsAcquiredListener> logger, 
+            ILogger<PatientListsAcquiredListener> logger,
             IKafkaConsumerFactory<string, PatientListMessage> kafkaConsumerFactory,
             ITransientExceptionHandler<string, PatientListMessage> transientExceptionHandler,
-            IDeadLetterExceptionHandler<string, PatientListMessage> deadLetterExceptionHandler, 
+            IDeadLetterExceptionHandler<string, PatientListMessage> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory, ServiceInformation serviceInformation)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -77,92 +75,8 @@ namespace LantanaGroup.Link.Report.Listeners
                     {
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
-                            if (result == null)
-                            {
-                                consumer.Commit();
-                                return;
-                            }
-
-                            var reportEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportEntryManager>();
-
-                            try
-                            {
-                                using var scope = _serviceScopeFactory.CreateScope();
-                                var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
-
-                                var key = result.Message.Key;
-                                var value = result.Message.Value.PatientLists;
-                                facilityId = key;
-
-                                if (string.IsNullOrWhiteSpace(key) || value == null || value.Any(x => x.PatientIds == null))
-                                {
-                                    throw new DeadLetterException("Invalid Patient Id's Acquired Event");
-                                }
-
-                                var scheduledReports = await database.ReportScheduledRepository.FindAsync(x => x.FacilityId == key && x.EndOfReportPeriodJobHasRun == false, cancellationToken);
-
-                                if (!scheduledReports?.Any() ?? false)
-                                {
-                                    throw new TransientException($"{Name}: No Scheduled Reports found for facilityId: {key}");
-                                }
-
-                                foreach (var scheduledReport in scheduledReports)
-                                {
-                                    foreach (var patientListItem in value)
-                                    {
-                                        foreach (var pId in patientListItem.PatientIds)
-                                        {
-                                            var patientId = pId.Split('/').Last();
-                                            var entry = await reportEntryManager.SingleOrDefaultAsync(e => e.ReportScheduleId == scheduledReport.Id && e.PatientId == patientId, consumeCancellationToken);
-
-                                            if (entry == null)
-                                            {
-                                                entry = new ReportEntry()
-                                                {
-                                                    PatientId = patientId,
-                                                    FacilityId = scheduledReport.FacilityId,
-                                                    CreateDate = DateTime.Now,
-                                                    ReportingStatus = ReportingStatus.PatientIdentified,
-                                                    ReportScheduleId = scheduledReport.Id
-                                                };
-                                                await reportEntryManager.AddAsync(entry, cancellationToken);
-                                            }
-
-                                            foreach (var reportType in scheduledReport.ReportTypes)
-                                            {
-                                                var measureReportEntry = entry.MeasureReportList.Where(x => x.ReportType == reportType).FirstOrDefault();
-
-                                                if (measureReportEntry != null) {
-                                                    continue;
-                                                }
-
-                                                entry.MeasureReportList.Add(new EvaluatedMeasureReport()
-                                                {
-                                                    ReportType = reportType
-                                                });
-
-                                                await reportEntryManager.UpdateAsync(entry);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            catch (DeadLetterException ex)
-                            {
-                                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
-                            }
-                            catch (TransientException ex)
-                            {
-                                _transientExceptionHandler.HandleException(result, ex, facilityId);
-                            }
-                            catch (Exception ex)
-                            {
-                                _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - PatientListsAcquired Exception thrown: " + ex.Message), facilityId);
-                            }
-                            finally
-                            {
-                                consumer.Commit(result);
-                            }
+                            await ProcessMessageAsync(result, consumeCancellationToken);
+                            consumer.Commit(result);
                         }, cancellationToken);
                     }
                     catch (ConsumeException ex)
@@ -193,6 +107,94 @@ namespace LantanaGroup.Link.Report.Listeners
                 _logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
                 consumer.Close();
                 consumer.Dispose();
+            }
+        }
+
+        public async Task ProcessMessageAsync(ConsumeResult<string, PatientListMessage> result, CancellationToken cancellationToken)
+        {
+            string facilityId = string.Empty;
+
+            try
+            {
+                if (result == null)
+                {
+                    return;
+                }
+
+                var reportEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportEntryManager>();
+
+                using var scope = _serviceScopeFactory.CreateScope();
+                var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+
+                var key = result.Message.Key;
+                var value = result.Message.Value.PatientLists;
+                facilityId = key;
+
+                if (string.IsNullOrWhiteSpace(key) || value == null || value.Any(x => x.PatientIds == null))
+                {
+                    throw new DeadLetterException("Invalid Patient Id's Acquired Event");
+                }
+
+                var scheduledReports = await database.ReportScheduledRepository.FindAsync(x => x.FacilityId == key && x.EndOfReportPeriodJobHasRun == false, cancellationToken);
+
+                if (scheduledReports == null || !scheduledReports.Any())
+                {
+                    throw new TransientException($"{Name}: No Scheduled Reports found for facilityId: {key}");
+                }
+
+                foreach (var scheduledReport in scheduledReports)
+                {
+                    foreach (var patientListItem in value)
+                    {
+                        foreach (var pId in patientListItem.PatientIds)
+                        {
+                            var patientId = pId.Split('/').Last();
+                            var entry = await reportEntryManager.SingleOrDefaultAsync(e => e.ReportScheduleId == scheduledReport.Id && e.PatientId == patientId, cancellationToken);
+
+                            if (entry == null)
+                            {
+                                entry = new ReportEntry()
+                                {
+                                    PatientId = patientId,
+                                    FacilityId = scheduledReport.FacilityId,
+                                    CreateDate = DateTime.Now,
+                                    ReportingStatus = ReportingStatus.PatientIdentified,
+                                    ReportScheduleId = scheduledReport.Id
+                                };
+                                await reportEntryManager.AddAsync(entry, cancellationToken);
+                            }
+
+                            foreach (var reportType in scheduledReport.ReportTypes)
+                            {
+                                var measureReportEntry = entry.MeasureReportList.Where(x => x.ReportType == reportType).FirstOrDefault();
+
+                                if (measureReportEntry != null)
+                                {
+                                    continue;
+                                }
+
+                                entry.MeasureReportList.Add(new EvaluatedMeasureReport()
+                                {
+                                    ReportType = reportType
+                                });
+
+                                await reportEntryManager.UpdateAsync(entry);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (DeadLetterException ex)
+            {
+                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
+            }
+            catch (TransientException ex)
+            {
+                _transientExceptionHandler.HandleException(result, ex, facilityId);
+            }
+            catch (Exception ex)
+            {
+                _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - PatientListsAcquired Exception thrown: " + ex.Message, ex), facilityId);
             }
         }
 

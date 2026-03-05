@@ -516,7 +516,7 @@ public class PatientDataServiceTests
 
         // Assert
         Assert.NotNull(updatedModel);
-        Assert.Equal(RequestStatus.Pending, updatedModel.Status);
+        Assert.Equal(RequestStatus.Failed, updatedModel.Status);
     }
 
     [Fact]
