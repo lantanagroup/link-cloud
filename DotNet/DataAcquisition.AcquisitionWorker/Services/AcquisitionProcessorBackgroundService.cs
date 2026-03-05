@@ -154,6 +154,8 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                     ExecutionDate = log.ExecutionDate
                 }, ct);
             }
+
+            throw;
         }
             
         try
