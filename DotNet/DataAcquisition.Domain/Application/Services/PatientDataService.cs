@@ -639,6 +639,7 @@ public class PatientDataService : IPatientDataService
             log!.Notes ??= new List<string>();
 
             log.RetryAttempts ??= 0;
+            log.RetryAttempts++;
 
             log.Status = RequestStatus.Pending;
             log.Notes.Add(ex.Message);
@@ -663,6 +664,7 @@ public class PatientDataService : IPatientDataService
             log.Notes ??= new List<string>();
 
             log.RetryAttempts ??= 0;
+            log.RetryAttempts++;
 
             log.ExecutionDate = DateTime.UtcNow.Add(ex.RetryAfter);
             log.Status = RequestStatus.Failed; //Don't count this as a failure
@@ -691,6 +693,8 @@ public class PatientDataService : IPatientDataService
 
             log.Notes ??= new List<string>();
 
+            log.RetryAttempts ??= 0;
+            log.RetryAttempts++;
             log.Status = RequestStatus.Failed;
             log.Notes.Add(
                 $"PatientDataService.ExecuteLogRequest: [{DateTime.UtcNow}] Error encountered: {log.FacilityId?.Sanitize() ?? string.Empty}\n{ex.Message}\n{ex.InnerException?.Message ?? string.Empty}");
