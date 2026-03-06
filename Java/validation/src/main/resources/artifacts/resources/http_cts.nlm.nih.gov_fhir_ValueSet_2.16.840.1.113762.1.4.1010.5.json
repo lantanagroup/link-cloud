@@ -1,0 +1,119 @@
+{
+  "resourceType": "ValueSet",
+  "id": "2.16.840.1.113762.1.4.1010.5",
+  "meta": {
+    "versionId": "34",
+    "lastUpdated": "2024-06-27T01:15:11.000-04:00",
+    "profile": [
+      "http://hl7.org/fhir/StructureDefinition/shareablevalueset",
+      "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/computable-valueset-cqfm",
+      "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/publishable-valueset-cqfm"
+    ]
+  },
+  "language": "en",
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/valueset-author",
+      "valueContactDetail": {
+        "name": "HL7 US Realm Program Management Author"
+      }
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/resource-lastReviewDate",
+      "valueDate": "2025-08-19"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/valueset-effectiveDate",
+      "valueDateTime": "2024-06-27"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/artifact-effectivePeriod",
+      "valuePeriod": {
+        "start": "2024-06-27"
+      }
+    }
+  ],
+  "url": "http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1010.5",
+  "identifier": [
+    {
+      "system": "urn:ietf:rfc:3986",
+      "value": "urn:oid:2.16.840.1.113762.1.4.1010.5"
+    }
+  ],
+  "version": "20240627",
+  "name": "MedicationClinicalBrandSpecificDrug",
+  "title": "Medication Clinical Brand specific Drug",
+  "status": "active",
+  "date": "2024-06-27T01:15:11-04:00",
+  "publisher": "HL7 US Realm Program Management Steward",
+  "jurisdiction": [
+    {
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/data-absent-reason",
+          "valueCode": "unknown"
+        }
+      ]
+    }
+  ],
+  "purpose": "(Clinical Focus: All prescribable medication formulations represented using  a \"brand-specific\" concept developed to support HL7 C-CDA R2 October 2013 ballot.),(Data Element Scope: medication orderable),(Inclusion Criteria: Prescribable medications including multiple ingredient medications. Intersection (\nUnion(FilterOnProperty(TTY,SBDG), FilterOnProperty(TTY,SBDF), FilterOnProperty(TTY,SBD), FilterOnProperty(TTY,BPCK),\nFilterOnProperty(TTY,SBDC))),(Exclusion Criteria: Non-prescribable (OTC) drugs. Concepts representing \"generic\" (non-proprietary) concepts)",
+  "compose": {
+    "include": [
+      {
+        "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+        "version": "01052026",
+        "filter": [
+          {
+            "property": "tty",
+            "op": "=",
+            "value": "SBDG"
+          }
+        ]
+      },
+      {
+        "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+        "version": "01052026",
+        "filter": [
+          {
+            "property": "tty",
+            "op": "=",
+            "value": "SBDF"
+          }
+        ]
+      },
+      {
+        "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+        "version": "01052026",
+        "filter": [
+          {
+            "property": "tty",
+            "op": "=",
+            "value": "SBD"
+          }
+        ]
+      },
+      {
+        "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+        "version": "01052026",
+        "filter": [
+          {
+            "property": "tty",
+            "op": "=",
+            "value": "BPCK"
+          }
+        ]
+      },
+      {
+        "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+        "version": "01052026",
+        "filter": [
+          {
+            "property": "tty",
+            "op": "=",
+            "value": "BN"
+          }
+        ]
+      }
+    ]
+  }
+}

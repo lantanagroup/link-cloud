@@ -1,0 +1,74 @@
+{
+  "resourceType": "ValueSet",
+  "id": "2.16.840.1.113762.1.4.1240.4",
+  "meta": {
+    "versionId": "9",
+    "lastUpdated": "2025-04-18T10:20:37.000-04:00",
+    "profile": [
+      "http://hl7.org/fhir/StructureDefinition/shareablevalueset",
+      "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/computable-valueset-cqfm",
+      "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/publishable-valueset-cqfm"
+    ]
+  },
+  "language": "en",
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/valueset-author",
+      "valueContactDetail": {
+        "name": "HL7 US Realm Program Management Author"
+      }
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/resource-lastReviewDate",
+      "valueDate": "2025-10-22"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/valueset-effectiveDate",
+      "valueDateTime": "2023-06-28"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/artifact-effectivePeriod",
+      "valuePeriod": {
+        "start": "2023-06-28"
+      }
+    }
+  ],
+  "url": "http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1240.4",
+  "identifier": [
+    {
+      "system": "urn:ietf:rfc:3986",
+      "value": "urn:oid:2.16.840.1.113762.1.4.1240.4"
+    }
+  ],
+  "version": "20230628",
+  "name": "AskedDeclinedDataAbsentReason",
+  "title": "Asked Declined Data Absent Reason",
+  "status": "active",
+  "date": "2023-06-28T01:00:46-04:00",
+  "publisher": "HL7 US Realm Program Management Steward",
+  "description": "Used to specify why the normally expected content of the data element is missing. This single value value set is to be used when the source was asked but declined to answer.",
+  "jurisdiction": [
+    {
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/data-absent-reason",
+          "valueCode": "unknown"
+        }
+      ]
+    }
+  ],
+  "purpose": "(Clinical Focus: This single member value set provides an encoded term when the source declines to provide an answer.),(Data Element Scope: Any data element that carries information that can be obtained from the patient or related person.),(Inclusion Criteria: Includes only asked-declined term from the HL7 FHIR Data Absent reason code system.),(Exclusion Criteria: Exludes all other members of the code system)",
+  "compose": {
+    "include": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/data-absent-reason",
+        "concept": [
+          {
+            "code": "asked-declined",
+            "display": "Asked But Declined"
+          }
+        ]
+      }
+    ]
+  }
+}

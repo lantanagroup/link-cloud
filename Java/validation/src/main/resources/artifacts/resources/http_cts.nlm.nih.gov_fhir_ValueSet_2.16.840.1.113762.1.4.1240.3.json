@@ -1,0 +1,75 @@
+{
+  "resourceType": "ValueSet",
+  "id": "2.16.840.1.113762.1.4.1240.3",
+  "meta": {
+    "versionId": "10",
+    "lastUpdated": "2024-04-26T15:45:20.000-04:00",
+    "profile": [
+      "http://hl7.org/fhir/StructureDefinition/shareablevalueset",
+      "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/computable-valueset-cqfm",
+      "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/publishable-valueset-cqfm"
+    ]
+  },
+  "language": "en",
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/valueset-author",
+      "valueContactDetail": {
+        "name": "HL7 US Realm Program Management Author"
+      }
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/resource-lastReviewDate",
+      "valueDate": "2024-06-05"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/valueset-effectiveDate",
+      "valueDateTime": "2023-06-28"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/artifact-effectivePeriod",
+      "valuePeriod": {
+        "start": "2023-06-28"
+      }
+    }
+  ],
+  "url": "http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1240.3",
+  "identifier": [
+    {
+      "system": "urn:ietf:rfc:3986",
+      "value": "urn:oid:2.16.840.1.113762.1.4.1240.3"
+    }
+  ],
+  "version": "20230628",
+  "name": "Sex",
+  "title": "Sex",
+  "status": "active",
+  "date": "2023-06-28T01:00:46-04:00",
+  "publisher": "HL7 US Realm Program Management Steward",
+  "description": "Created specifically to support United States USCDI v3 data element \"Sex\"",
+  "jurisdiction": [
+    {
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/data-absent-reason",
+          "valueCode": "unknown"
+        }
+      ]
+    }
+  ],
+  "purpose": "(Clinical Focus: This grouped set contains codes for the terms Male, Female, Patient Sex Unknown, and Identifies as Binary. It includes an HL7 term to represent when a person declined to provide this information\nNote that this term has a SNOMED CT synonym of \"Fluctuating between male and female, or identifying as either having a gender that is in-between or beyond the two categories or as having no gender, either permanently or some of the time.\" which aligns with the concept of \"X\" that is an allowable term on passports and many states birth certificates.),(Data Element Scope: A data element used for general documentation of sex representation),(Inclusion Criteria: The general codes selected.),(Exclusion Criteria: Sex or gender related concepts that are more detailed or specific in nature.)",
+  "compose": {
+    "include": [
+      {
+        "valueSet": [
+          "http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1099.53"
+        ]
+      },
+      {
+        "valueSet": [
+          "http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1240.4"
+        ]
+      }
+    ]
+  }
+}

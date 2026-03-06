@@ -1,0 +1,120 @@
+{
+  "resourceType": "ValueSet",
+  "id": "2.16.840.1.113883.3.88.12.80.17",
+  "meta": {
+    "versionId": "36",
+    "lastUpdated": "2024-06-27T01:15:11.000-04:00",
+    "profile": [
+      "http://hl7.org/fhir/StructureDefinition/shareablevalueset",
+      "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/computable-valueset-cqfm",
+      "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/publishable-valueset-cqfm"
+    ]
+  },
+  "language": "en",
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/valueset-author",
+      "valueContactDetail": {
+        "name": "HL7 US Realm Program Management Author"
+      }
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/resource-lastReviewDate",
+      "valueDate": "2025-07-29"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/valueset-effectiveDate",
+      "valueDateTime": "2024-06-27"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/artifact-effectivePeriod",
+      "valuePeriod": {
+        "start": "2024-06-27"
+      }
+    }
+  ],
+  "url": "http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.88.12.80.17",
+  "identifier": [
+    {
+      "system": "urn:ietf:rfc:3986",
+      "value": "urn:oid:2.16.840.1.113883.3.88.12.80.17"
+    }
+  ],
+  "version": "20240627",
+  "name": "MedicationClinicalGeneralDrug",
+  "title": "Medication Clinical General Drug",
+  "status": "active",
+  "date": "2024-06-27T01:15:11-04:00",
+  "publisher": "HL7 US Realm Program Management Steward",
+  "description": "This value set was originally published as part of HITSP but has been refined.\n\"Value set intensionally defined from RXNORM (OID: 2.16.840.1.113883.6.88)\nIntersection(\n  FilterOnProperty(PRESCRIBABLE,Y),\n  Union(\n     FilterOnProperty(TTY,SCDG),\n     FilterOnProperty(TTY,SCDF),\n     FilterOnProperty(TTY,SCD),\n     FilterOnProperty(TTY,GPCK),\n     FilterOnProperty(TTY,SCDC)\n   ),\"",
+  "jurisdiction": [
+    {
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/data-absent-reason",
+          "valueCode": "unknown"
+        }
+      ]
+    }
+  ],
+  "purpose": "(Clinical Focus: All non-branded prescribable medication formulations in RxNorm except those limited to ingredient only.),(Data Element Scope: Medication orderables),(Inclusion Criteria: Prescribable medications including multiple ingredient medications.\nUnion(FilterOnProperty(TTY,SCDG), FilterOnProperty(TTY,SCDF), FilterOnProperty(TTY,SCD), FilterOnProperty(TTY,GPCK),\nFilterOnProperty(TTY,SCDC))),(Exclusion Criteria: Concepts for proprietary representations of drugs. Non-prescribable (OTC) drugs. Ingredient formulations.)",
+  "compose": {
+    "include": [
+      {
+        "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+        "version": "01052026",
+        "filter": [
+          {
+            "property": "tty",
+            "op": "=",
+            "value": "SCDG"
+          }
+        ]
+      },
+      {
+        "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+        "version": "01052026",
+        "filter": [
+          {
+            "property": "tty",
+            "op": "=",
+            "value": "SCDF"
+          }
+        ]
+      },
+      {
+        "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+        "version": "01052026",
+        "filter": [
+          {
+            "property": "tty",
+            "op": "=",
+            "value": "SCD"
+          }
+        ]
+      },
+      {
+        "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+        "version": "01052026",
+        "filter": [
+          {
+            "property": "tty",
+            "op": "=",
+            "value": "GPCK"
+          }
+        ]
+      },
+      {
+        "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+        "version": "01052026",
+        "filter": [
+          {
+            "property": "tty",
+            "op": "=",
+            "value": "IN"
+          }
+        ]
+      }
+    ]
+  }
+}
