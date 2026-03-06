@@ -75,6 +75,8 @@ public class ArtifactService {
 
     public void initializeArtifacts() throws IOException {
         logger.info("Initializing artifacts");
+        artifactRepository.deleteAll();
+        logger.info("Deleted all existing artifacts");
         initializeArtifacts(ArtifactType.PACKAGE, "classpath*:artifacts/packages/*.tgz");
         initializeArtifacts(ArtifactType.RESOURCE, "classpath*:artifacts/resources/*.json");
         invalidateValidationSupport();
