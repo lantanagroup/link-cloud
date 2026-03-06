@@ -121,6 +121,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task<ReportPopulation> UpdateAsyncWithAggregateResult(ReportPopulation populationModel, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken)
         {
+            populationModel.ModifyDate = DateTime.UtcNow;
+
             if (string.IsNullOrWhiteSpace(populationModel.Measure))
             {
                 populationModel.Measure = aggregateResult.Measure;
