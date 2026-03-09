@@ -8,6 +8,8 @@ import com.lantanagroup.link.validation.entities.CategorySnapshot;
 import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.repositories.CategoryRepository;
 import com.lantanagroup.link.validation.repositories.CategoryRuleRepository;
+import com.lantanagroup.link.validation.repositories.ResultRepository;
+import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Scope;
@@ -18,8 +20,13 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @Scope(value = "prototype", proxyMode = ScopedProxyMode.TARGET_CLASS)
@@ -29,17 +36,41 @@ public class CategorizationService {
     private final ObjectMapper objectMapper;
     private final CategoryRepository categoryRepository;
     private final CategoryRuleRepository categoryRuleRepository;
+    private final ResultRepository resultRepository;
     private final MetricService metricService;
 
     public CategorizationService(
             ObjectMapper objectMapper,
             CategoryRepository categoryRepository,
             CategoryRuleRepository categoryRuleRepository,
+            ResultRepository resultRepository,
             MetricService metricService) {
         this.objectMapper = objectMapper;
         this.categoryRepository = categoryRepository;
         this.categoryRuleRepository = categoryRuleRepository;
+        this.resultRepository = resultRepository;
         this.metricService = metricService;
+    }
+
+    /**
+     * Removes any persisted categories (and their associated category_rule and result_category rows)
+     * whose IDs are not present in {@code keepIds}. Intended to be called before saving an authoritative
+     * set of categories (e.g. on $initialize or $bulk-import) so that stale categories do not linger.
+     */
+    @Transactional
+    public void removeObsoleteCategories(Collection<String> keepIds) {
+        Set<String> keepSet = new HashSet<>(keepIds);
+        List<String> obsoleteIds = categoryRepository.findAll().stream()
+                .map(Category::getId)
+                .filter(id -> !keepSet.contains(id))
+                .collect(Collectors.toList());
+        if (obsoleteIds.isEmpty()) {
+            return;
+        }
+        logger.info("Removing {} obsolete categories: {}", obsoleteIds.size(), obsoleteIds);
+        resultRepository.deleteByCategoryIds(obsoleteIds);
+        categoryRuleRepository.deleteByCategoryIdIn(obsoleteIds);
+        categoryRepository.deleteByIdIn(obsoleteIds);
     }
 
     public void saveCategorySnapshot(CategorySnapshot categorySnapshot) {
@@ -50,12 +81,17 @@ public class CategorizationService {
         categoryRuleRepository.save(categoryRule);
     }
 
+    @Transactional
     public void initializeCategories() throws IOException {
         logger.info("Initializing categories");
         PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
         Resource resource = resolver.getResource("classpath:categories.json");
         try (InputStream stream = resource.getInputStream()) {
             CategorySnapshot[] categorySnapshots = objectMapper.readValue(stream, CategorySnapshot[].class);
+            Set<String> keepIds = Arrays.stream(categorySnapshots)
+                    .map(CategorySnapshot::getId)
+                    .collect(Collectors.toSet());
+            removeObsoleteCategories(keepIds);
             for (CategorySnapshot categorySnapshot : categorySnapshots) {
                 logger.debug("Initializing category: {}", categorySnapshot.getId());
                 saveCategorySnapshot(categorySnapshot);
