@@ -33,6 +33,7 @@ namespace IntegrationTests.Report
             using var scope = _fixture.ScopeFactory.CreateScope();
             var listener = scope.ServiceProvider.GetRequiredService<ReportScheduledListener>();
             var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+            var reportPopulationManager = scope.ServiceProvider.GetRequiredService<IReportPopulationManager>();
 
             var facilityId = Guid.NewGuid().ToString();
             var reportId = Guid.NewGuid().ToString();
@@ -71,6 +72,10 @@ namespace IntegrationTests.Report
             Assert.Equal(Frequency.Monthly, created.Frequency);
             Assert.Equal(2, created.ReportTypes.Count);
 
+            var population = await reportPopulationManager.FindAsync(x => x.ReportScheduleId == reportId);
+            Assert.NotNull(population);
+            Assert.Equal(2, population.Count);
+            
             var expectedJobData = new Dictionary<string, object>
             {
                 { "ReportScheduleId", reportId },
