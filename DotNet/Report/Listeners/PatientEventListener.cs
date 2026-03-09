@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
+using Google.Protobuf.WellKnownTypes;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
@@ -77,7 +78,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     {
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
-
+                            await ProcessMessageAsync(result, consumeCancellationToken);
                             consumer.Commit(result);
                         }, cancellationToken);
                     }
@@ -112,10 +113,11 @@ namespace LantanaGroup.Link.Report.Listeners
             }
         }
 
-        public async Task ProcessMessageAsync(ConsumeResult<string, PatientEventValue> result, CancellationToken cancellationToken)
+        public async Task ProcessMessageAsync(ConsumeResult<string, PatientEventValue>? result, CancellationToken cancellationToken)
         {
             if (result == null)
             {
+                _logger.LogWarning("Null PatientEvent consumer result found");
                 return;
             }
 
