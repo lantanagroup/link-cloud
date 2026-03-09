@@ -71,8 +71,10 @@ public class CategorizationService {
         resultRepository.deleteByCategoryIds(obsoleteIds);
         categoryRuleRepository.deleteByCategoryIdIn(obsoleteIds);
         categoryRepository.deleteByIdIn(obsoleteIds);
+        categoryRepository.flush();
     }
 
+    @Transactional
     public void saveCategorySnapshot(CategorySnapshot categorySnapshot) {
         Category category = categoryRepository.findById(categorySnapshot.getId())
                 .orElseGet(categorySnapshot::toCategory);
