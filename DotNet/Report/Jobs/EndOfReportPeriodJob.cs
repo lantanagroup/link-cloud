@@ -88,6 +88,7 @@ namespace LantanaGroup.Link.Report.Jobs
                         catch (ProduceException<string, DataAcquisitionRequestedValue> ex)
                         {
                             _logger.LogError(ex, "Error generating Data Acquisition Requested event for FacilityId {FacilityId}", schedule.FacilityId);
+                            throw;
                         }
                     }
                 }
@@ -109,7 +110,7 @@ namespace LantanaGroup.Link.Report.Jobs
                     await _quartz.RescheduleJob<EndOfReportPeriodJob>(
                         identity: context.JobDetail.Key.Name,
                         jobData: context.JobDetail.JobDataMap,
-                        newStartAt: schedule.ReportEndDate,
+                        newStartAt: DateTimeOffset.UtcNow.AddMinutes(5),
                         group: context.JobDetail.Key.Group,
                         description: context.JobDetail.Description);
                 }
