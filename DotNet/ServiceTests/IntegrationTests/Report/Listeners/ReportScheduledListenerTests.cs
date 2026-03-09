@@ -71,8 +71,14 @@ namespace IntegrationTests.Report
             Assert.Equal(Frequency.Monthly, created.Frequency);
             Assert.Equal(2, created.ReportTypes.Count);
 
+            var expectedJobData = new Dictionary<string, object>
+            {
+                { "ReportScheduleId", reportId },
+                { "FacilityId", facilityId }
+            };
+
             _fixture.QuartzJobHelperMock.Verify(f => f.ScheduleJob<EndOfReportPeriodJob>(
-                It.IsAny<IDictionary<string, object>>(), 
+                expectedJobData,
                 endDate, 
                 It.IsAny<string>(),
                 It.IsAny<string>(), 
