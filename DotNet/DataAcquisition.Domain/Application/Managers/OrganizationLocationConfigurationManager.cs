@@ -56,15 +56,29 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
 
     public async Task<OrganizationLocationConfigurationModel> UpdateByIdAsync(int configId, UpdateOrganizationLocationConfigurationModel model)
     {
-        var entity = await _database.LocationConfigurationRepository.GetAsync(configId);
-        if (entity == null)
-            throw new KeyNotFoundException($"OrganizationLocationConfiguration with ConfigId {configId} not found.");
+        try
+        {
+            await _database.BeginTransactionAsync();
+            var entity = await _database.LocationConfigurationRepository.GetAsync(configId);
+            entity.LocationConditions = await _database.LocationConditionRepository.FindAsync(c => c.ConfigId == configId);
 
-        ApplyUpdateToEntity(entity, model);
-        _database.LocationConfigurationRepository.Update(entity);
-        await _database.SaveChangesAsync();
+            if (entity == null)
+                throw new KeyNotFoundException($"OrganizationLocationConfiguration with ConfigId {configId} not found.");
 
-        return ProjectToModel(entity);
+            await ApplyUpdateToEntity(entity, model);
+            _database.LocationConfigurationRepository.Update(entity);
+
+            await _database.SaveChangesAsync();
+
+            await _database.CommitTransactionAsync();
+
+            return ProjectToModel(entity);
+        }
+        catch
+        {
+            await _database.RollbackTransactionAsync();
+            throw;
+        }
     }
 
     public async Task<List<OrganizationLocationConfigurationModel>> UpdateByFacilityIdAsync(string facilityId, UpdateOrganizationLocationConfigurationModel model)
@@ -75,25 +89,40 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
         if (entities.Count == 0)
             throw new KeyNotFoundException($"No OrganizationLocationConfiguration found for FacilityId {facilityId}");
 
-        // Update ALL configs for this facility (common pattern when multiples are allowed)
+        var updatedEntities = new List<OrganizationLocationConfigurationModel>();
         foreach (var entity in entities)
         {
-            ApplyUpdateToEntity(entity, model);
-            _database.LocationConfigurationRepository.Update(entity);
+            var updated = await UpdateByIdAsync(entity.ConfigId, model);
+
+            updatedEntities.Add(updated);
         }
 
-        await _database.SaveChangesAsync();
-
-        return entities.Select(ProjectToModel).ToList();
+        return updatedEntities;
     }
 
     public async Task DeleteByIdAsync(int configId)
     {
-        var entity = await _database.LocationConfigurationRepository.GetAsync(configId);
-        if (entity != null)
+        try
         {
+            await _database.BeginTransactionAsync();
+
+            var entity = await _database.LocationConfigurationRepository.GetAsync(configId);
+
+            entity.LocationConditions = await _database.LocationConditionRepository.FindAsync(c => c.ConfigId == configId);
+
+            foreach (var condition in entity.LocationConditions)
+            {
+                _database.LocationConditionRepository.Remove(condition);
+            }
+
             _database.LocationConfigurationRepository.Remove(entity);
             await _database.SaveChangesAsync();
+            
+            await _database.CommitTransactionAsync();
+        }
+        catch
+        {
+            await _database.RollbackTransactionAsync();
         }
     }
 
@@ -103,18 +132,13 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
         var entities = await _database.LocationConfigurationRepository
             .FindAsync(c => c.FacilityId == facilityId);
 
-        if (entities.Count == 0)
-            return; // Nothing to delete
-
-        foreach (var entity in entities)
+        foreach(var entity in entities)
         {
-            _database.LocationConfigurationRepository.Remove(entity);
+            await DeleteByIdAsync(entity.ConfigId);
         }
-
-        await _database.SaveChangesAsync();
     }
 
-    private void ApplyUpdateToEntity(OrganizationLocationConfiguration entity, UpdateOrganizationLocationConfigurationModel model)
+    private async Task ApplyUpdateToEntity(OrganizationLocationConfiguration entity, UpdateOrganizationLocationConfigurationModel model)
     {
         if (model.Description != null)
             entity.Description = model.Description;
@@ -124,14 +148,17 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
 
         entity.ModifiedOn = DateTime.UtcNow;
 
-        if (model.Conditions != null)
+        if (model.Conditions != null && model.Conditions.Any())
         {
-            // Replace all conditions
-            foreach (var cond in entity.LocationConditions.ToList())
+            //Rebuild conditions
+            foreach (var condition in entity.LocationConditions)
             {
-                _database.LocationConditionRepository.Remove(cond);
+                _database.LocationConditionRepository.Remove(condition);
             }
+
             entity.LocationConditions.Clear();
+
+            await _database.SaveChangesAsync();
 
             foreach (var cond in model.Conditions)
             {

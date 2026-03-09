@@ -59,8 +59,9 @@ public class OrganizationLocationConfigurationQueriesTests : IClassFixture<DataA
         var result = await queries.GetByFacilityIdAsync("Get-By-Facility");
 
         Assert.NotNull(result);
-        Assert.Equal("Get-By-Facility", result.FacilityId);
-        Assert.Equal("Facility Test", result.Description);
+        Assert.NotEmpty(result);
+        Assert.Equal("Get-By-Facility", result.First().FacilityId);
+        Assert.Equal("Facility Test", result.First().Description);
     }
 
     [Fact]
