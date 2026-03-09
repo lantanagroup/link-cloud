@@ -75,9 +75,15 @@ namespace IntegrationTests.Report
             var population = await reportPopulationManager.FindAsync(x => x.ReportScheduleId == reportId);
             Assert.NotNull(population);
             Assert.Equal(2, population.Count);
+            
+            var expectedJobData = new Dictionary<string, object>
+            {
+                { "ReportScheduleId", reportId },
+                { "FacilityId", facilityId }
+            };
 
             _fixture.QuartzJobHelperMock.Verify(f => f.ScheduleJob<EndOfReportPeriodJob>(
-                It.IsAny<IDictionary<string, object>>(), 
+                expectedJobData,
                 endDate, 
                 It.IsAny<string>(),
                 It.IsAny<string>(), 
