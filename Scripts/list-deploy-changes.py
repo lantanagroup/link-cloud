@@ -1,26 +1,26 @@
 ﻿#!/usr/bin/env python3
 
-import os
-import sys
-import subprocess
 import argparse
-import json
-from typing import List, Optional
+import os
+import subprocess
+import sys
+from typing import List
+
 
 def ensure_git_repo() -> str:
     """Ensure we're at repo root and return root directory path."""
     try:
         root_dir = subprocess.check_output(
-            ["git", "rev-parse", "--show-toplevel"], 
+            ["git", "rev-parse", "--show-toplevel"],
             stderr=subprocess.DEVNULL
         ).decode().strip()
         os.chdir(root_dir)
-        
+
         # Ensure we have both FROM and TO commits
         if len(sys.argv) > 2:  # Check if arguments are provided
             print(f"Fetching history for {sys.argv[1]}...", file=sys.stderr)
             subprocess.run(["git", "fetch", "--depth=1", "origin", sys.argv[1]], stderr=subprocess.DEVNULL)
-            
+
             print(f"Fetching history for {sys.argv[2]}...", file=sys.stderr)
             subprocess.run(["git", "fetch", "--depth=1", "origin", sys.argv[2]], stderr=subprocess.DEVNULL)
 
@@ -60,7 +60,7 @@ def print_added_removed_lines(from_ref: str, to_ref: str, file_path: str) -> Non
             ["git", "diff", "--unified=0", from_ref, to_ref, "--", file_path],
             stderr=subprocess.DEVNULL
         ).decode()
-        
+
         for line in diff.splitlines():
             if line.startswith('+') and not line.startswith('+++'):
                 print(f"ADD: {line[1:]}")
@@ -91,7 +91,13 @@ def call_azure_openai(endpoint: str, deployment: str, api_key: str, changes_outp
    - Configuration setting changes (new settings, changed defaults, removed settings)
    - Kafka topic changes (new topics, renamed topics, removed topics) - each row in the topics.txt file represents "<TOPIC_NAME>:<PARTITION_COUNT>:<REPLICATION_COUNT>". Ignore the partition count and replication count aspect, because those are only used for local testing using Docker Compose; only report on added/removed topic names and do not indicate to increase/decrease topic partitions/replications.
 
-Provide a concise summary focusing only on what deployment engineers need to know. When summarizing config changes, provide examples of what the configs should look like in an Azure App Config deployment scenario (i.e. 'Some:Property:Name=SomeValue')"""
+Provide a concise summary focusing only on what deployment engineers need to know.
+
+When summarizing config changes, include:
+* the config key in long format that can be used with environment variables (i.e. "/spring/data/redis/port" for Java, or "Authentication:Schemas:Oauth2:Endpoints:Authorization" for DotNet)
+* a description of what the key does and what the possible values are 
+* at least one example of what the config values should look like
+"""
 
     payload = {
         "messages": [
@@ -158,18 +164,14 @@ def main() -> None:
     if os.path.isdir("DotNet"):
         for svc in os.listdir("DotNet"):
             svc_path = os.path.join("DotNet", svc)
-            if os.path.isdir(svc_path) and os.path.exists(os.path.join(svc_path, "appsettings.json")):
+            if os.path.isdir(svc_path) and any(f.endswith(".csproj") for f in os.listdir(svc_path)):
                 dotnet_services.append(svc)
 
     if os.path.isdir("Java"):
         for svc in os.listdir("Java"):
             svc_path = os.path.join("Java", svc)
-            if os.path.isdir(svc_path):
-                resources_path = os.path.join(svc_path, "src", "main", "resources")
-                if os.path.exists(resources_path) and any(
-                    f.startswith("application.") for f in os.listdir(resources_path)
-                ):
-                    java_services.append(svc)
+            if os.path.isdir(svc_path) and os.path.exists(os.path.join(svc_path, "pom.xml")):
+                java_services.append(svc)
 
     print("== Per-Service Changes ==")
 
@@ -178,20 +180,51 @@ def main() -> None:
         base = f"{lang}/{svc_name}"
         had_section = False
 
-        # Database migrations
+        # Database changes (migrations and entities)
         db_paths = []
         if lang == "DotNet":
-            db_paths.append(f"{base}/Migrations")
+            db_paths.extend([
+                f"{base}/Migrations",
+                f"{base}/**/Entities/*.cs"
+            ])
         else:
             db_paths.extend([
                 f"{base}/src/main/resources/database/migrations",
-                f"{base}/src/main/resources/db/migration"
+                f"{base}/src/main/resources/db/migration",
+                f"{base}/src/main/java/**/entities/*.java",
+                f"{base}/src/main/java/**/entity/*.java"
             ])
 
         if any(has_changes(from_ref, to_ref, [p]) for p in db_paths):
             print("- Database changes:")
             for p in db_paths:
                 print_file_status(from_ref, to_ref, [p])
+            had_section = True
+
+        # MongoDB collections and indexes
+        mongo_paths = []
+        if svc_name.lower() == "report" and lang == "DotNet":
+            mongo_paths.extend([
+                f"{base}/Domain/MongoDbContext.cs",
+                f"{base}/Domain/MongoIndexCreationService.cs",
+                f"{base}/Entities/*.cs"
+            ])
+        elif svc_name.lower() == "measureeval" and lang == "Java":
+            mongo_paths.extend([
+                f"{base}/src/main/java/**/services/IndexCreator.java",
+                f"{base}/src/main/java/**/entities/*.java"
+            ])
+
+        if mongo_paths and any(has_changes(from_ref, to_ref, [p]) for p in mongo_paths):
+            print("- MongoDB changes:")
+            for path in mongo_paths:
+                try:
+                    files = subprocess.check_output(["git", "diff", "--name-only", from_ref, to_ref, "--", path]).decode().splitlines()
+                    for file in files:
+                        print(f"  > {file}")
+                        print_added_removed_lines(from_ref, to_ref, file)
+                except subprocess.CalledProcessError:
+                    pass
             had_section = True
 
         # Configuration entity files
@@ -240,8 +273,11 @@ def main() -> None:
     shared_cfg_paths = [
         "DotNet/Shared/Settings/*.cs",
         "DotNet/Shared/Application/Models/Configs/*.cs",
+        "DotNet/Shared/**/Entities/*.cs",
         "Java/shared/src/main/java/**/config/*Config.java",
-        "Java/shared/src/main/java/**/*Settings.java"
+        "Java/shared/src/main/java/**/*Settings.java",
+        "Java/shared/src/main/java/**/entities/*.java",
+        "Java/shared/src/main/java/**/entity/*.java"
     ]
 
     if any(has_changes(from_ref, to_ref, [p]) for p in shared_cfg_paths):

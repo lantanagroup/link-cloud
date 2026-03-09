@@ -6,15 +6,16 @@ namespace LantanaGroup.Link.Report.Jobs.JobStoreFactories;
 
 public class ReportQuartzMongoDbJobStoreFactory : IQuartzMongoDbJobStoreFactory
 {
-    private readonly MongoDbContext _mongoDbContext;
-
-    public ReportQuartzMongoDbJobStoreFactory(MongoDbContext context)
+    private readonly IServiceScopeFactory _serviceScopeFactory;
+    public ReportQuartzMongoDbJobStoreFactory(IServiceScopeFactory serviceScopeFactory)
     {
-        _mongoDbContext = context;
+        _serviceScopeFactory = serviceScopeFactory;
     }
 
     public IMongoDatabase GetDatabase()
     {
-        return _mongoDbContext.MongoDatabase;
+        using var scope = _serviceScopeFactory.CreateScope();
+        var mongoDbContext = scope.ServiceProvider.GetRequiredService<MongoDbContext>();
+        return mongoDbContext.MongoDatabase;
     }
 }

@@ -1,7 +1,7 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.Listeners;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
@@ -10,8 +10,6 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Quartz;
-using System.Text;
-using Xunit;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report
@@ -73,7 +71,19 @@ namespace IntegrationTests.Report
             Assert.Equal(Frequency.Monthly, created.Frequency);
             Assert.Equal(2, created.ReportTypes.Count);
 
-            _fixture.SchedulerFactoryMock.Verify(f => f.GetScheduler(It.IsAny<CancellationToken>()), Times.Once);
+            var expectedJobData = new Dictionary<string, object>
+            {
+                { "ReportScheduleId", reportId },
+                { "FacilityId", facilityId }
+            };
+
+            _fixture.QuartzJobHelperMock.Verify(f => f.ScheduleJob<EndOfReportPeriodJob>(
+                expectedJobData,
+                endDate, 
+                It.IsAny<string>(),
+                It.IsAny<string>(), 
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]

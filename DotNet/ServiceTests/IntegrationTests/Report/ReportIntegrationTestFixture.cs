@@ -19,6 +19,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -63,7 +64,7 @@ namespace IntegrationTests.Report
 
         public Mock<ITenantApiService> TenantApiServiceMock { get; } = new();
         public Mock<IHttpClientFactory> HttpClientFactoryMock { get; } = new();
-
+        public Mock<IQuartzJobHelper> QuartzJobHelperMock { get; } = new();
         public Mock<IKafkaConsumerFactory<string, ReportScheduledValue>> ReportScheduledConsumerFactoryMock { get; } = new();
         public Mock<ITransientExceptionHandler<string, ReportScheduledValue>> ReportScheduledTransientHandlerMock { get; } = new();
         public Mock<IDeadLetterExceptionHandler<string, ReportScheduledValue>> ReportScheduledDeadLetterHandlerMock { get; } = new();
@@ -122,6 +123,8 @@ namespace IntegrationTests.Report
                 var client = sp.GetRequiredService<IMongoClient>();
                 options.UseMongoDB(client, "report_integration_test");
             });
+
+            builder.Services.AddSingleton<IQuartzJobHelper>(QuartzJobHelperMock.Object);
 
             builder.Services.AddTransient<IEntityRepository<ReportSchedule>, EntityRepository<ReportSchedule, MongoDbContext>>();
             builder.Services.AddTransient<IEntityRepository<ReportEntry>, EntityRepository<ReportEntry, MongoDbContext>>();
