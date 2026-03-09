@@ -1,12 +1,10 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
-using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -16,6 +14,7 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
+using static Confluent.Kafka.ConfigPropertyNames;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -78,95 +77,8 @@ namespace LantanaGroup.Link.Report.Listeners
                     {
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
-                            if (result == null)
-                            {
-                                consumer.Commit();
-                                return;
-                            }
 
-                            var reportEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportEntryManager>();
-
-                            try
-                            {
-                                using var scope = _serviceScopeFactory.CreateScope();
-                                var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
-
-                                var key = result.Message.Key;
-                                var value = result.Message.Value;
-                                facilityId = key;
-
-                                if (string.IsNullOrWhiteSpace(key) || value == null)
-                                {
-                                    throw new DeadLetterException("Invalid Patient Event");
-                                }
-
-                                if (value.EventType != PatientEvents.Admit.ToString())
-                                {
-                                    _logger.LogInformation("Patient {PatientId} has event type of {EventType}. Ignoring.", HtmlInputSanitizer.Sanitize(value.PatientId), HtmlInputSanitizer.Sanitize(value.EventType));
-                                    consumer.Commit(result);
-                                    return;
-                                }
-
-                                _logger.LogInformation("Consuming Admit PatientEvent (FacilityId: {facilityId}, PatientId: {PatientId})", HtmlInputSanitizer.Sanitize(facilityId), HtmlInputSanitizer.Sanitize(value.PatientId));
-
-                                var scheduledReports = await database.ReportScheduledRepository.FindAsync(x => x.FacilityId == key && x.EndOfReportPeriodJobHasRun == false, cancellationToken);
-
-                                if (!scheduledReports?.Any() ?? false)
-                                {
-                                    throw new TransientException($"{Name}: No Scheduled Reports found for facilityId: {key}");
-                                }
-
-                                foreach (var scheduledReport in scheduledReports)
-                                {
-                                    var entry = await reportEntryManager.SingleOrDefaultAsync(e => e.ReportScheduleId == scheduledReport.Id && e.PatientId == value.PatientId, consumeCancellationToken);
-
-                                    if (entry == null)
-                                    {
-                                        entry = new ReportEntry()
-                                        {
-                                            PatientId = value.PatientId,
-                                            FacilityId = scheduledReport.FacilityId,
-                                            CreateDate = DateTime.Now,
-                                            ReportingStatus = ReportingStatus.PatientIdentified,
-                                            ReportScheduleId = scheduledReport.Id
-                                        };
-                                        await reportEntryManager.AddAsync(entry, cancellationToken);
-                                    }
-
-                                    foreach (var reportType in scheduledReport.ReportTypes)
-                                    {
-                                        var measureReportEntry = entry.MeasureReportList.Where(x => x.ReportType == reportType).FirstOrDefault();
-
-                                        if (measureReportEntry != null)
-                                        {
-                                            continue;
-                                        }
-
-                                        entry.MeasureReportList.Add(new EvaluatedMeasureReport()
-                                        {
-                                            ReportType = reportType
-                                        });
-
-                                        await reportEntryManager.UpdateAsync(entry);
-                                    }
-                                }
-                            }
-                            catch (DeadLetterException ex)
-                            {
-                                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
-                            }
-                            catch (TransientException ex)
-                            {
-                                _transientExceptionHandler.HandleException(result, ex, facilityId);
-                            }
-                            catch (Exception ex)
-                            {
-                                _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - PatientEvent Exception thrown: " + ex.Message), facilityId);
-                            }
-                            finally
-                            {
-                                consumer.Commit(result);
-                            }
+                            consumer.Commit(result);
                         }, cancellationToken);
                     }
                     catch (ConsumeException ex)
@@ -197,6 +109,92 @@ namespace LantanaGroup.Link.Report.Listeners
                 _logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
                 consumer.Close();
                 consumer.Dispose();
+            }
+        }
+
+        public async Task ProcessMessageAsync(ConsumeResult<string, PatientEventValue> result, CancellationToken cancellationToken)
+        {
+            if (result == null)
+            {
+                return;
+            }
+
+            string facilityId = result.Message.Key;
+            var reportEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportEntryManager>();
+
+            try
+            {
+                using var scope = _serviceScopeFactory.CreateScope();
+                var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+
+                var value = result.Message.Value;
+
+                if (string.IsNullOrWhiteSpace(facilityId) || value == null)
+                {
+                    throw new DeadLetterException("Invalid Patient Event");
+                }
+
+                if (value.EventType != PatientEvents.Admit.ToString())
+                {
+                    _logger.LogInformation("Patient {PatientId} has event type of {EventType}. Ignoring.", HtmlInputSanitizer.Sanitize(value.PatientId), HtmlInputSanitizer.Sanitize(value.EventType));
+                    return;
+                }
+
+                _logger.LogInformation("Consuming Admit PatientEvent (FacilityId: {facilityId}, PatientId: {PatientId})", HtmlInputSanitizer.Sanitize(facilityId), HtmlInputSanitizer.Sanitize(value.PatientId));
+
+                var scheduledReports = await database.ReportScheduledRepository.FindAsync(x => x.FacilityId == facilityId && x.EndOfReportPeriodJobHasRun == false, cancellationToken);
+
+                if (!scheduledReports?.Any() ?? false)
+                {
+                    throw new TransientException($"{Name}: No Scheduled Reports found for facilityId: {facilityId}");
+                }
+
+                foreach (var scheduledReport in scheduledReports)
+                {
+                    var entry = await reportEntryManager.SingleOrDefaultAsync(e => e.ReportScheduleId == scheduledReport.Id && e.PatientId == value.PatientId, cancellationToken);
+
+                    if (entry == null)
+                    {
+                        entry = new ReportEntry()
+                        {
+                            PatientId = value.PatientId,
+                            FacilityId = scheduledReport.FacilityId,
+                            CreateDate = DateTime.Now,
+                            ReportingStatus = ReportingStatus.PatientIdentified,
+                            ReportScheduleId = scheduledReport.Id
+                        };
+                        await reportEntryManager.AddAsync(entry, cancellationToken);
+                    }
+
+                    foreach (var reportType in scheduledReport.ReportTypes)
+                    {
+                        var measureReportEntry = entry.MeasureReportList.Where(x => x.ReportType == reportType).FirstOrDefault();
+
+                        if (measureReportEntry != null)
+                        {
+                            continue;
+                        }
+
+                        entry.MeasureReportList.Add(new EvaluatedMeasureReport()
+                        {
+                            ReportType = reportType
+                        });
+
+                        await reportEntryManager.UpdateAsync(entry);
+                    }
+                }
+            }
+            catch (DeadLetterException ex)
+            {
+                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
+            }
+            catch (TransientException ex)
+            {
+                _transientExceptionHandler.HandleException(result, ex, facilityId);
+            }
+            catch (Exception ex)
+            {
+                _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - PatientEvent Exception thrown: " + ex.Message), facilityId);
             }
         }
 
