@@ -5,8 +5,10 @@ using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
+using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
@@ -17,6 +19,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
@@ -34,6 +37,8 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IDeadLetterExceptionHandler<string, GenerateReportValue> _deadLetterExceptionHandler;
         private readonly ServiceRegistry _serviceRegistry;
         private readonly IServiceScopeFactory _serviceScopeFactory;
+
+        private readonly IQuartzJobHelper _quartzJobHelper;
 
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
@@ -60,6 +65,7 @@ namespace LantanaGroup.Link.Report.Listeners
             IProducer<string, EvaluationRequestedValue> evaluationProducer,
             BlobStorageService blobStorageService,
             ServiceInformation serviceInformation,
+            IQuartzJobHelper quartzJobHelper,
             IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -80,6 +86,8 @@ namespace LantanaGroup.Link.Report.Listeners
             _blobStorageService = blobStorageService;
             _serviceInformation = serviceInformation;
             _linkBearerServiceOptions = linkBearerServiceOptions;
+
+            _quartzJobHelper = quartzJobHelper;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -254,41 +262,41 @@ namespace LantanaGroup.Link.Report.Listeners
 
                         await reportEntryManager.AddAsync(newEntry, cancellationToken);
 
-                                        try
-                                        {
-                                            await _evaluationProducer.ProduceAsync(nameof(KafkaTopic.EvaluationRequested), new Message<string, EvaluationRequestedValue>
-                                            {
-                                                Key = facilityId,
-                                                Value = new EvaluationRequestedValue
-                                                {
-                                                    PreviousReportId = value.ReportId,
-                                                    PatientId = p,
-                                                    ReportTrackingId = reportSchedule.Id
-                                                },
-                                                Headers = new Headers
+                        try
+                        {
+                            await _evaluationProducer.ProduceAsync(nameof(KafkaTopic.EvaluationRequested), new Message<string, EvaluationRequestedValue>
+                            {
+                                Key = facilityId,
+                                Value = new EvaluationRequestedValue
+                                {
+                                    PreviousReportId = value.ReportId,
+                                    PatientId = p,
+                                    ReportTrackingId = reportSchedule.Id
+                                },
+                                Headers = new Headers
                                             {
                                                 { "X-Correlation-Id", Encoding.ASCII.GetBytes(Guid.NewGuid().ToString()) }
                                             }
-                                            });
-                                        }
-                                        catch (ProduceException<string, EvaluationRequestedValue> ex)
-                                        {
-                                            _logger.LogError(ex, "An error was encountered generating an Evaluation Requested event.\n\tFacilityId: {facilityId}\n\tPatientId: {patientId}\n\tReportTrackingId: {reportTrackingId}",
-                                                facilityId?.SanitizeUntrustedString(), p?.SanitizeUntrustedString(), reportSchedule.Id?.SanitizeUntrustedString());
-                                        }
-                                    }
-                                }
-                                else
-                                {
-                                    _logger.LogInformation("Generating new Adhoc report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, reportSchedule.Id, DateTime.UtcNow);
-                                    
-                                    // Get Patient List if none was provided
-                                    if (value.PatientIds == null || value.PatientIds.Count == 0)
-                                    {
-                                        _logger.LogDebug("Getting Patient List from Census Service for facility {FacilityId} from {StartDate} to {EndDate}", facilityId, startDate, endDate);
-                                        value.PatientIds =
-                                            await GetPatientList(facilityId, startDate.Value, endDate.Value);
-                                    }
+                            });
+                        }
+                        catch (ProduceException<string, EvaluationRequestedValue> ex)
+                        {
+                            _logger.LogError(ex, "An error was encountered generating an Evaluation Requested event.\n\tFacilityId: {facilityId}\n\tPatientId: {patientId}\n\tReportTrackingId: {reportTrackingId}",
+                                facilityId?.SanitizeUntrustedString(), p?.SanitizeUntrustedString(), reportSchedule.Id?.SanitizeUntrustedString());
+                        }
+                    }
+                }
+                else
+                {
+                    _logger.LogInformation("Generating new Adhoc report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, reportSchedule.Id, DateTime.UtcNow);
+
+                    // Get Patient List if none was provided
+                    if (value.PatientIds == null || value.PatientIds.Count == 0)
+                    {
+                        _logger.LogDebug("Getting Patient List from Census Service for facility {FacilityId} from {StartDate} to {EndDate}", facilityId, startDate, endDate);
+                        value.PatientIds =
+                            await GetPatientList(facilityId, startDate.Value, endDate.Value);
+                    }
 
                     var patientIds = value.PatientIds.Distinct().ToList();
 

@@ -17,6 +17,8 @@ using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Moq;
+using Microsoft.Extensions.Logging;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
@@ -86,6 +88,7 @@ public class FhirApiServiceTests
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var readFhirCommand = new Mock<IReadFhirCommand>();
         var kafkaProducer = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
+        var logger = new Mock<ILogger<FhirApiService>>();
 
         var service = new FhirApiService(
             referenceResourceManager.Object,
@@ -93,7 +96,8 @@ public class FhirApiServiceTests
             referenceResourceService.Object,
             searchFhirCommand.Object,
             readFhirCommand.Object,
-            kafkaProducer.Object
+            kafkaProducer.Object,
+            logger.Object
         );
 
         var resource = new Patient();
@@ -124,6 +128,7 @@ public class FhirApiServiceTests
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var readFhirCommand = new Mock<IReadFhirCommand>();
         var kafkaProducer = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
+        var logger = new Mock<ILogger<FhirApiService>>();
 
         var service = new FhirApiService(
             referenceResourceManager.Object,
@@ -131,7 +136,8 @@ public class FhirApiServiceTests
             referenceResourceService.Object,
             searchFhirCommand.Object,
             readFhirCommand.Object,
-            kafkaProducer.Object
+            kafkaProducer.Object,
+            logger.Object
         );
 
         var resource = new Patient();
@@ -148,17 +154,194 @@ public class FhirApiServiceTests
         };
 
         var outcome = new OperationOutcome();
-        outcome.AddIssue("Something went horribly wrong.", Issue.PROCESSING_CATASTROPHIC_FAILURE);
+        outcome.Issue.Add(new OperationOutcome.IssueComponent
+        {
+            Severity = OperationOutcome.IssueSeverity.Fatal,
+            Code = OperationOutcome.IssueType.Processing,
+            Diagnostics = "Something went horribly wrong."
+        });
         var exception = new FhirOperationException("Something went horribly wrong.", HttpStatusCode.InternalServerError, outcome);
 
         readFhirCommand.Setup(x => x.ExecuteAsync(It.IsAny<ReadFhirCommandRequest>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(exception);
 
-        await Assert.ThrowsAsync<FhirOperationException>(async () =>
+        await Assert.ThrowsAsync<OpOutcomeException>(async () =>
             await service.ExecuteRead(log, fhirQuery, ResourceType.Patient, new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://example.com/fhir" }));
         Assert.NotNull(log.Notes);
         Assert.NotEmpty(log.Notes);
         Assert.StartsWith("OperationOutcome", log.Notes[0]);
+    }
+
+    [Fact]
+    public async Task ExecuteSearch_OperationOutcomeIsNoted()
+    {
+        // Arrange: Mock all dependencies for FhirApiService
+        var referenceResourceManager = new Mock<IReferenceResourcesManager>();
+        var referenceResourceQueries = new Mock<IReferenceResourcesQueries>();
+        var referenceResourceService = new Mock<IReferenceResourceService>();
+        var searchFhirCommand = new Mock<ISearchFhirCommand>();
+        var readFhirCommand = new Mock<IReadFhirCommand>();
+        var kafkaProducer = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
+        var logger = new Mock<ILogger<FhirApiService>>();
+
+        var service = new FhirApiService(
+            referenceResourceManager.Object,
+            referenceResourceQueries.Object,
+            referenceResourceService.Object,
+            searchFhirCommand.Object,
+            readFhirCommand.Object,
+            kafkaProducer.Object,
+            logger.Object
+        );
+
+        var log = new DataAcquisitionLogModel
+        {
+            FacilityId = "12345",
+            CorrelationId = "corr-1"
+        };
+        var fhirQuery = new FhirQueryModel
+        {
+            IsReference = false
+        };
+
+        var outcome = new OperationOutcome();
+        outcome.Issue.Add(new OperationOutcome.IssueComponent
+        {
+            Severity = OperationOutcome.IssueSeverity.Error,
+            Code = OperationOutcome.IssueType.Processing,
+            Diagnostics = "Something went wrong during search."
+        });
+        var exception = new FhirOperationException("Search failed", HttpStatusCode.BadRequest, outcome);
+
+        searchFhirCommand
+            .Setup(x => x.ExecuteAsync(It.IsAny<SearchFhirCommandRequest>(), It.IsAny<CancellationToken>()))
+            .Returns(GetExceptionBundleAsync(exception));
+
+        await Assert.ThrowsAsync<OpOutcomeException>(async () =>
+            await service.ExecuteSearch(log, fhirQuery, new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://example.com/fhir" }, ResourceType.Patient));
+
+        Assert.NotNull(log.Notes);
+        Assert.NotEmpty(log.Notes);
+        Assert.StartsWith("OperationOutcome", log.Notes[0]);
+    }
+
+    [Fact]
+    public async Task ExecuteRead_NotFound_ThrowsOpOutcomeException()
+    {
+        // Arrange
+        var readFhirCommand = new Mock<IReadFhirCommand>();
+        var service = new FhirApiService(
+            new Mock<IReferenceResourcesManager>().Object,
+            new Mock<IReferenceResourcesQueries>().Object,
+            new Mock<IReferenceResourceService>().Object,
+            new Mock<ISearchFhirCommand>().Object,
+            readFhirCommand.Object,
+            new Mock<IProducer<ResourceKey, ResourceAcquired>>().Object,
+            new Mock<ILogger<FhirApiService>>().Object
+        );
+
+        var log = new DataAcquisitionLogModel { FacilityId = "123", ResourceId = "res-1" };
+        var fhirQuery = new FhirQueryModel { IsReference = false };
+        var exception = new FhirOperationException("Not Found", HttpStatusCode.NotFound);
+
+        readFhirCommand.Setup(x => x.ExecuteAsync(It.IsAny<ReadFhirCommandRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(exception);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<OpOutcomeException>(async () =>
+            await service.ExecuteRead(log, fhirQuery, ResourceType.Patient, new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test" }));
+        
+        Assert.Contains("HTTP NotFound returned", log.Notes[0]);
+    }
+
+    [Fact]
+    public async Task ExecuteSearch_Gone_ThrowsOpOutcomeException()
+    {
+        // Arrange
+        var searchFhirCommand = new Mock<ISearchFhirCommand>();
+        var service = new FhirApiService(
+            new Mock<IReferenceResourcesManager>().Object,
+            new Mock<IReferenceResourcesQueries>().Object,
+            new Mock<IReferenceResourceService>().Object,
+            searchFhirCommand.Object,
+            new Mock<IReadFhirCommand>().Object,
+            new Mock<IProducer<ResourceKey, ResourceAcquired>>().Object,
+            new Mock<ILogger<FhirApiService>>().Object
+        );
+
+        var log = new DataAcquisitionLogModel { FacilityId = "123", CorrelationId = "c-1" };
+        var fhirQuery = new FhirQueryModel { IsReference = false };
+        var exception = new FhirOperationException("Gone", HttpStatusCode.Gone);
+
+        searchFhirCommand.Setup(x => x.ExecuteAsync(It.IsAny<SearchFhirCommandRequest>(), It.IsAny<CancellationToken>()))
+            .Returns(GetExceptionBundleAsync(exception));
+
+        // Act & Assert
+        await Assert.ThrowsAsync<OpOutcomeException>(async () =>
+            await service.ExecuteSearch(log, fhirQuery, new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test" }, ResourceType.Patient));
+        
+        Assert.Contains("HTTP Gone returned", log.Notes[0]);
+    }
+
+    [Fact]
+    public async Task ExecuteSearch_SkipsOperationOutcome()
+    {
+        // Arrange
+        var searchFhirCommand = new Mock<ISearchFhirCommand>();
+        var kafkaProducer = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
+        var service = new FhirApiService(
+            new Mock<IReferenceResourcesManager>().Object,
+            new Mock<IReferenceResourcesQueries>().Object,
+            new Mock<IReferenceResourceService>().Object,
+            searchFhirCommand.Object,
+            new Mock<IReadFhirCommand>().Object,
+            kafkaProducer.Object,
+            new Mock<ILogger<FhirApiService>>().Object
+        );
+
+        var patient = new Patient { Id = "p1" };
+        var outcome = new OperationOutcome { Id = "o1" };
+        var bundle = new Bundle
+        {
+            Entry = new List<Bundle.EntryComponent>
+            {
+                new Bundle.EntryComponent { Resource = patient },
+                new Bundle.EntryComponent { Resource = outcome }
+            }
+        };
+
+        searchFhirCommand.Setup(x => x.ExecuteAsync(It.IsAny<SearchFhirCommandRequest>(), It.IsAny<CancellationToken>()))
+            .Returns(GetBundleAsync(bundle));
+
+        var log = new DataAcquisitionLogModel { FacilityId = "123", CorrelationId = "c1", ScheduledReport = new ScheduledReport(), ReportableEvent = ReportableEvent.Adhoc };
+        var fhirQuery = new FhirQueryModel { IsReference = false, ResourceReferenceTypes = new List<ResourceReferenceTypeModel>() };
+
+        // Act
+        var ids = await service.ExecuteSearch(log, fhirQuery, new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test" }, ResourceType.Patient);
+
+        // Assert
+        Assert.Single(ids);
+        Assert.Equal("Patient/p1", ids.First());
+        Assert.NotNull(log.Notes);
+        Assert.Contains(log.Notes, n => n.Contains("OperationOutcome found in search bundle"));
+        
+        // Ensure only Patient was produced to Kafka
+        kafkaProducer.Verify(x => x.ProduceAsync(
+            It.IsAny<string>(),
+            It.Is<Message<ResourceKey, ResourceAcquired>>(m => m.Value.Resource.TypeName == "Patient"),
+            It.IsAny<CancellationToken>()), Times.Once);
+        
+        kafkaProducer.Verify(x => x.ProduceAsync(
+            It.IsAny<string>(),
+            It.Is<Message<ResourceKey, ResourceAcquired>>(m => m.Value.Resource.TypeName == "OperationOutcome"),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    private async IAsyncEnumerable<Bundle> GetExceptionBundleAsync(Exception ex)
+    {
+        await Task.CompletedTask;
+        throw ex;
+        yield break;
     }
 
     [Fact]
@@ -171,6 +354,7 @@ public class FhirApiServiceTests
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var readFhirCommand = new Mock<IReadFhirCommand>();
         var kafkaProducer = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
+        var logger = new Mock<ILogger<FhirApiService>>();
 
         // Prepare a shared resource (e.g., Location) with no patient context
         var location = new Location
@@ -211,7 +395,8 @@ public class FhirApiServiceTests
             referenceResourceService.Object,
             searchFhirCommand.Object,
             readFhirCommand.Object,
-            kafkaProducer.Object
+            kafkaProducer.Object,
+            logger.Object
         );
 
         var log = new DataAcquisitionLogModel
