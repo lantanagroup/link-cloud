@@ -1,6 +1,4 @@
-﻿using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.Report.Application.Models;
+﻿using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Entities;
 using System.Linq.Expressions;
 
