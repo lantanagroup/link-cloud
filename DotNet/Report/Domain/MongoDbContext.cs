@@ -115,6 +115,30 @@ public class MongoDbContext : DbContext
     }
 
     /// <summary>
+    /// Begins a new MongoDB multi-document transaction.
+    /// </summary>
+    public async Task BeginTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        await Database.BeginTransactionAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Commits the current transaction.
+    /// </summary>
+    public async Task CommitTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        await Database.CommitTransactionAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Rolls back the current transaction.
+    /// </summary>
+    public async Task RollbackTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        await Database.RollbackTransactionAsync(cancellationToken);
+    }
+
+    /// <summary>
     /// Ensures all defined indexes exist by attempting to create them.
     /// MongoDB will skip creation if an index with the same key specification already exists.
     /// Call this method during application startup (e.g., from an IHostedService).

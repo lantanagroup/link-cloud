@@ -10,6 +10,20 @@ namespace LantanaGroup.Link.Report.Domain
         IEntityRepository<ReportPopulation> ReportPopulationRepository { get; set; }
         IEntityRepository<ReportResource> ReportResourceRepository { get; set; }
 
+        /// <summary>
+        /// Begins a new MongoDB multi-document transaction.
+        /// </summary>
+        Task BeginTransactionAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Commits the current transaction.
+        /// </summary>
+        Task CommitTransactionAsync(CancellationToken cancellationToken = default);
+        /// <summary>
+        /// Rolls back the current transaction.
+        /// </summary>
+        Task RollbackTransactionAsync(CancellationToken cancellationToken = default);
+
         Task SaveChangesAsync();
     }
 
@@ -34,6 +48,30 @@ namespace LantanaGroup.Link.Report.Domain
             ReportEntryRepository = reportEntryRepository;
             ReportPopulationRepository = reportPopulationRepository;
             ReportResourceRepository = reportResourceRepository;
+        }
+
+        /// <summary>
+        /// Begins a new MongoDB multi-document transaction.
+        /// </summary>
+        public async Task BeginTransactionAsync(CancellationToken cancellationToken = default)
+        {
+            await DbContext.Database.BeginTransactionAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Commits the current transaction.
+        /// </summary>
+        public async Task CommitTransactionAsync(CancellationToken cancellationToken = default)
+        {
+            await DbContext.Database.CommitTransactionAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Rolls back the current transaction.
+        /// </summary>
+        public async Task RollbackTransactionAsync(CancellationToken cancellationToken = default)
+        {
+            await DbContext.Database.RollbackTransactionAsync(cancellationToken);
         }
 
         public async Task SaveChangesAsync()
