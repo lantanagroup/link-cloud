@@ -18,6 +18,10 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
         IEntityRepository<OrganizationLocationCondition> LocationConditionRepository { get; set; }
         IEntityRepository<OrganizationLocationMapping> LocationMappingRepository { get; set; }
 
+
+        Task BeginTransactionAsync(CancellationToken cancellationToken = default);
+        Task CommitTransactionAsync(CancellationToken cancellationToken = default);
+        Task RollbackTransactionAsync(CancellationToken cancellationToken = default);
         Task SaveChangesAsync();
     }
     public class Database : IDatabase
@@ -66,6 +70,21 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
         public async Task SaveChangesAsync()
         {
             await _context.SaveChangesAsync();
+        }
+
+        public async Task BeginTransactionAsync(CancellationToken cancellationToken = default)
+        {
+            await _context.Database.BeginTransactionAsync(cancellationToken);
+        }
+
+        public async Task CommitTransactionAsync(CancellationToken cancellationToken = default)
+        {
+            await _context.Database.CommitTransactionAsync(cancellationToken);
+        }
+
+        public async Task RollbackTransactionAsync(CancellationToken cancellationToken = default)
+        {
+            await _context.Database.RollbackTransactionAsync(cancellationToken);
         }
     }
 }

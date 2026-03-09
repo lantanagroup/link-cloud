@@ -35,24 +35,17 @@ public class OrganizationLocationConfigurationController : Controller
     /// <summary>
     /// GET /location-org-configs/{id}
     /// </summary>
-    [HttpGet("{id:int}")]
+    [HttpGet("{id:int}", Name = nameof(GetByIdAsync))]
     [ProducesResponseType(typeof(OrganizationLocationConfigurationModel), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> GetByIdAsync(int id)
     {
         try
         {
             var result = await _queries.GetByIdAsync(id);
-            if (result == null)
-                throw new NotFoundException($"OrganizationLocationConfiguration with id {id} not found.");
 
             return Ok(result);
-        }
-        catch (NotFoundException ex)
-        {
-            _logger.LogError(ex, "NotFoundException occurred.");
-            return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
@@ -65,9 +58,8 @@ public class OrganizationLocationConfigurationController : Controller
     /// GET /location-org-configs/facilities/{facilityId}
     /// </summary>
     [HttpGet("facilities/{facilityId}")]
-    [ProducesResponseType(typeof(OrganizationLocationConfigurationModel), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(List<OrganizationLocationConfigurationModel>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> GetByFacilityIdAsync(string facilityId)
     {
@@ -79,8 +71,6 @@ public class OrganizationLocationConfigurationController : Controller
             facilityId = facilityId.SanitizeAndRemove();
 
             var result = await _queries.GetByFacilityIdAsync(facilityId);
-            if (result == null)
-                throw new NotFoundException($"No OrganizationLocationConfiguration found for facilityId: {facilityId}.");
 
             return Ok(result);
         }
@@ -88,11 +78,6 @@ public class OrganizationLocationConfigurationController : Controller
         {
             _logger.LogError(ex, "BadRequestException occurred.");
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
-        }
-        catch (NotFoundException ex)
-        {
-            _logger.LogError(ex, "NotFoundException occurred.");
-            return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
@@ -164,7 +149,6 @@ public class OrganizationLocationConfigurationController : Controller
 
             facilityId = facilityId.SanitizeAndRemove();
 
-            // Map API model → internal Create model (FacilityId comes from route only)
             var createModel = new CreateOrganizationLocationConfigurationModel
             {
                 FacilityId = facilityId,
@@ -175,7 +159,7 @@ public class OrganizationLocationConfigurationController : Controller
 
             var created = await _manager.CreateAsync(createModel);
 
-            return CreatedAtAction(nameof(GetByIdAsync), new { id = created.ConfigId }, created);
+            return CreatedAtRoute(nameof(GetByIdAsync), new { id = created.ConfigId }, created);
         }
         catch (BadRequestException ex)
         {
@@ -195,7 +179,6 @@ public class OrganizationLocationConfigurationController : Controller
     [HttpPut("{id:int}")]
     [ProducesResponseType(typeof(OrganizationLocationConfigurationModel), StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> UpdateByIdAsync(int id, [FromBody] UpdateOrganizationLocationConfigurationModel model)
     {
@@ -210,7 +193,7 @@ public class OrganizationLocationConfigurationController : Controller
         catch (KeyNotFoundException ex)
         {
             _logger.LogError(ex, "KeyNotFoundException occurred.");
-            return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
+            return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (BadRequestException ex)
         {
