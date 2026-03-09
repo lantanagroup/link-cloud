@@ -44,22 +44,10 @@ public static class JobDataMapExtensions
         {
             if (storedValue is string rawValue && !string.IsNullOrEmpty(rawValue))
             {
-                try
-                {
-                    string? deserialized = JsonSerializer.Deserialize<string>(rawValue);
-                    if (deserialized != null)
-                        return (T)(object)deserialized;
-                }
-                catch
-                {
-                }
+                string? deserialized = JsonSerializer.Deserialize<string>(rawValue);
+                if (deserialized != null)
+                    return (T)(object)deserialized;
 
-                string result = rawValue;
-                if (result.Length >= 2 && result[0] == '"' && result[^1] == '"')
-                {
-                    result = result[1..^1];
-                }
-                return (T)(object)result;
             }
             return default;
         }
