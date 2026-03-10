@@ -1,8 +1,8 @@
-﻿namespace LantanaGroup.Link.DataAcquisition.Models;
+﻿using System.Diagnostics.CodeAnalysis;
 
-/// <summary>
-/// Dedicated lightweight API model for search
-/// </summary>
+namespace LantanaGroup.Link.DataAcquisition.Models;
+
+[ExcludeFromCodeCoverage]
 public class OrganizationLocationMappingSearchParameters
 {
     public int? LocationMappingId { get; set; }

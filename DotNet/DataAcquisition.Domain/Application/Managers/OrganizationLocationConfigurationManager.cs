@@ -133,7 +133,6 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
 
     public async Task DeleteByFacilityIdAsync(string facilityId)
     {
-        // Delete ALL configurations for this facility
         var entities = await _database.LocationConfigurationRepository
             .FindAsync(c => c.FacilityId == facilityId);
 

@@ -82,12 +82,11 @@ public class OrganizationLocationMappingManager : IOrganizationLocationMappingMa
 
     public async Task DeleteByFacilityIdAsync(string facilityId)
     {
-        // Delete ALL mappings for this facility (protects PartOf relationships by design)
         var entities = await _database.LocationMappingRepository
             .FindAsync(m => m.FacilityId == facilityId);
 
         if (entities.Count == 0)
-            return; // Nothing to delete
+            return;
 
         foreach (var entity in entities)
         {
