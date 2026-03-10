@@ -158,7 +158,7 @@ namespace IntegrationTests.Census
             var responses = await patientListService.ProcessList(facilityId, list, CancellationToken.None);
 
             // Assertions
-            Assert.Empty(responses);
+            Assert.Single(responses); //admit event
             Assert.Contains(db.PatientEvents,
                 e => e.FacilityId == facilityId && e.SourcePatientId == patientId &&
                      e.EventType == EventType.FHIRListAdmit);
@@ -215,8 +215,8 @@ namespace IntegrationTests.Census
             var secondResponses = await patientListService.ProcessList(facilityId, list, CancellationToken.None);
 
             // Assert
-            Assert.Empty(firstResponses);
-            Assert.Empty(secondResponses);
+            Assert.Single(firstResponses); //admit event
+            Assert.Empty(secondResponses); //should not contain events
 
             // Check that there's only one event in the database (not duplicated)
             var events = db.PatientEvents.Where(e => e.FacilityId == facilityId && e.SourcePatientId == patientId)
