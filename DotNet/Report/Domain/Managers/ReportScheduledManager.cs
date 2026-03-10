@@ -1,5 +1,4 @@
-﻿using LantanaGroup.Link.Report.Application.Factory;
-using LantanaGroup.Link.Report.Entities;
+﻿using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
@@ -51,17 +50,12 @@ namespace LantanaGroup.Link.Report.Domain.Managers
     public class ReportScheduledManager : IReportScheduledManager
     {
         private readonly IDatabase _database;
-        private readonly ScheduledReportFactory _scheduledReportFactory;
-        private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly MongoDbContext _context;
 
-        public ReportScheduledManager(MongoDbContext context, IDatabase database,
-            ScheduledReportFactory scheduledReportFactory, IServiceScopeFactory serviceScopeFactory)
+        public ReportScheduledManager(MongoDbContext context, IDatabase database)
         {
             _context = context;
             _database = database;
-            _scheduledReportFactory = scheduledReportFactory;
-            _serviceScopeFactory = serviceScopeFactory;
         }
 
         public async Task<ReportSchedule?> GetReportSchedule(string facilityid, string reportId,
