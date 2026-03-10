@@ -49,11 +49,8 @@
 		<PackageReference Include="Microsoft.AspNetCore.HeaderPropagation" Version="8.*" />
 		<PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="8.*" />
 		<PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="7.4.*" />
-		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
-		
-		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
-		
-		
+		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />		
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />	
 	</ItemGroup>
 
 	<ItemGroup>

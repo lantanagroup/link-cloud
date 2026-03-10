@@ -25,8 +25,7 @@
     <PackageReference Include="FluentAssertions" Version="8.*" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
     <PackageReference Include="Moq" Version="4.*" />
-    <PackageReference Include="Moq.AutoMock" Version="*-*" />
-    
+    <PackageReference Include="Moq.AutoMock" Version="*-*" />    
     <PackageReference Include="Testcontainers" Version="4.*" />
     <PackageReference Include="Testcontainers.Azurite" Version="4.*" />
     <PackageReference Include="Testcontainers.MongoDb" Version="4.*" />

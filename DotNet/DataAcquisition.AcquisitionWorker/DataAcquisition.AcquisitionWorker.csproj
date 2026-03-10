@@ -40,8 +40,7 @@
 	  <PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
 	  <PackageReference Include="JWT" Version="10.*" />
 	  <PackageReference Include="LinqKit" Version="1.*" />
-	  <PackageReference Include="Azure.Identity" Version="1.*" />
-   
+	  <PackageReference Include="Azure.Identity" Version="1.*" />   
   </ItemGroup>
 
 
