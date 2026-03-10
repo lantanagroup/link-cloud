@@ -99,7 +99,8 @@ public class LogController : Controller
                         PageNumber = queryParameters.PageNumber,
                         PageSize = queryParameters.PageSize,
                         SortBy = queryParameters.SortBy,
-                        SortOrder = queryParameters.SortOrder
+                        SortOrder = queryParameters.SortOrder,
+                        IncludeDeleted = queryParameters.IncludeDeleted
                     }, cancellationToken);
 
                 return Ok(result);
@@ -207,7 +208,8 @@ public class LogController : Controller
                 PageNumber = queryParameters.PageNumber,
                 PageSize = queryParameters.PageSize,
                 SortBy = queryParameters.SortBy,
-                SortOrder = queryParameters.SortOrder
+                SortOrder = queryParameters.SortOrder,
+                IncludeDeleted = queryParameters.IncludeDeleted
             }, cancellationToken);
 
             return Ok(summary);
@@ -254,14 +256,15 @@ public class LogController : Controller
         try
         {
             var summary = await _logQueries.SearchQueryLogSummaryAsync(
-                new SearchDataAcquisitionLogRequest 
+                new SearchDataAcquisitionLogRequest
                 {
                     FacilityId = facilityId.SanitizeAndRemove(),
                     PatientId = patientId.SanitizeAndRemove(),
                     PageNumber = queryParameters.PageNumber,
                     PageSize = queryParameters.PageSize,
                     SortBy = queryParameters.SortBy,
-                    SortOrder = queryParameters.SortOrder
+                    SortOrder = queryParameters.SortOrder,
+                    IncludeDeleted = queryParameters.IncludeDeleted
                 }, cancellationToken);
 
             return Ok(summary);
@@ -469,6 +472,74 @@ public class LogController : Controller
     }
 
     /// <summary>
+    /// Soft delete all data acquisition log entries for a facility.
+    /// </summary>
+    /// <param name="facilityId">The facility ID whose logs should be soft deleted.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The number of records soft deleted.</returns>
+    /// <response code="200">Returns the count of soft deleted records.</response>
+    /// <response code="400">If the facility ID is null or empty.</response>
+    /// <response code="500">If there is an internal server error.</response>
+    [HttpDelete("facility/{facilityId}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> SoftDeleteByFacility(
+        string facilityId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId))
+        {
+            return BadRequest("facilityId cannot be null or empty.");
+        }
+
+        try
+        {
+            await _logManager.SoftDeleteByFacilityAsync(facilityId.SanitizeAndRemove(), cancellationToken);
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.DeleteItem, "SoftDeleteByFacility"), ex, "An exception occurred while attempting to soft delete logs for facility {facilityId}", facilityId.Sanitize());
+            return Problem(title: "Internal Server Error", statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Restore soft deleted data acquisition log entries for a facility.
+    /// </summary>
+    /// <param name="facilityId">The facility ID whose logs should be restored.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The number of records restored.</returns>
+    /// <response code="200">Returns the count of restored records.</response>
+    /// <response code="400">If the facility ID is null or empty.</response>
+    /// <response code="500">If there is an internal server error.</response>
+    [HttpPatch("facility/{facilityId}/restore")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(int))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> RestoreByFacility(
+        string facilityId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId))
+        {
+            return BadRequest("facilityId cannot be null or empty.");
+        }
+
+        try
+        {
+            var count = await _logManager.RestoreByFacilityAsync(facilityId.SanitizeAndRemove(), cancellationToken);
+            return Ok(count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.UpdateItem, "RestoreByFacility"), ex, "An exception occurred while attempting to restore logs for facility {facilityId}", facilityId.Sanitize());
+            return Problem(title: "Internal Server Error", statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
     /// Process a data acquisition log entry.
     /// </summary>
     /// <returns>
@@ -585,6 +656,7 @@ public class LogController : Controller
                     RequestStatuses = queryParameters.Statuses,
                     AcquisitionPriority = queryParameters.Priority,
                     ResourceType = queryParameters.ResourceType,
+                    IncludeDeleted = queryParameters.IncludeDeleted,
                     PageNumber = 1,
                     PageSize = int.MaxValue // Get all matching IDs
                 }, cancellationToken);

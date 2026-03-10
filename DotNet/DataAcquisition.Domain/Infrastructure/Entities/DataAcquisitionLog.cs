@@ -51,6 +51,8 @@ public class DataAcquisitionLog
 
     public bool TailSent { get; set; } = false;
 
+    public bool IsDeleted { get; set; } = false;
+
     [MaxLength(128)]
     public string? ReportTrackingId { get; set; }
 

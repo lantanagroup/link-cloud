@@ -218,6 +218,10 @@ public class DataAcquisitionDbContext : DbContext
             entity.HasIndex(e => new { e.Status, e.ExecutionDate })
                 .HasDatabaseName("IX_DataAcquisitionLogs_Status_ExecutionDate");
 
+            entity.HasIndex(e => e.FacilityId)
+                .HasDatabaseName("IX_DataAcquisitionLogs_FacilityId_IsDeleted")
+                .HasFilter("[IsDeleted] = 1");
+
             entity.HasIndex(e => new { e.TailSent, e.FacilityId, e.ReportTrackingId, e.CorrelationId, e.ReportStartDate, e.ReportEndDate, e.QueryPhase })
                 .HasDatabaseName("IX_DataAcquisitionLogs_Tailing_Optimization")
                 .HasFilter("[TailSent] = 0 AND [ReportTrackingId] IS NOT NULL AND [CorrelationId] IS NOT NULL AND [ReportStartDate] IS NOT NULL AND [ReportEndDate] IS NOT NULL");

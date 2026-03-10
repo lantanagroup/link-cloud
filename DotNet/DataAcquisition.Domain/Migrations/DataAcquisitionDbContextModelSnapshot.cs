@@ -598,6 +598,9 @@ namespace DataAcquisition.Domain.Migrations
                     b.Property<bool>("IsCensus")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
 
@@ -655,6 +658,10 @@ namespace DataAcquisition.Domain.Migrations
                         .HasColumnType("nvarchar(64)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("FacilityId")
+                        .HasDatabaseName("IX_DataAcquisitionLogs_FacilityId_IsDeleted")
+                        .HasFilter("[IsDeleted] = 1");
 
                     b.HasIndex("ExecutionDate", "Id")
                         .IsDescending()

@@ -22,6 +22,7 @@ public record QueryLogSummaryModel
     public DateTime? CompletionDate { get; init; }
     public int? RetryAttempts { get; init; }
     public RequestStatus? Status { get; init; }
+    public bool IsDeleted { get; init; }
 
     public static QueryLogSummaryModel FromDomain(DataAcquisitionLogModel log)
     {

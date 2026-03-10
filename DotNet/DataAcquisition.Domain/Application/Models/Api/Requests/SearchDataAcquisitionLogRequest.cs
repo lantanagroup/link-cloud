@@ -19,4 +19,5 @@ public class SearchDataAcquisitionLogRequest
     public List<RequestStatus>? RequestStatuses { get; set; }
     public string? CorrelationId { get; set; }
     public string? ResourceType { get; set; }
+    public bool IncludeDeleted { get; set; } = false;
 }
