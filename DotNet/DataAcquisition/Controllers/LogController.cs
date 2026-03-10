@@ -481,7 +481,7 @@ public class LogController : Controller
     /// <response code="400">If the facility ID is null or empty.</response>
     /// <response code="500">If there is an internal server error.</response>
     [HttpDelete("facility/{facilityId}")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(int))]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> SoftDeleteByFacility(
@@ -495,13 +495,13 @@ public class LogController : Controller
 
         try
         {
-            var count = await _logManager.SoftDeleteByFacilityAsync(facilityId.SanitizeAndRemove(), cancellationToken);
-            return Ok(count);
+            await _logManager.SoftDeleteByFacilityAsync(facilityId.SanitizeAndRemove(), cancellationToken);
+            return NoContent();
         }
         catch (Exception ex)
         {
             _logger.LogWarning(new EventId(LoggingIds.DeleteItem, "SoftDeleteByFacility"), ex, "An exception occurred while attempting to soft delete logs for facility {facilityId}", facilityId.Sanitize());
-            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+            return Problem(title: "Internal Server Error", statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
 
@@ -535,7 +535,7 @@ public class LogController : Controller
         catch (Exception ex)
         {
             _logger.LogWarning(new EventId(LoggingIds.UpdateItem, "RestoreByFacility"), ex, "An exception occurred while attempting to restore logs for facility {facilityId}", facilityId.Sanitize());
-            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+            return Problem(title: "Internal Server Error", statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
 
@@ -656,6 +656,7 @@ public class LogController : Controller
                     RequestStatuses = queryParameters.Statuses,
                     AcquisitionPriority = queryParameters.Priority,
                     ResourceType = queryParameters.ResourceType,
+                    IncludeDeleted = queryParameters.IncludeDeleted,
                     PageNumber = 1,
                     PageSize = int.MaxValue // Get all matching IDs
                 }, cancellationToken);
