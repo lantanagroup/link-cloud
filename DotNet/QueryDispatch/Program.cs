@@ -1,6 +1,3 @@
-using System.Diagnostics;
-using System.Reflection;
-using System.Text.Json.Serialization;
 using HealthChecks.UI.Client;
 using LanatanGroup.Link.QueryDispatch.Jobs;
 using LantanaGroup.Link.QueryDispatch.Application.Factory;
@@ -40,6 +37,9 @@ using QueryDispatch.Domain.Managers;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
+using System.Diagnostics;
+using System.Reflection;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
