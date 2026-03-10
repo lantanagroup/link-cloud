@@ -55,9 +55,9 @@ public class OrganizationLocationConfigurationController : Controller
     }
 
     /// <summary>
-    /// GET /location-org-configs/facilities/{facilityId}
+    /// GET /location-org-configs/facility/{facilityId}
     /// </summary>
-    [HttpGet("facilities/{facilityId}")]
+    [HttpGet("facility/{facilityId}")]
     [ProducesResponseType(typeof(List<OrganizationLocationConfigurationModel>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -87,9 +87,9 @@ public class OrganizationLocationConfigurationController : Controller
     }
 
     /// <summary>
-    /// GET /location-org-configs/facilities/{facilityId}/search
+    /// GET /location-org-configs/facility/{facilityId}/search
     /// </summary>
-    [HttpGet("facilities/{facilityId}/search")]
+    [HttpGet("facility/{facilityId}/search")]
     [ProducesResponseType(typeof(PagedConfigModel<OrganizationLocationConfigurationModel>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -129,9 +129,9 @@ public class OrganizationLocationConfigurationController : Controller
     }
 
     /// <summary>
-    /// POST /location-org-configs/facilities/{facilityId}
+    /// POST /location-org-configs/facility/{facilityId}
     /// </summary>
-    [HttpPost("facilities/{facilityId}")]
+    [HttpPost("facility/{facilityId}")]
     [ProducesResponseType(typeof(OrganizationLocationConfigurationModel), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -208,9 +208,9 @@ public class OrganizationLocationConfigurationController : Controller
     }
 
     /// <summary>
-    /// PUT /location-org-configs/facilities/{facilityId} (updates ALL configs for the facility)
+    /// PUT /location-org-configs/facility/{facilityId} (updates ALL configs for the facility)
     /// </summary>
-    [HttpPut("facilities/{facilityId}")]
+    [HttpPut("facility/{facilityId}")]
     [ProducesResponseType(typeof(List<OrganizationLocationConfigurationModel>), StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -270,9 +270,9 @@ public class OrganizationLocationConfigurationController : Controller
     }
 
     /// <summary>
-    /// DELETE /location-org-configs/facilities/{facilityId}
+    /// DELETE /location-org-configs/facility/{facilityId}
     /// </summary>
-    [HttpDelete("facilities/{facilityId}")]
+    [HttpDelete("facility/{facilityId}")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
