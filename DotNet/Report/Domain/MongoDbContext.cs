@@ -44,60 +44,6 @@ public class MongoDbContext : DbContext
         modelBuilder.Entity<ReportPopulation>()
             .ToCollection("reportPopulation");
 
-        // Indexes for ReportSchedule
-        modelBuilder.Entity<ReportSchedule>()
-            .HasIndex(x => x.FacilityId);
-
-        modelBuilder.Entity<ReportSchedule>()
-            .HasIndex(x => new { x.FacilityId, x.Id });
-
-        modelBuilder.Entity<ReportSchedule>()
-            .HasIndex(x => new { x.FacilityId, x.ReportStartDate, x.ReportEndDate });
-
-        modelBuilder.Entity<ReportSchedule>()
-            .HasIndex(x => x.Status);
-
-        modelBuilder.Entity<ReportSchedule>()
-            .HasIndex(x => x.CreateDate)
-            .IsDescending();
-
-        // Indexes for ReportEntry
-        modelBuilder.Entity<ReportEntry>()
-            .HasIndex(x => new { x.FacilityId, x.ReportScheduleId, x.PatientId });
-
-        modelBuilder.Entity<ReportEntry>()
-            .HasIndex(x => new { x.ReportScheduleId, x.ReportingStatus });
-
-        modelBuilder.Entity<ReportEntry>()
-            .HasIndex(x => new { x.FacilityId, x.PatientId });
-
-        modelBuilder.Entity<ReportEntry>()
-            .HasIndex(x => new { x.ReportingStatus, x.SubmissionStatus });
-
-        modelBuilder.Entity<ReportEntry>()
-            .HasIndex(x => x.ReportScheduleId);
-
-        modelBuilder.Entity<ReportEntry>()
-            .HasIndex(x => x.CreateDate)
-            .IsDescending();
-
-        // Indexes for ReportResource
-        modelBuilder.Entity<ReportResource>()
-            .HasIndex(x => new { x.FacilityId, x.ResourceType, x.ResourceId });
-
-        modelBuilder.Entity<ReportResource>()
-            .HasIndex(x => new { x.FacilityId, x.PatientId });
-
-        modelBuilder.Entity<ReportResource>()
-            .HasIndex(x => x.ResourceType);
-
-        // Indexes for ReportPopulation
-        modelBuilder.Entity<ReportPopulation>()
-            .HasIndex(x => new { x.FacilityId });
-
-        modelBuilder.Entity<ReportPopulation>()
-            .HasIndex(x => new { x.FacilityId, x.ReportScheduleId });
-
         modelBuilder.Entity<ReportPopulation>(entity =>
         {
             entity.HasKey(e => e.Id);
@@ -139,83 +85,74 @@ public class MongoDbContext : DbContext
     }
 
     /// <summary>
-    /// Ensures all defined indexes exist by attempting to create them.
-    /// MongoDB will skip creation if an index with the same key specification already exists.
-    /// Call this method during application startup (e.g., from an IHostedService).
+    /// Ensures all indexes exist.
     /// </summary>
     public async Task EnsureIndexesAsync(CancellationToken cancellationToken = default)
     {
         try
         {
-            var indexOptions = new CreateIndexOptions { Background = true }; // Build in background to avoid blocking
+            var indexOptions = new CreateIndexOptions { Background = true };
 
-            // Indexes for reportSchedule collection
+            // ReportSchedule indexes
             var reportScheduleCollection = MongoDatabase.GetCollection<ReportSchedule>("reportSchedule");
-            var reportScheduleBuilders = Builders<ReportSchedule>.IndexKeys;
-            await reportScheduleCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<ReportSchedule>(reportScheduleBuilders.Ascending(x => x.FacilityId), indexOptions),
-                cancellationToken: cancellationToken);
-            await reportScheduleCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<ReportSchedule>(reportScheduleBuilders.Ascending(x => x.FacilityId).Ascending(x => x.Id), indexOptions),
-                cancellationToken: cancellationToken);
-            await reportScheduleCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<ReportSchedule>(reportScheduleBuilders.Ascending(x => x.FacilityId).Ascending(x => x.ReportStartDate).Ascending(x => x.ReportEndDate), indexOptions),
-                cancellationToken: cancellationToken);
-            await reportScheduleCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<ReportSchedule>(reportScheduleBuilders.Ascending(x => x.Status), indexOptions),
-                cancellationToken: cancellationToken);
-            await reportScheduleCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<ReportSchedule>(reportScheduleBuilders.Descending(x => x.CreateDate), indexOptions),
-                cancellationToken: cancellationToken);
+            var rs = Builders<ReportSchedule>.IndexKeys;
+            await SafeCreateIndex(reportScheduleCollection, new CreateIndexModel<ReportSchedule>(rs.Ascending(x => x.FacilityId), indexOptions), cancellationToken);
+            await SafeCreateIndex(reportScheduleCollection, new CreateIndexModel<ReportSchedule>(rs.Ascending(x => x.FacilityId).Ascending(x => x.Id), indexOptions), cancellationToken);
+            await SafeCreateIndex(reportScheduleCollection, new CreateIndexModel<ReportSchedule>(rs.Ascending(x => x.FacilityId).Ascending(x => x.ReportStartDate).Ascending(x => x.ReportEndDate), indexOptions), cancellationToken);
+            await SafeCreateIndex(reportScheduleCollection, new CreateIndexModel<ReportSchedule>(rs.Ascending(x => x.Status), indexOptions), cancellationToken);
+            await SafeCreateIndex(reportScheduleCollection, new CreateIndexModel<ReportSchedule>(rs.Descending(x => x.CreateDate), indexOptions), cancellationToken);
 
-            // Indexes for reportEntry collection
+            // ReportEntry indexes
             var reportEntryCollection = MongoDatabase.GetCollection<ReportEntry>("reportEntry");
-            var reportEntryBuilders = Builders<ReportEntry>.IndexKeys;
-            await reportEntryCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<ReportEntry>(reportEntryBuilders.Ascending(x => x.FacilityId).Ascending(x => x.ReportScheduleId).Ascending(x => x.PatientId), indexOptions),
-                cancellationToken: cancellationToken);
-            await reportEntryCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<ReportEntry>(reportEntryBuilders.Ascending(x => x.ReportScheduleId).Ascending(x => x.ReportingStatus), indexOptions),
-                cancellationToken: cancellationToken);
-            await reportEntryCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<ReportEntry>(reportEntryBuilders.Ascending(x => x.FacilityId).Ascending(x => x.PatientId), indexOptions),
-                cancellationToken: cancellationToken);
-            await reportEntryCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<ReportEntry>(reportEntryBuilders.Ascending(x => x.ReportingStatus).Ascending(x => x.SubmissionStatus), indexOptions),
-                cancellationToken: cancellationToken);
-            await reportEntryCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<ReportEntry>(reportEntryBuilders.Ascending(x => x.ReportScheduleId), indexOptions),
-                cancellationToken: cancellationToken);
-            await reportEntryCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<ReportEntry>(reportEntryBuilders.Descending(x => x.CreateDate), indexOptions),
-                cancellationToken: cancellationToken);
+            var re = Builders<ReportEntry>.IndexKeys;
+            await SafeCreateIndex(reportEntryCollection, new CreateIndexModel<ReportEntry>(re.Ascending(x => x.FacilityId).Ascending(x => x.ReportScheduleId).Ascending(x => x.PatientId), indexOptions), cancellationToken);
+            await SafeCreateIndex(reportEntryCollection, new CreateIndexModel<ReportEntry>(re.Ascending(x => x.ReportScheduleId).Ascending(x => x.ReportingStatus), indexOptions), cancellationToken);
+            await SafeCreateIndex(reportEntryCollection, new CreateIndexModel<ReportEntry>(re.Ascending(x => x.FacilityId).Ascending(x => x.PatientId), indexOptions), cancellationToken);
+            await SafeCreateIndex(reportEntryCollection, new CreateIndexModel<ReportEntry>(re.Ascending(x => x.ReportingStatus).Ascending(x => x.SubmissionStatus), indexOptions), cancellationToken);
+            await SafeCreateIndex(reportEntryCollection, new CreateIndexModel<ReportEntry>(re.Ascending(x => x.ReportScheduleId), indexOptions), cancellationToken);
+            await SafeCreateIndex(reportEntryCollection, new CreateIndexModel<ReportEntry>(re.Descending(x => x.CreateDate), indexOptions), cancellationToken);
 
-            // Indexes for reportResource collection
+            // ReportResource indexes
             var reportResourceCollection = MongoDatabase.GetCollection<ReportResource>("reportResource");
-            var reportResourceBuilders = Builders<ReportResource>.IndexKeys;
-            await reportResourceCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<ReportResource>(reportResourceBuilders.Ascending(x => x.FacilityId).Ascending(x => x.ResourceType).Ascending(x => x.ResourceId), indexOptions),
-                cancellationToken: cancellationToken);
-            await reportResourceCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<ReportResource>(reportResourceBuilders.Ascending(x => x.FacilityId).Ascending(x => x.PatientId), indexOptions),
-                cancellationToken: cancellationToken);
-            await reportResourceCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<ReportResource>(reportResourceBuilders.Ascending(x => x.ResourceType), indexOptions),
-                cancellationToken: cancellationToken);
+            var rr = Builders<ReportResource>.IndexKeys;
+            await SafeCreateIndex(reportResourceCollection, new CreateIndexModel<ReportResource>(rr.Ascending(x => x.FacilityId).Ascending(x => x.ResourceType).Ascending(x => x.ResourceId), indexOptions), cancellationToken);
+            await SafeCreateIndex(reportResourceCollection, new CreateIndexModel<ReportResource>(rr.Ascending(x => x.FacilityId).Ascending(x => x.PatientId), indexOptions), cancellationToken);
+            await SafeCreateIndex(reportResourceCollection, new CreateIndexModel<ReportResource>(rr.Ascending(x => x.ResourceType), indexOptions), cancellationToken);
 
-            // Indexes for reportPopulation collection
+            // ReportPopulation indexes
             var reportPopulationCollection = MongoDatabase.GetCollection<ReportPopulation>("reportPopulation");
-            var reportPopulationBuilders = Builders <ReportPopulation>.IndexKeys;
-            await reportPopulationCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<ReportPopulation>(reportPopulationBuilders.Ascending(x => x.FacilityId), indexOptions),
-                cancellationToken: cancellationToken);
-            await reportPopulationCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<ReportPopulation>(reportPopulationBuilders.Ascending(x => x.FacilityId).Ascending(x => x.ReportScheduleId), indexOptions),
-                cancellationToken: cancellationToken);
+            var rp = Builders<ReportPopulation>.IndexKeys;
+            await SafeCreateIndex(reportPopulationCollection, new CreateIndexModel<ReportPopulation>(rp.Ascending(x => x.FacilityId), indexOptions), cancellationToken);
+            await SafeCreateIndex(reportPopulationCollection, new CreateIndexModel<ReportPopulation>(rp.Ascending(x => x.FacilityId).Ascending(x => x.ReportScheduleId), indexOptions), cancellationToken);
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Exception While Creating Mongo Indexes");
+            _logger.LogWarning(ex, "Unexpected exception while creating Mongo indexes");
+        }
+    }
+
+    /// <summary>
+    /// Helper that safely creates an index, or fails gracefully.
+    /// </summary>
+    private async Task SafeCreateIndex<T>(IMongoCollection<T> collection, CreateIndexModel<T> model, CancellationToken ct)
+    {
+        try
+        {
+            await collection.Indexes.CreateOneAsync(model, cancellationToken: ct);
+        }
+        catch (MongoCommandException ex)
+            when (ex.Code == 13
+               || ex.Message.Contains("unique index cannot be modified", StringComparison.OrdinalIgnoreCase)
+               || ex.Message.Contains("Forbidden", StringComparison.OrdinalIgnoreCase)
+               || ex.Message.Contains("Index already exists", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogDebug("Index already exists or cannot be modified on collection {Collection} (Cosmos DB limitation) — skipping.",
+                collection.CollectionNamespace.CollectionName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to create index on collection {Collection}",
+                collection.CollectionNamespace.CollectionName);
         }
     }
 }
