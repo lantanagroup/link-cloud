@@ -127,7 +127,7 @@ public class OrganizationLocationMappingManagerTests : IClassFixture<DataAcquisi
         await manager.DeleteByIdAsync(created.LocationMappingId);
 
         var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
-        Assert.Null(await queries.GetByIdAsync(created.LocationMappingId));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => queries.GetByIdAsync(created.LocationMappingId));
     }
 
     [Fact]

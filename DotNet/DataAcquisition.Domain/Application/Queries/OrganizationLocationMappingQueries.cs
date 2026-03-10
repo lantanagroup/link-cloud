@@ -46,7 +46,7 @@ public class OrganizationLocationMappingQueries : IOrganizationLocationMappingQu
                 ModifiedDate = m.ModifiedDate,
                 IsActive = m.IsActive
             })
-            .FirstOrDefaultAsync();
+            .SingleAsync();
     }
 
     public async Task<OrganizationLocationMappingModel> GetByFacilityIdAndLocationIdAsync(string facilityId, string locationId)

@@ -10,6 +10,7 @@ public interface IOrganizationLocationMappingManager
     Task<OrganizationLocationMappingModel> UpdateByIdAsync(int locationMappingId, UpdateOrganizationLocationMappingModel model);
     Task<OrganizationLocationMappingModel> UpdateByFacilityIdAndLocationIdAsync(string facilityId, string locationId, UpdateOrganizationLocationMappingModel model);
     Task DeleteByIdAsync(int locationMappingId);
+    Task DeleteByFacilityIdAsync(string facilityId);
     Task DeleteByFacilityIdAndLocationIdAsync(string facilityId, string locationId);
 }
 
@@ -71,11 +72,29 @@ public class OrganizationLocationMappingManager : IOrganizationLocationMappingMa
     public async Task DeleteByIdAsync(int locationMappingId)
     {
         var entity = await _database.LocationMappingRepository.GetAsync(locationMappingId);
+
         if (entity != null)
         {
             _database.LocationMappingRepository.Remove(entity);
             await _database.SaveChangesAsync();
         }
+    }
+
+    public async Task DeleteByFacilityIdAsync(string facilityId)
+    {
+        // Delete ALL mappings for this facility (protects PartOf relationships by design)
+        var entities = await _database.LocationMappingRepository
+            .FindAsync(m => m.FacilityId == facilityId);
+
+        if (entities.Count == 0)
+            return; // Nothing to delete
+
+        foreach (var entity in entities)
+        {
+            _database.LocationMappingRepository.Remove(entity);
+        }
+
+        await _database.SaveChangesAsync();
     }
 
     public async Task DeleteByFacilityIdAndLocationIdAsync(string facilityId, string locationId)
