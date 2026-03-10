@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -22,7 +23,8 @@ public class OrganizationLocationConfigurationManagerTests : IClassFixture<DataA
     private IOrganizationLocationConfigurationManager CreateManager(IServiceScope scope)
     {
         var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
-        return new OrganizationLocationConfigurationManager(database);
+        var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationQueries>();
+        return new OrganizationLocationConfigurationManager(database, queries);
     }
 
     [Fact]
@@ -121,7 +123,7 @@ public class OrganizationLocationConfigurationManagerTests : IClassFixture<DataA
         await manager.DeleteByIdAsync(created.ConfigId);
 
         var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationQueries>();
-        Assert.Null(await queries.GetByIdAsync(created.ConfigId));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => queries.GetByIdAsync(created.ConfigId));
     }
 
     [Fact]
@@ -149,7 +151,7 @@ public class OrganizationLocationConfigurationManagerTests : IClassFixture<DataA
         using var scope = _fixture.ServiceProvider.CreateScope();
         var manager = CreateManager(scope);
 
-        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+        await Assert.ThrowsAsync<NotFoundException>(() =>
             manager.UpdateByIdAsync(99999, new UpdateOrganizationLocationConfigurationModel()));
     }
 }

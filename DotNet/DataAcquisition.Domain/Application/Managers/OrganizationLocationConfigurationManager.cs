@@ -1,4 +1,6 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
@@ -20,10 +22,12 @@ public interface IOrganizationLocationConfigurationManager
 public class OrganizationLocationConfigurationManager : IOrganizationLocationConfigurationManager
 {
     private readonly IDatabase _database;
+    private readonly IOrganizationLocationConfigurationQueries _organizationLocationConfigurationQueries;
 
-    public OrganizationLocationConfigurationManager(IDatabase database)
+    public OrganizationLocationConfigurationManager(IDatabase database, IOrganizationLocationConfigurationQueries organizationLocationConfigurationQueries)
     {
-        _database = database ?? throw new ArgumentNullException(nameof(database));
+        _database = database;
+        _organizationLocationConfigurationQueries = organizationLocationConfigurationQueries;
     }
 
     public async Task<OrganizationLocationConfigurationModel> CreateAsync(CreateOrganizationLocationConfigurationModel model)
@@ -60,10 +64,11 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
         {
             await _database.BeginTransactionAsync();
             var entity = await _database.LocationConfigurationRepository.GetAsync(configId);
-            entity.LocationConditions = await _database.LocationConditionRepository.FindAsync(c => c.ConfigId == configId);
 
             if (entity == null)
-                throw new KeyNotFoundException($"OrganizationLocationConfiguration with ConfigId {configId} not found.");
+                throw new NotFoundException($"OrganizationLocationConfiguration with ConfigId {configId} not found.");
+
+            entity.LocationConditions = await _database.LocationConditionRepository.FindAsync(c => c.ConfigId == configId);
 
             await ApplyUpdateToEntity(entity, model);
             _database.LocationConfigurationRepository.Update(entity);

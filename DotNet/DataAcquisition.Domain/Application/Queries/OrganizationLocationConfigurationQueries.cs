@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
 public interface IOrganizationLocationConfigurationQueries
 {
-    Task<OrganizationLocationConfigurationModel?> GetByIdAsync(int configId);
+    Task<OrganizationLocationConfigurationModel> GetByIdAsync(int configId);
     Task<List<OrganizationLocationConfigurationModel>> GetByFacilityIdAsync(string facilityId);
     Task<PagedConfigModel<OrganizationLocationConfigurationModel>> SearchAsync(
         OrganizationLocationConfigurationSearchModel search,
@@ -24,7 +24,7 @@ public class OrganizationLocationConfigurationQueries : IOrganizationLocationCon
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
-    public async Task<OrganizationLocationConfigurationModel?> GetByIdAsync(int configId)
+    public async Task<OrganizationLocationConfigurationModel> GetByIdAsync(int configId)
     {
         return await _context.LocationConfigurations
             .Where(c => c.ConfigId == configId)
@@ -45,7 +45,7 @@ public class OrganizationLocationConfigurationQueries : IOrganizationLocationCon
                     ModifiedOn = cond.ModifiedOn ?? DateTime.UtcNow
                 }).ToList()
             })
-            .FirstOrDefaultAsync();
+            .SingleAsync();
     }
 
     public async Task<List<OrganizationLocationConfigurationModel>> GetByFacilityIdAsync(string facilityId)

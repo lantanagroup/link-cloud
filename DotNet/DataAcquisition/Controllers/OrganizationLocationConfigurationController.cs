@@ -37,15 +37,21 @@ public class OrganizationLocationConfigurationController : Controller
     /// </summary>
     [HttpGet("{id:int}", Name = nameof(GetByIdAsync))]
     [ProducesResponseType(typeof(OrganizationLocationConfigurationModel), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> GetByIdAsync(int id)
     {
         try
         {
             var result = await _queries.GetByIdAsync(id);
-
             return Ok(result);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("Sequence contains no elements", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning(ex, "OrganizationLocationConfiguration with id {id} not found.", id);
+            return Problem(title: "Not Found",
+                           detail: $"OrganizationLocationConfiguration with id {id} not found.",
+                           statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
@@ -190,10 +196,10 @@ public class OrganizationLocationConfigurationController : Controller
             var updated = await _manager.UpdateByIdAsync(id, model);
             return Accepted(updated);
         }
-        catch (KeyNotFoundException ex)
+        catch (NotFoundException ex)
         {
-            _logger.LogError(ex, "KeyNotFoundException occurred.");
-            return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
+            _logger.LogError(ex, "NotFoundException occurred.");
+            return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (BadRequestException ex)
         {
@@ -232,9 +238,9 @@ public class OrganizationLocationConfigurationController : Controller
             var updatedList = await _manager.UpdateByFacilityIdAsync(facilityId, model);
             return Accepted(updatedList);
         }
-        catch (KeyNotFoundException ex)
+        catch (NotFoundException ex)
         {
-            _logger.LogError(ex, "KeyNotFoundException occurred.");
+            _logger.LogError(ex, "NotFoundException occurred.");
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (BadRequestException ex)
