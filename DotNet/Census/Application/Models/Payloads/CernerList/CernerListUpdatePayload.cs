@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.Census.Application.Models.Payloads.CernerList
 {
     public class CernerListUpdatePayload : IPayload
     {
-        public string PayloadType { get; } = EventType.CernerListAdmit.ToString();
+        public string PayloadType { get; } = EventType.CernerListUpdate.ToString();
         public string PatientId { get; private set; }
         public string EncounterId { get; private set; }
         public string FinNumber { get; private set; }
