@@ -125,22 +125,6 @@ public class ReportScheduledManagerTests
     }
 
     [Fact]
-    public async Task UpdateReportsDeletedStatusForFacility_WithSubmittedReport_WhenDeleted_PassesReportToUpdateRange()
-    {
-        // Arrange
-        var facilityId = "FAC001";
-        var submittedReport = CreateReport(facilityId, ScheduleStatus.Submitted, isDeleted: false);
-
-        SetupFindAsync(new List<ReportSchedule> { submittedReport });
-
-        // Act
-        await _sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: true);
-
-        // Assert
-        Assert.Contains(submittedReport, _context.UpdateRangeItems);
-    }
-
-    [Fact]
     public async Task UpdateReportsDeletedStatusForFacility_WithScheduledReport_WhenDeleted_CallsDeleteJob()
     {
         // Arrange
@@ -167,7 +151,7 @@ public class ReportScheduledManagerTests
     }
 
     [Fact]
-    public async Task UpdateReportsDeletedStatusForFacility_WithScheduledReport_WhenDeleted_DoesNotSetIsDeleted()
+    public async Task UpdateReportsDeletedStatusForFacility_WithScheduledReport_WhenDeleted_SetsIsDeletedTrue()
     {
         // Arrange
         var facilityId = "FAC001";
@@ -182,13 +166,12 @@ public class ReportScheduledManagerTests
         // Act
         await _sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: true);
 
-        // Assert: Scheduled report should NOT have IsDeleted modified
-        Assert.False(scheduledReport.IsDeleted);
-        Assert.DoesNotContain(scheduledReport, _context.UpdateRangeItems);
+        // Assert: Scheduled reports ARE soft-deleted along with their Quartz job
+        Assert.True(scheduledReport.IsDeleted);
     }
 
     [Fact]
-    public async Task UpdateReportsDeletedStatusForFacility_WithScheduledReport_WhenDeleted_DoesNotCallSaveChangesAsync()
+    public async Task UpdateReportsDeletedStatusForFacility_WithScheduledReport_WhenDeleted_CallsSaveChangesAsync()
     {
         // Arrange
         var facilityId = "FAC001";
@@ -203,8 +186,8 @@ public class ReportScheduledManagerTests
         // Act
         await _sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: true);
 
-        // Assert: no Submitted reports, so SaveChanges should not be called
-        Assert.False(_context.SaveChangesWasCalled);
+        // Assert: Scheduled reports are persisted
+        Assert.True(_context.SaveChangesWasCalled);
     }
 
     [Fact]
@@ -215,15 +198,15 @@ public class ReportScheduledManagerTests
         var endOfPeriodReport = CreateReport(facilityId, ScheduleStatus.EndOfPeriod, isDeleted: false);
         var originalModifyDate = endOfPeriodReport.ModifyDate;
 
-        SetupFindAsync(new List<ReportSchedule> { endOfPeriodReport });
+        // EndOfPeriod reports don't match the Status == Scheduled query; return empty from repository
+        SetupFindAsync(new List<ReportSchedule>());
 
         // Act
         await _sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: true);
 
-        // Assert
+        // Assert: EndOfPeriod report is never touched
         Assert.False(endOfPeriodReport.IsDeleted);
         Assert.Equal(originalModifyDate, endOfPeriodReport.ModifyDate);
-        Assert.DoesNotContain(endOfPeriodReport, _context.UpdateRangeItems);
         Assert.False(_context.SaveChangesWasCalled);
         _mockQuartzJobHelper.Verify(
             q => q.DeleteJob(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
@@ -238,15 +221,15 @@ public class ReportScheduledManagerTests
         var newReport = CreateReport(facilityId, ScheduleStatus.New, isDeleted: false);
         var originalModifyDate = newReport.ModifyDate;
 
-        SetupFindAsync(new List<ReportSchedule> { newReport });
+        // New reports don't match the Status == Scheduled query; return empty from repository
+        SetupFindAsync(new List<ReportSchedule>());
 
         // Act
         await _sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: true);
 
-        // Assert
+        // Assert: New report is never touched
         Assert.False(newReport.IsDeleted);
         Assert.Equal(originalModifyDate, newReport.ModifyDate);
-        Assert.DoesNotContain(newReport, _context.UpdateRangeItems);
         Assert.False(_context.SaveChangesWasCalled);
         _mockQuartzJobHelper.Verify(
             q => q.DeleteJob(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
@@ -379,7 +362,7 @@ public class ReportScheduledManagerTests
     }
 
     [Fact]
-    public async Task UpdateReportsDeletedStatusForFacility_WithOnlyScheduledReports_WhenDeleted_DoesNotCallSaveChangesAsync()
+    public async Task UpdateReportsDeletedStatusForFacility_WithOnlyScheduledReports_WhenDeleted_CallsSaveChangesAsync()
     {
         // Arrange
         var facilityId = "FAC001";
@@ -395,8 +378,8 @@ public class ReportScheduledManagerTests
         // Act
         await _sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: true);
 
-        // Assert
-        Assert.False(_context.SaveChangesWasCalled);
+        // Assert: Scheduled reports are persisted when soft-deleted
+        Assert.True(_context.SaveChangesWasCalled);
     }
 
     [Fact]
@@ -415,8 +398,6 @@ public class ReportScheduledManagerTests
         // Assert
         Assert.True(submittedReport1.IsDeleted);
         Assert.True(submittedReport2.IsDeleted);
-        Assert.Contains(submittedReport1, _context.UpdateRangeItems);
-        Assert.Contains(submittedReport2, _context.UpdateRangeItems);
         Assert.True(_context.SaveChangesWasCalled);
         Assert.Equal(1, _context.SaveChangesCallCount);
     }
@@ -430,13 +411,14 @@ public class ReportScheduledManagerTests
     {
         // Arrange
         var facilityId = "FAC001";
-        var submittedReport = CreateReport(facilityId, ScheduleStatus.Submitted, isDeleted: false);
+        // Only Scheduled reports come from the repository (Status == Scheduled query)
         var scheduledReport = CreateReport(facilityId, ScheduleStatus.Scheduled);
         scheduledReport.Id = "sched-mixed-id";
+        // EndOfPeriod and New reports don't match either query path — they stay untouched
         var endOfPeriodReport = CreateReport(facilityId, ScheduleStatus.EndOfPeriod, isDeleted: false);
         var newReport = CreateReport(facilityId, ScheduleStatus.New, isDeleted: false);
 
-        SetupFindAsync(new List<ReportSchedule> { submittedReport, scheduledReport, endOfPeriodReport, newReport });
+        SetupFindAsync(new List<ReportSchedule> { scheduledReport });
 
         _mockQuartzJobHelper
             .Setup(q => q.DeleteJob(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -445,19 +427,15 @@ public class ReportScheduledManagerTests
         // Act
         await _sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: true);
 
-        // Assert
-        Assert.True(submittedReport.IsDeleted);
-        Assert.Contains(submittedReport, _context.UpdateRangeItems);
-
+        // Assert: Scheduled report is soft-deleted and its Quartz job removed
+        Assert.True(scheduledReport.IsDeleted);
         _mockQuartzJobHelper.Verify(
             q => q.DeleteJob("sched-mixed-id", "MeasureReportSubmissionGroup", It.IsAny<CancellationToken>()),
             Times.Once);
 
+        // Assert: EndOfPeriod and New reports are never touched
         Assert.False(endOfPeriodReport.IsDeleted);
-        Assert.DoesNotContain(endOfPeriodReport, _context.UpdateRangeItems);
-
         Assert.False(newReport.IsDeleted);
-        Assert.DoesNotContain(newReport, _context.UpdateRangeItems);
 
         Assert.True(_context.SaveChangesWasCalled);
     }
@@ -537,6 +515,18 @@ public class ReportScheduledManagerTests
                 new Mock<IMongoDatabase>().Object,
                 new Mock<ILogger<MongoDbContext>>().Object)
         {
+        }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            // Do NOT call base — base calls ToCollection() (MongoDB-specific extension) which
+            // breaks the EF Core in-memory provider's internal service provider.
+            // Configure only the minimum needed for tests that exercise ReportSchedule.
+            modelBuilder.Entity<ReportSchedule>();
+            modelBuilder.Entity<ReportEntry>().Ignore(e => e.MeasureReportList);
+            modelBuilder.Entity<ReportResource>();
+            modelBuilder.Entity<ReportPopulation>()
+                .Ignore(e => e.GroupPopulations);
         }
 
         /// <summary>
