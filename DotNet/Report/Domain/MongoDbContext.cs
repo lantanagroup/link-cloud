@@ -141,10 +141,8 @@ public class MongoDbContext : DbContext
             await collection.Indexes.CreateOneAsync(model, cancellationToken: ct);
         }
         catch (MongoCommandException ex)
-            when (ex.Code == 13
-               || ex.Message.Contains("unique index cannot be modified", StringComparison.OrdinalIgnoreCase)
-               || ex.Message.Contains("Forbidden", StringComparison.OrdinalIgnoreCase)
-               || ex.Message.Contains("Index already exists", StringComparison.OrdinalIgnoreCase))
+            when (ex.Message.Contains("unique index cannot be modified", StringComparison.OrdinalIgnoreCase)
+                    || ex.Message.Contains("Index already exists", StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogDebug("Index already exists or cannot be modified on collection {Collection} (Cosmos DB limitation) — skipping.",
                 collection.CollectionNamespace.CollectionName);
