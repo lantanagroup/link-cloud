@@ -8,5 +8,6 @@ export interface IDataAcquisitionQueryConfigModel {
   timeZone: string,
   minAcquisitionPullTime?: string
   maxAcquisitionPullTime?: string,
-  maxConcurrentRequests?: number
+  maxConcurrentRequests?: number,
+  maxRetries?: number
 }

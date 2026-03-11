@@ -506,6 +506,8 @@ public class PatientDataService : IPatientDataService
                         $"No configuration for {log.FacilityId} exists.");
                 }
 
+                var maxRetryAttempts = fhirQueryConfiguration.MaxRetries ?? DataAcquisitionLog.MaxRetryAttempts;
+
                 //hashset to hold unique resource ids
                 var resourceIds = new HashSet<string>();
 
@@ -615,10 +617,22 @@ public class PatientDataService : IPatientDataService
             }
             else
             {
+                var fhirQueryConfiguration = await _fhirQueryQueries.GetByFacilityIdAsync(log.FacilityId, cancellationToken);
+                var maxRetryAttempts = fhirQueryConfiguration?.MaxRetries ?? DataAcquisitionLog.MaxRetryAttempts;
+
                 log.RetryAttempts ??= 0;
                 log.RetryAttempts++;
-                log.Status = RequestStatus.Failed;
-                log.Notes.Add($"[{DateTime.UtcNow}] OperationOutcome encountered (HTTP {ex.StatusCode}): Retrying. Attempt {log.RetryAttempts}.");
+
+                if (log.RetryAttempts >= maxRetryAttempts)
+                {
+                    log.Status = RequestStatus.MaxRetriesReached;
+                    log.Notes.Add($"[{DateTime.UtcNow}] OperationOutcome encountered (HTTP {ex.StatusCode}): Maximum retry attempts reached ({maxRetryAttempts}).");
+                }
+                else
+                {
+                    log.Status = RequestStatus.Failed;
+                    log.Notes.Add($"[{DateTime.UtcNow}] OperationOutcome encountered (HTTP {ex.StatusCode}): Retrying. Attempt {log.RetryAttempts}.");
+                }
             }
 
             await _dataAcquisitionLogQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
@@ -691,9 +705,25 @@ public class PatientDataService : IPatientDataService
 
             log.Notes ??= new List<string>();
 
-            log.Status = RequestStatus.Failed;
-            log.Notes.Add(
-                $"PatientDataService.ExecuteLogRequest: [{DateTime.UtcNow}] Error encountered: {log.FacilityId?.Sanitize() ?? string.Empty}\n{ex.Message}\n{ex.InnerException?.Message ?? string.Empty}");
+            var fhirQueryConfiguration = await _fhirQueryQueries.GetByFacilityIdAsync(log.FacilityId, cancellationToken);
+            var maxRetryAttempts = fhirQueryConfiguration?.MaxRetries ?? DataAcquisitionLog.MaxRetryAttempts;
+
+            log.RetryAttempts ??= 0;
+            log.RetryAttempts++;
+            
+            if (log.RetryAttempts >= maxRetryAttempts)
+            {
+                log.Status = RequestStatus.MaxRetriesReached;
+                log.Notes.Add(
+                    $"PatientDataService.ExecuteLogRequest: [{DateTime.UtcNow}] Error encountered: {log.FacilityId?.Sanitize() ?? string.Empty}\n{ex.Message}\nMaximum retry attempts reached ({maxRetryAttempts}).");
+            }
+            else
+            {
+                log.Status = RequestStatus.Failed;
+                log.Notes.Add(
+                    $"PatientDataService.ExecuteLogRequest: [{DateTime.UtcNow}] Error encountered: {log.FacilityId?.Sanitize() ?? string.Empty}\n{ex.Message}\n{ex.InnerException?.Message ?? string.Empty}");
+            }
+
             await _dataAcquisitionLogQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
             {
                 Id = log.Id,

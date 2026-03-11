@@ -114,6 +114,7 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
             FacilityId = model.FacilityId,
             FhirServerBaseUrl = model.FhirServerBaseUrl,
             MaxConcurrentRequests = model.MaxConcurrentRequests,
+            MaxRetries = model.MaxRetries,
             CreateDate = DateTime.UtcNow,
             ModifyDate = DateTime.UtcNow
         };
@@ -148,6 +149,7 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
         existingEntity.FhirServerBaseUrl = model.FhirServerBaseUrl;
         existingEntity.ModifyDate = DateTime.UtcNow;
         existingEntity.MaxConcurrentRequests = model.MaxConcurrentRequests;
+        existingEntity.MaxRetries = model.MaxRetries;
         existingEntity.MinAcquisitionPullTime = model.MinAcquisitionPullTime;
         existingEntity.MaxAcquisitionPullTime = model.MaxAcquisitionPullTime;
 
