@@ -392,9 +392,12 @@ namespace LantanaGroup.Link.Tenant.Controllers
         {
             facilityId = facilityId?.Sanitize();
 
-            var existingModel = await _facilityQueries.GetAsync(facilityId, null, cancellationToken);
+            var existingModel = await _facilityQueries.GetAsync(facilityId, null, cancellationToken, includeDeleted: true);
             if (existingModel == null)
                 return NotFound($"Facility with Id: {facilityId} Not Found");
+
+            if (existingModel.IsDeleted == true)
+                return NoContent();
 
             try
             {

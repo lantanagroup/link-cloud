@@ -6,6 +6,7 @@ using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LinqKit;
+using Microsoft.EntityFrameworkCore;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
@@ -181,7 +182,30 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
             if (!string.IsNullOrWhiteSpace(reportScheduleId))
             {
+                // If the requested schedule is soft-deleted, return empty results
+                var scheduleIsActive = await _dbContext.ReportSchedules
+                    .AnyAsync(s => s.Id == reportScheduleId && s.IsDeleted != true, cancellationToken);
+
+                if (!scheduleIsActive)
+                    return new PagedConfigModel<ReportEntry>(new List<ReportEntry>(), new PaginationMetadata(pageSize, pageNumber, 0));
+
                 predicate = predicate.And(q => q.ReportScheduleId == reportScheduleId);
+            }
+            else
+            {
+                // Exclude entries belonging to soft-deleted schedules
+                var schedulesQuery = _dbContext.ReportSchedules.Where(s => s.IsDeleted != true);
+
+                if (!string.IsNullOrWhiteSpace(facilityId))
+                {
+                    schedulesQuery = schedulesQuery.Where(s => s.FacilityId == facilityId);
+                }
+
+                var validScheduleIds = await schedulesQuery
+                    .Select(s => s.Id)
+                    .ToListAsync(cancellationToken);
+
+                predicate = predicate.And(q => validScheduleIds.Contains(q.ReportScheduleId));
             }
 
             if (reportingStatuses != null && reportingStatuses.Count > 0)

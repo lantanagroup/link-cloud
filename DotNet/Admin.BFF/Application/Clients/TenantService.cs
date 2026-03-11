@@ -1,9 +1,12 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
+using System.Security.Claims;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
 {
@@ -12,12 +15,16 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         private readonly ILogger<TenantService> _logger;
         private readonly HttpClient _client;
         private readonly IOptions<ServiceRegistry> _serviceRegistry;
+        private readonly IOptions<AuthenticationSchemaConfig> _authenticationSchemaConfig;
+        private readonly IServiceScopeFactory _scopeFactory;
 
-        public TenantService(ILogger<TenantService> logger, HttpClient client, IOptions<ServiceRegistry> serviceRegistry)
+        public TenantService(ILogger<TenantService> logger, HttpClient client, IOptions<ServiceRegistry> serviceRegistry, IOptions<AuthenticationSchemaConfig> authenticationSchemaConfig, IServiceScopeFactory scopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _client = client ?? throw new ArgumentNullException(nameof(client));
             _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
+            _authenticationSchemaConfig = authenticationSchemaConfig ?? throw new ArgumentNullException(nameof(authenticationSchemaConfig));
+            _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
 
             InitHttpClient();
         }
@@ -46,6 +53,30 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 _logger.LogError(ex, "Tenant service health check failed");
                 return new LinkServiceHealthReport { Service = "Tenant", Status = HealthStatus.Unhealthy };
             }
+        }
+
+        public async Task<HttpResponseMessage> RestoreFacilityAsync(ClaimsPrincipal user, string facilityId, CancellationToken cancellationToken)
+        {
+            if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
+            {
+                var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            return await _client.PatchAsync($"api/facility/restore/{Uri.EscapeDataString(facilityId)}", null, cancellationToken);
+        }
+
+        public async Task<HttpResponseMessage> SoftDeleteFacilityAsync(ClaimsPrincipal user, string facilityId, CancellationToken cancellationToken)
+        {
+            if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
+            {
+                var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            return await _client.DeleteAsync($"api/facility/softDelete/{Uri.EscapeDataString(facilityId)}", cancellationToken);
         }
 
         private void InitHttpClient()
