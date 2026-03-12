@@ -55,7 +55,7 @@ public static class SoftDeleteFacility
         if (!tenantResponse.IsSuccessStatusCode)
         {
             var tenantDetail = await ReadDetailAsync(tenantResponse);
-            logger.LogWarning("Tenant soft-delete failed for facility {FacilityId} with status {StatusCode}: {Detail}", facilityId, tenantResponse.StatusCode, tenantDetail);
+            logger.LogWarning("Tenant soft-delete failed for facility {FacilityId} with status {StatusCode}", facilityId, tenantResponse.StatusCode);
             return ProblemDetailsExtension.UserFacingProblem(tenantDetail ?? "Failed to soft-delete tenant.", (int)tenantResponse.StatusCode);
         }
 

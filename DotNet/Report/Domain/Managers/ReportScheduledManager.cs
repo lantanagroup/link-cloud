@@ -192,13 +192,15 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             var scheduledReports = await _database.ReportScheduledRepository
                 .FindAsync(r => r.FacilityId == facilityId && r.Status == ScheduleStatus.Scheduled, cancellationToken);
 
+            var quartzFailedIds = new HashSet<string>();
+
             foreach (var r in scheduledReports)
             {
                 try
                 {
                     if (deleted)
                     {
-                        await _quartzJobHelper.DeleteJob(r.Id, ReportConstants.MeasureReportSubmissionScheduler.Group, cancellationToken);
+                         await _quartzJobHelper.DeleteJob(r.Id, ReportConstants.MeasureReportSubmissionScheduler.Group, cancellationToken);
                     }
                     else if (r.ReportEndDate > DateTime.UtcNow)
                     {
@@ -208,7 +210,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                                 { "ReportScheduleId", r.Id },
                                 { "FacilityId", r.FacilityId }
                             },
-                            new DateTimeOffset(r.ReportEndDate, TimeSpan.Zero),
+                            r.ReportEndDate,
                             r.Id,
                             ReportConstants.MeasureReportSubmissionScheduler.Group,
                             $"{r.Id}-{r.ReportEndDate}",
@@ -223,8 +225,13 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 {
                     _logger.LogWarning(ex, "Failed to {Action} Quartz job for report schedule {ReportScheduleId}",
                         deleted ? "delete" : "re-schedule", r.Id);
+                    quartzFailedIds.Add(r.Id);
                 }
             }
+
+            if (quartzFailedIds.Count > 0)
+                throw new InvalidOperationException(
+                    $"Failed to {(deleted ? "delete" : "reschedule")} Quartz jobs for {quartzFailedIds.Count} report schedule(s) for facility {facilityId}.");
 
             var scheduledToUpdate = scheduledReports
                 .Where(r => deleted ? !r.IsDeleted.HasValue || r.IsDeleted == false : r.IsDeleted == true)

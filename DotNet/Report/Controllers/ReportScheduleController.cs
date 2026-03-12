@@ -71,10 +71,16 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <summary>
         /// Returns scheduled reports for the given facility Id.
         /// An optional 'active' parameter is available to only return current active reports.
+        /// An optional 'blocking' parameter filters to only reports with statuses that block facility deletion (New, EndOfPeriod).
         /// An optional 'includeDeleted' parameter is available to include soft-deleted reports.
         /// </summary>
         /// <param name="facilityId"></param>
         /// <param name="active"></param>
+        /// <param name="blocking">
+        /// When set to <c>true</c>, returns only report schedules with a status of <c>New</c> or <c>EndOfPeriod</c>
+        /// — the statuses that indicate a report is actively in progress and would block a facility soft-delete.
+        /// Defaults to <c>false</c>.
+        /// </param>
         /// <param name="includeDeleted">
         /// When set to <c>true</c>, includes soft-deleted report schedules.
         /// Defaults to <c>false</c>.

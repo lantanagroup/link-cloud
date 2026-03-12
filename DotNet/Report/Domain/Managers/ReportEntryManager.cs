@@ -193,19 +193,13 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             }
             else
             {
-                // Exclude entries belonging to soft-deleted schedules
-                var schedulesQuery = _dbContext.ReportSchedules.Where(s => s.IsDeleted != true);
-
-                if (!string.IsNullOrWhiteSpace(facilityId))
-                {
-                    schedulesQuery = schedulesQuery.Where(s => s.FacilityId == facilityId);
-                }
-
-                var validScheduleIds = await schedulesQuery
-                    .Select(s => s.Id)
-                    .ToListAsync(cancellationToken);
-
-                predicate = predicate.And(q => validScheduleIds.Contains(q.ReportScheduleId));
+                // Exclude entries belonging to soft-deleted schedules using a server-side subquery
+                // so no schedule IDs are materialized into application memory before paging.
+                predicate = predicate.And(q =>
+                    _dbContext.ReportSchedules.Any(s =>
+                        s.Id == q.ReportScheduleId &&
+                        s.IsDeleted != true &&
+                        (string.IsNullOrWhiteSpace(facilityId) || s.FacilityId == facilityId)));
             }
 
             if (reportingStatuses != null && reportingStatuses.Count > 0)
@@ -235,15 +229,21 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 predicate = predicate.And(q => q.MeasureReportList.Any(a => a.ReportType == reportType));
             }
 
-            var (results, metadata) = await _database.ReportEntryRepository.SearchAsync(
-                predicate,
-                sortBy,
-                sortOrder,
-                pageSize,
-                pageNumber,
-                cancellationToken);
+            var efQuery = _dbContext.ReportEntries.Where(predicate);
 
-            return new PagedConfigModel<ReportEntry>(results, metadata);
+            var totalCount = await efQuery.LongCountAsync(cancellationToken);
+
+            if (!string.IsNullOrWhiteSpace(sortBy))
+            {
+                efQuery = sortOrder == SortOrder.Descending
+                    ? efQuery.OrderByDescending(x => EF.Property<object>(x, sortBy))
+                    : efQuery.OrderBy(x => EF.Property<object>(x, sortBy));
+            }
+
+            var skip = (pageNumber - 1) * pageSize;
+            var results = await efQuery.Skip(skip).Take(pageSize).ToListAsync(cancellationToken);
+
+            return new PagedConfigModel<ReportEntry>(results, new PaginationMetadata(pageSize, pageNumber, totalCount));
         }
 
         public async Task<ReportEntrySummary> GetSummaryByReportScheduleIdAsync(string reportScheduleId, CancellationToken cancellationToken = default)

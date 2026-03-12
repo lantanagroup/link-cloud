@@ -32,7 +32,7 @@ public static class RestoreFacility
         if (!tenantResponse.IsSuccessStatusCode)
         {
             var tenantDetail = await ReadDetailAsync(tenantResponse);
-            logger.LogWarning("Tenant restore failed for facility {FacilityId} with status {StatusCode}: {Detail}", facilityId, tenantResponse.StatusCode, tenantDetail);
+            logger.LogWarning("Tenant restore failed for facility {FacilityId} with status {StatusCode}", facilityId, tenantResponse.StatusCode);
             return ProblemDetailsExtension.UserFacingProblem(tenantDetail ?? "Failed to restore tenant.", (int)tenantResponse.StatusCode);
         }
 

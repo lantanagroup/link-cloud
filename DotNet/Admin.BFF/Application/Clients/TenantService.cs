@@ -57,26 +57,25 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
 
         public async Task<HttpResponseMessage> RestoreFacilityAsync(ClaimsPrincipal user, string facilityId, CancellationToken cancellationToken)
         {
-            if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
-            {
-                var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
-                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
-                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            }
-
-            return await _client.PatchAsync($"api/facility/restore/{Uri.EscapeDataString(facilityId)}", null, cancellationToken);
+            var request = new HttpRequestMessage(HttpMethod.Patch, $"api/facility/restore/{Uri.EscapeDataString(facilityId)}");
+            await SetAuthHeaderAsync(user, request);
+            return await _client.SendAsync(request, cancellationToken);
         }
 
         public async Task<HttpResponseMessage> SoftDeleteFacilityAsync(ClaimsPrincipal user, string facilityId, CancellationToken cancellationToken)
         {
-            if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
-            {
-                var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
-                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
-                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            }
+            var request = new HttpRequestMessage(HttpMethod.Delete, $"api/facility/softDelete/{Uri.EscapeDataString(facilityId)}");
+            await SetAuthHeaderAsync(user, request);
+            return await _client.SendAsync(request, cancellationToken);
+        }
 
-            return await _client.DeleteAsync($"api/facility/softDelete/{Uri.EscapeDataString(facilityId)}", cancellationToken);
+        private async Task SetAuthHeaderAsync(ClaimsPrincipal user, HttpRequestMessage request)
+        {
+            if (_authenticationSchemaConfig.Value.EnableAnonymousAccess) return;
+            using var scope = _scopeFactory.CreateScope();
+            var createLinkBearerToken = scope.ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
+            var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
 
         private void InitHttpClient()
