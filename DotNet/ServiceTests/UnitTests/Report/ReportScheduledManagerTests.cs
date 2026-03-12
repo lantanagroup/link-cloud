@@ -295,7 +295,7 @@ public class ReportScheduledManagerTests
     #region Exception Handling Tests
 
     [Fact]
-    public async Task UpdateReportsDeletedStatusForFacility_WhenDeleteJobThrows_ExceptionIsCaughtAndDoesNotPropagate()
+    public async Task UpdateReportsDeletedStatusForFacility_WhenDeleteJobThrows_ThrowsInvalidOperationException()
     {
         // Arrange
         var facilityId = "FAC001";
@@ -307,11 +307,9 @@ public class ReportScheduledManagerTests
             .Setup(q => q.DeleteJob(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Quartz job store error"));
 
-        // Act — should not throw
-        var act = async () => await _sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: true);
-
-        // Assert
-        await act(); // no exception
+        // Act & Assert — Quartz failure must propagate so Admin.BFF can roll back the tenant
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: true));
     }
 
     [Fact]
@@ -328,8 +326,9 @@ public class ReportScheduledManagerTests
             .Setup(q => q.DeleteJob(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(expectedException);
 
-        // Act
-        await _sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: true);
+        // Act — will throw, but the warning must have been logged before that
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: true));
 
         // Assert: warning was logged
         _mockLogger.Verify(
