@@ -22,6 +22,7 @@ import org.springframework.web.server.ServerErrorException;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @RestController
@@ -113,6 +114,10 @@ public class CategoryController {
                     HttpStatus.BAD_REQUEST,
                     String.format("Duplicate IDs provided: %s", String.join(", ", duplicateIds)));
         }
+        Set<String> keepIds = categorySnapshots.stream()
+                .map(CategorySnapshot::getId)
+                .collect(Collectors.toSet());
+        categorizationService.removeObsoleteCategories(keepIds);
         for (CategorySnapshot categorySnapshot : categorySnapshots) {
             categorizationService.saveCategorySnapshot(categorySnapshot);
         }
