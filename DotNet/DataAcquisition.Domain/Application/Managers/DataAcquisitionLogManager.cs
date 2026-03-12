@@ -22,6 +22,8 @@ public interface IDataAcquisitionLogManager
     Task<int> UpdateStatusBatchAsync(IEnumerable<long> ids, RequestStatus newStatus, CancellationToken cancellationToken = default);
     Task<List<DataAcquisitionLog>> GetLogsByIdsAsync(List<long> ids, CancellationToken cancellationToken = default);
     Task DeleteAsync(long id, CancellationToken cancellationToken = default);
+    Task<int> SoftDeleteByFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
+    Task<int> RestoreByFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
     Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(List<long> logIds, string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default);
     Task ThrottleFacilityAcquisitions(string facilityId, DateTime executionDate, CancellationToken cancellationToken = default);
 }
@@ -130,6 +132,67 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         await _database.DataAcquisitionLogRepository.SaveChangesAsync();
     }
 
+    private const int SoftDeleteBatchSize = 1000;
+
+    public async Task<int> SoftDeleteByFacilityAsync(string facilityId, CancellationToken cancellationToken = default)
+    {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.SoftDeleteByFacilityAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+
+        if (string.IsNullOrWhiteSpace(facilityId))
+        {
+            throw new ArgumentNullException(nameof(facilityId), "Facility ID cannot be null or empty.");
+        }
+
+        int totalUpdated = 0;
+        int updated;
+
+        do
+        {
+            updated = await _dbContext.DataAcquisitionLogs
+                .Where(l => l.FacilityId == facilityId && !l.IsDeleted)
+                .Take(SoftDeleteBatchSize)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(l => l.IsDeleted, true)
+                    .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                    cancellationToken);
+
+            totalUpdated += updated;
+        }
+        while (updated == SoftDeleteBatchSize);
+
+        return totalUpdated;
+    }
+
+    public async Task<int> RestoreByFacilityAsync(string facilityId, CancellationToken cancellationToken = default)
+    {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.RestoreByFacilityAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+
+        if (string.IsNullOrWhiteSpace(facilityId))
+        {
+            throw new ArgumentNullException(nameof(facilityId), "Facility ID cannot be null or empty.");
+        }
+
+        int totalUpdated = 0;
+        int updated;
+
+        do
+        {
+            updated = await _dbContext.DataAcquisitionLogs
+                .Where(l => l.FacilityId == facilityId && l.IsDeleted)
+                .Take(SoftDeleteBatchSize)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(l => l.IsDeleted, false)
+                    .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                    cancellationToken);
+
+            totalUpdated += updated;
+        }
+        while (updated == SoftDeleteBatchSize);
+
+        return totalUpdated;
+    }
 
     public async Task<DataAcquisitionLogModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default)
     {
