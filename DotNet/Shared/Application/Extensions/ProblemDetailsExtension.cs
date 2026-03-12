@@ -16,11 +16,11 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
             services.AddProblemDetails(options => {
                 options.CustomizeProblemDetails = ctx =>
                 {
-                    /*if (ctx.HttpContext.Response.StatusCode == (int)HttpStatusCode.InternalServerError)
+                    if (ctx.HttpContext.Response.StatusCode == (int)HttpStatusCode.InternalServerError)
                     {
                         ctx.ProblemDetails.Detail =
                             "An error occurred in our API. Please use the trace id when requesting assistance.";
-                    }*/
+                    }
                     if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))
                     {
                         string? traceId = Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;

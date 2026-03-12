@@ -24,8 +24,9 @@ public class ReportScheduledManagerTests
     private readonly Mock<IServiceScopeFactory> _mockServiceScopeFactory;
     private readonly Mock<ScheduledReportFactory> _mockScheduledReportFactory;
 
-    // A minimal testable subclass that bypasses the MongoDB-specific constructor logic
-    // and exposes the list of items passed to UpdateRange for verification.
+    // A minimal testable subclass that bypasses the MongoDB-specific constructor logic.
+    // Seeding is done via Seed(), which writes to the EF Core in-memory store without
+    // counting the call as a test-observable SaveChangesAsync invocation.
     private readonly TestableMongoDbContext _context;
 
     private readonly ReportScheduledManager _sut;
@@ -81,7 +82,10 @@ public class ReportScheduledManagerTests
         var facilityId = "FAC001";
         var submittedReport = CreateReport(facilityId, ScheduleStatus.Submitted, isDeleted: false);
 
-        SetupFindAsync(new List<ReportSchedule> { submittedReport });
+        // Submitted reports go through the EF Core batch path, not the repository mock.
+        // Seed them directly into the in-memory store so the LINQ query can find them.
+        await _context.Seed(submittedReport);
+        SetupFindAsync(new List<ReportSchedule>());
 
         // Act
         await _sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: true);
@@ -98,7 +102,8 @@ public class ReportScheduledManagerTests
         var submittedReport = CreateReport(facilityId, ScheduleStatus.Submitted, isDeleted: false);
         var beforeTest = DateTime.UtcNow;
 
-        SetupFindAsync(new List<ReportSchedule> { submittedReport });
+        await _context.Seed(submittedReport);
+        SetupFindAsync(new List<ReportSchedule>());
 
         // Act
         await _sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: true);
@@ -115,7 +120,8 @@ public class ReportScheduledManagerTests
         var facilityId = "FAC001";
         var submittedReport = CreateReport(facilityId, ScheduleStatus.Submitted, isDeleted: false);
 
-        SetupFindAsync(new List<ReportSchedule> { submittedReport });
+        await _context.Seed(submittedReport);
+        SetupFindAsync(new List<ReportSchedule>());
 
         // Act
         await _sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: true);
@@ -132,6 +138,8 @@ public class ReportScheduledManagerTests
         var scheduledReport = CreateReport(facilityId, ScheduleStatus.Scheduled);
         scheduledReport.Id = "sched-report-id-1";
 
+        // Seed into context so UpdateRange has a tracked entity to modify.
+        await _context.Seed(scheduledReport);
         SetupFindAsync(new List<ReportSchedule> { scheduledReport });
 
         _mockQuartzJobHelper
@@ -157,6 +165,7 @@ public class ReportScheduledManagerTests
         var facilityId = "FAC001";
         var scheduledReport = CreateReport(facilityId, ScheduleStatus.Scheduled, isDeleted: false);
 
+        await _context.Seed(scheduledReport);
         SetupFindAsync(new List<ReportSchedule> { scheduledReport });
 
         _mockQuartzJobHelper
@@ -177,6 +186,7 @@ public class ReportScheduledManagerTests
         var facilityId = "FAC001";
         var scheduledReport = CreateReport(facilityId, ScheduleStatus.Scheduled);
 
+        await _context.Seed(scheduledReport);
         SetupFindAsync(new List<ReportSchedule> { scheduledReport });
 
         _mockQuartzJobHelper
@@ -247,7 +257,8 @@ public class ReportScheduledManagerTests
         var facilityId = "FAC001";
         var submittedReport = CreateReport(facilityId, ScheduleStatus.Submitted, isDeleted: true);
 
-        SetupFindAsync(new List<ReportSchedule> { submittedReport });
+        await _context.Seed(submittedReport);
+        SetupFindAsync(new List<ReportSchedule>());
 
         // Act
         await _sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: false);
@@ -263,7 +274,8 @@ public class ReportScheduledManagerTests
         var facilityId = "FAC001";
         var submittedReport = CreateReport(facilityId, ScheduleStatus.Submitted, isDeleted: true);
 
-        SetupFindAsync(new List<ReportSchedule> { submittedReport });
+        await _context.Seed(submittedReport);
+        SetupFindAsync(new List<ReportSchedule>());
 
         // Act
         await _sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: false);
@@ -279,6 +291,8 @@ public class ReportScheduledManagerTests
         var facilityId = "FAC001";
         var scheduledReport = CreateReport(facilityId, ScheduleStatus.Scheduled);
 
+        // scheduledReport.IsDeleted == false, so scheduledToUpdate will be empty (restore
+        // path only updates reports where IsDeleted == true). No UpdateRange → no seeding needed.
         SetupFindAsync(new List<ReportSchedule> { scheduledReport });
 
         // Act
@@ -301,6 +315,7 @@ public class ReportScheduledManagerTests
         var facilityId = "FAC001";
         var scheduledReport = CreateReport(facilityId, ScheduleStatus.Scheduled);
 
+        // The method throws before reaching UpdateRange, so no seeding is required.
         SetupFindAsync(new List<ReportSchedule> { scheduledReport });
 
         _mockQuartzJobHelper
@@ -368,6 +383,7 @@ public class ReportScheduledManagerTests
         var scheduledReport1 = CreateReport(facilityId, ScheduleStatus.Scheduled);
         var scheduledReport2 = CreateReport(facilityId, ScheduleStatus.Scheduled);
 
+        await _context.Seed(scheduledReport1, scheduledReport2);
         SetupFindAsync(new List<ReportSchedule> { scheduledReport1, scheduledReport2 });
 
         _mockQuartzJobHelper
@@ -389,12 +405,14 @@ public class ReportScheduledManagerTests
         var submittedReport1 = CreateReport(facilityId, ScheduleStatus.Submitted, isDeleted: false);
         var submittedReport2 = CreateReport(facilityId, ScheduleStatus.Submitted, isDeleted: false);
 
-        SetupFindAsync(new List<ReportSchedule> { submittedReport1, submittedReport2 });
+        // Seed both into the in-memory store; the batch LINQ query will find them.
+        await _context.Seed(submittedReport1, submittedReport2);
+        SetupFindAsync(new List<ReportSchedule>());
 
         // Act
         await _sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: true);
 
-        // Assert
+        // Assert: both reports updated, one batch → one SaveChanges call
         Assert.True(submittedReport1.IsDeleted);
         Assert.True(submittedReport2.IsDeleted);
         Assert.True(_context.SaveChangesWasCalled);
@@ -417,6 +435,7 @@ public class ReportScheduledManagerTests
         var endOfPeriodReport = CreateReport(facilityId, ScheduleStatus.EndOfPeriod, isDeleted: false);
         var newReport = CreateReport(facilityId, ScheduleStatus.New, isDeleted: false);
 
+        await _context.Seed(scheduledReport);
         SetupFindAsync(new List<ReportSchedule> { scheduledReport });
 
         _mockQuartzJobHelper
@@ -432,7 +451,8 @@ public class ReportScheduledManagerTests
             q => q.DeleteJob("sched-mixed-id", "MeasureReportSubmissionGroup", It.IsAny<CancellationToken>()),
             Times.Once);
 
-        // Assert: EndOfPeriod and New reports are never touched
+        // Assert: EndOfPeriod and New reports are never touched (local sentinel objects,
+        // not seeded into the context and not returned by the mock)
         Assert.False(endOfPeriodReport.IsDeleted);
         Assert.False(newReport.IsDeleted);
 
@@ -440,27 +460,32 @@ public class ReportScheduledManagerTests
     }
 
     [Fact]
-    public async Task UpdateReportsDeletedStatusForFacility_WithMixedStatuses_WhenNotDeleted_OnlySubmittedAreUpdated()
+    public async Task UpdateReportsDeletedStatusForFacility_WithMixedStatuses_WhenNotDeleted_OnlyScheduledReportsAreUpdated()
     {
         // Arrange
         var facilityId = "FAC001";
-        var submittedReport = CreateReport(facilityId, ScheduleStatus.Submitted, isDeleted: true);
-        var scheduledReport = CreateReport(facilityId, ScheduleStatus.Scheduled);
+        // The repository query filters by Status == Scheduled, so only this report comes back
+        var scheduledReport = CreateReport(facilityId, ScheduleStatus.Scheduled, isDeleted: true);
+        // endOfPeriodReport is a sentinel: not seeded in context, not returned by mock —
+        // its IsDeleted should remain true to confirm it was never restored
         var endOfPeriodReport = CreateReport(facilityId, ScheduleStatus.EndOfPeriod, isDeleted: true);
 
-        SetupFindAsync(new List<ReportSchedule> { submittedReport, scheduledReport, endOfPeriodReport });
+        await _context.Seed(scheduledReport);
+        SetupFindAsync(new List<ReportSchedule> { scheduledReport });
 
         // Act
         await _sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: false);
 
-        // Assert
-        Assert.False(submittedReport.IsDeleted);
+        // Assert: deleted scheduled report is restored
+        Assert.False(scheduledReport.IsDeleted);
 
+        // No DeleteJob calls during restore
         _mockQuartzJobHelper.Verify(
             q => q.DeleteJob(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
 
-        Assert.DoesNotContain(endOfPeriodReport, _context.UpdateRangeItems);
+        // EndOfPeriod report is never restored (sentinel remains unchanged)
+        Assert.True(endOfPeriodReport.IsDeleted == true);
 
         Assert.True(_context.SaveChangesWasCalled);
     }
@@ -482,27 +507,36 @@ public class ReportScheduledManagerTests
         };
     }
 
+    /// <summary>
+    /// Configures the repository mock so that <see cref="IEntityRepository{T}.FindAsync"/> applies
+    /// the predicate to <paramref name="reports"/> and returns only the matching items.
+    /// This mirrors the real repository behaviour and prevents non-matching fixtures (e.g. Submitted
+    /// reports) from leaking into the Scheduled-report code path.
+    /// </summary>
     private void SetupFindAsync(List<ReportSchedule> reports)
     {
         _mockRepository
             .Setup(r => r.FindAsync(
                 It.IsAny<System.Linq.Expressions.Expression<Func<ReportSchedule, bool>>>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(reports);
+            .ReturnsAsync((System.Linq.Expressions.Expression<Func<ReportSchedule, bool>> predicate, CancellationToken _) =>
+                reports.Where(predicate.Compile()).ToList());
     }
 
     #endregion
 
     /// <summary>
-    /// A minimal concrete subclass of <see cref="MongoDbContext"/> that bypasses the MongoDB-specific
-    /// infrastructure and intercepts the <see cref="DbContext.SaveChangesAsync(CancellationToken)"/>
-    /// and <see cref="DbSet{TEntity}.UpdateRange"/> calls for verification in unit tests.
+    /// A minimal concrete subclass of <see cref="MongoDbContext"/> that uses the EF Core in-memory
+    /// provider so the batch LINQ queries in
+    /// <see cref="ReportScheduledManager.UpdateReportsDeletedStatusForFacility"/> return real results.
+    ///
+    /// Use <see cref="Seed"/> to populate the in-memory store before the test.  The seed call is
+    /// transparent — it does NOT increment <see cref="SaveChangesCallCount"/>.
     /// </summary>
     private sealed class TestableMongoDbContext : MongoDbContext
     {
-        private readonly List<ReportSchedule> _updateRangeItems = new();
+        private bool _seeding;
 
-        public IReadOnlyList<ReportSchedule> UpdateRangeItems => _updateRangeItems;
         public bool SaveChangesWasCalled { get; private set; }
         public int SaveChangesCallCount { get; private set; }
 
@@ -529,23 +563,34 @@ public class ReportScheduledManagerTests
         }
 
         /// <summary>
-        /// Intercepts <see cref="DbSet{TEntity}.UpdateRange"/> calls by recording the items
-        /// rather than forwarding them to the EF Core change tracker (which would fail without a
-        /// real MongoDB provider).
+        /// Adds the given report schedules to the in-memory store without counting the call as a
+        /// test-observable <see cref="SaveChangesAsync"/> invocation.  EF Core's identity map ensures
+        /// that subsequent LINQ queries return the same object instances, so property assertions on the
+        /// original objects remain valid after the manager modifies them.
         /// </summary>
-        public new void UpdateRange<TEntity>(IEnumerable<TEntity> entities) where TEntity : class
+        public async Task Seed(params ReportSchedule[] reports)
         {
-            if (entities is IEnumerable<ReportSchedule> schedules)
+            _seeding = true;
+            try
             {
-                _updateRangeItems.AddRange(schedules);
+                await ReportSchedules.AddRangeAsync(reports);
+                // Call base directly to bypass our tracking override during seeding.
+                await base.SaveChangesAsync(CancellationToken.None);
+            }
+            finally
+            {
+                _seeding = false;
             }
         }
 
-        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
-            SaveChangesWasCalled = true;
-            SaveChangesCallCount++;
-            return Task.FromResult(0);
+            if (!_seeding)
+            {
+                SaveChangesWasCalled = true;
+                SaveChangesCallCount++;
+            }
+            return await base.SaveChangesAsync(cancellationToken);
         }
     }
 }

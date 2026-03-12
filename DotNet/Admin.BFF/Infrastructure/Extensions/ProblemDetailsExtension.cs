@@ -16,7 +16,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
             Results.Problem(detail, statusCode: statusCode,
                 extensions: new Dictionary<string, object?> { [UserFacingKey] = true });
 
-        public static IServiceCollection AddProblemDetailsService(this IServiceCollection services, Action<ProblemDetailsOptions>? options = null)
+        public static IServiceCollection AddBffProblemDetailsService(this IServiceCollection services, Action<ProblemDetailsOptions>? options = null)
         {
             var problemDetailsOptions = new ProblemDetailsOptions();
             options?.Invoke(problemDetailsOptions);
@@ -30,11 +30,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
                     // For 500 errors, replace detail with a generic message unless explicitly user-facing
                     if (ctx.ProblemDetails.Status == StatusCodes.Status500InternalServerError && !isUserFacing)
                     {
-                        ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
+                        ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistance.";
                     }
                     else if (string.IsNullOrEmpty(ctx.ProblemDetails.Detail))
                     {
-                        ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
+                        ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistance.";
                     }
 
                     if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))
@@ -45,7 +45,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
 
                     if (problemDetailsOptions.Environment.IsDevelopment() || problemDetailsOptions.IncludeExceptionDetails)
                     {
-                        ctx.ProblemDetails.Extensions.Add("API", LinkAdminConstants.ServiceName);
+                        ctx.ProblemDetails.Extensions.Add("API", problemDetailsOptions.ServiceName);
                     }
                     else
                     {
@@ -61,6 +61,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
     public class ProblemDetailsOptions
     {
         public IWebHostEnvironment Environment { get; set; } = null!;
+        public string ServiceName { get; set; } = null!;
         public bool IncludeExceptionDetails { get; set; } = false;
     }
 }
