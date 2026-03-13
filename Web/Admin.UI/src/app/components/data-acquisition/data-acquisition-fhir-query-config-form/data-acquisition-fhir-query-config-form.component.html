@@ -51,6 +51,34 @@
       </mat-form-field>
     </div>
 
+    <div class="form-inputs" style="display: flex; flex-direction: column; gap: 16px;">
+      <mat-form-field appearance="fill">
+        <mat-label>Max Retries</mat-label>
+        <input matInput
+          type="number"
+          min="0"
+          max="10"
+          [formControl]="maxRetriesControl"
+          placeholder="Enter max retries"
+          [disabled]="viewOnly">
+          @if (maxRetriesControl.hasError('required')) {
+            <mat-error>
+              This field is required
+            </mat-error>
+          }
+          @if (maxRetriesControl.hasError('min')) {
+            <mat-error>
+              Minimum value is 0
+            </mat-error>
+          }
+          @if (maxRetriesControl.hasError('max')) {
+            <mat-error>
+              Maximum value is 10
+            </mat-error>
+          }
+        </mat-form-field>
+      </div>
+
     <!-- Min Acquisition Pull -->
     <div class="form-group">
       <label class="form-label">Min Acquisition Pull</label>

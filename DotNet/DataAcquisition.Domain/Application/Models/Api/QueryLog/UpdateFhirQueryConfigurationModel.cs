@@ -11,5 +11,6 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryL
         public int? MaxConcurrentRequests { get; set; } = 1;
         public TimeSpan? MinAcquisitionPullTime { get; set; }
         public TimeSpan? MaxAcquisitionPullTime { get; set; }
+        public int? MaxRetries { get; set; }
     }
 }
