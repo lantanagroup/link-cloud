@@ -66,7 +66,7 @@ namespace LantanaGroup.Link.Report.Services
         {
             if (_containerClient == null)
             {
-                return null;
+                throw new Exception("ABS Container Client is null when attempting to upload patient submission");
             }
             string reportName = GetReportName(reportSchedule);
             string bundleName = $"patient-{patientSubmission.PatientId}.ndjson";
@@ -93,8 +93,9 @@ namespace LantanaGroup.Link.Report.Services
         {
             if (_containerClient == null)
             {
-                return null;
+                throw new Exception("ABS Container Client is null when attempting to upload manifest file");
             }
+
             string reportName = GetReportName(reportSchedule);
             string bundleName = "manifest.ndjson";
             string blobName = GetBlobName(reportName, bundleName);
