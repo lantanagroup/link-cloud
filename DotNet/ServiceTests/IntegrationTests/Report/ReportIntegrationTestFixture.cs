@@ -29,7 +29,6 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Quartz;
 using Testcontainers.Azurite;
-using Testcontainers.MongoDb;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report
@@ -39,11 +38,6 @@ namespace IntegrationTests.Report
 
     public class ReportIntegrationTestFixture : IAsyncLifetime, IDisposable
     {
-        private readonly MongoDbContainer _mongoContainer = new MongoDbBuilder()
-            .WithImage("mongo:7.0")
-            .WithReplicaSet("rs0")
-            .Build();
-
         private readonly AzuriteContainer _azuriteContainer = new AzuriteBuilder()
             .WithImage("mcr.microsoft.com/azure-storage/azurite:latest")
             .Build();
@@ -89,19 +83,14 @@ namespace IntegrationTests.Report
         public Mock<ITransientExceptionHandler<string, GenerateReportValue>> GenerateReportTransientHandlerMock { get; } = new();
         public Mock<IDeadLetterExceptionHandler<string, GenerateReportValue>> GenerateReportDeadLetterHandlerMock { get; } = new();
 
-        public string MongoConnectionString => _mongoContainer.GetConnectionString() + "&replicaSet=rs0";
         public string AzuriteConnectionString => _azuriteContainer.GetConnectionString();
-
         public async Task InitializeAsync()
         {
-            await Task.WhenAll(_mongoContainer.StartAsync(), _azuriteContainer.StartAsync());
-
+            await Task.WhenAll(_azuriteContainer.StartAsync());
             var builder = Host.CreateApplicationBuilder();
 
             builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Mongo:ConnectionString"] = MongoConnectionString,
-                ["Mongo:DatabaseName"] = "report_integration_test",
                 ["BlobStorage:ConnectionString"] = AzuriteConnectionString,
                 ["BlobStorage:BlobContainerName"] = "report-test-container",
                 ["BlobStorage:BlobRoot"] = "test-root",
@@ -109,7 +98,6 @@ namespace IntegrationTests.Report
                 ["Kafka:BootstrapServers"] = "localhost:9092",
                 ["ServiceRegistry:CensusServiceApiUrl"] = "http://localhost:8080"
             });
-
             builder.Services.Configure<BlobStorageSettings>(builder.Configuration.GetSection("BlobStorage"));
 
             var _dbPath = Path.Combine(Path.GetTempPath(), $"testdb_{Guid.NewGuid()}.db");
@@ -122,16 +110,16 @@ namespace IntegrationTests.Report
 
             builder.Services.AddSingleton<IQuartzJobHelper>(QuartzJobHelperMock.Object);
 
-            builder.Services.AddTransient<IEntityRepository<ReportSchedule>, EntityRepository<ReportSchedule, ReportDbContext>>();
-            builder.Services.AddTransient<IEntityRepository<ReportEntry>, EntityRepository<ReportEntry, ReportDbContext>>();
-            builder.Services.AddTransient<IEntityRepository<ReportPopulation>, EntityRepository<ReportPopulation, ReportDbContext>>();
-            builder.Services.AddTransient<IEntityRepository<ReportResource>, EntityRepository<ReportResource, ReportDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<ReportSchedule>, EntityRepository<ReportSchedule, ReportDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<ReportEntry>, EntityRepository<ReportEntry, ReportDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<ReportPopulation>, EntityRepository<ReportPopulation, ReportDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<ReportResource>, EntityRepository<ReportResource, ReportDbContext>>();
 
-            builder.Services.AddTransient<IDatabase, Database>();
-            builder.Services.AddTransient<IReportScheduledManager, ReportScheduledManager>();
-            builder.Services.AddTransient<IReportEntryManager, ReportEntryManager>();
-            builder.Services.AddTransient<IReportPopulationManager, ReportPopulationManager>();
-            builder.Services.AddTransient<IReportResourceManager, ReportResourceManager>();
+            builder.Services.AddScoped<IDatabase, Database>();
+            builder.Services.AddScoped<IReportScheduledManager, ReportScheduledManager>();
+            builder.Services.AddScoped<IReportEntryManager, ReportEntryManager>();
+            builder.Services.AddScoped<IReportPopulationManager, ReportPopulationManager>();
+            builder.Services.AddScoped<IReportResourceManager, ReportResourceManager>();
 
             builder.Services.AddTransient<IReportServiceMetrics, ReportServiceMetrics>();
 
@@ -239,8 +227,6 @@ namespace IntegrationTests.Report
                 await _host.StopAsync();
                 _host.Dispose();
             }
-            await _mongoContainer.DisposeAsync();
-            await _azuriteContainer.DisposeAsync();
         }
 
         public void Dispose() { }
