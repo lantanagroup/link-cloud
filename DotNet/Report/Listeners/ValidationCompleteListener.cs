@@ -26,8 +26,8 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IKafkaConsumerFactory<string, ValidationCompleteValue> _kafkaConsumerFactory;
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ServiceInformation _serviceInformation;
-        private readonly ITransientExceptionHandler<string, ValidationCompleteValue> _transientExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<string, ValidationCompleteValue> _deadLetterExceptionHandler;
+        private readonly ITransientExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue> _deadLetterExceptionHandler;
         private readonly SubmitPayloadProducer _submitPayloadProducer;
 
         private string Name => this.GetType().Name;
@@ -35,8 +35,8 @@ namespace LantanaGroup.Link.Report.Listeners
         public ValidationCompleteListener(
             ILogger<ValidationCompleteListener> logger,
             IKafkaConsumerFactory<string, ValidationCompleteValue> kafkaConsumerFactory,
-            ITransientExceptionHandler<string, ValidationCompleteValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<string, ValidationCompleteValue> deadLetterExceptionHandler,
+            ITransientExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue> deadLetterExceptionHandler,
             SubmitPayloadProducer submitPayloadProducer,
             IServiceScopeFactory serviceScopeFactory,
             ServiceInformation serviceInformation,

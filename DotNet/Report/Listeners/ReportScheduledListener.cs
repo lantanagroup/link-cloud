@@ -1,7 +1,6 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Report.Data;
-using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.Models;
@@ -23,8 +22,8 @@ namespace LantanaGroup.Link.Report.Listeners
     {
         private readonly ILogger<ReportScheduledListener> _logger;
         private readonly IKafkaConsumerFactory<string, ReportScheduledValue> _kafkaConsumerFactory;
-        private readonly ITransientExceptionHandler<string, ReportScheduledValue> _transientExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<string, ReportScheduledValue> _deadLetterExceptionHandler;
+        private readonly ITransientExceptionHandler<ReportScheduledListener, string, ReportScheduledValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<ReportScheduledListener, string, ReportScheduledValue> _deadLetterExceptionHandler;
         private readonly IQuartzJobHelper _quartzJobHelper;
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ServiceInformation _serviceInformation;
@@ -32,8 +31,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
         public ReportScheduledListener(ILogger<ReportScheduledListener> logger, IKafkaConsumerFactory<string, ReportScheduledValue> kafkaConsumerFactory,
             IQuartzJobHelper quartzJobHelper,
-            ITransientExceptionHandler<string, ReportScheduledValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<string, ReportScheduledValue> deadLetterExceptionHandler,
+            ITransientExceptionHandler<ReportScheduledListener, string, ReportScheduledValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<ReportScheduledListener, string, ReportScheduledValue> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory,
             BlobStorageService blobStorageService,
             ServiceInformation serviceInformation)

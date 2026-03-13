@@ -16,7 +16,6 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Services.Security;
-using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
@@ -30,12 +29,10 @@ namespace LantanaGroup.Link.Report.Listeners
     {
         private readonly ILogger<GenerateReportListener> _logger;
         private readonly IKafkaConsumerFactory<string, GenerateReportValue> _kafkaConsumerFactory;
-        private readonly ITransientExceptionHandler<string, GenerateReportValue> _transientExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<string, GenerateReportValue> _deadLetterExceptionHandler;
+        private readonly ITransientExceptionHandler<GenerateReportListener, string, GenerateReportValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<GenerateReportListener, string, GenerateReportValue> _deadLetterExceptionHandler;
         private readonly ServiceRegistry _serviceRegistry;
         private readonly IServiceScopeFactory _serviceScopeFactory;
-
-        private readonly IQuartzJobHelper _quartzJobHelper;
 
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
@@ -51,8 +48,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
         public GenerateReportListener(ILogger<GenerateReportListener> logger,
             IKafkaConsumerFactory<string, GenerateReportValue> kafkaConsumerFactory,
-            ITransientExceptionHandler<string, GenerateReportValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<string, GenerateReportValue> deadLetterExceptionHandler,
+            ITransientExceptionHandler<GenerateReportListener, string, GenerateReportValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<GenerateReportListener, string, GenerateReportValue> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory,
             IHttpClientFactory httpClientFactory,
             IOptions<LinkTokenServiceSettings> linkTokenService,
@@ -62,7 +59,6 @@ namespace LantanaGroup.Link.Report.Listeners
             IProducer<string, EvaluationRequestedValue> evaluationProducer,
             BlobStorageService blobStorageService,
             ServiceInformation serviceInformation,
-            IQuartzJobHelper quartzJobHelper,
             IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -83,8 +79,6 @@ namespace LantanaGroup.Link.Report.Listeners
             _blobStorageService = blobStorageService;
             _serviceInformation = serviceInformation;
             _linkBearerServiceOptions = linkBearerServiceOptions;
-
-            _quartzJobHelper = quartzJobHelper;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)

@@ -18,8 +18,8 @@ namespace LantanaGroup.Link.Report.Listeners
     {
         private readonly ILogger<PatientListsAcquiredListener> _logger;
         private readonly IKafkaConsumerFactory<string, PatientListMessage> _kafkaConsumerFactory;
-        private readonly ITransientExceptionHandler<string, PatientListMessage> _transientExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<string, PatientListMessage> _deadLetterExceptionHandler;
+        private readonly ITransientExceptionHandler<PatientListsAcquiredListener, string, PatientListMessage> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<PatientListsAcquiredListener, string, PatientListMessage> _deadLetterExceptionHandler;
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ServiceInformation _serviceInformation;
 
@@ -28,8 +28,8 @@ namespace LantanaGroup.Link.Report.Listeners
         public PatientListsAcquiredListener(
             ILogger<PatientListsAcquiredListener> logger,
             IKafkaConsumerFactory<string, PatientListMessage> kafkaConsumerFactory,
-            ITransientExceptionHandler<string, PatientListMessage> transientExceptionHandler,
-            IDeadLetterExceptionHandler<string, PatientListMessage> deadLetterExceptionHandler,
+            ITransientExceptionHandler<PatientListsAcquiredListener, string, PatientListMessage> transientExceptionHandler,
+            IDeadLetterExceptionHandler<PatientListsAcquiredListener, string, PatientListMessage> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory, ServiceInformation serviceInformation)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));

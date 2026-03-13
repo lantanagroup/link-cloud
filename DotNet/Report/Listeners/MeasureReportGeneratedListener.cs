@@ -5,7 +5,6 @@ using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Models;
-using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -24,12 +23,10 @@ namespace LantanaGroup.Link.Report.Listeners
 
         private readonly IServiceScopeFactory _serviceScopeFactory;
 
-        private readonly ITransientExceptionHandler<Null, MeasureReportGeneratedValue> _transientExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<Null, MeasureReportGeneratedValue> _deadLetterExceptionHandler;
+        private readonly ITransientExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue> _deadLetterExceptionHandler;
 
-        private readonly BlobStorageService _blobStorageService;
         private readonly ReadyForValidationProducer _readyForValidationProducer;
-        private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
         private readonly ServiceInformation _serviceInformation;
 
         private string Name => this.GetType().Name;
@@ -37,13 +34,11 @@ namespace LantanaGroup.Link.Report.Listeners
         public MeasureReportGeneratedListener(
             ILogger<MeasureReportGeneratedListener> logger,
             IKafkaConsumerFactory<Null, MeasureReportGeneratedValue> kafkaConsumerFactory,
-            ITransientExceptionHandler<Null, MeasureReportGeneratedValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<Null, MeasureReportGeneratedValue> deadLetterExceptionHandler,
+            ITransientExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory,
             ServiceInformation serviceInformation,
-            BlobStorageService blobStorageService,
-            ReadyForValidationProducer readyForValidationProducer,
-            AuditableEventOccurredProducer auditableEventOccurredProducer)
+            ReadyForValidationProducer readyForValidationProducer)
         {
 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -57,9 +52,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _transientExceptionHandler.Topic = nameof(KafkaTopic.MeasureReportGenerated) + "-Retry";
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.MeasureReportGenerated) + "-Error";
 
-            _blobStorageService = blobStorageService;
             _readyForValidationProducer = readyForValidationProducer;
-            _auditableEventOccurredProducer = auditableEventOccurredProducer;
             _serviceInformation = serviceInformation;
         }
 

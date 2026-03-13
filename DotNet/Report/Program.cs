@@ -37,6 +37,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using MongoDB.Driver;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
@@ -247,31 +248,9 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
 
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, GenerateReportValue>, DeadLetterExceptionHandler<string, GenerateReportValue>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<string, GenerateReportValue>, TransientExceptionHandler<string, GenerateReportValue>>();
-
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, ReportScheduledValue>, DeadLetterExceptionHandler<string, ReportScheduledValue>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<string, ReportScheduledValue>, TransientExceptionHandler<string, ReportScheduledValue>>();
-
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<Null, MeasureReportGeneratedValue>, DeadLetterExceptionHandler<Null, MeasureReportGeneratedValue>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<Null, MeasureReportGeneratedValue>, TransientExceptionHandler<Null, MeasureReportGeneratedValue>>();
-
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
-
-    builder.Services.AddTransient<ITransientExceptionHandler<string, PatientListMessage>, TransientExceptionHandler<string, PatientListMessage>>();
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientListMessage>, DeadLetterExceptionHandler<string, PatientListMessage>>();
-
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, DataAcquisitionRequestedValue>, DeadLetterExceptionHandler<string, DataAcquisitionRequestedValue>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<string, DataAcquisitionRequestedValue>, TransientExceptionHandler<string, DataAcquisitionRequestedValue>>();
-
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, ValidationCompleteValue>, DeadLetterExceptionHandler<string, ValidationCompleteValue>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<string, ValidationCompleteValue>, TransientExceptionHandler<string, ValidationCompleteValue>>();
-
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue>, DeadLetterExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue>, TransientExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue>>();
-
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, DataAcquisitionRequestedValue>, DeadLetterExceptionHandler<string, DataAcquisitionRequestedValue>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<string, DataAcquisitionRequestedValue>, TransientExceptionHandler<string, DataAcquisitionRequestedValue>>();
+    builder.Services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
+    builder.Services.AddSingleton(typeof(ITransientExceptionHandler<,,>), typeof(TransientExceptionHandler<,,>));
+    builder.Services.AddSingleton(typeof(IDeadLetterExceptionHandler<,,>), typeof(DeadLetterExceptionHandler<,,>));
 
     builder.Services.AddLinkCorsService(options => {
         options.Environment = builder.Environment;
