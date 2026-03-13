@@ -392,9 +392,20 @@ namespace LantanaGroup.Link.Tenant.Controllers
         {
             facilityId = facilityId?.Sanitize();
 
-            var existingModel = await _facilityQueries.GetAsync(facilityId, null, cancellationToken);
+            var existingModel = await _facilityQueries.GetAsync(facilityId, null, cancellationToken, includeDeleted: true);
             if (existingModel == null)
                 return NotFound($"Facility with Id: {facilityId} Not Found");
+
+            if (existingModel.IsDeleted == true)
+            {
+                // Always attempt job cleanup to self-heal partial failures from prior attempts
+                // (DeleteJobsForFacility is a no-op when no jobs exist)
+                using (ServiceActivitySource.Instance.StartActivity("Delete Jobs for Facility"))
+                {
+                    await _scheduleService.DeleteJobsForFacility(facilityId, cancellationToken: cancellationToken);
+                }
+                return NoContent();
+            }
 
             try
             {

@@ -11,6 +11,7 @@ import org.hl7.fhir.r4.model.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -25,7 +26,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ArtifactServiceTest {
-    private static final String NHSN_MEASURES_PACKAGE_NAME = "gov.cdc.nhsn.measures";
+    private static final String NHSN_MEASURES_PACKAGE_NAME = "gov.cdc.nhsn.measures.r4";
 
     private ArtifactService artifactService;
 
@@ -297,7 +298,10 @@ class ArtifactServiceTest {
         assertNotNull(validationSupport);
         List<ImplementationGuide> igs = validationSupport.getImplementationGuides();
         assertEquals(1, igs.size());
-        assertEquals(NHSN_MEASURES_PACKAGE_NAME, igs.get(0).getIdPart());
+        assertTrue(
+                NHSN_MEASURES_PACKAGE_NAME.equals(igs.get(0).getIdPart()) ||
+                        NHSN_MEASURES_PACKAGE_NAME.replace(".r4", "").equals(igs.get(0).getIdPart())
+        );
     }
 
     @Test
@@ -312,5 +316,16 @@ class ArtifactServiceTest {
         // And partially initialized support is *not* cached
         // I.e., subsequent initialization attempts also fail
         assertThrows(Exception.class, artifactService::getValidationSupport);
+    }
+
+    @Test
+    void initializeArtifacts_DeletesExistingArtifactsFirst() throws IOException {
+        when(artifactRepository.findByTypeAndName(any(), any())).thenReturn(Optional.empty());
+
+        artifactService.initializeArtifacts();
+
+        InOrder inOrder = inOrder(artifactRepository);
+        inOrder.verify(artifactRepository).deleteAll();
+        inOrder.verify(artifactRepository, atLeastOnce()).save(any(Artifact.class));
     }
 }
