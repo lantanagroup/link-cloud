@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LantanaGroup.Link.Report.Migrations
 {
     [DbContext(typeof(ReportDbContext))]
-    [Migration("20260313062727_InitialCreate")]
+    [Migration("20260313151140_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -883,9 +883,6 @@ namespace LantanaGroup.Link.Report.Migrations
                     b.HasIndex(new[] { "FacilityId", "ReportStartDate", "ReportEndDate" }, "IX_ReportSchedules_Facility_Period");
 
                     b.HasIndex(new[] { "Status" }, "IX_ReportSchedules_Status");
-
-                    b.HasIndex(new[] { "FacilityId", "ReportStartDate", "ReportEndDate" }, "UQ_ReportSchedules_Facility_Period")
-                        .IsUnique();
 
                     b.ToTable("ReportSchedule");
                 });

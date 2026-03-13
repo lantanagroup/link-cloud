@@ -881,9 +881,6 @@ namespace LantanaGroup.Link.Report.Migrations
 
                     b.HasIndex(new[] { "Status" }, "IX_ReportSchedules_Status");
 
-                    b.HasIndex(new[] { "FacilityId", "ReportStartDate", "ReportEndDate" }, "UQ_ReportSchedules_Facility_Period")
-                        .IsUnique();
-
                     b.ToTable("ReportSchedule");
                 });
 

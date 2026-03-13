@@ -628,12 +628,6 @@ namespace LantanaGroup.Link.Report.Migrations
                 name: "IX_ReportSchedules_Status",
                 table: "ReportSchedule",
                 column: "Status");
-
-            migrationBuilder.CreateIndex(
-                name: "UQ_ReportSchedules_Facility_Period",
-                table: "ReportSchedule",
-                columns: new[] { "FacilityId", "ReportStartDate", "ReportEndDate" },
-                unique: true);
         }
 
         /// <inheritdoc />

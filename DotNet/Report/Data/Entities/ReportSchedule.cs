@@ -15,7 +15,6 @@ namespace LantanaGroup.Link.Report.Data.Entities;
 [Index("FacilityId", "Id", Name = "IX_ReportSchedules_FacilityId_Id")]
 [Index("FacilityId", "ReportStartDate", "ReportEndDate", Name = "IX_ReportSchedules_Facility_Period")]
 [Index("Status", Name = "IX_ReportSchedules_Status")]
-[Index("FacilityId", "ReportStartDate", "ReportEndDate", Name = "UQ_ReportSchedules_Facility_Period", IsUnique = true)]
 public partial class ReportSchedule
 {
     [Key]

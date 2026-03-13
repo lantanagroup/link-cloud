@@ -1,9 +1,12 @@
 ﻿using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
+using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.Models;
+using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LinqKit;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
@@ -29,16 +32,26 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             bool includeDeleted, string? sortBy, SortOrder? sortOrder,
             int pageSize, int pageNumber, CancellationToken cancellationToken = default);
 
-        Task UpdateReportsDeletedStatusForFacility(string facilityId, bool deleted, CancellationToken cancellationToken = default);
+        Task UpdateReportsDeletedStatusForFacility(
+            string facilityId, bool deleted, CancellationToken cancellationToken = default);
     }
 
     public class ReportScheduledManager : IReportScheduledManager
     {
-        private readonly ReportDbContext _context;
+        private const int BatchSize = 100;
 
-        public ReportScheduledManager(ReportDbContext context)
+        private readonly ReportDbContext _context;
+        private readonly ILogger<ReportScheduledManager> _logger;
+        private readonly IQuartzJobHelper _quartzJobHelper;
+
+        public ReportScheduledManager(
+            ReportDbContext context,
+            ILogger<ReportScheduledManager> logger,
+            IQuartzJobHelper quartzJobHelper)
         {
             _context = context;
+            _logger = logger;
+            _quartzJobHelper = quartzJobHelper;
         }
 
         public async Task<ReportScheduleModel?> GetReportSchedule(string facilityid, Guid reportId, CancellationToken cancellationToken = default)
@@ -64,6 +77,56 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     ReportTypes = r.ReportTypes.Select(rt => rt.ReportType).ToList()
                 })
                 .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        public async Task<List<ReportScheduleModel>> FindAsync(Expression<Func<ReportSchedule, bool>> predicate, CancellationToken cancellationToken = default)
+        {
+            return await _context.ReportSchedule
+                .Where(predicate)
+                .Select(r => new ReportScheduleModel
+                {
+                    Id = r.Id,
+                    CreateDate = r.CreateDate,
+                    ModifyDate = r.ModifyDate,
+                    FacilityId = r.FacilityId,
+                    ReportStartDate = r.ReportStartDate,
+                    ReportEndDate = r.ReportEndDate,
+                    SubmitReportDateTime = r.SubmitReportDateTime,
+                    EnableSubmission = r.EnableSubmission,
+                    EndOfReportPeriodJobHasRun = r.EndOfReportPeriodJobHasRun,
+                    AdHocType = r.AdHocType,
+                    Frequency = r.Frequency,
+                    PayloadRootUri = r.PayloadRootUri,
+                    Status = r.Status,
+                    IsDeleted = r.IsDeleted,
+                    ReportTypes = r.ReportTypes.Select(rt => rt.ReportType).ToList()
+                })
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task<ReportScheduleModel?> SingleOrDefaultAsync(Expression<Func<ReportSchedule, bool>> predicate, CancellationToken cancellationToken = default)
+        {
+            return await _context.ReportSchedule
+                .Where(predicate)
+                .Select(r => new ReportScheduleModel
+                {
+                    Id = r.Id,
+                    CreateDate = r.CreateDate,
+                    ModifyDate = r.ModifyDate,
+                    FacilityId = r.FacilityId,
+                    ReportStartDate = r.ReportStartDate,
+                    ReportEndDate = r.ReportEndDate,
+                    SubmitReportDateTime = r.SubmitReportDateTime,
+                    EnableSubmission = r.EnableSubmission,
+                    EndOfReportPeriodJobHasRun = r.EndOfReportPeriodJobHasRun,
+                    AdHocType = r.AdHocType,
+                    Frequency = r.Frequency,
+                    PayloadRootUri = r.PayloadRootUri,
+                    Status = r.Status,
+                    IsDeleted = r.IsDeleted,
+                    ReportTypes = r.ReportTypes.Select(rt => rt.ReportType).ToList()
+                })
+                .SingleOrDefaultAsync(cancellationToken);
         }
 
         public async Task<ReportScheduleModel> UpdateAsync(ReportScheduleModel model, CancellationToken cancellationToken)
@@ -137,56 +200,6 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
             model.Id = entity.Id;
             return model;
-        }
-
-        public async Task<List<ReportScheduleModel>> FindAsync(Expression<Func<ReportSchedule, bool>> predicate, CancellationToken cancellationToken = default)
-        {
-            return await _context.ReportSchedule
-                .Where(predicate)
-                .Select(r => new ReportScheduleModel
-                {
-                    Id = r.Id,
-                    CreateDate = r.CreateDate,
-                    ModifyDate = r.ModifyDate,
-                    FacilityId = r.FacilityId,
-                    ReportStartDate = r.ReportStartDate,
-                    ReportEndDate = r.ReportEndDate,
-                    SubmitReportDateTime = r.SubmitReportDateTime,
-                    EnableSubmission = r.EnableSubmission,
-                    EndOfReportPeriodJobHasRun = r.EndOfReportPeriodJobHasRun,
-                    AdHocType = r.AdHocType,
-                    Frequency = r.Frequency,
-                    PayloadRootUri = r.PayloadRootUri,
-                    Status = r.Status,
-                    IsDeleted = r.IsDeleted,
-                    ReportTypes = r.ReportTypes.Select(rt => rt.ReportType).ToList()
-                })
-                .ToListAsync(cancellationToken);
-        }
-
-        public async Task<ReportScheduleModel?> SingleOrDefaultAsync(Expression<Func<ReportSchedule, bool>> predicate, CancellationToken cancellationToken = default)
-        {
-            return await _context.ReportSchedule
-                .Where(predicate)
-                .Select(r => new ReportScheduleModel
-                {
-                    Id = r.Id,
-                    CreateDate = r.CreateDate,
-                    ModifyDate = r.ModifyDate,
-                    FacilityId = r.FacilityId,
-                    ReportStartDate = r.ReportStartDate,
-                    ReportEndDate = r.ReportEndDate,
-                    SubmitReportDateTime = r.SubmitReportDateTime,
-                    EnableSubmission = r.EnableSubmission,
-                    EndOfReportPeriodJobHasRun = r.EndOfReportPeriodJobHasRun,
-                    AdHocType = r.AdHocType,
-                    Frequency = r.Frequency,
-                    PayloadRootUri = r.PayloadRootUri,
-                    Status = r.Status,
-                    IsDeleted = r.IsDeleted,
-                    ReportTypes = r.ReportTypes.Select(rt => rt.ReportType).ToList()
-                })
-                .SingleOrDefaultAsync(cancellationToken);
         }
 
         public async Task<PagedConfigModel<ReportScheduleModel>> SearchAsync(
@@ -272,25 +285,103 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return new PagedConfigModel<ReportScheduleModel>(results, metadata);
         }
 
-        public async Task UpdateReportsDeletedStatusForFacility(string facilityId, bool deleted, CancellationToken cancellationToken = default)
+        public async Task UpdateReportsDeletedStatusForFacility(
+            string facilityId,
+            bool deleted,
+            CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(facilityId))
                 throw new ArgumentException("facilityId is required", nameof(facilityId));
 
-            var reports = await _context.ReportSchedule
-                .Where(r => r.FacilityId == facilityId)
+            var now = DateTime.UtcNow;
+            var quartzFailedIds = new HashSet<Guid>();
+
+            // Quartz handling for Scheduled reports
+            var scheduledReports = await _context.ReportSchedule
+                .Where(r => r.FacilityId == facilityId && r.Status == ScheduleStatus.Scheduled)
                 .ToListAsync(cancellationToken);
 
-            var now = DateTime.UtcNow;
+            foreach (var r in scheduledReports)
+            {
+                try
+                {
+                    if (deleted)
+                    {
+                        await _quartzJobHelper.DeleteJob(r.Id.ToString(), ReportConstants.MeasureReportSubmissionScheduler.Group, cancellationToken);
+                    }
+                    else if (r.ReportEndDate > DateTime.UtcNow)
+                    {
+                        await _quartzJobHelper.ScheduleJob<EndOfReportPeriodJob>(
+                            new Dictionary<string, object>
+                            {
+                                { "ReportScheduleId", r.Id },
+                                { "FacilityId", r.FacilityId }
+                            },
+                            r.ReportEndDate,
+                            r.Id.ToString(),
+                            ReportConstants.MeasureReportSubmissionScheduler.Group,
+                            $"{r.Id}-{r.ReportEndDate}",
+                            cancellationToken);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Skipping Quartz job re-schedule for report schedule {ReportScheduleId}: ReportEndDate {ReportEndDate} is in the past", r.Id, r.ReportEndDate);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to {Action} Quartz job for report schedule {ReportScheduleId}",
+                        deleted ? "delete" : "re-schedule", r.Id);
+                    quartzFailedIds.Add(r.Id);
+                }
+            }
 
-            foreach (var r in reports)
+            if (quartzFailedIds.Count > 0)
+                throw new InvalidOperationException(
+                    $"Failed to {(deleted ? "delete" : "reschedule")} Quartz jobs for {quartzFailedIds.Count} report schedule(s) for facility {facilityId}.");
+
+            // Update Scheduled reports
+            var scheduledToUpdate = scheduledReports
+                .Where(r => deleted ? !r.IsDeleted.HasValue || r.IsDeleted == false : r.IsDeleted == true)
+                .ToList();
+
+            foreach (var r in scheduledToUpdate)
             {
                 r.IsDeleted = deleted;
                 r.ModifyDate = now;
             }
 
-            _context.ReportSchedule.UpdateRange(reports);
-            await _context.SaveChangesAsync(cancellationToken);
+            if (scheduledToUpdate.Count > 0)
+            {
+                _context.ReportSchedule.UpdateRange(scheduledToUpdate);
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+
+            // Batching for Submitted reports
+            List<ReportSchedule> batch;
+            do
+            {
+                batch = await _context.ReportSchedule
+                    .Where(r => r.FacilityId == facilityId &&
+                                r.Status == ScheduleStatus.Submitted &&
+                                (deleted
+                                    ? !r.IsDeleted.HasValue || r.IsDeleted == false
+                                    : r.IsDeleted == true))
+                    .Take(BatchSize)
+                    .ToListAsync(cancellationToken);
+
+                if (batch.Count == 0) break;
+
+                foreach (var r in batch)
+                {
+                    r.IsDeleted = deleted;
+                    r.ModifyDate = now;
+                }
+
+                _context.ReportSchedule.UpdateRange(batch);
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+            while (batch.Count == BatchSize);
         }
     }
 }
