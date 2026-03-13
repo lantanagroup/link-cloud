@@ -184,28 +184,14 @@ namespace LantanaGroup.Link.Report.Listeners
                 var serializer = new FhirJsonSerializer();
                 string json = serializer.SerializeToString(operationOutcome);
 
-                try
-                {
-                    await patientAggregator.AppendResourceToBlob(reportEntry.AggregateReportBlobName, operationOutcome);
-                }
-                catch (Exception ex)
-                {
-                    throw new TransientException($"Could not append OperationOutcome resource to patient aggregate report (ReportId = {schedule.Id}, FacilityId = {facilityId}).");
-                }
+                await patientAggregator.AppendResourceToBlob(reportEntry.AggregateReportBlobName, operationOutcome);
             }
 
-            try
-            {
-                reportEntry.ReportingStatus = value.IsValid ? ReportingStatus.PassedValidation : ReportingStatus.FailedValidation;
-                reportEntry.SubmissionStatus = SubmissionStatus.Submitting;
-                await reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
+            reportEntry.ReportingStatus = value.IsValid ? ReportingStatus.PassedValidation : ReportingStatus.FailedValidation;
+            reportEntry.SubmissionStatus = SubmissionStatus.Submitting;
+            await reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
 
-                await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, correlationIdStr, reportEntry.AggregateReportUri);
-            }
-            catch (Exception ex)
-            {
-                throw new TransientException($"An error was encountered when producing a Submit Payload event(ReportId = {schedule.Id}, FacilityId = {facilityId}, PatientId {value.PatientId}).", ex);
-            }
+            await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, correlationIdStr, reportEntry.AggregateReportUri);
         }
 
         private static OperationOutcome GetOperationOutcome()
