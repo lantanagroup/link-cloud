@@ -6,10 +6,10 @@ using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Services.Security;
 using System.Diagnostics;
 using System.Text;
 using Task = System.Threading.Tasks.Task;
@@ -29,6 +29,8 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ReadyForValidationProducer _readyForValidationProducer;
         private readonly ServiceInformation _serviceInformation;
 
+        private readonly IExceptionLogger<MeasureReportGeneratedListener> _exceptionLogger;
+
         private string Name => this.GetType().Name;
 
         public MeasureReportGeneratedListener(
@@ -38,7 +40,8 @@ namespace LantanaGroup.Link.Report.Listeners
             IDeadLetterExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory,
             ServiceInformation serviceInformation,
-            ReadyForValidationProducer readyForValidationProducer)
+            ReadyForValidationProducer readyForValidationProducer,
+            IExceptionLogger<MeasureReportGeneratedListener> exceptionLogger)
         {
 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -54,6 +57,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             _readyForValidationProducer = readyForValidationProducer;
             _serviceInformation = serviceInformation;
+            _exceptionLogger = exceptionLogger ?? throw new ArgumentNullException(nameof(exceptionLogger));
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -73,7 +77,7 @@ namespace LantanaGroup.Link.Report.Listeners
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.MeasureReportGenerated));
-                _logger.LogInformation("Started MeasureReportGenerated consumer on {date} for topic '{MeasureReportGeneratedName}'", DateTime.UtcNow, nameof(KafkaTopic.MeasureReportGenerated));
+                _logger.LogInformation("{Name}: Started MeasureReportGenerated consumer on {date} for topic '{MeasureReportGeneratedName}'", Name, DateTime.UtcNow, nameof(KafkaTopic.MeasureReportGenerated));
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -98,7 +102,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (Exception ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - MeasureReportGenerated Exception thrown: " + ex.Message, ex), facilityId);
+                                _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - MeasureReportGenerated Exception thrown", ex), facilityId);
                             }
                             finally
                             {
@@ -108,7 +112,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (ConsumeException ex)
                     {
-                        _logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+                        _exceptionLogger.Handle(ex, "Error consuming message for topics", LogLevel.Error, facilityId, new { Topics = string.Join(", ", consumer.Subscription) });
 
                         if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                         {
@@ -122,14 +126,14 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error encountered in MeasureReportGeneratedListener");
+                        _exceptionLogger.Handle(ex, "Error encountered in MeasureReportGeneratedListener", LogLevel.Error);
                         consumer.Commit();
                     }
                 }
             }
             catch (OperationCanceledException oce)
             {
-                _logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
+                _exceptionLogger.Handle(oce, "Operation Canceled", LogLevel.Error);
                 consumer.Close();
                 consumer.Dispose();
             }
@@ -137,7 +141,6 @@ namespace LantanaGroup.Link.Report.Listeners
 
         public async Task ProcessMessageAsync(ConsumeResult<Null, MeasureReportGeneratedValue> result, string facilityId, CancellationToken cancellationToken)
         {
-
             if (result.Message.Value == null)
             {
                 throw new DeadLetterException($"{Name}: MeasureReportGenerated event value segment missing");
@@ -149,8 +152,6 @@ namespace LantanaGroup.Link.Report.Listeners
             }
 
             var messageValue = result.Message.Value;
-
-            _logger.LogDebug("Consuming MeasureReportGenerated (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId}, ReportType = {ReportType})", messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId, messageValue.ReportType);
 
             using var scope = _serviceScopeFactory.CreateScope();
             var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
@@ -175,11 +176,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
             var isAllNonReportable = reportEntry.MeasureReports.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable);
 
-            //Handles the case when all Measure Reports for a patient do not meet the criteria for the reported measures. In this case, we want to update the patient entry as 'Not Reportable'. Afterwards, we will attempt to produce a manifest if this consumed event was the last for the reporting period.
             if (isAllNonReportable)
             {
-                _logger.LogDebug("Entry not reportable (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId);
-
                 await reportEntryManager.UpdateAsyncNotReportableEntry(reportEntry, cancellationToken);
                 await reportManifestProducer.Produce(schedule, correlationId);
                 return;
@@ -187,17 +185,11 @@ namespace LantanaGroup.Link.Report.Listeners
 
             var readyForAggregation = reportEntry.MeasureReports.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable || x.Status == Domain.Enums.MeasureReportStatus.ReadyForValidation);
 
-            //The aggregation step for a patient will only be performed once the Report service has consumed 'MeasureReportGenerated' events for all entries in reportEntry.MeasureReportList.
             if (!readyForAggregation)
             {
-                _logger.LogDebug("Patient not ready for aggregation (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId);
-                //TODO - Daniel: The 'isAllNonReportable' logic above was recently added (2/12/2026) and may replace the need for executing reportManifestProducer below. It won't hurt to run, but may not be needed. If we find that we don't need to execute the manifest producer, we will only need to return in this block.
                 await reportManifestProducer.Produce(schedule, correlationId);
                 return;
             }
-
-            _logger.LogDebug("Patient ready for aggregation (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId);
-            var startTime = Stopwatch.GetTimestamp();
 
             AggregateResult aggregateResult;
 
@@ -209,12 +201,6 @@ namespace LantanaGroup.Link.Report.Listeners
             {
                 throw new DeadLetterException(ex.Message, ex);
             }
-
-            var elapsed = Stopwatch.GetElapsedTime(startTime);
-
-            _logger.LogDebug("Patient aggregation complete. Elapsed time: {Elapsed} (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", elapsed.ToString(), messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId);
-
-            startTime = Stopwatch.GetTimestamp();
 
             await reportEntryManager.UpdateAsyncWithAggregateResult(reportEntry, aggregateResult);
             await reportResourceManager.AddAsyncWithAggregateResult(facilityId, reportTrackingId, messageValue.PatientId, aggregateResult, cancellationToken);
@@ -238,17 +224,13 @@ namespace LantanaGroup.Link.Report.Listeners
                 return;
             }
 
-            elapsed = Stopwatch.GetElapsedTime(startTime);
-
-            _logger.LogDebug("Update to Mongo collections complete. Elapsed time: {Elapsed} (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", elapsed.ToString(), messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId);
-
             try
             {
                 await _readyForValidationProducer.Produce(schedule.Id, schedule.ReportTypes, schedule.FacilityId, messageValue.PatientId, aggregateResult.Uri.AbsoluteUri, correlationId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An error was encountered producing a ReadyForValidation (ReportId = {reportId}, FacilityId = {facilityId}, PatientId = {patientId}).", schedule.Id, schedule.FacilityId.SanitizeUntrustedString(), messageValue.PatientId.SanitizeUntrustedString());
+                _exceptionLogger.Handle(ex, "An error was encountered producing a ReadyForValidation", LogLevel.Error, facilityId, new { ReportId = schedule.Id });
                 throw new DeadLetterException(ex.Message, ex);
             }
 

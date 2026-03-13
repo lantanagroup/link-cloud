@@ -7,6 +7,7 @@ using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -15,7 +16,6 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.SerDes;
-using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
@@ -44,6 +44,8 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly BlobStorageService _blobStorageService;
         private readonly ServiceInformation _serviceInformation;
 
+        private readonly IExceptionLogger<GenerateReportListener> _exceptionLogger;
+
         private string Name => this.GetType().Name;
 
         public GenerateReportListener(ILogger<GenerateReportListener> logger,
@@ -59,7 +61,8 @@ namespace LantanaGroup.Link.Report.Listeners
             IProducer<string, EvaluationRequestedValue> evaluationProducer,
             BlobStorageService blobStorageService,
             ServiceInformation serviceInformation,
-            IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions)
+            IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions,
+            IExceptionLogger<GenerateReportListener> exceptionLogger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -79,6 +82,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _blobStorageService = blobStorageService;
             _serviceInformation = serviceInformation;
             _linkBearerServiceOptions = linkBearerServiceOptions;
+            _exceptionLogger = exceptionLogger ?? throw new ArgumentNullException(nameof(exceptionLogger));
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -101,7 +105,7 @@ namespace LantanaGroup.Link.Report.Listeners
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.GenerateReportRequested));
-                _logger.LogInformation("Started Genearate Report consumer for topic '{Topic}' at {Timestamp}", nameof(KafkaTopic.GenerateReportRequested), DateTime.UtcNow);
+                _logger.LogInformation("{Name}: Started consumer for topic '{Topic}' at {Timestamp}", Name, nameof(KafkaTopic.GenerateReportRequested), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -117,7 +121,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (ConsumeException ex)
                     {
-                        _logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+                        _exceptionLogger.Handle(ex, "Error consuming message for topics", LogLevel.Error, facilityId, new { Topics = string.Join(", ", consumer.Subscription) });
 
                         if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                         {
@@ -133,14 +137,14 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error encountered in GenerateReportListener");
+                        _exceptionLogger.Handle(ex, "Error encountered in GenerateReportListener", LogLevel.Error);
                         consumer.Commit();
                     }
                 }
             }
             catch (OperationCanceledException oce)
             {
-                _logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
+                _exceptionLogger.Handle(oce, "Operation Canceled", LogLevel.Error);
                 consumer.Close();
                 consumer.Dispose();
             }
@@ -170,7 +174,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 if (string.IsNullOrWhiteSpace(facilityId))
                 {
-                    throw new DeadLetterException($"{Name}: FacilityId is null or empty.");
+                    throw new DeadLetterException("FacilityId is null or empty.");
                 }
 
                 if (value is { Regenerate: true, ReportId: not null })
@@ -190,7 +194,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 {
                     if (reportTypes == null || reportTypes.Count == 0)
                     {
-                        throw new DeadLetterException($"{Name}: ReportTypes is null or empty.");
+                        throw new DeadLetterException("ReportTypes is null or empty.");
                     }
 
                     if (startDate == null || endDate == null)
@@ -273,19 +277,20 @@ namespace LantanaGroup.Link.Report.Listeners
                         }
                         catch (ProduceException<string, EvaluationRequestedValue> ex)
                         {
-                            _logger.LogError(ex, "An error was encountered generating an Evaluation Requested event.\n\tFacilityId: {facilityId}\n\tPatientId: {patientId}\n\tReportTrackingId: {reportTrackingId}",
-                                facilityId?.SanitizeUntrustedString(), p?.SanitizeUntrustedString(), reportSchedule.Id);
+                            _exceptionLogger.Handle(ex, "An error was encountered generating an Evaluation Requested event", LogLevel.Error, facilityId, new { ReportTrackingId = reportSchedule.Id });
                         }
                     }
                 }
                 else
                 {
-                    _logger.LogInformation("Generating new Adhoc report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, reportSchedule.Id, DateTime.UtcNow);
+                    _logger.LogInformation("{Name}: Generating new Adhoc report. ReportId: {ReportId}",
+                        Name, reportSchedule.Id);
 
-                    // Get Patient List if none was provided
                     if (value.PatientIds == null || value.PatientIds.Count == 0)
                     {
-                        _logger.LogDebug("Getting Patient List from Census Service for facility {FacilityId} from {StartDate} to {EndDate}", facilityId, startDate, endDate);
+                        _logger.LogDebug("{Name}: Getting Patient List from Census Service. ReportId: {ReportId}",
+                            Name, reportSchedule.Id);
+
                         value.PatientIds =
                             await GetPatientList(facilityId, startDate.Value, endDate.Value);
                     }

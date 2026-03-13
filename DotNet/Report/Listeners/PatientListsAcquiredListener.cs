@@ -4,6 +4,7 @@ using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -23,6 +24,8 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ServiceInformation _serviceInformation;
 
+        private readonly IExceptionLogger<PatientListsAcquiredListener> _exceptionLogger;
+
         private string Name => this.GetType().Name;
 
         public PatientListsAcquiredListener(
@@ -30,7 +33,8 @@ namespace LantanaGroup.Link.Report.Listeners
             IKafkaConsumerFactory<string, PatientListMessage> kafkaConsumerFactory,
             ITransientExceptionHandler<PatientListsAcquiredListener, string, PatientListMessage> transientExceptionHandler,
             IDeadLetterExceptionHandler<PatientListsAcquiredListener, string, PatientListMessage> deadLetterExceptionHandler,
-            IServiceScopeFactory serviceScopeFactory, ServiceInformation serviceInformation)
+            IServiceScopeFactory serviceScopeFactory, ServiceInformation serviceInformation,
+            IExceptionLogger<PatientListsAcquiredListener> exceptionLogger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -43,6 +47,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _transientExceptionHandler.Topic = KafkaTopic.PatientListsAcquiredRetry.GetStringValue();
 
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.PatientListsAcquired) + "-Error";
+            _exceptionLogger = exceptionLogger ?? throw new ArgumentNullException(nameof(exceptionLogger));
         }
 
         protected override System.Threading.Tasks.Task ExecuteAsync(CancellationToken stoppingToken)
@@ -64,7 +69,7 @@ namespace LantanaGroup.Link.Report.Listeners
             {
                 consumer.Subscribe(nameof(KafkaTopic.PatientListsAcquired));
 
-                _logger.LogInformation("Started PatientListsAcquired consumer for topic '{Topic}' at {StartTime}", nameof(KafkaTopic.PatientListsAcquired), DateTime.UtcNow);
+                _logger.LogInformation("{Name}: Started PatientListsAcquired consumer for topic '{Topic}' at {StartTime}", Name, nameof(KafkaTopic.PatientListsAcquired), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -80,7 +85,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (ConsumeException ex)
                     {
-                        _logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+                        _exceptionLogger.Handle(ex, "Error consuming message for topics", LogLevel.Error, facilityId, new { Topics = string.Join(", ", consumer.Subscription) });
 
                         if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                         {
@@ -96,14 +101,14 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error encountered in PatientListsAcquiredListener");
+                        _exceptionLogger.Handle(ex, "Error encountered in PatientListsAcquiredListener", LogLevel.Error);
                         consumer.Commit();
                     }
                 }
             }
             catch (OperationCanceledException oce)
             {
-                _logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
+                _exceptionLogger.Handle(oce, "Operation Canceled", LogLevel.Error);
                 consumer.Close();
                 consumer.Dispose();
             }
@@ -137,7 +142,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 if (scheduledReports == null || !scheduledReports.Any())
                 {
-                    throw new TransientException($"{Name}: No Scheduled Reports found for facilityId: {key}");
+                    throw new TransientException($"No Scheduled Reports found for facilityId: {key}");
                 }
 
                 foreach (var scheduledReport in scheduledReports)
@@ -172,7 +177,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
 
                                 entry.MeasureReports.Add(new EntryMeasureReportModel()
-                                {                                    
+                                {
                                     ReportType = reportType
                                 });
 
