@@ -20,7 +20,7 @@ public class ReportEntryModel
 
 public class EntryMeasureReportModel
 {
-    public string MeasureReportId { get; set; } = string.Empty;
+    public string? MeasureReportId { get; set; }
     public MeasureReportStatus Status { get; set; } = MeasureReportStatus.EntryCreated;
     public string ReportType { get; set; } = string.Empty;
     public string? MeasureReportUri { get; set; }

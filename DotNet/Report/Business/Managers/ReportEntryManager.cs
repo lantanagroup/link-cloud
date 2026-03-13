@@ -28,11 +28,18 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         Task<ReportEntryModel> UpdateAsyncNotReportableEntry(ReportEntryModel model, CancellationToken cancellationToken = default);
 
         Task<PagedConfigModel<ReportEntryModel>> SearchAsync(
-            string? facilityId, string? patientId, Guid? reportScheduleId,
-            List<ReportingStatus>? reportingStatuses, List<SubmissionStatus>? submissionStatuses,
-            bool submissionStatusIsNull, string? reportType,
-            string? sortBy, SortOrder? sortOrder,
-            int pageSize, int pageNumber, CancellationToken cancellationToken = default);
+            string? facilityId,
+            string? patientId,
+            Guid? reportScheduleId,
+            List<ReportingStatus>? reportingStatuses,
+            List<SubmissionStatus>? submissionStatuses,
+            bool submissionStatusIsNull,
+            string? reportType,
+            string? sortBy,
+            SortOrder? sortOrder,
+            int pageSize,
+            int pageNumber,
+            CancellationToken cancellationToken = default);
 
         Task<int> CountAsync(Expression<Func<ReportEntry, bool>> predicate, CancellationToken cancellationToken = default);
 
@@ -72,10 +79,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             List<ResourceCountProjection> ResourceCounts
         );
 
-        private record ResourceCountProjection(
-            string ResourceType,
-            int ResourceCount
-        );
+        private record ResourceCountProjection(string ResourceType, int ResourceCount);
 
         private static ReportEntryModel MapToModel(ReportEntryProjection proj)
         {
@@ -192,81 +196,6 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 .SingleOrDefaultAsync(cancellationToken);
 
             return proj == null ? null : MapToModel(proj);
-        }
-
-        public async Task<PagedConfigModel<ReportEntryModel>> SearchAsync(
-            string? facilityId, string? patientId, Guid? reportScheduleId,
-            List<ReportingStatus>? reportingStatuses, List<SubmissionStatus>? submissionStatuses,
-            bool submissionStatusIsNull, string? reportType,
-            string? sortBy, SortOrder? sortOrder,
-            int pageSize, int pageNumber, CancellationToken cancellationToken = default)
-        {
-            Expression<Func<ReportEntry, bool>> predicate = x => true;
-
-            if (!string.IsNullOrWhiteSpace(facilityId))
-                predicate = predicate.And(q => q.FacilityId == facilityId);
-
-            if (!string.IsNullOrWhiteSpace(patientId))
-                predicate = predicate.And(q => q.PatientId == patientId);
-
-            if (reportScheduleId.HasValue)
-                predicate = predicate.And(q => q.ReportScheduleId == reportScheduleId.Value);
-
-            if (reportingStatuses != null && reportingStatuses.Count > 0)
-                predicate = predicate.And(q => reportingStatuses.Contains(q.ReportingStatus));
-
-            Expression<Func<ReportEntry, bool>>? submissionPredicate = null;
-            if (submissionStatusIsNull)
-                submissionPredicate = x => x.SubmissionStatus == null;
-
-            if (submissionStatuses != null && submissionStatuses.Count > 0)
-            {
-                Expression<Func<ReportEntry, bool>> p = x => x.SubmissionStatus != null && submissionStatuses.Contains(x.SubmissionStatus.Value);
-                submissionPredicate = submissionPredicate == null ? p : submissionPredicate.Or(p);
-            }
-
-            if (submissionPredicate != null)
-                predicate = predicate.And(submissionPredicate);
-
-            if (!string.IsNullOrWhiteSpace(reportType))
-                predicate = predicate.And(q => q.MeasureReports.Any(a => a.ReportType == reportType));
-
-            var projList = await _dbContext.ReportEntry
-                .Where(predicate)
-                .Select(e => new ReportEntryProjection(
-                    e.Id,
-                    e.CreateDate,
-                    e.ModifyDate,
-                    e.FacilityId,
-                    e.ReportScheduleId,
-                    e.PatientId,
-                    e.ReportingStatus,
-                    e.SubmissionStatus,
-                    e.SubmitReportDateTime,
-                    e.AggregateReportUri,
-                    e.AggregateReportBlobName,
-                    e.MeasureReports.Select(m => new MeasureReportProjection(
-                        m.MeasureReportId,
-                        m.Status,
-                        m.ReportType,
-                        m.MeasureReportUri,
-                        m.MeasureReportFileName,
-                        m.ResourceCounts.Select(rc => new ResourceCountProjection(rc.ResourceType, rc.ResourceCount)).ToList()
-                    )).ToList()
-                ))
-                .Skip((pageNumber - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync(cancellationToken);
-
-            var results = projList.Select(MapToModel).ToList();
-
-            var totalCount = await _dbContext.ReportEntry
-                .Where(predicate)
-                .CountAsync(cancellationToken);
-
-            var metadata = new PaginationMetadata(totalCount, pageSize, pageNumber);
-
-            return new PagedConfigModel<ReportEntryModel>(results, metadata);
         }
 
         public async Task<ReportEntryModel> UpdateAsync(ReportEntryModel model, CancellationToken cancellationToken)
@@ -395,7 +324,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task<ReportEntryModel> UpdateAsyncWithConsumerResult(MeasureReportGeneratedValue consumerValue)
         {
-            var model = await GetEntry(Guid.Parse(consumerValue.ReportTrackingId), consumerValue.PatientId);
+            var scheduleId = Guid.Parse(consumerValue.ReportTrackingId);
+            var model = await GetEntry(scheduleId, consumerValue.PatientId);
             if (model == null) throw new InvalidOperationException("Entry not found");
 
             var measureEntry = model.MeasureReports.First(x => x.ReportType == consumerValue.ReportType);
@@ -440,6 +370,127 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return await _dbContext.ReportEntry
                 .Where(predicate)
                 .CountAsync(cancellationToken);
+        }
+
+        public async Task<PagedConfigModel<ReportEntryModel>> SearchAsync(
+            string? facilityId,
+            string? patientId,
+            Guid? reportScheduleId,
+            List<ReportingStatus>? reportingStatuses,
+            List<SubmissionStatus>? submissionStatuses,
+            bool submissionStatusIsNull,
+            string? reportType,
+            string? sortBy,
+            SortOrder? sortOrder,
+            int pageSize,
+            int pageNumber,
+            CancellationToken cancellationToken = default)
+        {
+            Expression<Func<ReportEntry, bool>> predicate = x => true;
+
+            if (!string.IsNullOrWhiteSpace(facilityId))
+            {
+                predicate = predicate.And(q => q.FacilityId == facilityId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(patientId))
+            {
+                predicate = predicate.And(q => q.PatientId == patientId);
+            }
+
+            if (reportScheduleId != null && reportScheduleId != Guid.Empty)
+            {
+                var scheduleIsActive = await _dbContext.ReportSchedule
+                    .AnyAsync(s => s.Id == reportScheduleId && s.IsDeleted != true, cancellationToken);
+
+                if (!scheduleIsActive)
+                    return new PagedConfigModel<ReportEntryModel>(new List<ReportEntryModel>(), new PaginationMetadata(0, pageSize, pageNumber));
+
+                predicate = predicate.And(q => q.ReportScheduleId == reportScheduleId);
+            }
+            else
+            {
+                predicate = predicate.And(q =>
+                    _dbContext.ReportSchedule.Any(s =>
+                        s.Id == q.ReportScheduleId &&
+                        s.IsDeleted != true &&
+                        (string.IsNullOrWhiteSpace(facilityId) || s.FacilityId == facilityId)));
+            }
+
+            if (reportingStatuses != null && reportingStatuses.Count > 0)
+            {
+                predicate = predicate.And(q => reportingStatuses.Contains(q.ReportingStatus));
+            }
+
+            Expression<Func<ReportEntry, bool>>? submissionPredicate = null;
+            if (submissionStatusIsNull)
+            {
+                submissionPredicate = x => x.SubmissionStatus == null;
+            }
+
+            if (submissionStatuses != null && submissionStatuses.Count > 0)
+            {
+                Expression<Func<ReportEntry, bool>> p = x => x.SubmissionStatus != null && submissionStatuses.Contains(x.SubmissionStatus.Value);
+                submissionPredicate = submissionPredicate == null ? p : submissionPredicate.Or(p);
+            }
+
+            if (submissionPredicate != null)
+            {
+                predicate = predicate.And(submissionPredicate);
+            }
+
+            if (!string.IsNullOrWhiteSpace(reportType))
+            {
+                predicate = predicate.And(q => q.MeasureReports.Any(a => a.ReportType == reportType));
+            }
+
+            var query = _dbContext.ReportEntry
+                .Where(predicate)
+                .Select(e => new ReportEntryProjection(
+                    e.Id,
+                    e.CreateDate,
+                    e.ModifyDate,
+                    e.FacilityId,
+                    e.ReportScheduleId,
+                    e.PatientId,
+                    e.ReportingStatus,
+                    e.SubmissionStatus,
+                    e.SubmitReportDateTime,
+                    e.AggregateReportUri,
+                    e.AggregateReportBlobName,
+                    e.MeasureReports.Select(m => new MeasureReportProjection(
+                        m.MeasureReportId,
+                        m.Status,
+                        m.ReportType,
+                        m.MeasureReportUri,
+                        m.MeasureReportFileName,
+                        m.ResourceCounts.Select(rc => new ResourceCountProjection(rc.ResourceType, rc.ResourceCount)).ToList()
+                    )).ToList()
+                ));
+
+            if (!string.IsNullOrWhiteSpace(sortBy))
+            {
+                query = sortOrder == SortOrder.Descending
+                    ? query.OrderByDescending(x => EF.Property<object>(x, sortBy))
+                    : query.OrderBy(x => EF.Property<object>(x, sortBy));
+            }
+            else
+            {
+                query = query.OrderByDescending(x => x.CreateDate);
+            }
+
+            var projList = await query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync(cancellationToken);
+
+            var results = projList.Select(MapToModel).ToList();
+
+            var totalCount = await _dbContext.ReportEntry
+                .Where(predicate)
+                .LongCountAsync(cancellationToken);
+
+            return new PagedConfigModel<ReportEntryModel>(results, new PaginationMetadata(pageSize, pageNumber, totalCount));
         }
 
         public async Task<ReportEntrySummary> GetSummaryByReportScheduleIdAsync(Guid reportScheduleId, CancellationToken cancellationToken = default)
