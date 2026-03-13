@@ -278,7 +278,7 @@ public class FacilityControllerTests
         var objectResult = Assert.IsType<OkObjectResult>(actionResult);
         Assert.Equal(200, objectResult.StatusCode);
         var response = Assert.IsType<GenerateAdhocReportResponse>(objectResult.Value);
-        Assert.NotEmpty(response.ReportId);
+        Assert.True(response.ReportId != default);
     }
 
     [Fact]

@@ -1,7 +1,7 @@
-﻿using System.Net;
-using LantanaGroup.Link.Report.Domain;
+﻿using LantanaGroup.Link.Report.Data;
+using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -11,7 +11,6 @@ using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
-using LantanaGroup.Link.Shared.Application.Models.Report;
 
 namespace LantanaGroup.Link.Report.Controllers
 {
@@ -43,15 +42,18 @@ namespace LantanaGroup.Link.Report.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<ReportSchedule>> GetById(
             string id,
-            [FromQuery] bool includeDeleted = false) 
+            [FromQuery] bool includeDeleted = false)
         {
             if (string.IsNullOrWhiteSpace(id))
                 return BadRequest("Id is required.");
 
+            if (!Guid.TryParse(id, out Guid parsedId))
+                return BadRequest("Invalid ID format");
+
             try
             {
                 var reportSchedule = (await _reportScheduledManager
-                        .FindAsync(x => x.Id == id &&
+                        .FindAsync(x => x.Id == parsedId &&
                                         (includeDeleted || !x.IsDeleted.HasValue || x.IsDeleted == false)))
                     .FirstOrDefault();
 
@@ -86,18 +88,18 @@ namespace LantanaGroup.Link.Report.Controllers
         public async Task<ActionResult<List<ReportSchedule>>> GetByFacilityId(
             string facilityId,
             [FromQuery] bool? active = null,
-            [FromQuery] bool includeDeleted = false) 
+            [FromQuery] bool includeDeleted = false)
         {
             if (string.IsNullOrWhiteSpace(facilityId))
                 return BadRequest("FacilityId is required.");
 
             try
             {
-                List<ReportSchedule>? reportSchedules;
+                List<ReportScheduleModel>? reportSchedules;
 
                 if (active == true)
                 {
-                    reportSchedules = await _reportScheduledManager.FindAsync(x => 
+                    reportSchedules = await _reportScheduledManager.FindAsync(x =>
                         x.FacilityId == facilityId &&
                         x.Status != Shared.Application.Enums.ScheduleStatus.Submitted &&
                         (includeDeleted || !x.IsDeleted.HasValue || x.IsDeleted == false));
@@ -108,7 +110,7 @@ namespace LantanaGroup.Link.Report.Controllers
                         x.FacilityId == facilityId &&
                         (includeDeleted || !x.IsDeleted.HasValue || x.IsDeleted == false));
                 }
-                
+
                 if (reportSchedules == null)
                     return NotFound();
 

@@ -1,33 +1,18 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using Google.Protobuf.WellKnownTypes;
-using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.Report.Application.Interfaces;
-using LantanaGroup.Link.Report.Application.Models;
-using LantanaGroup.Link.Report.Core;
-using LantanaGroup.Link.Report.Domain;
-using LantanaGroup.Link.Report.Domain.Enums;
+using LantanaGroup.Link.Report.Application.Core;
+using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.KafkaProducers;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
-using LantanaGroup.Link.Report.Services.ResourceMerger;
-using LantanaGroup.Link.Report.Services.ResourceMerger.Strategies;
-using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.Security;
-using LantanaGroup.Link.Shared.Settings;
-using OpenTelemetry.Trace;
 using System.Diagnostics;
-using System.Reflection.Metadata.Ecma335;
 using System.Text;
-using System.Text.Json;
-using static Hl7.Fhir.Model.MeasureReport;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Listeners
@@ -185,7 +170,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
             var correlationId = Encoding.UTF8.GetString(headerValue);
 
-            var schedule = await reportScheduledManager.GetReportSchedule(messageValue.FacilityId, messageValue.ReportTrackingId, cancellationToken);
+            var reportTrackingId = Guid.Parse(messageValue.ReportTrackingId);
+            var schedule = await reportScheduledManager.GetReportSchedule(messageValue.FacilityId, reportTrackingId, cancellationToken);
 
             if (schedule == null)
             {
@@ -194,7 +180,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             var reportEntry = await reportEntryManager.UpdateAsyncWithConsumerResult(messageValue);
 
-            var isAllNonReportable = reportEntry.MeasureReportList.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable);
+            var isAllNonReportable = reportEntry.MeasureReports.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable);
 
             //Handles the case when all Measure Reports for a patient do not meet the criteria for the reported measures. In this case, we want to update the patient entry as 'Not Reportable'. Afterwards, we will attempt to produce a manifest if this consumed event was the last for the reporting period.
             if (isAllNonReportable)
@@ -206,7 +192,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 return;
             }
 
-            var readyForAggregation = reportEntry.MeasureReportList.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable || x.Status == Domain.Enums.MeasureReportStatus.ReadyForValidation);
+            var readyForAggregation = reportEntry.MeasureReports.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable || x.Status == Domain.Enums.MeasureReportStatus.ReadyForValidation);
 
             //The aggregation step for a patient will only be performed once the Report service has consumed 'MeasureReportGenerated' events for all entries in reportEntry.MeasureReportList.
             if (!readyForAggregation)
@@ -238,22 +224,22 @@ namespace LantanaGroup.Link.Report.Listeners
             startTime = Stopwatch.GetTimestamp();
 
             await reportEntryManager.UpdateAsyncWithAggregateResult(reportEntry, aggregateResult);
-            await reportResourceManager.AddAsyncWithAggregateResult(facilityId, messageValue.ReportTrackingId, messageValue.PatientId, aggregateResult, cancellationToken);
+            await reportResourceManager.AddAsyncWithAggregateResult(facilityId, reportTrackingId, messageValue.PatientId, aggregateResult, cancellationToken);
 
             foreach (var aggregateMeasureReport in aggregateResult.MeasureReportResults)
             {
-                var populationModel = await reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == messageValue.ReportTrackingId && x.ReportType == aggregateMeasureReport.ReportType);
+                var populationModel = await reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == reportTrackingId && x.ReportType == aggregateMeasureReport.ReportType);
 
                 if (populationModel == null)
                 {
-                    await reportPopulationManager.AddAsyncWithAggregateResult(messageValue.FacilityId, messageValue.ReportTrackingId, aggregateMeasureReport, cancellationToken);
+                    await reportPopulationManager.AddAsyncWithAggregateResult(messageValue.FacilityId, reportTrackingId, aggregateMeasureReport, cancellationToken);
                     continue;
                 }
 
                 await reportPopulationManager.UpdateAsyncWithAggregateResult(populationModel, aggregateMeasureReport, cancellationToken);
             }
 
-            if (reportEntry.MeasureReportList.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable))
+            if (reportEntry.MeasureReports.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable))
             {
                 await reportEntryManager.UpdateAsyncNotReportableEntry(reportEntry, cancellationToken);
                 return;
@@ -269,7 +255,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An error was encountered producing a ReadyForValidation (ReportId = {reportId}, FacilityId = {facilityId}, PatientId = {patientId}).", schedule.Id.SanitizeUntrustedString(), schedule.FacilityId.SanitizeUntrustedString(), messageValue.PatientId.SanitizeUntrustedString());
+                _logger.LogError(ex, "An error was encountered producing a ReadyForValidation (ReportId = {reportId}, FacilityId = {facilityId}, PatientId = {patientId}).", schedule.Id, schedule.FacilityId.SanitizeUntrustedString(), messageValue.PatientId.SanitizeUntrustedString());
                 throw new DeadLetterException(ex.Message, ex);
             }
 

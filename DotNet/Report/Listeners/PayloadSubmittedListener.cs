@@ -1,7 +1,7 @@
 using System.Text;
 using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using LantanaGroup.Link.Report.Domain;
+using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
@@ -113,7 +113,7 @@ public class PayloadSubmittedListener(
 
             if (result.Message.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry)
             {
-                var reportEntry = await database.ReportEntryRepository.FirstAsync(e => e.PatientId == result.Message.Value.PatientId && e.ReportScheduleId == result.Message.Key.ReportScheduleId);
+                var reportEntry = await database.ReportEntryRepository.FirstAsync(e => e.PatientId == result.Message.Value.PatientId && e.ReportScheduleId == reportTrackingId);
 
                 reportEntry.SubmissionStatus = SubmissionStatus.Submitted;
                 reportEntry.SubmitReportDateTime = DateTime.UtcNow;

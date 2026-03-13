@@ -1,9 +1,10 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using LantanaGroup.Link.Report.Domain;
+using LantanaGroup.Link.Report.Data;
+using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Jobs;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
@@ -140,30 +141,31 @@ namespace LantanaGroup.Link.Report.Listeners
                 var startDate = value.StartDate.UtcDateTime;
                 var endDate = value.EndDate.UtcDateTime;
                 var frequency = value.Frequency;
-                var reportTypes = value.ReportTypes;
                 var reportId = value.ReportTrackingId;
 
-                ReportSchedule? existing = null;
+                var reportTypes = value.ReportTypes;
 
-                if (!string.IsNullOrEmpty(reportId))
+                ReportScheduleModel? existing = null;
+
+                if (reportId != null)
                 {
                     existing = await reportScheduleManager.SingleOrDefaultAsync(x => x.Id == reportId, cancellationToken);
                 }
                 else
                 {
-                    reportId = Guid.NewGuid().ToString();
+                    reportId = Guid.NewGuid();
                 }
 
-                ReportSchedule? reportSchedule;
+                ReportScheduleModel? reportSchedule;
                 if (existing != null)
                 {
                     throw new DeadLetterException($"Report with id {reportId} already exists.");
                 }
                 else
                 {
-                    reportSchedule = new ReportSchedule
+                    reportSchedule = new ReportScheduleModel
                     {
-                        Id = reportId,
+                        Id = reportId.Value,
                         FacilityId = facilityId,
                         ReportStartDate = startDate,
                         ReportEndDate = endDate,
@@ -186,7 +188,7 @@ namespace LantanaGroup.Link.Report.Listeners
                         {
                             { "ReportScheduleId", reportSchedule.Id },
                             { "FacilityId", reportSchedule.FacilityId }
-                        }, reportSchedule.ReportEndDate, reportSchedule.Id, ReportConstants.MeasureReportSubmissionScheduler.Group, $"{reportSchedule.Id}-{reportSchedule.ReportEndDate}");
+                        }, reportSchedule.ReportEndDate, reportSchedule.Id.ToString(), ReportConstants.MeasureReportSubmissionScheduler.Group, $"{reportSchedule.Id}-{reportSchedule.ReportEndDate}");
 
                         await _database.CommitTransactionAsync();
                     }
