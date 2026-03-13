@@ -84,6 +84,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       isAuthEnabled: new FormControl(false),
 
       maxConcurrentRequests: new FormControl(1, [Validators.required, Validators.min(1), Validators.max(16)]),
+      maxRetries: new FormControl<number | null>(null, [Validators.min(0), Validators.max(10)]),
 
       // Min acquisition pull time
       minAcqPull: this.createTimeGroup(),
@@ -111,8 +112,6 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
   }
 
   ngOnInit(): void {
-    this.configForm.reset();
-
     if (this.item) {
 
       //set form values
@@ -126,6 +125,10 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       this.setMaxAcqPull(this.item.maxAcquisitionPullTime ?? "");
       if (this.item.maxConcurrentRequests != null) {
         this.maxConcurrentRequestsControl.setValue(this.item.maxConcurrentRequests);
+      }
+
+      if (this.item.maxRetries !== undefined) {
+        this.maxRetriesControl.setValue(this.item.maxRetries);
       }
 
       this.isAuthEnabledControl.setValue(!!this.item.authentication?.authType);
@@ -217,6 +220,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       this.setMinAcqPull(this.item.minAcquisitionPullTime ?? null);
       this.setMaxAcqPull(this.item.maxAcquisitionPullTime ?? null);
       this.maxConcurrentRequestsControl.setValue(this.item.maxConcurrentRequests);
+      this.maxRetriesControl.setValue(this.item.maxRetries ?? null);
 
       this.isAuthEnabledControl.setValue(!!this.item.authentication?.authType);
       this.isAuthEnabledControl.updateValueAndValidity();
@@ -295,6 +299,10 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
     return this.configForm.get('maxConcurrentRequests') as FormControl;
   }
 
+  get maxRetriesControl(): FormControl {
+    return this.configForm.get('maxRetries') as FormControl;
+  }
+
   private parseTime(time: string | null): { hour: number; minute: number; second: number } {
     if (!time) return { hour: 0, minute: 0, second: 0 };
 
@@ -348,6 +356,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       this.userNameControl.disable();
       this.passwordControl.disable();
       this.maxConcurrentRequestsControl.disable();
+      this.maxRetriesControl.disable();
       this.minAcqHoursControl.disable();
       this.minAcqMinutesControl.disable();
       this.minAcqSecondsControl.disable();
@@ -365,6 +374,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       this.userNameControl.enable();
       this.passwordControl.enable();
       this.maxConcurrentRequestsControl.enable();
+      this.maxRetriesControl.enable();
       this.minAcqHoursControl.enable();
       const enableMin = this.minAcqHoursControl.value !== null
       this.minAcqMinutesControl[enableMin ? 'enable' : 'disable']();
@@ -522,6 +532,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
           facilityId: this.facilityIdControl.value,
           fhirServerBaseUrl: this.fhirServerBaseUrlControl.value,
           maxConcurrentRequests: this.maxConcurrentRequestsControl.value,
+          maxRetries: this.maxRetriesControl.value,
           ...(this.getAcqPull("minAcqPull") && { minAcquisitionPullTime: this.getAcqPull("minAcqPull") }),
           ...(this.getAcqPull("maxAcqPull") && { maxAcquisitionPullTime: this.getAcqPull("maxAcqPull") }),
           timeZone: this.item.timeZone,
@@ -546,6 +557,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
             facilityId: this.facilityIdControl.value,
             fhirServerBaseUrl: this.fhirServerBaseUrlControl.value,
             maxConcurrentRequests: this.maxConcurrentRequestsControl.value,
+            maxRetries: this.maxRetriesControl.value,
             ...(this.getAcqPull("minAcqPull") && { minAcquisitionPullTime: this.getAcqPull("minAcqPull") }),
             ...(this.getAcqPull("maxAcqPull") && { maxAcquisitionPullTime: this.getAcqPull("maxAcqPull") }),
             timeZone: this.item.timeZone,

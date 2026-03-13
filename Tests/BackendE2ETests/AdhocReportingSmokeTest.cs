@@ -322,7 +322,8 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         {
             ["FacilityId"] = FacilityId,
             ["FhirServerBaseUrl"] = TestConfig.InternalFhirServerBase,
-            ["MaxConcurrentRequests"] = TestConfig.FhirQueryConfig.MaxConcurrentRequests
+            ["MaxConcurrentRequests"] = TestConfig.FhirQueryConfig.MaxConcurrentRequests,
+            ["MaxRetries"] = 3
         };
         request.AddJsonBody(body.ToString(), "application/json");
         var response = await AdminBffClient.ExecuteAsync(request);

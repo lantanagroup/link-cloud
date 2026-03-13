@@ -802,6 +802,9 @@ namespace DataAcquisition.Domain.Migrations
                     b.Property<int?>("MaxConcurrentRequests")
                         .HasColumnType("int");
 
+                    b.Property<int?>("MaxRetries")
+                        .HasColumnType("int");
+
                     b.Property<TimeSpan?>("MinAcquisitionPullTime")
                         .HasColumnType("time");
 
