@@ -284,6 +284,7 @@ public class FacilityControllerTests
     [Fact]
     public async Task RegenerateReport_Success()
     {
+        var reportId = Guid.NewGuid().ToString();
         var facilityId = Guid.NewGuid().ToString();
         var facilityName = $"Regen Test {facilityId}";
         var facility = new Facility
@@ -299,18 +300,18 @@ public class FacilityControllerTests
         var handler = new StubHttpMessageHandler(new HttpResponseMessage
         {
             StatusCode = HttpStatusCode.OK,
-            Content = new StringContent(JsonSerializer.Serialize(new ReportScheduleSummaryModel { FacilityId = facilityId, ReportId = "test-report-id" }))
+            Content = new StringContent(JsonSerializer.Serialize(new ReportScheduleSummaryModel { FacilityId = facilityId, ReportId = reportId }))
         });
         var httpClient = new HttpClient(handler);
 
         var httpClientFactoryStub = new StubHttpClientFactory(httpClient);
 
         // Temporarily set the _httpClient to our stub factory
-        typeof(FacilityController).GetField("_httpClient", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.SetValue(_controller, httpClientFactoryStub);
+        typeof(FacilityController).GetField("_httpClient", BindingFlags.NonPublic | BindingFlags.Instance)?.SetValue(_controller, httpClientFactoryStub);
 
         var request = new RegenerateReportRequest
         {
-            ReportId = "test-report-id",
+            ReportId = reportId,
             BypassSubmission = false
         };
 

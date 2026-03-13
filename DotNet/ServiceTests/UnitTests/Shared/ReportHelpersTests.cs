@@ -9,23 +9,6 @@ namespace UnitTests.Shared
         [Theory]
         [InlineData(null)]
         [InlineData("")]
-        public void GetReportName_InvalidScheduleId_ThrowsArgumentException(Guid scheduleId)
-        {
-            // Arrange
-            var facilityId = "TestFacility";
-            var reportTypes = new List<string> { "TestReport" };
-            var reportStartDate = DateTime.Now;
-
-            // Act & Assert
-            var exception = Assert.Throws<ArgumentException>(() =>
-                ReportHelpers.GetReportName(scheduleId, facilityId, reportTypes, reportStartDate));
-            Assert.Equal("scheduleID", exception.ParamName);
-            Assert.Contains("Schedule ID cannot be null or empty", exception.Message);
-        }
-
-        [Theory]
-        [InlineData(null)]
-        [InlineData("")]
         public void GetReportName_InvalidFacilityId_ThrowsArgumentException(string facilityId)
         {
             // Arrange
@@ -326,7 +309,9 @@ namespace UnitTests.Shared
 
             // Assert
             var scheduleIdPart = result.Split('_').Last();
-            Assert.Equal("-specialchars", scheduleIdPart); // Schedule ID is lowercased and appended
+            Assert.Equal(scheduleId.ToString().ToLower().Replace("/", "_")
+                .Replace("+", "-")
+                .Replace("=", string.Empty), scheduleIdPart);
         }
 
         #endregion
