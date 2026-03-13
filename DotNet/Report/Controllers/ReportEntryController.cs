@@ -61,7 +61,7 @@ namespace LantanaGroup.Link.Report.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(new EventId(ReportConstants.LoggingIds.GetItem, "GetById"), ex, "An exception occurred while attempting to get a Report Entry record for Id {id}", HtmlInputSanitizer.Sanitize(id));
+                _logger.LogError(new EventId(ReportConstants.LoggingIds.GetItem, "GetById"), ex, "An exception occurred while attempting to get a Report Entry record for Id {id}", parsedId);
 
                 throw;
             }
@@ -100,7 +100,7 @@ namespace LantanaGroup.Link.Report.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(new EventId(ReportConstants.LoggingIds.GetItem, "GetByReportScheduleId"), ex, "An exception occurred while attempting to get a Report Entry record for Report Schedule Id {id}", HtmlInputSanitizer.Sanitize(reportScheduleId));
+                _logger.LogError(new EventId(ReportConstants.LoggingIds.GetItem, "GetByReportScheduleId"), ex, "An exception occurred while attempting to get a Report Entry record for Report Schedule Id {id}", parsedId);
 
                 throw;
             }
@@ -140,7 +140,7 @@ namespace LantanaGroup.Link.Report.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(new EventId(ReportConstants.LoggingIds.GetItem, "GetByReportScheduleIdAndPatientId"), ex, "An exception occurred while attempting to get a Report Entry record for Report Schedule Id {id}, Patient Id {patientId}", reportScheduleId, HtmlInputSanitizer.Sanitize(patientId));
+                _logger.LogError(new EventId(ReportConstants.LoggingIds.GetItem, "GetByReportScheduleIdAndPatientId"), ex, "An exception occurred while attempting to get a Report Entry record for Report Schedule Id {id}, Patient Id {patientId}", parsedId, HtmlInputSanitizer.Sanitize(patientId));
 
                 throw;
             }
@@ -174,7 +174,7 @@ namespace LantanaGroup.Link.Report.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(new EventId(ReportConstants.LoggingIds.GetItem, "GetCountByReportScheduleId"), ex, "An exception occurred while attempting to get the count of Report Entry records for Report Schedule Id {id}", HtmlInputSanitizer.Sanitize(reportScheduleId));
+                _logger.LogError(new EventId(ReportConstants.LoggingIds.GetItem, "GetCountByReportScheduleId"), ex, "An exception occurred while attempting to get the count of Report Entry records for Report Schedule Id {id}", parsedId);
 
                 throw;
             }
@@ -208,7 +208,7 @@ namespace LantanaGroup.Link.Report.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(new EventId(ReportConstants.LoggingIds.GetItem, "GetSummaryByReportScheduleId"), ex, "An exception occurred while attempting to get the summary of Report Entry records for Report Schedule Id {id}", HtmlInputSanitizer.Sanitize(reportScheduleId));
+                _logger.LogError(new EventId(ReportConstants.LoggingIds.GetItem, "GetSummaryByReportScheduleId"), ex, "An exception occurred while attempting to get the summary of Report Entry records for Report Schedule Id {id}", parsedId);
 
                 throw;
             }
