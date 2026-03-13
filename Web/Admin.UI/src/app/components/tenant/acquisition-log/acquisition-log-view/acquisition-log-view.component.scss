@@ -100,7 +100,9 @@ $skipped-status: #ffbf00;
 }
 
 .status-deleted {
-  @extend .log-status;
+  display: inline-block;
+  min-width: 85px;
+  text-align: center;
   background-color: #f3f4f6;
   color: #6b7280;
   box-shadow: 0 0 0 1px #9ca3af;

@@ -239,7 +239,7 @@ export class AcquisitionLogService {
   }
 
   softDeleteByFacility(facilityId: string): Observable<number> {
-    return this.http.delete<number>(`${this.baseUrl}/facility/${facilityId}`)
+    return this.http.delete<number>(`${this.baseUrl}/facility/${encodeURIComponent(facilityId)}`)
       .pipe(
         catchError((error: HttpErrorResponse) => {
           return this.errorHandler.handleError(error);
@@ -248,7 +248,7 @@ export class AcquisitionLogService {
   }
 
   restoreByFacility(facilityId: string): Observable<number> {
-    return this.http.patch<number>(`${this.baseUrl}/facility/${facilityId}/restore`, {})
+    return this.http.patch<number>(`${this.baseUrl}/facility/${encodeURIComponent(facilityId)}/restore`, {})
       .pipe(
         catchError((error: HttpErrorResponse) => {
           return this.errorHandler.handleError(error);

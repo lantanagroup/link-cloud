@@ -98,12 +98,8 @@
   display: block;
 }
 
-.subnav-item.dropdown.active .dropdown-menu {
+.subnav-item.dropdown.active:not(:hover):not(:focus):not(:focus-within) .dropdown-menu {
   display: none;
-}
-
-.subnav-item.dropdown.active:hover .dropdown-menu {
-  display: block;
 }
 
 .subnav-icon {

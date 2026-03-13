@@ -9,7 +9,6 @@ export interface SubnavItem {
   label: string;
   path?: string; // For routerLink
   children?: SubnavItem[]; // For dropdowns
-  hideWhenActive?: string; // Hide this item when the current route starts with this path
 }
 
 @Component({
@@ -50,7 +49,6 @@ export class LinkNavBarComponent {
     },
     {
       label: 'Logs',
-      hideWhenActive: '/tenant/acquisition-log',
       children: [
         { label: 'Acquisition Log', path: '/tenant/acquisition-log' },
         { label: 'Audit Event Log', path: '/audit' },
@@ -68,12 +66,6 @@ export class LinkNavBarComponent {
       ]
     },
   ];
-
-  get visibleSubnavItems(): SubnavItem[] {
-    return this.subnavItems.filter(item =>
-      !item.hideWhenActive || !this.router.url.startsWith(item.hideWhenActive)
-    );
-  }
 
   isChildRouteActive(children: SubnavItem[]): boolean {
     return children.some(child =>
@@ -96,7 +88,17 @@ export class LinkNavBarComponent {
   }
 
   closeMenu(event: Event): void {
-    const target = event.currentTarget as HTMLElement;
-    target.blur();
+    if (event.currentTarget instanceof HTMLElement) {
+      event.currentTarget.blur();
+    }
+  }
+
+  openMenu(event: Event): void {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    if (event.currentTarget instanceof HTMLElement) {
+      event.currentTarget.focus();
+    }
   }
 }
