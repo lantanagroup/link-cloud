@@ -1,8 +1,13 @@
-﻿using LantanaGroup.Link.Report.Entities;
+﻿using LantanaGroup.Link.Report.Application.Factory;
+using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Jobs;
+using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LinqKit;
+using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
@@ -49,13 +54,25 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
     public class ReportScheduledManager : IReportScheduledManager
     {
-        private readonly IDatabase _database;
-        private readonly MongoDbContext _context;
+        private const int BatchSize = 100;
 
-        public ReportScheduledManager(MongoDbContext context, IDatabase database)
+        private readonly ILogger<ReportScheduledManager> _logger;
+        private readonly IDatabase _database;
+        private readonly ScheduledReportFactory _scheduledReportFactory;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
+        private readonly MongoDbContext _context;
+        private readonly IQuartzJobHelper _quartzJobHelper;
+
+        public ReportScheduledManager(ILogger<ReportScheduledManager> logger, MongoDbContext context, IDatabase database,
+            ScheduledReportFactory scheduledReportFactory, IServiceScopeFactory serviceScopeFactory,
+            IQuartzJobHelper quartzJobHelper)
         {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _context = context;
             _database = database;
+            _scheduledReportFactory = scheduledReportFactory;
+            _serviceScopeFactory = serviceScopeFactory;
+            _quartzJobHelper = quartzJobHelper ?? throw new ArgumentNullException(nameof(quartzJobHelper));
         }
 
         public async Task<ReportSchedule?> GetReportSchedule(string facilityid, string reportId,
@@ -169,19 +186,94 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             if (string.IsNullOrWhiteSpace(facilityId))
                 throw new ArgumentException("facilityId is required", nameof(facilityId));
 
-            var reports = await _database.ReportScheduledRepository
-                .FindAsync(r => r.FacilityId == facilityId, cancellationToken);
-
             var now = DateTime.UtcNow;
 
-            foreach (var r in reports)
+            // Handle Quartz jobs for Scheduled reports and soft-delete/restore them
+            var scheduledReports = await _database.ReportScheduledRepository
+                .FindAsync(r => r.FacilityId == facilityId && r.Status == ScheduleStatus.Scheduled, cancellationToken);
+
+            var quartzFailedIds = new HashSet<string>();
+
+            foreach (var r in scheduledReports)
             {
-                r.IsDeleted = deleted;
-                r.ModifyDate = now;
+                try
+                {
+                    if (deleted)
+                    {
+                         await _quartzJobHelper.DeleteJob(r.Id, ReportConstants.MeasureReportSubmissionScheduler.Group, cancellationToken);
+                    }
+                    else if (r.ReportEndDate > DateTime.UtcNow)
+                    {
+                        await _quartzJobHelper.ScheduleJob<EndOfReportPeriodJob>(
+                            new Dictionary<string, object>
+                            {
+                                { "ReportScheduleId", r.Id },
+                                { "FacilityId", r.FacilityId }
+                            },
+                            r.ReportEndDate,
+                            r.Id,
+                            ReportConstants.MeasureReportSubmissionScheduler.Group,
+                            $"{r.Id}-{r.ReportEndDate}",
+                            cancellationToken);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Skipping Quartz job re-schedule for report schedule {ReportScheduleId}: ReportEndDate {ReportEndDate} is in the past", r.Id, r.ReportEndDate);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to {Action} Quartz job for report schedule {ReportScheduleId}",
+                        deleted ? "delete" : "re-schedule", r.Id);
+                    quartzFailedIds.Add(r.Id);
+                }
             }
 
-            _context.ReportSchedules.UpdateRange(reports);
-            await _context.SaveChangesAsync(cancellationToken);
+            if (quartzFailedIds.Count > 0)
+                throw new InvalidOperationException(
+                    $"Failed to {(deleted ? "delete" : "reschedule")} Quartz jobs for {quartzFailedIds.Count} report schedule(s) for facility {facilityId}.");
+
+            var scheduledToUpdate = scheduledReports
+                .Where(r => deleted ? !r.IsDeleted.HasValue || r.IsDeleted == false : r.IsDeleted == true)
+                .ToList();
+
+            if (scheduledToUpdate.Count > 0)
+            {
+                foreach (var r in scheduledToUpdate)
+                {
+                    r.IsDeleted = deleted;
+                    r.ModifyDate = now;
+                }
+                _context.ReportSchedules.UpdateRange(scheduledToUpdate);
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+
+            // Soft-delete (or restore) Submitted reports in batches
+            List<ReportSchedule> batch;
+
+            do
+            {
+                batch = await _context.ReportSchedules
+                    .Where(r => r.FacilityId == facilityId &&
+                                r.Status == ScheduleStatus.Submitted &&
+                                (deleted
+                                    ? !r.IsDeleted.HasValue || r.IsDeleted == false
+                                    : r.IsDeleted == true))
+                    .Take(BatchSize)
+                    .ToListAsync(cancellationToken);
+
+                if (batch.Count == 0) break;
+
+                foreach (var r in batch)
+                {
+                    r.IsDeleted = deleted;
+                    r.ModifyDate = now;
+                }
+
+                _context.ReportSchedules.UpdateRange(batch);
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+            while (batch.Count == BatchSize);
         }
     }
 }

@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Diagnostics;
+using System.Net;
 
 namespace LantanaGroup.Link.Shared.Application.Extensions
 {
@@ -15,7 +16,11 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
             services.AddProblemDetails(options => {
                 options.CustomizeProblemDetails = ctx =>
                 {
-                    ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
+                    if (ctx.HttpContext.Response.StatusCode == (int)HttpStatusCode.InternalServerError)
+                    {
+                        ctx.ProblemDetails.Detail =
+                            "An error occurred in our API. Please use the trace id when requesting assistance.";
+                    }
                     if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))
                     {
                         string? traceId = Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;

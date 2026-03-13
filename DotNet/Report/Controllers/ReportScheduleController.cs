@@ -71,10 +71,16 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <summary>
         /// Returns scheduled reports for the given facility Id.
         /// An optional 'active' parameter is available to only return current active reports.
+        /// An optional 'blocking' parameter filters to only reports with statuses that block facility deletion (New, EndOfPeriod).
         /// An optional 'includeDeleted' parameter is available to include soft-deleted reports.
         /// </summary>
         /// <param name="facilityId"></param>
         /// <param name="active"></param>
+        /// <param name="blocking">
+        /// When set to <c>true</c>, returns only report schedules with a status of <c>New</c> or <c>EndOfPeriod</c>
+        /// — the statuses that indicate a report is actively in progress and would block a facility soft-delete.
+        /// Defaults to <c>false</c>.
+        /// </param>
         /// <param name="includeDeleted">
         /// When set to <c>true</c>, includes soft-deleted report schedules.
         /// Defaults to <c>false</c>.
@@ -86,7 +92,8 @@ namespace LantanaGroup.Link.Report.Controllers
         public async Task<ActionResult<List<ReportSchedule>>> GetByFacilityId(
             string facilityId,
             [FromQuery] bool? active = null,
-            [FromQuery] bool includeDeleted = false) 
+            [FromQuery] bool blocking = false,
+            [FromQuery] bool includeDeleted = false)
         {
             if (string.IsNullOrWhiteSpace(facilityId))
                 return BadRequest("FacilityId is required.");
@@ -95,9 +102,19 @@ namespace LantanaGroup.Link.Report.Controllers
             {
                 List<ReportSchedule>? reportSchedules;
 
-                if (active == true)
+                if (blocking)
                 {
-                    reportSchedules = await _reportScheduledManager.FindAsync(x => 
+                    // Only statuses that cannot be safely cleaned up: New and EndOfPeriod.
+                    // Scheduled reports are handled by deleting their Quartz jobs; Submitted are terminal.
+                    reportSchedules = await _reportScheduledManager.FindAsync(x =>
+                        x.FacilityId == facilityId &&
+                        (x.Status == Shared.Application.Enums.ScheduleStatus.New ||
+                         x.Status == Shared.Application.Enums.ScheduleStatus.EndOfPeriod) &&
+                        (includeDeleted || !x.IsDeleted.HasValue || x.IsDeleted == false));
+                }
+                else if (active == true)
+                {
+                    reportSchedules = await _reportScheduledManager.FindAsync(x =>
                         x.FacilityId == facilityId &&
                         x.Status != Shared.Application.Enums.ScheduleStatus.Submitted &&
                         (includeDeleted || !x.IsDeleted.HasValue || x.IsDeleted == false));
