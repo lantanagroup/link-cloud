@@ -655,7 +655,7 @@ public class PatientDataService : IPatientDataService
             log.RetryAttempts ??= 0;
 
             log.Status = RequestStatus.Pending;
-            log.Notes.Add(ex.Message);
+            log.Notes.Add($"[{DateTime.UtcNow}] Processing delay encountered. Retrying at {log.ExecutionDate}. See application logs for details.");
 
             await _dataAcquisitionLogQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
             {
@@ -715,13 +715,13 @@ public class PatientDataService : IPatientDataService
             {
                 log.Status = RequestStatus.MaxRetriesReached;
                 log.Notes.Add(
-                    $"PatientDataService.ExecuteLogRequest: [{DateTime.UtcNow}] Error encountered: {log.FacilityId?.Sanitize() ?? string.Empty}\n{ex.Message}\nMaximum retry attempts reached ({maxRetryAttempts}).");
+                    $"[{DateTime.UtcNow}] Error encountered. Maximum retry attempts reached ({maxRetryAttempts}). See application logs for details.");
             }
             else
             {
                 log.Status = RequestStatus.Failed;
                 log.Notes.Add(
-                    $"PatientDataService.ExecuteLogRequest: [{DateTime.UtcNow}] Error encountered: {log.FacilityId?.Sanitize() ?? string.Empty}\n{ex.Message}\n{ex.InnerException?.Message ?? string.Empty}");
+                    $"[{DateTime.UtcNow}] Error encountered. Retrying. Attempt {log.RetryAttempts}. See application logs for details.");
             }
 
             await _dataAcquisitionLogQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
