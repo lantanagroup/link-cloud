@@ -1,6 +1,6 @@
 <nav class="subnavbar">
   <ul class="subnav-menu">
-    @for (item of subnavItems; track item) {
+    @for (item of visibleSubnavItems; track item) {
       <li class="subnav-item" [class.dropdown]="item.children"
         [class.active]="(item.path && isRouteActive(item.path)) || (item.children && isChildRouteActive(item.children))">
         <!-- Top-level item with path -->
@@ -31,7 +31,7 @@
             @for (child of item.children; track child) {
               <li>
                 @if (child.path?.startsWith('/')) {
-                  <a [routerLink]="[child.path]" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+                  <a [routerLink]="[child.path]" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeMenu($event)">
                     {{ child.label }}
                   </a>
                 }
@@ -39,7 +39,8 @@
                   <a
                     [href]="child.path"
                     [attr.target]="child.path.startsWith('http') ? '_blank' : null"
-                    [attr.rel]="child.path.startsWith('http') ? 'noopener noreferrer' : null">
+                    [attr.rel]="child.path.startsWith('http') ? 'noopener noreferrer' : null"
+                    (click)="closeMenu($event)">
                     {{ child.label }}
                   </a>
                 }
