@@ -95,7 +95,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                         throw new DeadLetterException("Invalid Report Scheduled event");
                                     }
 
-                                    string reportTrackingId = value.ReportTrackingId;
+                                    var reportTrackingId = value.ReportTrackingId?.ToString();
 
                                     string key = consumeResult.Message.Key;
 

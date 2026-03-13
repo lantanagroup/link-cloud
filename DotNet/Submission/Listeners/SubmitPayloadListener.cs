@@ -182,7 +182,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                     _payloadSubmittedProducer.Produce(
                         correlationId,
                         facilityId,
-                        key?.ReportScheduleId!,
+                        key.ReportScheduleId,
                         value.PayloadType,
                         value.PatientId);
                 }

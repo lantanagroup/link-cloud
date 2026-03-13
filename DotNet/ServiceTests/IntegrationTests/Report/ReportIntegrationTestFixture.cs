@@ -1,15 +1,14 @@
 ﻿using Azure.Storage.Blobs;
 using Confluent.Kafka;
-using LantanaGroup.Link.Report.Application.Factory;
+using LantanaGroup.Link.Report.Application.Core;
 using LantanaGroup.Link.Report.Application.Interfaces;
-using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Application.Options;
-using LantanaGroup.Link.Report.Core;
-using LantanaGroup.Link.Report.Domain;
+using LantanaGroup.Link.Report.Data;
+using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Listeners;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
@@ -27,7 +26,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using MongoDB.Driver;
 using Moq;
 using Quartz;
 using Testcontainers.Azurite;
@@ -112,24 +110,22 @@ namespace IntegrationTests.Report
                 ["ServiceRegistry:CensusServiceApiUrl"] = "http://localhost:8080"
             });
 
-            builder.Services.Configure<MongoConnection>(builder.Configuration.GetSection("Mongo"));
             builder.Services.Configure<BlobStorageSettings>(builder.Configuration.GetSection("BlobStorage"));
 
-            builder.Services.AddSingleton<IMongoClient>(sp => new MongoClient(MongoConnectionString));
-            builder.Services.AddSingleton<IMongoDatabase>(sp => sp.GetRequiredService<IMongoClient>().GetDatabase("report_integration_test"));
+            var _dbPath = Path.Combine(Path.GetTempPath(), $"testdb_{Guid.NewGuid()}.db");
+            var sqliteConnectionString = $"Data Source={_dbPath};";
 
-            builder.Services.AddDbContext<MongoDbContext>((sp, options) =>
+            builder.Services.AddDbContext<ReportDbContext>(options =>
             {
-                var client = sp.GetRequiredService<IMongoClient>();
-                options.UseMongoDB(client, "report_integration_test");
+                options.UseSqlite(sqliteConnectionString);
             });
 
             builder.Services.AddSingleton<IQuartzJobHelper>(QuartzJobHelperMock.Object);
 
-            builder.Services.AddTransient<IEntityRepository<ReportSchedule>, EntityRepository<ReportSchedule, MongoDbContext>>();
-            builder.Services.AddTransient<IEntityRepository<ReportEntry>, EntityRepository<ReportEntry, MongoDbContext>>();
-            builder.Services.AddTransient<IEntityRepository<ReportPopulation>, EntityRepository<ReportPopulation, MongoDbContext>>();
-            builder.Services.AddTransient<IEntityRepository<ReportResource>, EntityRepository<ReportResource, MongoDbContext>>();
+            builder.Services.AddTransient<IEntityRepository<ReportSchedule>, EntityRepository<ReportSchedule, ReportDbContext>>();
+            builder.Services.AddTransient<IEntityRepository<ReportEntry>, EntityRepository<ReportEntry, ReportDbContext>>();
+            builder.Services.AddTransient<IEntityRepository<ReportPopulation>, EntityRepository<ReportPopulation, ReportDbContext>>();
+            builder.Services.AddTransient<IEntityRepository<ReportResource>, EntityRepository<ReportResource, ReportDbContext>>();
 
             builder.Services.AddTransient<IDatabase, Database>();
             builder.Services.AddTransient<IReportScheduledManager, ReportScheduledManager>();
@@ -138,9 +134,6 @@ namespace IntegrationTests.Report
             builder.Services.AddTransient<IReportResourceManager, ReportResourceManager>();
 
             builder.Services.AddTransient<IReportServiceMetrics, ReportServiceMetrics>();
-
-            builder.Services.AddTransient<ScheduledReportFactory>();
-            builder.Services.AddTransient<MeasureReportSummaryFactory>();
 
             builder.Services.AddTransient<PatientAggregator>();
             builder.Services.AddTransient<MeasureReportAggregator>();
@@ -232,6 +225,11 @@ namespace IntegrationTests.Report
             var blobServiceClient = new BlobServiceClient(blobConnectionString);
             var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
             await containerClient.CreateIfNotExistsAsync();
+
+            // Ensure database is created and set PRAGMAs
+            using var scope = ServiceProvider.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+            dbContext.Database.EnsureCreated();
         }
 
         public async Task DisposeAsync()

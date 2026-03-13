@@ -1,0 +1,82 @@
+﻿using LantanaGroup.Link.Report.Data.Entities;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+
+namespace LantanaGroup.Link.Report.Data
+{
+    public interface IDatabase
+    {
+        IEntityRepository<ReportSchedule> ReportScheduledRepository { get; set; }
+        IEntityRepository<ReportEntry> ReportEntryRepository { get; set; }
+        IEntityRepository<ReportPopulation> ReportPopulationRepository { get; set; }
+        IEntityRepository<ReportResource> ReportResourceRepository { get; set; }
+
+        /// <summary>
+        /// Begins a new MongoDB multi-document transaction.
+        /// </summary>
+        Task BeginTransactionAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Commits the current transaction.
+        /// </summary>
+        Task CommitTransactionAsync(CancellationToken cancellationToken = default);
+        /// <summary>
+        /// Rolls back the current transaction.
+        /// </summary>
+        Task RollbackTransactionAsync(CancellationToken cancellationToken = default);
+
+        Task SaveChangesAsync();
+    }
+
+    public class Database : IDatabase
+    {
+        protected ReportDbContext DbContext { get; set; }
+
+        public IEntityRepository<ReportSchedule> ReportScheduledRepository { get; set; }
+        public IEntityRepository<ReportEntry> ReportEntryRepository { get; set; }
+        public IEntityRepository<ReportPopulation> ReportPopulationRepository { get; set; }
+        public IEntityRepository<ReportResource> ReportResourceRepository { get; set; }
+
+        public Database(ReportDbContext context,
+            IEntityRepository<ReportSchedule> reportScheduledRepository,
+            IEntityRepository<ReportEntry> reportEntryRepository,
+            IEntityRepository<ReportPopulation> reportPopulationRepository,
+            IEntityRepository<ReportResource> reportResourceRepository)
+        {
+            DbContext = context;
+
+            ReportScheduledRepository = reportScheduledRepository;
+            ReportEntryRepository = reportEntryRepository;
+            ReportPopulationRepository = reportPopulationRepository;
+            ReportResourceRepository = reportResourceRepository;
+        }
+
+        /// <summary>
+        /// Begins a new MongoDB multi-document transaction.
+        /// </summary>
+        public async Task BeginTransactionAsync(CancellationToken cancellationToken = default)
+        {
+            await DbContext.Database.BeginTransactionAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Commits the current transaction.
+        /// </summary>
+        public async Task CommitTransactionAsync(CancellationToken cancellationToken = default)
+        {
+            await DbContext.Database.CommitTransactionAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Rolls back the current transaction.
+        /// </summary>
+        public async Task RollbackTransactionAsync(CancellationToken cancellationToken = default)
+        {
+            await DbContext.Database.RollbackTransactionAsync(cancellationToken);
+        }
+
+        public async Task SaveChangesAsync()
+        {
+            await DbContext.SaveChangesAsync();
+        }
+    }
+}

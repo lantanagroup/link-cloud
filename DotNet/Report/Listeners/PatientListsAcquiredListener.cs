@@ -1,9 +1,8 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -121,10 +120,9 @@ namespace LantanaGroup.Link.Report.Listeners
                     return;
                 }
 
-                var reportEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportEntryManager>();
-
                 using var scope = _serviceScopeFactory.CreateScope();
-                var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+                var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+                var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
 
                 var key = result.Message.Key;
                 var value = result.Message.Value.PatientLists;
@@ -135,7 +133,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     throw new DeadLetterException("Invalid Patient Id's Acquired Event");
                 }
 
-                var scheduledReports = await database.ReportScheduledRepository.FindAsync(x => x.FacilityId == key && x.EndOfReportPeriodJobHasRun == false, cancellationToken);
+                var scheduledReports = await reportScheduledManager.FindAsync(x => x.FacilityId == key && x.EndOfReportPeriodJobHasRun == false, cancellationToken);
 
                 if (scheduledReports == null || !scheduledReports.Any())
                 {
@@ -153,7 +151,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             if (entry == null)
                             {
-                                entry = new ReportEntry()
+                                entry = new ReportEntryModel()
                                 {
                                     PatientId = patientId,
                                     FacilityId = scheduledReport.FacilityId,
@@ -166,19 +164,19 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             foreach (var reportType in scheduledReport.ReportTypes)
                             {
-                                var measureReportEntry = entry.MeasureReportList.Where(x => x.ReportType == reportType).FirstOrDefault();
+                                var measureReportEntry = entry.MeasureReports.Where(x => x.ReportType == reportType).FirstOrDefault();
 
                                 if (measureReportEntry != null)
                                 {
                                     continue;
                                 }
 
-                                entry.MeasureReportList.Add(new EvaluatedMeasureReport()
-                                {
+                                entry.MeasureReports.Add(new EntryMeasureReportModel()
+                                {                                    
                                     ReportType = reportType
                                 });
 
-                                await reportEntryManager.UpdateAsync(entry);
+                                await reportEntryManager.UpdateAsync(entry, CancellationToken.None);
                             }
                         }
                     }

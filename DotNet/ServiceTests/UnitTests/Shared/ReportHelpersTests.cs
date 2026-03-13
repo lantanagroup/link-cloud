@@ -9,7 +9,7 @@ namespace UnitTests.Shared
         [Theory]
         [InlineData(null)]
         [InlineData("")]
-        public void GetReportName_InvalidScheduleId_ThrowsArgumentException(string scheduleId)
+        public void GetReportName_InvalidScheduleId_ThrowsArgumentException(Guid scheduleId)
         {
             // Arrange
             var facilityId = "TestFacility";
@@ -29,7 +29,7 @@ namespace UnitTests.Shared
         public void GetReportName_InvalidFacilityId_ThrowsArgumentException(string facilityId)
         {
             // Arrange
-            var scheduleId = "TestSchedule123";
+            var scheduleId = Guid.NewGuid();
             var reportTypes = new List<string> { "TestReport" };
             var reportStartDate = DateTime.Now;
 
@@ -44,7 +44,7 @@ namespace UnitTests.Shared
         public void GetReportName_NullReportTypes_ThrowsArgumentException()
         {
             // Arrange
-            var scheduleId = "TestSchedule123";
+            var scheduleId = Guid.NewGuid();
             var facilityId = "TestFacility";
             List<string> reportTypes = null;
             var reportStartDate = DateTime.Now;
@@ -60,7 +60,7 @@ namespace UnitTests.Shared
         public void GetReportName_EmptyReportTypes_ThrowsArgumentException()
         {
             // Arrange
-            var scheduleId = "TestSchedule123";
+            var scheduleId = Guid.NewGuid();
             var facilityId = "TestFacility";
             var reportTypes = new List<string>();
             var reportStartDate = DateTime.Now;
@@ -80,7 +80,7 @@ namespace UnitTests.Shared
         public void GetReportName_FacilityIdCaseVariations_NormalizesToLowercase()
         {
             // Arrange
-            var scheduleId = "TestSchedule123";
+            var scheduleId = Guid.NewGuid();
             var reportTypes = new List<string> { "NHSNdQMAcuteCareHospitalInitialPopulation" };
             var reportStartDate = new DateTime(2024, 1, 15);
 
@@ -99,7 +99,7 @@ namespace UnitTests.Shared
         public void GetReportName_ReportTypesCaseVariations_NormalizesToLowercase()
         {
             // Arrange
-            var scheduleId = "TestSchedule123";
+            var scheduleId = Guid.NewGuid();
             var facilityId = "TestFacility";
             var reportStartDate = new DateTime(2024, 1, 15);
 
@@ -125,7 +125,7 @@ namespace UnitTests.Shared
         public void GetReportName_KnownReportTypes_UsesCorrectShortening(string reportType, string expectedShortened)
         {
             // Arrange
-            var scheduleId = "TestSchedule123";
+            var scheduleId = Guid.NewGuid();
             var facilityId = "TestFacility";
             var reportTypes = new List<string> { reportType };
             var reportStartDate = new DateTime(2024, 1, 15);
@@ -141,7 +141,7 @@ namespace UnitTests.Shared
         public void GetReportName_UnknownReportType_UsesOriginalNameLowercased()
         {
             // Arrange
-            var scheduleId = "TestSchedule123";
+            var scheduleId = Guid.NewGuid();
             var facilityId = "TestFacility";
             var unknownReportType = "UnknownReportType";
             var reportTypes = new List<string> { unknownReportType };
@@ -162,7 +162,7 @@ namespace UnitTests.Shared
         public void GetReportName_ReportTypesOrderIndependent_ProducesSameResult()
         {
             // Arrange
-            var scheduleId = "TestSchedule123";
+            var scheduleId = Guid.NewGuid();
             var facilityId = "TestFacility";
             var reportTypes1 = new List<string> { "NHSNdQMAcuteCareHospitalInitialPopulation", "NHSNGlycemicControlHypoglycemicInitialPopulation" };
             var reportTypes2 = new List<string> { "NHSNGlycemicControlHypoglycemicInitialPopulation", "NHSNdQMAcuteCareHospitalInitialPopulation" };
@@ -182,7 +182,7 @@ namespace UnitTests.Shared
         public void GetReportName_MultipleReportTypes_JoinedWithPlus()
         {
             // Arrange
-            var scheduleId = "TestSchedule123";
+            var scheduleId = Guid.NewGuid();
             var facilityId = "TestFacility";
             var reportTypes = new List<string>
             {
@@ -207,7 +207,7 @@ namespace UnitTests.Shared
         public void GetReportName_WithStartDate_IncludesFormattedDate()
         {
             // Arrange
-            var scheduleId = "TestSchedule123";
+            var scheduleId = Guid.NewGuid();
             var facilityId = "TestFacility";
             var reportTypes = new List<string> { "NHSNdQMAcuteCareHospitalInitialPopulation" };
             var reportStartDate = new DateTime(2024, 3, 15);
@@ -223,7 +223,7 @@ namespace UnitTests.Shared
         public void GetReportName_WithoutStartDate_ExcludesDate()
         {
             // Arrange
-            var scheduleId = "TestSchedule123";
+            var scheduleId = Guid.NewGuid();
             var facilityId = "TestFacility";
             var reportTypes = new List<string> { "NHSNdQMAcuteCareHospitalInitialPopulation" };
 
@@ -250,7 +250,7 @@ namespace UnitTests.Shared
         public void GetReportName_SameInputs_ProducesSameOutput()
         {
             // Arrange
-            var scheduleId = "TestSchedule123";
+            var scheduleId = Guid.NewGuid();
             var facilityId = "TestFacility";
             var reportTypes = new List<string> { "NHSNdQMAcuteCareHospitalInitialPopulation", "NHSNGlycemicControlHypoglycemicInitialPopulation" };
             var reportStartDate = new DateTime(2024, 1, 15);
@@ -274,8 +274,8 @@ namespace UnitTests.Shared
             var reportStartDate = new DateTime(2024, 1, 15);
 
             // Act
-            var result1 = ReportHelpers.GetReportName("Schedule1", facilityId, reportTypes, reportStartDate);
-            var result2 = ReportHelpers.GetReportName("Schedule2", facilityId, reportTypes, reportStartDate);
+            var result1 = ReportHelpers.GetReportName(Guid.NewGuid(), facilityId, reportTypes, reportStartDate);
+            var result2 = ReportHelpers.GetReportName(Guid.NewGuid(), facilityId, reportTypes, reportStartDate);
 
             // Assert
             Assert.NotEqual(result1, result2);
@@ -289,7 +289,7 @@ namespace UnitTests.Shared
         public void GetReportName_KnownInputs_ProducesExpectedStructure()
         {
             // Arrange - Using deterministic inputs to ensure platform stability
-            var scheduleId = "SCHED-12345";
+            var scheduleId = Guid.NewGuid();
             var facilityId = "FAC001";
             var reportTypes = new List<string> { "NHSNdQMAcuteCareHospitalInitialPopulation" };
             var reportStartDate = new DateTime(2024, 1, 1);
@@ -316,7 +316,7 @@ namespace UnitTests.Shared
         public void GetReportName_ScheduleIdIsAppended_ContainsScheduleId()
         {
             // Arrange
-            var scheduleId = "-SpecialChars";
+            var scheduleId = Guid.NewGuid();
             var facilityId = "TestFacility";
             var reportTypes = new List<string> { "NHSNdQMAcuteCareHospitalInitialPopulation" };
             var reportStartDate = new DateTime(2024, 1, 15);
@@ -337,7 +337,7 @@ namespace UnitTests.Shared
         public void GetReportName_MixedCaseReportTypesWithUnknownType_HandlesCorrectly()
         {
             // Arrange
-            var scheduleId = "TestSchedule123";
+            var scheduleId = Guid.NewGuid();
             var facilityId = "TESTFAC";
             var reportTypes = new List<string>
             {
@@ -360,7 +360,7 @@ namespace UnitTests.Shared
         public void GetReportName_SingleCharacterInputs_HandlesCorrectly()
         {
             // Arrange
-            var scheduleId = "A";
+            var scheduleId = Guid.NewGuid();
             var facilityId = "B";
             var reportTypes = new List<string> { "C" };
 

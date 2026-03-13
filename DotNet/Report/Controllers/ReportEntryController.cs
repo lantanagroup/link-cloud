@@ -1,9 +1,8 @@
-﻿using System.Text.Json;
-using LantanaGroup.Link.Report.Application.Models;
-using LantanaGroup.Link.Report.Domain;
+﻿using LantanaGroup.Link.Report.Data;
+using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
@@ -11,6 +10,7 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.Report.Controllers
 {
@@ -42,9 +42,15 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<ReportEntry>> GetById(string id)
         {
+            if (string.IsNullOrWhiteSpace(id))
+                return BadRequest("Id is required.");
+
+            if (!Guid.TryParse(id, out Guid parsedId))
+                return BadRequest("Invalid ID format");
+
             try
             {
-                var reportEntry = (await _reportEntryManager.FindAsync(x => x.Id == id)).FirstOrDefault();
+                var reportEntry = (await _reportEntryManager.FindAsync(x => x.Id == parsedId)).FirstOrDefault();
 
                 if (reportEntry == null)
                 {
@@ -53,7 +59,7 @@ namespace LantanaGroup.Link.Report.Controllers
 
                 return Ok(reportEntry);
             }
-            catch (Exception ex) 
+            catch (Exception ex)
             {
                 _logger.LogError(new EventId(ReportConstants.LoggingIds.GetItem, "GetById"), ex, "An exception occurred while attempting to get a Report Entry record for Id {id}", HtmlInputSanitizer.Sanitize(id));
 
@@ -71,9 +77,15 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<List<ReportEntry>>> GetByReportScheduleId(string reportScheduleId)
         {
+            if (string.IsNullOrWhiteSpace(reportScheduleId))
+                return BadRequest("ReportScheduleId is required.");
+
+            if (!Guid.TryParse(reportScheduleId, out Guid parsedId))
+                return BadRequest("Invalid ReportScheduleId format");
+
             try
             {
-                var reportEntries = await _reportEntryManager.FindAsync(x => x.ReportScheduleId == reportScheduleId);
+                var reportEntries = await _reportEntryManager.FindAsync(x => x.ReportScheduleId == parsedId);
 
                 if (reportEntries == null || reportEntries.Count == 0)
                 {
@@ -101,9 +113,15 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<ReportEntry>> GetByReportScheduleIdAndPatientId(string reportScheduleId, string patientId)
         {
+            if (string.IsNullOrWhiteSpace(reportScheduleId))
+                return BadRequest("ReportScheduleId is required.");
+
+            if (!Guid.TryParse(reportScheduleId, out Guid parsedId))
+                return BadRequest("Invalid ReportScheduleId format");
+
             try
             {
-                var reportEntry = (await _reportEntryManager.FindAsync(x => x.ReportScheduleId == reportScheduleId && x.PatientId == patientId)).FirstOrDefault();
+                var reportEntry = (await _reportEntryManager.FindAsync(x => x.ReportScheduleId == parsedId && x.PatientId == patientId)).FirstOrDefault();
 
                 if (reportEntry == null)
                 {
@@ -114,7 +132,7 @@ namespace LantanaGroup.Link.Report.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(new EventId(ReportConstants.LoggingIds.GetItem, "GetByReportScheduleIdAndPatientId"), ex, "An exception occurred while attempting to get a Report Entry record for Report Schedule Id {id}, Patient Id {patientId}", HtmlInputSanitizer.Sanitize(reportScheduleId), HtmlInputSanitizer.Sanitize(patientId));
+                _logger.LogError(new EventId(ReportConstants.LoggingIds.GetItem, "GetByReportScheduleIdAndPatientId"), ex, "An exception occurred while attempting to get a Report Entry record for Report Schedule Id {id}, Patient Id {patientId}", reportScheduleId, HtmlInputSanitizer.Sanitize(patientId));
 
                 throw;
             }
@@ -129,9 +147,15 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<int>> GetCountByReportScheduleId(string reportScheduleId)
         {
+            if (string.IsNullOrWhiteSpace(reportScheduleId))
+                return BadRequest("ReportScheduleId is required.");
+
+            if (!Guid.TryParse(reportScheduleId, out Guid parsedId))
+                return BadRequest("Invalid ReportScheduleId format");
+
             try
             {
-                var count = await _reportEntryManager.CountAsync(x => x.ReportScheduleId == reportScheduleId);
+                var count = await _reportEntryManager.CountAsync(x => x.ReportScheduleId == parsedId);
 
                 return Ok(count);
             }
@@ -152,9 +176,15 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<ReportEntrySummary>> GetSummaryByReportScheduleId(string reportScheduleId)
         {
+            if (string.IsNullOrWhiteSpace(reportScheduleId))
+                return BadRequest("ReportScheduleId is required.");
+
+            if (!Guid.TryParse(reportScheduleId, out Guid parsedId))
+                return BadRequest("Invalid ReportScheduleId format");
+
             try
             {
-                var summary = await _reportEntryManager.GetSummaryByReportScheduleIdAsync(reportScheduleId);
+                var summary = await _reportEntryManager.GetSummaryByReportScheduleIdAsync(parsedId);
 
                 return Ok(summary);
             }
@@ -225,6 +255,10 @@ namespace LantanaGroup.Link.Report.Controllers
             int pageSize = 10,
             int pageNumber = 1)
         {
+            Guid? parsedScheduleId = null;
+            if (!string.IsNullOrWhiteSpace(reportScheduleId) && Guid.TryParse(reportScheduleId, out Guid temp))
+                parsedScheduleId = temp;
+
             try
             {
                 if (pageSize < 1 || pageSize > 100)
@@ -240,7 +274,7 @@ namespace LantanaGroup.Link.Report.Controllers
                 var result = await _reportEntryManager.SearchAsync(
                     facilityId,
                     patientId,
-                    reportScheduleId,
+                    parsedScheduleId,
                     reportingStatuses,
                     submissionStatuses,
                     submissionStatusIsNull,

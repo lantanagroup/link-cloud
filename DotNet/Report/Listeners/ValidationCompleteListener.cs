@@ -3,11 +3,11 @@ using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Support;
-using LantanaGroup.Link.Report.Application.Models;
-using LantanaGroup.Link.Report.Core;
+using LantanaGroup.Link.Report.Application.Core;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
@@ -155,7 +155,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             var facilityId = result.Message.Key;
             var value = result.Message.Value;
-            var reportId = value.ReportTrackingId;
+            var reportId = Guid.Parse(value.ReportTrackingId);
 
             var schedule = await reportScheduledManager.SingleOrDefaultAsync(s => s.Id == reportId, cancellationToken);
 
@@ -210,7 +210,7 @@ namespace LantanaGroup.Link.Report.Listeners
             {
                 reportEntry.ReportingStatus = value.IsValid ? ReportingStatus.PassedValidation : ReportingStatus.FailedValidation;
                 reportEntry.SubmissionStatus = SubmissionStatus.Submitting;
-                await reportEntryManager.UpdateAsync(reportEntry);
+                await reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
 
                 await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, correlationIdStr, reportEntry.AggregateReportUri);
             }
