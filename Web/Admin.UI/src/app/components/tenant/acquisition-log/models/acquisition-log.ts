@@ -18,13 +18,14 @@ export interface AcquisitionLog {
     referenceResources?: ReferencedResource[];
     notes?: string[];
     scheduledReport: ScheduledReport;
+    isDeleted: boolean;
 }
 
 export interface ReferencedResource {
     facilityId: string;
     resourceId: string;
     resourceType: string;
-    queryPhase: string;    
+    queryPhase: string;
 }
 
 export interface ResourceReferenceType {

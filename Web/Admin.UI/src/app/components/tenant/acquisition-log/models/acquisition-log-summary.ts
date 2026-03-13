@@ -16,6 +16,7 @@ export interface AcquisitionLogSummary {
     retryAttempts: number;
     status: string;
     reportIds: string[];
+    isDeleted: boolean;
 }
 
 export interface IPagedAcquisitionLogSummary {

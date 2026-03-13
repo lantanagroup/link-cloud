@@ -222,7 +222,26 @@
             <fa-icon [icon]="faRotate"></fa-icon>
             Refresh
           </button>
+
+          <mat-checkbox [(ngModel)]="includeDeleted" (change)="applyFilters()">
+            Show Deleted
+          </mat-checkbox>
         </div>
+
+        @if (selectedFacilityFilter !== 'Any') {
+          <div class="btn-group">
+            <button type="button" class="link-button warning" (click)="disableLogsByFacility()"
+                    matTooltip="Soft-delete all acquisition logs for the selected facility">
+              <fa-icon [icon]="faBan"></fa-icon>
+              Disable Logs
+            </button>
+            <button type="button" class="link-button secondary" (click)="restoreLogsByFacility()"
+                    matTooltip="Restore all soft-deleted acquisition logs for the selected facility">
+              <fa-icon [icon]="faArrowRotateLeft"></fa-icon>
+              Restore Logs
+            </button>
+          </div>
+        }
 
         @if (selectedLogIds.size > 0 || isAllSelected) {
           <div class="btn-group">
@@ -295,6 +314,9 @@
               Status
               <fa-icon [icon]="getSortIcon('status')"></fa-icon>
             </th>
+            <th scope="col" class="header-column">
+              Is Deleted
+            </th>
             <th scope="col" class="header-column action-column">
               <span class="sr-only">Edit</span>
             </th>
@@ -302,7 +324,12 @@
         </thead>
         <tbody class="table-body">
           @for (log of acquisitionLogs; track log) {
-            <tr @fadeInSlideUp [ngClass]="{'priority-critical': log.priority === 'Critical', 'priority-high': log.priority === 'High'}">
+            <tr @fadeInSlideUp [ngClass]="{
+              'priority-critical': log.priority === 'Critical',
+              'priority-high': log.priority === 'High',
+              'row-deleted': log.isDeleted,
+              'row-status-failed': (log.status === 'Failed' || log.status === 'MaxRetriesReached') && log.priority !== 'Critical' && log.priority !== 'High'
+            }">
               <td class="table-cell" style="position: relative;">
                   @if (allowLogSelection)
                   {
@@ -380,6 +407,7 @@
                     'status-skipped': log.status === 'Skipped'
                   }">{{log.status}}</span>
                 </td>
+                <td class="data-col table-cell">{{ log.isDeleted ? 'Yes' : 'No' }}</td>
                 <td class="table-cell action-column">
                   <app-table-command
                     [acquisitionLogId]="log.id"

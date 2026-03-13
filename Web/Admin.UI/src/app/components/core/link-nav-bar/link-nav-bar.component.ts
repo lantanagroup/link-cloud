@@ -86,4 +86,19 @@ export class LinkNavBarComponent {
       matrixParams: 'ignored'
     });
   }
+
+  closeMenu(event: Event): void {
+    if (event.currentTarget instanceof HTMLElement) {
+      event.currentTarget.blur();
+    }
+  }
+
+  openMenu(event: Event): void {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    if (event.currentTarget instanceof HTMLElement) {
+      event.currentTarget.focus();
+    }
+  }
 }
