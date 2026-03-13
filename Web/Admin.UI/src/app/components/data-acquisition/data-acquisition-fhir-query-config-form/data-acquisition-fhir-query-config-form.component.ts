@@ -84,7 +84,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       isAuthEnabled: new FormControl(false),
 
       maxConcurrentRequests: new FormControl(1, [Validators.required, Validators.min(1), Validators.max(16)]),
-      maxRetries: new FormControl(5, [Validators.required, Validators.min(0), Validators.max(10)]),
+      maxRetries: new FormControl<number | null>(null, [Validators.min(0), Validators.max(10)]),
 
       // Min acquisition pull time
       minAcqPull: this.createTimeGroup(),
@@ -127,7 +127,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
         this.maxConcurrentRequestsControl.setValue(this.item.maxConcurrentRequests);
       }
 
-      if (this.item.maxRetries != null) {
+      if (this.item.maxRetries !== undefined) {
         this.maxRetriesControl.setValue(this.item.maxRetries);
       }
 
@@ -220,7 +220,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       this.setMinAcqPull(this.item.minAcquisitionPullTime ?? null);
       this.setMaxAcqPull(this.item.maxAcquisitionPullTime ?? null);
       this.maxConcurrentRequestsControl.setValue(this.item.maxConcurrentRequests);
-      this.maxRetriesControl.setValue(this.item.maxRetries);
+      this.maxRetriesControl.setValue(this.item.maxRetries ?? null);
 
       this.isAuthEnabledControl.setValue(!!this.item.authentication?.authType);
       this.isAuthEnabledControl.updateValueAndValidity();
