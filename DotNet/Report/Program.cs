@@ -45,6 +45,7 @@ using MongoDB.Driver;
 using Quartz;
 using Reddoxx.Quartz.MongoDbJobStore;
 using Reddoxx.Quartz.MongoDbJobStore.Database;
+using Reddoxx.Quartz.MongoDbJobStore.Extensions;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
@@ -267,7 +268,13 @@ static void RegisterServices(WebApplicationBuilder builder)
                 c.CheckinInterval = TimeSpan.FromSeconds(7.5);
                 c.CheckinMisfireThreshold = TimeSpan.FromSeconds(7.5);
             });
+
             store.UseSystemTextJsonSerializer();
+
+            store.ConfigureMongoDb(c =>
+            {
+                c.CollectionPrefix = "reportjobs";
+            });
         });
     });
 
