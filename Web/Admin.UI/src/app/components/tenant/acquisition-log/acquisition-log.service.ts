@@ -35,7 +35,8 @@ export class AcquisitionLogService {
     sortOrder: 'ascending' | 'descending' | null,
     pageNumber: number,
     pageSize: number,
-    showLoadingIndicator: boolean = true) : Observable<IPagedAcquisitionLogSummary> {
+    showLoadingIndicator: boolean = true,
+    includeDeleted: boolean = false) : Observable<IPagedAcquisitionLogSummary> {
 
     const headers = new HttpHeaders({ 'X-Skip-Loading': 'true' });
 
@@ -86,6 +87,9 @@ export class AcquisitionLogService {
     }
     if(priority) {
         params = params.set('priority', priority);
+    }
+    if(includeDeleted) {
+        params = params.set('includeDeleted', 'true');
     }
 
     if(showLoadingIndicator)
@@ -230,6 +234,24 @@ export class AcquisitionLogService {
         catchError((error: HttpErrorResponse) => {
           var err = this.errorHandler.handleError(error);
           return err;
+        })
+      );
+  }
+
+  softDeleteByFacility(facilityId: string): Observable<number> {
+    return this.http.delete<number>(`${this.baseUrl}/facility/${encodeURIComponent(facilityId)}`)
+      .pipe(
+        catchError((error: HttpErrorResponse) => {
+          return this.errorHandler.handleError(error);
+        })
+      );
+  }
+
+  restoreByFacility(facilityId: string): Observable<number> {
+    return this.http.patch<number>(`${this.baseUrl}/facility/${encodeURIComponent(facilityId)}/restore`, {})
+      .pipe(
+        catchError((error: HttpErrorResponse) => {
+          return this.errorHandler.handleError(error);
         })
       );
   }

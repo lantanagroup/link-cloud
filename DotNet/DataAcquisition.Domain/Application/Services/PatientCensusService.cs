@@ -301,7 +301,8 @@ public class PatientCensusService : IPatientCensusService
             catch (Exception ex)
             {
                 isFailed = true;
-                notes.Add($"Error retrieving patient list for facility {query.FacilityId} with list id {query.CensusListId}: {ex.Message}");
+                _logger.LogError(ex, "Error retrieving patient list for facility {FacilityId} with list id {CensusListId}", query.FacilityId, query.CensusListId);
+                notes.Add($"[{DateTime.UtcNow}] Error retrieving patient list for facility {query.FacilityId}. See application logs for details.");
             }
         }
 
@@ -311,9 +312,8 @@ public class PatientCensusService : IPatientCensusService
             {
                 log.Notes = new List<string>();
             }
-            log.Notes.Add($"Failed to retrieve patient list for facility {log.FacilityId}. \n" + string.Join(", ", notes));
+            log.Notes.Add($"[{DateTime.UtcNow}] Failed to retrieve patient list for facility {log.FacilityId}. See application logs for details.");
             log.Status = RequestStatus.Failed;
-            log.Notes.AddRange(notes);
         }
         else
         {

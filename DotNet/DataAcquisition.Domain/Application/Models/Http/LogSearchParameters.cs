@@ -32,4 +32,5 @@ public class GenericLogSearchParameters
     public int PageSize { get; set; } = 10;
     public string SortBy { get; set; } = "ExecutionDate";
     public SortOrder SortOrder { get; set; } = SortOrder.Descending;
+    public bool IncludeDeleted { get; set; } = false;
 }

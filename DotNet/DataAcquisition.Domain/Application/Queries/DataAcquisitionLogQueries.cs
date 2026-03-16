@@ -312,7 +312,8 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 log.ExecutionDate,
                 log.CreateDate,
                 log.RetryAttempts,
-                log.Status
+                log.Status,
+                log.IsDeleted
             })
             .ToListAsync(cancellationToken);
 
@@ -376,7 +377,8 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     ExecutionDate = log.ExecutionDate,
                     CreateDate = log.CreateDate,
                     RetryAttempts = log.RetryAttempts,
-                    Status = log.Status
+                    Status = log.Status,
+                    IsDeleted = log.IsDeleted
                 };
             }).ToList();
         }
@@ -509,7 +511,8 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     DataAcquisitionLogId = r.DataAcquisitionLogId
                 }).ToList(),
                 Notes = l.Notes,
-                ScheduledReport = l.ScheduledReport
+                ScheduledReport = l.ScheduledReport,
+                IsDeleted = l.IsDeleted
             }).ToListAsync(cancellationToken);
 
         return new PagedConfigModel<DataAcquisitionLogModel>
@@ -716,6 +719,11 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     private IQueryable<DataAcquisitionLog> BuildSearchQuery(SearchDataAcquisitionLogRequest model)
     {
         var query = _dbContext.DataAcquisitionLogs.AsNoTracking().AsQueryable();
+
+        if (!model.IncludeDeleted)
+        {
+            query = query.Where(log => !log.IsDeleted);
+        }
 
         if (!string.IsNullOrEmpty(model.FacilityId))
         {

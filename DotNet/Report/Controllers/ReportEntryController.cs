@@ -62,7 +62,7 @@ namespace LantanaGroup.Link.Report.Controllers
         }
 
         /// <summary>
-        /// Returns report entries for the given entry report schedule Id. 
+        /// Returns report entries for the given entry report schedule Id.
         /// </summary>
         /// <param name="reportScheduleId"></param>
         [HttpGet("schedules/{reportScheduleId}")]
@@ -73,6 +73,10 @@ namespace LantanaGroup.Link.Report.Controllers
         {
             try
             {
+                var schedule = await _reportScheduledManager.SingleOrDefaultAsync(x => x.Id == reportScheduleId);
+                if (schedule == null || schedule.IsDeleted == true)
+                    return NotFound();
+
                 var reportEntries = await _reportEntryManager.FindAsync(x => x.ReportScheduleId == reportScheduleId);
 
                 if (reportEntries == null || reportEntries.Count == 0)
@@ -91,7 +95,7 @@ namespace LantanaGroup.Link.Report.Controllers
         }
 
         /// <summary>
-        /// Returns a report entry record for the given entry report schedule Id and patient Id. 
+        /// Returns a report entry record for the given entry report schedule Id and patient Id.
         /// </summary>
         /// <param name="reportScheduleId"></param>
         /// <param name="patientId"></param>
@@ -103,6 +107,10 @@ namespace LantanaGroup.Link.Report.Controllers
         {
             try
             {
+                var schedule = await _reportScheduledManager.SingleOrDefaultAsync(x => x.Id == reportScheduleId);
+                if (schedule == null || schedule.IsDeleted == true)
+                    return NotFound();
+
                 var reportEntry = (await _reportEntryManager.FindAsync(x => x.ReportScheduleId == reportScheduleId && x.PatientId == patientId)).FirstOrDefault();
 
                 if (reportEntry == null)
@@ -126,11 +134,16 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="reportScheduleId"></param>
         [HttpGet("schedules/{reportScheduleId}/count")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(int))]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<int>> GetCountByReportScheduleId(string reportScheduleId)
         {
             try
             {
+                var schedule = await _reportScheduledManager.SingleOrDefaultAsync(x => x.Id == reportScheduleId);
+                if (schedule == null || schedule.IsDeleted == true)
+                    return NotFound();
+
                 var count = await _reportEntryManager.CountAsync(x => x.ReportScheduleId == reportScheduleId);
 
                 return Ok(count);
@@ -149,11 +162,16 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="reportScheduleId"></param>
         [HttpGet("schedules/{reportScheduleId}/summary")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ReportEntrySummary))]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<ReportEntrySummary>> GetSummaryByReportScheduleId(string reportScheduleId)
         {
             try
             {
+                var schedule = await _reportScheduledManager.SingleOrDefaultAsync(x => x.Id == reportScheduleId);
+                if (schedule == null || schedule.IsDeleted == true)
+                    return NotFound();
+
                 var summary = await _reportEntryManager.GetSummaryByReportScheduleIdAsync(reportScheduleId);
 
                 return Ok(summary);

@@ -1,5 +1,4 @@
-﻿using Azure.Identity;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net;
 using System.Reflection;
 using Confluent.Kafka;
@@ -7,7 +6,6 @@ using DataAcquisition.Domain.Application.Queries;
 using FluentValidation;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.ParameterFactories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.QueryFactories;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services;
@@ -37,7 +35,6 @@ using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
@@ -54,7 +51,6 @@ using Microsoft.Extensions.Logging;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Settings.Configuration;
-using Serilog.Sinks.SystemConsole.Themes;
 using IHostingEnvironment = Microsoft.Extensions.Hosting.IHostingEnvironment;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
@@ -77,7 +73,7 @@ public static class GeneralStartupExtensions
         var connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
         builder.Services.RegisterQuartzDatabase(connectionString);
         
-        builder.Configuration.RegisterMonitoring(builder.Logging, builder.Services, serviceName);
+        builder.RegisterMonitoring();
         builder.Services.RegisterConfigs(builder.Configuration);
         builder.RegisterEntityFramework();
 
@@ -103,14 +99,14 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterProblemDetails((IHostingEnvironment)builder.Environment);
     }
 
-    public static void RegisterMonitoring(this IConfigurationManager configuration, ILoggingBuilder logging, IServiceCollection services, string serviceName)
+    public static void RegisterMonitoring(this WebApplicationBuilder builder)
     {
         // Clear default providers first to avoid duplicate logging
-        logging.ClearProviders();
+        builder.Logging.ClearProviders();
 
         var loggerOptions = new ConfigurationReaderOptions { SectionName = DataAcquisitionConstants.AppSettingsSectionNames.Serilog };
         var serilogConfig = new LoggerConfiguration()
-            .ReadFrom.Configuration(configuration, loggerOptions)
+            .ReadFrom.Configuration(builder.Configuration, loggerOptions)
             .Filter.ByExcluding("RequestPath like '/health%'")
             .Enrich.FromLogContext()
             .Enrich.WithSpan()
@@ -119,7 +115,7 @@ public static class GeneralStartupExtensions
         Log.Logger = serilogConfig.CreateLogger();
 
         // Use Serilog as the logging provider
-        logging.AddSerilog(Log.Logger, dispose: true);
+        builder.Logging.AddSerilog(Log.Logger, dispose: true);
     }
 
     public static void RegisterConfigs(this IServiceCollection services, IConfigurationManager configuration)

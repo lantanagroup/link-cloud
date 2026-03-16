@@ -138,27 +138,6 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Failed to process LogId {LogId} for facility {FacilityId}", item.LogId, item.FacilityId);
-
-            if (log != null)
-            {
-                log.Notes ??= new List<string>();
-                var safeMessage = $"[{DateTime.UtcNow:O}] Processing failed: {ex.GetType().Name} - {ex.Message}";
-                log.Notes.Add(safeMessage);
-                log.Status = RequestStatus.Failed;
-
-                await logQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
-                {
-                    Id = log.Id,
-                    Status = log.Status,
-                    Notes = log.Notes,
-                    ResourceAcquiredIds = log.ResourceAcquiredIds,
-                    RetryAttempts = log.RetryAttempts,
-                    CompletionDate = log.CompletionDate,
-                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
-                    TraceId = log.TraceId,
-                    ExecutionDate = log.ExecutionDate
-                }, ct);
-            }
         }
     }
 }
