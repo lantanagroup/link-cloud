@@ -37,7 +37,6 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
-using MongoDB.Driver;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
