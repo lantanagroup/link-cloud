@@ -1,26 +1,19 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="AppAny.Quartz.EntityFrameworkCore.Migrations" Version="0.*" />
-    <PackageReference Include="AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer" Version="0.*" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.*" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.*">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="Quartz" Version="3.*" />
-    <PackageReference Include="System.Text.Json" Version="10.0.1" />
-  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Quartz" Version="3.*" />
 
-  <ItemGroup>
-    <ProjectReference Include="..\Shared\Shared.csproj" />
-  </ItemGroup>
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Shared\Shared.csproj" />
+	</ItemGroup>
 
 </Project>
 

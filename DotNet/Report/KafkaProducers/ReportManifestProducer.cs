@@ -49,11 +49,6 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
             var reportEntries = await database.ReportEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
 
-            if (reportEntries == null || reportEntries.Count == 0) 
-            {
-                return null;
-            }
-
             var facilityConfig = await _tenantApiService.GetFacilityConfig(schedule.FacilityId, CancellationToken.None);
 
             if (facilityConfig == null) 

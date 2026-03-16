@@ -75,7 +75,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     ServiceActivitySource.Initialize(serviceInformation);
 
     // Add problem details
-    builder.Services.AddProblemDetailsService(options =>
+    builder.Services.AddBffProblemDetailsService(options =>
     {
         options.Environment = builder.Environment;
         options.ServiceName = LinkAdminConstants.ServiceName;

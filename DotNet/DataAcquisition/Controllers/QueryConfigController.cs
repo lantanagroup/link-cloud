@@ -91,7 +91,8 @@ public class QueryConfigController : Controller
                 MinAcquisitionPullTime = result.MinAcquisitionPullTime,
                 MaxAcquisitionPullTime = result.MaxAcquisitionPullTime,
                 FhirServerBaseUrl = result.FhirServerBaseUrl,
-                MaxConcurrentRequests = result.MaxConcurrentRequests
+                MaxConcurrentRequests = result.MaxConcurrentRequests,
+                MaxRetries = result.MaxRetries
             });
         }
         catch (BadRequestException ex)
@@ -156,6 +157,7 @@ public class QueryConfigController : Controller
                 MinAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MinAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
                 FacilityId = facilityId,
                 MaxConcurrentRequests = fhirQueryConfiguration.MaxConcurrentRequests,
+                MaxRetries = fhirQueryConfiguration.MaxRetries,
                 FhirServerBaseUrl = fhirQueryConfiguration.FhirServerBaseUrl
             }, cancellationToken);
 
@@ -177,7 +179,8 @@ public class QueryConfigController : Controller
                     MinAcquisitionPullTime = result.MinAcquisitionPullTime,
                     MaxAcquisitionPullTime = result.MaxAcquisitionPullTime,
                     FhirServerBaseUrl= result.FhirServerBaseUrl,
-                    MaxConcurrentRequests= result.MaxConcurrentRequests
+                    MaxConcurrentRequests= result.MaxConcurrentRequests,
+                    MaxRetries = result.MaxRetries
                 });
         }
         catch (EntityAlreadyExistsException ex)
@@ -256,6 +259,7 @@ public class QueryConfigController : Controller
                 FhirServerBaseUrl = fhirQueryConfiguration.FhirServerBaseUrl,
                 Authentication = fhirQueryConfiguration.Authentication,
                 MaxConcurrentRequests = fhirQueryConfiguration.MaxConcurrentRequests,
+                MaxRetries = fhirQueryConfiguration.MaxRetries,
                 MinAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MinAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
                 MaxAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MaxAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
             }, cancellationToken);
@@ -287,7 +291,8 @@ public class QueryConfigController : Controller
                 MinAcquisitionPullTime = result.MinAcquisitionPullTime,
                 MaxAcquisitionPullTime = result.MaxAcquisitionPullTime,
                 FhirServerBaseUrl = result.FhirServerBaseUrl,
-                MaxConcurrentRequests = result.MaxConcurrentRequests
+                MaxConcurrentRequests = result.MaxConcurrentRequests,
+                MaxRetries = result.MaxRetries
             });
         }
         catch (MissingFacilityConfigurationException ex)

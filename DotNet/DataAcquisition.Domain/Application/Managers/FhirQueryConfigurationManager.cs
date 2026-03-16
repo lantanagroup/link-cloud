@@ -30,6 +30,14 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
     {
         _database = database;
     }
+
+    private static void ValidateMaxRetries(int? maxRetries)
+    {
+        if (maxRetries is < 0 or > 10)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxRetries), "MaxRetries must be between 0 and 10.");
+        }
+    }
     
     public async Task<AuthenticationConfigurationModel> CreateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default)
     {
@@ -88,22 +96,24 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
         using var activity = ServiceActivitySource.Instance.StartActivity("FhirQueryConfigurationManager.CreateAsync");
         activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
 
+        if (string.IsNullOrEmpty(model.FacilityId))
+        {
+            throw new ArgumentNullException("FacilityId cannot be null or empty");
+        }
+
+        if (string.IsNullOrEmpty(model.FhirServerBaseUrl))
+        {
+            throw new ArgumentNullException("FhirServerBaseUrl cannot be null or empty");
+        }
+
+        ValidateMaxRetries(model.MaxRetries);
+
         var existingEntity = await _database.FhirQueryConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == model.FacilityId);
 
         if (existingEntity != null)
         {
             throw new EntityAlreadyExistsException(
                 $"A {nameof(FhirQueryConfiguration)} already exists for facilityId: {model.FacilityId}");
-        }
-
-        if(string.IsNullOrEmpty(model.FacilityId))
-        {
-            throw new ArgumentNullException("FacilityId camnot be null or empty");
-        }
-
-        if (string.IsNullOrEmpty(model.FhirServerBaseUrl))
-        {
-            throw new ArgumentNullException("FhirServerBaseUrl camnot be null or empty");
         }
 
         var entity = new FhirQueryConfiguration
@@ -114,6 +124,7 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
             FacilityId = model.FacilityId,
             FhirServerBaseUrl = model.FhirServerBaseUrl,
             MaxConcurrentRequests = model.MaxConcurrentRequests,
+            MaxRetries = model.MaxRetries,
             CreateDate = DateTime.UtcNow,
             ModifyDate = DateTime.UtcNow
         };
@@ -129,25 +140,28 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
         using var activity = ServiceActivitySource.Instance.StartActivity("FhirQueryConfigurationManager.UpdateAsync");
         activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
 
+        if (string.IsNullOrEmpty(model.FacilityId))
+        {
+            throw new ArgumentNullException("FacilityId cannot be null or empty");
+        }
+
+        if (string.IsNullOrEmpty(model.FhirServerBaseUrl))
+        {
+            throw new ArgumentNullException("FhirServerBaseUrl cannot be null or empty");
+        }
+
+        ValidateMaxRetries(model.MaxRetries);
+
         var existingEntity = await _database.FhirQueryConfigurationRepository.SingleOrDefaultAsync(q => q.FacilityId == model.FacilityId);
 
         if (existingEntity == null)
             throw new NotFoundException($"No configuration found for facilityId: {model.FacilityId}. Unable to update configuration.");
 
-        if (string.IsNullOrEmpty(model.FacilityId))
-        {
-            throw new ArgumentNullException("FacilityId camnot be null or empty");
-        }
-
-        if (string.IsNullOrEmpty(model.FhirServerBaseUrl))
-        {
-            throw new ArgumentNullException("FhirServerBaseUrl camnot be null or empty");
-        }
-
         existingEntity.Authentication = model.Authentication?.ToDomain();
         existingEntity.FhirServerBaseUrl = model.FhirServerBaseUrl;
         existingEntity.ModifyDate = DateTime.UtcNow;
         existingEntity.MaxConcurrentRequests = model.MaxConcurrentRequests;
+        existingEntity.MaxRetries = model.MaxRetries;
         existingEntity.MinAcquisitionPullTime = model.MinAcquisitionPullTime;
         existingEntity.MaxAcquisitionPullTime = model.MaxAcquisitionPullTime;
 

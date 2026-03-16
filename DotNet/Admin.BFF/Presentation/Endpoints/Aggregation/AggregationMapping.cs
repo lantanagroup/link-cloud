@@ -1,3 +1,5 @@
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Facility;
+using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation.Handlers.Facility;
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation.Handlers.Report;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using Link.Authorization.Infrastructure;
@@ -13,6 +15,38 @@ public static class AggregationMapping
         {
             Tags = new List<OpenApiTag> { new() { Name = "Service Aggregation" } }
         });
+
+        routes.MapDelete("/facility/{facilityId}", SoftDeleteFacility.Handle)
+            .RequireAuthorization(LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName)
+            .Produces<FacilitySoftDeleteResult>()
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status500InternalServerError)
+            .WithOpenApi(x => new OpenApiOperation(x)
+            {
+                Summary = "Soft Delete Facility",
+                Description = "Soft deletes a facility and its associated report schedules and acquisition logs. " +
+                              "Returns 409 if reports are currently running. " +
+                              "Returns 404 if the facility does not exist. " +
+                              "If a downstream step fails, all completed steps are rolled back and 500 is returned."
+            });
+
+        routes.MapPatch("/facility/{facilityId}/restore", RestoreFacility.Handle)
+            .RequireAuthorization(LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName)
+            .Produces<FacilityRestoreResult>()
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status500InternalServerError)
+            .WithOpenApi(x => new OpenApiOperation(x)
+            {
+                Summary = "Restore Facility",
+                Description = "Restores a soft-deleted facility and its associated report schedules and acquisition logs. " +
+                              "Returns 404 if the facility does not exist. " +
+                              "If a downstream step fails, all completed steps are rolled back and 500 is returned."
+            });
 
         routes.MapGet("/reports/summaries", GetReportSummaries.Search)
             .RequireAuthorization(LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName)

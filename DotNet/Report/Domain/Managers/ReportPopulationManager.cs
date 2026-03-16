@@ -1,8 +1,8 @@
 ﻿using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Entities;
 using System.Linq.Expressions;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
 {
@@ -13,6 +13,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         Task<ReportPopulation> AddAsync(ReportPopulation entry,
             CancellationToken cancellationToken);
+        Task<List<ReportPopulation>> AddWithReportScheduleAsync(ReportSchedule reportSchedule, CancellationToken cancellationToken);
         Task<ReportPopulation> UpdateAsyncWithAggregateResult(ReportPopulation populationModel, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken);
 
         Task<ReportPopulation> AddAsyncWithAggregateResult(string facilityId, string reportId, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken);
@@ -43,6 +44,46 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             await _database.SaveChangesAsync();
 
             return entry;
+        }
+
+        /// <summary>
+        /// Daniel - 3/2026: Adding this function to build the population list when a reportScheduled event is consumed. This helps in a few ways:
+        ///     1. In the case where all evaluated measure reports for a facility do not meet the criteria of the measure, a population record already exists with a count set to 0.
+        ///     2. The admin UI doesn't have to add logic to render 0 count populations.
+        ///     3. When generating a manifest, logic doesn't need to be added to figure out if there was a 0 count for any of the reported measures. 
+        /// It's assumed that each developed measure will at least have 'initial-population' as a Population Id. This logic would need to change if that assumption is no longer true.
+        /// </summary>
+        /// <param name="reportSchedule"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        public async Task<List<ReportPopulation>> AddWithReportScheduleAsync(ReportSchedule reportSchedule, CancellationToken cancellationToken)
+        {
+            List<ReportPopulation> reportPopulations = new List<ReportPopulation>();
+
+            foreach (var reportType in reportSchedule.ReportTypes)
+            {
+                ReportPopulation newPopulation = new ReportPopulation()
+                {
+                    CreateDate = DateTime.UtcNow,
+                    FacilityId = reportSchedule.FacilityId,
+                    ReportType = reportType,
+                    ReportScheduleId = reportSchedule.Id,
+                    GroupPopulations = new List<GroupPopulation>()
+                    {
+                        new GroupPopulation() { 
+                            PopulationId = "initial-population",
+                            TotalPopulationCount = 0
+                        }
+                    }
+                };
+
+                reportPopulations.Add(newPopulation);
+            }
+
+            await _database.ReportPopulationRepository.AddRangeAsync(reportPopulations);
+            await _database.SaveChangesAsync();
+
+            return reportPopulations;
         }
 
         public async Task<ReportPopulation> AddAsyncWithAggregateResult(string facilityId, string reportId, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken)
@@ -82,6 +123,13 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task<ReportPopulation> UpdateAsyncWithAggregateResult(ReportPopulation populationModel, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken)
         {
+            populationModel.ModifyDate = DateTime.UtcNow;
+
+            if (string.IsNullOrWhiteSpace(populationModel.Measure))
+            {
+                populationModel.Measure = aggregateResult.Measure;
+            }
+
             foreach (var measureReportpopulation in aggregateResult.PopulationList)
             {
                 var group = populationModel.GroupPopulations.FirstOrDefault(x => x.PopulationId == measureReportpopulation.PopulationId);
