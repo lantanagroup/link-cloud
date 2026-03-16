@@ -125,17 +125,48 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
 
             if (log.Status != RequestStatus.Queued)
             {
-                _logger.LogInformation("Log {LogId} no longer in Queued state ({Status}) - skipping", log.Id.ToString().SanitizeUntrustedString(), log.Status?.ToString()?.SanitizeUntrustedString());
+                _logger.LogInformation("Log {LogId} no longer in Queued state ({Status}) - skipping",
+                    log.Id.ToString().SanitizeUntrustedString(), log.Status?.ToString()?.SanitizeUntrustedString());
                 return;
             }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to process LogId {LogId} for facility {FacilityId}", item.LogId, item.FacilityId);
 
+            if (log != null)
+            {
+                log.Notes ??= new List<string>();
+                var safeMessage = $"[{DateTime.UtcNow:O}] Processing failed: {ex.GetType().Name} - {ex.Message}";
+                log.Notes.Add(safeMessage);
+                log.Status = RequestStatus.Failed;
+            
+                await logQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
+                {
+                    Id = log.Id,
+                    Status = log.Status,
+                    Notes = log.Notes,
+                    ResourceAcquiredIds = log.ResourceAcquiredIds,
+                    RetryAttempts = log.RetryAttempts,
+                    CompletionDate = log.CompletionDate,
+                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                    TraceId = log.TraceId,
+                    ExecutionDate = log.ExecutionDate
+                }, ct);
+            }
+
+            throw;
+        }
+            
+        try
+        {
             await patientDataService.ExecuteLogRequest(
                 new AcquisitionRequest(log.Id, item.FacilityId),
                 ct);
 
             _logger.LogInformation("Successfully completed acquisition for LogId {LogId}", log.Id);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to process LogId {LogId} for facility {FacilityId}", item.LogId, item.FacilityId);
         }
