@@ -5,7 +5,7 @@ namespace LantanaGroup.Link.Shared.Application.Models;
 public enum KafkaTopic
 {
     CernerPatientsAcquired,
-    [StringValue("CernerPatientsAcquired")]
+    [StringValue("CernerPatientsAcquired-Retry")]
     CernerPatientsAcquiredRetry,
     DataAcquired,
     [StringValue("PatientListsAcquired")]

@@ -60,10 +60,10 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
                     string patientId = null;
                     DateTime admitDate = DateTime.MinValue;
                 
-                    if (rootElement.TryGetProperty("patientId", out var patientIdProp))
+                    if (rootElement.TryGetProperty("PatientId", out var patientIdProp))
                         patientId = patientIdProp.GetString();
                     
-                    if (rootElement.TryGetProperty("admitDate", out var admitDateProp) && 
+                    if (rootElement.TryGetProperty("AdmitDate", out var admitDateProp) && 
                         admitDateProp.ValueKind == JsonValueKind.String)
                     {
                         DateTime.TryParse(admitDateProp.GetString(), out admitDate);
@@ -76,10 +76,10 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
                     patientId = null;
                     DateTime dischargeDate = DateTime.MinValue;
                 
-                    if (rootElement.TryGetProperty("patientId", out patientIdProp))
+                    if (rootElement.TryGetProperty("PatientId", out patientIdProp))
                         patientId = patientIdProp.GetString();
                     
-                    if (rootElement.TryGetProperty("dischargeDate", out var dischargeDateProp) && 
+                    if (rootElement.TryGetProperty("DischargeDate", out var dischargeDateProp) && 
                         dischargeDateProp.ValueKind == JsonValueKind.String)
                     {
                         DateTime.TryParse(dischargeDateProp.GetString(), out dischargeDate);
@@ -113,17 +113,17 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
         {
             //TODO: Daniel - Do we need to build the FHIR List payloads? Or can we do something similar to the CernerListAdmitPayload logic below
             writer.WriteStartObject();
-            writer.WriteString("payloadType", value.GetType().Name.Replace("Payload", ""));
-            writer.WriteString("patientId", admitPayload.PatientId);
-            writer.WriteString("admitDate", admitPayload.AdmitDate.ToString("o"));
+            writer.WriteString("PayloadType", value.GetType().Name.Replace("Payload", ""));
+            writer.WriteString("PatientId", admitPayload.PatientId);
+            writer.WriteString("AdmitDate", admitPayload.AdmitDate.ToString("o"));
             writer.WriteEndObject();
         }
         else if (value is FHIRListDischargePayload dischargePayload)
         {
             writer.WriteStartObject();
-            writer.WriteString("payloadType", value.GetType().Name.Replace("Payload", ""));
-            writer.WriteString("patientId", dischargePayload.PatientId);
-            writer.WriteString("dischargeDate", dischargePayload.DischargeDate.ToString("o"));
+            writer.WriteString("PayloadType", value.GetType().Name.Replace("Payload", ""));
+            writer.WriteString("PatientId", dischargePayload.PatientId);
+            writer.WriteString("DischargeDate", dischargePayload.DischargeDate.ToString("o"));
             writer.WriteEndObject();
         }
         else if (value is CernerListAdmitPayload cernerAdmitPayload)
