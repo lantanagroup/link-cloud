@@ -273,7 +273,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
             store.ConfigureMongoDb(c =>
             {
-                c.CollectionPrefix = "reportJobs";
+                c.CollectionPrefix = "reportjobs";
             });
         });
     });
