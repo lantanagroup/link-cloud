@@ -1,13 +1,13 @@
-﻿using LantanaGroup.Link.Report.Domain;
+﻿using LantanaGroup.Link.Report.Data;
+using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using LantanaGroup.Link.Shared.Application.Models.Responses;
-using LantanaGroup.Link.Shared.Application.Enums;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Report.Controllers
@@ -38,9 +38,15 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<ReportResource>> GetById(string id)
         {
+            if (string.IsNullOrWhiteSpace(id))
+                return BadRequest("Id is required.");
+
+            if (!Guid.TryParse(id, out Guid parsedId))
+                return BadRequest("Invalid ID format");
+
             try
             {
-                var reportResource = (await _reportResourceManager.FindAsync(x => x.Id == id)).FirstOrDefault();
+                var reportResource = (await _reportResourceManager.FindAsync(x => x.Id == parsedId)).FirstOrDefault();
 
                 if (reportResource == null)
                 {
@@ -67,9 +73,15 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<List<ReportResource>>> GetByReportScheduleId(string reportScheduleId)
         {
+            if (string.IsNullOrWhiteSpace(reportScheduleId))
+                return BadRequest("ReportScheduleId is required.");
+
+            if (!Guid.TryParse(reportScheduleId, out Guid parsedId))
+                return BadRequest("Invalid ReportScheduleId format");
+
             try
             {
-                var reportResources = await _reportResourceManager.FindAsync(x => x.ReportScheduledId == reportScheduleId);
+                var reportResources = await _reportResourceManager.FindAsync(x => x.ReportScheduleId == parsedId);
 
                 if (reportResources == null)
                 {
@@ -97,9 +109,15 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<List<ReportResource>>> GetByReportScheduleIdAndPatientId(string reportScheduleId, string patientId)
         {
+            if (string.IsNullOrWhiteSpace(reportScheduleId))
+                return BadRequest("ReportScheduleId is required.");
+
+            if (!Guid.TryParse(reportScheduleId, out Guid parsedId))
+                return BadRequest("Invalid ReportScheduleId format");
+
             try
             {
-                var reportResources = await _reportResourceManager.FindAsync(x => x.ReportScheduledId == reportScheduleId && x.PatientId == patientId);
+                var reportResources = await _reportResourceManager.FindAsync(x => x.ReportScheduleId == parsedId && x.PatientId == patientId);
 
                 if (reportResources == null)
                 {
@@ -173,6 +191,10 @@ namespace LantanaGroup.Link.Report.Controllers
             int pageSize = 10,
             int pageNumber = 1)
         {
+            Guid? parsedScheduleId = null;
+            if (!string.IsNullOrWhiteSpace(reportScheduleId) && Guid.TryParse(reportScheduleId, out Guid temp))
+                parsedScheduleId = temp;
+
             try
             {
                 if (pageSize < 1 || pageSize > 100)
@@ -187,7 +209,7 @@ namespace LantanaGroup.Link.Report.Controllers
 
                 var result = await _reportResourceManager.SearchAsync(
                     facilityId,
-                    reportScheduleId,
+                    parsedScheduleId,
                     patientId,
                     measureReportId,
                     resourceType,

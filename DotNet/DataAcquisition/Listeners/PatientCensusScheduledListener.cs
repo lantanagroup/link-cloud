@@ -18,9 +18,9 @@ public class PatientCensusScheduledListener : BaseListener<PatientCensusSchedule
 
     public PatientCensusScheduledListener(ILogger<BaseListener<PatientCensusScheduled, string, PatientCensusScheduled, string, List<PatientListModel>>> logger,
         IKafkaConsumerFactory<string, PatientCensusScheduled> kafkaConsumerFactory,
-        ITransientExceptionHandler<string, PatientCensusScheduled> transientExceptionHandler,
-        IDeadLetterExceptionHandler<string, PatientCensusScheduled> deadLetterExceptionHandler,
-        IDeadLetterExceptionHandler<string, string> deadLetterConsumerErrorHandler,
+        ITransientExceptionHandler<PatientCensusScheduled, string, PatientCensusScheduled> transientExceptionHandler,
+        IDeadLetterExceptionHandler<PatientCensusScheduled, string, PatientCensusScheduled> deadLetterExceptionHandler,
+        IDeadLetterExceptionHandler<PatientCensusScheduled, string, string> deadLetterConsumerErrorHandler,
         IServiceScopeFactory serviceScopeFactory,
         ServiceInformation serviceInformation) : base(logger, kafkaConsumerFactory, deadLetterExceptionHandler, deadLetterConsumerErrorHandler, transientExceptionHandler, serviceInformation)
     {

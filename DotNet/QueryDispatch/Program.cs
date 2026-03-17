@@ -104,10 +104,9 @@ builder.Services.AddTransient<IScheduledReportManager, ScheduledReportManager>()
 
 
 //Excepation Handlers
-builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientEventValue>, DeadLetterExceptionHandler<string, PatientEventValue>>();
-builder.Services.AddTransient<IDeadLetterExceptionHandler<string, ReportScheduledValue>, DeadLetterExceptionHandler<string, ReportScheduledValue>>();
-builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
-builder.Services.AddTransient<ITransientExceptionHandler<string, PatientEventValue>, TransientExceptionHandler<string, PatientEventValue>>();
+builder.Services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
+builder.Services.AddSingleton(typeof(ITransientExceptionHandler<,,>), typeof(TransientExceptionHandler<,,>));
+builder.Services.AddSingleton(typeof(IDeadLetterExceptionHandler<,,>), typeof(DeadLetterExceptionHandler<,,>));
 
 //Add Services
 builder.Services.AddTransient<ITenantApiService, TenantApiService>();

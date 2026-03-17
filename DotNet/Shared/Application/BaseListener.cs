@@ -13,17 +13,17 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
 {
     protected readonly ILogger<BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, ProduceKeyType, ProduceValueType>> Logger;
     protected readonly IKafkaConsumerFactory<ConsumeKeyType, ConsumeValueType> KafkaConsumerFactory;
-    protected readonly IDeadLetterExceptionHandler<ConsumeKeyType, ConsumeValueType> DeadLetterConsumerHandler;
-    protected readonly ITransientExceptionHandler<ConsumeKeyType, ConsumeValueType> TransientExceptionHandler;
+    protected readonly IDeadLetterExceptionHandler<MessageType, ConsumeKeyType, ConsumeValueType> DeadLetterConsumerHandler;
+    protected readonly ITransientExceptionHandler<MessageType, ConsumeKeyType, ConsumeValueType> TransientExceptionHandler;
     protected readonly ServiceInformation ServiceInformation;
     protected readonly string TopicName;
 
     protected BaseListener(
         ILogger<BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, ProduceKeyType, ProduceValueType>> logger,
         IKafkaConsumerFactory<ConsumeKeyType, ConsumeValueType> kafkaConsumerFactory,
-        IDeadLetterExceptionHandler<ConsumeKeyType, ConsumeValueType> deadLetterConsumerHandler,
-        IDeadLetterExceptionHandler<string, string> deadLetterConsumerErrorHandler,
-        ITransientExceptionHandler<ConsumeKeyType, ConsumeValueType> transientExceptionHandler,
+        IDeadLetterExceptionHandler<MessageType, ConsumeKeyType, ConsumeValueType> deadLetterConsumerHandler,
+        IDeadLetterExceptionHandler<MessageType, string, string> deadLetterConsumerErrorHandler,
+        ITransientExceptionHandler<MessageType, ConsumeKeyType, ConsumeValueType> transientExceptionHandler,
         ServiceInformation serviceInformation)
     {
         Logger = logger ?? throw new ArgumentNullException(nameof(logger));

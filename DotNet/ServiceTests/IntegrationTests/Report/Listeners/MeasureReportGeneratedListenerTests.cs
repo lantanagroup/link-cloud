@@ -1,11 +1,10 @@
 ﻿using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
 using Confluent.Kafka;
-using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Listeners;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -28,16 +27,16 @@ namespace IntegrationTests.Report
             _fixture = fixture;
         }
 
-        private ReportSchedule CreateSchedule(string facilityId, string reportId)
+        private ReportScheduleModel CreateSchedule(string facilityId, Guid reportId)
         {
-            return new ReportSchedule
+            return new ReportScheduleModel
             {
                 Id = reportId,
                 FacilityId = facilityId,
                 ReportStartDate = DateTime.UtcNow.AddDays(-30),
                 ReportEndDate = DateTime.UtcNow.AddDays(30),
                 Frequency = Frequency.Monthly,
-                ReportTypes = new List<string> { "DE-111" },
+                ReportTypes = { "DE-111" } ,
                 Status = ScheduleStatus.Scheduled,
                 CreateDate = DateTime.UtcNow,
                 EndOfReportPeriodJobHasRun = true,
@@ -46,9 +45,9 @@ namespace IntegrationTests.Report
             };
         }
 
-        private ReportEntry CreateEntry(string facilityId, string reportId, string patientId, MeasureReportStatus status, string measureReportFileName, ReportingStatus reportingStatus = ReportingStatus.PatientIdentified, SubmissionStatus? submissionStatus = null)
+        private ReportEntryModel CreateEntry(string facilityId, Guid reportId, string patientId, MeasureReportStatus status, string measureReportFileName, ReportingStatus reportingStatus = ReportingStatus.PatientIdentified, SubmissionStatus? submissionStatus = null)
         {
-            return new ReportEntry
+            return new ReportEntryModel
             {
                 FacilityId = facilityId,
                 ReportScheduleId = reportId,
@@ -56,16 +55,20 @@ namespace IntegrationTests.Report
                 ReportingStatus = reportingStatus,
                 SubmissionStatus = submissionStatus,
                 CreateDate = DateTime.UtcNow,
-                MeasureReportList = new List<EvaluatedMeasureReport>
+                MeasureReports = new List<EntryMeasureReportModel>
                 {
-                    new EvaluatedMeasureReport
+                    new EntryMeasureReportModel
                     {
                         ReportType = "DE-111",
                         Status = status,
                         MeasureReportId = Guid.NewGuid().ToString(),
                         MeasureReportUri = "https://blob.example.com/measure/" + Guid.NewGuid(),
                         MeasureReportFileName = measureReportFileName,
-                        ResourceCount = new Dictionary<string, int> { { "Patient", 1 }, { "Observation", 5 } }
+                        ResourceCount = new Dictionary<string, int>()
+                        {
+                            { "Patient", 1 },
+                            { "Observation", 5 }
+                        }
                     }
                 }
             };
@@ -163,7 +166,7 @@ namespace IntegrationTests.Report
             var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
 
             var facilityId = "test-facility-014";
-            var reportId = Guid.NewGuid().ToString();
+            var reportId = Guid.NewGuid();
             var measureReportBlobName = "measure-" + Guid.NewGuid() + ".json";
 
             var schedule = CreateSchedule(facilityId, reportId);
@@ -177,7 +180,7 @@ namespace IntegrationTests.Report
             var value = new MeasureReportGeneratedValue
             {
                 FacilityId = facilityId,
-                ReportTrackingId = reportId,
+                ReportTrackingId = reportId.ToString(),
                 PatientId = "pat-123",
                 ReportType = "DE-111",
                 MeasureReportId = Guid.NewGuid().ToString(),
@@ -216,7 +219,7 @@ namespace IntegrationTests.Report
             var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
 
             var facilityId = "test-facility-015";
-            var reportId = Guid.NewGuid().ToString();
+            var reportId = Guid.NewGuid();
             var measureReportBlobName = "measure-" + Guid.NewGuid() + ".json";
 
             var schedule = CreateSchedule(facilityId, reportId);
@@ -225,7 +228,7 @@ namespace IntegrationTests.Report
             // Setup to explicitly enter the !readyForAggregation block AND pass the foreach in ReportManifestProducer.Produce():
             //   - Two measures: DE-111 gets updated to NotReportable, DE-222 stays EntryCreated → readyForAggregation = false
             //   - Parent ReportEntry statuses = NotReportable + NotEligable → foreach never returns false
-            var entry = new ReportEntry
+            var entry = new ReportEntryModel
             {
                 FacilityId = facilityId,
                 ReportScheduleId = reportId,
@@ -233,25 +236,33 @@ namespace IntegrationTests.Report
                 ReportingStatus = ReportingStatus.NotReportable,
                 SubmissionStatus = SubmissionStatus.NotEligable,
                 CreateDate = DateTime.UtcNow,
-                MeasureReportList = new List<EvaluatedMeasureReport>
+                MeasureReports = new List<EntryMeasureReportModel>
                 {
-                    new EvaluatedMeasureReport
+                    new EntryMeasureReportModel
                     {
                         ReportType = "DE-111",
                         Status = MeasureReportStatus.EntryCreated,
                         MeasureReportId = Guid.NewGuid().ToString(),
                         MeasureReportUri = "https://blob.example.com/measure/" + Guid.NewGuid(),
                         MeasureReportFileName = measureReportBlobName,
-                        ResourceCount = new Dictionary<string, int> { { "Patient", 1 }, { "Observation", 5 } }
+                        ResourceCount = new Dictionary<string, int>()
+                         {
+                            { "Patient", 1 },
+                            { "Observation", 5 }
+                         }
                     },
-                    new EvaluatedMeasureReport
+                    new EntryMeasureReportModel
                     {
                         ReportType = "DE-222",
                         Status = MeasureReportStatus.EntryCreated,
                         MeasureReportId = Guid.NewGuid().ToString(),
                         MeasureReportUri = "https://blob.example.com/measure/" + Guid.NewGuid(),
                         MeasureReportFileName = "measure-" + Guid.NewGuid() + ".json",
-                        ResourceCount = new Dictionary<string, int> { { "Patient", 1 }, { "Observation", 5 } }
+                        ResourceCount = new Dictionary<string, int>()
+                         {
+                            { "Patient", 1 },
+                            { "Observation", 5 }
+                         }
                     }
                 }
             };
@@ -262,7 +273,7 @@ namespace IntegrationTests.Report
             var value = new MeasureReportGeneratedValue
             {
                 FacilityId = facilityId,
-                ReportTrackingId = reportId,
+                ReportTrackingId = reportId.ToString(),
                 PatientId = "pat-123",
                 ReportType = "DE-111",
                 MeasureReportId = Guid.NewGuid().ToString(),
@@ -302,7 +313,7 @@ namespace IntegrationTests.Report
             var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
             var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
 
-            var reportId = Guid.NewGuid().ToString();
+            var reportId = Guid.NewGuid();
             var measureReportBlobName = "measure-" + Guid.NewGuid() + ".json";
 
             var schedule = CreateSchedule(facilityId, reportId);
@@ -316,7 +327,7 @@ namespace IntegrationTests.Report
             var value = new MeasureReportGeneratedValue
             {
                 FacilityId = facilityId,
-                ReportTrackingId = reportId,
+                ReportTrackingId = reportId.ToString(),
                 PatientId = "pat-123",
                 ReportType = "DE-111",
                 MeasureReportId = Guid.NewGuid().ToString(),
