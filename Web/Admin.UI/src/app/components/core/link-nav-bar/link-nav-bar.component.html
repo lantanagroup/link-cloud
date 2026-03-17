@@ -19,7 +19,8 @@
           <a role="button"
             tabindex="0"
             [attr.aria-haspopup]="true"
-            [attr.aria-expanded]="isChildRouteActive(item.children)">
+            [attr.aria-expanded]="isChildRouteActive(item.children)"
+            (click)="openMenu($event)">
             {{ item.label }}
             <div class="dropdown-icon">
               <vd-icon filePath="../../../assets/icons/chevron-default.svg"></vd-icon>
@@ -31,7 +32,7 @@
             @for (child of item.children; track child) {
               <li>
                 @if (child.path?.startsWith('/')) {
-                  <a [routerLink]="[child.path]" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+                  <a [routerLink]="[child.path]" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeMenu($event)">
                     {{ child.label }}
                   </a>
                 }
@@ -39,7 +40,8 @@
                   <a
                     [href]="child.path"
                     [attr.target]="child.path.startsWith('http') ? '_blank' : null"
-                    [attr.rel]="child.path.startsWith('http') ? 'noopener noreferrer' : null">
+                    [attr.rel]="child.path.startsWith('http') ? 'noopener noreferrer' : null"
+                    (click)="closeMenu($event)">
                     {{ child.label }}
                   </a>
                 }

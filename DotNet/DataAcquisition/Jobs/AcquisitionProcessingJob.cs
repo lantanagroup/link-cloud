@@ -165,10 +165,13 @@ public class AcquisitionProcessingJob : IJob
 
                 _logger.BeginScope("Processing {count} processable requests for facility {facilityId}", requests.Count, facilityId);
 
-                var logIds = requests.Select(r => r.Id).ToList();
+        var logIds = requests.Select(r => r.Id).ToList();
                 var failedLogs = requests.Where(r => r.Status == RequestStatus.Failed).ToList();
+
+                var maxRetryAttempts = config.MaxRetries ?? DataAcquisitionLog.MaxRetryAttempts;
+
                 var maxRetriesReachedIds = failedLogs
-                    .Where(r => r.RetryAttempts >= DataAcquisitionLog.MaxRetryAttempts)
+                    .Where(r => r.RetryAttempts >= maxRetryAttempts)
                     .Select(r => r.Id)
                     .ToList();
                 
@@ -341,7 +344,7 @@ public class AcquisitionProcessingJob : IJob
                         message.LogIds,
                         message.FacilityId,
                         message.CorrelationId,
-                        message.ResourceAcquired.ScheduledReports.FirstOrDefault()?.ReportTrackingId,
+                        message.ResourceAcquired.ScheduledReports.FirstOrDefault()?.ReportTrackingId?.ToString() ?? "",
                         cancellationToken);
                 }
                 catch (Exception ex)

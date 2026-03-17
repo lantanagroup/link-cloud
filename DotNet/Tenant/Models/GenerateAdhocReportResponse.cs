@@ -1,6 +1,6 @@
 namespace LantanaGroup.Link.Tenant.Models;
 
-public class GenerateAdhocReportResponse(string reportId)
+public class GenerateAdhocReportResponse(Guid reportId)
 {
-    public string ReportId { get; set; } = reportId;
+    public Guid ReportId { get; set; } = reportId;
 }

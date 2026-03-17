@@ -1,5 +1,4 @@
-﻿using Hl7.Fhir.Model;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Models;
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
@@ -18,7 +17,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         /// <example>TestPatient01</example>
         public List<PatientListItem> PatientLists { get; set; } = new List<PatientListItem>();
 
-        public string ReportTrackingId { get; set; } = string.Empty;
+        public Guid ReportTrackingId { get; set; }
 
     }
 
