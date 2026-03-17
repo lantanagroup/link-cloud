@@ -117,8 +117,12 @@ public class DeadLetterExceptionHandler<T, K, V> : IDeadLetterExceptionHandler<T
             var message = new Message<string, string>()
             {
                 Headers = ex.ConsumerRecord.Message.Headers,
-                Key = Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key),
-                Value = Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Value)
+                Key = ex.ConsumerRecord.Message.Key != null
+                    ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key)
+                    : string.Empty,
+                Value = ex.ConsumerRecord.Message.Value != null
+                    ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Value)
+                    : string.Empty
             };
 
             _exceptionHandler.Handle(ex, "Error consuming message", LogLevel.Error, facilityId,
