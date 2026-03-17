@@ -1,10 +1,9 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
-using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Interfaces
 {
-    public interface IDeadLetterExceptionHandler<K, V>
+    public interface IDeadLetterExceptionHandler<T, K, V>
     {
         /// <summary>
         /// The Topic to use when publishing Retry Kafka events.

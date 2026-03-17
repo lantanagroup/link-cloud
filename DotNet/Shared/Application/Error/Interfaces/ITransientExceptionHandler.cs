@@ -3,7 +3,7 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Interfaces
 {
-    public interface ITransientExceptionHandler<K, V>
+    public interface ITransientExceptionHandler<T, K, V>
     {
         /// <summary>
         /// The Topic to use when publishing Retry Kafka events.

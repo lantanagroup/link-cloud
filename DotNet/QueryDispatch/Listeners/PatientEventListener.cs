@@ -21,9 +21,9 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
         private readonly ILogger<PatientEventListener> _logger;
         private readonly IKafkaConsumerFactory<string, PatientEventValue> _kafkaConsumerFactory;
         private readonly IQueryDispatchFactory _queryDispatchFactory;
-        private readonly ITransientExceptionHandler<string, PatientEventValue> _transientExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<string, PatientEventValue> _deadLetterExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<string, string> _consumeResultDeadLetterExceptionHandler;
+        private readonly ITransientExceptionHandler<PatientEventListener, string, PatientEventValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<PatientEventListener, string, PatientEventValue> _deadLetterExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<PatientEventListener, string, string> _consumeResultDeadLetterExceptionHandler;
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly IProducer<string, AuditEventMessage> _producer;
 
@@ -31,9 +31,9 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
             ILogger<PatientEventListener> logger,
             IKafkaConsumerFactory<string, PatientEventValue> kafkaConsumerFactory,
             IQueryDispatchFactory queryDispatchFactory,
-            IDeadLetterExceptionHandler<string, PatientEventValue> deadLetterExceptionHandler,
-            IDeadLetterExceptionHandler<string, string> consumeResultDeadLetterExceptionHandler,
-            ITransientExceptionHandler<string, PatientEventValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<PatientEventListener, string, PatientEventValue> deadLetterExceptionHandler,
+            IDeadLetterExceptionHandler<PatientEventListener, string, string> consumeResultDeadLetterExceptionHandler,
+            ITransientExceptionHandler<PatientEventListener, string, PatientEventValue> transientExceptionHandler,
             IServiceScopeFactory serviceScopeFactory
 ,
             IProducer<string, AuditEventMessage> producer)

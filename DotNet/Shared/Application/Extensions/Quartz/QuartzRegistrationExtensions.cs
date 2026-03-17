@@ -29,4 +29,12 @@ public static class QuartzRegistrationExtensions
             });
         });
     }
+
+    public static void RegisterQuartzDatabaseInTest(this IServiceCollection collection)
+    {
+        collection.AddQuartz(q =>
+        {
+            q.UseInMemoryStore();
+        });
+    }
 }

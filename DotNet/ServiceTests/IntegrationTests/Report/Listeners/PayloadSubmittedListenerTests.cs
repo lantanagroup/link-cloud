@@ -1,8 +1,8 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Listeners;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -44,7 +44,7 @@ namespace IntegrationTests.Report
             var listener = scope.ServiceProvider.GetRequiredService<PayloadSubmittedListener>();
 
             var facilityId = "test-facility-payload";
-            var reportId = Guid.NewGuid().ToString();
+            var reportId = Guid.NewGuid();
 
             var key = new PayloadSubmittedKey { FacilityId = facilityId, ReportScheduleId = reportId };
             var value = new PayloadSubmittedValue { PayloadType = PayloadType.ReportSchedule };
@@ -73,16 +73,16 @@ namespace IntegrationTests.Report
             var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
 
             var facilityId = "test-facility-schedule";
-            var reportId = Guid.NewGuid().ToString();
+            var reportId = Guid.NewGuid();
 
-            var schedule = new ReportSchedule
+            var schedule = new ReportScheduleModel
             {
                 Id = reportId,
                 FacilityId = facilityId,
                 ReportStartDate = DateTime.UtcNow.AddDays(-30),
                 ReportEndDate = DateTime.UtcNow.AddDays(30),
                 Frequency = Frequency.Monthly,
-                ReportTypes = new List<string> { "DE-111" },
+                ReportTypes = { "DE-111" },
                 Status = ScheduleStatus.Scheduled,
                 CreateDate = DateTime.UtcNow
             };
@@ -126,24 +126,24 @@ namespace IntegrationTests.Report
             var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
 
             var facilityId = "test-facility-entry";
-            var reportId = Guid.NewGuid().ToString();
+            var reportId = Guid.NewGuid();
             var patientId = "pat-001";
 
-            var schedule = new ReportSchedule
+            var schedule = new ReportScheduleModel
             {
                 Id = reportId,
                 FacilityId = facilityId,
                 ReportStartDate = DateTime.UtcNow.AddDays(-30),
                 ReportEndDate = DateTime.UtcNow.AddDays(30),
                 Frequency = Frequency.Monthly,
-                ReportTypes = new List<string> { "DE-111" },
+                ReportTypes = { "DE-111" },
                 Status = ScheduleStatus.Scheduled,
                 CreateDate = DateTime.UtcNow,
                 EndOfReportPeriodJobHasRun = true
             };
             await reportScheduledManager.AddAsync(schedule, CancellationToken.None);
 
-            var entry = new ReportEntry
+            var entry = new ReportEntryModel
             {
                 PatientId = patientId,
                 ReportScheduleId = reportId,

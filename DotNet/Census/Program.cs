@@ -155,10 +155,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
     // Exception Handlers
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientListMessage>, DeadLetterExceptionHandler<string, PatientListMessage>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<string, string>, TransientExceptionHandler<string, string>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<string, PatientListMessage>, TransientExceptionHandler<string, PatientListMessage>>();
+    builder.Services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
+    builder.Services.AddSingleton(typeof(ITransientExceptionHandler<,,>), typeof(TransientExceptionHandler<,,>));
+    builder.Services.AddSingleton(typeof(IDeadLetterExceptionHandler<,,>), typeof(DeadLetterExceptionHandler<,,>));
 
     builder.Services.AddTransient<SchedulePatientListRetrieval>();
     builder.Services.AddTransient<RetryJob>();

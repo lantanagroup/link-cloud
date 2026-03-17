@@ -516,7 +516,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 return BadRequest("EndDate must be after StartDate.");
             }
 
-            var reportId = Guid.NewGuid().ToString();
+            var reportId = Guid.NewGuid();
 
             try
             {
@@ -599,7 +599,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 return BadRequest("ReportId must be provided.");
             }
 
-            var reportId = Guid.NewGuid().ToString();
+            var reportId = Guid.NewGuid();
 
             try
             {
@@ -643,7 +643,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                     Headers = new Headers(),
                     Value = new GenerateReportValue()
                     {
-                        ReportId = request.ReportId,
+                        ReportId = request.ReportId == null ? null : Guid.Parse(request.ReportId),
                         AdhocReportId = reportId,
                         Regenerate = true,
                         BypassSubmission = request.BypassSubmission ?? false

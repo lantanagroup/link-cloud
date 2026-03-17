@@ -21,8 +21,8 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
         private readonly IKafkaConsumerFactory<string, ReportScheduledValue> _kafkaConsumerFactory;
         private readonly IQueryDispatchFactory _queryDispatchFactory;
         private readonly IProducer<string, AuditEventMessage> _auditProducer;
-        private readonly IDeadLetterExceptionHandler<string, ReportScheduledValue> _deadLetterExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<string, string> _consumeResultDeadLetterExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<ReportScheduledEventListener, string, ReportScheduledValue> _deadLetterExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<ReportScheduledEventListener, string, string> _consumeResultDeadLetterExceptionHandler;
         private readonly IServiceScopeFactory _serviceScopeFactory;
 
         public ReportScheduledEventListener(
@@ -30,8 +30,8 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
             IKafkaConsumerFactory<string, ReportScheduledValue> kafkaConsumerFactory,
             IQueryDispatchFactory queryDispatchFactory, 
             IProducer<string, AuditEventMessage> auditProducer, 
-            IDeadLetterExceptionHandler<string, ReportScheduledValue> deadLetterExceptionHandler,
-            IDeadLetterExceptionHandler<string, string> consumeResultDeadLetterExceptionHandler,
+            IDeadLetterExceptionHandler<ReportScheduledEventListener, string, ReportScheduledValue> deadLetterExceptionHandler,
+            IDeadLetterExceptionHandler<ReportScheduledEventListener, string, string> consumeResultDeadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger;
@@ -95,7 +95,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                         throw new DeadLetterException("Invalid Report Scheduled event");
                                     }
 
-                                    string reportTrackingId = value.ReportTrackingId;
+                                    var reportTrackingId = value.ReportTrackingId?.ToString();
 
                                     string key = consumeResult.Message.Key;
 

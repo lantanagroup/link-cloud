@@ -85,11 +85,9 @@ static void RegisterServices(WebApplicationBuilder builder)
         new ProducerConfig() { CompressionType = CompressionType.Zstd });
     builder.Services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection: builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>(), new ProducerConfig());
 
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<ResourceKey, string>, DeadLetterExceptionHandler<ResourceKey, string>>();
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<ResourceKey, ResourceAcquiredMessage>, DeadLetterExceptionHandler<ResourceKey, ResourceAcquiredMessage>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<ResourceKey, ResourceAcquiredMessage>, TransientExceptionHandler<ResourceKey, ResourceAcquiredMessage>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<string, string>, TransientExceptionHandler<string, string>>();
+    builder.Services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
+    builder.Services.AddSingleton(typeof(ITransientExceptionHandler<,,>), typeof(TransientExceptionHandler<,,>));
+    builder.Services.AddSingleton(typeof(IDeadLetterExceptionHandler<,,>), typeof(DeadLetterExceptionHandler<,,>));
 
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 

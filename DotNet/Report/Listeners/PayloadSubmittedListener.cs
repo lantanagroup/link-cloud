@@ -1,28 +1,29 @@
-using System.Text;
 using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using LantanaGroup.Link.Report.Domain;
+using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Utilities;
-//using Hl7.Fhir.Model;
+using System.Text;
 
 namespace LantanaGroup.Link.Report.Listeners;
 
 public class PayloadSubmittedListener(
     IKafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue> kafkaConsumerFactory,
-    ITransientExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue> transientExceptionHandler,
-    IDeadLetterExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue> deadLetterExceptionHandler,
+    ITransientExceptionHandler<PayloadSubmittedListener, PayloadSubmittedKey, PayloadSubmittedValue> transientExceptionHandler,
+    IDeadLetterExceptionHandler<PayloadSubmittedListener, PayloadSubmittedKey, PayloadSubmittedValue> deadLetterExceptionHandler,
     ILogger<PayloadSubmittedListener> logger,
     IServiceScopeFactory serviceScopeFactory,
-    ServiceInformation serviceInformation)
+    ServiceInformation serviceInformation,
+    IExceptionLogger<PayloadSubmittedListener> exceptionLogger)
     : BackgroundService
 {
     private string Name => this.GetType().Name;
@@ -44,7 +45,7 @@ public class PayloadSubmittedListener(
         try
         {
             consumer.Subscribe(nameof(KafkaTopic.PayloadSubmitted));
-            logger.LogInformation("Started report submitted consumer for topic '{Topic}' at {StartTime}", nameof(KafkaTopic.PayloadSubmitted), DateTime.UtcNow);
+            logger.LogInformation("{Name}: Started report submitted consumer for topic '{Topic}' at {StartTime}", Name, nameof(KafkaTopic.PayloadSubmitted), DateTime.UtcNow);
 
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -58,7 +59,7 @@ public class PayloadSubmittedListener(
                 }
                 catch (ConsumeException ex)
                 {
-                    logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+                    exceptionLogger.Handle(ex, "Error consuming message for topics", LogLevel.Error, null, new { Topics = string.Join(", ", consumer.Subscription) });
 
                     if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                     {
@@ -76,14 +77,14 @@ public class PayloadSubmittedListener(
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex, "Error encountered in ReportScheduledListener");
+                    exceptionLogger.Handle(ex, "Error encountered in PayloadSubmittedListener", LogLevel.Error);
                     consumer.Commit();
                 }
             }
         }
         catch (OperationCanceledException oce)
         {
-            logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
+            exceptionLogger.Handle(oce, "Operation Canceled", LogLevel.Error);
             consumer.Close();
         }
     }
@@ -113,7 +114,7 @@ public class PayloadSubmittedListener(
 
             if (result.Message.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry)
             {
-                var reportEntry = await database.ReportEntryRepository.FirstAsync(e => e.PatientId == result.Message.Value.PatientId && e.ReportScheduleId == result.Message.Key.ReportScheduleId);
+                var reportEntry = await database.ReportEntryRepository.FirstAsync(e => e.PatientId == result.Message.Value.PatientId && e.ReportScheduleId == reportTrackingId);
 
                 reportEntry.SubmissionStatus = SubmissionStatus.Submitted;
                 reportEntry.SubmitReportDateTime = DateTime.UtcNow;

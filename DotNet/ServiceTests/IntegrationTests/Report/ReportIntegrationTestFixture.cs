@@ -1,15 +1,14 @@
 ﻿using Azure.Storage.Blobs;
 using Confluent.Kafka;
-using LantanaGroup.Link.Report.Application.Factory;
+using LantanaGroup.Link.Report.Application.Core;
 using LantanaGroup.Link.Report.Application.Interfaces;
-using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Application.Options;
-using LantanaGroup.Link.Report.Core;
-using LantanaGroup.Link.Report.Domain;
+using LantanaGroup.Link.Report.Data;
+using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Listeners;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
@@ -27,11 +26,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using MongoDB.Driver;
 using Moq;
 using Quartz;
 using Testcontainers.Azurite;
-using Testcontainers.MongoDb;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report
@@ -41,17 +38,11 @@ namespace IntegrationTests.Report
 
     public class ReportIntegrationTestFixture : IAsyncLifetime, IDisposable
     {
-        private readonly MongoDbContainer _mongoContainer = new MongoDbBuilder()
-            .WithImage("mongo:7.0")
-            .WithReplicaSet("rs0")
-            .Build();
-
         private readonly AzuriteContainer _azuriteContainer = new AzuriteBuilder()
             .WithImage("mcr.microsoft.com/azure-storage/azurite:latest")
             .Build();
 
         private IHost _host;
-
         public IServiceProvider ServiceProvider { get; private set; } = null!;
         public IServiceScopeFactory ScopeFactory { get; private set; } = null!;
 
@@ -66,44 +57,42 @@ namespace IntegrationTests.Report
         public Mock<IHttpClientFactory> HttpClientFactoryMock { get; } = new();
         public Mock<IQuartzJobHelper> QuartzJobHelperMock { get; } = new();
         public Mock<IKafkaConsumerFactory<string, ReportScheduledValue>> ReportScheduledConsumerFactoryMock { get; } = new();
-        public Mock<ITransientExceptionHandler<string, ReportScheduledValue>> ReportScheduledTransientHandlerMock { get; } = new();
-        public Mock<IDeadLetterExceptionHandler<string, ReportScheduledValue>> ReportScheduledDeadLetterHandlerMock { get; } = new();
+
+        public Mock<ITransientExceptionHandler<ReportScheduledListener, string, ReportScheduledValue>> ReportScheduledTransientHandlerMock { get; } = new();
+        public Mock<IDeadLetterExceptionHandler<ReportScheduledListener, string, ReportScheduledValue>> ReportScheduledDeadLetterHandlerMock { get; } = new();
 
         public Mock<IKafkaConsumerFactory<string, PatientListMessage>> PatientListsAcquiredConsumerFactoryMock { get; } = new();
-        public Mock<ITransientExceptionHandler<string, PatientListMessage>> PatientListsAcquiredTransientHandlerMock { get; } = new();
-        public Mock<IDeadLetterExceptionHandler<string, PatientListMessage>> PatientListsAcquiredDeadLetterHandlerMock { get; } = new();
+        public Mock<ITransientExceptionHandler<PatientListsAcquiredListener, string, PatientListMessage>> PatientListsAcquiredTransientHandlerMock { get; } = new();
+        public Mock<IDeadLetterExceptionHandler<PatientListsAcquiredListener, string, PatientListMessage>> PatientListsAcquiredDeadLetterHandlerMock { get; } = new();
 
         public Mock<IKafkaConsumerFactory<Null, MeasureReportGeneratedValue>> MeasureReportGeneratedConsumerFactoryMock { get; } = new();
-        public Mock<ITransientExceptionHandler<Null, MeasureReportGeneratedValue>> MeasureReportGeneratedTransientHandlerMock { get; } = new();
-        public Mock<IDeadLetterExceptionHandler<Null, MeasureReportGeneratedValue>> MeasureReportGeneratedDeadLetterHandlerMock { get; } = new();
+        public Mock<ITransientExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue>> MeasureReportGeneratedTransientHandlerMock { get; } = new();
+        public Mock<IDeadLetterExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue>> MeasureReportGeneratedDeadLetterHandlerMock { get; } = new();
 
         public Mock<IKafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>> PayloadSubmittedConsumerFactoryMock { get; } = new();
-        public Mock<ITransientExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue>> PayloadSubmittedTransientHandlerMock { get; } = new();
-        public Mock<IDeadLetterExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue>> PayloadSubmittedDeadLetterHandlerMock { get; } = new();
+        public Mock<ITransientExceptionHandler<PayloadSubmittedListener, PayloadSubmittedKey, PayloadSubmittedValue>> PayloadSubmittedTransientHandlerMock { get; } = new();
+        public Mock<IDeadLetterExceptionHandler<PayloadSubmittedListener, PayloadSubmittedKey, PayloadSubmittedValue>> PayloadSubmittedDeadLetterHandlerMock { get; } = new();
 
         public Mock<IKafkaConsumerFactory<string, ValidationCompleteValue>> ValidationCompleteConsumerFactoryMock { get; } = new();
-        public Mock<ITransientExceptionHandler<string, ValidationCompleteValue>> ValidationCompleteTransientHandlerMock { get; } = new();
-        public Mock<IDeadLetterExceptionHandler<string, ValidationCompleteValue>> ValidationCompleteDeadLetterHandlerMock { get; } = new();
+        public Mock<ITransientExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue>> ValidationCompleteTransientHandlerMock { get; } = new();
+        public Mock<IDeadLetterExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue>> ValidationCompleteDeadLetterHandlerMock { get; } = new();
 
         public Mock<ICreateSystemToken> CreateSystemTokenMock { get; } = new();
         public Mock<IProducer<string, EvaluationRequestedValue>> EvaluationRequestedProducerMock { get; } = new();
         public Mock<IKafkaConsumerFactory<string, GenerateReportValue>> GenerateReportConsumerFactoryMock { get; } = new();
-        public Mock<ITransientExceptionHandler<string, GenerateReportValue>> GenerateReportTransientHandlerMock { get; } = new();
-        public Mock<IDeadLetterExceptionHandler<string, GenerateReportValue>> GenerateReportDeadLetterHandlerMock { get; } = new();
+        public Mock<ITransientExceptionHandler<GenerateReportListener, string, GenerateReportValue>> GenerateReportTransientHandlerMock { get; } = new();
+        public Mock<IDeadLetterExceptionHandler<GenerateReportListener, string, GenerateReportValue>> GenerateReportDeadLetterHandlerMock { get; } = new();
 
-        public string MongoConnectionString => _mongoContainer.GetConnectionString() + "&replicaSet=rs0";
         public string AzuriteConnectionString => _azuriteContainer.GetConnectionString();
 
         public async Task InitializeAsync()
         {
-            await Task.WhenAll(_mongoContainer.StartAsync(), _azuriteContainer.StartAsync());
+            await _azuriteContainer.StartAsync();
 
             var builder = Host.CreateApplicationBuilder();
 
             builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Mongo:ConnectionString"] = MongoConnectionString,
-                ["Mongo:DatabaseName"] = "report_integration_test",
                 ["BlobStorage:ConnectionString"] = AzuriteConnectionString,
                 ["BlobStorage:BlobContainerName"] = "report-test-container",
                 ["BlobStorage:BlobRoot"] = "test-root",
@@ -112,35 +101,25 @@ namespace IntegrationTests.Report
                 ["ServiceRegistry:CensusServiceApiUrl"] = "http://localhost:8080"
             });
 
-            builder.Services.Configure<MongoConnection>(builder.Configuration.GetSection("Mongo"));
             builder.Services.Configure<BlobStorageSettings>(builder.Configuration.GetSection("BlobStorage"));
 
-            builder.Services.AddSingleton<IMongoClient>(sp => new MongoClient(MongoConnectionString));
-            builder.Services.AddSingleton<IMongoDatabase>(sp => sp.GetRequiredService<IMongoClient>().GetDatabase("report_integration_test"));
-
-            builder.Services.AddDbContext<MongoDbContext>((sp, options) =>
-            {
-                var client = sp.GetRequiredService<IMongoClient>();
-                options.UseMongoDB(client, "report_integration_test");
-            });
+            var _dbPath = Path.Combine(Path.GetTempPath(), $"testdb_{Guid.NewGuid()}.db");
+            builder.Services.AddDbContext<ReportDbContext>(options => options.UseSqlite($"Data Source={_dbPath};"));
 
             builder.Services.AddSingleton<IQuartzJobHelper>(QuartzJobHelperMock.Object);
 
-            builder.Services.AddTransient<IEntityRepository<ReportSchedule>, EntityRepository<ReportSchedule, MongoDbContext>>();
-            builder.Services.AddTransient<IEntityRepository<ReportEntry>, EntityRepository<ReportEntry, MongoDbContext>>();
-            builder.Services.AddTransient<IEntityRepository<ReportPopulation>, EntityRepository<ReportPopulation, MongoDbContext>>();
-            builder.Services.AddTransient<IEntityRepository<ReportResource>, EntityRepository<ReportResource, MongoDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<ReportSchedule>, EntityRepository<ReportSchedule, ReportDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<ReportEntry>, EntityRepository<ReportEntry, ReportDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<ReportPopulation>, EntityRepository<ReportPopulation, ReportDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<ReportResource>, EntityRepository<ReportResource, ReportDbContext>>();
 
-            builder.Services.AddTransient<IDatabase, Database>();
-            builder.Services.AddTransient<IReportScheduledManager, ReportScheduledManager>();
-            builder.Services.AddTransient<IReportEntryManager, ReportEntryManager>();
-            builder.Services.AddTransient<IReportPopulationManager, ReportPopulationManager>();
-            builder.Services.AddTransient<IReportResourceManager, ReportResourceManager>();
+            builder.Services.AddScoped<IDatabase, Database>();
+            builder.Services.AddScoped<IReportScheduledManager, ReportScheduledManager>();
+            builder.Services.AddScoped<IReportEntryManager, ReportEntryManager>();
+            builder.Services.AddScoped<IReportPopulationManager, ReportPopulationManager>();
+            builder.Services.AddScoped<IReportResourceManager, ReportResourceManager>();
 
             builder.Services.AddTransient<IReportServiceMetrics, ReportServiceMetrics>();
-
-            builder.Services.AddTransient<ScheduledReportFactory>();
-            builder.Services.AddTransient<MeasureReportSummaryFactory>();
 
             builder.Services.AddTransient<PatientAggregator>();
             builder.Services.AddTransient<MeasureReportAggregator>();
@@ -158,6 +137,7 @@ namespace IntegrationTests.Report
                 ServiceConfigName = "ReportIntegrationTest",
                 Version = "1.0.0-test"
             };
+
             builder.Services.AddSingleton(serviceInformation);
 
             builder.Services.AddTransient<SubmitPayloadProducer>(sp =>
@@ -181,33 +161,32 @@ namespace IntegrationTests.Report
                     sp.GetRequiredService<BlobStorageService>(),
                     sp.GetRequiredService<SubmitPayloadProducer>(),
                     sp.GetRequiredService<AuditableEventOccurredProducer>()));
-
+            
             builder.Services.AddSingleton<IKafkaConsumerFactory<string, ReportScheduledValue>>(ReportScheduledConsumerFactoryMock.Object);
-            builder.Services.AddSingleton<ITransientExceptionHandler<string, ReportScheduledValue>>(ReportScheduledTransientHandlerMock.Object);
-            builder.Services.AddSingleton<IDeadLetterExceptionHandler<string, ReportScheduledValue>>(ReportScheduledDeadLetterHandlerMock.Object);
+            builder.Services.AddSingleton<ITransientExceptionHandler<ReportScheduledListener, string, ReportScheduledValue>>(ReportScheduledTransientHandlerMock.Object);
+            builder.Services.AddSingleton<IDeadLetterExceptionHandler<ReportScheduledListener, string, ReportScheduledValue>>(ReportScheduledDeadLetterHandlerMock.Object);
 
             builder.Services.AddSingleton<IKafkaConsumerFactory<string, PatientListMessage>>(PatientListsAcquiredConsumerFactoryMock.Object);
-            builder.Services.AddSingleton<ITransientExceptionHandler<string, PatientListMessage>>(PatientListsAcquiredTransientHandlerMock.Object);
-            builder.Services.AddSingleton<IDeadLetterExceptionHandler<string, PatientListMessage>>(PatientListsAcquiredDeadLetterHandlerMock.Object);
+            builder.Services.AddSingleton<ITransientExceptionHandler<PatientListsAcquiredListener, string, PatientListMessage>>(PatientListsAcquiredTransientHandlerMock.Object);
+            builder.Services.AddSingleton<IDeadLetterExceptionHandler<PatientListsAcquiredListener, string, PatientListMessage>>(PatientListsAcquiredDeadLetterHandlerMock.Object);
 
             builder.Services.AddSingleton<IKafkaConsumerFactory<Null, MeasureReportGeneratedValue>>(MeasureReportGeneratedConsumerFactoryMock.Object);
-            builder.Services.AddSingleton<ITransientExceptionHandler<Null, MeasureReportGeneratedValue>>(MeasureReportGeneratedTransientHandlerMock.Object);
-            builder.Services.AddSingleton<IDeadLetterExceptionHandler<Null, MeasureReportGeneratedValue>>(MeasureReportGeneratedDeadLetterHandlerMock.Object);
-
+            builder.Services.AddSingleton<ITransientExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue>>(MeasureReportGeneratedTransientHandlerMock.Object);
+            builder.Services.AddSingleton<IDeadLetterExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue>>(MeasureReportGeneratedDeadLetterHandlerMock.Object);
             builder.Services.AddSingleton<ICreateSystemToken>(CreateSystemTokenMock.Object);
             builder.Services.AddSingleton<IProducer<string, EvaluationRequestedValue>>(EvaluationRequestedProducerMock.Object);
 
             builder.Services.AddSingleton<IKafkaConsumerFactory<string, GenerateReportValue>>(GenerateReportConsumerFactoryMock.Object);
-            builder.Services.AddSingleton<ITransientExceptionHandler<string, GenerateReportValue>>(GenerateReportTransientHandlerMock.Object);
-            builder.Services.AddSingleton<IDeadLetterExceptionHandler<string, GenerateReportValue>>(GenerateReportDeadLetterHandlerMock.Object);
+            builder.Services.AddSingleton<ITransientExceptionHandler<PayloadSubmittedListener, PayloadSubmittedKey, PayloadSubmittedValue>>(PayloadSubmittedTransientHandlerMock.Object);
+            builder.Services.AddSingleton<IDeadLetterExceptionHandler<PayloadSubmittedListener, PayloadSubmittedKey, PayloadSubmittedValue>>(PayloadSubmittedDeadLetterHandlerMock.Object);
 
             builder.Services.AddSingleton<IKafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>(PayloadSubmittedConsumerFactoryMock.Object);
-            builder.Services.AddSingleton<ITransientExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue>>(PayloadSubmittedTransientHandlerMock.Object);
-            builder.Services.AddSingleton<IDeadLetterExceptionHandler<PayloadSubmittedKey, PayloadSubmittedValue>>(PayloadSubmittedDeadLetterHandlerMock.Object);
+            builder.Services.AddSingleton<ITransientExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue>>(ValidationCompleteTransientHandlerMock.Object);
+            builder.Services.AddSingleton<IDeadLetterExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue>>(ValidationCompleteDeadLetterHandlerMock.Object);
 
             builder.Services.AddSingleton<IKafkaConsumerFactory<string, ValidationCompleteValue>>(ValidationCompleteConsumerFactoryMock.Object);
-            builder.Services.AddSingleton<ITransientExceptionHandler<string, ValidationCompleteValue>>(ValidationCompleteTransientHandlerMock.Object);
-            builder.Services.AddSingleton<IDeadLetterExceptionHandler<string, ValidationCompleteValue>>(ValidationCompleteDeadLetterHandlerMock.Object);
+            builder.Services.AddSingleton<ITransientExceptionHandler<GenerateReportListener, string, GenerateReportValue>>(GenerateReportTransientHandlerMock.Object);
+            builder.Services.AddSingleton<IDeadLetterExceptionHandler<GenerateReportListener, string, GenerateReportValue>>(GenerateReportDeadLetterHandlerMock.Object);
 
             builder.Services.AddTransient<PatientListsAcquiredListener>();
             builder.Services.AddTransient<ReportScheduledListener>();
@@ -232,6 +211,10 @@ namespace IntegrationTests.Report
             var blobServiceClient = new BlobServiceClient(blobConnectionString);
             var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
             await containerClient.CreateIfNotExistsAsync();
+
+            using var scope = ServiceProvider.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+            dbContext.Database.EnsureCreated();
         }
 
         public async Task DisposeAsync()
@@ -241,7 +224,6 @@ namespace IntegrationTests.Report
                 await _host.StopAsync();
                 _host.Dispose();
             }
-            await _mongoContainer.DisposeAsync();
             await _azuriteContainer.DisposeAsync();
         }
 

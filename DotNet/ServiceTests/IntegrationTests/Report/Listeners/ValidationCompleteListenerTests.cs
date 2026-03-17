@@ -1,11 +1,10 @@
 ﻿using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
 using Confluent.Kafka;
-using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Listeners;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -13,7 +12,6 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using System.Text;
-using Xunit;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report
@@ -48,17 +46,17 @@ namespace IntegrationTests.Report
             var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
 
             var facilityId = "test-facility-validation";
-            var reportId = Guid.NewGuid().ToString();
+            var reportId = Guid.NewGuid();
             var patientId = "pat-001";
 
-            var schedule = new ReportSchedule
+            var schedule = new ReportScheduleModel
             {
                 Id = reportId,
                 FacilityId = facilityId,
                 ReportStartDate = DateTime.UtcNow.AddDays(-30),
                 ReportEndDate = DateTime.UtcNow.AddDays(30),
                 Frequency = Frequency.Monthly,
-                ReportTypes = new List<string> { "DE-111" },
+                ReportTypes = { "DE-111" },
                 Status = ScheduleStatus.Scheduled,
                 CreateDate = DateTime.UtcNow
             };
@@ -68,7 +66,7 @@ namespace IntegrationTests.Report
             {
                 PatientId = patientId,
                 IsValid = true,
-                ReportTrackingId = reportId
+                ReportTrackingId = reportId.ToString()
             };
 
             var consumeResult = new ConsumeResult<string, ValidationCompleteValue>
@@ -94,14 +92,14 @@ namespace IntegrationTests.Report
             var listener = scope.ServiceProvider.GetRequiredService<ValidationCompleteListener>();
 
             var facilityId = "test-facility-validation";
-            var reportId = Guid.NewGuid().ToString();
+            var reportId = Guid.NewGuid();
             var patientId = "pat-001";
 
             var value = new ValidationCompleteValue
             {
                 PatientId = patientId,
                 IsValid = true,
-                ReportTrackingId = reportId
+                ReportTrackingId = reportId.ToString()
             };
 
             var headers = new Headers { { "X-Correlation-Id", Encoding.UTF8.GetBytes("corr-123") } };
@@ -130,17 +128,17 @@ namespace IntegrationTests.Report
             var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
 
             var facilityId = "test-facility-validation";
-            var reportId = Guid.NewGuid().ToString();
+            var reportId = Guid.NewGuid();
             var patientId = "pat-001";
 
-            var schedule = new ReportSchedule
+            var schedule = new ReportScheduleModel
             {
                 Id = reportId,
                 FacilityId = facilityId,
                 ReportStartDate = DateTime.UtcNow.AddDays(-30),
                 ReportEndDate = DateTime.UtcNow.AddDays(30),
                 Frequency = Frequency.Monthly,
-                ReportTypes = new List<string> { "DE-111" },
+                ReportTypes = { "DE-111" },
                 Status = ScheduleStatus.Scheduled,
                 CreateDate = DateTime.UtcNow
             };
@@ -150,7 +148,7 @@ namespace IntegrationTests.Report
             {
                 PatientId = patientId,
                 IsValid = true,
-                ReportTrackingId = reportId
+                ReportTrackingId = reportId.ToString()
             };
 
             var headers = new Headers { { "X-Correlation-Id", Encoding.UTF8.GetBytes("corr-123") } };
@@ -182,23 +180,23 @@ namespace IntegrationTests.Report
             var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
 
             var facilityId = "test-facility-validation";
-            var reportId = Guid.NewGuid().ToString();
+            var reportId = Guid.NewGuid();
             var patientId = "pat-001";
 
-            var schedule = new ReportSchedule
+            var schedule = new ReportScheduleModel
             {
                 Id = reportId,
                 FacilityId = facilityId,
                 ReportStartDate = DateTime.UtcNow.AddDays(-30),
                 ReportEndDate = DateTime.UtcNow.AddDays(30),
                 Frequency = Frequency.Monthly,
-                ReportTypes = new List<string> { "DE-111" },
+                ReportTypes = { "DE-111" },
                 Status = ScheduleStatus.Scheduled,
                 CreateDate = DateTime.UtcNow
             };
             await reportScheduledManager.AddAsync(schedule, CancellationToken.None);
 
-            var entry = new ReportEntry
+            var entry = new ReportEntryModel
             {
                 PatientId = patientId,
                 ReportScheduleId = reportId,
@@ -215,7 +213,7 @@ namespace IntegrationTests.Report
             {
                 PatientId = patientId,
                 IsValid = true,
-                ReportTrackingId = reportId
+                ReportTrackingId = reportId.ToString()
             };
 
             var headers = new Headers { { "X-Correlation-Id", Encoding.UTF8.GetBytes("corr-123") } };
@@ -260,23 +258,23 @@ namespace IntegrationTests.Report
             var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
 
             var facilityId = "test-facility-validation";
-            var reportId = Guid.NewGuid().ToString();
+            var reportId = Guid.NewGuid();
             var patientId = "pat-001";
 
-            var schedule = new ReportSchedule
+            var schedule = new ReportScheduleModel
             {
                 Id = reportId,
                 FacilityId = facilityId,
                 ReportStartDate = DateTime.UtcNow.AddDays(-30),
                 ReportEndDate = DateTime.UtcNow.AddDays(30),
                 Frequency = Frequency.Monthly,
-                ReportTypes = new List<string> { "DE-111" },
+                ReportTypes = { "DE-111" },
                 Status = ScheduleStatus.Scheduled,
                 CreateDate = DateTime.UtcNow
             };
             await reportScheduledManager.AddAsync(schedule, CancellationToken.None);
 
-            var entry = new ReportEntry
+            var entry = new ReportEntryModel
             {
                 PatientId = patientId,
                 ReportScheduleId = reportId,
@@ -295,7 +293,7 @@ namespace IntegrationTests.Report
             {
                 PatientId = patientId,
                 IsValid = false,
-                ReportTrackingId = reportId
+                ReportTrackingId = reportId.ToString()
             };
 
             var headers = new Headers { { "X-Correlation-Id", Encoding.UTF8.GetBytes("corr-123") } };

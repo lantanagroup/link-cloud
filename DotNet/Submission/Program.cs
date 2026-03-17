@@ -193,12 +193,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton(auditableEventOccurredProducer);
 
     #region Exception Handling
-    //Report Scheduled Listener
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<SubmitPayloadKey, SubmitPayloadValue>, DeadLetterExceptionHandler<SubmitPayloadKey, SubmitPayloadValue>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<SubmitPayloadKey, SubmitPayloadValue>, TransientExceptionHandler<SubmitPayloadKey, SubmitPayloadValue>>();
-
-    //Retry Listener
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
+    builder.Services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
+    builder.Services.AddSingleton(typeof(ITransientExceptionHandler<,,>), typeof(TransientExceptionHandler<,,>));
+    builder.Services.AddSingleton(typeof(IDeadLetterExceptionHandler<,,>), typeof(DeadLetterExceptionHandler<,,>));
     #endregion
 
     // Logging using Serilog

@@ -25,7 +25,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly IOptions<ConsumerSettings> _consumerSettings;
         private readonly IRetryModelFactory _retryEntityFactory;
-        private readonly IDeadLetterExceptionHandler<string, string> _deadLetterExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<RetryListener, string, string> _deadLetterExceptionHandler;
         private readonly RetryListenerSettings _retryListenerSettings;
         private readonly ServiceInformation _serviceInformation;
         private readonly IServiceScopeFactory _serviceScopeFactory;
@@ -35,7 +35,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
             ISchedulerFactory schedulerFactory,
             IOptions<ConsumerSettings> consumerSettings,
             IRetryModelFactory retryEntityFactory,
-            IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler,
+            IDeadLetterExceptionHandler<RetryListener, string, string> deadLetterExceptionHandler,
             RetryListenerSettings retryListenerSettings,
             ServiceInformation serviceInformation,
             IServiceScopeFactory serviceScopeFactory)

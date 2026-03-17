@@ -1,6 +1,4 @@
-﻿using MongoDB.Bson.Serialization.Attributes;
-
-namespace LantanaGroup.Link.Shared.Application.Models
+﻿namespace LantanaGroup.Link.Shared.Application.Models
 {
     public class RetryModel
     {

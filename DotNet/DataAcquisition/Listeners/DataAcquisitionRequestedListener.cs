@@ -10,7 +10,6 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using Microsoft.Extensions.Options;
 using System.Text;
 using System.Text.Json;
 
@@ -22,9 +21,9 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
 
     public DataAcquisitionRequestedListener(ILogger<BaseListener<DataAcquisitionRequested, string, DataAcquisitionRequested, string, ResourceAcquired>> logger,
         IKafkaConsumerFactory<string, DataAcquisitionRequested> kafkaConsumerFactory,
-        ITransientExceptionHandler<string, DataAcquisitionRequested> transientExceptionHandler,
-        IDeadLetterExceptionHandler<string, DataAcquisitionRequested> deadLetterExceptionHandler,
-        IDeadLetterExceptionHandler<string, string> deadLetterConsumerErrorHandler,
+        ITransientExceptionHandler<DataAcquisitionRequested, string, DataAcquisitionRequested> transientExceptionHandler,
+        IDeadLetterExceptionHandler<DataAcquisitionRequested, string, DataAcquisitionRequested> deadLetterExceptionHandler,
+        IDeadLetterExceptionHandler<DataAcquisitionRequested, string, string> deadLetterConsumerErrorHandler,
         IServiceScopeFactory serviceScopeFactory,
         ServiceInformation serviceInformation) : base(logger, kafkaConsumerFactory, deadLetterExceptionHandler, deadLetterConsumerErrorHandler, transientExceptionHandler, serviceInformation)
     {

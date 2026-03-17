@@ -1,6 +1,7 @@
-﻿using LantanaGroup.Link.Report.Domain;
+﻿using LantanaGroup.Link.Report.Data;
+using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
@@ -35,9 +36,15 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<ReportPopulation>> GetById(string id)
         {
+            if (string.IsNullOrWhiteSpace(id))
+                return BadRequest("Id is required.");
+
+            if (!Guid.TryParse(id, out Guid parsedId))
+                return BadRequest("Invalid ID format");
+
             try
             {
-                var reportPopulation = (await _reportPopulationManager.FindAsync(x => x.Id == id)).FirstOrDefault();
+                var reportPopulation = (await _reportPopulationManager.FindAsync(x => x.Id == parsedId)).FirstOrDefault();
 
                 if (reportPopulation == null)
                 {
@@ -65,17 +72,23 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<List<ReportPopulation>>> GetByReportScheduleId(string reportScheduleId, string? reportType)
         {
+            if (string.IsNullOrWhiteSpace(reportScheduleId))
+                return BadRequest("ReportScheduleId is required.");
+
+            if (!Guid.TryParse(reportScheduleId, out Guid parsedId))
+                return BadRequest("Invalid ReportScheduleId format");
+
             try
             {
-                List<ReportPopulation>? reportPopulation = null;
+                List<ReportPopulationModel>? reportPopulation = null;
 
                 if (reportType == null)
                 {
-                    reportPopulation = (await _reportPopulationManager.FindAsync(x => x.ReportScheduleId == reportScheduleId));
+                    reportPopulation = (await _reportPopulationManager.FindAsync(x => x.ReportScheduleId == parsedId));
                 }
-                else 
+                else
                 {
-                    reportPopulation = (await _reportPopulationManager.FindAsync(x => x.ReportScheduleId == reportScheduleId && x.ReportType == reportType));
+                    reportPopulation = (await _reportPopulationManager.FindAsync(x => x.ReportScheduleId == parsedId && x.ReportType == reportType));
                 }
 
                 if (reportPopulation == null)
@@ -103,9 +116,15 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<int>> GetInitialPopulationCount(string reportScheduleId, CancellationToken cancellationToken)
         {
+            if (string.IsNullOrWhiteSpace(reportScheduleId))
+                return BadRequest("ReportScheduleId is required.");
+
+            if (!Guid.TryParse(reportScheduleId, out Guid parsedId))
+                return BadRequest("Invalid ReportScheduleId format");
+
             try
             {
-                var count = await _reportPopulationManager.CountNumberOfMeasureReportPopulationsInIP(reportScheduleId, cancellationToken);
+                var count = await _reportPopulationManager.CountNumberOfMeasureReportPopulationsInIP(parsedId, cancellationToken);
 
                 return Ok(count);
             }

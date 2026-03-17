@@ -1,6 +1,6 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Text;
 
@@ -21,7 +21,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public class ProduceValidationModel
         {
-            public required string ReportScheduleId { get; set; }
+            public required Guid ReportScheduleId { get; set; }
             public required List<string> ReportTypes { get; set; }
             public required string FacilityId { get; set; }
             public required string PatientId { get; set; }
@@ -36,7 +36,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             }
         }
 
-        public async Task Produce(string scheduleId, List<string> reportTypes, string facilityId, string patientId, string? payloadUri, string correlationId)
+        public async Task Produce(Guid scheduleId, List<string> reportTypes, string facilityId, string patientId, string? payloadUri, string correlationId)
         {
             _logger.LogDebug("Producing ReadyForValidation (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", facilityId, patientId, scheduleId);
 
@@ -52,7 +52,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     {
                         PatientId = patientId,
                         ReportTypes = reportTypes,
-                        ReportTrackingId = scheduleId,
+                        ReportTrackingId = scheduleId.ToString(),
                         PayloadUri = payloadUri
                     },
                     Headers = new Headers
@@ -74,7 +74,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             entry.ReportingStatus = Domain.Enums.ReportingStatus.PendingValidation;
             entry.SubmissionStatus = Domain.Enums.SubmissionStatus.PendingValidation;
             
-            await reportEntryManager.UpdateAsync(entry);
+            await reportEntryManager.UpdateAsync(entry, CancellationToken.None);
         }
     }
 }

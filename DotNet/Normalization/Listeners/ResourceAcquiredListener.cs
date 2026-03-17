@@ -29,9 +29,9 @@ public class ResourceAcquiredListener : BackgroundService
     private readonly ILogger<ResourceAcquiredListener> _logger;
     private readonly IKafkaConsumerFactory<ResourceKey, ResourceAcquiredMessage> _consumerFactory;
     private readonly IProducer<ResourceKey, ResourceNormalizedMessage> _producer;
-    private readonly IDeadLetterExceptionHandler<ResourceKey, string> _consumeExceptionHandler;
-    private readonly IDeadLetterExceptionHandler<ResourceKey, ResourceAcquiredMessage> _deadLetterExceptionHandler;
-    private readonly ITransientExceptionHandler<ResourceKey, ResourceAcquiredMessage> _transientExceptionHandler;
+    private readonly IDeadLetterExceptionHandler<ResourceAcquiredListener, ResourceKey, string> _consumeExceptionHandler;
+    private readonly IDeadLetterExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage> _deadLetterExceptionHandler;
+    private readonly ITransientExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage> _transientExceptionHandler;
     private bool _cancelled = false;
     private readonly INormalizationServiceMetrics _metrics;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -47,9 +47,9 @@ public class ResourceAcquiredListener : BackgroundService
         ServiceInformation serviceInformation,
         IServiceScopeFactory scopeFactory,
         IKafkaConsumerFactory<ResourceKey, ResourceAcquiredMessage> consumerFactory,
-        IDeadLetterExceptionHandler<ResourceKey, string> consumeExceptionHandler,
-        IDeadLetterExceptionHandler<ResourceKey, ResourceAcquiredMessage> deadLetterExceptionHandler,
-        ITransientExceptionHandler<ResourceKey, ResourceAcquiredMessage> transientExceptionHandler,
+        IDeadLetterExceptionHandler<ResourceAcquiredListener, ResourceKey, string> consumeExceptionHandler,
+        IDeadLetterExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage> deadLetterExceptionHandler,
+        ITransientExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage> transientExceptionHandler,
         INormalizationServiceMetrics metrics,
         IProducer<ResourceKey, ResourceNormalizedMessage> producer,
         CopyPropertyOperationService copyPropertyOperationService,

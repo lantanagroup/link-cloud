@@ -1,17 +1,14 @@
 ﻿using Confluent.Kafka;
-using Confluent.Kafka.Extensions.Diagnostics;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using LantanaGroup.Link.Audit.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using OpenTelemetry.Trace;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using System.Diagnostics;
 using System.Text;
-using LantanaGroup.Link.Audit.Application.Interfaces;
-using static Confluent.Kafka.ConfigPropertyNames;
 
 namespace LantanaGroup.Link.Audit.Listeners
 {
@@ -20,12 +17,12 @@ namespace LantanaGroup.Link.Audit.Listeners
         private readonly ILogger<AuditEventListener> _logger;
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly IKafkaConsumerFactory<string, AuditEventMessage> _kafkaConsumerFactory;
-        private readonly IDeadLetterExceptionHandler<string, AuditEventMessage> _deadLetterExceptionHandler;
-        private readonly ITransientExceptionHandler<string, AuditEventMessage> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<AuditEventListener, string, AuditEventMessage> _deadLetterExceptionHandler;
+        private readonly ITransientExceptionHandler<AuditEventListener, string, AuditEventMessage> _transientExceptionHandler;
 
         public AuditEventListener(ILogger<AuditEventListener> logger, IServiceScopeFactory scopeFactory, IKafkaConsumerFactory<string, 
-            AuditEventMessage> kafkaConsumerFactory, IDeadLetterExceptionHandler<string, AuditEventMessage> deadLetterExceptionHandler, 
-            ITransientExceptionHandler<string, AuditEventMessage> transientExceptionHandler)
+            AuditEventMessage> kafkaConsumerFactory, IDeadLetterExceptionHandler<AuditEventListener, string, AuditEventMessage> deadLetterExceptionHandler, 
+            ITransientExceptionHandler<AuditEventListener, string, AuditEventMessage> transientExceptionHandler)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
