@@ -82,11 +82,9 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         {
             foreach (var measureReport in aggregateResult.MeasureReportResults)
             {
-                List<ReportResourceModel> models = new();
-
                 foreach (var resource in measureReport.ResourceReferences)
                 {
-                    models.Add(new ReportResourceModel
+                    var resModel = new ReportResourceModel
                     {
                         Id = Guid.NewGuid(),
                         ReportScheduleId = reportId,
@@ -96,10 +94,10 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                         ResourceType = resource[0],
                         ResourceId = resource[1],
                         CreateDate = DateTime.UtcNow
-                    });
-                }
+                    };
 
-                await AddAsync(models[0], cancellationToken); // reuse AddAsync
+                    await AddAsync(resModel, cancellationToken);
+                }
             }
         }
 
