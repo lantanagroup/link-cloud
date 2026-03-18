@@ -20,14 +20,14 @@ namespace LantanaGroup.Link.Census.Listeners
     {
         private readonly IKafkaConsumerFactory<string, CernerPatientsAcquired> _kafkaConsumerFactory;
         private readonly ILogger<PatientListsAcquiredListener> _logger;
-        private readonly IDeadLetterExceptionHandler<string, CernerPatientsAcquired> _deadLetterExceptionHandler;
-        private readonly ITransientExceptionHandler<string, CernerPatientsAcquired> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<CernerPatientsAcquiredListener, string, CernerPatientsAcquired> _deadLetterExceptionHandler;
+        private readonly ITransientExceptionHandler<CernerPatientsAcquiredListener, string, CernerPatientsAcquired> _transientExceptionHandler;
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly IEventProducerService<PatientEvent> _eventProducerService;
 
         private string ClassName => this.GetType().Name;
 
-        public CernerPatientsAcquiredListener(IKafkaConsumerFactory<string, CernerPatientsAcquired> kafkaConsumerFactory, ILogger<PatientListsAcquiredListener> logger, IDeadLetterExceptionHandler<string, CernerPatientsAcquired> deadLetterExceptionHandler, ITransientExceptionHandler<string, CernerPatientsAcquired> transientExceptionHandler, IServiceScopeFactory scopeFactory, IEventProducerService<PatientEvent> eventProducerService)
+        public CernerPatientsAcquiredListener(IKafkaConsumerFactory<string, CernerPatientsAcquired> kafkaConsumerFactory, ILogger<PatientListsAcquiredListener> logger, IDeadLetterExceptionHandler<CernerPatientsAcquiredListener, string, CernerPatientsAcquired> deadLetterExceptionHandler, ITransientExceptionHandler<CernerPatientsAcquiredListener, string, CernerPatientsAcquired> transientExceptionHandler, IServiceScopeFactory scopeFactory, IEventProducerService<PatientEvent> eventProducerService)
         {
             _kafkaConsumerFactory = kafkaConsumerFactory;
             _logger = logger;
