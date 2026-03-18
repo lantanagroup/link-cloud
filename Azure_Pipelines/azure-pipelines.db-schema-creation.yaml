@@ -286,12 +286,12 @@ stages:
       - script: |
           cd DotNet/Report
           mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
-          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c ReportDbContext -s $(build.sourcesdirectory)/DotNet/Report/Report.csproj -p $(build.sourcesdirectory)/DotNet/Report/Report.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/ReportDb.sql
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c ReportDbContext -s $(build.sourcesdirectory)/DotNet/Report/Report.csproj -p $(build.sourcesdirectory)/DotNet/Report/Report.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/reportDb.sql
         displayName: Generate Report SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
-         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/ReportDb.sql'
-         ArtifactName: 'Report-db'
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/reportDb.sql'
+         ArtifactName: 'report-db'
          publishLocation: 'container'
         displayName: Publish Query Dispatch SQL Script  
   ###
