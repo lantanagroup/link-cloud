@@ -203,7 +203,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 .Take(pageSize)
                 .ToListAsync(cancellationToken);
 
-            var metadata = new PaginationMetadata(totalCount, pageSize, pageNumber);
+            var metadata = new PaginationMetadata(pageSize, pageNumber, totalCount);
 
             return new PagedConfigModel<ReportResourceModel>(results, metadata);
         }
