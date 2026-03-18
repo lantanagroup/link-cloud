@@ -404,7 +404,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     .AnyAsync(s => s.Id == reportScheduleId && s.IsDeleted != true, cancellationToken);
 
                 if (!scheduleIsActive)
-                    return new PagedConfigModel<ReportEntryModel>(new List<ReportEntryModel>(), new PaginationMetadata(0, pageSize, pageNumber));
+                    return new PagedConfigModel<ReportEntryModel>(new List<ReportEntryModel>(), new PaginationMetadata(pageSize, pageNumber, 0));
 
                 predicate = predicate.And(q => q.ReportScheduleId == reportScheduleId);
             }
@@ -444,9 +444,21 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 predicate = predicate.And(q => q.MeasureReports.Any(a => a.ReportType == reportType));
             }
 
-            var query = _dbContext.ReportEntry
-                .Where(predicate)
-                .Select(e => new ReportEntryProjection(
+            
+            IQueryable<ReportEntry> entityQuery = _dbContext.ReportEntry.Where(predicate);
+
+            if (!string.IsNullOrWhiteSpace(sortBy))
+            {
+                entityQuery = sortOrder == SortOrder.Descending
+                    ? entityQuery.OrderByDescending(x => EF.Property<object>(x, sortBy))
+                    : entityQuery.OrderBy(x => EF.Property<object>(x, sortBy));
+            }
+            else
+            {
+                entityQuery = entityQuery.OrderByDescending(x => x.CreateDate);
+            }
+
+            var query = entityQuery.Select(e => new ReportEntryProjection(
                     e.Id,
                     e.CreateDate,
                     e.ModifyDate,
@@ -467,17 +479,6 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                         m.ResourceCounts.Select(rc => new ResourceCountProjection(rc.ResourceType, rc.ResourceCount)).ToList()
                     )).ToList()
                 ));
-
-            if (!string.IsNullOrWhiteSpace(sortBy))
-            {
-                query = sortOrder == SortOrder.Descending
-                    ? query.OrderByDescending(x => EF.Property<object>(x, sortBy))
-                    : query.OrderBy(x => EF.Property<object>(x, sortBy));
-            }
-            else
-            {
-                query = query.OrderByDescending(x => x.CreateDate);
-            }
 
             var projList = await query
                 .Skip((pageNumber - 1) * pageSize)
