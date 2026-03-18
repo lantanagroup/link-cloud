@@ -124,14 +124,14 @@ public static class GetReportSummaries
 
     private static async Task PopulateSummaryCounts(HttpContext context, ReportService reportService, ScheduledReportListSummary summary)
     {
-        var patientInCensusCountResponse = await reportService.GetPatientInCensusCount(context.User, context.RequestAborted, summary.Id);
+        var patientInCensusCountResponse = await reportService.GetPatientInCensusCount(context.User, context.RequestAborted, summary.Id.ToString());
         if (patientInCensusCountResponse.IsSuccessStatusCode)
         {
             var content = await patientInCensusCountResponse.Content.ReadAsStringAsync();
             summary.CensusCount = int.Parse(content);
         }
 
-        var populationResponse = await reportService.GetReportPopulationsByReportScheduleId(context.User, context.RequestAborted, summary.Id);
+        var populationResponse = await reportService.GetReportPopulationsByReportScheduleId(context.User, context.RequestAborted, summary.Id.ToString());
         if (populationResponse.IsSuccessStatusCode)
         {
             var content = await populationResponse.Content.ReadAsStringAsync();

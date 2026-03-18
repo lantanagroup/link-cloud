@@ -1,13 +1,14 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using LantanaGroup.Link.Report.Domain;
+using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Jobs;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -22,20 +23,23 @@ namespace LantanaGroup.Link.Report.Listeners
     {
         private readonly ILogger<ReportScheduledListener> _logger;
         private readonly IKafkaConsumerFactory<string, ReportScheduledValue> _kafkaConsumerFactory;
-        private readonly ITransientExceptionHandler<string, ReportScheduledValue> _transientExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<string, ReportScheduledValue> _deadLetterExceptionHandler;
+        private readonly ITransientExceptionHandler<ReportScheduledListener, string, ReportScheduledValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<ReportScheduledListener, string, ReportScheduledValue> _deadLetterExceptionHandler;
         private readonly IQuartzJobHelper _quartzJobHelper;
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ServiceInformation _serviceInformation;
         private readonly BlobStorageService _blobStorageService;
 
+        private readonly IExceptionLogger<ReportScheduledListener> _exceptionLogger;
+
         public ReportScheduledListener(ILogger<ReportScheduledListener> logger, IKafkaConsumerFactory<string, ReportScheduledValue> kafkaConsumerFactory,
             IQuartzJobHelper quartzJobHelper,
-            ITransientExceptionHandler<string, ReportScheduledValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<string, ReportScheduledValue> deadLetterExceptionHandler,
+            ITransientExceptionHandler<ReportScheduledListener, string, ReportScheduledValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<ReportScheduledListener, string, ReportScheduledValue> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory,
             BlobStorageService blobStorageService,
-            ServiceInformation serviceInformation)
+            ServiceInformation serviceInformation,
+            IExceptionLogger<ReportScheduledListener> exceptionLogger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -50,6 +54,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ReportScheduled) + "-Error";
 
             _blobStorageService = blobStorageService;
+            _exceptionLogger = exceptionLogger ?? throw new ArgumentNullException(nameof(exceptionLogger));
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -69,7 +74,7 @@ namespace LantanaGroup.Link.Report.Listeners
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.ReportScheduled));
-                _logger.LogInformation("Started report scheduled consumer for topic '{Topic}' at {StartTime}", nameof(KafkaTopic.ReportScheduled), DateTime.UtcNow);
+                _logger.LogInformation("{Name}: Started consumer for topic '{Topic}' at {StartTime}", nameof(ReportScheduledListener), nameof(KafkaTopic.ReportScheduled), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -85,7 +90,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (ConsumeException ex)
                     {
-                        _logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+                        _exceptionLogger.Handle(ex, "Error consuming message for topics", LogLevel.Error, facilityId, new { Topics = string.Join(", ", consumer.Subscription) });
 
                         if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                         {
@@ -101,14 +106,14 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error encountered in ReportScheduledListener");
+                        _exceptionLogger.Handle(ex, "Error encountered in ReportScheduledListener", LogLevel.Error);
                         consumer.Commit();
                     }
                 }
             }
             catch (OperationCanceledException oce)
             {
-                _logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
+                _exceptionLogger.Handle(oce, "Operation Canceled", LogLevel.Error);
                 consumer.Close();
             }
         }
@@ -120,8 +125,7 @@ namespace LantanaGroup.Link.Report.Listeners
             {
                 if (result == null)
                 {
-                    _logger.LogWarning("ReportScheduled event is null. Commiting and moving on.");
-                    return;
+                    throw new DeadLetterException("ReportScheduled event is null.");
                 }
 
                 var key = result.Message.Key;
@@ -140,30 +144,31 @@ namespace LantanaGroup.Link.Report.Listeners
                 var startDate = value.StartDate.UtcDateTime;
                 var endDate = value.EndDate.UtcDateTime;
                 var frequency = value.Frequency;
-                var reportTypes = value.ReportTypes;
                 var reportId = value.ReportTrackingId;
 
-                ReportSchedule? existing = null;
+                var reportTypes = value.ReportTypes;
 
-                if (!string.IsNullOrEmpty(reportId))
+                ReportScheduleModel? existing = null;
+
+                if (reportId != null)
                 {
                     existing = await reportScheduleManager.SingleOrDefaultAsync(x => x.Id == reportId, cancellationToken);
                 }
                 else
                 {
-                    reportId = Guid.NewGuid().ToString();
+                    reportId = Guid.NewGuid();
                 }
 
-                ReportSchedule? reportSchedule;
+                ReportScheduleModel? reportSchedule;
                 if (existing != null)
                 {
                     throw new DeadLetterException($"Report with id {reportId} already exists.");
                 }
                 else
                 {
-                    reportSchedule = new ReportSchedule
+                    reportSchedule = new ReportScheduleModel
                     {
-                        Id = reportId,
+                        Id = reportId.Value,
                         FacilityId = facilityId,
                         ReportStartDate = startDate,
                         ReportEndDate = endDate,
@@ -186,14 +191,14 @@ namespace LantanaGroup.Link.Report.Listeners
                         {
                             { "ReportScheduleId", reportSchedule.Id },
                             { "FacilityId", reportSchedule.FacilityId }
-                        }, reportSchedule.ReportEndDate, reportSchedule.Id, ReportConstants.MeasureReportSubmissionScheduler.Group, $"{reportSchedule.Id}-{reportSchedule.ReportEndDate}");
+                        }, reportSchedule.ReportEndDate, reportSchedule.Id.ToString(), ReportConstants.MeasureReportSubmissionScheduler.Group, $"{reportSchedule.Id}-{reportSchedule.ReportEndDate}");
 
                         await _database.CommitTransactionAsync();
                     }
                     catch (Exception ex)
                     {
                         await _database.RollbackTransactionAsync();
-                        _logger.LogError(ex, "Error processing ReportScheduled event for facilityId: {FacilityId} and reportScheduleId: {ReportScheduleId}", facilityId, reportSchedule.Id);
+                        _exceptionLogger.Handle(ex, "Error processing ReportScheduled event", LogLevel.Error, facilityId, new { ReportScheduleId = reportSchedule.Id });
                         throw;
                     }
                 }

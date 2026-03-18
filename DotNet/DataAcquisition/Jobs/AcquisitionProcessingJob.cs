@@ -344,7 +344,7 @@ public class AcquisitionProcessingJob : IJob
                         message.LogIds,
                         message.FacilityId,
                         message.CorrelationId,
-                        message.ResourceAcquired.ScheduledReports.FirstOrDefault()?.ReportTrackingId,
+                        message.ResourceAcquired.ScheduledReports.FirstOrDefault()?.ReportTrackingId?.ToString() ?? "",
                         cancellationToken);
                 }
                 catch (Exception ex)

@@ -21,9 +21,9 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
     public ReadyToAcquireListener(
         ILogger<ReadyToAcquireListener> logger,
         IKafkaConsumerFactory<long, ReadyToAcquire> kafkaConsumerFactory,
-        IDeadLetterExceptionHandler<long, ReadyToAcquire> deadLetterConsumerHandler,
-        IDeadLetterExceptionHandler<string, string> deadLetterConsumerErrorHandler,
-        ITransientExceptionHandler<long, ReadyToAcquire> transientExceptionHandler,
+        IDeadLetterExceptionHandler<ReadyToAcquire, long, ReadyToAcquire> deadLetterConsumerHandler,
+        IDeadLetterExceptionHandler<ReadyToAcquire, string, string> deadLetterConsumerErrorHandler,
+        ITransientExceptionHandler<ReadyToAcquire, long, ReadyToAcquire> transientExceptionHandler,
         ServiceInformation serviceInformation,
         IServiceScopeFactory serviceScopeFactory)
         : base(logger, kafkaConsumerFactory, deadLetterConsumerHandler, deadLetterConsumerErrorHandler, transientExceptionHandler, serviceInformation)

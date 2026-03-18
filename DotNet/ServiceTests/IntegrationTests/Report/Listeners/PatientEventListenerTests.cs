@@ -2,8 +2,8 @@
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Listeners;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -33,16 +33,16 @@ namespace IntegrationTests.Report
             var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
 
             var facilityId = "test-facility-003";
-            var reportId = Guid.NewGuid().ToString();
+            var reportId = Guid.NewGuid();
 
-            var schedule = new ReportSchedule
+            var schedule = new ReportScheduleModel
             {
                 Id = reportId,
                 FacilityId = facilityId,
                 ReportStartDate = DateTime.UtcNow.AddDays(-30),
                 ReportEndDate = DateTime.UtcNow.AddDays(30),
                 Frequency = Frequency.Monthly,
-                ReportTypes = new List<string> { "DE-111", "DE-222" },
+                ReportTypes = { "DE-111", "DE-222" }, 
                 Status = ScheduleStatus.Scheduled,
                 EndOfReportPeriodJobHasRun = false,
                 CreateDate = DateTime.UtcNow
@@ -129,29 +129,29 @@ namespace IntegrationTests.Report
             var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
 
             var facilityId = "test-facility-009";
-            var reportId = Guid.NewGuid().ToString();
+            var reportId = Guid.NewGuid();
 
-            var schedule = new ReportSchedule
+            var schedule = new ReportScheduleModel
             {
                 Id = reportId,
                 FacilityId = facilityId,
                 ReportStartDate = DateTime.UtcNow.AddDays(-30),
                 ReportEndDate = DateTime.UtcNow.AddDays(30),
                 Frequency = Frequency.Monthly,
-                ReportTypes = new List<string> { "DE-111", "DE-333" },
+                ReportTypes = { "DE-111", "DE-333" },
                 Status = ScheduleStatus.Scheduled,
                 EndOfReportPeriodJobHasRun = false,
                 CreateDate = DateTime.UtcNow
             };
             await reportScheduledManager.AddAsync(schedule, CancellationToken.None);
 
-            var existingEntry = new ReportEntry
+            var existingEntry = new ReportEntryModel
             {
                 PatientId = "12345",
                 ReportScheduleId = reportId,
                 FacilityId = facilityId,
                 ReportingStatus = ReportingStatus.PatientIdentified,
-                MeasureReportList = new List<EvaluatedMeasureReport> { new EvaluatedMeasureReport { ReportType = "DE-111" } }
+                MeasureReports = new List<EntryMeasureReportModel> { new EntryMeasureReportModel { MeasureReportId = Guid.NewGuid().ToString(), ReportType = "DE-111" } }
             };
             await reportEntryManager.AddAsync(existingEntry, CancellationToken.None);
 
@@ -170,8 +170,12 @@ namespace IntegrationTests.Report
 
             await listener.ProcessMessageAsync(consumeResult, CancellationToken.None);
 
-            var updated = await reportEntryManager.SingleOrDefaultAsync(e => e.PatientId == "12345" && e.ReportScheduleId == reportId);
-            Assert.Equal(2, updated.MeasureReportList.Count);
+            scope.Dispose();
+
+            using var assertScope = _fixture.ScopeFactory.CreateScope();
+            var assertReportEntryManager = assertScope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+            var updated = await assertReportEntryManager.SingleOrDefaultAsync(e => e.PatientId == "12345" && e.ReportScheduleId == reportId);
+            Assert.Equal(2, updated.MeasureReports.Count);
         }
 
         [Fact]

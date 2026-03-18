@@ -1,12 +1,10 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using Google.Protobuf.WellKnownTypes;
-using LantanaGroup.Link.Report.Application.Models;
-using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -28,13 +26,16 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ServiceInformation _serviceInformation;
 
+        private readonly IExceptionLogger<PatientListsAcquiredListener> _exceptionLogger;
+
         private string Name => this.GetType().Name;
 
         public PatientEventListener(
             ILogger<PatientEventListener> logger,
             IKafkaConsumerFactory<string, PatientEventValue> kafkaConsumerFactory,
-            ITransientExceptionHandler<string, PatientEventValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<string, PatientEventValue> deadLetterExceptionHandler,
+            ITransientExceptionHandler<PatientEventListener, string, PatientEventValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<PatientEventListener, string, PatientEventValue> deadLetterExceptionHandler,
+            IExceptionLogger<PatientEventListener> exceptionLogger)
             IServiceScopeFactory serviceScopeFactory, ServiceInformation serviceInformation)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -47,6 +48,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             _transientExceptionHandler.Topic = KafkaTopic.PatientEventRetry.GetStringValue();
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.PatientEvent) + "-Error";
+            _exceptionLogger = exceptionLogger ?? throw new ArgumentNullException(nameof(exceptionLogger));
         }
 
         protected override System.Threading.Tasks.Task ExecuteAsync(CancellationToken stoppingToken)
@@ -68,7 +70,7 @@ namespace LantanaGroup.Link.Report.Listeners
             {
                 consumer.Subscribe(nameof(KafkaTopic.PatientEvent));
 
-                _logger.LogInformation("Started PatientEvent consumer for topic '{Topic}' at {StartTime}", nameof(KafkaTopic.PatientEvent), DateTime.UtcNow);
+                _logger.LogInformation("{Name}: Started PatientEvent consumer for topic '{Topic}' at {StartTime}", Name, nameof(KafkaTopic.PatientEvent), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -84,7 +86,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (ConsumeException ex)
                     {
-                        _logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+                        _exceptionLogger.Handle(ex, "Error consuming message for topics", LogLevel.Error, facilityId, new { Topics = string.Join(", ", consumer.Subscription) });
 
                         if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                         {
@@ -100,14 +102,14 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error encountered in PatientEventListener");
+                        _exceptionLogger.Handle(ex, "Error encountered in PatientEventListener", LogLevel.Error);
                         consumer.Commit();
                     }
                 }
             }
             catch (OperationCanceledException oce)
             {
-                _logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
+                _exceptionLogger.Handle(oce, "Operation Canceled", LogLevel.Error);
                 consumer.Close();
                 consumer.Dispose();
             }
@@ -126,8 +128,14 @@ namespace LantanaGroup.Link.Report.Listeners
 
             try
             {
+                if (result == null)
+                {
+                    return;
+                }
+
                 using var scope = _serviceScopeFactory.CreateScope();
-                var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+                var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+                var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
 
                 var value = result.Message.Value;
 
@@ -136,19 +144,11 @@ namespace LantanaGroup.Link.Report.Listeners
                     throw new DeadLetterException("Invalid Patient Event");
                 }
 
-                if (value.EventType != PatientEvents.Admit.ToString())
+                var scheduledReports = await reportScheduledManager.FindAsync(x => x.FacilityId == key && x.EndOfReportPeriodJobHasRun == false, cancellationToken);
+
+                if (scheduledReports == null || !scheduledReports.Any())
                 {
-                    _logger.LogInformation("Patient {PatientId} has event type of {EventType}. Ignoring.", HtmlInputSanitizer.Sanitize(value.PatientId), HtmlInputSanitizer.Sanitize(value.EventType));
-                    return;
-                }
-
-                _logger.LogInformation("Consuming Admit PatientEvent (FacilityId: {facilityId}, PatientId: {PatientId})", HtmlInputSanitizer.Sanitize(facilityId), HtmlInputSanitizer.Sanitize(value.PatientId));
-
-                var scheduledReports = await database.ReportScheduledRepository.FindAsync(x => x.FacilityId == facilityId && x.EndOfReportPeriodJobHasRun == false, cancellationToken);
-
-                if (!scheduledReports?.Any() ?? false)
-                {
-                    throw new TransientException($"{Name}: No Scheduled Reports found for facilityId: {facilityId}");
+                    throw new TransientException($"No Scheduled Reports found for facilityId: {key}");
                 }
 
                 foreach (var scheduledReport in scheduledReports)

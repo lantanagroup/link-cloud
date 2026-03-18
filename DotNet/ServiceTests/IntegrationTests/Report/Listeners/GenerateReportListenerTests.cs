@@ -1,8 +1,8 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Listeners;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -12,7 +12,6 @@ using Moq;
 using Moq.Protected;
 using System.Net;
 using System.Text;
-using Xunit;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report
@@ -58,7 +57,7 @@ namespace IntegrationTests.Report
 
             var value = new GenerateReportValue
             {
-                AdhocReportId = Guid.NewGuid().ToString(),
+                AdhocReportId = Guid.NewGuid(),
                 StartDate = DateTime.UtcNow.AddDays(-1),
                 EndDate = DateTime.UtcNow.AddDays(30),
                 ReportTypes = new List<string> { "DE-111" }
@@ -91,7 +90,7 @@ namespace IntegrationTests.Report
 
             var value = new GenerateReportValue
             {
-                AdhocReportId = Guid.NewGuid().ToString(),
+                AdhocReportId = Guid.NewGuid(),
                 StartDate = DateTime.UtcNow.AddDays(-1),
                 EndDate = DateTime.UtcNow.AddDays(30),
                 ReportTypes = new List<string>()
@@ -128,7 +127,7 @@ namespace IntegrationTests.Report
 
             var value = new GenerateReportValue
             {
-                AdhocReportId = Guid.NewGuid().ToString(),
+                AdhocReportId = Guid.NewGuid(),
                 StartDate = DateTime.UtcNow.AddDays(30),
                 EndDate = DateTime.UtcNow.AddDays(-1),
                 ReportTypes = new List<string> { "DE-111" }
@@ -164,7 +163,7 @@ namespace IntegrationTests.Report
             var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
 
             var facilityId = "test-facility-adhoc-manual";
-            var adhocReportId = Guid.NewGuid().ToString();
+            var adhocReportId = Guid.NewGuid();
             var reportTypes = new List<string> { "DE-111", "DE-222" };
             var patientIds = new List<string> { "pat-001", "pat-002" };
 
@@ -206,7 +205,7 @@ namespace IntegrationTests.Report
                     It.Is<Message<string, DataAcquisitionRequestedValue>>(m =>
                         m.Key == facilityId &&
                         m.Value.ScheduledReports.Count == 1 &&
-                        m.Value.ScheduledReports[0].ReportTrackingId == adhocReportId),
+                        m.Value.ScheduledReports[0].ReportTrackingId == adhocReportId.ToString()),
                     It.IsAny<Action<DeliveryReport<string, DataAcquisitionRequestedValue>>>()),
                 Times.Exactly(2));
         }
@@ -224,7 +223,7 @@ namespace IntegrationTests.Report
             var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
 
             var facilityId = "test-facility-census";
-            var adhocReportId = Guid.NewGuid().ToString();
+            var adhocReportId = Guid.NewGuid();
             var reportTypes = new List<string> { "DE-111" };
 
             var value = new GenerateReportValue
@@ -262,7 +261,7 @@ namespace IntegrationTests.Report
                     It.Is<Message<string, DataAcquisitionRequestedValue>>(m =>
                         m.Key == facilityId &&
                         m.Value.ScheduledReports.Count == 1 &&
-                        m.Value.ScheduledReports[0].ReportTrackingId == adhocReportId),
+                        m.Value.ScheduledReports[0].ReportTrackingId == adhocReportId.ToString()),
                     It.IsAny<Action<DeliveryReport<string, DataAcquisitionRequestedValue>>>()),
                 Times.Exactly(2));
         }
@@ -278,32 +277,32 @@ namespace IntegrationTests.Report
             var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
 
             var facilityId = "test-facility-regen";
-            var originalReportId = Guid.NewGuid().ToString();
-            var newAdhocReportId = Guid.NewGuid().ToString();
+            var originalReportId = Guid.NewGuid();
+            var newAdhocReportId = Guid.NewGuid();
 
-            var existingSchedule = new ReportSchedule
+            var existingSchedule = new ReportScheduleModel
             {
                 Id = originalReportId,
                 FacilityId = facilityId,
                 ReportStartDate = DateTime.UtcNow.AddDays(-60),
                 ReportEndDate = DateTime.UtcNow.AddDays(-30),
                 Frequency = Frequency.Monthly,
-                ReportTypes = new List<string> { "DE-111" },
+                ReportTypes = { "DE-111" },
                 Status = ScheduleStatus.Scheduled,
                 CreateDate = DateTime.UtcNow
             };
             await reportScheduledManager.AddAsync(existingSchedule, CancellationToken.None);
 
-            var existingEntry = new ReportEntry
+            var existingEntry = new ReportEntryModel
             {
                 PatientId = "pat-regen-001",
                 ReportScheduleId = originalReportId,
                 FacilityId = facilityId,
                 ReportingStatus = ReportingStatus.PatientIdentified,
                 CreateDate = DateTime.UtcNow,
-                MeasureReportList = new List<EvaluatedMeasureReport>
+                MeasureReports = new List<EntryMeasureReportModel>
                 {
-                    new EvaluatedMeasureReport { ReportType = "DE-111", Status = MeasureReportStatus.ReadyForValidation }
+                    new EntryMeasureReportModel { ReportType = "DE-111", Status = MeasureReportStatus.ReadyForValidation }
                 }
             };
             await reportEntryManager.AddAsync(existingEntry, CancellationToken.None);
@@ -343,12 +342,12 @@ namespace IntegrationTests.Report
             var listener = scope.ServiceProvider.GetRequiredService<GenerateReportListener>();
 
             var facilityId = "test-facility-regen-missing";
-            var nonExistentId = Guid.NewGuid().ToString();
+            var nonExistentId = Guid.NewGuid();
 
             var value = new GenerateReportValue
             {
                 ReportId = nonExistentId,
-                AdhocReportId = Guid.NewGuid().ToString(),
+                AdhocReportId = Guid.NewGuid(),
                 Regenerate = true
             };
 

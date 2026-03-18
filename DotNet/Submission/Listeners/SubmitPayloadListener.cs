@@ -26,8 +26,8 @@ namespace LantanaGroup.Link.Submission.Listeners
 
         private readonly ILogger<SubmitPayloadListener> _logger;
         private readonly IConsumer<SubmitPayloadKey, SubmitPayloadValue> _consumer;
-        private readonly ITransientExceptionHandler<SubmitPayloadKey, SubmitPayloadValue> _transientExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<SubmitPayloadKey, SubmitPayloadValue> _deadLetterExceptionHandler;
+        private readonly ITransientExceptionHandler<SubmitPayloadListener, SubmitPayloadKey, SubmitPayloadValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<SubmitPayloadListener, SubmitPayloadKey, SubmitPayloadValue> _deadLetterExceptionHandler;
         private readonly BlobStorageService _blobStorageService;
         private readonly PayloadSubmittedProducer _payloadSubmittedProducer;
         private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
@@ -36,8 +36,8 @@ namespace LantanaGroup.Link.Submission.Listeners
         public SubmitPayloadListener(
             ILogger<SubmitPayloadListener> logger,
             IKafkaConsumerFactory<SubmitPayloadKey, SubmitPayloadValue> kafkaConsumerFactory,
-            ITransientExceptionHandler<SubmitPayloadKey, SubmitPayloadValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<SubmitPayloadKey, SubmitPayloadValue> deadLetterExceptionHandler,
+            ITransientExceptionHandler<SubmitPayloadListener, SubmitPayloadKey, SubmitPayloadValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<SubmitPayloadListener, SubmitPayloadKey, SubmitPayloadValue> deadLetterExceptionHandler,
             BlobStorageService blobStorageService,
             PayloadSubmittedProducer payloadSubmittedProducer,
             AuditableEventOccurredProducer auditableEventOccurredProducer,
@@ -182,7 +182,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                     _payloadSubmittedProducer.Produce(
                         correlationId,
                         facilityId,
-                        key?.ReportScheduleId!,
+                        key.ReportScheduleId,
                         value.PayloadType,
                         value.PatientId);
                 }

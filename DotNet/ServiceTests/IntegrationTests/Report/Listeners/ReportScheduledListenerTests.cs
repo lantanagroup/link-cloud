@@ -1,8 +1,9 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.Listeners;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -36,7 +37,7 @@ namespace IntegrationTests.Report
             var reportPopulationManager = scope.ServiceProvider.GetRequiredService<IReportPopulationManager>();
 
             var facilityId = Guid.NewGuid().ToString();
-            var reportId = Guid.NewGuid().ToString();
+            var reportId = Guid.NewGuid();
 
             var startDate = DateTimeOffset.UtcNow.AddDays(-1);
             var endDate = DateTimeOffset.UtcNow.AddDays(30);
@@ -103,7 +104,7 @@ namespace IntegrationTests.Report
 
             var value = new ReportScheduledValue
             {
-                ReportTrackingId = Guid.NewGuid().ToString(),
+                ReportTrackingId = Guid.NewGuid(),
                 StartDate = DateTimeOffset.UtcNow.AddDays(-1),
                 EndDate = DateTimeOffset.UtcNow.AddDays(30),
                 Frequency = Frequency.Monthly,
@@ -141,7 +142,7 @@ namespace IntegrationTests.Report
 
             var value = new ReportScheduledValue
             {
-                ReportTrackingId = Guid.NewGuid().ToString(),
+                ReportTrackingId = Guid.NewGuid(),
                 StartDate = DateTimeOffset.UtcNow.AddDays(-1),
                 EndDate = DateTimeOffset.UtcNow.AddDays(30),
                 Frequency = Frequency.Monthly,
@@ -179,7 +180,7 @@ namespace IntegrationTests.Report
 
             var value = new ReportScheduledValue
             {
-                ReportTrackingId = Guid.NewGuid().ToString(),
+                ReportTrackingId = Guid.NewGuid(),
                 StartDate = default,
                 EndDate = DateTimeOffset.UtcNow.AddDays(30),
                 Frequency = Frequency.Monthly,
@@ -217,7 +218,7 @@ namespace IntegrationTests.Report
 
             var value = new ReportScheduledValue
             {
-                ReportTrackingId = Guid.NewGuid().ToString(),
+                ReportTrackingId = Guid.NewGuid(),
                 StartDate = DateTimeOffset.UtcNow.AddDays(-1),
                 EndDate = default,
                 Frequency = Frequency.Monthly,
@@ -255,7 +256,6 @@ namespace IntegrationTests.Report
 
             var value = new ReportScheduledValue
             {
-                ReportTrackingId = "",
                 StartDate = DateTimeOffset.UtcNow.AddDays(-1),
                 EndDate = DateTimeOffset.UtcNow.AddDays(30),
                 Frequency = Frequency.Monthly,
@@ -291,16 +291,16 @@ namespace IntegrationTests.Report
             var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
 
             var facilityId = Guid.NewGuid().ToString();
-            var existingId = Guid.NewGuid().ToString();
+            var existingId = Guid.NewGuid();
 
-            var existing = new ReportSchedule
+            var existing = new ReportScheduleModel
             {
                 Id = existingId,
                 FacilityId = facilityId,
                 ReportStartDate = DateTime.UtcNow.AddDays(-1),
                 ReportEndDate = DateTime.UtcNow.AddDays(30),
                 Frequency = Frequency.Monthly,
-                ReportTypes = new List<string> { "DE-111" },
+                ReportTypes = {  "DE-111" },
                 Status = ScheduleStatus.Scheduled,
                 CreateDate = DateTime.UtcNow
             };

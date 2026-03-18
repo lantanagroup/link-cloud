@@ -51,7 +51,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
             _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
         }
 
-        public async Task<Bundle?> GetSubmissionBundleForPatientAsync(string facilityId, string patientId, string reportScheduleId, CancellationToken cancellationToken = default)
+        public async Task<Bundle?> GetSubmissionBundleForPatientAsync(string facilityId, string patientId, Guid reportScheduleId, CancellationToken cancellationToken = default)
         {
             _logger.LogDebug("Retrieving submission bundle from Report");
             var client = await GetClientAsync();
@@ -59,20 +59,20 @@ namespace LantanaGroup.Link.Submission.Application.Services
                 $"{_serviceRegistry.Value.ReportServiceApiUrl}/Report/Bundle/Patient" +
                 $"?facilityId={facilityId.SanitizeAndRemove()}" +
                 $"&patientId={patientId.SanitizeAndRemove()}" +
-                $"&reportScheduleId={reportScheduleId.SanitizeAndRemove()}";
+                $"&reportScheduleId={reportScheduleId}";
             var response = await client.GetStringAsync(url, cancellationToken);
             var model = JsonSerializer.Deserialize<PatientSubmissionModel>(response, lenientJsonOptions);
             return model?.Bundle;
         }
 
-        public async Task<Bundle?> GetManifestBundleAsync(string facilityId, string reportScheduleId, CancellationToken cancellationToken = default)
+        public async Task<Bundle?> GetManifestBundleAsync(string facilityId, Guid reportScheduleId, CancellationToken cancellationToken = default)
         {
             _logger.LogDebug("Retrieving manifest bundle from Report");
             var client = await GetClientAsync();
             var url =
                 $"{_serviceRegistry.Value.ReportServiceApiUrl}/Report/Bundle/Manifest" +
                 $"?facilityId={facilityId.SanitizeAndRemove()}" +
-                $"&reportScheduleId={reportScheduleId.SanitizeAndRemove()}";
+                $"&reportScheduleId={reportScheduleId}";
             var response = await client.GetStringAsync(url, cancellationToken);
             return JsonSerializer.Deserialize<Bundle>(response, lenientJsonOptions);
         }

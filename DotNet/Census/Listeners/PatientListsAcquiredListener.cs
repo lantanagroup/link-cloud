@@ -8,10 +8,10 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Data.SqlClient;
 using System.Text;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 namespace LantanaGroup.Link.Census.Listeners;
 
@@ -19,8 +19,8 @@ public class PatientListsAcquiredListener : BackgroundService
 {
     private readonly IKafkaConsumerFactory<string, PatientListMessage> _kafkaConsumerFactory;
     private readonly ILogger<PatientListsAcquiredListener> _logger;
-    private readonly IDeadLetterExceptionHandler<string, PatientListMessage> _nonTransientExceptionHandler;
-    private readonly ITransientExceptionHandler<string, PatientListMessage> _transientExceptionHandler;
+    private readonly IDeadLetterExceptionHandler<PatientListsAcquiredListener, string, PatientListMessage> _nonTransientExceptionHandler;
+    private readonly ITransientExceptionHandler<PatientListsAcquiredListener, string, PatientListMessage> _transientExceptionHandler;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IEventProducerService<PatientEvent> _eventProducerService;
 
@@ -28,8 +28,8 @@ public class PatientListsAcquiredListener : BackgroundService
         ILogger<PatientListsAcquiredListener> logger,
         IKafkaConsumerFactory<string, PatientListMessage> kafkaConsumerFactory,
         IProducer<string, object> kafkaProducer,
-        IDeadLetterExceptionHandler<string, PatientListMessage> nonTransientExceptionHandler,
-        ITransientExceptionHandler<string, PatientListMessage> transientExceptionHandler,
+        IDeadLetterExceptionHandler<PatientListsAcquiredListener, string, PatientListMessage> nonTransientExceptionHandler,
+        ITransientExceptionHandler<PatientListsAcquiredListener, string, PatientListMessage> transientExceptionHandler,
         IServiceScopeFactory scopeFactory,
         IEventProducerService<PatientEvent> eventProducerService
         )

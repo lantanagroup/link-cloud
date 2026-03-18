@@ -197,14 +197,9 @@ public static class GeneralStartupExtensions
 
     public static void RegisterExceptionHandlers(this IServiceCollection services)
     {
-        services.AddSingleton<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
-        services.AddSingleton<IDeadLetterExceptionHandler<string, DataAcquisitionRequested>, DeadLetterExceptionHandler<string, DataAcquisitionRequested>>();
-        services.AddSingleton<IDeadLetterExceptionHandler<string, PatientCensusScheduled>, DeadLetterExceptionHandler<string, PatientCensusScheduled>>();
-        services.AddSingleton<IDeadLetterExceptionHandler<long, ReadyToAcquire>, DeadLetterExceptionHandler<long, ReadyToAcquire>>();
-        services.AddSingleton<ITransientExceptionHandler<string, string>, TransientExceptionHandler<string, string>>();
-        services.AddSingleton<ITransientExceptionHandler<string, DataAcquisitionRequested>, TransientExceptionHandler<string, DataAcquisitionRequested>>();
-        services.AddSingleton<ITransientExceptionHandler<string, PatientCensusScheduled>, TransientExceptionHandler<string, PatientCensusScheduled>>();
-        services.AddSingleton<ITransientExceptionHandler<long, ReadyToAcquire>, TransientExceptionHandler<long, ReadyToAcquire>>();
+        services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
+        services.AddSingleton(typeof(ITransientExceptionHandler<,,>), typeof(TransientExceptionHandler<,,>));
+        services.AddSingleton(typeof(IDeadLetterExceptionHandler<,,>), typeof(DeadLetterExceptionHandler<,,>));
     }
 
     public static void RegisterRepositories(this IServiceCollection services)
