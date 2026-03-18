@@ -314,8 +314,9 @@
               Status
               <fa-icon [icon]="getSortIcon('status')"></fa-icon>
             </th>
-            <th scope="col" class="header-column">
+            <th scope="col" class="header-column sortable" (click)="onSort('isDeleted')">
               Is Deleted
+              <fa-icon [icon]="getSortIcon('isDeleted')"></fa-icon>
             </th>
             <th scope="col" class="header-column action-column">
               <span class="sr-only">Edit</span>

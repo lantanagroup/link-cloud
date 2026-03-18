@@ -88,6 +88,8 @@ export class FacilityViewComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.paginationMetadata.pageNumber = this.defaultPageNumber;
     this.paginationMetadata.pageSize = this.defaultPageSize;
+    this.paginationMetadata.totalCount = 0;
+    this.paginationMetadata.totalPages = 0;
 
     this.subscription = this.route.params.subscribe(params => {
       this.facilityId = params['facilityId'];
@@ -166,7 +168,7 @@ export class FacilityViewComponent implements OnInit, OnDestroy {
       this.showDeleted,
       this.currentSortBy,
       this.currentSortOrder,
-      this.paginationMetadata.pageSize,
+      Math.max(1, this.paginationMetadata.pageSize || this.defaultPageSize),
       this.paginationMetadata.pageNumber + 1 // API expects 1-based indexing
     ).subscribe({
       next: (data) => {
@@ -201,8 +203,10 @@ export class FacilityViewComponent implements OnInit, OnDestroy {
   }
 
   onPageChange(event: PageEvent): void {
-    this.paginationMetadata.pageSize = event.pageSize;
     this.paginationMetadata.pageNumber = event.pageIndex;
+    if (event.pageSize > 0) {
+      this.paginationMetadata.pageSize = event.pageSize;
+    }
     this.loadReportSchedules();
   }
 
