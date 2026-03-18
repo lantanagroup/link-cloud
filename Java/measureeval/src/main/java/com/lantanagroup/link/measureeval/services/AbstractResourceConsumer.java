@@ -218,6 +218,11 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         logger.debug("Evaluating measures");
 
         for (PatientReportingEvaluationStatus.Report report : patientStatus.getReports()) {
+            //We only want to evaluate supplemental reports that have been marked as reportable. If they failed initial evaluation, then we should not perform a supplemental evaluation for the report.
+            if (value.getQueryType() == QueryType.SUPPLEMENTAL && !report.getReportable()) {
+                continue;
+            }
+
             MeasureReport measureReport = evaluateMeasureService.evaluateMeasure(value.getQueryType().toString(), patientStatus, report, bundle);
 
             if (measureReport.getIdPart() == null) {
