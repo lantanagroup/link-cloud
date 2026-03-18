@@ -270,6 +270,29 @@ stages:
          PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/querydispatchDb.sql'
          ArtifactName: 'querydispatch-db'
          publishLocation: 'container'
+        displayName: Publish Query Dispatch SQL Script
+  ###
+  # Report
+  - job: Report
+    displayName: "Generate Report Schema Script"
+    steps:
+      - script: |
+          cd DotNet/Report
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
+      - script: |
+          cd DotNet/Report
+          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c ReportDbContext -s $(build.sourcesdirectory)/DotNet/Report/Report.csproj -p $(build.sourcesdirectory)/DotNet/Report/Report.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/ReportDb.sql
+        displayName: Generate Report SQL Script
+      - task: PublishBuildArtifacts@1
+        inputs:
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/ReportDb.sql'
+         ArtifactName: 'Report-db'
+         publishLocation: 'container'
         displayName: Publish Query Dispatch SQL Script  
   ###
   # Submission
@@ -457,6 +480,24 @@ stages:
           deployType: 'SqlTask'
           SqlFile: '$(Pipeline.Workspace)/querydispatch-db/querydispatchDb.sql'
 
+  ### Report
+  - job: UpdatereportSchema
+    displayName: Update report DB Schema
+    steps:
+      - download: current
+        artifact: report-db
+
+      - task: SqlAzureDacpacDeployment@1
+        displayName: Apply report DB Schema
+        inputs:
+          azureSubscription: "NHSNLink Resource Manager"
+          ServerName: '$(link-db_server)'
+          DatabaseName: 'link-test-botw-report'
+          SqlUsername: '$(link-db_username)'
+          SqlPassword: '$(link-db_pass)'
+          deployType: 'SqlTask'
+          SqlFile: '$(Pipeline.Workspace)/report-db/reportDb.sql'
+
   ### Submission
   - job: UpdatesubmissionSchema
     displayName: Update submission DB Schema
@@ -632,6 +673,24 @@ stages:
           SqlPassword: '$(link-db_pass)'
           deployType: 'SqlTask'
           SqlFile: '$(Pipeline.Workspace)/querydispatch-db/querydispatchDb.sql'
+
+  ### Report
+  - job: UpdatereportSchema
+    displayName: Update report DB Schema
+    steps:
+      - download: current
+        artifact: report-db
+
+      - task: SqlAzureDacpacDeployment@1
+        displayName: Apply report DB Schema
+        inputs:
+          azureSubscription: "NHSNLink Resource Manager"
+          ServerName: '$(link-db_server)'
+          DatabaseName: 'link-qa-botw-report'
+          SqlUsername: '$(link-db_username)'
+          SqlPassword: '$(link-db_pass)'
+          deployType: 'SqlTask'
+          SqlFile: '$(Pipeline.Workspace)/report-db/reportDb.sql'
 
   ### Submission
   - job: UpdatesubmissionSchema
