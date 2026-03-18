@@ -13,6 +13,7 @@ import { FacilityConfigDialogComponent } from '../facility-config-dialog/facilit
 import { RouterLink } from '@angular/router';
 import { PaginationMetadata } from '../../../models/pagination-metadata.model';
 import { MatPaginatorModule, PageEvent } from "@angular/material/paginator";
+import { MatSortModule, Sort } from '@angular/material/sort';
 import { CensusService } from "../../../services/gateway/census/census.service";
 import { DataAcquisitionService } from "../../../services/gateway/data-acquisition/data-acquisition.service";
 import { QueryDispatchService } from "../../../services/gateway/query-dispatch/query-dispatch.service";
@@ -39,6 +40,7 @@ import { NgIf } from "@angular/common";
     MatSnackBarModule,
     RouterLink,
     MatPaginatorModule,
+    MatSortModule,
     MatIconModule,
     MatCheckbox,
     FormsModule,
@@ -128,6 +130,26 @@ export class TenantDashboardComponent implements OnInit {
   }
 
   onShowDeletedChange(): void {
+    this.paginationMetadata.pageNumber = 0;
+    this.getFacilities();
+  }
+
+  onSortChange(sort: Sort): void {
+    const sortFieldMap: { [key: string]: string } = {
+      'facilityId': 'FacilityId',
+      'facilityName': 'FacilityName',
+      'timeZone': 'TimeZone',
+      'isDeleted': 'IsDeleted'
+    };
+
+    if (sort.active && sort.direction) {
+      this.sortBy = sortFieldMap[sort.active] || 'FacilityId';
+      this.sortOrder = sort.direction === 'desc' ? 1 : 0;
+    } else {
+      this.sortBy = 'FacilityId';
+      this.sortOrder = 0;
+    }
+
     this.paginationMetadata.pageNumber = 0;
     this.getFacilities();
   }

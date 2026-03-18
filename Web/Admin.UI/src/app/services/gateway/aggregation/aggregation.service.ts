@@ -24,4 +24,12 @@ export class AggregationService {
       null
     );
   }
+
+  softDeleteReport(reportScheduleId: string): Observable<void> {
+    return this.http.delete<void>(
+      `${this.appConfigService.config?.baseApiUrl}/aggregate/reports/${encodeURIComponent(reportScheduleId)}`
+    );
+  }
+
+
 }

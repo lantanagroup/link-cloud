@@ -33,8 +33,8 @@ public static class GetReportSummaries
 
             //TODO: add validation for facilityId
 
-            if (pageNumber < 1) return Results.BadRequest("Page number must be greater than 0");
-            if (pageSize < 1) return Results.BadRequest("Page size must be greater than 0");
+            if (pageNumber < 1) pageNumber = 1;
+            if (pageSize < 1) pageSize = 10;
 
             var response = await reportService.ReportSummaryList(context.User,
                 context.RequestAborted,

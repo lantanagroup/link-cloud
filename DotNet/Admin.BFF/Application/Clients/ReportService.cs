@@ -246,6 +246,18 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             return await _client.GetAsync($"api/schedules/facilities/{Uri.EscapeDataString(facilityId)}?blocking=true", cancellationToken);
         }
 
+        public async Task<HttpResponseMessage> SoftDeleteReportScheduleAsync(ClaimsPrincipal user, string reportScheduleId, CancellationToken cancellationToken)
+        {
+            if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
+            {
+                var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            return await _client.DeleteAsync($"api/schedules/{Uri.EscapeDataString(reportScheduleId)}", cancellationToken);
+        }
+
         public async Task<HttpResponseMessage> SoftDeleteReportSchedulesAsync(ClaimsPrincipal user, string facilityId, CancellationToken cancellationToken)
         {
             if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
