@@ -1,5 +1,4 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Listeners;
@@ -70,7 +69,7 @@ namespace IntegrationTests.Report
 
             Assert.NotNull(entry1);
             Assert.Equal(ReportingStatus.PatientIdentified, entry1.ReportingStatus);
-            Assert.Equal(2, entry1.MeasureReportList.Count);
+            Assert.Equal(2, entry1.MeasureReports.Count);
         }
 
         [Fact]
@@ -82,9 +81,9 @@ namespace IntegrationTests.Report
             var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
 
             var facilityId = "test-facility-003";
-            var reportId = Guid.NewGuid().ToString();
+            var reportId = Guid.NewGuid();
 
-            var schedule = new ReportSchedule
+            var schedule = new ReportScheduleModel
             {
                 Id = reportId,
                 FacilityId = facilityId,

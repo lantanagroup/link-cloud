@@ -62,8 +62,8 @@ namespace IntegrationTests.Report
         public Mock<IDeadLetterExceptionHandler<ReportScheduledListener, string, ReportScheduledValue>> ReportScheduledDeadLetterHandlerMock { get; } = new();
 
         public Mock<IKafkaConsumerFactory<string, PatientEventValue>> PatientEventConsumerFactoryMock { get; } = new();
-        public Mock<ITransientExceptionHandler<string, PatientEventValue>> PatientEventTransientHandlerMock { get; } = new();
-        public Mock<IDeadLetterExceptionHandler<string, PatientEventValue>> PatientEventDeadLetterHandlerMock { get; } = new();
+        public Mock<ITransientExceptionHandler<PatientEventListener, string, PatientEventValue>> PatientEventTransientHandlerMock { get; } = new();
+        public Mock<IDeadLetterExceptionHandler<PatientEventListener, string, PatientEventValue>> PatientEventDeadLetterHandlerMock { get; } = new();
 
         public Mock<IKafkaConsumerFactory<Null, MeasureReportGeneratedValue>> MeasureReportGeneratedConsumerFactoryMock { get; } = new();
         public Mock<ITransientExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue>> MeasureReportGeneratedTransientHandlerMock { get; } = new();
@@ -167,8 +167,8 @@ namespace IntegrationTests.Report
             builder.Services.AddSingleton<IDeadLetterExceptionHandler<ReportScheduledListener, string, ReportScheduledValue>>(ReportScheduledDeadLetterHandlerMock.Object);
 
             builder.Services.AddSingleton<IKafkaConsumerFactory<string, PatientEventValue>>(PatientEventConsumerFactoryMock.Object);
-            builder.Services.AddSingleton<ITransientExceptionHandler<string, PatientEventValue>>(PatientEventTransientHandlerMock.Object);
-            builder.Services.AddSingleton<IDeadLetterExceptionHandler<string, PatientEventValue>>(PatientEventDeadLetterHandlerMock.Object);
+            builder.Services.AddSingleton<ITransientExceptionHandler<PatientEventListener, string, PatientEventValue>>(PatientEventTransientHandlerMock.Object);
+            builder.Services.AddSingleton<IDeadLetterExceptionHandler<PatientEventListener, string, PatientEventValue>>(PatientEventDeadLetterHandlerMock.Object);
 
             builder.Services.AddSingleton<IKafkaConsumerFactory<Null, MeasureReportGeneratedValue>>(MeasureReportGeneratedConsumerFactoryMock.Object);
             builder.Services.AddSingleton<ITransientExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue>>(MeasureReportGeneratedTransientHandlerMock.Object);
