@@ -307,6 +307,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 log.Priority,
                 log.FacilityId,
                 log.PatientId,
+                log.ReportTrackingId,
                 log.FhirVersion,
                 log.QueryType,
                 log.QueryPhase,
