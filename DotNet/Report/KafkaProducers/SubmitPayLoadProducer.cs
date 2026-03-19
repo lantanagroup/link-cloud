@@ -1,5 +1,5 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -21,7 +21,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _logger = logger;
         }
 
-        public async Task<bool> Produce(ReportSchedule schedule, PayloadType payloadType, string? patientId = null, string? correlationId = null, string? payloadUri = null)
+        public async Task<bool> Produce(ReportScheduleModel schedule, PayloadType payloadType, string? patientId = null, string? correlationId = null, string? payloadUri = null)
         {
             _logger.LogDebug("Producing SubmitPayload (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId, patientId, schedule.Id);
 

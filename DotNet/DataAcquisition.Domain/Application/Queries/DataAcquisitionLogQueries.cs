@@ -307,6 +307,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 log.Priority,
                 log.FacilityId,
                 log.PatientId,
+                log.ReportTrackingId,
                 log.FhirVersion,
                 log.QueryType,
                 log.QueryPhase,
@@ -379,7 +380,8 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     CreateDate = log.CreateDate,
                     RetryAttempts = log.RetryAttempts,
                     Status = log.Status,
-                    IsDeleted = log.IsDeleted
+                    IsDeleted = log.IsDeleted,
+                    ReportTrackingId = log.ReportTrackingId
                 };
             }).ToList();
         }
@@ -793,6 +795,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             "status" => descending ? query.OrderByDescending(log => log.Status) : query.OrderBy(log => log.Status),
             "priority" => descending ? query.OrderByDescending(log => log.Priority) : query.OrderBy(log => log.Priority),
             "retryattempts" => descending ? query.OrderByDescending(log => log.RetryAttempts) : query.OrderBy(log => log.RetryAttempts),
+            "isdeleted" => descending ? query.OrderByDescending(log => log.IsDeleted) : query.OrderBy(log => log.IsDeleted),
             _ => descending ? query.OrderByDescending(log => log.Id) : query.OrderBy(log => log.Id)
         };
     }

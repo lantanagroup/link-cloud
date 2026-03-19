@@ -6,7 +6,6 @@
 
         public static class AppSettingsSectionNames
         {
-            public const string Mongo = "MongoDB";
             public const string ServiceInformation = "ServiceInformation";
         }
 

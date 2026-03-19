@@ -21,9 +21,9 @@ public class ResourceAcquiredListenerTests
     private readonly Mock<ServiceInformation> _serviceInformationMock;
     private readonly Mock<IServiceScopeFactory> _scopeFactoryMock;
     private readonly Mock<IKafkaConsumerFactory<ResourceKey, ResourceAcquiredMessage>> _consumerFactoryMock;
-    private readonly Mock<IDeadLetterExceptionHandler<ResourceKey, string>> _consumeExceptionHandlerMock;
-    private readonly Mock<IDeadLetterExceptionHandler<ResourceKey, ResourceAcquiredMessage>> _deadLetterExceptionHandlerMock;
-    private readonly Mock<ITransientExceptionHandler<ResourceKey, ResourceAcquiredMessage>> _transientExceptionHandlerMock;
+    private readonly Mock<IDeadLetterExceptionHandler<ResourceAcquiredListener, ResourceKey, string>> _consumeExceptionHandlerMock;
+    private readonly Mock<IDeadLetterExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage>> _deadLetterExceptionHandlerMock;
+    private readonly Mock<ITransientExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage>> _transientExceptionHandlerMock;
     private readonly Mock<INormalizationServiceMetrics> _metricsMock;
     private readonly Mock<IProducer<ResourceKey, ResourceNormalizedMessage>> _producerMock;
     private readonly Mock<CopyPropertyOperationService> _copyPropertyOperationServiceMock;
@@ -37,9 +37,9 @@ public class ResourceAcquiredListenerTests
         _serviceInformationMock = new Mock<ServiceInformation>();
         _scopeFactoryMock = new Mock<IServiceScopeFactory>();
         _consumerFactoryMock = new Mock<IKafkaConsumerFactory<ResourceKey, ResourceAcquiredMessage>>();
-        _consumeExceptionHandlerMock = new Mock<IDeadLetterExceptionHandler<ResourceKey, string>>();
-        _deadLetterExceptionHandlerMock = new Mock<IDeadLetterExceptionHandler<ResourceKey, ResourceAcquiredMessage>>();
-        _transientExceptionHandlerMock = new Mock<ITransientExceptionHandler<ResourceKey, ResourceAcquiredMessage>>();
+        _consumeExceptionHandlerMock = new Mock<IDeadLetterExceptionHandler<ResourceAcquiredListener, ResourceKey, string>>();
+        _deadLetterExceptionHandlerMock = new Mock<IDeadLetterExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage>>();
+        _transientExceptionHandlerMock = new Mock<ITransientExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage>>();
         _metricsMock = new Mock<INormalizationServiceMetrics>();
         _producerMock = new Mock<IProducer<ResourceKey, ResourceNormalizedMessage>>();
         

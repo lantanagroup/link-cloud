@@ -33,8 +33,8 @@ public static class GetReportSummaries
 
             //TODO: add validation for facilityId
 
-            if (pageNumber < 1) return Results.BadRequest("Page number must be greater than 0");
-            if (pageSize < 1) return Results.BadRequest("Page size must be greater than 0");
+            if (pageNumber < 1) pageNumber = 1;
+            if (pageSize < 1) pageSize = 10;
 
             var response = await reportService.ReportSummaryList(context.User,
                 context.RequestAborted,
@@ -124,14 +124,14 @@ public static class GetReportSummaries
 
     private static async Task PopulateSummaryCounts(HttpContext context, ReportService reportService, ScheduledReportListSummary summary)
     {
-        var patientInCensusCountResponse = await reportService.GetPatientInCensusCount(context.User, context.RequestAborted, summary.Id);
+        var patientInCensusCountResponse = await reportService.GetPatientInCensusCount(context.User, context.RequestAborted, summary.Id.ToString());
         if (patientInCensusCountResponse.IsSuccessStatusCode)
         {
             var content = await patientInCensusCountResponse.Content.ReadAsStringAsync();
             summary.CensusCount = int.Parse(content);
         }
 
-        var populationResponse = await reportService.GetReportPopulationsByReportScheduleId(context.User, context.RequestAborted, summary.Id);
+        var populationResponse = await reportService.GetReportPopulationsByReportScheduleId(context.User, context.RequestAborted, summary.Id.ToString());
         if (populationResponse.IsSuccessStatusCode)
         {
             var content = await populationResponse.Content.ReadAsStringAsync();

@@ -1,7 +1,7 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Report.Domain;
+using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Domain.Enums;
-using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using System.Diagnostics;
@@ -22,7 +22,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _dataAcqProducer = dataAcqProducer;
         }
 
-        public async Task<bool> Produce(ReportSchedule schedule, List<string>? patientsToEvaluate = null)
+        public async Task<bool> Produce(ReportScheduleModel schedule, List<string>? patientsToEvaluate = null)
         {
             var _database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
 
@@ -82,11 +82,11 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     {
                         new ()
                         {
-                            ReportTrackingId = schedule.Id!,
+                            ReportTrackingId = schedule.Id.ToString(),
                             StartDate = schedule.ReportStartDate,
                             EndDate = schedule.ReportEndDate,
                             Frequency = schedule.Frequency,
-                            ReportTypes = schedule.ReportTypes
+                            ReportTypes = schedule.ReportTypes,
                         }
                     },
                     QueryType = QueryType.Initial.ToString(),

@@ -1,7 +1,7 @@
-﻿using System.Net;
-using LantanaGroup.Link.Report.Domain;
+﻿using LantanaGroup.Link.Report.Data;
+using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -11,7 +11,6 @@ using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
-using LantanaGroup.Link.Shared.Application.Models.Report;
 
 namespace LantanaGroup.Link.Report.Controllers
 {
@@ -43,15 +42,18 @@ namespace LantanaGroup.Link.Report.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<ReportSchedule>> GetById(
             string id,
-            [FromQuery] bool includeDeleted = false) 
+            [FromQuery] bool includeDeleted = false)
         {
             if (string.IsNullOrWhiteSpace(id))
                 return BadRequest("Id is required.");
 
+            if (!Guid.TryParse(id, out Guid parsedId))
+                return BadRequest("Invalid ID format");
+
             try
             {
                 var reportSchedule = (await _reportScheduledManager
-                        .FindAsync(x => x.Id == id &&
+                        .FindAsync(x => x.Id == parsedId &&
                                         (includeDeleted || !x.IsDeleted.HasValue || x.IsDeleted == false)))
                     .FirstOrDefault();
 
@@ -100,7 +102,7 @@ namespace LantanaGroup.Link.Report.Controllers
 
             try
             {
-                List<ReportSchedule>? reportSchedules;
+                List<ReportScheduleModel>? reportSchedules;
 
                 if (blocking)
                 {
@@ -125,7 +127,7 @@ namespace LantanaGroup.Link.Report.Controllers
                         x.FacilityId == facilityId &&
                         (includeDeleted || !x.IsDeleted.HasValue || x.IsDeleted == false));
                 }
-                
+
                 if (reportSchedules == null)
                     return NotFound();
 
@@ -135,6 +137,45 @@ namespace LantanaGroup.Link.Report.Controllers
             {
                 _logger.LogError(new EventId(ReportConstants.LoggingIds.GetItem, "GetByFacilityId"), ex, "An exception occurred while attempting to get a Report Schedule record for Facility Id {id}", HtmlInputSanitizer.Sanitize(facilityId));
 
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Soft deletes a single report schedule by its ID.
+        /// </summary>
+        /// <param name="id">The ID of the report schedule to soft delete.</param>
+        [HttpDelete("{id}")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> SoftDelete(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                return BadRequest("Id is required.");
+
+            if (!Guid.TryParse(id, out Guid parsedId))
+                return BadRequest("Invalid ID format.");
+
+            try
+            {
+                await _reportScheduledManager.SoftDeleteByReportTrackingIdAsync(parsedId, HttpContext.RequestAborted);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
+            {
+                return NotFound(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogError(new EventId(ReportConstants.LoggingIds.UpdateItem, "SoftDelete"), ex, "Failed to soft delete report schedule {Id}", HtmlInputSanitizer.Sanitize(id));
+                return Conflict(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(new EventId(ReportConstants.LoggingIds.UpdateItem, "SoftDelete"), ex, "An exception occurred while attempting to soft delete report schedule {Id}", HtmlInputSanitizer.Sanitize(id));
                 throw;
             }
         }
