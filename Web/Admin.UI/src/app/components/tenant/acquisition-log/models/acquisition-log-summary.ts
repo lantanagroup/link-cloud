@@ -15,6 +15,7 @@ export interface AcquisitionLogSummary {
     completionDate?: Date;
     retryAttempts: number;
     status: string;
+    reportTrackingId: string;
     reportIds: string[];
     isDeleted: boolean;
 }
