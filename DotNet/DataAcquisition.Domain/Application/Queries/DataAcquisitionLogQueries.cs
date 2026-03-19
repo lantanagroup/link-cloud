@@ -307,6 +307,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 log.Priority,
                 log.FacilityId,
                 log.PatientId,
+                log.ReportTrackingId,
                 log.FhirVersion,
                 log.QueryType,
                 log.QueryPhase,
@@ -379,7 +380,8 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     CreateDate = log.CreateDate,
                     RetryAttempts = log.RetryAttempts,
                     Status = log.Status,
-                    IsDeleted = log.IsDeleted
+                    IsDeleted = log.IsDeleted,
+                    ReportTrackingId = log.ReportTrackingId
                 };
             }).ToList();
         }
