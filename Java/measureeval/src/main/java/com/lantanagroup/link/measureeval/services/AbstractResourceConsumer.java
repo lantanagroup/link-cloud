@@ -219,7 +219,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
 
         for (PatientReportingEvaluationStatus.Report report : patientStatus.getReports()) {
             //We only want to evaluate supplemental reports that have been marked as reportable. If they failed initial evaluation, then we should not perform a supplemental evaluation for the report.
-            if (value.getQueryType() == QueryType.SUPPLEMENTAL && !report.getReportable()) {
+            if (value.getQueryType() == QueryType.SUPPLEMENTAL && !Boolean.TRUE.equals(report.getReportable())) {
                 continue;
             }
 
