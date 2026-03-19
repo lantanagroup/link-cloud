@@ -8,7 +8,7 @@
 #     Then set the HAPI_FHIR_CUSTOMBEANPACKAGES environment variable to com.lantanagroup.link.hapi
 # See the upgrade notes in the POM as well
 
-FROM maven:3-eclipse-temurin-11 AS build
+FROM maven:3-eclipse-temurin-21 AS build
 WORKDIR /app
 COPY pom.xml ./
 COPY hapi/pom.xml hapi/
@@ -20,14 +20,21 @@ COPY hapi/ hapi/
 RUN mvn -pl hapi -am -B -DskipTests -e -ntp package
 RUN mvn -pl hapi dependency:copy-dependencies -DoutputDirectory=target/dependencies
 
-FROM hapiproject/hapi:v5.6.0-distroless AS run
+FROM hapiproject/hapi:v7.6.1 AS run
 WORKDIR /app
 COPY --from=build /app/hapi/target/hapi-*.jar extra-classes/link.jar
 COPY --from=build /app/hapi/target/dependencies/*.jar extra-classes/
+# In newer HAPI versions, the ENTRYPOINT is usually already set, but we might want to customize it if needed.
+# For now, let's keep the customization to ensure the extra-classes are picked up correctly.
+# But check if HAPI 7.6.1 uses a different mechanism.
+# Usually, we can use HAPI_FHIR_CUSTOMBEANPACKAGES.
+ENV HAPI_FHIR_CUSTOMBEANPACKAGES=com.lantanagroup.link.hapi
+# New HAPI versions might not need the custom ENTRYPOINT if we use the default and put jars in right place.
+# However, to be safe and consistent with previous version's intent:
 ENTRYPOINT [ \
     "java", \
     "--class-path", \
     "/app/main.war", \
     "-Dloader.path=main.war!/WEB-INF/classes/,main.war!/WEB-INF/,/app/extra-classes", \
-    "org.springframework.boot.loader.PropertiesLauncher" \
+    "org.springframework.boot.loader.launch.PropertiesLauncher" \
 ]
