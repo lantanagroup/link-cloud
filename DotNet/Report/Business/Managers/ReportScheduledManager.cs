@@ -425,6 +425,36 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             if (entity == null)
                 throw new InvalidOperationException($"Soft-deleted report schedule with ID '{reportTrackingId}' not found.");
 
+            if (entity.Status == ScheduleStatus.Scheduled)
+            {
+                if (entity.ReportEndDate > DateTime.UtcNow)
+                {
+                    try
+                    {
+                        await _quartzJobHelper.ScheduleJob<EndOfReportPeriodJob>(
+                            new Dictionary<string, object>
+                            {
+                                { "ReportScheduleId", entity.Id },
+                                { "FacilityId", entity.FacilityId }
+                            },
+                            entity.ReportEndDate,
+                            entity.Id.ToString(),
+                            ReportConstants.MeasureReportSubmissionScheduler.Group,
+                            $"{entity.Id}-{entity.ReportEndDate}",
+                            cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to re-schedule Quartz job for report schedule {ReportScheduleId}", entity.Id);
+                        throw new InvalidOperationException($"Failed to re-schedule job for report schedule '{reportTrackingId}'.");
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("Skipping Quartz job re-schedule for report schedule {ReportScheduleId}: ReportEndDate {ReportEndDate} is in the past", entity.Id, entity.ReportEndDate);
+                }
+            }
+
             entity.IsDeleted = false;
             entity.ModifyDate = DateTime.UtcNow;
             _context.ReportSchedule.Update(entity);
