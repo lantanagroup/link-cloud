@@ -36,6 +36,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             string facilityId, bool deleted, CancellationToken cancellationToken = default);
 
         Task SoftDeleteByReportTrackingIdAsync(Guid reportTrackingId, CancellationToken cancellationToken = default);
+        Task RestoreByReportTrackingIdAsync(Guid reportTrackingId, CancellationToken cancellationToken = default);
     }
 
     public class ReportScheduledManager : IReportScheduledManager
@@ -411,6 +412,20 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             }
 
             entity.IsDeleted = true;
+            entity.ModifyDate = DateTime.UtcNow;
+            _context.ReportSchedule.Update(entity);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task RestoreByReportTrackingIdAsync(Guid reportTrackingId, CancellationToken cancellationToken = default)
+        {
+            var entity = await _context.ReportSchedule
+                .FirstOrDefaultAsync(r => r.Id == reportTrackingId && r.IsDeleted == true, cancellationToken);
+
+            if (entity == null)
+                throw new InvalidOperationException($"Soft-deleted report schedule with ID '{reportTrackingId}' not found.");
+
+            entity.IsDeleted = false;
             entity.ModifyDate = DateTime.UtcNow;
             _context.ReportSchedule.Update(entity);
             await _context.SaveChangesAsync(cancellationToken);

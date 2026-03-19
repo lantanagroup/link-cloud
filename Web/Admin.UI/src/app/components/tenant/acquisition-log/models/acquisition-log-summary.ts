@@ -17,6 +17,7 @@ export interface AcquisitionLogSummary {
     status: string;
     reportIds: string[];
     isDeleted: boolean;
+    reportTrackingId: string;
 }
 
 export interface IPagedAcquisitionLogSummary {

@@ -279,6 +279,10 @@
               Patient Id
               <fa-icon [icon]="getSortIcon('patientId')"></fa-icon>
             </th>
+            <th scope="col" class="header-column sortable" (click)="onSort('reportTrackingId')">
+              Report Id
+              <fa-icon [icon]="getSortIcon('reportTrackingId')"></fa-icon>
+            </th>
             <th scope="col" class="header-column sortable" (click)="onSort('facilityId')">
               Facility
               <fa-icon [icon]="getSortIcon('facilityId')"></fa-icon>
@@ -363,6 +367,7 @@
                     </fa-icon>
                   }
                 </td>
+                <td class="data-col table-cell selectable-value">{{log.reportTrackingId}}</td>
                 <td class="data-col table-cell selectable-value">
                   {{log.facilityId}}
                   <a [routerLink]="['/tenant/facility', log.facilityId]" matTooltip="View Facility" class="facility-link">
