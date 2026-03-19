@@ -315,8 +315,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 log.CreateDate,
                 log.RetryAttempts,
                 log.Status,
-                log.IsDeleted,
-                log.ReportTrackingId
+                log.IsDeleted
             })
             .ToListAsync(cancellationToken);
 
