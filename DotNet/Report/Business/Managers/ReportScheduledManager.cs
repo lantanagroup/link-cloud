@@ -34,6 +34,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         Task UpdateReportsDeletedStatusForFacility(
             string facilityId, bool deleted, CancellationToken cancellationToken = default);
+
+        Task SoftDeleteByReportTrackingIdAsync(Guid reportTrackingId, CancellationToken cancellationToken = default);
     }
 
     public class ReportScheduledManager : IReportScheduledManager
@@ -383,5 +385,36 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             }
             while (batch.Count == BatchSize);
         }
+
+        public async Task SoftDeleteByReportTrackingIdAsync(Guid reportTrackingId, CancellationToken cancellationToken = default)
+        {
+            var entity = await _context.ReportSchedule
+                .FirstOrDefaultAsync(r => r.Id == reportTrackingId && (!r.IsDeleted.HasValue || r.IsDeleted == false), cancellationToken);
+
+            if (entity == null)
+                throw new InvalidOperationException($"Report schedule with ID '{reportTrackingId}' not found.");
+
+            if (entity.Status == ScheduleStatus.New || entity.Status == ScheduleStatus.EndOfPeriod)
+                throw new InvalidOperationException($"Report schedule '{reportTrackingId}' is currently in progress and cannot be deleted.");
+
+            if (entity.Status == ScheduleStatus.Scheduled)
+            {
+                try
+                {
+                    await _quartzJobHelper.DeleteJob(entity.Id.ToString(), ReportConstants.MeasureReportSubmissionScheduler.Group, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to delete Quartz job for report schedule {ReportScheduleId}", entity.Id);
+                    throw new InvalidOperationException($"Failed to delete scheduled job for report schedule '{reportTrackingId}'.");
+                }
+            }
+
+            entity.IsDeleted = true;
+            entity.ModifyDate = DateTime.UtcNow;
+            _context.ReportSchedule.Update(entity);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+
     }
 }

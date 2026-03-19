@@ -72,7 +72,7 @@ public class LogController : Controller
             try
             {
                 var allowedSortBy = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                    { "ExecutionDate", "CreateDate", "CompletionDate", "FacilityId", "PatientId", "QueryType", "QueryPhase", "Status", "Priority", "Id", "RetryAttempts" };
+                    { "ExecutionDate", "CreateDate", "CompletionDate", "FacilityId", "PatientId", "QueryType", "QueryPhase", "Status", "Priority", "Id", "RetryAttempts", "IsDeleted" };
                 
                 if (!allowedSortBy.Contains(queryParameters.SortBy))
                 {
@@ -501,6 +501,39 @@ public class LogController : Controller
         catch (Exception ex)
         {
             _logger.LogWarning(new EventId(LoggingIds.DeleteItem, "SoftDeleteByFacility"), ex, "An exception occurred while attempting to soft delete logs for facility {facilityId}", facilityId.Sanitize());
+            return Problem(title: "Internal Server Error", statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Soft delete all data acquisition log entries for a report tracking ID.
+    /// </summary>
+    /// <param name="reportTrackingId">The report tracking ID whose logs should be soft deleted.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <response code="204">Logs were successfully soft deleted.</response>
+    /// <response code="400">If the report tracking ID is null or empty.</response>
+    /// <response code="500">If there is an internal server error.</response>
+    [HttpDelete("report/{reportTrackingId}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> SoftDeleteByReportTrackingId(
+        string reportTrackingId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(reportTrackingId))
+        {
+            return BadRequest("reportTrackingId cannot be null or empty.");
+        }
+
+        try
+        {
+            await _logManager.SoftDeleteByReportTrackingIdAsync(reportTrackingId.SanitizeAndRemove(), cancellationToken);
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.DeleteItem, "SoftDeleteByReportTrackingId"), ex, "An exception occurred while attempting to soft delete logs for report tracking ID {reportTrackingId}", reportTrackingId.Sanitize());
             return Problem(title: "Internal Server Error", statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
