@@ -1,6 +1,6 @@
 package com.lantanagroup.link.hapi.utils;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 public class HttpServletRequestUtils {
     public static String getClientIpAddress(HttpServletRequest request) {

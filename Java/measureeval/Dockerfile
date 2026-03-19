@@ -1,4 +1,4 @@
-FROM maven:3-eclipse-temurin-17 AS build
+FROM maven:3-eclipse-temurin-21 AS build
 
 WORKDIR /app
 
@@ -13,13 +13,18 @@ COPY --chown=mvn:mvn ./ ./
 #RUN chmod +x ./mvn
 RUN mvn -pl measureeval -am -Dmaven.test.skip=true package
 
-FROM eclipse-temurin:17-alpine AS run
+FROM eclipse-temurin:21-alpine AS run
 RUN apk add --no-cache curl
 WORKDIR /app
 COPY --from=build /app/measureeval/target/measureeval-*.jar measureeval.jar
+
+# Extract using tools jarmode (replacement for layertools and cds in SB 3.4)
+RUN java -Djarmode=tools -jar measureeval.jar extract --launcher --destination . --force
+
 RUN chmod -R 755 /app \
   && chown -R 1001 /app
 
 USER 1001
 EXPOSE 5135
-CMD ["java", "--add-opens", "java.base/java.util=ALL-UNNAMED", "-jar", "measureeval.jar"]
+# Run from extracted classes with CDS (using current folder for classpath)
+ENTRYPOINT ["java", "-XX:SharedArchiveFile=application.jsa", "--add-opens", "java.base/java.util=ALL-UNNAMED", "org.springframework.boot.loader.launch.JarLauncher"]

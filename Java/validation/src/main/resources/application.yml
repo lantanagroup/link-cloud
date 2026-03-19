@@ -19,6 +19,9 @@ springdoc:
     enabled: false
 
 spring:
+  threads:
+    virtual:
+      enabled: true
   application:
     name: ValidationService
 

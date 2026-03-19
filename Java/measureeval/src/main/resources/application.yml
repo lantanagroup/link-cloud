@@ -46,6 +46,9 @@ springdoc:
     enabled: false
 
 spring:
+  threads:
+    virtual:
+      enabled: true
 
   cloud:
     discovery:
