@@ -365,7 +365,7 @@ stages:
 - stage: Apply_TEST_Update_SQL_DBs
   trigger: manual
   displayName: Apply_TEST_Update_SQL_DBs
-  condition: always()
+  condition: succeeded('Build') # Only runs if `Build` succeeds
 
   # Requires Windows runner for SQL
   pool:
@@ -558,8 +558,7 @@ stages:
 - stage: Apply_QA_Update_SQL_DBs
   trigger: manual
   displayName: Apply_QA_Update_SQL_DBs
-  # dependsOn: Build
-  condition: always()
+  condition: succeeded('Build') # Only runs if `Build` succeeds
 
   # Requires Windows runner for SQL
   pool:
