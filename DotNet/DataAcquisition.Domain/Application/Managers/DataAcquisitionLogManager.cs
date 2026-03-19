@@ -25,6 +25,7 @@ public interface IDataAcquisitionLogManager
     Task<int> SoftDeleteByFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<int> RestoreByFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<int> SoftDeleteByReportTrackingIdAsync(string reportTrackingId, CancellationToken cancellationToken = default);
+    Task<int> RestoreByReportTrackingIdAsync(string reportTrackingId, CancellationToken cancellationToken = default);
     Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(List<long> logIds, string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default);
     Task ThrottleFacilityAcquisitions(string facilityId, DateTime executionDate, CancellationToken cancellationToken = default);
 }
@@ -215,6 +216,36 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                 .Take(SoftDeleteBatchSize)
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(l => l.IsDeleted, true)
+                    .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                    cancellationToken);
+
+            totalUpdated += updated;
+        }
+        while (updated == SoftDeleteBatchSize);
+
+        return totalUpdated;
+    }
+
+    public async Task<int> RestoreByReportTrackingIdAsync(string reportTrackingId, CancellationToken cancellationToken = default)
+    {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.RestoreByReportTrackingIdAsync");
+        activity?.SetTag(DiagnosticNames.ReportTrackingId, reportTrackingId);
+
+        if (string.IsNullOrWhiteSpace(reportTrackingId))
+        {
+            throw new ArgumentNullException(nameof(reportTrackingId), "Report tracking ID cannot be null or empty.");
+        }
+
+        int totalUpdated = 0;
+        int updated;
+
+        do
+        {
+            updated = await _dbContext.DataAcquisitionLogs
+                .Where(l => l.ReportTrackingId == reportTrackingId && l.IsDeleted)
+                .Take(SoftDeleteBatchSize)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(l => l.IsDeleted, false)
                     .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
                     cancellationToken);
 

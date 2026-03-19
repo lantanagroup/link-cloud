@@ -72,7 +72,7 @@ public class LogController : Controller
             try
             {
                 var allowedSortBy = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                    { "ExecutionDate", "CreateDate", "CompletionDate", "FacilityId", "PatientId", "QueryType", "QueryPhase", "Status", "Priority", "Id", "RetryAttempts", "IsDeleted" };
+                    { "ExecutionDate", "CreateDate", "CompletionDate", "FacilityId", "PatientId", "QueryType", "QueryPhase", "Status", "Priority", "Id", "RetryAttempts", "IsDeleted", "ReportTrackingId" };
                 
                 if (!allowedSortBy.Contains(queryParameters.SortBy))
                 {
@@ -534,6 +534,39 @@ public class LogController : Controller
         catch (Exception ex)
         {
             _logger.LogWarning(new EventId(LoggingIds.DeleteItem, "SoftDeleteByReportTrackingId"), ex, "An exception occurred while attempting to soft delete logs for report tracking ID {reportTrackingId}", reportTrackingId.Sanitize());
+            return Problem(title: "Internal Server Error", statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Restore soft deleted data acquisition log entries for a report tracking ID.
+    /// </summary>
+    /// <param name="reportTrackingId">The report tracking ID whose logs should be restored.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <response code="204">Logs were successfully restored.</response>
+    /// <response code="400">If the report tracking ID is null or empty.</response>
+    /// <response code="500">If there is an internal server error.</response>
+    [HttpPatch("report/{reportTrackingId}/restore")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> RestoreByReportTrackingId(
+        string reportTrackingId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(reportTrackingId))
+        {
+            return BadRequest("reportTrackingId cannot be null or empty.");
+        }
+
+        try
+        {
+            await _logManager.RestoreByReportTrackingIdAsync(reportTrackingId.SanitizeAndRemove(), cancellationToken);
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.UpdateItem, "RestoreByReportTrackingId"), ex, "An exception occurred while attempting to restore logs for report tracking ID {reportTrackingId}", reportTrackingId.Sanitize());
             return Problem(title: "Internal Server Error", statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }

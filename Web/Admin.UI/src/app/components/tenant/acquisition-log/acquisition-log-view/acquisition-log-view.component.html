@@ -279,8 +279,9 @@
               Patient Id
               <fa-icon [icon]="getSortIcon('patientId')"></fa-icon>
             </th>
-            <th scope="col" class="header-column">
+            <th scope="col" class="header-column sortable" (click)="onSort('reportTrackingId')">
               Report Id
+              <fa-icon [icon]="getSortIcon('reportTrackingId')"></fa-icon>
             </th>
             <th scope="col" class="header-column sortable" (click)="onSort('facilityId')">
               Facility

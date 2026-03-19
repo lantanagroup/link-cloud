@@ -25,6 +25,9 @@ import {IReportSchedule} from '../../../interfaces/report/report-schedule.interf
 import {ReportService} from '../../../services/gateway/report/report.service';
 import {FormsModule} from "@angular/forms";
 import {MatCheckbox} from "@angular/material/checkbox";
+import {MatFormFieldModule} from '@angular/material/form-field';
+import {MatInputModule} from '@angular/material/input';
+import {MatSelectModule} from '@angular/material/select';
 
 @Component({
   selector: 'app-reports-dashboard',
@@ -43,7 +46,10 @@ import {MatCheckbox} from "@angular/material/checkbox";
     FormsModule,
     MatCheckbox,
     MatSnackBarModule,
-    MatDialogModule
+    MatDialogModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule
   ],
   templateUrl: './reports-dashboard.component.html',
   styleUrls: ['./reports-dashboard.component.scss']
@@ -68,6 +74,16 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
 
   currentSortBy: string = 'CreateDate';
   currentSortOrder: number = 1; // 1 = Descending, 0 = Ascending
+
+  // Filters
+  facilityIdFilter: string = '';
+  statusFilter: string = '';
+  frequencyFilter: string = '';
+  reportStartDateFilter: string = '';
+  reportEndDateFilter: string = '';
+
+  readonly statusOptions = ['New', 'Scheduled', 'EndOfPeriod', 'Submitted'];
+  readonly frequencyOptions = ['Monthly', 'Weekly', 'Daily', 'Adhoc'];
 
   constructor(
     private route: ActivatedRoute,
@@ -115,12 +131,12 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
     }
     this.loadingService.isLoading.next(true);
     this.reportService.searchReportSchedules(
+      this.facilityIdFilter || undefined,
+      this.frequencyFilter || undefined,
       undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
+      this.reportStartDateFilter ? new Date(this.reportStartDateFilter) : undefined,
+      this.reportEndDateFilter ? new Date(this.reportEndDateFilter) : undefined,
+      this.statusFilter || undefined,
       undefined,
       this.showDeleted,
       this.currentSortBy,
@@ -143,6 +159,26 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
         this.loadingService.isLoading.next(false);
       }
     });
+  }
+
+  applyFilters(): void {
+    this.paginationMetadata.pageNumber = 0;
+    this.loadReportSchedules();
+  }
+
+  clearFilters(): void {
+    this.facilityIdFilter = '';
+    this.statusFilter = '';
+    this.frequencyFilter = '';
+    this.reportStartDateFilter = '';
+    this.reportEndDateFilter = '';
+    this.paginationMetadata.pageNumber = 0;
+    this.loadReportSchedules();
+  }
+
+  hasActiveFilters(): boolean {
+    return !!(this.facilityIdFilter || this.statusFilter || this.frequencyFilter ||
+              this.reportStartDateFilter || this.reportEndDateFilter);
   }
 
   onShowDeletedChange(): void {
@@ -275,6 +311,47 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
                 ? 'This report cannot be deleted because it is currently in progress. Please wait for it to complete.'
                 : 'Failed to soft delete the report. Please try again.'),
               icon: is409 ? 'running_with_errors' : 'error',
+              iconColor: 'warn'
+            }
+          });
+        }
+      });
+    });
+  }
+
+  onRestoreReport(reportScheduleId: string): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        title: 'Restore Report',
+        message: 'Are you sure you want to restore this report and all its associated acquisition logs?',
+        icon: 'restore',
+        iconColor: 'primary',
+        confirmButtonText: 'Restore'
+      }
+    });
+
+    dialogRef.afterClosed().pipe(take(1)).subscribe(confirmed => {
+      if (!confirmed) return;
+
+      const progressSnackBar = this.snackBar.open('Restoring report, please wait...', 'Close');
+
+      this.aggregationService.restoreReport(reportScheduleId).subscribe({
+        next: () => {
+          progressSnackBar.dismiss();
+          this.snackBar.open('Report restored successfully', 'Close', { duration: 3000, panelClass: 'success-snackbar' });
+          this.paginationMetadata.pageNumber = 0;
+          this.loadReportSchedules();
+        },
+        error: (err) => {
+          progressSnackBar.dismiss();
+          const detail = this.extractDetail(err);
+          this.dialog.open(AlertDialogComponent, {
+            width: '420px',
+            data: {
+              title: 'Restore Failed',
+              message: detail || 'Failed to restore the report. Please try again.',
+              icon: 'error',
               iconColor: 'warn'
             }
           });
