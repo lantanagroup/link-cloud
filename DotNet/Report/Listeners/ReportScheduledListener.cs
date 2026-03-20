@@ -32,7 +32,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
         private readonly IExceptionLogger<ReportScheduledListener> _exceptionLogger;
 
-        public ReportScheduledListener(ILogger<ReportScheduledListener> logger, IKafkaConsumerFactory<string, ReportScheduledValue> kafkaConsumerFactory,
+        public ReportScheduledListener(ILogger<ReportScheduledListener> logger,
+            IKafkaConsumerFactory<string, ReportScheduledValue> kafkaConsumerFactory,
             IQuartzJobHelper quartzJobHelper,
             ITransientExceptionHandler<ReportScheduledListener, string, ReportScheduledValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<ReportScheduledListener, string, ReportScheduledValue> deadLetterExceptionHandler,
@@ -139,6 +140,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 using var scope = _serviceScopeFactory.CreateScope();
                 var reportScheduleManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
                 var reportPopulationManager = scope.ServiceProvider.GetRequiredService<IReportPopulationManager>();
+                var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
 
                 facilityId = key;
                 var startDate = value.StartDate.UtcDateTime;
@@ -159,48 +161,45 @@ namespace LantanaGroup.Link.Report.Listeners
                     reportId = Guid.NewGuid();
                 }
 
-                ReportScheduleModel? reportSchedule;
                 if (existing != null)
                 {
                     throw new DeadLetterException($"Report with id {reportId} already exists.");
                 }
-                else
+
+                var reportSchedule = new ReportScheduleModel
                 {
-                    reportSchedule = new ReportScheduleModel
-                    {
-                        Id = reportId.Value,
-                        FacilityId = facilityId,
-                        ReportStartDate = startDate,
-                        ReportEndDate = endDate,
-                        Frequency = frequency,
-                        ReportTypes = reportTypes,
-                        Status = ScheduleStatus.Scheduled,
-                        CreateDate = DateTime.UtcNow
-                    };
-                    var reportName = _blobStorageService.GetReportName(reportSchedule);
-                    reportSchedule.PayloadRootUri = _blobStorageService.GetUri(reportName)?.ToString();
+                    Id = reportId.Value,
+                    FacilityId = facilityId,
+                    ReportStartDate = startDate,
+                    ReportEndDate = endDate,
+                    Frequency = frequency,
+                    ReportTypes = reportTypes,
+                    Status = ScheduleStatus.Scheduled,
+                    CreateDate = DateTime.UtcNow
+                };
 
-                    var _database = scope.ServiceProvider.GetRequiredService<IDatabase>();
-                    await _database.BeginTransactionAsync(cancellationToken);
-                    try
-                    {
-                        reportSchedule = await reportScheduleManager.AddAsync(reportSchedule, cancellationToken);
-                        await reportPopulationManager.AddWithReportScheduleAsync(reportSchedule, cancellationToken);
+                var reportName = _blobStorageService.GetReportName(reportSchedule);
+                reportSchedule.PayloadRootUri = _blobStorageService.GetUri(reportName)?.ToString();
 
-                        await _quartzJobHelper.ScheduleJob<EndOfReportPeriodJob>(new Dictionary<string, object>
-                        {
-                            { "ReportScheduleId", reportSchedule.Id },
-                            { "FacilityId", reportSchedule.FacilityId }
-                        }, reportSchedule.ReportEndDate, reportSchedule.Id.ToString(), ReportConstants.MeasureReportSubmissionScheduler.Group, $"{reportSchedule.Id}-{reportSchedule.ReportEndDate}");
+                await database.BeginTransactionAsync(cancellationToken);
+                try
+                {
+                    reportSchedule = await reportScheduleManager.AddAsync(reportSchedule, cancellationToken);
+                    await reportPopulationManager.AddWithReportScheduleAsync(reportSchedule, cancellationToken);
 
-                        await _database.CommitTransactionAsync();
-                    }
-                    catch (Exception ex)
+                    await _quartzJobHelper.ScheduleJob<EndOfReportPeriodJob>(new Dictionary<string, object>
                     {
-                        await _database.RollbackTransactionAsync();
-                        _exceptionLogger.Handle(ex, "Error processing ReportScheduled event", LogLevel.Error, facilityId, new { ReportScheduleId = reportSchedule.Id });
-                        throw;
-                    }
+                        { "ReportScheduleId", reportSchedule.Id },
+                        { "FacilityId", reportSchedule.FacilityId }
+                    }, reportSchedule.ReportEndDate, reportSchedule.Id.ToString(), ReportConstants.MeasureReportSubmissionScheduler.Group, $"{reportSchedule.Id}-{reportSchedule.ReportEndDate}");
+
+                    await database.CommitTransactionAsync();
+                }
+                catch (Exception ex)
+                {
+                    await database.RollbackTransactionAsync();
+                    _exceptionLogger.Handle(ex, "Error processing ReportScheduled event", LogLevel.Error, facilityId, new { ReportScheduleId = reportSchedule.Id });
+                    throw;
                 }
             }
             catch (DeadLetterException ex)

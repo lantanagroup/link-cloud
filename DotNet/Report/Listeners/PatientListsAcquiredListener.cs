@@ -188,7 +188,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 {
                                     PatientId = patientId,
                                     FacilityId = scheduledReport.FacilityId,
-                                    CreateDate = DateTime.Now,
+                                    CreateDate = DateTime.UtcNow,
                                     ReportingStatus = ReportingStatus.PatientIdentified,
                                     ReportScheduleId = scheduledReport.Id,
                                     MeasureReports = new List<EntryMeasureReportModel>()

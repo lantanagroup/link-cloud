@@ -91,6 +91,9 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
                 foreach (var resource in measureReport.ResourceReferences)
                 {
+                    if (resource == null || resource.Length < 2)
+                        continue;
+
                     var entity = new ReportResource
                     {
                         Id = Guid.NewGuid(),
