@@ -1,7 +1,6 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.Report.Data;
-using LantanaGroup.Link.Report.Data.Entities;
+using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using System.Collections.Immutable;
@@ -19,22 +18,24 @@ public class MeasureReportAggregator
         "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/subjectlist-measurereport";
 
     private readonly ILogger<MeasureReportAggregator> _logger;
-    private readonly IDatabase _database;
 
-    public MeasureReportAggregator(ILogger<MeasureReportAggregator> logger, IDatabase database)
+    private readonly IReportPopulationManager _reportPopulationManager;
+
+    public MeasureReportAggregator(ILogger<MeasureReportAggregator> logger, IReportPopulationManager reportPopulationManager)
     {
         _logger = logger;
-        _database = database ?? throw new ArgumentNullException(nameof(database));
+        _reportPopulationManager = reportPopulationManager;
     }
 
     public async Task<List<MeasureReport>> CreateMeasureReportAggregate(ReportScheduleModel reportSchedule, string organizationId)
     {
         var parser = new FhirJsonParser();
-        var populationModels = await _database.ReportPopulationRepository.FindAsync(x => x.ReportScheduleId == reportSchedule.Id);
+
+        var reportPopulations = await _reportPopulationManager.FindAsync(rp => rp.ReportScheduleId == reportSchedule.Id);
 
         List<MeasureReport> aggregates = new List<MeasureReport>();
 
-        foreach (var populationModel in populationModels)
+        foreach (var reportPopulation in reportPopulations)
         {
             MeasureReport measureReport = new MeasureReport();
 
@@ -46,15 +47,15 @@ public class MeasureReportAggregator
             measureReport.Type = MeasureReport.MeasureReportType.SubjectList;
             measureReport.Status = MeasureReport.MeasureReportStatus.Complete;
             measureReport.DateElement = FhirDateTime.Now();
-            measureReport.Measure = populationModel.Measure;
+            measureReport.Measure = reportPopulation.Measure;
             measureReport.Period = new Period(new FhirDateTime(new DateTimeOffset(reportSchedule.ReportStartDate)), new FhirDateTime(new DateTimeOffset(reportSchedule.ReportEndDate)));
             measureReport.Reporter = new ResourceReference($"Organization/{organizationId}");
 
-            foreach (var reportPopulation in populationModel.GroupPopulations)
+            foreach (var groupPopulation in reportPopulation.GroupPopulations)
             {
                 List measureReportList = new List();
 
-                foreach (var measureReportPopulation in reportPopulation.MeasureReportPopulations)
+                foreach (var measureReportPopulation in groupPopulation.MeasureReportPopulations)
                 {
                     measureReportList.Entry.Add(new List.EntryComponent()
                     {
@@ -70,9 +71,9 @@ public class MeasureReportAggregator
                 {
                     Population = new List<MeasureReport.PopulationComponent>() {
                         new MeasureReport.PopulationComponent() {
-                            Code = JsonSerializer.Deserialize<CodeableConcept>(reportPopulation.PopulationCodeJson, LinkFhirSerializerOptions.ForFhirLenientSerialization),
-                            Count = reportPopulation.TotalPopulationCount,
-                            SubjectResults = new ResourceReference("#" + reportPopulation.PopulationId + "-list")
+                            Code = JsonSerializer.Deserialize<CodeableConcept>(groupPopulation.PopulationCodeJson, LinkFhirSerializerOptions.ForFhirLenientSerialization),
+                            Count = groupPopulation.TotalPopulationCount,
+                            SubjectResults = new ResourceReference("#" + groupPopulation.PopulationId + "-list")
                         }
                     }
                 });

@@ -238,7 +238,14 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     {
                         PopulationId = gp.PopulationId,
                         PopulationCodeJson = gp.PopulationCodeJson,
-                        TotalPopulationCount = gp.TotalPopulationCount
+                        TotalPopulationCount = gp.TotalPopulationCount,
+                        MeasureReportPopulations = gp.MeasureReportPopulations.Select(mrp => new MeasureReportPopulationModel
+                        {
+                            Id = mrp.Id,
+                            GroupPopulationId = mrp.GroupPopulationId,
+                            MeasureReportId = mrp.MeasureReportId,
+                            PopulationCount = mrp.PopulationCount
+                        })
                     }).ToList()
                 })
                 .ToListAsync(cancellationToken);
@@ -261,7 +268,14 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     {
                         PopulationId = gp.PopulationId,
                         PopulationCodeJson = gp.PopulationCodeJson,
-                        TotalPopulationCount = gp.TotalPopulationCount
+                        TotalPopulationCount = gp.TotalPopulationCount,
+                        MeasureReportPopulations = gp.MeasureReportPopulations.Select(mrp => new MeasureReportPopulationModel
+                        {
+                            Id = mrp.Id,
+                            GroupPopulationId = mrp.GroupPopulationId,
+                            MeasureReportId = mrp.MeasureReportId,
+                            PopulationCount = mrp.PopulationCount
+                        })
                     }).ToList()
                 })
                 .SingleOrDefaultAsync(cancellationToken);

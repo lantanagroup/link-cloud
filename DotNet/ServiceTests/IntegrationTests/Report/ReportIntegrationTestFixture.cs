@@ -157,7 +157,7 @@ namespace IntegrationTests.Report
                 new ReportManifestProducer(
                     new Mock<ILogger<ReportManifestProducer>>().Object,
                     sp.GetRequiredService<IServiceScopeFactory>(),
-                    new MeasureReportAggregator(new Mock<ILogger<MeasureReportAggregator>>().Object, sp.GetRequiredService<IDatabase>()),
+                    new MeasureReportAggregator(new Mock<ILogger<MeasureReportAggregator>>().Object, sp.GetRequiredService<IReportPopulationManager>()),
                     TenantApiServiceMock.Object,
                     sp.GetRequiredService<BlobStorageService>(),
                     sp.GetRequiredService<SubmitPayloadProducer>(),
