@@ -10,6 +10,7 @@ using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Listeners;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -161,7 +162,9 @@ namespace IntegrationTests.Report
                     sp.GetRequiredService<BlobStorageService>(),
                     sp.GetRequiredService<SubmitPayloadProducer>(),
                     sp.GetRequiredService<AuditableEventOccurredProducer>()));
-            
+
+            builder.Services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
+
             builder.Services.AddSingleton<IKafkaConsumerFactory<string, ReportScheduledValue>>(ReportScheduledConsumerFactoryMock.Object);
             builder.Services.AddSingleton<ITransientExceptionHandler<ReportScheduledListener, string, ReportScheduledValue>>(ReportScheduledTransientHandlerMock.Object);
             builder.Services.AddSingleton<IDeadLetterExceptionHandler<ReportScheduledListener, string, ReportScheduledValue>>(ReportScheduledDeadLetterHandlerMock.Object);
