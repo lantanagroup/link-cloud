@@ -174,7 +174,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             if (reportEntry == null)
             {
-                throw new DeadLetterException($"No patient report entry records were found (ReportId = {schedule.Id}, FacilityId = {facilityId}");
+                throw new DeadLetterException($"No patient report entry records were found (ReportId = {schedule.Id}, FacilityId = {facilityId})");
             }
 
             if (!value.IsValid)
@@ -189,6 +189,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             reportEntry.ReportingStatus = value.IsValid ? ReportingStatus.PassedValidation : ReportingStatus.FailedValidation;
             reportEntry.SubmissionStatus = SubmissionStatus.Submitting;
+
             await reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
 
             await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, correlationIdStr, reportEntry.AggregateReportUri);

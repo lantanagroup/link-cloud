@@ -10,8 +10,10 @@ using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Listeners
@@ -205,17 +207,52 @@ namespace LantanaGroup.Link.Report.Listeners
             await reportEntryManager.UpdateAsyncWithAggregateResult(reportEntry, aggregateResult);
             await reportResourceManager.AddAsyncWithAggregateResult(facilityId, reportTrackingId, messageValue.PatientId, aggregateResult, cancellationToken);
 
+            // Bulk population handling (single DB load + bulk add for new populations)
+            var existingPopulations = await reportPopulationManager.FindAsync(
+                x => x.ReportScheduleId == reportTrackingId, cancellationToken);
+
+            var existingDict = existingPopulations.ToDictionary(p => p.ReportType);
+
+            var populationsToAdd = new List<ReportPopulationModel>();
+
             foreach (var aggregateMeasureReport in aggregateResult.MeasureReportResults)
             {
-                var populationModel = await reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == reportTrackingId && x.ReportType == aggregateMeasureReport.ReportType);
-
-                if (populationModel == null)
+                if (existingDict.TryGetValue(aggregateMeasureReport.ReportType, out var populationModel))
                 {
-                    await reportPopulationManager.AddAsyncWithAggregateResult(messageValue.FacilityId, reportTrackingId, aggregateMeasureReport, cancellationToken);
-                    continue;
+                    await reportPopulationManager.UpdateAsyncWithAggregateResult(populationModel, aggregateMeasureReport, cancellationToken);
                 }
+                else
+                {
+                    var newPopulation = new ReportPopulationModel
+                    {
+                        Id = Guid.NewGuid(),
+                        Measure = aggregateMeasureReport.Measure,
+                        ReportType = aggregateMeasureReport.ReportType,
+                        CreateDate = DateTime.UtcNow,
+                        FacilityId = facilityId,
+                        ReportScheduleId = reportTrackingId
+                    };
 
-                await reportPopulationManager.UpdateAsyncWithAggregateResult(populationModel, aggregateMeasureReport, cancellationToken);
+                    foreach (var measureReportpopulation in aggregateMeasureReport.PopulationList)
+                    {
+                        if (string.IsNullOrWhiteSpace(measureReportpopulation.PopulationId))
+                            continue;
+
+                        newPopulation.GroupPopulations.Add(new GroupPopulationModel
+                        {
+                            PopulationId = measureReportpopulation.PopulationId,
+                            PopulationCodeJson = JsonSerializer.Serialize(measureReportpopulation.PopulationCode, LinkFhirSerializerOptions.ForFhirLenientSerialization),
+                            TotalPopulationCount = measureReportpopulation.PopulationCount
+                        });
+                    }
+
+                    populationsToAdd.Add(newPopulation);
+                }
+            }
+
+            if (populationsToAdd.Count > 0)
+            {
+                await reportPopulationManager.AddRangeAsync(populationsToAdd, cancellationToken);
             }
 
             if (reportEntry.MeasureReports.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable))
@@ -233,7 +270,6 @@ namespace LantanaGroup.Link.Report.Listeners
                 _exceptionLogger.Handle(ex, "An error was encountered producing a ReadyForValidation", LogLevel.Error, facilityId, new { ReportId = schedule.Id });
                 throw new DeadLetterException(ex.Message, ex);
             }
-
         }
     }
 }

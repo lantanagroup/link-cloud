@@ -145,46 +145,77 @@ namespace LantanaGroup.Link.Report.Listeners
                     throw new TransientException($"No Scheduled Reports found for facilityId: {key}");
                 }
 
+                var newEntries = new List<ReportEntryModel>();
+                var entriesToUpdate = new List<ReportEntryModel>();
+
                 foreach (var scheduledReport in scheduledReports)
                 {
+                    var existingEntries = (await reportEntryManager.FindAsync(
+                        e => e.ReportScheduleId == scheduledReport.Id, cancellationToken))
+                        .ToDictionary(e => e.PatientId);
+
+                    var scheduleReportTypes = scheduledReport.ReportTypes.ToHashSet();
+
                     foreach (var patientListItem in value)
                     {
                         foreach (var pId in patientListItem.PatientIds)
                         {
                             var patientId = pId.Split('/').Last();
-                            var entry = await reportEntryManager.SingleOrDefaultAsync(e => e.ReportScheduleId == scheduledReport.Id && e.PatientId == patientId, cancellationToken);
 
-                            if (entry == null)
+                            if (string.IsNullOrWhiteSpace(patientId))
+                                continue;
+
+                            if (existingEntries.TryGetValue(patientId, out var existingEntry))
                             {
-                                entry = new ReportEntryModel()
+                                var existingTypes = existingEntry.MeasureReports.Select(m => m.ReportType).ToHashSet();
+                                var missingTypes = scheduleReportTypes.Except(existingTypes).ToList();
+
+                                if (missingTypes.Any())
+                                {
+                                    foreach (var missingType in missingTypes)
+                                    {
+                                        existingEntry.MeasureReports.Add(new EntryMeasureReportModel
+                                        {
+                                            ReportType = missingType
+                                        });
+                                    }
+                                    entriesToUpdate.Add(existingEntry);
+                                }
+                            }
+                            else
+                            {
+                                var newEntry = new ReportEntryModel()
                                 {
                                     PatientId = patientId,
                                     FacilityId = scheduledReport.FacilityId,
-                                    CreateDate = DateTime.Now,
+                                    CreateDate = DateTime.UtcNow,
                                     ReportingStatus = ReportingStatus.PatientIdentified,
-                                    ReportScheduleId = scheduledReport.Id
+                                    ReportScheduleId = scheduledReport.Id,
+                                    MeasureReports = new List<EntryMeasureReportModel>()
                                 };
-                                await reportEntryManager.AddAsync(entry, cancellationToken);
-                            }
 
-                            foreach (var reportType in scheduledReport.ReportTypes)
-                            {
-                                var measureReportEntry = entry.MeasureReports.Where(x => x.ReportType == reportType).FirstOrDefault();
-
-                                if (measureReportEntry != null)
+                                foreach (var reportType in scheduledReport.ReportTypes)
                                 {
-                                    continue;
+                                    newEntry.MeasureReports.Add(new EntryMeasureReportModel()
+                                    {
+                                        ReportType = reportType
+                                    });
                                 }
 
-                                entry.MeasureReports.Add(new EntryMeasureReportModel()
-                                {
-                                    ReportType = reportType
-                                });
-
-                                await reportEntryManager.UpdateAsync(entry, CancellationToken.None);
+                                newEntries.Add(newEntry);
                             }
                         }
                     }
+                }
+
+                if (newEntries.Count > 0)
+                {
+                    await reportEntryManager.AddRangeAsync(newEntries, cancellationToken);
+                }
+
+                foreach (var entryToUpdate in entriesToUpdate)
+                {
+                    await reportEntryManager.UpdateAsync(entryToUpdate, cancellationToken);
                 }
             }
             catch (DeadLetterException ex)
