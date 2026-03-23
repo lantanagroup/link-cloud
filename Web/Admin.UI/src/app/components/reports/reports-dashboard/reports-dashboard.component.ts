@@ -147,6 +147,7 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
       next: (data) => {
         this.reportSchedules = data.records;
         this.dataSource.data = this.reportSchedules;
+        this.paginationMetadata = data.metadata;
         this.paginationMetadata.pageNumber = data.metadata.pageNumber - 1; // Convert back to 0-based
         this.loadingService.isLoading.next(false);
         if (this.pendingHighlight && data.records.length > 0) {

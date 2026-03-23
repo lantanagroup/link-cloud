@@ -24,7 +24,7 @@
       <div class="data-label">
         Measure
         <span class="data-value selectable-value">
-          @for (report of measureReport.measureReportList; track report.measureReportId; let isLast = $last) {
+          @for (report of measureReport.measureReports; track report.measureReportId; let isLast = $last) {
             {{report.reportType}}@if (!isLast) {, }
           }
         </span>
