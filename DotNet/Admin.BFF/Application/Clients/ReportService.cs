@@ -76,7 +76,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             string? sortBy = null,
             SortOrder? sortOrder = null,
             int pageNumber = 1,
-            int pageSize = 10
+            int pageSize = 10,
+            DateTime? createDate = null
             )
         {
             // HTTP GET
@@ -147,6 +148,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             if (sortOrder.HasValue)
             {
                 queryParams["sortOrder"] = sortOrder.Value.ToString();
+            }
+
+            if (createDate.HasValue)
+            {
+                queryParams["createDate"] = createDate.Value.ToString("o");
             }
 
             var relativeUrl = QueryHelpers.AddQueryString("api/schedules/search", queryParams);

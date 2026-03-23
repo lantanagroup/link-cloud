@@ -391,6 +391,19 @@ export class AcquisitionLogViewComponent implements OnInit {
     );
   }
 
+  onIncludeDeletedChange(): void {
+    this.tenantService.getAllFacilities(this.includeDeleted).subscribe({
+      next: (facilities) => {
+        this.facilityFilterOptions = facilities;
+        if (this.selectedFacilityFilter !== 'Any' && !facilities[this.selectedFacilityFilter]) {
+          this.selectedFacilityFilter = 'Any';
+        }
+      },
+      error: (error) => console.error('Error loading facilities:', error)
+    });
+    this.applyFilters();
+  }
+
   refreshLogs(): void {
     const pageIndex = this.paginationMetadata?.pageNumber ?? this.defaultPageNumber;
     const pageSize = this.paginationMetadata?.pageSize ?? this.defaultPageSize;

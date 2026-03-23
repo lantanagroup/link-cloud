@@ -9,8 +9,8 @@ import {MatTableDataSource, MatTableModule} from '@angular/material/table';
 import {MatPaginator, MatPaginatorModule, PageEvent} from '@angular/material/paginator';
 import {MatSort, MatSortModule, Sort} from '@angular/material/sort';
 import {MatTooltipModule} from '@angular/material/tooltip';
-import {Subscription} from 'rxjs';
-import {take} from 'rxjs/operators';
+import {BehaviorSubject, combineLatest, Observable, of, Subscription} from 'rxjs';
+import {debounceTime, distinctUntilChanged, map, startWith, switchMap, take} from 'rxjs/operators';
 import {TenantService} from '../../../services/gateway/tenant/tenant.service';
 import {LoadingService} from '../../../services/loading.service';
 import {AggregationService} from '../../../services/gateway/aggregation/aggregation.service';
@@ -23,11 +23,13 @@ import {FontAwesomeModule} from '@fortawesome/angular-fontawesome';
 import {faRotate} from '@fortawesome/free-solid-svg-icons';
 import {IReportSchedule} from '../../../interfaces/report/report-schedule.interface';
 import {ReportService} from '../../../services/gateway/report/report.service';
-import {FormsModule} from "@angular/forms";
+import {FormControl, FormsModule, ReactiveFormsModule} from "@angular/forms";
 import {MatCheckbox} from "@angular/material/checkbox";
 import {MatFormFieldModule} from '@angular/material/form-field';
 import {MatInputModule} from '@angular/material/input';
 import {MatSelectModule} from '@angular/material/select';
+import {MatDatepickerModule} from '@angular/material/datepicker';
+import {MatAutocompleteModule} from '@angular/material/autocomplete';
 
 @Component({
   selector: 'app-reports-dashboard',
@@ -44,12 +46,15 @@ import {MatSelectModule} from '@angular/material/select';
     RouterLink,
     FontAwesomeModule,
     FormsModule,
+    ReactiveFormsModule,
     MatCheckbox,
     MatSnackBarModule,
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
-    MatSelectModule
+    MatSelectModule,
+    MatDatepickerModule,
+    MatAutocompleteModule
   ],
   templateUrl: './reports-dashboard.component.html',
   styleUrls: ['./reports-dashboard.component.scss']
@@ -76,11 +81,15 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
   currentSortOrder: number = 1; // 1 = Descending, 0 = Ascending
 
   // Filters
-  facilityIdFilter: string = '';
+  facilityInputControl = new FormControl<string>('');
+  selectedFacilityId: string | null = null;
+  filteredFacilities: Observable<{ facilityId: string; facilityName: string }[]> = of([]);
+  private showDeletedSubject = new BehaviorSubject<boolean>(false);
   statusFilter: string = '';
   frequencyFilter: string = '';
-  reportStartDateFilter: string = '';
-  reportEndDateFilter: string = '';
+  reportStartDateFilter: Date | null = null;
+  reportEndDateFilter: Date | null = null;
+  createDateFilter: Date | null = null;
 
   readonly statusOptions = ['New', 'Scheduled', 'EndOfPeriod', 'Submitted'];
   readonly frequencyOptions = ['Monthly', 'Weekly', 'Daily', 'Adhoc'];
@@ -107,6 +116,15 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
     this.paginationMetadata.pageSize = this.defaultPageSize;
     this.paginationMetadata.totalCount = 0;
     this.paginationMetadata.totalPages = 0;
+
+    this.filteredFacilities = combineLatest([
+      this.facilityInputControl.valueChanges.pipe(startWith(''), debounceTime(300), distinctUntilChanged()),
+      this.showDeletedSubject
+    ]).pipe(
+      switchMap(([term, includeDeleted]) => this.tenantService.autocompleteFacilities(term || '', includeDeleted)),
+      map(results => Object.entries(results || {}).map(([facilityId, facilityName]) => ({ facilityId, facilityName: facilityName as string })))
+    );
+
     this.loadReportSchedules();
   }
 
@@ -131,22 +149,24 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
     }
     this.loadingService.isLoading.next(true);
     this.reportService.searchReportSchedules(
-      this.facilityIdFilter || undefined,
+      this.selectedFacilityId || undefined,
       this.frequencyFilter || undefined,
       undefined,
-      this.reportStartDateFilter ? new Date(this.reportStartDateFilter) : undefined,
-      this.reportEndDateFilter ? new Date(this.reportEndDateFilter) : undefined,
+      this.reportStartDateFilter ?? undefined,
+      this.reportEndDateFilter ?? undefined,
       this.statusFilter || undefined,
       undefined,
       this.showDeleted,
       this.currentSortBy,
       this.currentSortOrder,
       Math.max(1, this.paginationMetadata.pageSize || this.defaultPageSize),
-      this.paginationMetadata.pageNumber + 1 // API expects 1-based indexing
+      this.paginationMetadata.pageNumber + 1, // API expects 1-based indexing
+      this.createDateFilter ?? undefined
     ).subscribe({
       next: (data) => {
         this.reportSchedules = data.records;
         this.dataSource.data = this.reportSchedules;
+        this.paginationMetadata = data.metadata;
         this.paginationMetadata.pageNumber = data.metadata.pageNumber - 1; // Convert back to 0-based
         this.loadingService.isLoading.next(false);
         if (this.pendingHighlight && data.records.length > 0) {
@@ -167,21 +187,43 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
   }
 
   clearFilters(): void {
-    this.facilityIdFilter = '';
+    this.facilityInputControl.setValue('', { emitEvent: false });
+    this.selectedFacilityId = null;
     this.statusFilter = '';
     this.frequencyFilter = '';
-    this.reportStartDateFilter = '';
-    this.reportEndDateFilter = '';
+    this.reportStartDateFilter = null;
+    this.reportEndDateFilter = null;
+    this.createDateFilter = null;
     this.paginationMetadata.pageNumber = 0;
     this.loadReportSchedules();
   }
 
+  onFacilitySelected(fac: { facilityId: string; facilityName: string }): void {
+    this.selectedFacilityId = fac.facilityId;
+    this.facilityInputControl.setValue(fac.facilityName || fac.facilityId, { emitEvent: false });
+    this.applyFilters();
+  }
+
+  clearFacilityFilter(): void {
+    this.selectedFacilityId = null;
+    this.facilityInputControl.setValue('', { emitEvent: false });
+    this.applyFilters();
+  }
+
+  displayFacility(fac: { facilityId: string; facilityName: string } | string | null): string {
+    if (!fac) return '';
+    if (typeof fac === 'string') return fac;
+    return fac.facilityName || fac.facilityId;
+  }
+
   hasActiveFilters(): boolean {
-    return !!(this.facilityIdFilter || this.statusFilter || this.frequencyFilter ||
-              this.reportStartDateFilter || this.reportEndDateFilter);
+    return !!(this.selectedFacilityId || this.facilityInputControl.value ||
+              this.statusFilter || this.frequencyFilter ||
+              this.reportStartDateFilter || this.reportEndDateFilter || this.createDateFilter);
   }
 
   onShowDeletedChange(): void {
+    this.showDeletedSubject.next(this.showDeleted);
     this.paginationMetadata.pageNumber = 0;
     this.loadReportSchedules();
   }

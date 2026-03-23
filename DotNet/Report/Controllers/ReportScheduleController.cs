@@ -265,7 +265,8 @@ namespace LantanaGroup.Link.Report.Controllers
             string? sortBy = null,
             SortOrder? sortOrder = null,
             int pageSize = 10,
-            int pageNumber = 1)
+            int pageNumber = 1,
+            DateTime? createDate = null)
         {
             try
             {
@@ -291,7 +292,9 @@ namespace LantanaGroup.Link.Report.Controllers
                     sortBy,
                     sortOrder,
                     pageSize,
-                    pageNumber);
+                    pageNumber,
+                    cancellationToken: HttpContext.RequestAborted,
+                    createDate: createDate);
 
                 Response.Headers.Append("X-Pagination", JsonSerializer.Serialize(result.Metadata));
 
