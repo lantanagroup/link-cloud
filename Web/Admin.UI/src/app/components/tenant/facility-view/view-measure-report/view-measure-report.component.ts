@@ -59,11 +59,11 @@ export class ViewMeasureReportComponent implements OnInit {
   getAggregatedResourceCount(): Record<string, number> {
     const aggregated: Record<string, number> = {};
     
-    if (!this.measureReport?.measureReportList) {
+    if (!this.measureReport?.measureReports) {
       return aggregated;
     }
 
-    for (const report of this.measureReport.measureReportList) {
+    for (const report of this.measureReport.measureReports) {
       if (report.resourceCount) {
         for (const [resourceType, count] of Object.entries(report.resourceCount)) {
           aggregated[resourceType] = (aggregated[resourceType] || 0) + count;
