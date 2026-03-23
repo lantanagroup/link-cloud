@@ -266,7 +266,7 @@ namespace LantanaGroup.Link.Report.Controllers
             SortOrder? sortOrder = null,
             int pageSize = 10,
             int pageNumber = 1,
-            DateTime? createDate = null)
+            DateOnly? createDate = null)
         {
             try
             {

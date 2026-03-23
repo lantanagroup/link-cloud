@@ -25,7 +25,7 @@ public static class GetReportSummaries
         SortOrder? sortOrder = null,
         int pageNumber = 1,
         int pageSize = 10,
-        DateTime? createDate = null
+        DateOnly? createDate = null
         )
     {
         try

@@ -10,7 +10,7 @@ import {MatPaginator, MatPaginatorModule, PageEvent} from '@angular/material/pag
 import {MatSort, MatSortModule, Sort} from '@angular/material/sort';
 import {MatTooltipModule} from '@angular/material/tooltip';
 import {BehaviorSubject, combineLatest, Observable, of, Subscription} from 'rxjs';
-import {debounceTime, distinctUntilChanged, map, startWith, switchMap, take} from 'rxjs/operators';
+import {debounceTime, distinctUntilChanged, map, startWith, switchMap, take, tap} from 'rxjs/operators';
 import {TenantService} from '../../../services/gateway/tenant/tenant.service';
 import {LoadingService} from '../../../services/loading.service';
 import {AggregationService} from '../../../services/gateway/aggregation/aggregation.service';
@@ -118,10 +118,21 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
     this.paginationMetadata.totalPages = 0;
 
     this.filteredFacilities = combineLatest([
-      this.facilityInputControl.valueChanges.pipe(startWith(''), debounceTime(300), distinctUntilChanged()),
+      this.facilityInputControl.valueChanges.pipe(
+        startWith(''),
+        debounceTime(300),
+        distinctUntilChanged(),
+        // Clear the selected ID whenever the user edits the text. emitEvent:false
+        // (used in onFacilitySelected) bypasses valueChanges, so the tap only
+        // fires on real keystrokes, not on programmatic selection.
+        tap(() => { this.selectedFacilityId = null; })
+      ),
       this.showDeletedSubject
     ]).pipe(
-      switchMap(([term, includeDeleted]) => this.tenantService.autocompleteFacilities(term || '', includeDeleted)),
+      switchMap(([term, includeDeleted]) => {
+        const search = typeof term === 'string' ? term : '';
+        return this.tenantService.autocompleteFacilities(search, includeDeleted);
+      }),
       map(results => Object.entries(results || {}).map(([facilityId, facilityName]) => ({ facilityId, facilityName: facilityName as string })))
     );
 
@@ -148,12 +159,15 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
       this.highlightedRowIds = new Set();
     }
     this.loadingService.isLoading.next(true);
+    const reportEndDateNormalized = this.reportEndDateFilter
+      ? new Date(this.reportEndDateFilter.getFullYear(), this.reportEndDateFilter.getMonth(), this.reportEndDateFilter.getDate(), 23, 59, 59, 999)
+      : undefined;
     this.reportService.searchReportSchedules(
-      this.selectedFacilityId || undefined,
+      this.selectedFacilityId || this.facilityInputControl.value || undefined,
       this.frequencyFilter || undefined,
       undefined,
       this.reportStartDateFilter ?? undefined,
-      this.reportEndDateFilter ?? undefined,
+      reportEndDateNormalized,
       this.statusFilter || undefined,
       undefined,
       this.showDeleted,

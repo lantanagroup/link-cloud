@@ -153,7 +153,9 @@ export class ReportService {
       params = params.set('sortOrder', sortOrder.toString());
     }
     if (createDate) {
-      params = params.set('createDate', createDate.toISOString());
+      const d = new Date(createDate);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      params = params.set('createDate', dateStr);
     }
 
     return this.http.get<IPagedReportSchedule>(`${this.appConfigService.config?.baseApiUrl}/aggregate/reports/summaries`, { params })

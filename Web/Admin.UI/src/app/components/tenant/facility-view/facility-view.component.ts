@@ -179,12 +179,15 @@ export class FacilityViewComponent implements OnInit, OnDestroy {
       this.highlightedRowIds = new Set();
     }
     this.loadingService.isLoading.next(true);
+    const reportEndDateNormalized = this.reportEndDateFilter
+      ? new Date(this.reportEndDateFilter.getFullYear(), this.reportEndDateFilter.getMonth(), this.reportEndDateFilter.getDate(), 23, 59, 59, 999)
+      : undefined;
     this.reportService.searchReportSchedules(
       this.facilityId,
       this.frequencyFilter || undefined,
       undefined,
       this.reportStartDateFilter ?? undefined,
-      this.reportEndDateFilter ?? undefined,
+      reportEndDateNormalized,
       this.statusFilter || undefined,
       undefined,
       this.showDeleted,

@@ -398,10 +398,10 @@ export class AcquisitionLogViewComponent implements OnInit {
         if (this.selectedFacilityFilter !== 'Any' && !facilities[this.selectedFacilityFilter]) {
           this.selectedFacilityFilter = 'Any';
         }
+        this.applyFilters();
       },
       error: (error) => console.error('Error loading facilities:', error)
     });
-    this.applyFilters();
   }
 
   refreshLogs(): void {
