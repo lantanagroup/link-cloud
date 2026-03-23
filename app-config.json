@@ -129,11 +129,10 @@
         "description": "The backend address for each service routed through the BFF (e.g., AccountService, AuditService, etc.)."
       }
     ],
-    "Audit": [],
-    "Census": [
+    "Audit": [
       {
-        "key": "CensusSettings:ObservationCodes",
-        "description": "Comma-separated list of FHIR Observation codes used to identify census events."
+        "key": "KafkaConnection:ClientId",
+        "description": "The client ID for the Kafka connection."
       }
     ],
     "DataAcquisition": [
@@ -144,6 +143,16 @@
       {
         "key": "ServiceRegistry:TenantService:TenantServiceUrl",
         "description": "The base URL for the Tenant Service used to validate facilities."
+      },
+      {
+        "key": "AcquisitionWorkerProcessorSettings:MaxConcurrentAcquisitions",
+        "description": "The maximum number of concurrent data acquisition tasks."
+      }
+    ],
+    "Census": [
+      {
+        "key": "CensusSettings:ObservationCodes",
+        "description": "Comma-separated list of FHIR Observation codes used to identify census events."
       }
     ],
     "MeasureEval": [
