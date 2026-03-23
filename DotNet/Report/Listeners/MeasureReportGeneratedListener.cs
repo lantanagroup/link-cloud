@@ -11,7 +11,6 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.SerDes;
-using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
@@ -242,7 +241,15 @@ namespace LantanaGroup.Link.Report.Listeners
                         {
                             PopulationId = measureReportpopulation.PopulationId,
                             PopulationCodeJson = JsonSerializer.Serialize(measureReportpopulation.PopulationCode, LinkFhirSerializerOptions.ForFhirLenientSerialization),
-                            TotalPopulationCount = measureReportpopulation.PopulationCount
+                            TotalPopulationCount = measureReportpopulation.PopulationCount,
+                            MeasureReportPopulations = new List<MeasureReportPopulationModel>
+                            {
+                                new MeasureReportPopulationModel
+                                {
+                                    MeasureReportId = aggregateMeasureReport.MeasureReportId,
+                                    PopulationCount = measureReportpopulation.PopulationCount
+                                }
+                            }
                         });
                     }
 
