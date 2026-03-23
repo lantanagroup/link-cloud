@@ -102,6 +102,35 @@
   font-style: italic;
 }
 
+button[color="warn"] {
+  color: #e53935;
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px 0;
+}
+
+.compact-filter {
+  flex: 1 1 160px;
+  max-width: 220px;
+  font-size: 14px;
+
+  .mat-mdc-form-field-subscript-wrapper {
+    display: none;
+  }
+}
+
+.filter-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding-bottom: 4px;
+}
+
 .no-data-message {
   text-align: center;
   color: gray;

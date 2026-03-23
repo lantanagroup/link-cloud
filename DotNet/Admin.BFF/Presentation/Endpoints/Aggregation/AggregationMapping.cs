@@ -48,6 +48,38 @@ public static class AggregationMapping
                               "If a downstream step fails, all completed steps are rolled back and 500 is returned."
             });
 
+        routes.MapDelete("/reports/{reportScheduleId}", SoftDeleteReport.Handle)
+            .RequireAuthorization(LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName)
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status500InternalServerError)
+            .WithOpenApi(x => new OpenApiOperation(x)
+            {
+                Summary = "Soft Delete Report Schedule",
+                Description = "Soft deletes a report schedule and its associated acquisition logs. " +
+                              "Returns 409 if the report is currently in progress (New or EndOfPeriod status). " +
+                              "Returns 404 if the report schedule does not exist. " +
+                              "If the acquisition log deletion fails, the report soft-delete is rolled back and 500 is returned."
+            });
+
+        routes.MapPatch("/reports/{reportScheduleId}/restore", RestoreReport.Handle)
+            .RequireAuthorization(LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName)
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status500InternalServerError)
+            .WithOpenApi(x => new OpenApiOperation(x)
+            {
+                Summary = "Restore Report Schedule",
+                Description = "Restores a soft-deleted report schedule and its associated acquisition logs. " +
+                              "Returns 404 if the report schedule does not exist. " +
+                              "If the acquisition log restore fails, the report restore is rolled back and 500 is returned."
+            });
+
         routes.MapGet("/reports/summaries", GetReportSummaries.Search)
             .RequireAuthorization(LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName)
             .Produces<List<ScheduledReportListSummary>>()

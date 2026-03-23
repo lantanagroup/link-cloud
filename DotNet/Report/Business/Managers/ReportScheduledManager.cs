@@ -34,6 +34,9 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         Task UpdateReportsDeletedStatusForFacility(
             string facilityId, bool deleted, CancellationToken cancellationToken = default);
+
+        Task SoftDeleteByReportTrackingIdAsync(Guid reportTrackingId, CancellationToken cancellationToken = default);
+        Task RestoreByReportTrackingIdAsync(Guid reportTrackingId, CancellationToken cancellationToken = default);
     }
 
     public class ReportScheduledManager : IReportScheduledManager
@@ -280,7 +283,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 .Take(pageSize)
                 .ToListAsync(cancellationToken);
 
-            var metadata = new PaginationMetadata(totalCount, pageSize, pageNumber);
+            var metadata = new PaginationMetadata(pageSize, pageNumber, totalCount);
 
             return new PagedConfigModel<ReportScheduleModel>(results, metadata);
         }
@@ -383,5 +386,80 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             }
             while (batch.Count == BatchSize);
         }
+
+        public async Task SoftDeleteByReportTrackingIdAsync(Guid reportTrackingId, CancellationToken cancellationToken = default)
+        {
+            var entity = await _context.ReportSchedule
+                .FirstOrDefaultAsync(r => r.Id == reportTrackingId && (!r.IsDeleted.HasValue || r.IsDeleted == false), cancellationToken);
+
+            if (entity == null)
+                throw new InvalidOperationException($"Report schedule with ID '{reportTrackingId}' not found.");
+
+            if (entity.Status == ScheduleStatus.New || entity.Status == ScheduleStatus.EndOfPeriod)
+                throw new InvalidOperationException($"Report schedule '{reportTrackingId}' is currently in progress and cannot be deleted.");
+
+            if (entity.Status == ScheduleStatus.Scheduled)
+            {
+                try
+                {
+                    await _quartzJobHelper.DeleteJob(entity.Id.ToString(), ReportConstants.MeasureReportSubmissionScheduler.Group, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to delete Quartz job for report schedule {ReportScheduleId}", entity.Id);
+                    throw new InvalidOperationException($"Failed to delete scheduled job for report schedule '{reportTrackingId}'.");
+                }
+            }
+
+            entity.IsDeleted = true;
+            entity.ModifyDate = DateTime.UtcNow;
+            _context.ReportSchedule.Update(entity);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task RestoreByReportTrackingIdAsync(Guid reportTrackingId, CancellationToken cancellationToken = default)
+        {
+            var entity = await _context.ReportSchedule
+                .FirstOrDefaultAsync(r => r.Id == reportTrackingId && r.IsDeleted == true, cancellationToken);
+
+            if (entity == null)
+                throw new InvalidOperationException($"Soft-deleted report schedule with ID '{reportTrackingId}' not found.");
+
+            if (entity.Status == ScheduleStatus.Scheduled)
+            {
+                if (entity.ReportEndDate > DateTime.UtcNow)
+                {
+                    try
+                    {
+                        await _quartzJobHelper.ScheduleJob<EndOfReportPeriodJob>(
+                            new Dictionary<string, object>
+                            {
+                                { "ReportScheduleId", entity.Id },
+                                { "FacilityId", entity.FacilityId }
+                            },
+                            entity.ReportEndDate,
+                            entity.Id.ToString(),
+                            ReportConstants.MeasureReportSubmissionScheduler.Group,
+                            $"{entity.Id}-{entity.ReportEndDate}",
+                            cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to re-schedule Quartz job for report schedule {ReportScheduleId}", entity.Id);
+                        throw new InvalidOperationException($"Failed to re-schedule job for report schedule '{reportTrackingId}'.");
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("Skipping Quartz job re-schedule for report schedule {ReportScheduleId}: ReportEndDate {ReportEndDate} is in the past", entity.Id, entity.ReportEndDate);
+                }
+            }
+
+            entity.IsDeleted = false;
+            entity.ModifyDate = DateTime.UtcNow;
+            _context.ReportSchedule.Update(entity);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+
     }
 }

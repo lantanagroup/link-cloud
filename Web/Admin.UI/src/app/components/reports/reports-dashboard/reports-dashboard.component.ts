@@ -3,15 +3,19 @@ import {ActivatedRoute, Router, RouterLink} from '@angular/router';
 import {MatToolbarModule} from '@angular/material/toolbar';
 import {MatIconModule} from '@angular/material/icon';
 import {MatButtonModule} from '@angular/material/button';
-import {MatDialog} from '@angular/material/dialog';
+import {MatDialog, MatDialogModule} from '@angular/material/dialog';
 import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
 import {MatTableDataSource, MatTableModule} from '@angular/material/table';
 import {MatPaginator, MatPaginatorModule, PageEvent} from '@angular/material/paginator';
 import {MatSort, MatSortModule, Sort} from '@angular/material/sort';
 import {MatTooltipModule} from '@angular/material/tooltip';
 import {Subscription} from 'rxjs';
+import {take} from 'rxjs/operators';
 import {TenantService} from '../../../services/gateway/tenant/tenant.service';
 import {LoadingService} from '../../../services/loading.service';
+import {AggregationService} from '../../../services/gateway/aggregation/aggregation.service';
+import {DeleteConfirmationDialogComponent} from '../../core/delete-confirmation-dialog/delete-confirmation-dialog.component';
+import {AlertDialogComponent} from '../../core/alert-dialog/alert-dialog.component';
 import {PaginationMetadata} from '../../../models/pagination-metadata.model';
 import {CommonModule} from '@angular/common';
 import {ResubmitDialogComponent} from "../../tenant/facility-view/resubmit-dialog.component";
@@ -21,6 +25,9 @@ import {IReportSchedule} from '../../../interfaces/report/report-schedule.interf
 import {ReportService} from '../../../services/gateway/report/report.service';
 import {FormsModule} from "@angular/forms";
 import {MatCheckbox} from "@angular/material/checkbox";
+import {MatFormFieldModule} from '@angular/material/form-field';
+import {MatInputModule} from '@angular/material/input';
+import {MatSelectModule} from '@angular/material/select';
 
 @Component({
   selector: 'app-reports-dashboard',
@@ -38,7 +45,11 @@ import {MatCheckbox} from "@angular/material/checkbox";
     FontAwesomeModule,
     FormsModule,
     MatCheckbox,
-    MatSnackBarModule
+    MatSnackBarModule,
+    MatDialogModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule
   ],
   templateUrl: './reports-dashboard.component.html',
   styleUrls: ['./reports-dashboard.component.scss']
@@ -64,6 +75,16 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
   currentSortBy: string = 'CreateDate';
   currentSortOrder: number = 1; // 1 = Descending, 0 = Ascending
 
+  // Filters
+  facilityIdFilter: string = '';
+  statusFilter: string = '';
+  frequencyFilter: string = '';
+  reportStartDateFilter: string = '';
+  reportEndDateFilter: string = '';
+
+  readonly statusOptions = ['New', 'Scheduled', 'EndOfPeriod', 'Submitted'];
+  readonly frequencyOptions = ['Monthly', 'Weekly', 'Daily', 'Adhoc'];
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
@@ -71,17 +92,21 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
     private loadingService: LoadingService,
     private dialog: MatDialog,
     private tenantService: TenantService,
+    private aggregationService: AggregationService,
     private snackBar: MatSnackBar) {
   }
 
   ngOnInit(): void {
     const savedPageSize = localStorage.getItem(this.PAGE_SIZE_KEY);
     if (savedPageSize) {
-      this.defaultPageSize = +savedPageSize;
+      const parsed = +savedPageSize;
+      if (parsed > 0) this.defaultPageSize = parsed;
     }
 
     this.paginationMetadata.pageNumber = this.defaultPageNumber;
     this.paginationMetadata.pageSize = this.defaultPageSize;
+    this.paginationMetadata.totalCount = 0;
+    this.paginationMetadata.totalPages = 0;
     this.loadReportSchedules();
   }
 
@@ -95,7 +120,7 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
   }
 
   getColumns(): string[] {
-    const cols = ['id', 'facilityId', 'reportStartDate', 'createDate', 'frequency', 'reportTypes', 'patientsInCensus', 'patientsInIP', 'status', 'action'];
+    const cols = ['id', 'facilityId', 'reportStartDate', 'createDate', 'frequency', 'reportTypes', 'patientsInCensus', 'patientsInIP', 'status', 'action', 'delete'];
     if (this.showDeleted) cols.push('isDeleted');
     return cols;
   }
@@ -106,23 +131,22 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
     }
     this.loadingService.isLoading.next(true);
     this.reportService.searchReportSchedules(
+      this.facilityIdFilter || undefined,
+      this.frequencyFilter || undefined,
       undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
+      this.reportStartDateFilter ? new Date(this.reportStartDateFilter) : undefined,
+      this.reportEndDateFilter ? new Date(this.reportEndDateFilter) : undefined,
+      this.statusFilter || undefined,
       undefined,
       this.showDeleted,
       this.currentSortBy,
       this.currentSortOrder,
-      this.paginationMetadata.pageSize,
+      Math.max(1, this.paginationMetadata.pageSize || this.defaultPageSize),
       this.paginationMetadata.pageNumber + 1 // API expects 1-based indexing
     ).subscribe({
       next: (data) => {
         this.reportSchedules = data.records;
         this.dataSource.data = this.reportSchedules;
-        this.paginationMetadata = data.metadata;
         this.paginationMetadata.pageNumber = data.metadata.pageNumber - 1; // Convert back to 0-based
         this.loadingService.isLoading.next(false);
         if (this.pendingHighlight && data.records.length > 0) {
@@ -137,15 +161,38 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  applyFilters(): void {
+    this.paginationMetadata.pageNumber = 0;
+    this.loadReportSchedules();
+  }
+
+  clearFilters(): void {
+    this.facilityIdFilter = '';
+    this.statusFilter = '';
+    this.frequencyFilter = '';
+    this.reportStartDateFilter = '';
+    this.reportEndDateFilter = '';
+    this.paginationMetadata.pageNumber = 0;
+    this.loadReportSchedules();
+  }
+
+  hasActiveFilters(): boolean {
+    return !!(this.facilityIdFilter || this.statusFilter || this.frequencyFilter ||
+              this.reportStartDateFilter || this.reportEndDateFilter);
+  }
+
   onShowDeletedChange(): void {
     this.paginationMetadata.pageNumber = 0;
     this.loadReportSchedules();
   }
 
   onPageChange(event: PageEvent): void {
-    this.paginationMetadata.pageSize = event.pageSize;
     this.paginationMetadata.pageNumber = event.pageIndex;
-    localStorage.setItem(this.PAGE_SIZE_KEY, event.pageSize.toString());
+    if (event.pageSize > 0) {
+      this.paginationMetadata.pageSize = event.pageSize;
+      this.defaultPageSize = event.pageSize;
+      localStorage.setItem(this.PAGE_SIZE_KEY, event.pageSize.toString());
+    }
     this.loadReportSchedules();
   }
 
@@ -158,7 +205,8 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
         'reportStartDate': 'ReportStartDate',
         'createDate': 'CreateDate',
         'frequency': 'Frequency',
-        'status': 'Status'
+        'status': 'Status',
+        'isDeleted': 'IsDeleted'
       };
 
       this.currentSortBy = sortFieldMap[sort.active] || 'CreateDate';
@@ -229,5 +277,92 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
   }
   onRefresh() {
     this.loadReportSchedules();
+  }
+
+  onSoftDeleteReport(reportScheduleId: string, status: string): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        message: 'Are you sure you want to soft delete this report and all its associated acquisition logs?'
+      }
+    });
+
+    dialogRef.afterClosed().pipe(take(1)).subscribe(confirmed => {
+      if (!confirmed) return;
+
+      const progressSnackBar = this.snackBar.open('Soft deleting report, please wait...', 'Close');
+
+      this.aggregationService.softDeleteReport(reportScheduleId).subscribe({
+        next: () => {
+          progressSnackBar.dismiss();
+          this.snackBar.open('Report soft deleted successfully', 'Close', { duration: 3000, panelClass: 'success-snackbar' });
+          this.paginationMetadata.pageNumber = 0;
+          this.loadReportSchedules();
+        },
+        error: (err) => {
+          progressSnackBar.dismiss();
+          const detail = this.extractDetail(err);
+          const is409 = err.status === 409;
+          this.dialog.open(AlertDialogComponent, {
+            width: '420px',
+            data: {
+              title: is409 ? 'Report In Progress' : 'Soft Delete Failed',
+              message: detail || (is409
+                ? 'This report cannot be deleted because it is currently in progress. Please wait for it to complete.'
+                : 'Failed to soft delete the report. Please try again.'),
+              icon: is409 ? 'running_with_errors' : 'error',
+              iconColor: 'warn'
+            }
+          });
+        }
+      });
+    });
+  }
+
+  onRestoreReport(reportScheduleId: string): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        title: 'Restore Report',
+        message: 'Are you sure you want to restore this report and all its associated acquisition logs?',
+        icon: 'restore',
+        iconColor: 'primary',
+        confirmButtonText: 'Restore'
+      }
+    });
+
+    dialogRef.afterClosed().pipe(take(1)).subscribe(confirmed => {
+      if (!confirmed) return;
+
+      const progressSnackBar = this.snackBar.open('Restoring report, please wait...', 'Close');
+
+      this.aggregationService.restoreReport(reportScheduleId).subscribe({
+        next: () => {
+          progressSnackBar.dismiss();
+          this.snackBar.open('Report restored successfully', 'Close', { duration: 3000, panelClass: 'success-snackbar' });
+          this.paginationMetadata.pageNumber = 0;
+          this.loadReportSchedules();
+        },
+        error: (err) => {
+          progressSnackBar.dismiss();
+          const detail = this.extractDetail(err);
+          this.dialog.open(AlertDialogComponent, {
+            width: '420px',
+            data: {
+              title: 'Restore Failed',
+              message: detail || 'Failed to restore the report. Please try again.',
+              icon: 'error',
+              iconColor: 'warn'
+            }
+          });
+        }
+      });
+    });
+  }
+
+  private extractDetail(err: any): string | null {
+    if (!err.error) return null;
+    if (typeof err.error === 'object') return err.error.detail ?? null;
+    try { return JSON.parse(err.error)?.detail ?? null; } catch { return null; }
   }
 }
