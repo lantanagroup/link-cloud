@@ -1,7 +1,6 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Report.Application.Core;
-using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Models;
@@ -10,9 +9,7 @@ using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.SerDes;
 using System.Text;
-using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Listeners
@@ -44,7 +41,6 @@ namespace LantanaGroup.Link.Report.Listeners
             ReadyForValidationProducer readyForValidationProducer,
             IExceptionLogger<MeasureReportGeneratedListener> exceptionLogger)
         {
-
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
 
@@ -143,19 +139,15 @@ namespace LantanaGroup.Link.Report.Listeners
         public async Task ProcessMessageAsync(ConsumeResult<Null, MeasureReportGeneratedValue> result, string facilityId, CancellationToken cancellationToken)
         {
             if (result.Message.Value == null)
-            {
                 throw new DeadLetterException($"{Name}: MeasureReportGenerated event value segment missing");
-            }
 
             if (!result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
-            {
                 throw new DeadLetterException($"{Name}: Received message without correlation ID (ReportId = {result.Message.Value.ReportTrackingId}, FacilityId = {result.Message.Value.FacilityId}).");
-            }
 
             var messageValue = result.Message.Value;
+            var correlationId = Encoding.UTF8.GetString(headerValue);
 
             using var scope = _serviceScopeFactory.CreateScope();
-            var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
             var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
             var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
             var reportResourceManager = scope.ServiceProvider.GetRequiredService<IReportResourceManager>();
@@ -163,15 +155,11 @@ namespace LantanaGroup.Link.Report.Listeners
             var patientAggregator = scope.ServiceProvider.GetRequiredService<PatientAggregator>();
             var reportManifestProducer = scope.ServiceProvider.GetRequiredService<ReportManifestProducer>();
 
-            var correlationId = Encoding.UTF8.GetString(headerValue);
-
             var reportTrackingId = Guid.Parse(messageValue.ReportTrackingId);
             var schedule = await reportScheduledManager.GetReportSchedule(messageValue.FacilityId, reportTrackingId, cancellationToken);
 
             if (schedule == null)
-            {
-                throw new DeadLetterException($"{Name}: No scheduled report record was found (ReportId = {messageValue.ReportTrackingId}, FacilityId = {result.Message.Value.FacilityId}).");
-            }
+                throw new DeadLetterException($"{Name}: No scheduled report record was found (ReportId = {messageValue.ReportTrackingId}, FacilityId = {facilityId}).");
 
             var reportEntry = await reportEntryManager.UpdateAsyncWithConsumerResult(messageValue);
 
@@ -193,7 +181,6 @@ namespace LantanaGroup.Link.Report.Listeners
             }
 
             AggregateResult aggregateResult;
-
             try
             {
                 aggregateResult = await patientAggregator.AggregateToABS(messageValue.PatientId, schedule);
@@ -206,60 +193,21 @@ namespace LantanaGroup.Link.Report.Listeners
             await reportEntryManager.UpdateAsyncWithAggregateResult(reportEntry, aggregateResult);
             await reportResourceManager.AddAsyncWithAggregateResult(facilityId, reportTrackingId, messageValue.PatientId, aggregateResult, cancellationToken);
 
-            // Bulk population handling (single DB load + bulk add for new populations)
-            var existingPopulations = await reportPopulationManager.FindAsync(
-                x => x.ReportScheduleId == reportTrackingId, cancellationToken);
-
-            var existingDict = existingPopulations.ToDictionary(p => p.ReportType);
-
-            var populationsToAdd = new List<ReportPopulationModel>();
-
-            foreach (var aggregateMeasureReport in aggregateResult.MeasureReportResults)
+            foreach (var agg in aggregateResult.MeasureReportResults)
             {
-                if (existingDict.TryGetValue(aggregateMeasureReport.ReportType, out var populationModel))
+                var existing = (await reportPopulationManager.FindAsync(
+                    x => x.ReportScheduleId == reportTrackingId && x.ReportType == agg.ReportType, cancellationToken))
+                    .FirstOrDefault();
+
+                if (existing != null)
                 {
-                    await reportPopulationManager.UpdateAsyncWithAggregateResult(populationModel, aggregateMeasureReport, cancellationToken);
+                    await reportPopulationManager.UpdateAsyncWithAggregateResult(existing, agg, cancellationToken);
                 }
                 else
                 {
-                    var newPopulation = new ReportPopulationModel
-                    {
-                        Id = Guid.NewGuid(),
-                        Measure = aggregateMeasureReport.Measure,
-                        ReportType = aggregateMeasureReport.ReportType,
-                        CreateDate = DateTime.UtcNow,
-                        FacilityId = facilityId,
-                        ReportScheduleId = reportTrackingId
-                    };
-
-                    foreach (var measureReportpopulation in aggregateMeasureReport.PopulationList)
-                    {
-                        if (string.IsNullOrWhiteSpace(measureReportpopulation.PopulationId))
-                            continue;
-
-                        newPopulation.GroupPopulations.Add(new GroupPopulationModel
-                        {
-                            PopulationId = measureReportpopulation.PopulationId,
-                            PopulationCodeJson = JsonSerializer.Serialize(measureReportpopulation.PopulationCode, LinkFhirSerializerOptions.ForFhirLenientSerialization),
-                            TotalPopulationCount = measureReportpopulation.PopulationCount,
-                            MeasureReportPopulations = new List<MeasureReportPopulationModel>
-                            {
-                                new MeasureReportPopulationModel
-                                {
-                                    MeasureReportId = aggregateMeasureReport.MeasureReportId,
-                                    PopulationCount = measureReportpopulation.PopulationCount
-                                }
-                            }
-                        });
-                    }
-
-                    populationsToAdd.Add(newPopulation);
+                    await reportPopulationManager.AddAsyncWithAggregateResult(
+                        facilityId, reportTrackingId, agg, cancellationToken);
                 }
-            }
-
-            if (populationsToAdd.Count > 0)
-            {
-                await reportPopulationManager.AddRangeAsync(populationsToAdd, cancellationToken);
             }
 
             if (reportEntry.MeasureReports.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable))
