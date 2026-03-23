@@ -35,6 +35,9 @@ public class PayloadSubmittedListener(
 
     private async Task StartConsumerLoop(CancellationToken cancellationToken)
     {
+        deadLetterExceptionHandler.Topic = KafkaTopic.PayloadSubmitted.GetStringValue() + "-Error";
+        transientExceptionHandler.Topic = KafkaTopic.PayloadSubmittedRetry.GetStringValue();
+
         var config = new ConsumerConfig()
         {
             GroupId = serviceInformation.ServiceConfigName,

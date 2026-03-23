@@ -180,7 +180,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     ReportScheduleId = reportSchedule.Id,
                     GroupPopulations = new List<GroupPopulation>
                     {
-                        new GroupPopulation { PopulationId = "initial-population", TotalPopulationCount = 0 }
+                        new GroupPopulation { PopulationId = "initial-population", TotalPopulationCount = 0, PopulationCodeJson = "{}" }
                     }
                 };
 
