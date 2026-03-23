@@ -206,7 +206,7 @@
           <ng-container matColumnDef="measure">
             <th mat-header-cell *matHeaderCellDef>Measure</th>
             <td mat-cell *matCellDef="let element">
-              <span *ngFor="let report of element.measureReportList; let last = last">
+              <span *ngFor="let report of element.measureReports; let last = last">
                 {{report.reportType}}<span *ngIf="!last">, </span>
               </span>
             </td>
@@ -216,10 +216,10 @@
           <ng-container matColumnDef="resourceCount">
             <th mat-header-cell *matHeaderCellDef>Number of Resources</th>
             <td mat-cell *matCellDef="let element">
-              <span *ngIf="element.measureReportList && element.measureReportList.length > 0">
-                {{getTotalResourceCount(element.measureReportList)}}
+              <span *ngIf="element.measureReports && element.measureReports.length > 0">
+                {{getTotalResourceCount(element.measureReports)}}
               </span>
-              <span *ngIf="!element.measureReportList || element.measureReportList.length === 0">0</span>
+              <span *ngIf="!element.measureReports || element.measureReports.length === 0">0</span>
             </td>
           </ng-container>
 
