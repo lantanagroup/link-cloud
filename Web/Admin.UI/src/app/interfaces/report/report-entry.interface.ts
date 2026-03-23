@@ -10,7 +10,7 @@ export interface IReportEntry {
   submitReportDateTime?: Date;
   aggregateReportUri: string;
   aggregateReportBlobName: string;
-  measureReportList: IEvaluatedMeasureReport[];
+  measureReports: IEvaluatedMeasureReport[];
 }
 
 export interface IEvaluatedMeasureReport {

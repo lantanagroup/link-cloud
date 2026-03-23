@@ -24,12 +24,12 @@
       </div>
     </div>
     <div class="filter-bar">
-      <mat-form-field appearance="outline" class="compact-filter">
+      <mat-form-field appearance="fill" class="compact-filter">
         <mat-label>Facility ID</mat-label>
         <input matInput [(ngModel)]="facilityIdFilter" (keyup.enter)="applyFilters()" placeholder="Filter by facility">
       </mat-form-field>
 
-      <mat-form-field appearance="outline" class="compact-filter">
+      <mat-form-field appearance="fill" class="compact-filter">
         <mat-label>Status</mat-label>
         <mat-select [(ngModel)]="statusFilter" (selectionChange)="applyFilters()">
           <mat-option value="">Any</mat-option>
@@ -39,7 +39,7 @@
         </mat-select>
       </mat-form-field>
 
-      <mat-form-field appearance="outline" class="compact-filter">
+      <mat-form-field appearance="fill" class="compact-filter">
         <mat-label>Frequency</mat-label>
         <mat-select [(ngModel)]="frequencyFilter" (selectionChange)="applyFilters()">
           <mat-option value="">Any</mat-option>
@@ -49,12 +49,12 @@
         </mat-select>
       </mat-form-field>
 
-      <mat-form-field appearance="outline" class="compact-filter">
+      <mat-form-field appearance="fill" class="compact-filter">
         <mat-label>Start Date From</mat-label>
         <input matInput type="date" [(ngModel)]="reportStartDateFilter" (change)="applyFilters()">
       </mat-form-field>
 
-      <mat-form-field appearance="outline" class="compact-filter">
+      <mat-form-field appearance="fill" class="compact-filter">
         <mat-label>Start Date To</mat-label>
         <input matInput type="date" [(ngModel)]="reportEndDateFilter" (change)="applyFilters()">
       </mat-form-field>
