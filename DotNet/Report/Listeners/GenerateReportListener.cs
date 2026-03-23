@@ -232,7 +232,6 @@ namespace LantanaGroup.Link.Report.Listeners
                 reportSchedule.PayloadRootUri = _blobStorageService.GetUri(reportName)?.ToString();
 
                 await reportScheduledManager.AddAsync(reportSchedule, cancellationToken);
-                await reportPopulationManager.AddWithReportScheduleAsync(reportSchedule, cancellationToken);
 
                 var newEntries = new List<ReportEntryModel>();
 

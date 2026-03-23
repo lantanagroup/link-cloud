@@ -25,6 +25,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         Task<ReportScheduleModel?> SingleOrDefaultAsync(Expression<Func<ReportSchedule, bool>> predicate, CancellationToken cancellationToken = default);
 
+        Task<ReportScheduleModel> SingleAsync(Expression<Func<ReportSchedule, bool>> predicate, CancellationToken cancellationToken = default);
+
         Task<PagedConfigModel<ReportScheduleModel>> SearchAsync(
             string? facilityId, Frequency? frequency, string? reportType,
             DateTime? reportStartDate, DateTime? reportEndDate,
@@ -46,15 +48,18 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         private readonly ReportDbContext _context;
         private readonly ILogger<ReportScheduledManager> _logger;
         private readonly IQuartzJobHelper _quartzJobHelper;
+        private readonly IReportPopulationManager _reportPopulationManager;
 
         public ReportScheduledManager(
             ReportDbContext context,
             ILogger<ReportScheduledManager> logger,
-            IQuartzJobHelper quartzJobHelper)
+            IQuartzJobHelper quartzJobHelper,
+            IReportPopulationManager reportPopulationManager)
         {
             _context = context;
             _logger = logger;
             _quartzJobHelper = quartzJobHelper;
+            _reportPopulationManager = reportPopulationManager;
         }
 
         public async Task<ReportScheduleModel?> GetReportSchedule(string facilityid, Guid reportId, CancellationToken cancellationToken = default)
@@ -105,6 +110,12 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     ReportTypes = r.ReportTypes.Select(rt => rt.ReportType).ToList()
                 })
                 .ToListAsync(cancellationToken);
+        }
+
+        public async Task<ReportScheduleModel> SingleAsync(Expression<Func<ReportSchedule, bool>> predicate, CancellationToken cancellationToken = default)
+        {
+            return await SingleOrDefaultAsync(predicate, cancellationToken)
+                ?? throw new InvalidOperationException("No ReportSchedule found matching the specified criteria.");
         }
 
         public async Task<ReportScheduleModel?> SingleOrDefaultAsync(Expression<Func<ReportSchedule, bool>> predicate, CancellationToken cancellationToken = default)
@@ -176,33 +187,47 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task<ReportScheduleModel> AddAsync(ReportScheduleModel model, CancellationToken cancellationToken)
         {
-            var entity = new ReportSchedule
-            {
-                Id = model.Id == Guid.Empty ? Guid.NewGuid() : model.Id,
-                CreateDate = DateTime.UtcNow,
-                FacilityId = model.FacilityId,
-                ReportStartDate = model.ReportStartDate,
-                ReportEndDate = model.ReportEndDate,
-                SubmitReportDateTime = model.SubmitReportDateTime,
-                EnableSubmission = model.EnableSubmission,
-                EndOfReportPeriodJobHasRun = model.EndOfReportPeriodJobHasRun,
-                AdHocType = model.AdHocType,
-                Frequency = model.Frequency,
-                PayloadRootUri = model.PayloadRootUri,
-                Status = model.Status,
-                IsDeleted = model.IsDeleted
-            };
+            using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
-            foreach (var type in model.ReportTypes)
+            try
             {
-                entity.ReportTypes.Add(new ScheduleReportType { ReportType = type });
+                var entity = new ReportSchedule
+                {
+                    Id = model.Id == Guid.Empty ? Guid.NewGuid() : model.Id,
+                    CreateDate = DateTime.UtcNow,
+                    FacilityId = model.FacilityId,
+                    ReportStartDate = model.ReportStartDate,
+                    ReportEndDate = model.ReportEndDate,
+                    SubmitReportDateTime = model.SubmitReportDateTime,
+                    EnableSubmission = model.EnableSubmission,
+                    EndOfReportPeriodJobHasRun = model.EndOfReportPeriodJobHasRun,
+                    AdHocType = model.AdHocType,
+                    Frequency = model.Frequency,
+                    PayloadRootUri = model.PayloadRootUri,
+                    Status = model.Status,
+                    IsDeleted = model.IsDeleted
+                };
+
+                foreach (var type in model.ReportTypes)
+                {
+                    entity.ReportTypes.Add(new ScheduleReportType { ReportType = type });
+                }
+
+                await _context.AddAsync(entity, cancellationToken);
+                await _context.SaveChangesAsync(cancellationToken);
+
+                await _reportPopulationManager.AddWithReportScheduleAsync(model, cancellationToken);
+
+                await transaction.CommitAsync();
+
+                return await SingleAsync(r => r.Id == entity.Id);
             }
-
-            await _context.AddAsync(entity, cancellationToken);
-            await _context.SaveChangesAsync(cancellationToken);
-
-            model.Id = entity.Id;
-            return model;
+            catch(Exception ex)
+            {
+                _logger.LogError(ex, "Error adding new ReportSchedule");
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
 
         public async Task<PagedConfigModel<ReportScheduleModel>> SearchAsync(
