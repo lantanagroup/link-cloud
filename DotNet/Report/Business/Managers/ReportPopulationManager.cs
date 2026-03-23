@@ -40,7 +40,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         {
             var entity = await _context.ReportPopulation
                 .Include(r => r.GroupPopulations)
-                .ThenInclude(g => g.MeasureReportPopulations)
+                    .ThenInclude(g => g.MeasureReportPopulations)
                 .FirstOrDefaultAsync(r => r.Id == model.Id, cancellationToken);
 
             if (entity == null)
@@ -54,21 +54,50 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
             foreach (var groupModel in model.GroupPopulations)
             {
-                var existing = existingGroups.FirstOrDefault(g => g.PopulationId == groupModel.PopulationId);
-                if (existing == null)
+                var existingGroup = existingGroups.FirstOrDefault(g => g.PopulationId == groupModel.PopulationId);
+
+                if (existingGroup == null)
                 {
-                    entity.GroupPopulations.Add(new GroupPopulation
+                    var newGroup = new GroupPopulation
                     {
                         PopulationId = groupModel.PopulationId,
                         PopulationCodeJson = groupModel.PopulationCodeJson,
                         TotalPopulationCount = groupModel.TotalPopulationCount
-                    });
+                    };
+
+                    foreach (var mrpModel in groupModel.MeasureReportPopulations)
+                    {
+                        newGroup.MeasureReportPopulations.Add(new MeasureReportPopulation
+                        {
+                            MeasureReportId = mrpModel.MeasureReportId,
+                            PopulationCount = mrpModel.PopulationCount
+                        });
+                    }
+
+                    entity.GroupPopulations.Add(newGroup);
                 }
                 else
-                {
-                    existing.PopulationCodeJson = groupModel.PopulationCodeJson;
-                    existing.TotalPopulationCount = groupModel.TotalPopulationCount;
-                    existingGroups.Remove(existing);
+                {                   
+                    existingGroup.PopulationCodeJson = groupModel.PopulationCodeJson;
+                    existingGroup.TotalPopulationCount = groupModel.TotalPopulationCount;
+
+                    var existingMrpIds = existingGroup.MeasureReportPopulations
+                        .Select(m => m.MeasureReportId)
+                        .ToHashSet(StringComparer.Ordinal);
+
+                    foreach (var mrpModel in groupModel.MeasureReportPopulations)
+                    {
+                        if (!existingMrpIds.Contains(mrpModel.MeasureReportId))
+                        {
+                            existingGroup.MeasureReportPopulations.Add(new MeasureReportPopulation
+                            {
+                                MeasureReportId = mrpModel.MeasureReportId,
+                                PopulationCount = mrpModel.PopulationCount
+                            });
+                        }
+                    }
+
+                    existingGroups.Remove(existingGroup);
                 }
             }
 
@@ -90,7 +119,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task AddRangeAsync(IEnumerable<ReportPopulationModel> models, CancellationToken cancellationToken)
         {
-            if (models == null || !models.Any())
+            if (models == null || !models.Any()) 
                 return;
 
             var entities = new List<ReportPopulation>();
@@ -113,7 +142,12 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     {
                         PopulationId = groupModel.PopulationId,
                         PopulationCodeJson = groupModel.PopulationCodeJson,
-                        TotalPopulationCount = groupModel.TotalPopulationCount
+                        TotalPopulationCount = groupModel.TotalPopulationCount,
+                        MeasureReportPopulations = groupModel.MeasureReportPopulations.Select(mrp => new MeasureReportPopulation
+                        {
+                            MeasureReportId = mrp.MeasureReportId,
+                            PopulationCount = mrp.PopulationCount
+                        }).ToList()
                     });
                 }
 
@@ -180,7 +214,15 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 {
                     PopulationId = measureReportpopulation.PopulationId,
                     PopulationCodeJson = JsonSerializer.Serialize(measureReportpopulation.PopulationCode, LinkFhirSerializerOptions.ForFhirLenientSerialization),
-                    TotalPopulationCount = measureReportpopulation.PopulationCount
+                    TotalPopulationCount = measureReportpopulation.PopulationCount,
+                    MeasureReportPopulations = new List<MeasureReportPopulationModel>
+                    {
+                        new MeasureReportPopulationModel
+                        {
+                            MeasureReportId = aggregateResult.MeasureReportId,
+                            PopulationCount = measureReportpopulation.PopulationCount
+                        }
+                    }
                 });
             }
 
@@ -191,9 +233,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         public async Task<ReportPopulationModel> UpdateAsyncWithAggregateResult(ReportPopulationModel model, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken)
         {
             model.ModifyDate = DateTime.UtcNow;
-
-            if (string.IsNullOrWhiteSpace(model.Measure))
-                model.Measure = aggregateResult.Measure;
+            model.Measure = aggregateResult.Measure;
 
             foreach (var measureReportpopulation in aggregateResult.PopulationList)
             {
@@ -204,17 +244,25 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
                 if (group == null)
                 {
-                    model.GroupPopulations.Add(new GroupPopulationModel
+                    group = new GroupPopulationModel
                     {
                         PopulationId = measureReportpopulation.PopulationId,
                         PopulationCodeJson = JsonSerializer.Serialize(measureReportpopulation.PopulationCode, LinkFhirSerializerOptions.ForFhirLenientSerialization),
-                        TotalPopulationCount = measureReportpopulation.PopulationCount
-                    });
+                        TotalPopulationCount = measureReportpopulation.PopulationCount,
+                        MeasureReportPopulations = new List<MeasureReportPopulationModel>()
+                    };
+                    model.GroupPopulations.Add(group);
                 }
                 else
                 {
                     group.TotalPopulationCount += measureReportpopulation.PopulationCount;
                 }
+
+                group.MeasureReportPopulations.Add(new MeasureReportPopulationModel
+                {
+                    MeasureReportId = aggregateResult.MeasureReportId,
+                    PopulationCount = measureReportpopulation.PopulationCount
+                });
             }
 
             await UpdateAsync(model, cancellationToken);
@@ -245,7 +293,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                             GroupPopulationId = mrp.GroupPopulationId,
                             MeasureReportId = mrp.MeasureReportId,
                             PopulationCount = mrp.PopulationCount
-                        })
+                        }).ToList()
                     }).ToList()
                 })
                 .ToListAsync(cancellationToken);
@@ -275,7 +323,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                             GroupPopulationId = mrp.GroupPopulationId,
                             MeasureReportId = mrp.MeasureReportId,
                             PopulationCount = mrp.PopulationCount
-                        })
+                        }).ToList()
                     }).ToList()
                 })
                 .SingleOrDefaultAsync(cancellationToken);

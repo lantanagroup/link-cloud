@@ -1,5 +1,4 @@
-﻿
-namespace LantanaGroup.Link.Report.Models;
+﻿namespace LantanaGroup.Link.Report.Models;
 public class ReportPopulationModel
 {
     public Guid Id { get; set; }
@@ -18,5 +17,5 @@ public class GroupPopulationModel
     public string PopulationId { get; set; } = string.Empty;
     public string? PopulationCodeJson { get; set; }
     public int TotalPopulationCount { get; set; }
-    public IEnumerable<MeasureReportPopulationModel> MeasureReportPopulations { get; internal set; }
+    public List<MeasureReportPopulationModel> MeasureReportPopulations { get; set; } = new();
 }
