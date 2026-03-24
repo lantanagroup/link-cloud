@@ -179,6 +179,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     CreateDate = DateTime.UtcNow,
                     FacilityId = reportSchedule.FacilityId,
                     ReportType = reportType,
+                    Measure = reportType, //TODO: Daniel - 03/2026 - We'll want to eventually populate this with the actual measure name rather than the reportType. This will get overridden when there is a patient that meets the IP, but will display as reportType in the manifest file if there are no patients that meet the IP which isn't great, but is a small enough edge case for now. 
                     ReportScheduleId = reportSchedule.Id,
                     GroupPopulations = new List<GroupPopulation>
                     {

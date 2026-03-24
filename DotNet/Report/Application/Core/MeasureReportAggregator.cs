@@ -37,6 +37,7 @@ public class MeasureReportAggregator
                 Meta = new Meta { Profile = ImmutableList.Create(AggregateMeasureReportProfile) },
                 Id = Guid.NewGuid().ToString(),
                 Type = MeasureReport.MeasureReportType.SubjectList,
+                MeasureElement = new Canonical(reportPopulation.Measure),
                 Status = MeasureReport.MeasureReportStatus.Complete,
                 DateElement = FhirDateTime.Now(),
                 Measure = reportPopulation.Measure,
