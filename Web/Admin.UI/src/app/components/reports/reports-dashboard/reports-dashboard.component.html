@@ -14,13 +14,6 @@
         <div class="left-pane">
           <p class="title">All Reports</p>
         </div>
-        <div class="right-pane">
-          <mat-checkbox
-            [(ngModel)]="showDeleted"
-            (change)="onShowDeletedChange()">
-            Show deleted
-          </mat-checkbox>
-        </div>
       </div>
     </div>
     <div class="filter-bar">
@@ -87,8 +80,13 @@
         </div>
       </div>
 
+      <mat-checkbox
+        [(ngModel)]="showDeleted"
+        (change)="onShowDeletedChange()">
+        Show deleted
+      </mat-checkbox>
+
       <div class="filter-actions">
-        <button class="link-button success" (click)="applyFilters()">Apply</button>
         <button class="link-button secondary" (click)="clearFilters()" *ngIf="hasActiveFilters()">Clear</button>
       </div>
     </div>
