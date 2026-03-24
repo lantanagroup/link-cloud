@@ -181,26 +181,13 @@ namespace LantanaGroup.Link.Report.Listeners
                 var reportName = _blobStorageService.GetReportName(reportSchedule);
                 reportSchedule.PayloadRootUri = _blobStorageService.GetUri(reportName)?.ToString();
 
-                await database.BeginTransactionAsync(cancellationToken);
-                try
-                {
-                    reportSchedule = await reportScheduleManager.AddAsync(reportSchedule, cancellationToken);
-                    await reportPopulationManager.AddWithReportScheduleAsync(reportSchedule, cancellationToken);
+                reportSchedule = await reportScheduleManager.AddAsync(reportSchedule, cancellationToken);
 
-                    await _quartzJobHelper.ScheduleJob<EndOfReportPeriodJob>(new Dictionary<string, object>
-                    {
-                        { "ReportScheduleId", reportSchedule.Id },
-                        { "FacilityId", reportSchedule.FacilityId }
-                    }, reportSchedule.ReportEndDate, reportSchedule.Id.ToString(), ReportConstants.MeasureReportSubmissionScheduler.Group, $"{reportSchedule.Id}-{reportSchedule.ReportEndDate}");
-
-                    await database.CommitTransactionAsync();
-                }
-                catch (Exception ex)
+                await _quartzJobHelper.ScheduleJob<EndOfReportPeriodJob>(new Dictionary<string, object>
                 {
-                    await database.RollbackTransactionAsync();
-                    _exceptionLogger.Handle(ex, "Error processing ReportScheduled event", LogLevel.Error, facilityId, new { ReportScheduleId = reportSchedule.Id });
-                    throw;
-                }
+                    { "ReportScheduleId", reportSchedule.Id },
+                    { "FacilityId", reportSchedule.FacilityId }
+                }, reportSchedule.ReportEndDate, reportSchedule.Id.ToString(), ReportConstants.MeasureReportSubmissionScheduler.Group, $"{reportSchedule.Id}-{reportSchedule.ReportEndDate}");
             }
             catch (DeadLetterException ex)
             {

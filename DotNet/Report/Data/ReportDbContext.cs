@@ -3,6 +3,7 @@
 using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
 using LantanaGroup.Link.Report.Data.Entities;
+using LantanaGroup.Link.Report.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -60,6 +61,9 @@ public partial class ReportDbContext : DbContext
 
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
 
+            entity.Property(e => e.ReportingStatus).HasConversion<string>();
+            entity.Property(e => e.SubmissionStatus).HasConversion<string>();
+
             entity.HasOne(d => d.ReportSchedule).WithMany(p => p.ReportEntries)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_ReportEntries_ReportSchedules");
@@ -70,6 +74,8 @@ public partial class ReportDbContext : DbContext
             entity.HasKey(e => e.Id).HasName("PK__ReportEn__3214EC07C971CE5C");
 
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
+
+            entity.Property(e => e.Status).HasConversion<string>();
 
             entity.HasOne(d => d.ReportEntry).WithMany(p => p.MeasureReports).HasConstraintName("FK_ReportEntryMeasureReports_ReportEntries");
         });
@@ -108,6 +114,10 @@ public partial class ReportDbContext : DbContext
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
             entity.Property(e => e.EnableSubmission).HasDefaultValue(true);
             entity.Property(e => e.IsDeleted).HasDefaultValue(false);
+
+            entity.Property(e => e.AdHocType).HasConversion<string>();
+            entity.Property(e => e.Frequency).HasConversion<string>();
+            entity.Property(e => e.Status).HasConversion<string>();
         });
 
         modelBuilder.Entity<ScheduleReportType>(entity =>
