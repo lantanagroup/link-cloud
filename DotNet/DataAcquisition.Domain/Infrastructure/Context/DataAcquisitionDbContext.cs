@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
@@ -28,6 +28,8 @@ public class DataAcquisitionDbContext : DbContext
     public DbSet<OrganizationLocationCondition> LocationConditions { get; set; }
     public DbSet<OrganizationLocationConfiguration> LocationConfigurations { get; set; }
     public virtual DbSet<OrganizationLocationMapping> OrganizationLocationMappings { get; set; }
+    public DbSet<EncounterMapping> EncounterMappings { get; set; }
+    public DbSet<EncounterLocation> EncounterLocations { get; set; }
 
     public DbSet<FhirQueryConfiguration> FhirQueryConfigurations { get; set; }
     public DbSet<FhirListConfiguration> FhirListConfigurations { get; set; }
@@ -279,6 +281,32 @@ public class DataAcquisitionDbContext : DbContext
             entity.Property(e => e.ModifiedDate).HasDefaultValueSql("(getutcdate())");
 
             entity.HasOne(d => d.PartOf).WithMany(p => p.InversePartOf).HasConstraintName("FK_LocationMapping_PartOf");
+        });
+
+        //-------------------EncounterMapping-------------------
+        modelBuilder.Entity<EncounterMapping>(entity =>
+        {
+            entity.HasKey(e => e.EncounterMappingId).HasName("PK_EncounterMapping_EncounterMappingId");
+
+            entity.Property(e => e.CreateDate).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.ModifiedDate).HasDefaultValueSql("(getutcdate())");
+        });
+
+        //-------------------EncounterLocation-------------------
+        modelBuilder.Entity<EncounterLocation>(entity =>
+        {
+            entity.HasKey(e => e.EncounterLocationId).HasName("PK_EncounterLocation_EncounterLocationId");
+
+            entity.Property(e => e.CreateDate).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.ModifiedDate).HasDefaultValueSql("(getutcdate())");
+
+            entity.HasOne(d => d.EncounterMapping).WithMany(p => p.EncounterLocations)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_EncounterLocation_EncounterMapping");
+
+            entity.HasOne(d => d.OrganizationLocationMapping).WithMany(p => p.EncounterLocations)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_EncounterLocation_OrganizationLocationMapping");
         });
 
         // Prefix and schema can be passed as parameters
