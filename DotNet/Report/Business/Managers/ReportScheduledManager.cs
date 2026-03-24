@@ -32,7 +32,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             DateTime? reportStartDate, DateTime? reportEndDate,
             ScheduleStatus? status, bool? endOfReportPeriodJobHasRun,
             bool includeDeleted, string? sortBy, SortOrder? sortOrder,
-            int pageSize, int pageNumber, CancellationToken cancellationToken = default);
+            int pageSize, int pageNumber, CancellationToken cancellationToken = default,
+            DateOnly? createDate = null);
 
         Task UpdateReportsDeletedStatusForFacility(
             string facilityId, bool deleted, CancellationToken cancellationToken = default);
@@ -235,7 +236,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             DateTime? reportStartDate, DateTime? reportEndDate,
             ScheduleStatus? status, bool? endOfReportPeriodJobHasRun,
             bool includeDeleted, string? sortBy, SortOrder? sortOrder,
-            int pageSize, int pageNumber, CancellationToken cancellationToken = default)
+            int pageSize, int pageNumber, CancellationToken cancellationToken = default,
+            DateOnly? createDate = null)
         {
             Expression<Func<ReportSchedule, bool>> predicate = x => true;
 
@@ -253,6 +255,13 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
             if (reportEndDate.HasValue)
                 predicate = predicate.And(q => q.ReportEndDate <= reportEndDate.Value);
+
+            if (createDate.HasValue)
+            { 
+                var dayStart = createDate.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+                var dayEnd = dayStart.AddDays(1);
+                predicate = predicate.And(q => q.CreateDate >= dayStart && q.CreateDate < dayEnd);
+            }
 
             if (status.HasValue)
                 predicate = predicate.And(q => q.Status == status.Value);
