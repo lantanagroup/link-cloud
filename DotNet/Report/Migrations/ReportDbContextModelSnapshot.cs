@@ -592,8 +592,9 @@ namespace LantanaGroup.Link.Report.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id")
                         .HasName("PK__ReportEn__3214EC07C971CE5C");
@@ -692,11 +693,12 @@ namespace LantanaGroup.Link.Report.Migrations
                     b.Property<Guid>("ReportScheduleId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<int>("ReportingStatus")
-                        .HasColumnType("int");
+                    b.Property<string>("ReportingStatus")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
 
-                    b.Property<int?>("SubmissionStatus")
-                        .HasColumnType("int");
+                    b.Property<string>("SubmissionStatus")
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<DateTime?>("SubmitReportDateTime")
                         .HasColumnType("datetime2");
@@ -821,8 +823,8 @@ namespace LantanaGroup.Link.Report.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<int?>("AdHocType")
-                        .HasColumnType("int");
+                    b.Property<string>("AdHocType")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
@@ -840,8 +842,9 @@ namespace LantanaGroup.Link.Report.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<int>("Frequency")
-                        .HasColumnType("int");
+                    b.Property<string>("Frequency")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<bool?>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -861,8 +864,9 @@ namespace LantanaGroup.Link.Report.Migrations
                     b.Property<DateTime>("ReportStartDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<DateTime?>("SubmitReportDateTime")
                         .HasColumnType("datetime2");

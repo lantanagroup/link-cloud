@@ -17,4 +17,5 @@ public class GroupPopulationModel
     public string PopulationId { get; set; } = string.Empty;
     public string? PopulationCodeJson { get; set; }
     public int TotalPopulationCount { get; set; }
+    public List<MeasureReportPopulationModel> MeasureReportPopulations { get; set; } = new();
 }

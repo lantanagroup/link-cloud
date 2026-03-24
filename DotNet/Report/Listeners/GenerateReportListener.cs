@@ -163,6 +163,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 using var scope = _serviceScopeFactory.CreateScope();
                 var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
                 var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+                var reportPopulationManager = scope.ServiceProvider.GetRequiredService<IReportPopulationManager>();
 
                 var key = result.Message.Key;
                 var value = result.Message.Value;

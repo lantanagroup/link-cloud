@@ -123,5 +123,9 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="IntegrationTests\Report\Aggregators\" />
+  </ItemGroup>
+
 </Project>
 

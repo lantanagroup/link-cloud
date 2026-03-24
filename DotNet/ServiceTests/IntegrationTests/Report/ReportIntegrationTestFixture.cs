@@ -113,6 +113,8 @@ namespace IntegrationTests.Report
             builder.Services.AddScoped<IEntityRepository<ReportEntry>, EntityRepository<ReportEntry, ReportDbContext>>();
             builder.Services.AddScoped<IEntityRepository<ReportPopulation>, EntityRepository<ReportPopulation, ReportDbContext>>();
             builder.Services.AddScoped<IEntityRepository<ReportResource>, EntityRepository<ReportResource, ReportDbContext>>();
+            builder.Services.AddTransient<IEntityRepository<GroupPopulation>, EntityRepository<GroupPopulation, ReportDbContext>>();
+            builder.Services.AddTransient<IEntityRepository<MeasureReportPopulation>, EntityRepository<MeasureReportPopulation, ReportDbContext>>();
 
             builder.Services.AddScoped<IDatabase, Database>();
             builder.Services.AddScoped<IReportScheduledManager, ReportScheduledManager>();
@@ -157,7 +159,7 @@ namespace IntegrationTests.Report
                 new ReportManifestProducer(
                     new Mock<ILogger<ReportManifestProducer>>().Object,
                     sp.GetRequiredService<IServiceScopeFactory>(),
-                    new MeasureReportAggregator(new Mock<ILogger<MeasureReportAggregator>>().Object, sp.GetRequiredService<IDatabase>()),
+                    new MeasureReportAggregator(new Mock<ILogger<MeasureReportAggregator>>().Object, sp.GetRequiredService<IReportPopulationManager>()),
                     TenantApiServiceMock.Object,
                     sp.GetRequiredService<BlobStorageService>(),
                     sp.GetRequiredService<SubmitPayloadProducer>(),

@@ -5,8 +5,6 @@ using Hl7.Fhir.Rest;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Options;
-using LantanaGroup.Link.Report.Data;
-using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Models;
@@ -18,27 +16,24 @@ namespace LantanaGroup.Link.Report.Application.Core
 {
     public class PatientAggregator
     {
-        private readonly ILogger<PatientAggregator> _logger;
         private readonly IReportServiceMetrics _metrics;
-        private readonly IDatabase _database;
-        private readonly IReportScheduledManager _reportScheduledManager;
+        private readonly IReportEntryManager _reportEntryManager;
         private readonly BlobStorageService _blobStorageService;
         private readonly BlobContainerClient _containerClient;
         private readonly BlobStorageSettings _settings;
 
-        public PatientAggregator(ILogger<PatientAggregator> logger, IDatabase database, IReportServiceMetrics metrics, IReportScheduledManager reportScheduledManager, BlobStorageService blobStorageService, IOptions<BlobStorageSettings> settings)
+        public PatientAggregator(
+            IReportServiceMetrics metrics, 
+            IReportEntryManager reportEntryManager,
+            BlobStorageService blobStorageService, 
+            IOptions<BlobStorageSettings> settings)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _metrics = metrics ?? throw new ArgumentException(nameof(metrics));
-            _database = database ?? throw new ArgumentNullException(nameof(database));
-            _reportScheduledManager = reportScheduledManager ?? throw new ArgumentNullException(nameof(reportScheduledManager));
+            _reportEntryManager = reportEntryManager;
             _blobStorageService = blobStorageService;
 
             _settings = settings.Value;
-            if (_settings.ConnectionString != null)
-            {
-                _containerClient = new BlobContainerClient(_settings.ConnectionString, _settings.BlobContainerName);
-            }
+            _containerClient = new BlobContainerClient(_settings.ConnectionString, _settings.BlobContainerName);
         }
 
         public async Task<AggregateResult> AggregateToABS(string patientId, ReportScheduleModel reportSchedule)
@@ -50,7 +45,7 @@ namespace LantanaGroup.Link.Report.Application.Core
 
             AggregateResult aggregateResult = new AggregateResult();
 
-            var entry = await _database.ReportEntryRepository.SingleOrDefaultAsync(x => x.ReportScheduleId == reportSchedule.Id && x.PatientId == patientId);
+            var entry = await _reportEntryManager.SingleOrDefaultAsync(x => x.ReportScheduleId == reportSchedule.Id && x.PatientId == patientId);
 
             if (entry == null)
             {

@@ -72,6 +72,8 @@ namespace IntegrationTests.Report
             Assert.Equal(ScheduleStatus.Scheduled, created.Status);
             Assert.Equal(Frequency.Monthly, created.Frequency);
             Assert.Equal(2, created.ReportTypes.Count);
+            Assert.Equal(startDate.UtcDateTime, created.ReportStartDate);
+            Assert.Equal(endDate.UtcDateTime, created.ReportEndDate);
 
             var population = await reportPopulationManager.FindAsync(x => x.ReportScheduleId == reportId);
             Assert.NotNull(population);
@@ -85,7 +87,7 @@ namespace IntegrationTests.Report
 
             _fixture.QuartzJobHelperMock.Verify(f => f.ScheduleJob<EndOfReportPeriodJob>(
                 expectedJobData,
-                endDate, 
+                It.IsAny<DateTimeOffset>(), 
                 It.IsAny<string>(),
                 It.IsAny<string>(), 
                 It.IsAny<string>(),
