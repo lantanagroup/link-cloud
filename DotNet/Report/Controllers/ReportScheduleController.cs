@@ -142,6 +142,78 @@ namespace LantanaGroup.Link.Report.Controllers
         }
 
         /// <summary>
+        /// Soft deletes a single report schedule by its ID.
+        /// </summary>
+        /// <param name="id">The ID of the report schedule to soft delete.</param>
+        [HttpDelete("{id}")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> SoftDelete(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                return BadRequest("Id is required.");
+
+            if (!Guid.TryParse(id, out Guid parsedId))
+                return BadRequest("Invalid ID format.");
+
+            try
+            {
+                await _reportScheduledManager.SoftDeleteByReportTrackingIdAsync(parsedId, HttpContext.RequestAborted);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
+            {
+                return NotFound(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogError(new EventId(ReportConstants.LoggingIds.UpdateItem, "SoftDelete"), ex, "Failed to soft delete report schedule {Id}", HtmlInputSanitizer.Sanitize(id));
+                return Conflict(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(new EventId(ReportConstants.LoggingIds.UpdateItem, "SoftDelete"), ex, "An exception occurred while attempting to soft delete report schedule {Id}", HtmlInputSanitizer.Sanitize(id));
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Restores a single soft-deleted report schedule by its ID.
+        /// </summary>
+        /// <param name="id">The ID of the report schedule to restore.</param>
+        [HttpPatch("{id}/restore")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> Restore(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                return BadRequest("Id is required.");
+
+            if (!Guid.TryParse(id, out Guid parsedId))
+                return BadRequest("Invalid ID format.");
+
+            try
+            {
+                await _reportScheduledManager.RestoreByReportTrackingIdAsync(parsedId, HttpContext.RequestAborted);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
+            {
+                return NotFound(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(new EventId(ReportConstants.LoggingIds.UpdateItem, "Restore"), ex, "An exception occurred while attempting to restore report schedule {Id}", HtmlInputSanitizer.Sanitize(id));
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Sets the deleted status for all report schedules associated with a facility.
         /// </summary>
         /// <param name="facilityId">
@@ -193,7 +265,8 @@ namespace LantanaGroup.Link.Report.Controllers
             string? sortBy = null,
             SortOrder? sortOrder = null,
             int pageSize = 10,
-            int pageNumber = 1)
+            int pageNumber = 1,
+            DateOnly? createDate = null)
         {
             try
             {
@@ -219,7 +292,9 @@ namespace LantanaGroup.Link.Report.Controllers
                     sortBy,
                     sortOrder,
                     pageSize,
-                    pageNumber);
+                    pageNumber,
+                    cancellationToken: HttpContext.RequestAborted,
+                    createDate: createDate);
 
                 Response.Headers.Append("X-Pagination", JsonSerializer.Serialize(result.Metadata));
 

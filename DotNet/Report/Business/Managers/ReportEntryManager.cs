@@ -12,20 +12,28 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 {
     public interface IReportEntryManager
     {
-        Task<ReportEntryModel?> GetEntry(Guid reportScheduleId, string patientId, CancellationToken cancellationToken = default);
+        Task<ReportEntryModel?> GetEntry(Guid reportScheduleId, string patientId,
+            CancellationToken cancellationToken = default);
 
         Task<ReportEntryModel> UpdateAsync(ReportEntryModel model, CancellationToken cancellationToken);
 
         Task<ReportEntryModel> AddAsync(ReportEntryModel model, CancellationToken cancellationToken);
 
-        Task<List<ReportEntryModel>> FindAsync(Expression<Func<ReportEntry, bool>> predicate, CancellationToken cancellationToken = default);
+        Task AddRangeAsync(IEnumerable<ReportEntryModel> models, CancellationToken cancellationToken);
 
-        Task<ReportEntryModel?> SingleOrDefaultAsync(Expression<Func<ReportEntry, bool>> predicate, CancellationToken cancellationToken = default);
+        Task<List<ReportEntryModel>> FindAsync(Expression<Func<ReportEntry, bool>> predicate,
+            CancellationToken cancellationToken = default);
+
+        Task<ReportEntryModel?> SingleOrDefaultAsync(Expression<Func<ReportEntry, bool>> predicate,
+            CancellationToken cancellationToken = default);
 
         Task<ReportEntryModel> UpdateAsyncWithConsumerResult(MeasureReportGeneratedValue consumerValue);
 
-        Task<ReportEntryModel> UpdateAsyncWithAggregateResult(ReportEntryModel model, AggregateResult aggregateResult, CancellationToken cancellationToken = default);
-        Task<ReportEntryModel> UpdateAsyncNotReportableEntry(ReportEntryModel model, CancellationToken cancellationToken = default);
+        Task<ReportEntryModel> UpdateAsyncWithAggregateResult(ReportEntryModel model, AggregateResult aggregateResult,
+            CancellationToken cancellationToken = default);
+
+        Task<ReportEntryModel> UpdateAsyncNotReportableEntry(ReportEntryModel model,
+            CancellationToken cancellationToken = default);
 
         Task<PagedConfigModel<ReportEntryModel>> SearchAsync(
             string? facilityId,
@@ -41,9 +49,11 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             int pageNumber,
             CancellationToken cancellationToken = default);
 
-        Task<int> CountAsync(Expression<Func<ReportEntry, bool>> predicate, CancellationToken cancellationToken = default);
+        Task<int> CountAsync(Expression<Func<ReportEntry, bool>> predicate,
+            CancellationToken cancellationToken = default);
 
-        Task<ReportEntrySummary> GetSummaryByReportScheduleIdAsync(Guid reportScheduleId, CancellationToken cancellationToken = default);
+        Task<ReportEntrySummary> GetSummaryByReportScheduleIdAsync(Guid reportScheduleId,
+            CancellationToken cancellationToken = default);
     }
 
     public class ReportEntryManager : IReportEntryManager
@@ -108,7 +118,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             };
         }
 
-        public async Task<ReportEntryModel?> GetEntry(Guid reportScheduleId, string patientId, CancellationToken cancellationToken = default)
+        public async Task<ReportEntryModel?> GetEntry(Guid reportScheduleId, string patientId,
+            CancellationToken cancellationToken = default)
         {
             var proj = await _dbContext.ReportEntry
                 .Where(e => e.ReportScheduleId == reportScheduleId && e.PatientId == patientId)
@@ -130,7 +141,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                         m.ReportType,
                         m.MeasureReportUri,
                         m.MeasureReportFileName,
-                        m.ResourceCounts.Select(rc => new ResourceCountProjection(rc.ResourceType, rc.ResourceCount)).ToList()
+                        m.ResourceCounts.Select(rc => new ResourceCountProjection(rc.ResourceType, rc.ResourceCount))
+                            .ToList()
                     )).ToList()
                 ))
                 .FirstOrDefaultAsync(cancellationToken);
@@ -138,7 +150,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return proj == null ? null : MapToModel(proj);
         }
 
-        public async Task<List<ReportEntryModel>> FindAsync(Expression<Func<ReportEntry, bool>> predicate, CancellationToken cancellationToken = default)
+        public async Task<List<ReportEntryModel>> FindAsync(Expression<Func<ReportEntry, bool>> predicate,
+            CancellationToken cancellationToken = default)
         {
             var projList = await _dbContext.ReportEntry
                 .Where(predicate)
@@ -160,7 +173,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                         m.ReportType,
                         m.MeasureReportUri,
                         m.MeasureReportFileName,
-                        m.ResourceCounts.Select(rc => new ResourceCountProjection(rc.ResourceType, rc.ResourceCount)).ToList()
+                        m.ResourceCounts.Select(rc => new ResourceCountProjection(rc.ResourceType, rc.ResourceCount))
+                            .ToList()
                     )).ToList()
                 ))
                 .ToListAsync(cancellationToken);
@@ -168,7 +182,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return projList.Select(MapToModel).ToList();
         }
 
-        public async Task<ReportEntryModel?> SingleOrDefaultAsync(Expression<Func<ReportEntry, bool>> predicate, CancellationToken cancellationToken = default)
+        public async Task<ReportEntryModel?> SingleOrDefaultAsync(Expression<Func<ReportEntry, bool>> predicate,
+            CancellationToken cancellationToken = default)
         {
             var proj = await _dbContext.ReportEntry
                 .Where(predicate)
@@ -190,7 +205,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                         m.ReportType,
                         m.MeasureReportUri,
                         m.MeasureReportFileName,
-                        m.ResourceCounts.Select(rc => new ResourceCountProjection(rc.ResourceType, rc.ResourceCount)).ToList()
+                        m.ResourceCounts.Select(rc => new ResourceCountProjection(rc.ResourceType, rc.ResourceCount))
+                            .ToList()
                     )).ToList()
                 ))
                 .SingleOrDefaultAsync(cancellationToken);
@@ -261,6 +277,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                             existingCounts.Remove(ec);
                         }
                     }
+
                     foreach (var orphan in existingCounts)
                         existing.ResourceCounts.Remove(orphan);
 
@@ -278,48 +295,68 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task<ReportEntryModel> AddAsync(ReportEntryModel model, CancellationToken cancellationToken)
         {
-            var entity = new ReportEntry
-            {
-                Id = model.Id == Guid.Empty ? Guid.NewGuid() : model.Id,
-                CreateDate = DateTime.UtcNow,
-                FacilityId = model.FacilityId,
-                ReportScheduleId = model.ReportScheduleId,
-                PatientId = model.PatientId,
-                ReportingStatus = model.ReportingStatus,
-                SubmissionStatus = model.SubmissionStatus,
-                SubmitReportDateTime = model.SubmitReportDateTime,
-                AggregateReportUri = model.AggregateReportUri,
-                AggregateReportBlobName = model.AggregateReportBlobName
-            };
+            await AddRangeAsync(new[] { model }, cancellationToken);
+            return model;
+        }
 
-            foreach (var measureModel in model.MeasureReports)
+        public async Task AddRangeAsync(IEnumerable<ReportEntryModel> models, CancellationToken cancellationToken)
+        {
+            if (models == null || !models.Any())
+                return;
+
+            var entities = new List<ReportEntry>();
+
+            foreach (var model in models)
             {
-                var measureEntry = new EntryMeasureReport
+                var entity = new ReportEntry
                 {
-                    ReportType = measureModel.ReportType,
-                    Status = measureModel.Status,
-                    MeasureReportId = measureModel.MeasureReportId,
-                    MeasureReportUri = measureModel.MeasureReportUri,
-                    MeasureReportFileName = measureModel.MeasureReportFileName
+                    Id = model.Id == Guid.Empty ? Guid.NewGuid() : model.Id,
+                    CreateDate = DateTime.UtcNow,
+                    FacilityId = model.FacilityId,
+                    ReportScheduleId = model.ReportScheduleId,
+                    PatientId = model.PatientId,
+                    ReportingStatus = model.ReportingStatus,
+                    SubmissionStatus = model.SubmissionStatus,
+                    SubmitReportDateTime = model.SubmitReportDateTime,
+                    AggregateReportUri = model.AggregateReportUri,
+                    AggregateReportBlobName = model.AggregateReportBlobName
                 };
 
-                foreach (var rc in measureModel.ResourceCount)
+                foreach (var measureModel in model.MeasureReports)
                 {
-                    measureEntry.ResourceCounts.Add(new ResourceCounts
+                    var measureEntry = new EntryMeasureReport
                     {
-                        ResourceType = rc.Key,
-                        ResourceCount = rc.Value
-                    });
+                        ReportType = measureModel.ReportType,
+                        Status = measureModel.Status,
+                        MeasureReportId = measureModel.MeasureReportId,
+                        MeasureReportUri = measureModel.MeasureReportUri,
+                        MeasureReportFileName = measureModel.MeasureReportFileName
+                    };
+
+                    foreach (var rc in measureModel.ResourceCount)
+                    {
+                        measureEntry.ResourceCounts.Add(new ResourceCounts
+                        {
+                            ResourceType = rc.Key,
+                            ResourceCount = rc.Value
+                        });
+                    }
+
+                    entity.MeasureReports.Add(measureEntry);
                 }
 
-                entity.MeasureReports.Add(measureEntry);
+                entities.Add(entity);
             }
 
-            await _dbContext.AddAsync(entity, cancellationToken);
+            await _dbContext.ReportEntry.AddRangeAsync(entities, cancellationToken);
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            model.Id = entity.Id;
-            return model;
+            var entityArray = entities.ToArray();
+            int index = 0;
+            foreach (var model in models)
+            {
+                model.Id = entityArray[index++].Id;
+            }
         }
 
         public async Task<ReportEntryModel> UpdateAsyncWithConsumerResult(MeasureReportGeneratedValue consumerValue)
@@ -341,7 +378,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return await UpdateAsync(model, CancellationToken.None);
         }
 
-        public async Task<ReportEntryModel> UpdateAsyncWithAggregateResult(ReportEntryModel model, AggregateResult aggregateResult, CancellationToken cancellationToken = default)
+        public async Task<ReportEntryModel> UpdateAsyncWithAggregateResult(ReportEntryModel model,
+            AggregateResult aggregateResult, CancellationToken cancellationToken = default)
         {
             model.AggregateReportUri = aggregateResult.Uri.AbsoluteUri;
             model.AggregateReportBlobName = aggregateResult.BlobName;
@@ -356,7 +394,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return await UpdateAsync(model, cancellationToken);
         }
 
-        public async Task<ReportEntryModel> UpdateAsyncNotReportableEntry(ReportEntryModel model, CancellationToken cancellationToken = default)
+        public async Task<ReportEntryModel> UpdateAsyncNotReportableEntry(ReportEntryModel model,
+            CancellationToken cancellationToken = default)
         {
             model.ReportingStatus = ReportingStatus.NotReportable;
             model.SubmissionStatus = SubmissionStatus.NotEligable;
@@ -365,7 +404,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return await UpdateAsync(model, cancellationToken);
         }
 
-        public async Task<int> CountAsync(Expression<Func<ReportEntry, bool>> predicate, CancellationToken cancellationToken = default)
+        public async Task<int> CountAsync(Expression<Func<ReportEntry, bool>> predicate,
+            CancellationToken cancellationToken = default)
         {
             return await _dbContext.ReportEntry
                 .Where(predicate)
@@ -404,7 +444,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     .AnyAsync(s => s.Id == reportScheduleId && s.IsDeleted != true, cancellationToken);
 
                 if (!scheduleIsActive)
-                    return new PagedConfigModel<ReportEntryModel>(new List<ReportEntryModel>(), new PaginationMetadata(0, pageSize, pageNumber));
+                    return new PagedConfigModel<ReportEntryModel>(new List<ReportEntryModel>(),
+                        new PaginationMetadata(pageSize, pageNumber, 0));
 
                 predicate = predicate.And(q => q.ReportScheduleId == reportScheduleId);
             }
@@ -430,7 +471,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
             if (submissionStatuses != null && submissionStatuses.Count > 0)
             {
-                Expression<Func<ReportEntry, bool>> p = x => x.SubmissionStatus != null && submissionStatuses.Contains(x.SubmissionStatus.Value);
+                Expression<Func<ReportEntry, bool>> p = x =>
+                    x.SubmissionStatus != null && submissionStatuses.Contains(x.SubmissionStatus.Value);
                 submissionPredicate = submissionPredicate == null ? p : submissionPredicate.Or(p);
             }
 
@@ -444,40 +486,68 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 predicate = predicate.And(q => q.MeasureReports.Any(a => a.ReportType == reportType));
             }
 
-            var query = _dbContext.ReportEntry
-                .Where(predicate)
-                .Select(e => new ReportEntryProjection(
-                    e.Id,
-                    e.CreateDate,
-                    e.ModifyDate,
-                    e.FacilityId,
-                    e.ReportScheduleId,
-                    e.PatientId,
-                    e.ReportingStatus,
-                    e.SubmissionStatus,
-                    e.SubmitReportDateTime,
-                    e.AggregateReportUri,
-                    e.AggregateReportBlobName,
-                    e.MeasureReports.Select(m => new MeasureReportProjection(
-                        m.MeasureReportId,
-                        m.Status,
-                        m.ReportType,
-                        m.MeasureReportUri,
-                        m.MeasureReportFileName,
-                        m.ResourceCounts.Select(rc => new ResourceCountProjection(rc.ResourceType, rc.ResourceCount)).ToList()
-                    )).ToList()
-                ));
+            IQueryable<ReportEntry> entityQuery = _dbContext.ReportEntry.Where(predicate);
 
             if (!string.IsNullOrWhiteSpace(sortBy))
             {
-                query = sortOrder == SortOrder.Descending
-                    ? query.OrderByDescending(x => EF.Property<object>(x, sortBy))
-                    : query.OrderBy(x => EF.Property<object>(x, sortBy));
+                entityQuery = sortOrder == SortOrder.Descending
+                    ? entityQuery.OrderByDescending(x => EF.Property<object>(x, sortBy))
+                    : entityQuery.OrderBy(x => EF.Property<object>(x, sortBy));
             }
             else
             {
-                query = query.OrderByDescending(x => x.CreateDate);
+                entityQuery = entityQuery.OrderByDescending(x => x.CreateDate);
             }
+
+            if (!string.IsNullOrWhiteSpace(sortBy))
+            {
+                entityQuery = sortBy.ToLower() switch
+                {
+                    "createdate" => sortOrder == SortOrder.Descending
+                        ? entityQuery.OrderByDescending(x => x.CreateDate)
+                        : entityQuery.OrderBy(x => x.CreateDate),
+                    "facilityid" => sortOrder == SortOrder.Descending
+                        ? entityQuery.OrderByDescending(x => x.FacilityId)
+                        : entityQuery.OrderBy(x => x.FacilityId),
+                    "patientid" => sortOrder == SortOrder.Descending
+                        ? entityQuery.OrderByDescending(x => x.PatientId)
+                        : entityQuery.OrderBy(x => x.PatientId),
+                    "reportingstatus" => sortOrder == SortOrder.Descending
+                        ? entityQuery.OrderByDescending(x => x.ReportingStatus)
+                        : entityQuery.OrderBy(x => x.ReportingStatus),
+                    "submissionstatus" => sortOrder == SortOrder.Descending
+                        ? entityQuery.OrderByDescending(x => x.SubmissionStatus)
+                        : entityQuery.OrderBy(x => x.SubmissionStatus),
+                    _ => entityQuery.OrderByDescending(x => x.CreateDate)
+                };
+            }
+            else
+            {
+                entityQuery = entityQuery.OrderByDescending(x => x.CreateDate);
+            }
+
+            var query = entityQuery.Select(e => new ReportEntryProjection(
+                e.Id,
+                e.CreateDate,
+                e.ModifyDate,
+                e.FacilityId,
+                e.ReportScheduleId,
+                e.PatientId,
+                e.ReportingStatus,
+                e.SubmissionStatus,
+                e.SubmitReportDateTime,
+                e.AggregateReportUri,
+                e.AggregateReportBlobName,
+                e.MeasureReports.Select(m => new MeasureReportProjection(
+                    m.MeasureReportId,
+                    m.Status,
+                    m.ReportType,
+                    m.MeasureReportUri,
+                    m.MeasureReportFileName,
+                    m.ResourceCounts.Select(rc => new ResourceCountProjection(rc.ResourceType, rc.ResourceCount))
+                        .ToList()
+                )).ToList()
+            ));
 
             var projList = await query
                 .Skip((pageNumber - 1) * pageSize)
@@ -490,10 +560,12 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 .Where(predicate)
                 .LongCountAsync(cancellationToken);
 
-            return new PagedConfigModel<ReportEntryModel>(results, new PaginationMetadata(pageSize, pageNumber, totalCount));
+            return new PagedConfigModel<ReportEntryModel>(results,
+                new PaginationMetadata(pageSize, pageNumber, totalCount));
         }
 
-        public async Task<ReportEntrySummary> GetSummaryByReportScheduleIdAsync(Guid reportScheduleId, CancellationToken cancellationToken = default)
+        public async Task<ReportEntrySummary> GetSummaryByReportScheduleIdAsync(Guid reportScheduleId,
+            CancellationToken cancellationToken = default)
         {
             var entries = await _dbContext.ReportEntry
                 .Where(x => x.ReportScheduleId == reportScheduleId)
@@ -506,7 +578,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             {
                 var reportingStatusKey = entry.ReportingStatus.ToString();
                 if (summary.ReportingStatusCounts.ContainsKey(reportingStatusKey))
-                    summary.ReportingStatusCounts[reportingStatusKey]++;
+                    summary.ReportingStatusCounts[reportingStatusKey] = summary.ReportingStatusCounts.GetValueOrDefault(reportingStatusKey) + 1;
                 else
                     summary.ReportingStatusCounts[reportingStatusKey] = 1;
 
@@ -515,7 +587,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     : "Pending";
 
                 if (summary.SubmissionStatusCounts.ContainsKey(submissionStatusKey))
-                    summary.SubmissionStatusCounts[submissionStatusKey]++;
+                    summary.SubmissionStatusCounts[submissionStatusKey] = summary.SubmissionStatusCounts.GetValueOrDefault(submissionStatusKey) + 1;
                 else
                     summary.SubmissionStatusCounts[submissionStatusKey] = 1;
 
@@ -524,7 +596,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     foreach (var measureReport in entry.MeasureReports)
                     {
                         if (summary.ReportTypeCounts.ContainsKey(measureReport.ReportType))
-                            summary.ReportTypeCounts[measureReport.ReportType]++;
+                            summary.ReportTypeCounts[measureReport.ReportType] = summary.ReportTypeCounts.GetValueOrDefault(measureReport.ReportType) + 1;
                         else
                             summary.ReportTypeCounts[measureReport.ReportType] = 1;
                     }

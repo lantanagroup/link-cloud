@@ -62,6 +62,20 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             return await _client.SendAsync(request, cancellationToken);
         }
 
+        public async Task<HttpResponseMessage> RestoreLogsByReportTrackingIdAsync(ClaimsPrincipal user, string reportTrackingId, CancellationToken cancellationToken)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Patch, $"api/data/acquisition-logs/report/{Uri.EscapeDataString(reportTrackingId)}/restore");
+            await SetAuthHeaderAsync(user, request);
+            return await _client.SendAsync(request, cancellationToken);
+        }
+
+        public async Task<HttpResponseMessage> SoftDeleteLogsByReportTrackingIdAsync(ClaimsPrincipal user, string reportTrackingId, CancellationToken cancellationToken)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Delete, $"api/data/acquisition-logs/report/{Uri.EscapeDataString(reportTrackingId)}");
+            await SetAuthHeaderAsync(user, request);
+            return await _client.SendAsync(request, cancellationToken);
+        }
+
         public async Task<HttpResponseMessage> SoftDeleteLogsAsync(ClaimsPrincipal user, string facilityId, CancellationToken cancellationToken)
         {
             var request = new HttpRequestMessage(HttpMethod.Delete, $"api/data/acquisition-logs/facility/{Uri.EscapeDataString(facilityId)}");

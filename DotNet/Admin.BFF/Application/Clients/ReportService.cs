@@ -76,7 +76,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             string? sortBy = null,
             SortOrder? sortOrder = null,
             int pageNumber = 1,
-            int pageSize = 10
+            int pageSize = 10,
+            DateOnly? createDate = null
             )
         {
             // HTTP GET
@@ -147,6 +148,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             if (sortOrder.HasValue)
             {
                 queryParams["sortOrder"] = sortOrder.Value.ToString();
+            }
+
+            if (createDate.HasValue)
+            {
+                queryParams["createDate"] = createDate.Value.ToString("yyyy-MM-dd");
             }
 
             var relativeUrl = QueryHelpers.AddQueryString("api/schedules/search", queryParams);
@@ -244,6 +250,31 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             }
 
             return await _client.GetAsync($"api/schedules/facilities/{Uri.EscapeDataString(facilityId)}?blocking=true", cancellationToken);
+        }
+
+        public async Task<HttpResponseMessage> SoftDeleteReportScheduleAsync(ClaimsPrincipal user, string reportScheduleId, CancellationToken cancellationToken)
+        {
+            if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
+            {
+                var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            return await _client.DeleteAsync($"api/schedules/{Uri.EscapeDataString(reportScheduleId)}", cancellationToken);
+        }
+
+        public async Task<HttpResponseMessage> RestoreReportScheduleAsync(ClaimsPrincipal user, string reportScheduleId, CancellationToken cancellationToken)
+        {
+            if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
+            {
+                var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var request = new HttpRequestMessage(HttpMethod.Patch, $"api/schedules/{Uri.EscapeDataString(reportScheduleId)}/restore");
+            return await _client.SendAsync(request, cancellationToken);
         }
 
         public async Task<HttpResponseMessage> SoftDeleteReportSchedulesAsync(ClaimsPrincipal user, string facilityId, CancellationToken cancellationToken)

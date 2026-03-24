@@ -25,6 +25,12 @@ import { FormsModule } from "@angular/forms";
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatSortModule, MatSort, Sort } from '@angular/material/sort';
 import { ReportService } from "../../../services/gateway/report/report.service";
+import {MatFormFieldModule} from '@angular/material/form-field';
+import {MatInputModule} from '@angular/material/input';
+import {MatSelectModule} from '@angular/material/select';
+import {MatDatepickerModule} from '@angular/material/datepicker';
+import {MatCheckbox} from '@angular/material/checkbox';
+import {MatTooltipModule} from '@angular/material/tooltip';
 
 @Component({
   selector: 'app-facility-view',
@@ -40,7 +46,13 @@ import { ReportService } from "../../../services/gateway/report/report.service";
     FormsModule,
     MatTableModule,
     MatSortModule,
-    MatSnackBarModule
+    MatSnackBarModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+    MatDatepickerModule,
+    MatCheckbox,
+    MatTooltipModule
   ],
   templateUrl: './facility-view.component.html',
   styleUrl: './facility-view.component.scss'
@@ -70,6 +82,16 @@ export class FacilityViewComponent implements OnInit, OnDestroy {
 
   showDeleted: boolean = false;
 
+  // Filters
+  statusFilter: string = '';
+  frequencyFilter: string = '';
+  reportStartDateFilter: Date | null = null;
+  reportEndDateFilter: Date | null = null;
+  createDateFilter: Date | null = null;
+
+  readonly statusOptions = ['New', 'Scheduled', 'EndOfPeriod', 'Submitted'];
+  readonly frequencyOptions = ['Monthly', 'Weekly', 'Daily', 'Adhoc'];
+
   currentSortBy: string = 'CreateDate';
   currentSortOrder: number = 1; // 1 = Descending, 0 = Ascending
 
@@ -88,6 +110,8 @@ export class FacilityViewComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.paginationMetadata.pageNumber = this.defaultPageNumber;
     this.paginationMetadata.pageSize = this.defaultPageSize;
+    this.paginationMetadata.totalCount = 0;
+    this.paginationMetadata.totalPages = 0;
 
     this.subscription = this.route.params.subscribe(params => {
       this.facilityId = params['facilityId'];
@@ -155,19 +179,23 @@ export class FacilityViewComponent implements OnInit, OnDestroy {
       this.highlightedRowIds = new Set();
     }
     this.loadingService.isLoading.next(true);
+    const reportEndDateNormalized = this.reportEndDateFilter
+      ? new Date(this.reportEndDateFilter.getFullYear(), this.reportEndDateFilter.getMonth(), this.reportEndDateFilter.getDate(), 23, 59, 59, 999)
+      : undefined;
     this.reportService.searchReportSchedules(
       this.facilityId,
+      this.frequencyFilter || undefined,
       undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
+      this.reportStartDateFilter ?? undefined,
+      reportEndDateNormalized,
+      this.statusFilter || undefined,
       undefined,
       this.showDeleted,
       this.currentSortBy,
       this.currentSortOrder,
-      this.paginationMetadata.pageSize,
-      this.paginationMetadata.pageNumber + 1 // API expects 1-based indexing
+      Math.max(1, this.paginationMetadata.pageSize || this.defaultPageSize),
+      this.paginationMetadata.pageNumber + 1, // API expects 1-based indexing
+      this.createDateFilter ?? undefined
     ).subscribe({
       next: (data) => {
         this.reportSchedules = data.records;
@@ -187,6 +215,26 @@ export class FacilityViewComponent implements OnInit, OnDestroy {
     });
   }
 
+  applyFilters(): void {
+    this.paginationMetadata.pageNumber = 0;
+    this.loadReportSchedules();
+  }
+
+  clearFilters(): void {
+    this.statusFilter = '';
+    this.frequencyFilter = '';
+    this.reportStartDateFilter = null;
+    this.reportEndDateFilter = null;
+    this.createDateFilter = null;
+    this.paginationMetadata.pageNumber = 0;
+    this.loadReportSchedules();
+  }
+
+  hasActiveFilters(): boolean {
+    return !!(this.statusFilter || this.frequencyFilter ||
+              this.reportStartDateFilter || this.reportEndDateFilter || this.createDateFilter);
+  }
+
   onFacilityConfig(): void {
     this.router.navigate(['/tenant/facility', this.facilityId, 'edit']);
   }
@@ -201,8 +249,10 @@ export class FacilityViewComponent implements OnInit, OnDestroy {
   }
 
   onPageChange(event: PageEvent): void {
-    this.paginationMetadata.pageSize = event.pageSize;
     this.paginationMetadata.pageNumber = event.pageIndex;
+    if (event.pageSize > 0) {
+      this.paginationMetadata.pageSize = event.pageSize;
+    }
     this.loadReportSchedules();
   }
 

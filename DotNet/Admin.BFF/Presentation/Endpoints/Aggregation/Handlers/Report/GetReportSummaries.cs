@@ -24,7 +24,8 @@ public static class GetReportSummaries
         string? sortBy = null,
         SortOrder? sortOrder = null,
         int pageNumber = 1,
-        int pageSize = 10
+        int pageSize = 10,
+        DateOnly? createDate = null
         )
     {
         try
@@ -33,8 +34,8 @@ public static class GetReportSummaries
 
             //TODO: add validation for facilityId
 
-            if (pageNumber < 1) return Results.BadRequest("Page number must be greater than 0");
-            if (pageSize < 1) return Results.BadRequest("Page size must be greater than 0");
+            if (pageNumber < 1) pageNumber = 1;
+            if (pageSize < 1) pageSize = 10;
 
             var response = await reportService.ReportSummaryList(context.User,
                 context.RequestAborted,
@@ -49,7 +50,8 @@ public static class GetReportSummaries
                 sortBy,
                 sortOrder,
                 pageNumber,
-                pageSize
+                pageSize,
+                createDate
                 );
 
             if (!response.IsSuccessStatusCode)
