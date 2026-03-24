@@ -55,9 +55,11 @@ public class GenerateReportListenerTests : IClassFixture<ReportIntegrationTestFi
         var listener = scope.ServiceProvider.GetRequiredService<GenerateReportListener>();
         var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
 
+        var adhocReportId = Guid.NewGuid();
+
         var value = new GenerateReportValue
         {
-            AdhocReportId = Guid.NewGuid(),
+            AdhocReportId = adhocReportId,
             StartDate = DateTime.UtcNow.AddDays(-1),
             EndDate = DateTime.UtcNow.AddDays(30),
             ReportTypes = new List<string> { "DE-111" }
@@ -74,8 +76,8 @@ public class GenerateReportListenerTests : IClassFixture<ReportIntegrationTestFi
 
         await listener.ProcessMessageAsync(consumeResult, CancellationToken.None);
 
-        var schedules = await reportScheduledManager.FindAsync(x => true);
-        Assert.Empty(schedules);
+        var schedule = await reportScheduledManager.SingleOrDefaultAsync(x => x.Id == adhocReportId);
+        Assert.Null(schedule);
     }
 
     [Fact]
