@@ -23,6 +23,48 @@
         </div>
       </div>
     </div>
+    <div class="filter-bar">
+      <mat-form-field appearance="fill" class="compact-filter">
+        <mat-label>Facility ID</mat-label>
+        <input matInput [(ngModel)]="facilityIdFilter" (keyup.enter)="applyFilters()" placeholder="Filter by facility">
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" class="compact-filter">
+        <mat-label>Status</mat-label>
+        <mat-select [(ngModel)]="statusFilter" (selectionChange)="applyFilters()">
+          <mat-option value="">Any</mat-option>
+          @for (s of statusOptions; track s) {
+            <mat-option [value]="s">{{ s === 'EndOfPeriod' ? 'End of Period' : s }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" class="compact-filter">
+        <mat-label>Frequency</mat-label>
+        <mat-select [(ngModel)]="frequencyFilter" (selectionChange)="applyFilters()">
+          <mat-option value="">Any</mat-option>
+          @for (f of frequencyOptions; track f) {
+            <mat-option [value]="f">{{ f }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" class="compact-filter">
+        <mat-label>Start Date From</mat-label>
+        <input matInput type="date" [(ngModel)]="reportStartDateFilter" (change)="applyFilters()">
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" class="compact-filter">
+        <mat-label>Start Date To</mat-label>
+        <input matInput type="date" [(ngModel)]="reportEndDateFilter" (change)="applyFilters()">
+      </mat-form-field>
+
+      <div class="filter-actions">
+        <button class="link-button success" (click)="applyFilters()">Apply</button>
+        <button class="link-button secondary" (click)="clearFilters()" *ngIf="hasActiveFilters()">Clear</button>
+      </div>
+    </div>
+
     <div class="table-container no-border">
       <table mat-table [dataSource]="dataSource" matSort (matSortChange)="onSortChange($event)" style="width: 100%; background-color: transparent">
 
@@ -141,6 +183,12 @@
                     matTooltip="Soft delete this report"
                     (click)="onSoftDeleteReport(element.id, element.status)">
               <mat-icon>delete</mat-icon>
+            </button>
+            <button mat-icon-button color="accent"
+                    *ngIf="element.isDeleted"
+                    matTooltip="Restore this report"
+                    (click)="onRestoreReport(element.id)">
+              <mat-icon>restore</mat-icon>
             </button>
           </td>
         </ng-container>

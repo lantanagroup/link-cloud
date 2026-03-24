@@ -64,7 +64,22 @@ public static class AggregationMapping
                               "Returns 404 if the report schedule does not exist. " +
                               "If the acquisition log deletion fails, the report soft-delete is rolled back and 500 is returned."
             });
-        
+
+        routes.MapPatch("/reports/{reportScheduleId}/restore", RestoreReport.Handle)
+            .RequireAuthorization(LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName)
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status500InternalServerError)
+            .WithOpenApi(x => new OpenApiOperation(x)
+            {
+                Summary = "Restore Report Schedule",
+                Description = "Restores a soft-deleted report schedule and its associated acquisition logs. " +
+                              "Returns 404 if the report schedule does not exist. " +
+                              "If the acquisition log restore fails, the report restore is rolled back and 500 is returned."
+            });
+
         routes.MapGet("/reports/summaries", GetReportSummaries.Search)
             .RequireAuthorization(LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName)
             .Produces<List<ScheduledReportListSummary>>()

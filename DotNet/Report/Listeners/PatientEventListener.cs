@@ -159,6 +159,9 @@ namespace LantanaGroup.Link.Report.Listeners
                     throw new TransientException($"No Scheduled Reports found for facilityId: {facilityId}");
                 }
 
+                var newEntries = new List<ReportEntryModel>();
+                var entriesToUpdate = new List<ReportEntryModel>();
+
                 foreach (var scheduledReport in scheduledReports)
                 {
                     var entry = await reportEntryManager.SingleOrDefaultAsync(e => e.ReportScheduleId == scheduledReport.Id && e.PatientId == value.PatientId, cancellationToken);
@@ -192,6 +195,16 @@ namespace LantanaGroup.Link.Report.Listeners
 
                         await reportEntryManager.UpdateAsync(entry, cancellationToken);
                     }
+                }
+
+                if (newEntries.Count > 0)
+                {
+                    await reportEntryManager.AddRangeAsync(newEntries, cancellationToken);
+                }
+
+                foreach (var entryToUpdate in entriesToUpdate)
+                {
+                    await reportEntryManager.UpdateAsync(entryToUpdate, cancellationToken);
                 }
             }
             catch (DeadLetterException ex)

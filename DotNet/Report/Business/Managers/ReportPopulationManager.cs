@@ -18,6 +18,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         Task<ReportPopulationModel> AddAsyncWithAggregateResult(string facilityId, Guid reportScheduleId, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken);
 
+        Task AddRangeAsync(IEnumerable<ReportPopulationModel> models, CancellationToken cancellationToken);
+
         Task<List<ReportPopulationModel>> FindAsync(Expression<Func<ReportPopulation, bool>> predicate, CancellationToken cancellationToken = default);
 
         Task<ReportPopulationModel?> SingleOrDefaultAsync(Expression<Func<ReportPopulation, bool>> predicate, CancellationToken cancellationToken = default);
@@ -82,31 +84,51 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task<ReportPopulationModel> AddAsync(ReportPopulationModel model, CancellationToken cancellationToken)
         {
-            var entity = new ReportPopulation
-            {
-                Id = model.Id == Guid.Empty ? Guid.NewGuid() : model.Id,
-                CreateDate = DateTime.UtcNow,
-                FacilityId = model.FacilityId,
-                ReportType = model.ReportType,
-                ReportScheduleId = model.ReportScheduleId,
-                Measure = model.Measure
-            };
+            await AddRangeAsync(new[] { model }, cancellationToken);
+            return model;
+        }
 
-            foreach (var groupModel in model.GroupPopulations)
+        public async Task AddRangeAsync(IEnumerable<ReportPopulationModel> models, CancellationToken cancellationToken)
+        {
+            if (models == null || !models.Any())
+                return;
+
+            var entities = new List<ReportPopulation>();
+
+            foreach (var model in models)
             {
-                entity.GroupPopulations.Add(new GroupPopulation
+                var entity = new ReportPopulation
                 {
-                    PopulationId = groupModel.PopulationId,
-                    PopulationCodeJson = groupModel.PopulationCodeJson,
-                    TotalPopulationCount = groupModel.TotalPopulationCount
-                });
+                    Id = model.Id == Guid.Empty ? Guid.NewGuid() : model.Id,
+                    CreateDate = DateTime.UtcNow,
+                    FacilityId = model.FacilityId,
+                    ReportType = model.ReportType,
+                    ReportScheduleId = model.ReportScheduleId,
+                    Measure = model.Measure
+                };
+
+                foreach (var groupModel in model.GroupPopulations)
+                {
+                    entity.GroupPopulations.Add(new GroupPopulation
+                    {
+                        PopulationId = groupModel.PopulationId,
+                        PopulationCodeJson = groupModel.PopulationCodeJson,
+                        TotalPopulationCount = groupModel.TotalPopulationCount
+                    });
+                }
+
+                entities.Add(entity);
             }
 
-            await _context.AddAsync(entity, cancellationToken);
+            await _context.AddRangeAsync(entities, cancellationToken);
             await _context.SaveChangesAsync(cancellationToken);
 
-            model.Id = entity.Id;
-            return model;
+            var entityList = entities.ToList();
+            int index = 0;
+            foreach (var model in models)
+            {
+                model.Id = entityList[index++].Id;
+            }
         }
 
         public async Task<List<ReportPopulationModel>> AddWithReportScheduleAsync(ReportScheduleModel reportSchedule, CancellationToken cancellationToken)
