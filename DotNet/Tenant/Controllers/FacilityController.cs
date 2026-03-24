@@ -161,7 +161,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                     }
                 }
 
-                var facilities = await _facilityQueries.SearchAsync(searchModel, HttpContext.RequestAborted);
+                var facilities = await _facilityQueries.SearchAsync(searchModel, HttpContext.RequestAborted, includeDeleted);
 
                 if ((facilities?.Count ?? 0) == 0)
                 {

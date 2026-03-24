@@ -9,7 +9,7 @@ public class ScheduledReportListSummary
     public DateTime ReportStartDate { get; set; }
     public DateTime ReportEndDate { get; set; }
     public bool Submitted { get; set; }
-    public DateTime? SubmitDate { get; set; }
+    public DateTime? SubmitReportDateTime { get; set; }
     public List<string> ReportTypes { get; set; } = [];
     public Frequency Frequency { get; set; }
     

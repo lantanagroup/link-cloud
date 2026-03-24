@@ -24,7 +24,8 @@ public static class GetReportSummaries
         string? sortBy = null,
         SortOrder? sortOrder = null,
         int pageNumber = 1,
-        int pageSize = 10
+        int pageSize = 10,
+        DateOnly? createDate = null
         )
     {
         try
@@ -49,7 +50,8 @@ public static class GetReportSummaries
                 sortBy,
                 sortOrder,
                 pageNumber,
-                pageSize
+                pageSize,
+                createDate
                 );
 
             if (!response.IsSuccessStatusCode)
