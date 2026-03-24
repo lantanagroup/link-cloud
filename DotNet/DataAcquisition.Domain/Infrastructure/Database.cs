@@ -54,8 +54,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
             IEntityRepository<ResourceReferenceType> resourceReferenceTypeRepository,
             IEntityRepository<FhirQueryResourceType> fhirQueryResourceTypeRepository,
             IEntityRepository<SftpAcquisitionLog> sftpAcquisitionLogRepository,
-            IEntityRepository<SftpConfiguration> sftpConfigurationRepository)
-            IEntityRepository<FhirQueryResourceType> fhirQueryResourceTypeRepository,
+            IEntityRepository<SftpConfiguration> sftpConfigurationRepository,
             IEntityRepository<OrganizationLocationConfiguration> locationConfigurationRepository,
             IEntityRepository<OrganizationLocationCondition> locationConditionRepository,
             IEntityRepository<OrganizationLocationMapping> locationMappingRepository)
