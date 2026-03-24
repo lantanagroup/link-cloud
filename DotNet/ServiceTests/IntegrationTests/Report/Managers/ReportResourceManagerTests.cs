@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Task = System.Threading.Tasks.Task;
 
-namespace IntegrationTests.Report;
+namespace IntegrationTests.Report.Managers;
 
 [Trait("Category", "IntegrationTests")]
 public class ReportResourceManagerTests : IClassFixture<ReportIntegrationTestFixture>

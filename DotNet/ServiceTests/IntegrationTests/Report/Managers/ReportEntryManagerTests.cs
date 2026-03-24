@@ -3,12 +3,11 @@ using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Models;
-using LantanaGroup.Link.Shared.Application.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Task = System.Threading.Tasks.Task;
 
-namespace IntegrationTests.Report;
+namespace IntegrationTests.Report.Managers;
 
 [Trait("Category", "IntegrationTests")]
 public class ReportEntryManagerTests : IClassFixture<ReportIntegrationTestFixture>
