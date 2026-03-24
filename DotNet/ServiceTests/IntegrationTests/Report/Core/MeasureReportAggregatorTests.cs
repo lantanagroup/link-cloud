@@ -27,10 +27,6 @@ namespace IntegrationTests.Report.Core
             _fixture = fixture;
         }
 
-        // ------------------------------------------------------------------ //
-        //  Helpers
-        // ------------------------------------------------------------------ //
-
         private static ReportScheduleModel BuildSchedule(
             string facilityId,
             DateTime? startDate = null,
@@ -146,10 +142,6 @@ namespace IntegrationTests.Report.Core
             return new MeasureReportAggregator(logger, reportPopulationManager);
         }
 
-        // ------------------------------------------------------------------ //
-        //  Empty population list
-        // ------------------------------------------------------------------ //
-
         [Fact]
         public async SystemTask CreateMeasureReportAggregate_NoPopulations_ReturnsEmptyList()
         {
@@ -165,10 +157,6 @@ namespace IntegrationTests.Report.Core
             Assert.NotNull(result);
             Assert.Empty(result);
         }
-
-        // ------------------------------------------------------------------ //
-        //  Single population produces one aggregate MeasureReport
-        // ------------------------------------------------------------------ //
 
         [Fact]
         public async SystemTask CreateMeasureReportAggregate_SinglePopulation_ReturnsOneMeasureReport()
@@ -202,10 +190,6 @@ namespace IntegrationTests.Report.Core
             Assert.Equal("Organization/org-002", report.Reporter?.Reference);
         }
 
-        // ------------------------------------------------------------------ //
-        //  Aggregate MeasureReport profile is set correctly
-        // ------------------------------------------------------------------ //
-
         [Fact]
         public async SystemTask CreateMeasureReportAggregate_SinglePopulation_SetsCorrectProfile()
         {
@@ -234,10 +218,6 @@ namespace IntegrationTests.Report.Core
             Assert.NotNull(report.Meta);
             Assert.Contains(AggregateMeasureReportProfile, report.Meta.Profile);
         }
-
-        // ------------------------------------------------------------------ //
-        //  Period is derived from the report schedule dates
-        // ------------------------------------------------------------------ //
 
         [Fact]
         public async SystemTask CreateMeasureReportAggregate_SinglePopulation_SetsPeriodFromScheduleDates()
@@ -276,10 +256,6 @@ namespace IntegrationTests.Report.Core
             Assert.Equal(expectedStart, report.Period.StartElement?.ToString());
             Assert.Equal(expectedEnd, report.Period.EndElement?.ToString());
         }
-
-        // ------------------------------------------------------------------ //
-        //  Multiple populations – one aggregate MeasureReport per population
-        // ------------------------------------------------------------------ //
 
         [Fact]
         public async SystemTask CreateMeasureReportAggregate_MultiplePopulations_ReturnsOneReportPerPopulation()
@@ -320,10 +296,6 @@ namespace IntegrationTests.Report.Core
             Assert.Contains(result, r => r.Measure == "http://example.com/Measure/DE-222");
         }
 
-        // ------------------------------------------------------------------ //
-        //  Group components are created for each GroupPopulation
-        // ------------------------------------------------------------------ //
-
         [Fact]
         public async SystemTask CreateMeasureReportAggregate_MultipleGroupPopulations_CreatesGroupForEach()
         {
@@ -357,10 +329,6 @@ namespace IntegrationTests.Report.Core
             Assert.Equal(3, report.Group.Count);
         }
 
-        // ------------------------------------------------------------------ //
-        //  Population counts are propagated onto GroupComponent.Population
-        // ------------------------------------------------------------------ //
-
         [Fact]
         public async SystemTask CreateMeasureReportAggregate_GroupPopulationCounts_AreSetOnGroupComponents()
         {
@@ -390,10 +358,6 @@ namespace IntegrationTests.Report.Core
             Assert.Equal(42, population.Count);
         }
 
-        // ------------------------------------------------------------------ //
-        //  SubjectResults reference follows the "#<populationId>-list" format
-        // ------------------------------------------------------------------ //
-
         [Fact]
         public async SystemTask CreateMeasureReportAggregate_GroupComponent_SubjectResultsRefMatchesPopulationId()
         {
@@ -422,10 +386,6 @@ namespace IntegrationTests.Report.Core
             var population = Assert.Single(group.Population);
             Assert.Equal("#initial-population-list", population.SubjectResults?.Reference);
         }
-
-        // ------------------------------------------------------------------ //
-        //  MeasureReportPopulation IDs appear in the contained List entries
-        // ------------------------------------------------------------------ //
 
         [Fact]
         public async SystemTask CreateMeasureReportAggregate_WithMeasureReportPopulations_AddsContainedListWithEntries()
@@ -465,10 +425,6 @@ namespace IntegrationTests.Report.Core
             Assert.Contains(list.Entry, e => e.Item?.Reference == $"MeasureReport/{mrId2}");
         }
 
-        // ------------------------------------------------------------------ //
-        //  Each GroupPopulation gets its own contained List
-        // ------------------------------------------------------------------ //
-
         [Fact]
         public async SystemTask CreateMeasureReportAggregate_MultipleGroupPopulations_ContainsOneListPerGroup()
         {
@@ -500,10 +456,6 @@ namespace IntegrationTests.Report.Core
             Assert.Equal(2, lists.Count);
         }
 
-        // ------------------------------------------------------------------ //
-        //  A group with no MeasureReportPopulations produces an empty contained List
-        // ------------------------------------------------------------------ //
-
         [Fact]
         public async SystemTask CreateMeasureReportAggregate_GroupWithNoMeasureReportPopulations_AddsEmptyContainedList()
         {
@@ -532,10 +484,6 @@ namespace IntegrationTests.Report.Core
             Assert.Empty(list.Entry);
         }
 
-        // ------------------------------------------------------------------ //
-        //  Reporter reference is always "Organization/<orgId>"
-        // ------------------------------------------------------------------ //
-
         [Fact]
         public async SystemTask CreateMeasureReportAggregate_SetsReporterWithOrganizationId()
         {
@@ -563,10 +511,6 @@ namespace IntegrationTests.Report.Core
             var report = Assert.Single(result);
             Assert.Equal($"Organization/{orgId}", report.Reporter?.Reference);
         }
-
-        // ------------------------------------------------------------------ //
-        //  Each returned MeasureReport gets a unique, non-empty Id
-        // ------------------------------------------------------------------ //
 
         [Fact]
         public async SystemTask CreateMeasureReportAggregate_MultiplePopulations_EachReportHasUniqueId()
@@ -604,10 +548,6 @@ namespace IntegrationTests.Report.Core
             Assert.Equal(ids.Count, ids.Distinct().Count());
         }
 
-        // ------------------------------------------------------------------ //
-        //  Population code JSON is deserialized onto GroupComponent.Population.Code
-        // ------------------------------------------------------------------ //
-
         [Fact]
         public async SystemTask CreateMeasureReportAggregate_GroupComponent_PopulationCodeIsDeserialized()
         {
@@ -642,10 +582,6 @@ namespace IntegrationTests.Report.Core
             Assert.Contains(pop.Code.Coding, c => c.Display == populationDisplay);
         }
 
-        // ------------------------------------------------------------------ //
-        //  Populations belonging to a different schedule are NOT returned
-        // ------------------------------------------------------------------ //
-
         [Fact]
         public async SystemTask CreateMeasureReportAggregate_PopulationsFromDifferentSchedule_AreNotIncluded()
         {
@@ -676,10 +612,6 @@ namespace IntegrationTests.Report.Core
 
             Assert.Empty(result);
         }
-
-        // ------------------------------------------------------------------ //
-        //  MeasureReport.Measure is taken from the population model's Measure property
-        // ------------------------------------------------------------------ //
 
         [Fact]
         public async SystemTask CreateMeasureReportAggregate_MeasureValue_IsSetFromPopulationMeasure()
