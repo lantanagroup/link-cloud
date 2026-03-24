@@ -223,7 +223,7 @@
             Refresh
           </button>
 
-          <mat-checkbox [(ngModel)]="includeDeleted" (change)="applyFilters()">
+          <mat-checkbox [(ngModel)]="includeDeleted" (change)="onIncludeDeletedChange()">
             Show Deleted
           </mat-checkbox>
         </div>

@@ -115,7 +115,8 @@ export class ReportService {
     sortBy?: string,
     sortOrder?: number,
     pageSize: number = 10,
-    pageNumber: number = 1
+    pageNumber: number = 1,
+    createDate?: Date
   ): Observable<IPagedReportSchedule> {
     let params = new HttpParams()
       .set('pageSize', pageSize.toString())
@@ -150,6 +151,11 @@ export class ReportService {
     }
     if (sortOrder !== undefined) {
       params = params.set('sortOrder', sortOrder.toString());
+    }
+    if (createDate) {
+      const d = new Date(createDate);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      params = params.set('createDate', dateStr);
     }
 
     return this.http.get<IPagedReportSchedule>(`${this.appConfigService.config?.baseApiUrl}/aggregate/reports/summaries`, { params })
