@@ -62,9 +62,9 @@ namespace IntegrationTests.Report
         public Mock<ITransientExceptionHandler<ReportScheduledListener, string, ReportScheduledValue>> ReportScheduledTransientHandlerMock { get; } = new();
         public Mock<IDeadLetterExceptionHandler<ReportScheduledListener, string, ReportScheduledValue>> ReportScheduledDeadLetterHandlerMock { get; } = new();
 
-        public Mock<IKafkaConsumerFactory<string, PatientListMessage>> PatientListsAcquiredConsumerFactoryMock { get; } = new();
-        public Mock<ITransientExceptionHandler<PatientListsAcquiredListener, string, PatientListMessage>> PatientListsAcquiredTransientHandlerMock { get; } = new();
-        public Mock<IDeadLetterExceptionHandler<PatientListsAcquiredListener, string, PatientListMessage>> PatientListsAcquiredDeadLetterHandlerMock { get; } = new();
+        public Mock<IKafkaConsumerFactory<string, PatientEventValue>> PatientEventConsumerFactoryMock { get; } = new();
+        public Mock<ITransientExceptionHandler<PatientEventListener, string, PatientEventValue>> PatientEventTransientHandlerMock { get; } = new();
+        public Mock<IDeadLetterExceptionHandler<PatientEventListener, string, PatientEventValue>> PatientEventDeadLetterHandlerMock { get; } = new();
 
         public Mock<IKafkaConsumerFactory<Null, MeasureReportGeneratedValue>> MeasureReportGeneratedConsumerFactoryMock { get; } = new();
         public Mock<ITransientExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue>> MeasureReportGeneratedTransientHandlerMock { get; } = new();
@@ -166,14 +166,13 @@ namespace IntegrationTests.Report
                     sp.GetRequiredService<AuditableEventOccurredProducer>()));
 
             builder.Services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
-
             builder.Services.AddSingleton<IKafkaConsumerFactory<string, ReportScheduledValue>>(ReportScheduledConsumerFactoryMock.Object);
             builder.Services.AddSingleton<ITransientExceptionHandler<ReportScheduledListener, string, ReportScheduledValue>>(ReportScheduledTransientHandlerMock.Object);
             builder.Services.AddSingleton<IDeadLetterExceptionHandler<ReportScheduledListener, string, ReportScheduledValue>>(ReportScheduledDeadLetterHandlerMock.Object);
 
-            builder.Services.AddSingleton<IKafkaConsumerFactory<string, PatientListMessage>>(PatientListsAcquiredConsumerFactoryMock.Object);
-            builder.Services.AddSingleton<ITransientExceptionHandler<PatientListsAcquiredListener, string, PatientListMessage>>(PatientListsAcquiredTransientHandlerMock.Object);
-            builder.Services.AddSingleton<IDeadLetterExceptionHandler<PatientListsAcquiredListener, string, PatientListMessage>>(PatientListsAcquiredDeadLetterHandlerMock.Object);
+            builder.Services.AddSingleton<IKafkaConsumerFactory<string, PatientEventValue>>(PatientEventConsumerFactoryMock.Object);
+            builder.Services.AddSingleton<ITransientExceptionHandler<PatientEventListener, string, PatientEventValue>>(PatientEventTransientHandlerMock.Object);
+            builder.Services.AddSingleton<IDeadLetterExceptionHandler<PatientEventListener, string, PatientEventValue>>(PatientEventDeadLetterHandlerMock.Object);
 
             builder.Services.AddSingleton<IKafkaConsumerFactory<Null, MeasureReportGeneratedValue>>(MeasureReportGeneratedConsumerFactoryMock.Object);
             builder.Services.AddSingleton<ITransientExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue>>(MeasureReportGeneratedTransientHandlerMock.Object);
@@ -193,7 +192,7 @@ namespace IntegrationTests.Report
             builder.Services.AddSingleton<ITransientExceptionHandler<GenerateReportListener, string, GenerateReportValue>>(GenerateReportTransientHandlerMock.Object);
             builder.Services.AddSingleton<IDeadLetterExceptionHandler<GenerateReportListener, string, GenerateReportValue>>(GenerateReportDeadLetterHandlerMock.Object);
 
-            builder.Services.AddTransient<PatientListsAcquiredListener>();
+            builder.Services.AddTransient<PatientEventListener>();
             builder.Services.AddTransient<ReportScheduledListener>();
             builder.Services.AddTransient<MeasureReportGeneratedListener>();
             builder.Services.AddTransient<PayloadSubmittedListener>();

@@ -6,5 +6,8 @@ public enum EventType
     A03,
     EncounterFound,
     FHIRListAdmit,
-    FHIRListDischarge
+    FHIRListDischarge,
+    CernerListAdmit,
+    CernerListUpdate,
+    CernerListDischarge
 }
