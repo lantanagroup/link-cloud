@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Census.Application.Models;
+using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Text;
@@ -28,6 +29,12 @@ public class EventProducerService<MessageType> : IEventProducerService<MessageTy
         {
             if (ev is PatientEventResponse patientEventResponse)
             {
+                //We are not going to generate an PatienEvent messages that are marked as 'Update'. We should only process admits and discharges.
+                if (patientEventResponse.PatientEvent.EventType == PatientEvents.Update.ToString()) 
+                {
+                    continue;
+                }
+
                 Headers? headers = null;
                 if (patientEventResponse.CorrelationId != null)
                     headers = new Headers
@@ -45,6 +52,7 @@ public class EventProducerService<MessageType> : IEventProducerService<MessageTy
 
                 try 
                 {
+                    _logger.LogDebug("Producing PatientEvent (Facility = {FacilityId}, PatientId = {PatientId}, Event = {Event})", patientEventResponse.FacilityId, patientEventResponse.PatientEvent.PatientId, patientEventResponse.PatientEvent.EventType);
                     await _kafkaProducer.ProduceAsync(KafkaTopic.PatientEvent.ToString(), message, cancellationToken);
                 }
                 catch (ProduceException<string, MessageType> ex)

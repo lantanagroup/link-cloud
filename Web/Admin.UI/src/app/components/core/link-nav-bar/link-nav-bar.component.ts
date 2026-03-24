@@ -51,9 +51,10 @@ export class LinkNavBarComponent {
       label: 'Logs',
       children: [
         { label: 'Acquisition Log', path: '/tenant/acquisition-log' },
+        { label: 'SFTP Acquisition Log', path: '/data-acquisition/sftp-logs' },
         { label: 'Audit Event Log', path: '/audit' },
         { label: 'Grafana', path: this.appConfig?.config?.grafanaUrl || '/' },
-        { label: 'Kafka', path: '/kafka' },
+        { label: 'Kafka', path: '/kafka' }        
       ]
     },
     {

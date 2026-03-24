@@ -1,4 +1,5 @@
-﻿using Confluent.Kafka;
+﻿using AngleSharp.Css.Dom;
+using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Application.Models;
@@ -12,6 +13,7 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using QueryDispatch.Application.Settings;
 using QueryDispatch.Domain.Managers;
+using System.Reflection.Metadata.Ecma335;
 using System.Text;
 
 namespace LantanaGroup.Link.QueryDispatch.Listeners
@@ -94,6 +96,13 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     }
 
                                     PatientEventValue value = consumeResult.Message.Value;
+
+                                    if (value.EventType != PatientEvents.Discharge.ToString()) {
+                                        _logger.LogInformation("Patient {PatientId} has event type of {EventType}. Ignoring.", HtmlInputSanitizer.Sanitize(value.PatientId), HtmlInputSanitizer.Sanitize(value.EventType));
+                                        _patientEventConsumer.Commit(consumeResult);
+                                        return;
+                                    }
+
                                     string correlationId = string.Empty;
 
                                     if (consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))

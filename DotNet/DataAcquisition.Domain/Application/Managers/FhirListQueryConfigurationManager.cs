@@ -116,6 +116,17 @@ public class FhirListQueryConfigurationManager : IFhirListQueryConfigurationMana
             activity?.SetStatus(ActivityStatusCode.Error, "FhirBaseServerUrl cannot be null");
             throw new ArgumentNullException(nameof(model.FhirBaseServerUrl));
         }
+        
+        // Verify that the facility does not already have an SFTP configuration
+        // A facility can only have one census acquisition method (SFTP or FHIR List)
+        var existingSftpConfig = await _database.SftpConfigurationRepository
+            .SingleOrDefaultAsync(s => s.OrganizationId == model.FacilityId, cancellationToken);
+        if (existingSftpConfig is not null)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "SFTP configuration already exists for facility");
+            throw new InvalidOperationException(
+                $"The facility '{model.FacilityId?.SanitizeAndRemove()}' already has an SFTP configuration. A facility can only have one census acquisition method.");
+        }
 
         var entity = new FhirListConfiguration()
         {

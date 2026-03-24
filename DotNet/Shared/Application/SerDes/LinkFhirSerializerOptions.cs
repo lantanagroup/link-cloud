@@ -62,5 +62,15 @@ namespace LantanaGroup.Link.Shared.Application.SerDes
                     }                                  
             } 
         }
+        
+        public static JsonSerializerOptions ActivityTagging { get; } = new()
+        {
+            ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.Preserve,
+            WriteIndented =  true,
+            Converters =
+            {
+                new System.Text.Json.Serialization.JsonStringEnumConverter()
+            }
+        };
     }
 }
