@@ -243,7 +243,7 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="reportType">Optional report type filter</param>
         /// <param name="reportStartDate">Optional report start date filter (inclusive)</param>
         /// <param name="reportEndDate">Optional report end date filter (inclusive)</param>
-        /// <param name="status">Optional status filter</param>
+        /// <param name="status">Optional status filter — supports multiple values (e.g. status=New&amp;status=Submitted)</param>
         /// <param name="endOfReportPeriodJobHasRun">Optional end of report period job flag filter</param>
         /// <param name="includeDeleted">Optional include deleted filter</param>
         /// <param name="sortBy">Optional sort field (e.g., "CreateDate", "ReportStartDate")</param>
