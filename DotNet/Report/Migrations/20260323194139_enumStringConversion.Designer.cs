@@ -597,7 +597,8 @@ namespace LantanaGroup.Link.Report.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.HasKey("Id")
                         .HasName("PK__ReportEn__3214EC07C971CE5C");
@@ -698,10 +699,12 @@ namespace LantanaGroup.Link.Report.Migrations
 
                     b.Property<string>("ReportingStatus")
                         .IsRequired()
-                        .HasColumnType("nvarchar(450)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("SubmissionStatus")
-                        .HasColumnType("nvarchar(450)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<DateTime?>("SubmitReportDateTime")
                         .HasColumnType("datetime2");
@@ -827,7 +830,8 @@ namespace LantanaGroup.Link.Report.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("AdHocType")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
@@ -847,7 +851,8 @@ namespace LantanaGroup.Link.Report.Migrations
 
                     b.Property<string>("Frequency")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<bool?>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -869,7 +874,8 @@ namespace LantanaGroup.Link.Report.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("nvarchar(450)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<DateTime?>("SubmitReportDateTime")
                         .HasColumnType("datetime2");

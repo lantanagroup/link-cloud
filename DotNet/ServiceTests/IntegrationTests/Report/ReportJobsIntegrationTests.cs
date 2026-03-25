@@ -13,7 +13,7 @@ using Quartz;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
-namespace IntegrationTests.Report;
+namespace IntegrationTests.Report.Jobs;
 
 [Collection("ReportIntegrationTests")]
 public class EndOfReportPeriodJobTests
