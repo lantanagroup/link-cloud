@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
-namespace IntegrationTests.Report;
+namespace IntegrationTests.Report.Managers;
 
 [Trait("Category", "IntegrationTests")]
 public class ReportPopulationManagerTests : IClassFixture<ReportIntegrationTestFixture>

@@ -61,8 +61,8 @@ public partial class ReportDbContext : DbContext
 
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
 
-            entity.Property(e => e.ReportingStatus).HasConversion<string>();
-            entity.Property(e => e.SubmissionStatus).HasConversion<string>();
+            entity.Property(e => e.ReportingStatus).HasConversion<string>().HasMaxLength(50);
+            entity.Property(e => e.SubmissionStatus).HasConversion<string>().HasMaxLength(50);
 
             entity.HasOne(d => d.ReportSchedule).WithMany(p => p.ReportEntries)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -75,7 +75,7 @@ public partial class ReportDbContext : DbContext
 
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
 
-            entity.Property(e => e.Status).HasConversion<string>();
+            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(50);
 
             entity.HasOne(d => d.ReportEntry).WithMany(p => p.MeasureReports).HasConstraintName("FK_ReportEntryMeasureReports_ReportEntries");
         });
@@ -115,9 +115,9 @@ public partial class ReportDbContext : DbContext
             entity.Property(e => e.EnableSubmission).HasDefaultValue(true);
             entity.Property(e => e.IsDeleted).HasDefaultValue(false);
 
-            entity.Property(e => e.AdHocType).HasConversion<string>();
-            entity.Property(e => e.Frequency).HasConversion<string>();
-            entity.Property(e => e.Status).HasConversion<string>();
+            entity.Property(e => e.AdHocType).HasConversion<string>().HasMaxLength(50);
+            entity.Property(e => e.Frequency).HasConversion<string>().HasMaxLength(50);
+            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(50);
         });
 
         modelBuilder.Entity<ScheduleReportType>(entity =>
