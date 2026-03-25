@@ -143,8 +143,7 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
         // 2. Loki — targeted scraping for measureeval and validation services
         await _lokiScraper.ScrapeServiceLogsAsync("measureeval", "validation");
 
-        // 3. Kafka — dead-letter and retry topic messages
-        await _kafkaMonitor.PollAsync();
+        // 3. Kafka — listener runs on its own thread, just check for captured errors
         if (_kafkaMonitor.HasErrors)
         {
             _hasCriticalFailure = true;
