@@ -1,11 +1,9 @@
-﻿using LantanaGroup.Link.Report.Data;
+using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Tests.E2ETests.Helpers;
-using Microsoft.EntityFrameworkCore;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Tests.E2ETests.Validation;
 
@@ -13,7 +11,7 @@ namespace LantanaGroup.Link.Tests.E2ETests.Validation;
 /// Validates the Report service's database state after a smoke test run.
 /// Delegates all queries to <see cref="PipelineSnapshot"/> and applies strict assertions.
 /// </summary>
-public class ReportDatabaseValidator(ITestOutputHelper output)
+public class ReportDatabaseValidator(DualOutputHelper output)
 {
     public async Task ValidateAllAsync(
         string facilityId,
@@ -21,6 +19,7 @@ public class ReportDatabaseValidator(ITestOutputHelper output)
         string expectedMeasureId,
         List<string> expectedPatientIds)
     {
+        output.WriteLine("\n");
         output.WriteLine($"\n=== Report Database Validation: FacilityId={facilityId}, ReportId={reportId} ===\n");
 
         var scheduleId = Guid.Parse(reportId);
@@ -55,7 +54,7 @@ public class ReportDatabaseValidator(ITestOutputHelper output)
 
         output.WriteLine($"  FacilityId={schedule.FacilityId}, Frequency={schedule.Frequency}, " +
                          $"AdHocType={schedule.AdHocType}, Status={schedule.Status}, " +
-                         $"Period={schedule.ReportStartDate:O} → {schedule.ReportEndDate:O} ✓");
+                         $"Period={schedule.ReportStartDate:O} -> {schedule.ReportEndDate:O}");
         output.WriteLine("[ReportSchedule] PASS");
     }
 
@@ -68,7 +67,7 @@ public class ReportDatabaseValidator(ITestOutputHelper output)
         Assert.Single(reportTypes);
         Assert.Equal(expectedMeasureId, reportTypes[0].ReportType);
 
-        output.WriteLine($"  ReportType: {reportTypes[0].ReportType} ✓");
+        output.WriteLine($"  ReportType: {reportTypes[0].ReportType}");
         output.WriteLine("[ScheduleReportType] PASS");
     }
 
@@ -92,7 +91,7 @@ public class ReportDatabaseValidator(ITestOutputHelper output)
 
             output.WriteLine($"  Patient {entry.PatientId}: " +
                              $"ReportingStatus={entry.ReportingStatus}, " +
-                             $"SubmissionStatus={entry.SubmissionStatus} ✓");
+                             $"SubmissionStatus={entry.SubmissionStatus}");
         }
 
         output.WriteLine("[ReportEntry] PASS");
@@ -119,7 +118,7 @@ public class ReportDatabaseValidator(ITestOutputHelper output)
 
             output.WriteLine($"  Id={report.Id}: Type={report.ReportType}, " +
                              $"Status={report.Status}, MeasureReportId={report.MeasureReportId}, " +
-                             $"ResourceCounts=[{resourceCountSummary}] ✓");
+                             $"ResourceCounts=[{resourceCountSummary}]");
         }
 
         output.WriteLine("[EntryMeasureReport] PASS");

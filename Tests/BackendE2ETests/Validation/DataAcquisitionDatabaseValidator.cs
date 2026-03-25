@@ -4,7 +4,6 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Tests.E2ETests.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Tests.E2ETests.Validation;
 
@@ -12,7 +11,7 @@ namespace LantanaGroup.Link.Tests.E2ETests.Validation;
 /// Validates the DataAcquisition service's database state after a smoke test run.
 /// Delegates shared queries to <see cref="PipelineSnapshot"/> and applies strict assertions.
 /// </summary>
-public class DataAcquisitionDatabaseValidator(ITestOutputHelper output)
+public class DataAcquisitionDatabaseValidator(DualOutputHelper output)
 {
     public async Task ValidateAllAsync(
         string facilityId,
@@ -20,6 +19,7 @@ public class DataAcquisitionDatabaseValidator(ITestOutputHelper output)
         string expectedMeasureId,
         List<string> expectedPatientIds)
     {
+        output.WriteLine("\n");
         output.WriteLine($"\n=== DataAcquisition Database Validation: FacilityId={facilityId}, ReportId={reportId} ===\n");
 
         await using var db = DatabaseConnectionFactory.CreateDataAcquisitionDbContext();
@@ -46,7 +46,7 @@ public class DataAcquisitionDatabaseValidator(ITestOutputHelper output)
         Assert.True(config.MaxRetries > 0, "MaxRetries should be > 0");
 
         output.WriteLine($"  FhirServerBaseUrl={config.FhirServerBaseUrl}, " +
-                         $"MaxConcurrentRequests={config.MaxConcurrentRequests}, MaxRetries={config.MaxRetries} ?");
+                         $"MaxConcurrentRequests={config.MaxConcurrentRequests}, MaxRetries={config.MaxRetries}");
         output.WriteLine("[FhirQueryConfiguration] PASS");
     }
 
@@ -69,7 +69,7 @@ public class DataAcquisitionDatabaseValidator(ITestOutputHelper output)
 
         output.WriteLine($"  Discharge: PlanName={dischargePlan.PlanName}, " +
                          $"InitialQueries={dischargePlan.InitialQueries?.Count}, " +
-                         $"SupplementalQueries={dischargePlan.SupplementalQueries?.Count} ?");
+                         $"SupplementalQueries={dischargePlan.SupplementalQueries?.Count}");
 
         var monthlyPlan = queryPlans.FirstOrDefault(qp => qp.Type == Frequency.Monthly);
         Assert.NotNull(monthlyPlan);
@@ -79,7 +79,7 @@ public class DataAcquisitionDatabaseValidator(ITestOutputHelper output)
 
         output.WriteLine($"  Monthly: PlanName={monthlyPlan.PlanName}, " +
                          $"InitialQueries={monthlyPlan.InitialQueries?.Count}, " +
-                         $"SupplementalQueries={monthlyPlan.SupplementalQueries?.Count} ?");
+                         $"SupplementalQueries={monthlyPlan.SupplementalQueries?.Count}");
         output.WriteLine("[QueryPlan] PASS");
     }
 
@@ -112,7 +112,7 @@ public class DataAcquisitionDatabaseValidator(ITestOutputHelper output)
 
         var completedCount = logs.Count(l => l.Status == RequestStatus.Completed);
         output.WriteLine($"  {logs.Count} log(s), {completedCount} completed, " +
-                         $"{expectedPatientIds.Count} patients found ?");
+                         $"{expectedPatientIds.Count} patients found");
 
         foreach (var patientId in expectedPatientIds)
         {
@@ -140,7 +140,7 @@ public class DataAcquisitionDatabaseValidator(ITestOutputHelper output)
 
         var byType = queries.GroupBy(q => q.QueryType)
             .Select(g => $"{g.Key}={g.Count()}");
-        output.WriteLine($"  {queries.Count} queries | {string.Join(", ", byType)} ?");
+        output.WriteLine($"  {queries.Count} queries | {string.Join(", ", byType)}");
         output.WriteLine("[FhirQuery] PASS");
     }
 
@@ -158,7 +158,7 @@ public class DataAcquisitionDatabaseValidator(ITestOutputHelper output)
         Assert.True(resources.Count > 0, "Expected ReferenceResources rows for the facility but found none");
 
         var totalCount = resources.Sum(r => r.Count);
-        output.WriteLine($"  {totalCount} resource(s) across {resources.Count} type/phase groups ?");
+        output.WriteLine($"  {totalCount} resource(s) across {resources.Count} type/phase groups");
         output.WriteLine("[ReferenceResources] PASS");
     }
 }

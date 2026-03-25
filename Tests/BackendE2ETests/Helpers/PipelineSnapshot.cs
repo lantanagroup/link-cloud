@@ -1,8 +1,10 @@
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+ï»¿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
+using LantanaGroup.Link.Tenant.Entities;
+using LantanaGroup.Link.Tenant.Repository.Context;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 using Xunit.Abstractions;
 using DataAcquisitionLog = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog;
@@ -13,13 +15,13 @@ namespace LantanaGroup.Link.Tests.E2ETests.Helpers;
 /// Non-asserting, read-only snapshot of the pipeline's database state.
 /// Used by both <see cref="DatabaseProgressMonitor"/> (real-time) and
 /// by the test's try/finally block (last-chance dump). Never throws
-/// assertion exceptions — only queries and formats results.
+/// assertion exceptions â€” only queries and formats results.
 /// </summary>
 public static class PipelineSnapshot
 {
-    // ??????????????????????????????????????????????
+    // ----------------------------------------------
     //  Report DB queries
-    // ??????????????????????????????????????????????
+    // ----------------------------------------------
 
     public static async Task<ReportSchedule?> GetReportScheduleAsync(ReportDbContext db, Guid scheduleId)
     {
@@ -75,9 +77,9 @@ public static class PipelineSnapshot
             .ToListAsync();
     }
 
-    // ??????????????????????????????????????????????
+    // ----------------------------------------------
     //  DataAcquisition DB queries
-    // ??????????????????????????????????????????????
+    // ----------------------------------------------
 
     public static async Task<List<DataAcquisitionLog>> GetAcquisitionLogsAsync(
         DataAcquisitionDbContext db, string facilityId, string reportId)
@@ -87,9 +89,9 @@ public static class PipelineSnapshot
             .ToListAsync();
     }
 
-    // ??????????????????????????????????????????????
+    // ----------------------------------------------
     //  Normalization DB queries
-    // ??????????????????????????????????????????????
+    // ----------------------------------------------
 
     public static async Task<List<Operation>> GetOperationsAsync(
         NormalizationDbContext db, string facilityId)
@@ -114,13 +116,23 @@ public static class PipelineSnapshot
             .ToListAsync();
     }
 
-    // ??????????????????????????????????????????????
+    // ----------------------------------------------
+    //  Tenant DB queries
+    // ----------------------------------------------
+
+    public static async Task<Facility?> GetFacilityAsync(TenantDbContext db, string facilityId)
+    {
+        return await db.Facilities
+            .FirstOrDefaultAsync(f => f.FacilityId == facilityId);
+    }
+
+    // ----------------------------------------------
     //  Formatted summary (non-asserting)
-    // ??????????????????????????????????????????????
+    // ----------------------------------------------
 
     /// <summary>
     /// Writes a complete, non-asserting pipeline snapshot to test output.
-    /// Safe to call at any point — never throws.
+    /// Safe to call at any point â€” never throws.
     /// </summary>
     public static async Task WriteFullSnapshotAsync(
         ITestOutputHelper output,
@@ -134,6 +146,7 @@ public static class PipelineSnapshot
         await WriteReportSnapshot(output, facilityId, scheduleId);
         await WriteDataAcquisitionSnapshot(output, facilityId, reportId);
         await WriteNormalizationSnapshot(output, facilityId);
+        await WriteTenantSnapshot(output, facilityId);
 
         output.WriteLine("\n=== END SNAPSHOT ===\n");
     }
@@ -319,6 +332,38 @@ public static class PipelineSnapshot
         catch (Exception ex)
         {
             output.WriteLine($"[Snapshot][Normalization] Error querying Normalization DB: {ex.Message}");
+        }
+    }
+
+    private static async Task WriteTenantSnapshot(ITestOutputHelper output, string facilityId)
+    {
+        try
+        {
+            await using var db = DatabaseConnectionFactory.CreateTenantDbContext();
+
+            var facility = await GetFacilityAsync(db, facilityId);
+
+            if (facility == null)
+            {
+                output.WriteLine("[Snapshot][Tenant]              Facility NOT FOUND");
+                return;
+            }
+
+            var monthly = facility.ScheduledReports?.Monthly ?? [];
+            var daily = facility.ScheduledReports?.Daily ?? [];
+            var weekly = facility.ScheduledReports?.Weekly ?? [];
+
+            output.WriteLine($"[Snapshot][Tenant]              FacilityId={facility.FacilityId}, " +
+                             $"Name={facility.FacilityName}, TimeZone={facility.TimeZone}, " +
+                             $"IsDeleted={facility.IsDeleted}, Created={facility.CreateDate:O}");
+            output.WriteLine($"[Snapshot][Tenant]              ScheduledReports: " +
+                             $"Monthly=[{string.Join(", ", monthly)}], " +
+                             $"Daily=[{string.Join(", ", daily)}], " +
+                             $"Weekly=[{string.Join(", ", weekly)}]");
+        }
+        catch (Exception ex)
+        {
+            output.WriteLine($"[Snapshot][Tenant] Error querying Tenant DB: {ex.Message}");
         }
     }
 }

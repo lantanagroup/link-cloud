@@ -1,9 +1,8 @@
-using LantanaGroup.Link.Tests.E2ETests.Helpers;
+﻿using LantanaGroup.Link.Tests.E2ETests.Helpers;
 using LantanaGroup.Link.Tests.E2ETests.Services;
 using LantanaGroup.Link.Tests.E2ETests.Validation;
 using RestSharp;
 using Xunit;
-using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Tests.E2ETests;
@@ -14,7 +13,7 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
 
     private static readonly FhirDataLoader FhirDataLoader = new(TestConfig.ExternalFhirServerBase);
 
-    private readonly ITestOutputHelper _output;
+    private readonly DualOutputHelper _output;
     private readonly RestClient _adminBffClient = AdminBffClientFactory.Create();
     private readonly LokiScraper _lokiScraper;
 
@@ -24,9 +23,9 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
     private ReportApiClient ReportApi => new(_adminBffClient, _output, _lokiScraper);
     private ValidationApiClient ValidationApi => new(_adminBffClient, _output, _lokiScraper);
 
-    public AdhocReportingSmokeTest(ITestOutputHelper output)
+    public AdhocReportingSmokeTest()
     {
-        _output = new DualOutputHelper(output);
+        _output = new DualOutputHelper();
         _lokiScraper = new LokiScraper(_output);
     }
 
@@ -116,7 +115,7 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
 
         _output.WriteLine("Done generating and validating report.");
 
-        // Step 9�10: Strict database validation (snapshot is already captured above
+        // Step 9–10: Strict database validation (snapshot is already captured above
         // even if an assertion fails here)
         var reportDbValidator = new ReportDatabaseValidator(_output);
         await reportDbValidator.ValidateAllAsync(
@@ -134,5 +133,8 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
 
         var normalizationValidator = new NormalizationDatabaseValidator(_output);
         await normalizationValidator.ValidateAllAsync(FacilityId);
+
+        var tenantValidator = new TenantDatabaseValidator(_output);
+        await tenantValidator.ValidateAllAsync(FacilityId, measureId);
     }
 }

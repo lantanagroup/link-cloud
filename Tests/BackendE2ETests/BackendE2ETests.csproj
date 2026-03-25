@@ -92,6 +92,7 @@
       <ProjectReference Include="..\..\DotNet\Normalization\Normalization.csproj" />
       <ProjectReference Include="..\..\DotNet\Report\Report.csproj" />
       <ProjectReference Include="..\..\DotNet\Shared\Shared.csproj" />
+      <ProjectReference Include="..\..\DotNet\Tenant\Tenant.csproj" />
     </ItemGroup>
 
 </Project>
