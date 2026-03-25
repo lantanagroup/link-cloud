@@ -243,7 +243,7 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="reportType">Optional report type filter</param>
         /// <param name="reportStartDate">Optional report start date filter (inclusive)</param>
         /// <param name="reportEndDate">Optional report end date filter (inclusive)</param>
-        /// <param name="status">Optional status filter</param>
+        /// <param name="status">Optional status filter — supports multiple values (e.g. status=New&amp;status=Submitted)</param>
         /// <param name="endOfReportPeriodJobHasRun">Optional end of report period job flag filter</param>
         /// <param name="includeDeleted">Optional include deleted filter</param>
         /// <param name="sortBy">Optional sort field (e.g., "CreateDate", "ReportStartDate")</param>
@@ -259,14 +259,15 @@ namespace LantanaGroup.Link.Report.Controllers
             string? reportType = null,
             DateTime? reportStartDate = null,
             DateTime? reportEndDate = null,
-            ScheduleStatus? status = null,
+            [FromQuery] ScheduleStatus[]? status = null,
             bool? endOfReportPeriodJobHasRun = null,
             bool includeDeleted = false,
             string? sortBy = null,
             SortOrder? sortOrder = null,
             int pageSize = 10,
             int pageNumber = 1,
-            DateOnly? createDate = null)
+            DateOnly? createDate = null,
+            string? id = null)
         {
             try
             {
@@ -280,13 +281,17 @@ namespace LantanaGroup.Link.Report.Controllers
                     pageNumber = 1;
                 }
 
+                Guid? parsedId = null;
+                if (!string.IsNullOrWhiteSpace(id) && Guid.TryParse(id, out var guidId))
+                    parsedId = guidId;
+
                 var result = await _reportScheduledManager.SearchAsync(
                     facilityId,
                     frequency,
                     reportType,
                     reportStartDate,
                     reportEndDate,
-                    status,
+                    statuses: status,
                     endOfReportPeriodJobHasRun,
                     includeDeleted,
                     sortBy,
@@ -294,7 +299,8 @@ namespace LantanaGroup.Link.Report.Controllers
                     pageSize,
                     pageNumber,
                     cancellationToken: HttpContext.RequestAborted,
-                    createDate: createDate);
+                    createDate: createDate,
+                    id: parsedId);
 
                 Response.Headers.Append("X-Pagination", JsonSerializer.Serialize(result.Metadata));
 
