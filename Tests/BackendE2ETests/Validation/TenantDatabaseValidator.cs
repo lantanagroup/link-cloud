@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Tenant.Repository.Context;
+﻿using LantanaGroup.Link.Tenant.Repository.Context;
 using LantanaGroup.Link.Tests.E2ETests.Helpers;
 using Xunit;
 using Xunit.Abstractions;
@@ -90,3 +90,4 @@ public class TenantDatabaseValidator(DualOutputHelper output)
         output.WriteLine("[ScheduledReports] PASS");
     }
 }
+
