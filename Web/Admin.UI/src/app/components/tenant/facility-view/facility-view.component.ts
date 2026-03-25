@@ -16,7 +16,11 @@ import {FontAwesomeModule} from '@fortawesome/angular-fontawesome';
 import {faRotate, faArrowLeft, faGears} from '@fortawesome/free-solid-svg-icons';
 import {LoadingService} from 'src/app/services/loading.service';
 import {forkJoin, Subscription} from 'rxjs';
+import {take} from 'rxjs/operators';
 import {ResubmitDialogComponent} from "./resubmit-dialog.component";
+import {AggregationService} from '../../../services/gateway/aggregation/aggregation.service';
+import {DeleteConfirmationDialogComponent} from '../../core/delete-confirmation-dialog/delete-confirmation-dialog.component';
+import {AlertDialogComponent} from '../../core/alert-dialog/alert-dialog.component';
 import {MatDialog} from "@angular/material/dialog";
 import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
 import {IPagedReportSchedule, IReportSchedule} from "../../../interfaces/report/report-schedule.interface";
@@ -103,6 +107,7 @@ export class FacilityViewComponent implements OnInit, OnDestroy {
     private facilityViewService: FacilityViewService,
     private loadingService: LoadingService,
     private reportService: ReportService,
+    private aggregationService: AggregationService,
     private dialog: MatDialog,
     private snackBar: MatSnackBar) {
   }
@@ -152,7 +157,7 @@ export class FacilityViewComponent implements OnInit, OnDestroy {
   }
 
   getColumns(): string[] {
-    const cols = ['id', 'facilityId', 'reportStartDate', 'createDate', 'frequency', 'reportTypes', 'patientsInCensus', 'patientsInIP', 'status', 'action'];
+    const cols = ['id', 'facilityId', 'reportStartDate', 'createDate', 'frequency', 'reportTypes', 'patientsInCensus', 'patientsInIP', 'status', 'action', 'delete'];
     if (this.showDeleted) cols.push('isDeleted');
     return cols;
   }
@@ -329,6 +334,93 @@ export class FacilityViewComponent implements OnInit, OnDestroy {
           }
         });
     });
+  }
+
+  onSoftDeleteReport(reportScheduleId: string): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        message: 'Are you sure you want to soft delete this report and all its associated acquisition logs?'
+      }
+    });
+
+    dialogRef.afterClosed().pipe(take(1)).subscribe(confirmed => {
+      if (!confirmed) return;
+
+      const progressSnackBar = this.snackBar.open('Soft deleting report, please wait...', 'Close');
+
+      this.aggregationService.softDeleteReport(reportScheduleId).subscribe({
+        next: () => {
+          progressSnackBar.dismiss();
+          this.snackBar.open('Report soft deleted successfully', 'Close', { duration: 3000, panelClass: 'success-snackbar' });
+          this.paginationMetadata.pageNumber = 0;
+          this.loadReportSchedules();
+        },
+        error: (err) => {
+          progressSnackBar.dismiss();
+          const detail = this.extractDetail(err);
+          const is409 = err.status === 409;
+          this.dialog.open(AlertDialogComponent, {
+            width: '420px',
+            data: {
+              title: is409 ? 'Report In Progress' : 'Soft Delete Failed',
+              message: detail || (is409
+                ? 'This report cannot be deleted because it is currently in progress. Please wait for it to complete.'
+                : 'Failed to soft delete the report. Please try again.'),
+              icon: is409 ? 'running_with_errors' : 'error',
+              iconColor: 'warn'
+            }
+          });
+        }
+      });
+    });
+  }
+
+  onRestoreReport(reportScheduleId: string): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        title: 'Restore Report',
+        message: 'Are you sure you want to restore this report and all its associated acquisition logs?',
+        icon: 'restore',
+        iconColor: 'primary',
+        confirmButtonText: 'Restore'
+      }
+    });
+
+    dialogRef.afterClosed().pipe(take(1)).subscribe(confirmed => {
+      if (!confirmed) return;
+
+      const progressSnackBar = this.snackBar.open('Restoring report, please wait...', 'Close');
+
+      this.aggregationService.restoreReport(reportScheduleId).subscribe({
+        next: () => {
+          progressSnackBar.dismiss();
+          this.snackBar.open('Report restored successfully', 'Close', { duration: 3000, panelClass: 'success-snackbar' });
+          this.paginationMetadata.pageNumber = 0;
+          this.loadReportSchedules();
+        },
+        error: (err) => {
+          progressSnackBar.dismiss();
+          const detail = this.extractDetail(err);
+          this.dialog.open(AlertDialogComponent, {
+            width: '420px',
+            data: {
+              title: 'Restore Failed',
+              message: detail || 'Failed to restore the report. Please try again.',
+              icon: 'error',
+              iconColor: 'warn'
+            }
+          });
+        }
+      });
+    });
+  }
+
+  private extractDetail(err: any): string | null {
+    if (!err.error) return null;
+    if (typeof err.error === 'object') return err.error.detail ?? null;
+    try { return JSON.parse(err.error)?.detail ?? null; } catch { return null; }
   }
 
   onRefresh() {
