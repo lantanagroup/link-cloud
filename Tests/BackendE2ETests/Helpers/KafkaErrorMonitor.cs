@@ -1,6 +1,8 @@
 ﻿using System.Collections.Concurrent;
 using System.Text;
 using Confluent.Kafka;
+using Newtonsoft.Json.Linq;
+using RestSharp;
 using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Tests.E2ETests.Helpers;
@@ -9,11 +11,17 @@ namespace LantanaGroup.Link.Tests.E2ETests.Helpers;
 /// Monitors Kafka error and retry topics for dead-letter messages that indicate
 /// processing failures in the pipeline. Uses a background consumer loop identical
 /// to the service listeners (e.g., ReportScheduledListener).
+///
+/// Topics are discovered directly from the broker — any topic ending in -Error or
+/// -Retry is automatically monitored.
 /// </summary>
 public class KafkaErrorMonitor : IAsyncDisposable
 {
     private static readonly string KafkaBootstrapServers =
         Environment.GetEnvironmentVariable("E2E_KAFKA_BOOTSTRAP_SERVERS") ?? "localhost:9094";
+
+    private static readonly string KafkaRestProxyBase =
+        Environment.GetEnvironmentVariable("E2E_KAFKA_REST_PROXY_URL") ?? "http://localhost:8082";
 
     private static readonly string KafkaUser =
         Environment.GetEnvironmentVariable("E2E_KAFKA_USER") ?? "user";
@@ -28,27 +36,6 @@ public class KafkaErrorMonitor : IAsyncDisposable
     private bool _initialized;
     private bool _disposed;
 
-    private static readonly string[] ErrorTopics =
-    [
-        "GenerateReportRequested-Error",
-        "DataAcquisitionRequested-Error",
-        "EvaluationRequested-Error",
-        "MeasureReportGenerated-Error",
-        "ResourceNormalized-Error",
-        "ResourceAcquired-Error",
-        "ReadyToAcquire-Error",
-        "PatientEvent-Error",
-        "ReadyForValidation-Error",
-        "ValidationComplete-Error",
-        "SubmitPayload-Error",
-        "PayloadSubmitted-Error",
-        "ReportScheduled-Error",
-        "GenerateReportRequested-Retry",
-        "DataAcquisitionRequested-Retry",
-        "EvaluationRequested-Retry",
-        "ReadyToAcquire-Retry",
-    ];
-
     private readonly ConcurrentBag<string> _capturedErrors = [];
 
     public IReadOnlyList<string> CapturedErrors => [.. _capturedErrors];
@@ -59,12 +46,47 @@ public class KafkaErrorMonitor : IAsyncDisposable
         _output = output;
     }
 
-    public Task InitializeAsync()
+    /// <summary>
+    /// Queries the Kafka REST Proxy v3 API to discover all topics ending in -Error or -Retry.
+    /// </summary>
+    private async Task<string[]> DiscoverErrorAndRetryTopicsAsync()
     {
-        if (_initialized) return Task.CompletedTask;
+        var client = new RestClient(KafkaRestProxyBase);
+
+        var clusterResponse = await client.ExecuteAsync(new RestRequest("/v3/clusters", Method.Get));
+        if (clusterResponse.StatusCode != System.Net.HttpStatusCode.OK || clusterResponse.Content == null)
+            throw new InvalidOperationException($"Failed to query Kafka clusters: {clusterResponse.StatusCode}");
+
+        var clusterId = JObject.Parse(clusterResponse.Content)["data"]?[0]?["cluster_id"]?.ToString()
+            ?? throw new InvalidOperationException("No cluster found in REST proxy response");
+
+        var topicsResponse = await client.ExecuteAsync(new RestRequest($"/v3/clusters/{clusterId}/topics", Method.Get));
+        if (topicsResponse.StatusCode != System.Net.HttpStatusCode.OK || topicsResponse.Content == null)
+            throw new InvalidOperationException($"Failed to query Kafka topics: {topicsResponse.StatusCode}");
+
+        return JObject.Parse(topicsResponse.Content)["data"]!
+            .Select(t => t["topic_name"]?.ToString())
+            .Where(t => t != null &&
+                        (t.EndsWith("-Error", StringComparison.OrdinalIgnoreCase) ||
+                         t.EndsWith("-Retry", StringComparison.OrdinalIgnoreCase)))
+            .Order()
+            .ToArray()!;
+    }
+
+    public async Task InitializeAsync()
+    {
+        if (_initialized) return;
 
         try
         {
+            var topics = await DiscoverErrorAndRetryTopicsAsync();
+
+            if (topics.Length == 0)
+            {
+                _output.WriteLine("[DIAG][Kafka] No -Error or -Retry topics found on broker");
+                return;
+            }
+
             var config = new ConsumerConfig
             {
                 BootstrapServers = KafkaBootstrapServers,
@@ -87,20 +109,18 @@ public class KafkaErrorMonitor : IAsyncDisposable
                 })
                 .Build();
 
-            _consumer.Subscribe(ErrorTopics);
+            _consumer.Subscribe(topics);
             _initialized = true;
 
             _cts = new CancellationTokenSource();
             _listenerTask = Task.Run(() => StartConsumerLoop(_cts.Token));
 
-            _output.WriteLine($"[DIAG][Kafka] Listening on {ErrorTopics.Length} error/retry topics");
+            _output.WriteLine($"[DIAG][Kafka] Listening on {topics.Length} error/retry topics discovered from broker");
         }
         catch (Exception ex)
         {
             _output.WriteLine($"[DIAG][Kafka] Init failed: {ex.Message}");
         }
-
-        return Task.CompletedTask;
     }
 
     private void StartConsumerLoop(CancellationToken cancellationToken)
