@@ -109,14 +109,15 @@ export class ReportService {
     reportType?: string,
     reportStartDate?: Date,
     reportEndDate?: Date,
-    status?: string,
+    statuses?: string[],
     endOfReportPeriodJobHasRun?: boolean,
     includeDeleted?: boolean,
     sortBy?: string,
     sortOrder?: number,
     pageSize: number = 10,
     pageNumber: number = 1,
-    createDate?: Date
+    createDate?: Date,
+    reportScheduleId?: string
   ): Observable<IPagedReportSchedule> {
     let params = new HttpParams()
       .set('pageSize', pageSize.toString())
@@ -137,8 +138,8 @@ export class ReportService {
     if (reportEndDate) {
       params = params.set('reportEndDate', reportEndDate.toISOString());
     }
-    if (status) {
-      params = params.set('status', status);
+    if (statuses && statuses.length > 0) {
+      statuses.forEach(s => params = params.append('status', s));
     }
     if (endOfReportPeriodJobHasRun !== undefined) {
       params = params.set('endOfReportPeriodJobHasRun', endOfReportPeriodJobHasRun.toString());
@@ -156,6 +157,9 @@ export class ReportService {
       const d = new Date(createDate);
       const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       params = params.set('createDate', dateStr);
+    }
+    if (reportScheduleId) {
+      params = params.set('reportScheduleId', reportScheduleId);
     }
 
     return this.http.get<IPagedReportSchedule>(`${this.appConfigService.config?.baseApiUrl}/aggregate/reports/summaries`, { params })

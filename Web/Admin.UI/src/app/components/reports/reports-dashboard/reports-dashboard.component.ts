@@ -9,7 +9,7 @@ import {MatTableDataSource, MatTableModule} from '@angular/material/table';
 import {MatPaginator, MatPaginatorModule, PageEvent} from '@angular/material/paginator';
 import {MatSort, MatSortModule, Sort} from '@angular/material/sort';
 import {MatTooltipModule} from '@angular/material/tooltip';
-import {BehaviorSubject, combineLatest, Observable, of, Subscription} from 'rxjs';
+import {BehaviorSubject, combineLatest, Observable, of, Subject, Subscription} from 'rxjs';
 import {debounceTime, distinctUntilChanged, map, startWith, switchMap, take, tap} from 'rxjs/operators';
 import {TenantService} from '../../../services/gateway/tenant/tenant.service';
 import {LoadingService} from '../../../services/loading.service';
@@ -64,6 +64,8 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
   @ViewChild(MatSort, { static: false }) sort!: MatSort;
 
   private subscription: Subscription | undefined;
+  private reportIdSubscription: Subscription | undefined;
+  private reportIdSubject = new Subject<string>();
   private readonly PAGE_SIZE_KEY = 'reportsDashboardPageSize';
   private refreshTimeoutId: ReturnType<typeof setTimeout> | null = null;
   defaultPageNumber: number = 0;
@@ -85,7 +87,8 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
   selectedFacilityId: string | null = null;
   filteredFacilities: Observable<{ facilityId: string; facilityName: string }[]> = of([]);
   private showDeletedSubject = new BehaviorSubject<boolean>(false);
-  statusFilter: string = '';
+  reportIdFilter: string = '';
+  statusFilters: string[] = [];
   frequencyFilter: string = '';
   reportStartDateFilter: Date | null = null;
   reportEndDateFilter: Date | null = null;
@@ -136,10 +139,19 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
       map(results => Object.entries(results || {}).map(([facilityId, facilityName]) => ({ facilityId, facilityName: facilityName as string })))
     );
 
+    this.reportIdSubscription = this.reportIdSubject.pipe(
+      debounceTime(300),
+      distinctUntilChanged()
+    ).subscribe(() => {
+      this.paginationMetadata.pageNumber = 0;
+      this.loadReportSchedules();
+    });
+
     this.loadReportSchedules();
   }
 
   ngOnDestroy(): void {
+    this.reportIdSubscription?.unsubscribe();
     if (this.subscription) {
       this.subscription.unsubscribe();
     }
@@ -168,14 +180,15 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
       undefined,
       this.reportStartDateFilter ?? undefined,
       reportEndDateNormalized,
-      this.statusFilter || undefined,
+      this.statusFilters.length > 0 ? this.statusFilters : undefined,
       undefined,
       this.showDeleted,
       this.currentSortBy,
       this.currentSortOrder,
       Math.max(1, this.paginationMetadata.pageSize || this.defaultPageSize),
       this.paginationMetadata.pageNumber + 1, // API expects 1-based indexing
-      this.createDateFilter ?? undefined
+      this.createDateFilter ?? undefined,
+      this.reportIdFilter || undefined
     ).subscribe({
       next: (data) => {
         this.reportSchedules = data.records;
@@ -195,6 +208,11 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  onReportIdInput(value: string): void {
+    this.reportIdFilter = value;
+    this.reportIdSubject.next(value);
+  }
+
   applyFilters(): void {
     this.paginationMetadata.pageNumber = 0;
     this.loadReportSchedules();
@@ -203,7 +221,8 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
   clearFilters(): void {
     this.facilityInputControl.setValue('', { emitEvent: false });
     this.selectedFacilityId = null;
-    this.statusFilter = '';
+    this.reportIdFilter = '';
+    this.statusFilters = [];
     this.frequencyFilter = '';
     this.reportStartDateFilter = null;
     this.reportEndDateFilter = null;
@@ -232,7 +251,7 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
 
   hasActiveFilters(): boolean {
     return !!(this.selectedFacilityId || this.facilityInputControl.value ||
-              this.statusFilter || this.frequencyFilter ||
+              this.reportIdFilter || this.statusFilters.length > 0 || this.frequencyFilter ||
               this.reportStartDateFilter || this.reportEndDateFilter || this.createDateFilter);
   }
 
