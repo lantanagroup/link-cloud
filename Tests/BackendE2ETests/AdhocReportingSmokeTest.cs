@@ -3,7 +3,6 @@ using LantanaGroup.Link.Tests.E2ETests.Services;
 using LantanaGroup.Link.Tests.E2ETests.Validation;
 using RestSharp;
 using Xunit;
-using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Tests.E2ETests;
@@ -24,9 +23,9 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
     private ReportApiClient ReportApi => new(_adminBffClient, _output, _lokiScraper);
     private ValidationApiClient ValidationApi => new(_adminBffClient, _output, _lokiScraper);
 
-    public AdhocReportingSmokeTest(ITestOutputHelper output)
+    public AdhocReportingSmokeTest()
     {
-        _output = new DualOutputHelper(output);
+        _output = new DualOutputHelper();
         _lokiScraper = new LokiScraper(_output);
     }
 
@@ -94,6 +93,13 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
 
         await diagnostics.StopAsync();
 
+        // Scrape measureeval and validation service logs for the full test duration
+        _output.WriteLine("");
+        _output.WriteLine("[DIAG] Scraping MeasureEval service logs...");
+        await _lokiScraper.ScrapeServiceHistoryAsync("measureeval", TimeSpan.FromMinutes(5), "DIAG MEASUREEVAL");
+        _output.WriteLine("[DIAG] Scraping Validation service logs...");
+        await _lokiScraper.ScrapeServiceHistoryAsync("validation", TimeSpan.FromMinutes(5), "DIAG VALIDATION");
+
         // Always write a snapshot before any assertions can kill the test.
         // This guarantees the full pipeline state is in the output for debugging.
         await PipelineSnapshot.WriteFullSnapshotAsync(_output, FacilityId, reportId);
@@ -137,5 +143,12 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
 
         var tenantValidator = new TenantDatabaseValidator(_output);
         await tenantValidator.ValidateAllAsync(FacilityId, measureId);
+
+        // Step 11: Validation results (API-based) -- explains why FailedValidation occurs
+        var validationResultsValidator = new ValidationResultsValidator(_adminBffClient, _output);
+        await validationResultsValidator.ValidateAllAsync(
+            FacilityId,
+            reportId,
+            TestConfig.AdhocReportingSmokeTestConfig.PatientIds);
     }
 }

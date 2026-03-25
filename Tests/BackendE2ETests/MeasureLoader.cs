@@ -1,4 +1,4 @@
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using RestSharp;
@@ -94,6 +94,9 @@ public class MeasureLoader(RestClient adminBffClient, ITestOutputHelper output)
             throw new Exception("Failed to load measure definition.");
         }
 
+        // Verify the definition was persisted by reading it back
+        await VerifyMeasureDefinitionAsync();
+
         if (this._validationBundle != null)
         {
             output.WriteLine("Loading profile artifacts for validation...");
@@ -114,6 +117,45 @@ public class MeasureLoader(RestClient adminBffClient, ITestOutputHelper output)
             
             await Task.WhenAll(validationTasks);
             output.WriteLine($"{this._validationBundle.Entry.Count} validation resources successfully loaded.");
+        }
+    }
+
+    /// <summary>
+    /// Reads the measure definition back from MeasureEval to confirm it was persisted,
+    /// and logs the related artifact summary.
+    /// </summary>
+    private async Task VerifyMeasureDefinitionAsync()
+    {
+        try
+        {
+            var verifyRequest = new RestRequest($"measureeval/measure-definition/{MeasureId}", Method.Get);
+            var verifyResponse = await adminBffClient.ExecuteAsync(verifyRequest);
+
+            if (verifyResponse.StatusCode == System.Net.HttpStatusCode.OK && verifyResponse.Content != null)
+            {
+                var json = Newtonsoft.Json.Linq.JObject.Parse(verifyResponse.Content);
+                var id = json["id"]?.ToString() ?? "(unknown)";
+                var bundle = json["bundle"];
+                var entryCount = (bundle?["entry"] as Newtonsoft.Json.Linq.JArray)?.Count ?? 0;
+
+                // Summarize resource types in the bundle
+                var resourceTypes = (bundle?["entry"] as Newtonsoft.Json.Linq.JArray)?
+                    .Select(e => e["resource"]?["resourceType"]?.ToString() ?? "unknown")
+                    .GroupBy(t => t)
+                    .Select(g => $"{g.Key}={g.Count()}")
+                    .ToList() ?? [];
+
+                output.WriteLine($"  MeasureEval definition verified: id={id}, entries={entryCount}");
+                output.WriteLine($"  Resource types: {string.Join(", ", resourceTypes)}");
+            }
+            else
+            {
+                output.WriteLine($"  WARNING: Could not verify measure definition (HTTP {verifyResponse.StatusCode})");
+            }
+        }
+        catch (Exception ex)
+        {
+            output.WriteLine($"  WARNING: Measure definition verification failed: {ex.Message}");
         }
     }
 }
