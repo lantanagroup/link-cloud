@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Normalization.Domain.Entities;
+﻿using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Tests.E2ETests.Helpers;
 using Xunit;
 
@@ -119,3 +119,4 @@ public class NormalizationDatabaseValidator(DualOutputHelper output)
         output.WriteLine("[OperationSequence] PASS");
     }
 }
+

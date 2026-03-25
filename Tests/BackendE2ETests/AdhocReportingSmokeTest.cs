@@ -3,6 +3,7 @@ using LantanaGroup.Link.Tests.E2ETests.Services;
 using LantanaGroup.Link.Tests.E2ETests.Validation;
 using RestSharp;
 using Xunit;
+using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Tests.E2ETests;
@@ -23,9 +24,9 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
     private ReportApiClient ReportApi => new(_adminBffClient, _output, _lokiScraper);
     private ValidationApiClient ValidationApi => new(_adminBffClient, _output, _lokiScraper);
 
-    public AdhocReportingSmokeTest()
+    public AdhocReportingSmokeTest(ITestOutputHelper output)
     {
-        _output = new DualOutputHelper();
+        _output = new DualOutputHelper(output);
         _lokiScraper = new LokiScraper(_output);
     }
 

@@ -1,4 +1,4 @@
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Tests.E2ETests.Helpers;
@@ -162,3 +162,4 @@ public class DataAcquisitionDatabaseValidator(DualOutputHelper output)
         output.WriteLine("[ReferenceResources] PASS");
     }
 }
+

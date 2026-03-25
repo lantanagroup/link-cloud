@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Report.Data;
+﻿using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -19,8 +19,12 @@ public class ReportDatabaseValidator(DualOutputHelper output)
         string expectedMeasureId,
         List<string> expectedPatientIds)
     {
-        output.WriteLine("\n");
-        output.WriteLine($"\n=== Report Database Validation: FacilityId={facilityId}, ReportId={reportId} ===\n");
+        output.WriteLine("");
+        output.WriteLine("=================================================================================");
+        output.WriteLine("  REPORT DATABASE VALIDATION");
+        output.WriteLine($"  FacilityId: {facilityId}");
+        output.WriteLine($"  ReportId:   {reportId}");
+        output.WriteLine("=================================================================================");
 
         var scheduleId = Guid.Parse(reportId);
 
@@ -33,12 +37,16 @@ public class ReportDatabaseValidator(DualOutputHelper output)
         await ValidateReportResources(db, scheduleId, facilityId, expectedPatientIds);
         await ValidateReportPopulations(db, scheduleId, facilityId, expectedMeasureId);
 
-        output.WriteLine("\n=== Report Database Validation Complete ===\n");
+        output.WriteLine("---------------------------------------------------------------------------------");
+        output.WriteLine("  REPORT DATABASE VALIDATION COMPLETE");
+        output.WriteLine("---------------------------------------------------------------------------------");
+        output.WriteLine("");
     }
 
     private async Task ValidateReportSchedule(ReportDbContext db, Guid scheduleId, string facilityId)
     {
-        output.WriteLine("[ReportSchedule] Validating...");
+        output.WriteLine("");
+        output.WriteLine("  --- ReportSchedule ---");
 
         var schedule = await PipelineSnapshot.GetReportScheduleAsync(db, scheduleId);
 
@@ -52,29 +60,33 @@ public class ReportDatabaseValidator(DualOutputHelper output)
         Assert.False(string.IsNullOrWhiteSpace(schedule.PayloadRootUri), "PayloadRootUri should be set");
         Assert.True(schedule.ReportStartDate < schedule.ReportEndDate, "StartDate should be before EndDate");
 
-        output.WriteLine($"  FacilityId={schedule.FacilityId}, Frequency={schedule.Frequency}, " +
-                         $"AdHocType={schedule.AdHocType}, Status={schedule.Status}, " +
-                         $"Period={schedule.ReportStartDate:O} -> {schedule.ReportEndDate:O}");
-        output.WriteLine("[ReportSchedule] PASS");
+        output.WriteLine($"      FacilityId        = {schedule.FacilityId}");
+        output.WriteLine($"      Frequency         = {schedule.Frequency}");
+        output.WriteLine($"      AdHocType         = {schedule.AdHocType}");
+        output.WriteLine($"      Status            = {schedule.Status}");
+        output.WriteLine($"      ReportPeriod      = {schedule.ReportStartDate:O} to {schedule.ReportEndDate:O}");
+        output.WriteLine("  --- ReportSchedule PASSED ---");
     }
 
     private async Task ValidateScheduleReportTypes(ReportDbContext db, Guid scheduleId, string expectedMeasureId)
     {
-        output.WriteLine("[ScheduleReportType] Validating...");
+        output.WriteLine("");
+        output.WriteLine("  --- ScheduleReportType ---");
 
         var reportTypes = await PipelineSnapshot.GetScheduleReportTypesAsync(db, scheduleId);
 
         Assert.Single(reportTypes);
         Assert.Equal(expectedMeasureId, reportTypes[0].ReportType);
 
-        output.WriteLine($"  ReportType: {reportTypes[0].ReportType}");
-        output.WriteLine("[ScheduleReportType] PASS");
+        output.WriteLine($"      ReportType        = {reportTypes[0].ReportType}");
+        output.WriteLine("  --- ScheduleReportType PASSED ---");
     }
 
     private async Task ValidateReportEntries(
         ReportDbContext db, Guid scheduleId, string facilityId, List<string> expectedPatientIds)
     {
-        output.WriteLine("[ReportEntry] Validating...");
+        output.WriteLine("");
+        output.WriteLine("  --- ReportEntry ---");
 
         var entries = await PipelineSnapshot.GetReportEntriesAsync(db, scheduleId);
 
@@ -89,18 +101,17 @@ public class ReportDatabaseValidator(DualOutputHelper output)
             Assert.Equal(facilityId, entry.FacilityId);
             Assert.Equal(SubmissionStatus.Submitted, entry.SubmissionStatus);
 
-            output.WriteLine($"  Patient {entry.PatientId}: " +
-                             $"ReportingStatus={entry.ReportingStatus}, " +
-                             $"SubmissionStatus={entry.SubmissionStatus}");
+            output.WriteLine($"      Patient {entry.PatientId,-12} ReportingStatus={entry.ReportingStatus}, SubmissionStatus={entry.SubmissionStatus}");
         }
 
-        output.WriteLine("[ReportEntry] PASS");
+        output.WriteLine("  --- ReportEntry PASSED ---");
     }
 
     private async Task ValidateEntryMeasureReports(
         ReportDbContext db, Guid scheduleId, string expectedMeasureId, int expectedPatientCount)
     {
-        output.WriteLine("[EntryMeasureReport] Validating...");
+        output.WriteLine("");
+        output.WriteLine("  --- EntryMeasureReport ---");
 
         var reports = await PipelineSnapshot.GetEntryMeasureReportsAsync(db, scheduleId);
 
@@ -116,18 +127,21 @@ public class ReportDatabaseValidator(DualOutputHelper output)
                 ? string.Join(", ", report.ResourceCounts.Select(rc => $"{rc.ResourceType}={rc.ResourceCount}"))
                 : "(none)";
 
-            output.WriteLine($"  Id={report.Id}: Type={report.ReportType}, " +
-                             $"Status={report.Status}, MeasureReportId={report.MeasureReportId}, " +
-                             $"ResourceCounts=[{resourceCountSummary}]");
+            output.WriteLine($"      Id={report.Id}");
+            output.WriteLine($"        Type            = {report.ReportType}");
+            output.WriteLine($"        Status          = {report.Status}");
+            output.WriteLine($"        MeasureReportId = {report.MeasureReportId}");
+            output.WriteLine($"        ResourceCounts  = [{resourceCountSummary}]");
         }
 
-        output.WriteLine("[EntryMeasureReport] PASS");
+        output.WriteLine("  --- EntryMeasureReport PASSED ---");
     }
 
     private async Task ValidateReportResources(
         ReportDbContext db, Guid scheduleId, string facilityId, List<string> expectedPatientIds)
     {
-        output.WriteLine("[ReportResource] Validating...");
+        output.WriteLine("");
+        output.WriteLine("  --- ReportResource ---");
 
         var resources = await PipelineSnapshot.GetReportResourceSummaryAsync(db, scheduleId, facilityId);
         var patientsWithResources = resources.Select(r => r.PatientId).Distinct().ToList();
@@ -138,16 +152,17 @@ public class ReportDatabaseValidator(DualOutputHelper output)
 
             var patientResources = resources.Where(r => r.PatientId == patientId).ToList();
             var totalCount = patientResources.Sum(r => r.Count);
-            output.WriteLine($"  Patient {patientId}: {totalCount} resources across {patientResources.Count} types");
+            output.WriteLine($"      Patient {patientId,-12} {totalCount} resources across {patientResources.Count} types");
         }
 
-        output.WriteLine("[ReportResource] PASS");
+        output.WriteLine("  --- ReportResource PASSED ---");
     }
 
     private async Task ValidateReportPopulations(
         ReportDbContext db, Guid scheduleId, string facilityId, string expectedMeasureId)
     {
-        output.WriteLine("[ReportPopulation] Validating...");
+        output.WriteLine("");
+        output.WriteLine("  --- ReportPopulation ---");
 
         var populations = await PipelineSnapshot.GetReportPopulationsAsync(db, scheduleId, facilityId);
 
@@ -156,7 +171,9 @@ public class ReportDatabaseValidator(DualOutputHelper output)
         foreach (var pop in populations)
         {
             Assert.Equal(expectedMeasureId, pop.ReportType);
-            output.WriteLine($"  Population Id={pop.Id}: Measure={pop.Measure}, ReportType={pop.ReportType}");
+            output.WriteLine($"      Population Id     = {pop.Id}");
+            output.WriteLine($"        Measure         = {pop.Measure}");
+            output.WriteLine($"        ReportType      = {pop.ReportType}");
 
             Assert.True(pop.GroupPopulations.Count > 0,
                 $"Expected GroupPopulations for ReportPopulation Id={pop.Id}");
@@ -170,22 +187,24 @@ public class ReportDatabaseValidator(DualOutputHelper output)
                 Assert.True(gp.MeasureReportPopulations.Count > 0,
                     $"Expected at least one MeasureReportPopulation for GroupPopulation Id={gp.Id} (PopulationId={gp.PopulationId})");
 
-                output.WriteLine($"    GroupPopulation Id={gp.Id}: PopulationId={gp.PopulationId}, " +
-                                 $"TotalCount={gp.TotalPopulationCount}, " +
-                                 $"PopulationCodeJson={gp.PopulationCodeJson}");
+                output.WriteLine($"        GroupPopulation Id={gp.Id}");
+                output.WriteLine($"          PopulationId       = {gp.PopulationId}");
+                output.WriteLine($"          TotalCount         = {gp.TotalPopulationCount}");
+                output.WriteLine($"          PopulationCodeJson = {gp.PopulationCodeJson}");
 
                 foreach (var mrp in gp.MeasureReportPopulations)
                 {
                     Assert.False(string.IsNullOrWhiteSpace(mrp.MeasureReportId),
                         $"MeasureReportId should be set on MeasureReportPopulation Id={mrp.Id}");
 
-                    output.WriteLine($"      MeasureReportPopulation Id={mrp.Id}: " +
-                                     $"MeasureReportId={mrp.MeasureReportId}, " +
-                                     $"PopulationCount={mrp.PopulationCount}");
+                    output.WriteLine($"          MeasureReportPopulation Id={mrp.Id}");
+                    output.WriteLine($"            MeasureReportId  = {mrp.MeasureReportId}");
+                    output.WriteLine($"            PopulationCount  = {mrp.PopulationCount}");
                 }
             }
         }
 
-        output.WriteLine("[ReportPopulation] PASS");
+        output.WriteLine("  --- ReportPopulation PASSED ---");
     }
 }
+
