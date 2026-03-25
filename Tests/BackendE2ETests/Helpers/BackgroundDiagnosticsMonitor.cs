@@ -1,4 +1,4 @@
-using Xunit.Abstractions;
+ï»¿using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Tests.E2ETests.Helpers;
 
@@ -94,7 +94,7 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
 
         if (_hasCriticalFailure)
         {
-            _output.WriteLine("[DIAG] Critical failure(s) detected — see [DIAG] entries above for details");
+            _output.WriteLine("[DIAG] Critical failure(s) detected â€” see [DIAG] entries above for details");
         }
         else
         {
@@ -137,17 +137,20 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
 
     private async Task RunSingleCheckAsync()
     {
-        // 1. Loki — errors and warnings from all services
+        // 1. Loki â€” errors and warnings from all services
         await _lokiScraper.ScrapeErrorsAsync();
 
-        // 2. Kafka — dead-letter and retry topic messages
+        // 2. Loki â€” targeted scraping for measureeval and validation services
+        await _lokiScraper.ScrapeServiceLogsAsync("measureeval", "validation");
+
+        // 3. Kafka â€” dead-letter and retry topic messages
         await _kafkaMonitor.PollAsync();
         if (_kafkaMonitor.HasErrors)
         {
             _hasCriticalFailure = true;
         }
 
-        // 3. Database — stuck/failed records
+        // 4. Database â€” stuck/failed records
         if (!string.IsNullOrEmpty(_reportId))
         {
             var dbFailure = await _dbMonitor.CheckProgressAsync(_facilityId, _reportId);
