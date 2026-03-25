@@ -1,4 +1,4 @@
-name: "Tests"
+﻿name: "Tests"
 
 on:
 #  schedule:
@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 jobs:
-
+  
   changes:
     runs-on: ubuntu-latest
     outputs: 
@@ -30,7 +30,7 @@ jobs:
         id: should
         shell: bash
         run: |
-          # For PRs, pass base�HEAD; for other events, the script will fallback
+          # For PRs, pass baseâ€¦HEAD; for other events, the script will fallback
           chmod +x Scripts/should-run-smoke-test.sh
           result=$(Scripts/should-run-smoke-test.sh "origin/${{ github.base_ref }}...HEAD")
           echo "$result"
@@ -38,12 +38,11 @@ jobs:
 
       - name: Show decision
         run: echo "run_job=${{ steps.should.outputs.run_job }}"
-
+          
   docker-build-and-run:    
     name: Smoke Test with Docker Compose
     runs-on: [docker-16core-64gb]
-    timeout-minutes: 15
-
+    
     needs: changes
     if: ${{ needs.changes.outputs.run_job == 'true' }}
 
@@ -83,20 +82,18 @@ jobs:
           name: service-logs
           path: service-logs/
 
-      - name: Run Backend E2E Smoke Tests
+      - name: Run Backend E2E Tests
         run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=SmokeTest" --logger "trx;LogFileName=test-results.trx" --logger "console;verbosity=detailed"
         env:
           SMOKE_TEST_DOWNLOAD_PATH: ./Tests/BackendE2ETests/TestResults/
 
       - name: Upload test results
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results
           path: ./Tests/BackendE2ETests/TestResults/test-results.trx
 
       - name: Upload submission ZIP
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results
@@ -106,7 +103,7 @@ jobs:
     name: Integration Tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
+    
     needs: changes
     if: ${{ needs.changes.outputs.run_job == 'true' }}
 
@@ -157,12 +154,12 @@ jobs:
           name: XUnit Integration Tests
           path: ./TestResults/dotnet-integration-test-results.trx
           reporter: dotnet-trx
-
+          
   dotnet-unit-tests:
     name: Unit Tests for DotNet
     runs-on: windows-latest
     timeout-minutes: 10
-
+    
     needs: changes
     if: ${{ needs.changes.outputs.run_job == 'true' }}
 
@@ -216,10 +213,10 @@ jobs:
   java-unit-tests:
     name: Unit Tests for Java
     runs-on: ['ubuntu-latest']
-
+    
     needs: changes
     if: ${{ needs.changes.outputs.run_job == 'true' }}
-
+    
     steps:
       - name: Checkout source repository
         uses: actions/checkout@v4
