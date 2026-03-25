@@ -1,18 +1,19 @@
-using System.Net;
-using Newtonsoft.Json.Linq;
-using RestSharp;
+﻿using System.Collections.Concurrent;
+using System.Text;
+using Confluent.Kafka;
 using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Tests.E2ETests.Helpers;
 
 /// <summary>
-/// Monitors Kafka error and retry topics via the Kafka REST Proxy for dead-letter
-/// messages that indicate processing failures in the pipeline.
+/// Monitors Kafka error and retry topics for dead-letter messages that indicate
+/// processing failures in the pipeline. Uses a background consumer loop identical
+/// to the service listeners (e.g., ReportScheduledListener).
 /// </summary>
 public class KafkaErrorMonitor : IAsyncDisposable
 {
-    private static readonly string KafkaRestProxyBase =
-        Environment.GetEnvironmentVariable("E2E_KAFKA_REST_PROXY_URL") ?? "http://localhost:8082";
+    private static readonly string KafkaBootstrapServers =
+        Environment.GetEnvironmentVariable("E2E_KAFKA_BOOTSTRAP_SERVERS") ?? "localhost:9094";
 
     private static readonly string KafkaUser =
         Environment.GetEnvironmentVariable("E2E_KAFKA_USER") ?? "user";
@@ -21,10 +22,9 @@ public class KafkaErrorMonitor : IAsyncDisposable
         Environment.GetEnvironmentVariable("E2E_KAFKA_PASSWORD") ?? "password";
 
     private readonly ITestOutputHelper _output;
-    private readonly RestClient _client;
-    private readonly string _consumerGroup;
-    private readonly string _instanceId;
-    private string? _consumerBaseUri;
+    private IConsumer<string, string>? _consumer;
+    private CancellationTokenSource? _cts;
+    private Task? _listenerTask;
     private bool _initialized;
     private bool _disposed;
 
@@ -49,128 +49,120 @@ public class KafkaErrorMonitor : IAsyncDisposable
         "ReadyToAcquire-Retry",
     ];
 
-    private readonly List<string> _capturedErrors = [];
+    private readonly ConcurrentBag<string> _capturedErrors = [];
 
-    public IReadOnlyList<string> CapturedErrors => _capturedErrors;
-    public bool HasErrors => _capturedErrors.Count > 0;
+    public IReadOnlyList<string> CapturedErrors => [.. _capturedErrors];
+    public bool HasErrors => !_capturedErrors.IsEmpty;
 
     public KafkaErrorMonitor(ITestOutputHelper output)
     {
         _output = output;
-        _client = new RestClient(KafkaRestProxyBase);
-        _consumerGroup = $"e2e-diag-{Guid.NewGuid():N}";
-        _instanceId = "diag-instance";
     }
 
-    public async Task InitializeAsync()
+    public Task InitializeAsync()
     {
-        if (_initialized) return;
+        if (_initialized) return Task.CompletedTask;
 
         try
         {
-            // Create consumer instance
-            var createRequest = new RestRequest($"/consumers/{_consumerGroup}", Method.Post);
-            createRequest.AddHeader("Content-Type", "application/vnd.kafka.v2+json");
-            var createBody = new JObject
+            var config = new ConsumerConfig
             {
-                ["name"] = _instanceId,
-                ["format"] = "binary",
-                ["auto.offset.reset"] = "latest",
-                ["auto.commit.enable"] = "true"
+                BootstrapServers = KafkaBootstrapServers,
+                GroupId = $"e2e-diag-{Guid.NewGuid():N}",
+                AutoOffsetReset = AutoOffsetReset.Latest,
+                EnableAutoCommit = true,
+                SecurityProtocol = SecurityProtocol.SaslPlaintext,
+                SaslMechanism = SaslMechanism.Plain,
+                SaslUsername = KafkaUser,
+                SaslPassword = KafkaPassword,
+                SessionTimeoutMs = 10000,
+                SocketTimeoutMs = 5000,
             };
-            createRequest.AddStringBody(createBody.ToString(), DataFormat.Json);
 
-            var createResponse = await _client.ExecuteAsync(createRequest);
-            if (createResponse.StatusCode != HttpStatusCode.OK && createResponse.StatusCode != HttpStatusCode.Conflict)
-            {
-                _output.WriteLine($"[DIAG][Kafka] Failed to create consumer: {createResponse.StatusCode} {createResponse.Content}");
-                return;
-            }
+            _consumer = new ConsumerBuilder<string, string>(config)
+                .SetErrorHandler((_, e) =>
+                {
+                    if (e.IsFatal)
+                        _output.WriteLine($"[DIAG][Kafka] Fatal consumer error: {e.Reason}");
+                })
+                .Build();
 
-            if (createResponse.Content != null)
-            {
-                var createJson = JObject.Parse(createResponse.Content);
-                _consumerBaseUri = createJson["base_uri"]?.ToString();
-            }
-
-            if (string.IsNullOrEmpty(_consumerBaseUri))
-            {
-                _consumerBaseUri = $"{KafkaRestProxyBase}/consumers/{_consumerGroup}/instances/{_instanceId}";
-            }
-
-            // Subscribe to error topics
-            var subscribeRequest = new RestRequest($"{_consumerBaseUri}/subscription", Method.Post);
-            subscribeRequest.AddHeader("Content-Type", "application/vnd.kafka.v2+json");
-            var subscribeBody = new JObject
-            {
-                ["topics"] = new JArray(ErrorTopics)
-            };
-            subscribeRequest.AddStringBody(subscribeBody.ToString(), DataFormat.Json);
-
-            var subscribeResponse = await _client.ExecuteAsync(subscribeRequest);
-            if (subscribeResponse.StatusCode != HttpStatusCode.NoContent &&
-                subscribeResponse.StatusCode != HttpStatusCode.OK)
-            {
-                _output.WriteLine($"[DIAG][Kafka] Failed to subscribe: {subscribeResponse.StatusCode} {subscribeResponse.Content}");
-                return;
-            }
-
+            _consumer.Subscribe(ErrorTopics);
             _initialized = true;
-            _output.WriteLine($"[DIAG][Kafka] Monitoring {ErrorTopics.Length} error/retry topics");
+
+            _cts = new CancellationTokenSource();
+            _listenerTask = Task.Run(() => StartConsumerLoop(_cts.Token));
+
+            _output.WriteLine($"[DIAG][Kafka] Listening on {ErrorTopics.Length} error/retry topics");
         }
         catch (Exception ex)
         {
             _output.WriteLine($"[DIAG][Kafka] Init failed: {ex.Message}");
         }
+
+        return Task.CompletedTask;
     }
 
-    /// <summary>
-    /// Polls for new messages on the subscribed error topics and logs any findings.
-    /// </summary>
-    public async Task PollAsync()
+    private void StartConsumerLoop(CancellationToken cancellationToken)
     {
-        if (!_initialized || _consumerBaseUri == null) return;
+        if (_consumer == null) return;
 
         try
         {
-            var pollRequest = new RestRequest($"{_consumerBaseUri}/records", Method.Get);
-            pollRequest.AddHeader("Accept", "application/vnd.kafka.binary.v2+json");
-
-            var response = await _client.ExecuteAsync(pollRequest);
-            if (response.StatusCode != HttpStatusCode.OK || string.IsNullOrEmpty(response.Content))
-                return;
-
-            var records = JArray.Parse(response.Content);
-            foreach (var record in records)
+            while (!cancellationToken.IsCancellationRequested)
             {
-                var topic = record["topic"]?.ToString() ?? "unknown";
-                var keyBase64 = record["key"]?.ToString();
-                var valueBase64 = record["value"]?.ToString();
+                try
+                {
+                    var result = _consumer.Consume(cancellationToken);
+                    if (result?.Message == null) continue;
 
-                var key = DecodeBase64(keyBase64);
-                var value = DecodeBase64(valueBase64);
+                    var topic = result.Topic;
+                    var key = result.Message.Key ?? "(null)";
+                    var value = result.Message.Value ?? "(null)";
+                    var headers = ExtractHeaders(result.Message.Headers);
 
-                var message = $"[DIAG][Kafka][{topic}] Key={key} Value={Truncate(value, 500)}";
-                _output.WriteLine(message);
-                _capturedErrors.Add(message);
+                    var message = $"[DIAG][Kafka][{topic}] Key={key}{headers} Value={Truncate(value, 500)}";
+                    _output.WriteLine(message);
+                    _capturedErrors.Add(message);
+                }
+                catch (ConsumeException ex)
+                {
+                    _output.WriteLine($"[DIAG][Kafka] Consume error: {ex.Error.Reason}");
+                }
             }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected during shutdown
         }
         catch (Exception ex)
         {
-            _output.WriteLine($"[DIAG][Kafka] Poll error: {ex.Message}");
+            _output.WriteLine($"[DIAG][Kafka] Listener error: {ex.Message}");
         }
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (_disposed || !_initialized || _consumerBaseUri == null) return;
+        if (_disposed) return;
         _disposed = true;
 
         try
         {
-            var deleteRequest = new RestRequest(_consumerBaseUri, Method.Delete);
-            deleteRequest.AddHeader("Content-Type", "application/vnd.kafka.v2+json");
-            await _client.ExecuteAsync(deleteRequest);
+            if (_cts != null)
+            {
+                await _cts.CancelAsync();
+
+                if (_listenerTask != null)
+                {
+                    try { await _listenerTask; }
+                    catch (OperationCanceledException) { }
+                }
+
+                _cts.Dispose();
+            }
+
+            _consumer?.Close();
+            _consumer?.Dispose();
         }
         catch
         {
@@ -178,17 +170,27 @@ public class KafkaErrorMonitor : IAsyncDisposable
         }
     }
 
-    private static string DecodeBase64(string? base64)
+    private static string ExtractHeaders(Headers? headers)
     {
-        if (string.IsNullOrEmpty(base64)) return "(null)";
-        try
+        if (headers == null || headers.Count == 0) return "";
+
+        var parts = new List<string>();
+        foreach (var header in headers)
         {
-            return System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(base64));
+            try
+            {
+                var value = header.GetValueBytes() != null
+                    ? Encoding.UTF8.GetString(header.GetValueBytes())
+                    : "(null)";
+                parts.Add($"{header.Key}={Truncate(value, 100)}");
+            }
+            catch
+            {
+                // Skip malformed headers
+            }
         }
-        catch
-        {
-            return base64;
-        }
+
+        return parts.Count > 0 ? $" Headers=[{string.Join(", ", parts)}]" : "";
     }
 
     private static string Truncate(string value, int maxLength)
