@@ -1,7 +1,6 @@
 ﻿using LantanaGroup.Link.Tenant.Repository.Context;
 using LantanaGroup.Link.Tests.E2ETests.Helpers;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Tests.E2ETests.Validation;
 
@@ -14,8 +13,11 @@ public class TenantDatabaseValidator(DualOutputHelper output)
 {
     public async Task ValidateAllAsync(string facilityId, string expectedMeasureId)
     {
-        output.WriteLine("\n");
-        output.WriteLine($"\n=== Tenant Database Validation: FacilityId={facilityId} ===\n");
+        output.WriteLine("");
+        output.WriteLine("=================================================================================");
+        output.WriteLine("  TENANT DATABASE VALIDATION");
+        output.WriteLine($"  FacilityId: {facilityId}");
+        output.WriteLine("=================================================================================");
 
         await using var db = DatabaseConnectionFactory.CreateTenantDbContext();
 
@@ -23,25 +25,31 @@ public class TenantDatabaseValidator(DualOutputHelper output)
         await ValidateFacilityProperties(db, facilityId);
         await ValidateScheduledReports(db, facilityId, expectedMeasureId);
 
-        output.WriteLine("\n=== Tenant Database Validation Complete ===\n");
+        output.WriteLine("---------------------------------------------------------------------------------");
+        output.WriteLine("  TENANT DATABASE VALIDATION COMPLETE");
+        output.WriteLine("---------------------------------------------------------------------------------");
+        output.WriteLine("");
     }
 
     private async Task ValidateFacilityExists(TenantDbContext db, string facilityId)
     {
-        output.WriteLine("[Facility] Validating existence...");
+        output.WriteLine("");
+        output.WriteLine("  --- Facility Exists ---");
 
         var facility = await PipelineSnapshot.GetFacilityAsync(db, facilityId);
 
         Assert.NotNull(facility);
         Assert.Equal(facilityId, facility.FacilityId);
 
-        output.WriteLine($"  Found Facility: Id={facility.Id}, FacilityId={facility.FacilityId}");
-        output.WriteLine("[Facility] PASS");
+        output.WriteLine($"      Id         = {facility.Id}");
+        output.WriteLine($"      FacilityId = {facility.FacilityId}");
+        output.WriteLine("  --- Facility Exists PASSED ---");
     }
 
     private async Task ValidateFacilityProperties(TenantDbContext db, string facilityId)
     {
-        output.WriteLine("[FacilityProperties] Validating...");
+        output.WriteLine("");
+        output.WriteLine("  --- FacilityProperties ---");
 
         var facility = await PipelineSnapshot.GetFacilityAsync(db, facilityId);
         Assert.NotNull(facility);
@@ -58,16 +66,17 @@ public class TenantDatabaseValidator(DualOutputHelper output)
         Assert.True(facility.CreateDate > DateTime.MinValue,
             "CreateDate should be populated");
 
-        output.WriteLine($"  FacilityName={facility.FacilityName}, " +
-                         $"TimeZone={facility.TimeZone}, " +
-                         $"IsDeleted={facility.IsDeleted}, " +
-                         $"CreateDate={facility.CreateDate:O}");
-        output.WriteLine("[FacilityProperties] PASS");
+        output.WriteLine($"      FacilityName = {facility.FacilityName}");
+        output.WriteLine($"      TimeZone     = {facility.TimeZone}");
+        output.WriteLine($"      IsDeleted    = {facility.IsDeleted}");
+        output.WriteLine($"      CreateDate   = {facility.CreateDate:O}");
+        output.WriteLine("  --- FacilityProperties PASSED ---");
     }
 
     private async Task ValidateScheduledReports(TenantDbContext db, string facilityId, string expectedMeasureId)
     {
-        output.WriteLine("[ScheduledReports] Validating...");
+        output.WriteLine("");
+        output.WriteLine("  --- ScheduledReports ---");
 
         var facility = await PipelineSnapshot.GetFacilityAsync(db, facilityId);
         Assert.NotNull(facility);
@@ -80,14 +89,13 @@ public class TenantDatabaseValidator(DualOutputHelper output)
             "Expected at least one Monthly scheduled report measure but found none");
         Assert.Contains(expectedMeasureId, monthly);
 
-        output.WriteLine($"  Monthly=[{string.Join(", ", monthly)}]");
-
         var daily = facility.ScheduledReports.Daily ?? [];
         var weekly = facility.ScheduledReports.Weekly ?? [];
 
-        output.WriteLine($"  Daily=[{string.Join(", ", daily)}], " +
-                         $"Weekly=[{string.Join(", ", weekly)}]");
-        output.WriteLine("[ScheduledReports] PASS");
+        output.WriteLine($"      Monthly = [{string.Join(", ", monthly)}]");
+        output.WriteLine($"      Daily   = [{string.Join(", ", daily)}]");
+        output.WriteLine($"      Weekly  = [{string.Join(", ", weekly)}]");
+        output.WriteLine("  --- ScheduledReports PASSED ---");
     }
 }
 

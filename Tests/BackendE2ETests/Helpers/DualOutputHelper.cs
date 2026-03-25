@@ -4,22 +4,24 @@ namespace LantanaGroup.Link.Tests.E2ETests.Helpers;
 
 /// <summary>
 /// Adapts <see cref="ITestOutputHelper"/> to write output appropriately for the environment.
-/// Uses Console.WriteLine for local development and ITestOutputHelper for CI builds.
+/// Always writes to Console for visibility, and also to ITestOutputHelper when available.
 /// </summary>
 public class DualOutputHelper : ITestOutputHelper
 {
     private readonly ITestOutputHelper? _inner;
-    private readonly bool _isCiEnvironment;
 
     public DualOutputHelper(ITestOutputHelper? inner = null)
     {
         _inner = inner;
-        _isCiEnvironment = IsCiEnvironment();
     }
 
     public void WriteLine(string message)
     {
-        if (_isCiEnvironment && _inner != null)
+        // Always write to console for visibility in CI logs
+        Console.WriteLine(message);
+        
+        // Also write to test output helper if available (for test framework capture)
+        if (_inner != null)
         {
             try
             {
@@ -28,19 +30,18 @@ public class DualOutputHelper : ITestOutputHelper
             catch (InvalidOperationException)
             {
                 // ITestOutputHelper throws if called after the test has completed
-                // Fall back to console output
-                Console.WriteLine(message);
+                // Console output already happened above
             }
-        }
-        else
-        {
-            Console.WriteLine(message);
         }
     }
 
     public void WriteLine(string format, params object[] args)
     {
-        if (_isCiEnvironment && _inner != null)
+        // Always write to console for visibility in CI logs
+        Console.WriteLine(format, args);
+        
+        // Also write to test output helper if available (for test framework capture)
+        if (_inner != null)
         {
             try
             {
@@ -48,36 +49,8 @@ public class DualOutputHelper : ITestOutputHelper
             }
             catch (InvalidOperationException)
             {
-                // Fall back to console output
-                Console.WriteLine(format, args);
+                // Console output already happened above
             }
         }
-        else
-        {
-            Console.WriteLine(format, args);
-        }
-    }
-
-    private static bool IsCiEnvironment()
-    {
-        // Check for common CI environment variables
-        var ciIndicators = new[]
-        {
-            "CI",                    // General CI indicator
-            "CONTINUOUS_INTEGRATION", // Some CI systems
-            "BUILD_NUMBER",          // Azure DevOps, Jenkins
-            "BUILD_ID",              // Jenkins, GitLab
-            "GITHUB_ACTIONS",        // GitHub Actions
-            "GITLAB_CI",             // GitLab CI
-            "JENKINS_HOME",          // Jenkins
-            "TEAMCITY_VERSION",      // TeamCity
-            "TF_BUILD",              // Azure DevOps
-            "CIRCLECI",              // CircleCI
-            "TRAVIS",                // Travis CI
-            "APPVEYOR",              // AppVeyor
-        };
-
-        return ciIndicators.Any(indicator =>
-            !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(indicator)));
     }
 }
