@@ -23,5 +23,8 @@ namespace LantanaGroup.Link.DataAcquisition.Models
 
         [JsonConverter(typeof(TimeSpanConverter))]
         public TimeSpan? MaxAcquisitionPullTime { get; set; } 
+
+        [JsonConverter(typeof(TimeSpanConverter))]
+        public TimeSpan? QueryLag { get; set; }
     }
 }
