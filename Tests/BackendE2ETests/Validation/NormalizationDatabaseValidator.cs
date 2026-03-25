@@ -13,8 +13,11 @@ public class NormalizationDatabaseValidator(DualOutputHelper output)
 {
     public async Task ValidateAllAsync(string facilityId)
     {
-        output.WriteLine("\n");
-        output.WriteLine($"\n=== Normalization Database Validation: FacilityId={facilityId} ===\n");
+        output.WriteLine("");
+        output.WriteLine("=================================================================================");
+        output.WriteLine("  NORMALIZATION DATABASE VALIDATION");
+        output.WriteLine($"  FacilityId: {facilityId}");
+        output.WriteLine("=================================================================================");
 
         await using var db = DatabaseConnectionFactory.CreateNormalizationDbContext();
 
@@ -22,12 +25,16 @@ public class NormalizationDatabaseValidator(DualOutputHelper output)
         await ValidateOperationResourceTypes(db, facilityId);
         await ValidateOperationSequences(db, facilityId);
 
-        output.WriteLine("\n=== Normalization Database Validation Complete ===\n");
+        output.WriteLine("---------------------------------------------------------------------------------");
+        output.WriteLine("  NORMALIZATION DATABASE VALIDATION COMPLETE");
+        output.WriteLine("---------------------------------------------------------------------------------");
+        output.WriteLine("");
     }
 
     private async Task ValidateOperations(NormalizationDbContext db, string facilityId)
     {
-        output.WriteLine("[Operation] Validating...");
+        output.WriteLine("");
+        output.WriteLine("  --- Operation ---");
 
         var operations = await PipelineSnapshot.GetOperationsAsync(db, facilityId);
 
@@ -47,17 +54,20 @@ public class NormalizationDatabaseValidator(DualOutputHelper output)
                 .Select(ort => ort.ResourceType?.Name ?? "(unknown)")
                 .ToList();
 
-            output.WriteLine($"  Id={op.Id}: Type={op.OperationType}, Name={op.Name}, " +
-                             $"ResourceTypes=[{string.Join(", ", resourceTypes)}], " +
-                             $"Disabled={op.IsDisabled}");
+            output.WriteLine($"      Id            = {op.Id}");
+            output.WriteLine($"        Type          = {op.OperationType}");
+            output.WriteLine($"        Name          = {op.Name}");
+            output.WriteLine($"        ResourceTypes = [{string.Join(", ", resourceTypes)}]");
+            output.WriteLine($"        Disabled      = {op.IsDisabled}");
         }
 
-        output.WriteLine("[Operation] PASS");
+        output.WriteLine("  --- Operation PASSED ---");
     }
 
     private async Task ValidateOperationResourceTypes(NormalizationDbContext db, string facilityId)
     {
-        output.WriteLine("[OperationResourceType] Validating...");
+        output.WriteLine("");
+        output.WriteLine("  --- OperationResourceType ---");
 
         var operations = await PipelineSnapshot.GetOperationsAsync(db, facilityId);
 
@@ -73,23 +83,24 @@ public class NormalizationDatabaseValidator(DualOutputHelper output)
                 Assert.False(string.IsNullOrWhiteSpace(ort.ResourceType.Name),
                     $"ResourceType.Name should be set for OperationResourceType Id={ort.Id}");
 
-                output.WriteLine($"  Operation={op.Id} -> ResourceType={ort.ResourceType.Name} (OrtId={ort.Id})");
+                output.WriteLine($"      Operation {op.Id} -> ResourceType={ort.ResourceType.Name} (OrtId={ort.Id})");
             }
         }
 
-        output.WriteLine("[OperationResourceType] PASS");
+        output.WriteLine("  --- OperationResourceType PASSED ---");
     }
 
     private async Task ValidateOperationSequences(NormalizationDbContext db, string facilityId)
     {
-        output.WriteLine("[OperationSequence] Validating...");
+        output.WriteLine("");
+        output.WriteLine("  --- OperationSequence ---");
 
         var sequences = await PipelineSnapshot.GetOperationSequencesAsync(db, facilityId);
 
         if (sequences.Count == 0)
         {
-            output.WriteLine("  No OperationSequence rows found (sequences are optional)");
-            output.WriteLine("[OperationSequence] PASS");
+            output.WriteLine("      No OperationSequence rows found (sequences are optional)");
+            output.WriteLine("  --- OperationSequence PASSED ---");
             return;
         }
 
@@ -102,8 +113,7 @@ public class NormalizationDatabaseValidator(DualOutputHelper output)
             var opType = seq.OperationResourceType.Operation.OperationType;
             var resType = seq.OperationResourceType.ResourceType.Name;
 
-            output.WriteLine($"  Id={seq.Id}: Sequence={seq.Sequence}, " +
-                             $"OperationType={opType}, ResourceType={resType}");
+            output.WriteLine($"      Id={seq.Id}: Sequence={seq.Sequence}, OperationType={opType}, ResourceType={resType}");
         }
 
         // Verify sequences are uniquely ordered (no duplicate sequence numbers)
@@ -115,8 +125,8 @@ public class NormalizationDatabaseValidator(DualOutputHelper output)
         var distinctCount = sequenceNumbers.Distinct().Count();
         Assert.Equal(sequenceNumbers.Count, distinctCount);
 
-        output.WriteLine($"  {sequences.Count} sequence(s) with unique ordering");
-        output.WriteLine("[OperationSequence] PASS");
+        output.WriteLine($"      {sequences.Count} sequence(s) with unique ordering");
+        output.WriteLine("  --- OperationSequence PASSED ---");
     }
 }
 
