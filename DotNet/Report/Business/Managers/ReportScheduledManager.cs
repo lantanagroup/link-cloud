@@ -28,10 +28,10 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         Task<PagedConfigModel<ReportScheduleModel>> SearchAsync(
             string? facilityId, Frequency? frequency, string? reportType,
             DateTime? reportStartDate, DateTime? reportEndDate,
-            ScheduleStatus? status, bool? endOfReportPeriodJobHasRun,
+            ScheduleStatus[]? statuses, bool? endOfReportPeriodJobHasRun,
             bool includeDeleted, string? sortBy, SortOrder? sortOrder,
             int pageSize, int pageNumber, CancellationToken cancellationToken = default,
-            DateOnly? createDate = null);
+            DateOnly? createDate = null, Guid? id = null);
 
         Task UpdateReportsDeletedStatusForFacility(
             string facilityId, bool deleted, CancellationToken cancellationToken = default);
@@ -209,12 +209,15 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         public async Task<PagedConfigModel<ReportScheduleModel>> SearchAsync(
             string? facilityId, Frequency? frequency, string? reportType,
             DateTime? reportStartDate, DateTime? reportEndDate,
-            ScheduleStatus? status, bool? endOfReportPeriodJobHasRun,
+            ScheduleStatus[]? statuses, bool? endOfReportPeriodJobHasRun,
             bool includeDeleted, string? sortBy, SortOrder? sortOrder,
             int pageSize, int pageNumber, CancellationToken cancellationToken = default,
-            DateOnly? createDate = null)
+            DateOnly? createDate = null, Guid? id = null)
         {
             Expression<Func<ReportSchedule, bool>> predicate = x => true;
+
+            if (id.HasValue)
+                predicate = predicate.And(q => q.Id == id.Value);
 
             if (!string.IsNullOrWhiteSpace(facilityId))
                 predicate = predicate.And(q => q.FacilityId == facilityId);
@@ -238,8 +241,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 predicate = predicate.And(q => q.CreateDate >= dayStart && q.CreateDate < dayEnd);
             }
 
-            if (status.HasValue)
-                predicate = predicate.And(q => q.Status == status.Value);
+            if (statuses != null && statuses.Length > 0)
+                predicate = predicate.And(q => statuses.Contains(q.Status));
 
             if (endOfReportPeriodJobHasRun.HasValue)
                 predicate = predicate.And(q => q.EndOfReportPeriodJobHasRun == endOfReportPeriodJobHasRun.Value);

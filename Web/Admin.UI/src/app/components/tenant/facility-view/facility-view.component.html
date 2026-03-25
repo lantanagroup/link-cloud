@@ -82,9 +82,18 @@
 
     <div class="filter-bar">
       <mat-form-field appearance="outline" class="compact-filter">
+        <mat-label>Report ID</mat-label>
+        <input matInput [ngModel]="reportIdFilter" (ngModelChange)="onReportIdInput($event)" placeholder="Search by report ID...">
+        @if (reportIdFilter) {
+          <button matSuffix mat-icon-button aria-label="Clear report ID" (click)="reportIdFilter = ''; applyFilters()">
+            <mat-icon>close</mat-icon>
+          </button>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="compact-filter">
         <mat-label>Status</mat-label>
-        <mat-select [(ngModel)]="statusFilter" (selectionChange)="applyFilters()">
-          <mat-option value="">Any</mat-option>
+        <mat-select multiple [(ngModel)]="statusFilters" (selectionChange)="applyFilters()">
           @for (s of statusOptions; track s) {
             <mat-option [value]="s">{{ s === 'EndOfPeriod' ? 'End of Period' : s }}</mat-option>
           }

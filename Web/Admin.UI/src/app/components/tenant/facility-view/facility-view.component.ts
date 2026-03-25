@@ -15,8 +15,8 @@ import {MatButtonModule} from '@angular/material/button';
 import {FontAwesomeModule} from '@fortawesome/angular-fontawesome';
 import {faRotate, faArrowLeft, faGears} from '@fortawesome/free-solid-svg-icons';
 import {LoadingService} from 'src/app/services/loading.service';
-import {forkJoin, Subscription} from 'rxjs';
-import {take} from 'rxjs/operators';
+import {forkJoin, Subject, Subscription} from 'rxjs';
+import {debounceTime, distinctUntilChanged, take} from 'rxjs/operators';
 import {ResubmitDialogComponent} from "./resubmit-dialog.component";
 import {AggregationService} from '../../../services/gateway/aggregation/aggregation.service';
 import {DeleteConfirmationDialogComponent} from '../../core/delete-confirmation-dialog/delete-confirmation-dialog.component';
@@ -65,6 +65,8 @@ export class FacilityViewComponent implements OnInit, OnDestroy {
   @ViewChild(MatSort, { static: false }) sort!: MatSort;
 
   private subscription: Subscription | undefined;
+  private reportIdSubscription: Subscription | undefined;
+  private reportIdSubject = new Subject<string>();
   private refreshTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   faRotate = faRotate;
@@ -87,7 +89,8 @@ export class FacilityViewComponent implements OnInit, OnDestroy {
   showDeleted: boolean = false;
 
   // Filters
-  statusFilter: string = '';
+  reportIdFilter: string = '';
+  statusFilters: string[] = [];
   frequencyFilter: string = '';
   reportStartDateFilter: Date | null = null;
   reportEndDateFilter: Date | null = null;
@@ -117,6 +120,14 @@ export class FacilityViewComponent implements OnInit, OnDestroy {
     this.paginationMetadata.pageSize = this.defaultPageSize;
     this.paginationMetadata.totalCount = 0;
     this.paginationMetadata.totalPages = 0;
+
+    this.reportIdSubscription = this.reportIdSubject.pipe(
+      debounceTime(300),
+      distinctUntilChanged()
+    ).subscribe(() => {
+      this.paginationMetadata.pageNumber = 0;
+      this.loadReportSchedules();
+    });
 
     this.subscription = this.route.params.subscribe(params => {
       this.facilityId = params['facilityId'];
@@ -148,6 +159,7 @@ export class FacilityViewComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.reportIdSubscription?.unsubscribe();
     if (this.subscription) {
       this.subscription.unsubscribe();
     }
@@ -193,14 +205,15 @@ export class FacilityViewComponent implements OnInit, OnDestroy {
       undefined,
       this.reportStartDateFilter ?? undefined,
       reportEndDateNormalized,
-      this.statusFilter || undefined,
+      this.statusFilters.length > 0 ? this.statusFilters : undefined,
       undefined,
       this.showDeleted,
       this.currentSortBy,
       this.currentSortOrder,
       Math.max(1, this.paginationMetadata.pageSize || this.defaultPageSize),
       this.paginationMetadata.pageNumber + 1, // API expects 1-based indexing
-      this.createDateFilter ?? undefined
+      this.createDateFilter ?? undefined,
+      this.reportIdFilter || undefined
     ).subscribe({
       next: (data) => {
         this.reportSchedules = data.records;
@@ -220,13 +233,19 @@ export class FacilityViewComponent implements OnInit, OnDestroy {
     });
   }
 
+  onReportIdInput(value: string): void {
+    this.reportIdFilter = value;
+    this.reportIdSubject.next(value);
+  }
+
   applyFilters(): void {
     this.paginationMetadata.pageNumber = 0;
     this.loadReportSchedules();
   }
 
   clearFilters(): void {
-    this.statusFilter = '';
+    this.reportIdFilter = '';
+    this.statusFilters = [];
     this.frequencyFilter = '';
     this.reportStartDateFilter = null;
     this.reportEndDateFilter = null;
@@ -236,7 +255,7 @@ export class FacilityViewComponent implements OnInit, OnDestroy {
   }
 
   hasActiveFilters(): boolean {
-    return !!(this.statusFilter || this.frequencyFilter ||
+    return !!(this.reportIdFilter || this.statusFilters.length > 0 || this.frequencyFilter ||
               this.reportStartDateFilter || this.reportEndDateFilter || this.createDateFilter);
   }
 
