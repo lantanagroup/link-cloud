@@ -1,10 +1,8 @@
-ï»¿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
-using LantanaGroup.Link.Tenant.Entities;
-using LantanaGroup.Link.Tenant.Repository.Context;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 using Xunit.Abstractions;
 using DataAcquisitionLog = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog;
@@ -13,15 +11,15 @@ namespace LantanaGroup.Link.Tests.E2ETests.Helpers;
 
 /// <summary>
 /// Non-asserting, read-only snapshot of the pipeline's database state.
-/// Used by both <see cref="ProgressMonitor"/> (real-time) and
+/// Used by both <see cref="DatabaseProgressMonitor"/> (real-time) and
 /// by the test's try/finally block (last-chance dump). Never throws
-/// assertion exceptions â€” only queries and formats results.
+/// assertion exceptions — only queries and formats results.
 /// </summary>
 public static class PipelineSnapshot
 {
-    // ----------------------------------------------
+    // ??????????????????????????????????????????????
     //  Report DB queries
-    // ----------------------------------------------
+    // ??????????????????????????????????????????????
 
     public static async Task<ReportSchedule?> GetReportScheduleAsync(ReportDbContext db, Guid scheduleId)
     {
@@ -77,9 +75,9 @@ public static class PipelineSnapshot
             .ToListAsync();
     }
 
-    // ----------------------------------------------
+    // ??????????????????????????????????????????????
     //  DataAcquisition DB queries
-    // ----------------------------------------------
+    // ??????????????????????????????????????????????
 
     public static async Task<List<DataAcquisitionLog>> GetAcquisitionLogsAsync(
         DataAcquisitionDbContext db, string facilityId, string reportId)
@@ -89,9 +87,9 @@ public static class PipelineSnapshot
             .ToListAsync();
     }
 
-    // ----------------------------------------------
+    // ??????????????????????????????????????????????
     //  Normalization DB queries
-    // ----------------------------------------------
+    // ??????????????????????????????????????????????
 
     public static async Task<List<Operation>> GetOperationsAsync(
         NormalizationDbContext db, string facilityId)
@@ -116,23 +114,13 @@ public static class PipelineSnapshot
             .ToListAsync();
     }
 
-    // ----------------------------------------------
-    //  Tenant DB queries
-    // ----------------------------------------------
-
-    public static async Task<Facility?> GetFacilityAsync(TenantDbContext db, string facilityId)
-    {
-        return await db.Facilities
-            .FirstOrDefaultAsync(f => f.FacilityId == facilityId);
-    }
-
-    // ----------------------------------------------
+    // ??????????????????????????????????????????????
     //  Formatted summary (non-asserting)
-    // ----------------------------------------------
+    // ??????????????????????????????????????????????
 
     /// <summary>
     /// Writes a complete, non-asserting pipeline snapshot to test output.
-    /// Safe to call at any point â€” never throws.
+    /// Safe to call at any point — never throws.
     /// </summary>
     public static async Task WriteFullSnapshotAsync(
         ITestOutputHelper output,
@@ -146,8 +134,6 @@ public static class PipelineSnapshot
         await WriteReportSnapshot(output, facilityId, scheduleId);
         await WriteDataAcquisitionSnapshot(output, facilityId, reportId);
         await WriteNormalizationSnapshot(output, facilityId);
-        await WriteTenantSnapshot(output, facilityId);
-        await WriteValidationSnapshot(output, facilityId, reportId);
 
         output.WriteLine("\n=== END SNAPSHOT ===\n");
     }
@@ -333,137 +319,6 @@ public static class PipelineSnapshot
         catch (Exception ex)
         {
             output.WriteLine($"[Snapshot][Normalization] Error querying Normalization DB: {ex.Message}");
-        }
-    }
-
-    private static async Task WriteTenantSnapshot(ITestOutputHelper output, string facilityId)
-    {
-        try
-        {
-            await using var db = DatabaseConnectionFactory.CreateTenantDbContext();
-
-            var facility = await GetFacilityAsync(db, facilityId);
-
-            if (facility == null)
-            {
-                output.WriteLine("[Snapshot][Tenant]              Facility NOT FOUND");
-                return;
-            }
-
-            var monthly = facility.ScheduledReports?.Monthly ?? [];
-            var daily = facility.ScheduledReports?.Daily ?? [];
-            var weekly = facility.ScheduledReports?.Weekly ?? [];
-
-            output.WriteLine($"[Snapshot][Tenant]              FacilityId={facility.FacilityId}, " +
-                             $"Name={facility.FacilityName}, TimeZone={facility.TimeZone}, " +
-                             $"IsDeleted={facility.IsDeleted}, Created={facility.CreateDate:O}");
-            output.WriteLine($"[Snapshot][Tenant]              ScheduledReports: " +
-                             $"Monthly=[{string.Join(", ", monthly)}], " +
-                             $"Daily=[{string.Join(", ", daily)}], " +
-                             $"Weekly=[{string.Join(", ", weekly)}]");
-        }
-        catch (Exception ex)
-        {
-            output.WriteLine($"[Snapshot][Tenant] Error querying Tenant DB: {ex.Message}");
-        }
-    }
-
-    private static async Task WriteValidationSnapshot(
-        ITestOutputHelper output,
-        string facilityId,
-        string reportId)
-    {
-        try
-        {
-            var connectionString = DatabaseConnectionFactory.GetConnectionString(DatabaseConnectionFactory.Databases.Validation);
-            await using var connection = new Microsoft.Data.SqlClient.SqlConnection(connectionString);
-            await connection.OpenAsync();
-
-            // Count results by severity
-            var severityQuery = @"
-                SELECT severity, COUNT(*) as cnt
-                FROM result
-                WHERE facility_id = @facilityId AND report_id = @reportId
-                GROUP BY severity
-                ORDER BY severity";
-
-            await using var severityCmd = new Microsoft.Data.SqlClient.SqlCommand(severityQuery, connection);
-            severityCmd.Parameters.AddWithValue("@facilityId", facilityId);
-            severityCmd.Parameters.AddWithValue("@reportId", reportId);
-
-            var severityCounts = new List<string>();
-            var totalResults = 0;
-
-            await using (var reader = await severityCmd.ExecuteReaderAsync())
-            {
-                while (await reader.ReadAsync())
-                {
-                    var severity = reader.GetString(0);
-                    var count = reader.GetInt32(1);
-                    totalResults += count;
-                    severityCounts.Add($"{severity}={count}");
-                }
-            }
-
-            output.WriteLine($"[Snapshot][Validation]          {totalResults} result(s)" +
-                             (severityCounts.Count > 0 ? $" | {string.Join(", ", severityCounts)}" : ""));
-
-            if (totalResults == 0) return;
-
-            // Count results by patient
-            var patientQuery = @"
-                SELECT patient_id, COUNT(*) as cnt
-                FROM result
-                WHERE facility_id = @facilityId AND report_id = @reportId
-                GROUP BY patient_id";
-
-            await using var patientCmd = new Microsoft.Data.SqlClient.SqlCommand(patientQuery, connection);
-            patientCmd.Parameters.AddWithValue("@facilityId", facilityId);
-            patientCmd.Parameters.AddWithValue("@reportId", reportId);
-
-            await using (var reader = await patientCmd.ExecuteReaderAsync())
-            {
-                while (await reader.ReadAsync())
-                {
-                    var patientId = reader.GetString(0);
-                    var count = reader.GetInt32(1);
-                    output.WriteLine($"[Snapshot][Validation]            Patient {patientId}: {count} result(s)");
-                }
-            }
-
-            // Top 5 error messages for quick diagnosis
-            var topErrorsQuery = @"
-                SELECT TOP 5 severity, LEFT(message, 150) as msg, COUNT(*) as cnt
-                FROM result
-                WHERE facility_id = @facilityId AND report_id = @reportId
-                  AND severity IN ('ERROR', 'FATAL')
-                GROUP BY severity, LEFT(message, 150)
-                ORDER BY cnt DESC";
-
-            await using var errorsCmd = new Microsoft.Data.SqlClient.SqlCommand(topErrorsQuery, connection);
-            errorsCmd.Parameters.AddWithValue("@facilityId", facilityId);
-            errorsCmd.Parameters.AddWithValue("@reportId", reportId);
-
-            var hasErrors = false;
-            await using (var reader = await errorsCmd.ExecuteReaderAsync())
-            {
-                while (await reader.ReadAsync())
-                {
-                    if (!hasErrors)
-                    {
-                        output.WriteLine("[Snapshot][Validation]          Top errors:");
-                        hasErrors = true;
-                    }
-                    var severity = reader.GetString(0);
-                    var msg = reader.GetString(1);
-                    var count = reader.GetInt32(2);
-                    output.WriteLine($"[Snapshot][Validation]            [{severity}] x{count}: {msg}");
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            output.WriteLine($"[Snapshot][Validation] Error querying Validation DB: {ex.Message}");
         }
     }
 }

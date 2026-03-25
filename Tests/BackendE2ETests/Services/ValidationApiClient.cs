@@ -10,7 +10,7 @@ public class ValidationApiClient(RestClient client, ITestOutputHelper output, Lo
 {
     public async Task InitializeArtifactsAsync()
     {
-        output.WriteLine("Initializing validation artifacts...");
+        output.WriteLine("Initializing validation artifacts (this is a heavy one-time operation)...");
         await RetryHelper.RetryUntilSuccess(async () =>
         {
             var request = new RestRequest("validation/artifact/$initialize", Method.Post);

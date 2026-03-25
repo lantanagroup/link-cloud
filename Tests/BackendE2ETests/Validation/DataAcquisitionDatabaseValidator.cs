@@ -1,9 +1,10 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Tests.E2ETests.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Tests.E2ETests.Validation;
 
@@ -11,7 +12,7 @@ namespace LantanaGroup.Link.Tests.E2ETests.Validation;
 /// Validates the DataAcquisition service's database state after a smoke test run.
 /// Delegates shared queries to <see cref="PipelineSnapshot"/> and applies strict assertions.
 /// </summary>
-public class DataAcquisitionDatabaseValidator(DualOutputHelper output)
+public class DataAcquisitionDatabaseValidator(ITestOutputHelper output)
 {
     public async Task ValidateAllAsync(
         string facilityId,
@@ -19,12 +20,7 @@ public class DataAcquisitionDatabaseValidator(DualOutputHelper output)
         string expectedMeasureId,
         List<string> expectedPatientIds)
     {
-        output.WriteLine("");
-        output.WriteLine("=================================================================================");
-        output.WriteLine("  DATA ACQUISITION DATABASE VALIDATION");
-        output.WriteLine($"  FacilityId: {facilityId}");
-        output.WriteLine($"  ReportId:   {reportId}");
-        output.WriteLine("=================================================================================");
+        output.WriteLine($"\n=== DataAcquisition Database Validation: FacilityId={facilityId}, ReportId={reportId} ===\n");
 
         await using var db = DatabaseConnectionFactory.CreateDataAcquisitionDbContext();
 
@@ -34,16 +30,12 @@ public class DataAcquisitionDatabaseValidator(DualOutputHelper output)
         await ValidateFhirQueries(db, facilityId, reportId);
         await ValidateReferenceResources(db, facilityId);
 
-        output.WriteLine("---------------------------------------------------------------------------------");
-        output.WriteLine("  DATA ACQUISITION DATABASE VALIDATION COMPLETE");
-        output.WriteLine("---------------------------------------------------------------------------------");
-        output.WriteLine("");
+        output.WriteLine("\n=== DataAcquisition Database Validation Complete ===\n");
     }
 
     private async Task ValidateFhirQueryConfiguration(DataAcquisitionDbContext db, string facilityId)
     {
-        output.WriteLine("");
-        output.WriteLine("  --- FhirQueryConfiguration ---");
+        output.WriteLine("[FhirQueryConfiguration] Validating...");
 
         var config = await db.FhirQueryConfigurations
             .FirstOrDefaultAsync(c => c.FacilityId == facilityId);
@@ -53,16 +45,14 @@ public class DataAcquisitionDatabaseValidator(DualOutputHelper output)
         Assert.True(config.MaxConcurrentRequests > 0, "MaxConcurrentRequests should be > 0");
         Assert.True(config.MaxRetries > 0, "MaxRetries should be > 0");
 
-        output.WriteLine($"      FhirServerBaseUrl     = {config.FhirServerBaseUrl}");
-        output.WriteLine($"      MaxConcurrentRequests = {config.MaxConcurrentRequests}");
-        output.WriteLine($"      MaxRetries            = {config.MaxRetries}");
-        output.WriteLine("  --- FhirQueryConfiguration PASSED ---");
+        output.WriteLine($"  FhirServerBaseUrl={config.FhirServerBaseUrl}, " +
+                         $"MaxConcurrentRequests={config.MaxConcurrentRequests}, MaxRetries={config.MaxRetries} ?");
+        output.WriteLine("[FhirQueryConfiguration] PASS");
     }
 
     private async Task ValidateQueryPlans(DataAcquisitionDbContext db, string facilityId, string expectedMeasureId)
     {
-        output.WriteLine("");
-        output.WriteLine("  --- QueryPlan ---");
+        output.WriteLine("[QueryPlan] Validating...");
 
         var queryPlans = await db.QueryPlans
             .Where(qp => qp.FacilityId == facilityId)
@@ -77,10 +67,9 @@ public class DataAcquisitionDatabaseValidator(DualOutputHelper output)
         Assert.True(dischargePlan.InitialQueries?.Count > 0, "Discharge plan should have InitialQueries");
         Assert.True(dischargePlan.SupplementalQueries?.Count > 0, "Discharge plan should have SupplementalQueries");
 
-        output.WriteLine($"      Discharge Plan:");
-        output.WriteLine($"        PlanName            = {dischargePlan.PlanName}");
-        output.WriteLine($"        InitialQueries      = {dischargePlan.InitialQueries?.Count}");
-        output.WriteLine($"        SupplementalQueries = {dischargePlan.SupplementalQueries?.Count}");
+        output.WriteLine($"  Discharge: PlanName={dischargePlan.PlanName}, " +
+                         $"InitialQueries={dischargePlan.InitialQueries?.Count}, " +
+                         $"SupplementalQueries={dischargePlan.SupplementalQueries?.Count} ?");
 
         var monthlyPlan = queryPlans.FirstOrDefault(qp => qp.Type == Frequency.Monthly);
         Assert.NotNull(monthlyPlan);
@@ -88,18 +77,16 @@ public class DataAcquisitionDatabaseValidator(DualOutputHelper output)
         Assert.True(monthlyPlan.InitialQueries?.Count > 0, "Monthly plan should have InitialQueries");
         Assert.True(monthlyPlan.SupplementalQueries?.Count > 0, "Monthly plan should have SupplementalQueries");
 
-        output.WriteLine($"      Monthly Plan:");
-        output.WriteLine($"        PlanName            = {monthlyPlan.PlanName}");
-        output.WriteLine($"        InitialQueries      = {monthlyPlan.InitialQueries?.Count}");
-        output.WriteLine($"        SupplementalQueries = {monthlyPlan.SupplementalQueries?.Count}");
-        output.WriteLine("  --- QueryPlan PASSED ---");
+        output.WriteLine($"  Monthly: PlanName={monthlyPlan.PlanName}, " +
+                         $"InitialQueries={monthlyPlan.InitialQueries?.Count}, " +
+                         $"SupplementalQueries={monthlyPlan.SupplementalQueries?.Count} ?");
+        output.WriteLine("[QueryPlan] PASS");
     }
 
     private async Task ValidateDataAcquisitionLogs(
         DataAcquisitionDbContext db, string facilityId, string reportId, List<string> expectedPatientIds)
     {
-        output.WriteLine("");
-        output.WriteLine("  --- DataAcquisitionLog ---");
+        output.WriteLine("[DataAcquisitionLog] Validating...");
 
         var logs = await PipelineSnapshot.GetAcquisitionLogsAsync(db, facilityId, reportId);
 
@@ -124,9 +111,8 @@ public class DataAcquisitionDatabaseValidator(DualOutputHelper output)
             string.Join(", ", failedLogs.Select(l => $"Id={l.Id} Patient={l.PatientId} Status={l.Status}")));
 
         var completedCount = logs.Count(l => l.Status == RequestStatus.Completed);
-        output.WriteLine($"      Total Logs   = {logs.Count}");
-        output.WriteLine($"      Completed    = {completedCount}");
-        output.WriteLine($"      Patients     = {expectedPatientIds.Count}");
+        output.WriteLine($"  {logs.Count} log(s), {completedCount} completed, " +
+                         $"{expectedPatientIds.Count} patients found ?");
 
         foreach (var patientId in expectedPatientIds)
         {
@@ -134,16 +120,15 @@ public class DataAcquisitionDatabaseValidator(DualOutputHelper output)
             var statusBreakdown = patientLogs
                 .GroupBy(l => l.Status)
                 .Select(g => $"{g.Key}={g.Count()}");
-            output.WriteLine($"      Patient {patientId,-12} {patientLogs.Count} log(s) [{string.Join(", ", statusBreakdown)}]");
+            output.WriteLine($"  Patient {patientId}: {patientLogs.Count} log(s) [{string.Join(", ", statusBreakdown)}]");
         }
 
-        output.WriteLine("  --- DataAcquisitionLog PASSED ---");
+        output.WriteLine("[DataAcquisitionLog] PASS");
     }
 
     private async Task ValidateFhirQueries(DataAcquisitionDbContext db, string facilityId, string reportId)
     {
-        output.WriteLine("");
-        output.WriteLine("  --- FhirQuery ---");
+        output.WriteLine("[FhirQuery] Validating...");
 
         var queries = await db.FhirQueries
             .Include(q => q.FhirQueryResourceTypes)
@@ -155,15 +140,13 @@ public class DataAcquisitionDatabaseValidator(DualOutputHelper output)
 
         var byType = queries.GroupBy(q => q.QueryType)
             .Select(g => $"{g.Key}={g.Count()}");
-        output.WriteLine($"      Total Queries = {queries.Count}");
-        output.WriteLine($"      By Type       = {string.Join(", ", byType)}");
-        output.WriteLine("  --- FhirQuery PASSED ---");
+        output.WriteLine($"  {queries.Count} queries | {string.Join(", ", byType)} ?");
+        output.WriteLine("[FhirQuery] PASS");
     }
 
     private async Task ValidateReferenceResources(DataAcquisitionDbContext db, string facilityId)
     {
-        output.WriteLine("");
-        output.WriteLine("  --- ReferenceResources ---");
+        output.WriteLine("[ReferenceResources] Validating...");
 
         var resources = await db.ReferenceResources
             .Where(r => r.FacilityId == facilityId)
@@ -175,9 +158,7 @@ public class DataAcquisitionDatabaseValidator(DualOutputHelper output)
         Assert.True(resources.Count > 0, "Expected ReferenceResources rows for the facility but found none");
 
         var totalCount = resources.Sum(r => r.Count);
-        output.WriteLine($"      Total Resources   = {totalCount}");
-        output.WriteLine($"      Type/Phase Groups = {resources.Count}");
-        output.WriteLine("  --- ReferenceResources PASSED ---");
+        output.WriteLine($"  {totalCount} resource(s) across {resources.Count} type/phase groups ?");
+        output.WriteLine("[ReferenceResources] PASS");
     }
 }
-

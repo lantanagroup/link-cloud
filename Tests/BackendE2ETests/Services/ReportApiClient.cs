@@ -11,9 +11,10 @@ using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Tests.E2ETests.Services;
 
-public class ReportApiClient(RestClient client, ITestOutputHelper output, LokiScraper lokiScraper, TestConfig.SmokeTestConfig? config = null)
+public class ReportApiClient(RestClient client, ITestOutputHelper output, LokiScraper lokiScraper)
 {
-    private readonly TestConfig.SmokeTestConfig _config = config ?? TestConfig.AdhocReportingSmokeTestConfig;
+    private const int PollingIntervalSeconds = 3;
+    private const int MaxRetryCount = 60;
 
     public async Task<string> GenerateReportAsync(string facilityId, string measureId)
     {
@@ -22,10 +23,10 @@ public class ReportApiClient(RestClient client, ITestOutputHelper output, LokiSc
         var body = new
         {
             BypassSubmission = false,
-            StartDate = _config.StartDate,
-            EndDate = _config.EndDate,
+            TestConfig.AdhocReportingSmokeTestConfig.StartDate,
+            TestConfig.AdhocReportingSmokeTestConfig.EndDate,
             ReportTypes = new[] { measureId },
-            PatientIds = _config.PatientIds
+            TestConfig.AdhocReportingSmokeTestConfig.PatientIds
         };
         request.AddJsonBody(body);
 
@@ -54,14 +55,11 @@ public class ReportApiClient(RestClient client, ITestOutputHelper output, LokiSc
 
     public async Task<bool> CheckSubmissionStatusAsync(string reportId, BackgroundDiagnosticsMonitor? diagnostics = null)
     {
-        var pollingIntervalSeconds = _config.PollingIntervalSeconds;
-        var maxRetryCount = _config.MaxRetryCount;
-
-        output.WriteLine($"Polling for report submission (reportId={reportId}, max {maxRetryCount * pollingIntervalSeconds}s)...");
+        output.WriteLine($"Polling for report submission (reportId={reportId}, max {MaxRetryCount * PollingIntervalSeconds}s)...");
 
         string? lastStatus = null;
 
-        for (var retry = 0; retry < maxRetryCount; retry++)
+        for (var retry = 0; retry < MaxRetryCount; retry++)
         {
             if (diagnostics?.HasCriticalFailure == true)
             {
@@ -85,7 +83,7 @@ public class ReportApiClient(RestClient client, ITestOutputHelper output, LokiSc
 
                 if (currentStatus == "Submitted")
                 {
-                    output.WriteLine($"Report submitted (after {retry * pollingIntervalSeconds}s).");
+                    output.WriteLine($"Report submitted (after {retry * PollingIntervalSeconds}s).");
                     return true;
                 }
             }
@@ -100,10 +98,10 @@ public class ReportApiClient(RestClient client, ITestOutputHelper output, LokiSc
                 lastStatus = currentStatus;
             }
 
-            await Task.Delay(pollingIntervalSeconds * 1000);
+            await Task.Delay(PollingIntervalSeconds * 1000);
         }
 
-        output.WriteLine($"Report {reportId} was not submitted after {maxRetryCount * pollingIntervalSeconds}s.");
+        output.WriteLine($"Report {reportId} was not submitted after {MaxRetryCount * PollingIntervalSeconds}s.");
         return false;
     }
 
@@ -125,7 +123,7 @@ public class ReportApiClient(RestClient client, ITestOutputHelper output, LokiSc
             if (!Directory.Exists(TestConfig.SmokeTestDownloadPath))
                 Directory.CreateDirectory(TestConfig.SmokeTestDownloadPath);
 
-            var downloadPath = Path.Combine(TestConfig.SmokeTestDownloadPath, _config.DownloadFileName);
+            var downloadPath = Path.Combine(TestConfig.SmokeTestDownloadPath, "adhoc-reporting-smoke-test-submission.zip");
             await File.WriteAllBytesAsync(downloadPath, response.RawBytes);
             output.WriteLine($"Report downloaded to {downloadPath}");
         }

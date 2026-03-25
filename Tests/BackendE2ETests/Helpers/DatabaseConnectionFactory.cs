@@ -1,7 +1,6 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Report.Data;
-using LantanaGroup.Link.Tenant.Repository.Context;
 using Microsoft.EntityFrameworkCore;
 
 namespace LantanaGroup.Link.Tests.E2ETests.Helpers;
@@ -66,21 +65,6 @@ public static class DatabaseConnectionFactory
             .Options;
 
         return new NormalizationDbContext(options);
-    }
-
-    /// <summary>
-    /// Creates a <see cref="TenantDbContext"/> connected to the live Docker SQL Server.
-    /// The context is configured as no-tracking for read-only validation queries.
-    /// </summary>
-    public static TenantDbContext CreateTenantDbContext()
-    {
-        var connectionString = GetConnectionString(Databases.Tenant);
-        var options = new DbContextOptionsBuilder<TenantDbContext>()
-            .UseSqlServer(connectionString)
-            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
-            .Options;
-
-        return new TenantDbContext(options);
     }
 
     public static class Databases

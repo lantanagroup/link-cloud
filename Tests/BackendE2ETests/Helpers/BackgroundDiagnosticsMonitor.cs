@@ -12,7 +12,7 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
     private readonly ITestOutputHelper _output;
     private readonly LokiScraper _lokiScraper;
     private readonly KafkaErrorMonitor _kafkaMonitor;
-    private readonly ProgressMonitor _progressMonitor;
+    private readonly DatabaseProgressMonitor _dbMonitor;
     private readonly TimeSpan _pollInterval;
 
     private CancellationTokenSource? _cts;
@@ -20,10 +20,6 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
     private volatile bool _hasCriticalFailure;
     private string _facilityId = "";
     private string _reportId = "";
-    private int _cycleCount;
-    private bool _stallDiagnosticsDumped;
-
-    private static readonly TimeSpan StallDiagnosticsThreshold = TimeSpan.FromSeconds(120);
 
     /// <summary>
     /// Indicates that a critical failure was detected (dead-letter message, failed DB record, etc.)
@@ -36,15 +32,20 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
     /// </summary>
     public IReadOnlyList<string> KafkaErrors => _kafkaMonitor.CapturedErrors;
 
-    public BackgroundDiagnosticsMonitor(ITestOutputHelper output, LokiScraper lokiScraper, int expectedPatientCount = 0, TimeSpan? pollInterval = null)
+    public BackgroundDiagnosticsMonitor(ITestOutputHelper output, LokiScraper lokiScraper, TimeSpan? pollInterval = null)
     {
         _output = output;
         _lokiScraper = lokiScraper;
         _kafkaMonitor = new KafkaErrorMonitor(output);
-        _progressMonitor = new ProgressMonitor(output, expectedPatientCount, lokiScraper);
+        _dbMonitor = new DatabaseProgressMonitor(output);
         _pollInterval = pollInterval ?? TimeSpan.FromSeconds(5);
     }
 
+    /// <summary>
+    /// Starts monitoring in the background. Call this before the report generation step.
+    /// </summary>
+    /// <param name="facilityId">The facility being tested.</param>
+    /// <param name="reportId">The report ID to track in database queries.</param>
     public async Task StartAsync(string facilityId, string reportId)
     {
         _facilityId = facilityId;
@@ -58,6 +59,9 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
         _output.WriteLine($"[DIAG] Background diagnostics started (polling every {_pollInterval.TotalSeconds}s)");
     }
 
+    /// <summary>
+    /// Stops monitoring and writes a final summary.
+    /// </summary>
     public async Task StopAsync()
     {
         if (_cts == null) return;
@@ -78,6 +82,7 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
             }
         }
 
+        // Final summary
         if (_kafkaMonitor.HasErrors)
         {
             _output.WriteLine($"[DIAG] {_kafkaMonitor.CapturedErrors.Count} Kafka error/retry message(s) detected during test");
@@ -89,7 +94,7 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
 
         if (_hasCriticalFailure)
         {
-            _output.WriteLine("[DIAG] Critical failure(s) detected -- see [DIAG] entries above for details");
+            _output.WriteLine("[DIAG] Critical failure(s) detected — see [DIAG] entries above for details");
         }
         else
         {
@@ -106,6 +111,7 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
 
     private async Task RunMonitorLoopAsync(CancellationToken ct)
     {
+        // Initial poll to establish baselines
         await RunSingleCheckAsync();
 
         while (!ct.IsCancellationRequested)
@@ -125,49 +131,30 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
             }
         }
 
+        // One final check to capture anything from the last interval
         await RunSingleCheckAsync();
     }
 
     private async Task RunSingleCheckAsync()
     {
-        _cycleCount++;
-
-        // 1. Loki -- errors from all services (single query, only prints if something found)
+        // 1. Loki — errors and warnings from all services
         await _lokiScraper.ScrapeErrorsAsync();
 
-        // 2. Kafka -- listener runs on its own thread, just check for captured errors
+        // 2. Kafka — dead-letter and retry topic messages
+        await _kafkaMonitor.PollAsync();
         if (_kafkaMonitor.HasErrors)
         {
             _hasCriticalFailure = true;
         }
 
-        // 3. Progress monitor -- database state, progress bar, heartbeat, service activity
+        // 3. Database — stuck/failed records
         if (!string.IsNullOrEmpty(_reportId))
         {
-            var dbFailure = await _progressMonitor.CheckProgressAsync(_facilityId, _reportId);
+            var dbFailure = await _dbMonitor.CheckProgressAsync(_facilityId, _reportId);
             if (dbFailure)
             {
                 _hasCriticalFailure = true;
             }
         }
-
-        // 4. Stall detection -- if progress hasn't moved for a while, scan all services (once)
-        if (!_stallDiagnosticsDumped &&
-            _progressMonitor.StallDuration > StallDiagnosticsThreshold &&
-            _progressMonitor.StalledStage != null)
-        {
-            _stallDiagnosticsDumped = true;
-            await DumpStallDiagnosticsAsync(_progressMonitor.StalledStage);
-        }
-    }
-
-    /// <summary>
-    /// When the pipeline is stalled, scan all services for errors to identify
-    /// the root cause (which is often in a different service than the stalled stage).
-    /// </summary>
-    private async Task DumpStallDiagnosticsAsync(string stalledStage)
-    {
-        _output.WriteLine($"[DIAG] STALL DETECTED -- pipeline stuck at '{stalledStage}' for {_progressMonitor.StallDuration.TotalSeconds:F0}s. Scanning all services for errors...");
-        await _lokiScraper.ScrapeAllServicesErrorSummaryAsync(TimeSpan.FromMinutes(5));
     }
 }
