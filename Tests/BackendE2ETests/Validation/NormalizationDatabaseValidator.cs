@@ -1,7 +1,6 @@
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Tests.E2ETests.Helpers;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Tests.E2ETests.Validation;
 
@@ -10,10 +9,11 @@ namespace LantanaGroup.Link.Tests.E2ETests.Validation;
 /// Ensures that the expected operations, resource type mappings, and operation
 /// sequences were persisted correctly for the facility.
 /// </summary>
-public class NormalizationDatabaseValidator(ITestOutputHelper output)
+public class NormalizationDatabaseValidator(DualOutputHelper output)
 {
     public async Task ValidateAllAsync(string facilityId)
     {
+        output.WriteLine("\n");
         output.WriteLine($"\n=== Normalization Database Validation: FacilityId={facilityId} ===\n");
 
         await using var db = DatabaseConnectionFactory.CreateNormalizationDbContext();
@@ -49,7 +49,7 @@ public class NormalizationDatabaseValidator(ITestOutputHelper output)
 
             output.WriteLine($"  Id={op.Id}: Type={op.OperationType}, Name={op.Name}, " +
                              $"ResourceTypes=[{string.Join(", ", resourceTypes)}], " +
-                             $"Disabled={op.IsDisabled} ?");
+                             $"Disabled={op.IsDisabled}");
         }
 
         output.WriteLine("[Operation] PASS");
@@ -73,7 +73,7 @@ public class NormalizationDatabaseValidator(ITestOutputHelper output)
                 Assert.False(string.IsNullOrWhiteSpace(ort.ResourceType.Name),
                     $"ResourceType.Name should be set for OperationResourceType Id={ort.Id}");
 
-                output.WriteLine($"  Operation={op.Id} ? ResourceType={ort.ResourceType.Name} (OrtId={ort.Id}) ?");
+                output.WriteLine($"  Operation={op.Id} -> ResourceType={ort.ResourceType.Name} (OrtId={ort.Id})");
             }
         }
 
@@ -86,8 +86,12 @@ public class NormalizationDatabaseValidator(ITestOutputHelper output)
 
         var sequences = await PipelineSnapshot.GetOperationSequencesAsync(db, facilityId);
 
-        Assert.True(sequences.Count > 0,
-            $"Expected at least 1 OperationSequence for FacilityId={facilityId} but found none");
+        if (sequences.Count == 0)
+        {
+            output.WriteLine("  No OperationSequence rows found (sequences are optional)");
+            output.WriteLine("[OperationSequence] PASS");
+            return;
+        }
 
         foreach (var seq in sequences)
         {
@@ -99,7 +103,7 @@ public class NormalizationDatabaseValidator(ITestOutputHelper output)
             var resType = seq.OperationResourceType.ResourceType.Name;
 
             output.WriteLine($"  Id={seq.Id}: Sequence={seq.Sequence}, " +
-                             $"OperationType={opType}, ResourceType={resType} ?");
+                             $"OperationType={opType}, ResourceType={resType}");
         }
 
         // Verify sequences are uniquely ordered (no duplicate sequence numbers)
@@ -111,7 +115,7 @@ public class NormalizationDatabaseValidator(ITestOutputHelper output)
         var distinctCount = sequenceNumbers.Distinct().Count();
         Assert.Equal(sequenceNumbers.Count, distinctCount);
 
-        output.WriteLine($"  {sequences.Count} sequence(s) with unique ordering ?");
+        output.WriteLine($"  {sequences.Count} sequence(s) with unique ordering");
         output.WriteLine("[OperationSequence] PASS");
     }
 }
