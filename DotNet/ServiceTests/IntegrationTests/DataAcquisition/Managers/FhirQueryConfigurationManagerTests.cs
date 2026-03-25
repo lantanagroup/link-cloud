@@ -211,6 +211,7 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
             FacilityId = "TestFacility",
             FhirServerBaseUrl = "http://example.com",
             TimeZone = "utc",
+            QueryLag = TimeSpan.FromMinutes(10),
             Authentication = new AuthenticationConfigurationModel
             {
                 Audience = "test",
@@ -229,6 +230,7 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         // Assert
         Assert.NotNull(result);
         Assert.Equal("TestFacility", result.FacilityId);
+        Assert.Equal(TimeSpan.FromMinutes(10), result.QueryLag);
     }
 
     [Fact]
@@ -283,7 +285,8 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         var model = new UpdateFhirQueryConfigurationModel
         {
             FacilityId = "TestFacility",
-            FhirServerBaseUrl = "http://new.com"
+            FhirServerBaseUrl = "http://new.com",
+            QueryLag = TimeSpan.FromHours(1)
         };
 
         // Act
@@ -292,6 +295,7 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         // Assert
         Assert.NotNull(result);
         Assert.Equal("http://new.com", result.FhirServerBaseUrl);
+        Assert.Equal(TimeSpan.FromHours(1), result.QueryLag);
     }
 
     [Fact]

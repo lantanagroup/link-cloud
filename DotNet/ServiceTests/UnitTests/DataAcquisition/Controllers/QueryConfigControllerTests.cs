@@ -28,11 +28,13 @@ namespace UnitTests.DataAcquisition.Controllers
 
             var min = DateTime.UtcNow.TimeOfDay;
             var max = DateTime.UtcNow.AddHours(5).TimeOfDay;
+            var lag = TimeSpan.FromMinutes(15);
 
             var expectedConfig = new FhirQueryConfigurationModel
             {
                 MinAcquisitionPullTime = min,
-                MaxAcquisitionPullTime = max
+                MaxAcquisitionPullTime = max,
+                QueryLag = lag
             };
 
             mocker.GetMock<IFhirQueryConfigurationQueries>().Setup(x => x.GetByFacilityIdAsync(It.IsAny<string>(), CancellationToken.None))
@@ -52,6 +54,7 @@ namespace UnitTests.DataAcquisition.Controllers
             var returnedConfig = Assert.IsType<ApiResultFhirQueryConfigurationModel>(okResult.Value);
             Assert.Equal(expectedConfig.MinAcquisitionPullTime, returnedConfig.MinAcquisitionPullTime);
             Assert.Equal(expectedConfig.MaxAcquisitionPullTime, returnedConfig.MaxAcquisitionPullTime);
+            Assert.Equal(expectedConfig.QueryLag, returnedConfig.QueryLag);
 
 
             mocker.GetMock<IFhirQueryConfigurationQueries>()

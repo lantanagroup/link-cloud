@@ -90,6 +90,7 @@ public class QueryConfigController : Controller
                 Authentication = result.Authentication,
                 MinAcquisitionPullTime = result.MinAcquisitionPullTime,
                 MaxAcquisitionPullTime = result.MaxAcquisitionPullTime,
+                QueryLag = result.QueryLag,
                 FhirServerBaseUrl = result.FhirServerBaseUrl,
                 MaxConcurrentRequests = result.MaxConcurrentRequests,
                 MaxRetries = result.MaxRetries
@@ -155,6 +156,7 @@ public class QueryConfigController : Controller
                 Authentication = fhirQueryConfiguration.Authentication,
                 MaxAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MaxAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
                 MinAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MinAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
+                QueryLag = fhirQueryConfiguration.QueryLag,
                 FacilityId = facilityId,
                 MaxConcurrentRequests = fhirQueryConfiguration.MaxConcurrentRequests,
                 MaxRetries = fhirQueryConfiguration.MaxRetries,
@@ -178,6 +180,7 @@ public class QueryConfigController : Controller
                     Authentication = result.Authentication,
                     MinAcquisitionPullTime = result.MinAcquisitionPullTime,
                     MaxAcquisitionPullTime = result.MaxAcquisitionPullTime,
+                    QueryLag = result.QueryLag,
                     FhirServerBaseUrl= result.FhirServerBaseUrl,
                     MaxConcurrentRequests= result.MaxConcurrentRequests,
                     MaxRetries = result.MaxRetries
@@ -262,6 +265,7 @@ public class QueryConfigController : Controller
                 MaxRetries = fhirQueryConfiguration.MaxRetries,
                 MinAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MinAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
                 MaxAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MaxAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
+                QueryLag = fhirQueryConfiguration.QueryLag,
             }, cancellationToken);
 
             if (result == null)
@@ -290,6 +294,7 @@ public class QueryConfigController : Controller
                 Authentication = result.Authentication,
                 MinAcquisitionPullTime = result.MinAcquisitionPullTime,
                 MaxAcquisitionPullTime = result.MaxAcquisitionPullTime,
+                QueryLag = result.QueryLag,
                 FhirServerBaseUrl = result.FhirServerBaseUrl,
                 MaxConcurrentRequests = result.MaxConcurrentRequests,
                 MaxRetries = result.MaxRetries
