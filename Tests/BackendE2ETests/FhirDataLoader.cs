@@ -21,9 +21,9 @@ public class FhirDataLoader
     {
         if (!TestConfig.FhirServerOAuth.ShouldAuthenticate &&
             !TestConfig.FhirServerBasicAuth.ShouldAuthenticate) return;
-        
+
         Console.WriteLine("Authenticating to load data on FHIR server...");
-            
+
         if (TestConfig.FhirServerOAuth.ShouldAuthenticate)
         {
             // Get a token for the user
@@ -40,10 +40,19 @@ public class FhirDataLoader
         var assembly = Assembly.GetExecutingAssembly();
         var resourceNames = assembly.GetManifestResourceNames()
                                     .Where(name => name.Contains(".fhir_server_data.") && name.EndsWith(".json"));
-        
-        output.WriteLine($"Found {resourceNames.Count()} resources to load. {string.Join(", ", resourceNames)}");
 
-        foreach (var resourceName in resourceNames)
+        var resourceList = resourceNames.ToList();
+        var shortNames = resourceList
+            .Select(n => n.Split(".fhir_server_data.").LastOrDefault() ?? n)
+            .ToList();
+
+        output.WriteLine($"Found {resourceList.Count} FHIR bundles to load:");
+        foreach (var name in shortNames)
+        {
+            output.WriteLine($"  - {name}");
+        }
+
+        foreach (var resourceName in resourceList)
         {
             await using var stream = assembly.GetManifestResourceStream(resourceName);
             using var reader = new StreamReader(stream ?? throw new InvalidOperationException());
@@ -51,15 +60,16 @@ public class FhirDataLoader
 
             var request = new RestRequest("", Method.Post);
             request.AddHeader("Content-Type", "application/fhir+json");
-            
+
             if (!string.IsNullOrEmpty(this._authorization))
                 request.AddHeader("Authorization", this._authorization);
-            
+
             request.AddStringBody(bundleJson, DataFormat.Json);
 
             var response = await this._restClient.ExecuteAsync(request);
 
-            output.WriteLine($"Posted {resourceName} => Status: {response.StatusCode}");
+            var shortName = resourceName.Split(".fhir_server_data.").LastOrDefault() ?? resourceName;
+            output.WriteLine($"  Posted {shortName} => {response.StatusCode}");
 
             if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
             {
@@ -88,7 +98,7 @@ public class FhirDataLoader
                         if (!string.IsNullOrEmpty(location))
                         {
                             var resourcePath = location.Split("/_history")[0]; // Just "Observation/123"
-                            
+
                             if (!this._createdResources.Contains(resourcePath))
                                 this._createdResources.Add(resourcePath);
                         }
@@ -109,10 +119,10 @@ public class FhirDataLoader
         {
             var request = new RestRequest($"{resource}", Method.Delete);
             request.AddHeader("Content-Type", "application/fhir+json");
-            
+
             if (!string.IsNullOrEmpty(this._authorization))
                 request.AddHeader("Authorization", this._authorization);
-            
+
             request.AddQueryParameter("_expunge", "true");
 
             var response = this._restClient.Execute(request);
