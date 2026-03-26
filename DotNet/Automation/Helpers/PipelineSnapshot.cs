@@ -305,11 +305,11 @@ public class PipelineSnapshot
 
             // Top 5 error messages for quick diagnosis
             var topErrorsQuery = @"
-                SELECT TOP 5 severity, LEFT(message, 150) as msg, COUNT(*) as cnt
+                SELECT TOP 10 severity, message, COUNT(*) as cnt
                 FROM result
                 WHERE facility_id = @facilityId AND report_id = @reportId
                   AND severity IN ('ERROR', 'FATAL')
-                GROUP BY severity, LEFT(message, 150)
+                GROUP BY severity, message
                 ORDER BY cnt DESC";
 
             await using var errorsCmd = new Microsoft.Data.SqlClient.SqlCommand(topErrorsQuery, connection);
@@ -327,8 +327,8 @@ public class PipelineSnapshot
                         hasErrors = true;
                     }
                     var severity = reader.GetString(0);
-                    var msg = reader.GetString(1);
-                    var count = reader.GetInt32(2);
+                    var msg      = reader.GetString(1);
+                    var count    = reader.GetInt32(2);
                     output.WriteLine($"[Snapshot][Validation]            [{severity}] x{count}: {msg}");
                 }
             }

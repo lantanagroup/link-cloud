@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -50,6 +50,7 @@
     <ProjectReference Include="..\Account\Account.csproj" />
     <ProjectReference Include="..\Admin.BFF\Admin.BFF.csproj" />
     <ProjectReference Include="..\Audit\Audit.csproj" />
+    <ProjectReference Include="..\Automation\Automation.csproj" />
     <ProjectReference Include="..\Census\Census.csproj" />
     <ProjectReference Include="..\DataAcquisition.AcquisitionWorker\DataAcquisition.AcquisitionWorker.csproj" />
     <ProjectReference Include="..\DataAcquisition.Domain\DataAcquisition.Domain.csproj" />

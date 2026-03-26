@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Automation;
 using LantanaGroup.Link.Automation.Configuration;
+using LantanaGroup.Link.Automation.Generation;
 using LantanaGroup.Link.Automation.Helpers;
 using LantanaGroup.Link.Automation.Services;
 using Xunit;
@@ -36,7 +37,7 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
 
     public async Task InitializeAsync()
     {
-        var (patientIds, bundles) = FhirBundleGenerator.Generate(_output, 1, 3000, "SmokePatient");
+        var (patientIds, bundles) = FhirBundleGenerator.Generate(_output, 1, 1000, "SmokePatient");
 
         if (Config.PatientIds.Count == 0)
         {

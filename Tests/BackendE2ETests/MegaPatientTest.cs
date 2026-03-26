@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Automation;
 using LantanaGroup.Link.Automation.Configuration;
+using LantanaGroup.Link.Automation.Generation;
 using LantanaGroup.Link.Automation.Helpers;
 using LantanaGroup.Link.Automation.Services;
 using Xunit;
