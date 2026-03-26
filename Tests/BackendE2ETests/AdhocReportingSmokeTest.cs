@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Tests.E2ETests.Helpers;
+using LantanaGroup.Link.Tests.E2ETests.Helpers;
 using LantanaGroup.Link.Tests.E2ETests.Services;
 using LantanaGroup.Link.Tests.E2ETests.Validation;
 using RestSharp;
@@ -12,6 +12,7 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
     private const string FacilityId = "SmokeTestFacility";
 
     private static readonly FhirDataLoader FhirDataLoader = new(TestConfig.ExternalFhirServerBase);
+    private static readonly TestConfig.SmokeTestConfig Config = TestConfig.AdhocReportingSmokeTestConfig;
 
     private readonly DualOutputHelper _output;
     private readonly RestClient _adminBffClient = AdminBffClientFactory.Create();
@@ -20,7 +21,7 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
     private FacilityApiClient FacilityApi => new(_adminBffClient, _output);
     private NormalizationApiClient NormalizationApi => new(_adminBffClient, _output);
     private QueryConfigApiClient QueryConfigApi => new(_adminBffClient, _output);
-    private ReportApiClient ReportApi => new(_adminBffClient, _output, _lokiScraper);
+    private ReportApiClient ReportApi => new(_adminBffClient, _output, _lokiScraper, Config);
     private ValidationApiClient ValidationApi => new(_adminBffClient, _output, _lokiScraper);
 
     public AdhocReportingSmokeTest()
@@ -31,6 +32,9 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
+        // Wait for FHIR server before uploading bundles
+        await FhirDataLoader.WaitForServerAsync(_output);
+
         // Load FHIR test data onto the external FHIR server
         await FhirDataLoader.LoadEmbeddedTransactionBundles(_output);
 
@@ -43,7 +47,7 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
     {
         _output.WriteLine("Cleaning up...\n");
 
-        if (TestConfig.AdhocReportingSmokeTestConfig.RemoveFacilityConfig)
+        if (Config.RemoveFacilityConfig)
         {
             await FacilityApi.DeleteAsync(FacilityId);
         }
@@ -53,18 +57,18 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
             FhirDataLoader.ExpungeEverything(_output);
         }
 
-        if (TestConfig.AdhocReportingSmokeTestConfig.RemoveReport)
+        if (Config.RemoveReport)
         {
             // TODO: Delete report
         }
     }
 
     [Fact]
-    [Trait("Category", "SmokeTest")]
+    [Trait("Category", "AdhocReportingSmokeTest")]
     public async Task ExecuteSmokeTest()
     {
         // Step 1: Load measure definition into measureeval and validation
-        var measureLoader = new MeasureLoader(_adminBffClient, _output);
+        var measureLoader = new MeasureLoader(_adminBffClient, _output, Config);
         await measureLoader.LoadAsync();
 
         var measureId = measureLoader.MeasureId
@@ -86,7 +90,7 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
         var reportId = await ReportApi.GenerateReportAsync(FacilityId, measureId);
 
         // Step 7: Start background diagnostics and poll until the report is submitted
-        await using var diagnostics = new BackgroundDiagnosticsMonitor(_output, _lokiScraper);
+        await using var diagnostics = new BackgroundDiagnosticsMonitor(_output, _lokiScraper, Config.PatientIds.Count);
         await diagnostics.StartAsync(FacilityId, reportId);
 
         var reportSubmitted = await ReportApi.CheckSubmissionStatusAsync(reportId, diagnostics);
@@ -96,9 +100,13 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
         // Scrape measureeval and validation service logs for the full test duration
         _output.WriteLine("");
         _output.WriteLine("[DIAG] Scraping MeasureEval service logs...");
-        await _lokiScraper.ScrapeServiceHistoryAsync("measureeval", TimeSpan.FromMinutes(5), "DIAG MEASUREEVAL");
+        await _lokiScraper.ScrapeServiceHistoryAsync(LokiScraper.Components.MeasureEval, Config.LokiScrapeWindow, "DIAG MEASUREEVAL");
         _output.WriteLine("[DIAG] Scraping Validation service logs...");
-        await _lokiScraper.ScrapeServiceHistoryAsync("validation", TimeSpan.FromMinutes(5), "DIAG VALIDATION");
+        await _lokiScraper.ScrapeServiceHistoryAsync(LokiScraper.Components.Validation, Config.LokiScrapeWindow, "DIAG VALIDATION");
+        _output.WriteLine("[DIAG] Scraping Normalization service logs...");
+        await _lokiScraper.ScrapeServiceHistoryAsync(LokiScraper.Components.Normalization, Config.LokiScrapeWindow, "DIAG NORMALIZATION");
+        _output.WriteLine("[DIAG] Scraping Report service logs...");
+        await _lokiScraper.ScrapeServiceHistoryAsync(LokiScraper.Components.Report, Config.LokiScrapeWindow, "DIAG REPORT");
 
         // Always write a snapshot before any assertions can kill the test.
         // This guarantees the full pipeline state is in the output for debugging.
@@ -114,7 +122,7 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
         Assert.True(downloadedResources.ContainsKey("manifest.ndjson"),
             "Expected report to include manifest.ndjson but it was not");
 
-        foreach (var patientId in TestConfig.AdhocReportingSmokeTestConfig.PatientIds)
+        foreach (var patientId in Config.PatientIds)
         {
             Assert.True(downloadedResources.ContainsKey($"patient-{patientId}.ndjson"),
                 $"Expected report to include patient-{patientId}.ndjson but it was not");
@@ -122,21 +130,21 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
 
         _output.WriteLine("Done generating and validating report.");
 
-        // Step 9–10: Strict database validation (snapshot is already captured above
+        // Step 9-10: Strict database validation (snapshot is already captured above
         // even if an assertion fails here)
         var reportDbValidator = new ReportDatabaseValidator(_output);
         await reportDbValidator.ValidateAllAsync(
             FacilityId,
             reportId,
             measureId,
-            TestConfig.AdhocReportingSmokeTestConfig.PatientIds);
+            Config.PatientIds);
 
         var dataAcqValidator = new DataAcquisitionDatabaseValidator(_output);
         await dataAcqValidator.ValidateAllAsync(
             FacilityId,
             reportId,
             measureId,
-            TestConfig.AdhocReportingSmokeTestConfig.PatientIds);
+            Config.PatientIds);
 
         var normalizationValidator = new NormalizationDatabaseValidator(_output);
         await normalizationValidator.ValidateAllAsync(FacilityId);
@@ -149,6 +157,6 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
         await validationResultsValidator.ValidateAllAsync(
             FacilityId,
             reportId,
-            TestConfig.AdhocReportingSmokeTestConfig.PatientIds);
+            Config.PatientIds);
     }
 }

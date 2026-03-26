@@ -13,7 +13,7 @@ namespace LantanaGroup.Link.Tests.E2ETests.Helpers;
 
 /// <summary>
 /// Non-asserting, read-only snapshot of the pipeline's database state.
-/// Used by both <see cref="DatabaseProgressMonitor"/> (real-time) and
+/// Used by both <see cref="ProgressMonitor"/> (real-time) and
 /// by the test's try/finally block (last-chance dump). Never throws
 /// assertion exceptions — only queries and formats results.
 /// </summary>
