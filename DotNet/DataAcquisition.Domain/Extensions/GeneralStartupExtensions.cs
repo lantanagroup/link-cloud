@@ -250,6 +250,8 @@ public static class GeneralStartupExtensions
         services.AddTransient<ISftpConfigurationManager, SftpConfigurationManager>();
         services.AddScoped<IOrganizationLocationConfigurationManager, OrganizationLocationConfigurationManager>();
         services.AddScoped<IOrganizationLocationMappingManager, OrganizationLocationMappingManager>();
+        services.AddScoped<IEncounterMappingManager, EncounterMappingManager>();
+        services.AddScoped<IEncounterMappingQueries, EncounterMappingQueries>();
     }
 
     public static void RegisterServices(this IServiceCollection services)

@@ -19,6 +19,8 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
         IEntityRepository<OrganizationLocationConfiguration> LocationConfigurationRepository { get; set; }
         IEntityRepository<OrganizationLocationCondition> LocationConditionRepository { get; set; }
         IEntityRepository<OrganizationLocationMapping> LocationMappingRepository { get; set; }
+        IEntityRepository<EncounterMapping> EncounterMappingRepository { get; set; }
+        IEntityRepository<EncounterLocation> EncounterLocationRepository { get; set; }
 
 
         Task BeginTransactionAsync(CancellationToken cancellationToken = default);
@@ -42,6 +44,8 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
         public IEntityRepository<OrganizationLocationConfiguration> LocationConfigurationRepository { get; set; }
         public IEntityRepository<OrganizationLocationCondition> LocationConditionRepository { get; set; }
         public IEntityRepository<OrganizationLocationMapping> LocationMappingRepository { get; set; }
+        public IEntityRepository<EncounterMapping> EncounterMappingRepository { get; set; }
+        public IEntityRepository<EncounterLocation> EncounterLocationRepository { get; set; }
 
         public Database(
             DataAcquisitionDbContext context,
@@ -57,7 +61,9 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
             IEntityRepository<SftpConfiguration> sftpConfigurationRepository,
             IEntityRepository<OrganizationLocationConfiguration> locationConfigurationRepository,
             IEntityRepository<OrganizationLocationCondition> locationConditionRepository,
-            IEntityRepository<OrganizationLocationMapping> locationMappingRepository)
+            IEntityRepository<OrganizationLocationMapping> locationMappingRepository,
+            IEntityRepository<EncounterMapping> encounterMappingRepository,
+            IEntityRepository<EncounterLocation> encounterLocationRepository)
         {
             _context = context;
             QueryPlanRepository = queryPlans;
@@ -73,6 +79,8 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
             LocationConfigurationRepository = locationConfigurationRepository;
             LocationConditionRepository = locationConditionRepository;
             LocationMappingRepository = locationMappingRepository;
+            EncounterMappingRepository = encounterMappingRepository;
+            EncounterLocationRepository = encounterLocationRepository;
         }
 
         public async Task SaveChangesAsync()

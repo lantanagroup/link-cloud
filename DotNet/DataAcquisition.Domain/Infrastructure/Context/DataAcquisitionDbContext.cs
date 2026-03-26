@@ -1,4 +1,4 @@
-using AppAny.Quartz.EntityFrameworkCore.Migrations;
+﻿using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
@@ -393,7 +393,7 @@ public class DataAcquisitionDbContext : DbContext
             entity.Property(e => e.ModifiedDate).HasDefaultValueSql("(getutcdate())");
 
             entity.HasOne(d => d.EncounterMapping).WithMany(p => p.EncounterLocations)
-                .OnDelete(DeleteBehavior.ClientSetNull)
+                .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("FK_EncounterLocation_EncounterMapping");
 
             entity.HasOne(d => d.OrganizationLocationMapping).WithMany(p => p.EncounterLocations)

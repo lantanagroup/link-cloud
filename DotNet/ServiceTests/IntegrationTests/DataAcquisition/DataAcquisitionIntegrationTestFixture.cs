@@ -85,6 +85,8 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddScoped<IEntityRepository<OrganizationLocationConfiguration>, EntityRepository<OrganizationLocationConfiguration, DataAcquisitionDbContext>>();
             builder.Services.AddScoped<IEntityRepository<OrganizationLocationCondition>, EntityRepository<OrganizationLocationCondition, DataAcquisitionDbContext>>();
             builder.Services.AddScoped<IEntityRepository<OrganizationLocationMapping>, EntityRepository<OrganizationLocationMapping, DataAcquisitionDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<EncounterMapping>, EntityRepository<EncounterMapping, DataAcquisitionDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<EncounterLocation>, EntityRepository<EncounterLocation, DataAcquisitionDbContext>>();
 
             // Register IDatabase implementation (it will now receive the new repositories via constructor injection)
             builder.Services.AddScoped<IDatabase, Database>();
@@ -105,6 +107,8 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddScoped<IOrganizationLocationConfigurationQueries, OrganizationLocationConfigurationQueries>();
             builder.Services.AddScoped<IOrganizationLocationMappingManager, OrganizationLocationMappingManager>();
             builder.Services.AddScoped<IOrganizationLocationMappingQueries, OrganizationLocationMappingQueries>();
+            builder.Services.AddScoped<IEncounterMappingManager, EncounterMappingManager>();
+            builder.Services.AddScoped<IEncounterMappingQueries, EncounterMappingQueries>();
 
             // Register queries
             builder.Services.AddScoped<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();
