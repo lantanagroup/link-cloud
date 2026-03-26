@@ -1,4 +1,4 @@
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using RestSharp;
@@ -7,23 +7,24 @@ using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Tests.E2ETests;
-public class MeasureLoader(RestClient adminBffClient, ITestOutputHelper output)
+public class MeasureLoader(RestClient adminBffClient, ITestOutputHelper output, TestConfig.SmokeTestConfig? config = null)
 {
     private readonly FhirJsonParser _parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
+    private readonly TestConfig.SmokeTestConfig _config = config ?? TestConfig.AdhocReportingSmokeTestConfig;
     public string? MeasureId;
     private Bundle? _evaluationBundle;
     private Bundle? _validationBundle;
 
     private async Task<string> GetMeasureBundleJsonAsync()
     {
-        if (TestConfig.AdhocReportingSmokeTestConfig.MeasureBundleLocation.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
+        if (_config.MeasureBundleLocation.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
         {
-            var filePath = TestConfig.AdhocReportingSmokeTestConfig.MeasureBundleLocation.Replace("file://", "", StringComparison.OrdinalIgnoreCase);
+            var filePath = _config.MeasureBundleLocation.Replace("file://", "", StringComparison.OrdinalIgnoreCase);
             return await File.ReadAllTextAsync(filePath);
         }
-        else if (TestConfig.AdhocReportingSmokeTestConfig.MeasureBundleLocation.StartsWith("resource://", StringComparison.OrdinalIgnoreCase))
+        else if (_config.MeasureBundleLocation.StartsWith("resource://", StringComparison.OrdinalIgnoreCase))
         {
-            var resourceName = TestConfig.AdhocReportingSmokeTestConfig.MeasureBundleLocation
+            var resourceName = _config.MeasureBundleLocation
                 .Replace("resource://", "", StringComparison.OrdinalIgnoreCase);
             await using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName);
             
@@ -33,20 +34,20 @@ public class MeasureLoader(RestClient adminBffClient, ITestOutputHelper output)
             using var reader = new StreamReader(stream);
             return await reader.ReadToEndAsync();
         }
-        else if (TestConfig.AdhocReportingSmokeTestConfig.MeasureBundleLocation.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                 TestConfig.AdhocReportingSmokeTestConfig.MeasureBundleLocation.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        else if (_config.MeasureBundleLocation.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                 _config.MeasureBundleLocation.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {
             var client = new RestClient();
-            var request = new RestRequest(TestConfig.AdhocReportingSmokeTestConfig.MeasureBundleLocation, Method.Get);
+            var request = new RestRequest(_config.MeasureBundleLocation, Method.Get);
             var response = await client.ExecuteAsync(request);
 
             if (!response.IsSuccessful)
-                throw new Exception($"Failed to fetch bundle from {TestConfig.AdhocReportingSmokeTestConfig.MeasureBundleLocation}: {response.ErrorMessage}");
+                throw new Exception($"Failed to fetch bundle from {_config.MeasureBundleLocation}: {response.ErrorMessage}");
 
             return response.Content;
         }
 
-        throw new NotSupportedException($"Unsupported path type: {TestConfig.AdhocReportingSmokeTestConfig.MeasureBundleLocation}");
+        throw new NotSupportedException($"Unsupported path type: {_config.MeasureBundleLocation}");
     }
 
     private async Task GetMeasureBundleAsync()
@@ -94,6 +95,9 @@ public class MeasureLoader(RestClient adminBffClient, ITestOutputHelper output)
             throw new Exception("Failed to load measure definition.");
         }
 
+        // Verify the definition was persisted by reading it back
+        await VerifyMeasureDefinitionAsync();
+
         if (this._validationBundle != null)
         {
             output.WriteLine("Loading profile artifacts for validation...");
@@ -114,6 +118,45 @@ public class MeasureLoader(RestClient adminBffClient, ITestOutputHelper output)
             
             await Task.WhenAll(validationTasks);
             output.WriteLine($"{this._validationBundle.Entry.Count} validation resources successfully loaded.");
+        }
+    }
+
+    /// <summary>
+    /// Reads the measure definition back from MeasureEval to confirm it was persisted,
+    /// and logs the related artifact summary.
+    /// </summary>
+    private async Task VerifyMeasureDefinitionAsync()
+    {
+        try
+        {
+            var verifyRequest = new RestRequest($"measureeval/measure-definition/{MeasureId}", Method.Get);
+            var verifyResponse = await adminBffClient.ExecuteAsync(verifyRequest);
+
+            if (verifyResponse.StatusCode == System.Net.HttpStatusCode.OK && verifyResponse.Content != null)
+            {
+                var json = Newtonsoft.Json.Linq.JObject.Parse(verifyResponse.Content);
+                var id = json["id"]?.ToString() ?? "(unknown)";
+                var bundle = json["bundle"];
+                var entryCount = (bundle?["entry"] as Newtonsoft.Json.Linq.JArray)?.Count ?? 0;
+
+                // Summarize resource types in the bundle
+                var resourceTypes = (bundle?["entry"] as Newtonsoft.Json.Linq.JArray)?
+                    .Select(e => e["resource"]?["resourceType"]?.ToString() ?? "unknown")
+                    .GroupBy(t => t)
+                    .Select(g => $"{g.Key}={g.Count()}")
+                    .ToList() ?? [];
+
+                output.WriteLine($"  MeasureEval definition verified: id={id}, entries={entryCount}");
+                output.WriteLine($"  Resource types: {string.Join(", ", resourceTypes)}");
+            }
+            else
+            {
+                output.WriteLine($"  WARNING: Could not verify measure definition (HTTP {verifyResponse.StatusCode})");
+            }
+        }
+        catch (Exception ex)
+        {
+            output.WriteLine($"  WARNING: Measure definition verification failed: {ex.Message}");
         }
     }
 }
