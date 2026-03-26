@@ -63,7 +63,7 @@ public static class FhirGenerationCodes
         // 0 — Community-acquired pneumonia, emergency admission
         ("233604007", "Pneumonia (disorder)",                               "J18.9",  "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "305",  "General Medicine",  "EM", "emergency"),
         // 1 — Acute decompensated heart failure, urgent admission
-        ("84114007",  "Heart failure (disorder)",                           "I50.9",  "32485007",  "Hospital admission (procedure)", "hosp", "Transferred from other hospital",     "snf",     "Skilled nursing facility", "303", "Cardiology",   "R",  "routine"),
+        ("84114007",  "Heart failure (disorder)",                           "I50.9",  "32485007",  "Hospital admission (procedure)", "hosp-trans", "Transferred from other hospital",     "snf",     "Skilled nursing facility", "303", "Cardiology",   "R",  "routine"),
         // 2 — Acute myocardial infarction, emergency admission
         ("57054005",  "Acute myocardial infarction (disorder)",             "I21.9",  "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "306",  "Cardiothoracic Surgery", "EM", "emergency"),
         // 3 — COPD exacerbation, emergency admission
@@ -73,7 +73,7 @@ public static class FhirGenerationCodes
         // 5 — Hip fracture, elective surgical admission
         ("700097003", "Fracture of bone of hip region (disorder)",          "S72.001A","32485007", "Hospital admission (procedure)", "gp",   "General practitioner referral",       "home",    "Home",              "308",  "Orthopaedics",      "R",  "routine"),
         // 6 — Acute renal failure, urgent admission
-        ("14669001",  "Acute renal failure syndrome (disorder)",            "N17.9",  "32485007",  "Hospital admission (procedure)", "hosp", "Transferred from other hospital",     "home",    "Home",              "310",  "Nephrology",        "R",  "routine"),
+        ("14669001",  "Acute renal failure syndrome (disorder)",            "N17.9",  "32485007",  "Hospital admission (procedure)", "hosp-trans", "Transferred from other hospital",     "home",    "Home",              "310",  "Nephrology",        "R",  "routine"),
         // 7 — Ischaemic stroke, emergency admission
         ("422504002", "Ischemic stroke (disorder)",                         "I63.9",  "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "rehab",   "Inpatient rehabilitation", "320", "Neurology",    "EM", "emergency"),
     ];
