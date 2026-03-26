@@ -122,17 +122,8 @@ public sealed class MultiPatientTest : IAsyncLifetime
 
         await diagnostics.StopAsync();
 
-        // Scrape measureeval and validation service logs for the full test duration
-        _output.WriteLine("");
-        _output.WriteLine("[DIAG] Scraping MeasureEval service logs...");
-        await _lokiScraper.ScrapeServiceHistoryAsync(LokiScraper.Components.MeasureEval, Config.LokiScrapeWindow, "DIAG MEASUREEVAL");
-        _output.WriteLine("[DIAG] Scraping Validation service logs...");
-        await _lokiScraper.ScrapeServiceHistoryAsync(LokiScraper.Components.Validation, Config.LokiScrapeWindow, "DIAG VALIDATION");
-        _output.WriteLine("[DIAG] Scraping Normalization service logs...");
-        await _lokiScraper.ScrapeServiceHistoryAsync(LokiScraper.Components.Normalization, Config.LokiScrapeWindow, "DIAG NORMALIZATION");
-        _output.WriteLine("[DIAG] Scraping Report service logs...");
-        await _lokiScraper.ScrapeServiceHistoryAsync(LokiScraper.Components.Report, Config.LokiScrapeWindow, "DIAG REPORT");
-
+        // Keep diagnostics output concise: rely on live background monitoring above,
+        // and capture a single DB snapshot before assertions.
         // Always write a snapshot before any assertions can kill the test.
         var pipelineSnapshot = new PipelineSnapshot(DbFactory);
         await pipelineSnapshot.WriteFullSnapshotAsync(_output, FacilityId, reportId);
