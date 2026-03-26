@@ -1,10 +1,10 @@
-﻿using LantanaGroup.Link.Automation;
+using LantanaGroup.Link.Automation;
+using LantanaGroup.Link.Automation;
 using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.Automation.Helpers;
 using LantanaGroup.Link.Automation.Services;
 using LantanaGroup.Link.Automation.Validation;
 using RestSharp;
-using System.Reflection;
 using Xunit;
 using Task = System.Threading.Tasks.Task;
 
@@ -14,7 +14,7 @@ namespace LantanaGroup.Link.Tests.E2ETests;
 /// Stress/volume test that generates 5 synthetic patients, each with over 10,000
 /// FHIR resources, and runs them through the full ad-hoc reporting pipeline.
 /// </summary>
-public sealed class MegaPatientAdhocReportingTest : IAsyncLifetime
+public sealed class MegaPatientTest : IAsyncLifetime
 {
     private const string FacilityId = "MegaPatientTestFacility";
 
@@ -33,7 +33,7 @@ public sealed class MegaPatientAdhocReportingTest : IAsyncLifetime
     private ReportApiClient ReportApi => new(_adminBffClient, _output, _lokiScraper, AutomationCfg, Config);
     private ValidationApiClient ValidationApi => new(_adminBffClient, _output, _lokiScraper);
 
-    public MegaPatientAdhocReportingTest()
+    public MegaPatientTest()
     {
         _output = new DualOutputHelper();
         _lokiScraper = new LokiScraper(_output, AutomationCfg);
@@ -57,9 +57,6 @@ public sealed class MegaPatientAdhocReportingTest : IAsyncLifetime
 
         // Load the generated bundles
         await FhirDataLoader.LoadTransactionBundlesFromJsonAsync(_output, bundles);
-
-        // Also load any standard embedded bundles (shared test infrastructure like Lists)
-        await FhirDataLoader.LoadEmbeddedTransactionBundles(_output, Assembly.GetExecutingAssembly());
 
         // Initialize validation artifacts and categories (with retry)
         await ValidationApi.InitializeArtifactsAsync();
@@ -91,7 +88,7 @@ public sealed class MegaPatientAdhocReportingTest : IAsyncLifetime
     public async Task ExecuteMegaPatientTest()
     {
         // Step 1: Load measure definition into measureeval and validation
-        var measureLoader = new MeasureLoader(_adminBffClient, _output, Config, Assembly.GetExecutingAssembly());
+        var measureLoader = new MeasureLoader(_adminBffClient, _output, Config);
         await measureLoader.LoadAsync();
 
         var measureId = measureLoader.MeasureId
@@ -186,3 +183,4 @@ public sealed class MegaPatientAdhocReportingTest : IAsyncLifetime
             Config.PatientIds);
     }
 }
+

@@ -1,10 +1,9 @@
 ﻿using LantanaGroup.Link.Automation;
+using LantanaGroup.Link.Automation;
 using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.Automation.Helpers;
 using LantanaGroup.Link.Automation.Services;
-using LantanaGroup.Link.Automation.Validation;
 using RestSharp;
-using System.Reflection;
 using Xunit;
 using Task = System.Threading.Tasks.Task;
 
@@ -16,7 +15,7 @@ namespace LantanaGroup.Link.Tests.E2ETests;
 ///
 /// Configuration is driven by MULTI_PATIENT_TEST_* environment variables.
 /// </summary>
-public sealed class MultiPatientAdhocReportingTest : IAsyncLifetime
+public sealed class MultiPatientTest : IAsyncLifetime
 {
     private const string FacilityId = "MultiPatientTestFacility";
 
@@ -35,7 +34,7 @@ public sealed class MultiPatientAdhocReportingTest : IAsyncLifetime
     private ReportApiClient ReportApi => new(_adminBffClient, _output, _lokiScraper, AutomationCfg, Config);
     private ValidationApiClient ValidationApi => new(_adminBffClient, _output, _lokiScraper);
 
-    public MultiPatientAdhocReportingTest()
+    public MultiPatientTest()
     {
         _output = new DualOutputHelper();
         _lokiScraper = new LokiScraper(_output, AutomationCfg);
@@ -59,9 +58,6 @@ public sealed class MultiPatientAdhocReportingTest : IAsyncLifetime
 
         // Load the generated bundles
         await FhirDataLoader.LoadTransactionBundlesFromJsonAsync(_output, bundles);
-
-        // Also load any standard embedded bundles (shared test infrastructure like Lists)
-        await FhirDataLoader.LoadEmbeddedTransactionBundles(_output, Assembly.GetExecutingAssembly());
 
         // Initialize validation artifacts and categories (with retry)
         await ValidationApi.InitializeArtifactsAsync();
@@ -93,7 +89,7 @@ public sealed class MultiPatientAdhocReportingTest : IAsyncLifetime
     public async Task ExecuteMultiPatientTest()
     {
         // Step 1: Load measure definition into measureeval and validation
-        var measureLoader = new MeasureLoader(_adminBffClient, _output, Config, Assembly.GetExecutingAssembly());
+        var measureLoader = new MeasureLoader(_adminBffClient, _output, Config);
         await measureLoader.LoadAsync();
 
         var measureId = measureLoader.MeasureId
@@ -160,3 +156,4 @@ public sealed class MultiPatientAdhocReportingTest : IAsyncLifetime
         _output.WriteLine("Done generating and validating report.");
     }
 }
+

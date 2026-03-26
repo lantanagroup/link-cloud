@@ -56,7 +56,8 @@ public static class TestConfig
         }
     };
 
-    public static TestScenarioConfig AdhocReportingSmokeTestConfig => BuildScenarioConfig("ADHOC_REPORTING_SMOKE_TEST");
+    public static TestScenarioConfig AdhocReportingSmokeTestConfig => BuildScenarioConfig("ADHOC_REPORTING_SMOKE_TEST",
+        defaultPatientIds: []);
 
     public static TestScenarioConfig MegaPatientTestConfig => BuildScenarioConfig("MEGA_PATIENT_TEST",
         defaultPatientIds: [],
@@ -73,7 +74,7 @@ public static class TestConfig
     {
         return new TestScenarioConfig
         {
-            MeasureBundleLocation = Environment.GetEnvironmentVariable($"{prefix}_MEASURE_BUNDLE_PATH") ?? "resource://LantanaGroup.Link.Tests.BackendE2ETests.measures.NHSNAcuteCareHospitalMonthlyInitialPopulation.json",
+            MeasureBundleLocation = Environment.GetEnvironmentVariable($"{prefix}_MEASURE_BUNDLE_PATH") ?? "resource://LantanaGroup.Link.Automation.measures.NHSNAcuteCareHospitalMonthlyInitialPopulation.json",
             StartDate = Environment.GetEnvironmentVariable($"{prefix}_START_DATE") ?? "2023-01-01T00:00:00Z",
             EndDate = Environment.GetEnvironmentVariable($"{prefix}_END_DATE") ?? "2023-12-31T23:59:59Z",
             PatientIds = Environment.GetEnvironmentVariable($"{prefix}_PATIENT_IDS")?.Split(',')?.ToList() ?? defaultPatientIds ?? ["207727"],
