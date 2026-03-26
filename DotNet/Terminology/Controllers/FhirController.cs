@@ -193,8 +193,8 @@ public class FhirController(FhirService fhirService) : Controller
         try
         {
             return Ok(fhirService.ValidateCodeInCodeSystem(
-                url?.Sanitize(),
-                id?.Sanitize(),
+                url?.Sanitize(), 
+                id?.Sanitize(), 
                 code?.Sanitize(),
                 display?.Sanitize(),
                 parameters));

@@ -16,7 +16,7 @@ public static class RestoreFacility
         string facilityId)
     {
         var logger = loggerFactory.CreateLogger("RestoreFacility");
-
+        
         // Step 1: Restore the tenant — no roll back needed if this fails
         HttpResponseMessage tenantResponse;
         try

@@ -9,7 +9,7 @@ namespace LantanaGroup.Link.Audit.Persistance;
 public class AuditDbContext : DbContext
 {
     public AuditDbContext(DbContextOptions<AuditDbContext> options) : base(options)
-    {
+    {          
     }
 
     public DbSet<AuditLog> AuditLogs { get; set; } = null!;
@@ -20,8 +20,8 @@ public class AuditDbContext : DbContext
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.AddQuartz(builder => builder.UseSqlServer());
-    }
-
+    }       
+    
 }
 
 public class AuditDbContextFactory : IDesignTimeDbContextFactory<AuditDbContext>

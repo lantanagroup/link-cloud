@@ -6,10 +6,9 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 
 public static class QuartzRegistrationExtensions
 {
-    public static void RegisterQuartzDatabase(this IServiceCollection collection, string? connectionString)
-    {
+    public static void RegisterQuartzDatabase(this IServiceCollection collection, string? connectionString) {
 
-        if (string.IsNullOrEmpty(connectionString))
+        if(string.IsNullOrEmpty(connectionString))
         {
             throw new ArgumentNullException(nameof(connectionString), "Connection string cannot be null or empty.");
         }

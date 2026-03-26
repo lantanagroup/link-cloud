@@ -37,7 +37,7 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
         //configure error handlers topic names
         DeadLetterConsumerHandler.Topic = $"{this.TopicName}-Error";
         TransientExceptionHandler.Topic = $"{this.TopicName}-Retry";
-
+        
     }
 
     public override async Task StartAsync(CancellationToken cancellationToken)

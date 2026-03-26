@@ -7,7 +7,7 @@
         public string FacilityId { get; set; }
         public string Topic { get; set; }
         public string Key { get; set; }
-        public string Value { get; set; }
+        public string Value { get; set; } 
         public Dictionary<string, string> Headers { get; set; }
         public DateTime ScheduledTrigger { get; set; }
         public int RetryCount { get; set; }

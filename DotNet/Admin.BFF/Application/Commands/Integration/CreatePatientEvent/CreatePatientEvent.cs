@@ -22,7 +22,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
         public async Task<string> Execute(PatientEvent model, string? userId = null)
         {
-            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Producing Patient Event");
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Producing Patient Event");                     
             string correlationId = Guid.NewGuid().ToString();
 
             try
@@ -39,7 +39,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     Headers = headers
                 };
 
-                await _producer.ProduceAsync(nameof(KafkaTopic.PatientEvent), message);
+                await _producer.ProduceAsync(nameof(KafkaTopic.PatientEvent), message);                     
                 _logger.LogKafkaProducerPatientEvent(correlationId);
 
                 return correlationId;
@@ -51,7 +51,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 Activity.Current?.AddException(ex);
                 _logger.LogKafkaProducerException(nameof(KafkaTopic.PatientEvent), ex.Message);
                 throw;
-            }
+            }                
 
         }
     }

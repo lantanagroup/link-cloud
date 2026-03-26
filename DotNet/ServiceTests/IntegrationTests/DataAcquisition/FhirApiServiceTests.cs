@@ -250,7 +250,7 @@ public class FhirApiServiceTests
         // Act & Assert
         await Assert.ThrowsAsync<OpOutcomeException>(async () =>
             await service.ExecuteRead(log, fhirQuery, ResourceType.Patient, new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test" }));
-
+        
         Assert.Contains("HTTP NotFound returned", log.Notes[0]);
     }
 
@@ -279,7 +279,7 @@ public class FhirApiServiceTests
         // Act & Assert
         await Assert.ThrowsAsync<OpOutcomeException>(async () =>
             await service.ExecuteSearch(log, fhirQuery, new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test" }, ResourceType.Patient));
-
+        
         Assert.Contains("HTTP Gone returned for Search operation", log.Notes[0]);
     }
 
@@ -324,13 +324,13 @@ public class FhirApiServiceTests
         Assert.Equal("Patient/p1", ids.First());
         Assert.NotNull(log.Notes);
         Assert.Contains(log.Notes, n => n.Contains("OperationOutcome(s) found in search bundle"));
-
+        
         // Ensure only Patient was produced to Kafka
         kafkaProducer.Verify(x => x.ProduceAsync(
             It.IsAny<string>(),
             It.Is<Message<ResourceKey, ResourceAcquired>>(m => m.Value.Resource.TypeName == "Patient"),
             It.IsAny<CancellationToken>()), Times.Once);
-
+        
         kafkaProducer.Verify(x => x.ProduceAsync(
             It.IsAny<string>(),
             It.Is<Message<ResourceKey, ResourceAcquired>>(m => m.Value.Resource.TypeName == "OperationOutcome"),

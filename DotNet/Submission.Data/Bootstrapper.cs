@@ -15,7 +15,7 @@ namespace Submission.Data
                                         ?? throw new InvalidOperationException("Database connection string is not configured.");
 
             services.AddDbContext<SubmissionContext>((sp, options) =>
-            {
+            {                                                            
                 options.UseSqlServer(connectionString);
             });
         }

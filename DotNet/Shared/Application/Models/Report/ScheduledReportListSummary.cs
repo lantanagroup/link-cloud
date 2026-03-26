@@ -12,7 +12,7 @@ public class ScheduledReportListSummary
     public DateTime? SubmitReportDateTime { get; set; }
     public List<string> ReportTypes { get; set; } = [];
     public Frequency Frequency { get; set; }
-
+    
     public bool? IsDeleted { get; set; } = false;
     public AdHocType? AdHocType { get; set; }
     public int CensusCount { get; set; }

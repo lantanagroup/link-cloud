@@ -5,14 +5,14 @@ namespace UnitTests.Account
 {
     public class TestAsyncEnumerable<T> : EnumerableQuery<T>, IAsyncEnumerable<T>, IQueryable<T>
     {
-        public TestAsyncEnumerable(IEnumerable<T> enumerable) : base(enumerable)
+        public TestAsyncEnumerable(IEnumerable<T> enumerable) : base (enumerable)
         {
 
         }
 
         public TestAsyncEnumerable(Expression expression) : base(expression)
         {
-
+            
         }
 
         public IAsyncEnumerator<T> GetEnumerator()
@@ -26,5 +26,5 @@ namespace UnitTests.Account
         {
             return new TestAsyncEnumerator<T>(this.AsEnumerable().GetEnumerator());
         }
-    }
+    } 
 }

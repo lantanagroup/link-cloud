@@ -4,8 +4,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Responses
 {
     public class ConsumerResponse
     {
-        // declare a list of ConsumerResponseTopic
-        public List<ConsumerResponseTopic> list { get; set; } = new List<ConsumerResponseTopic>();
+       // declare a list of ConsumerResponseTopic
+       public List<ConsumerResponseTopic> list { get; set; } = new List<ConsumerResponseTopic>();
 
     }
 

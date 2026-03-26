@@ -7,8 +7,8 @@ namespace LantanaGroup.Link.Audit.Domain.Entities
         public static AuditId Empty => new(Guid.Empty);
         public static AuditId NewId() => new(Guid.NewGuid());
         public static AuditId FromString(string id) => new(new Guid(id));
-    }
-
+    }   
+   
     public class AuditLog : BaseEntity
     {
         public long Id { get; set; }
@@ -24,7 +24,7 @@ namespace LantanaGroup.Link.Audit.Domain.Entities
         public string? Resource { get; set; }
         public List<EntityPropertyChange>? PropertyChanges { get; set; }
         [PiiData]
-        public string? Notes { get; set; }
+        public string? Notes { get; set; }       
     }
 
 }

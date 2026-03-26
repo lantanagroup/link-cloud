@@ -57,7 +57,7 @@ public class FhirListQueryConfigurationManagerTests(DataAcquisitionIntegrationTe
         // Act & Assert
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => manager.CreateAsync(fhirListConfigModel, CancellationToken.None));
-
+        
         Assert.Contains(facilityId, exception.Message);
     }
 }

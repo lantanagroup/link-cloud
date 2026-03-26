@@ -104,9 +104,9 @@ public class QueryListController : Controller
             {
                 _logger.LogError(new EventId(LoggingIds.GenerateItems, "PostFhirConfiguration"), ex, "An exception occurred while attempting to create a fhir query configuration with a facility id of {id}", HtmlInputSanitizer.Sanitize(fhirListConfiguration.FacilityId));
                 return StatusCode(StatusCodes.Status500InternalServerError, $"An error occurred while processing your request. Please try again later\n{ex.Message}");
-            }
+            } 
         }
-        else
+        else 
         {
             return BadRequest(ModelState);
         }
@@ -152,7 +152,7 @@ public class QueryListController : Controller
                 throw;
             }
         }
-        else
+        else 
         {
             return BadRequest(ModelState);
         }

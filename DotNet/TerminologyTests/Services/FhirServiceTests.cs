@@ -34,11 +34,11 @@ public class FhirServiceTests
         Mock<IMemoryCache> mockCache = new Mock<IMemoryCache>();
         Mock<IOptions<TerminologyConfig>> mockConfig = new Mock<IOptions<TerminologyConfig>>();
         mockConfig.Setup(x => x.Value).Returns(config);
-
+        
         _mockCacheService = new Mock<CodeGroupCacheService>(mockCacheLogger.Object, mockCache.Object, mockConfig.Object);
         _mockLogger = new Mock<ILogger<FhirService>>();
         _service = new FhirService(_mockCacheService.Object, _mockLogger.Object);
-
+        
         string valueSet1 = @"
 {
   ""resourceType"" : ""ValueSet"",
@@ -105,7 +105,7 @@ public class FhirServiceTests
 }
 ";
 
-        string valueSet2 = @"
+    string valueSet2 = @"
 {
     ""resourceType"": ""ValueSet"",
     ""id"": ""v2-0916"",
@@ -153,7 +153,7 @@ public class FhirServiceTests
     }
 }
 ";
-
+    
         _mockValueSets =
         [
             LinkFhirSerializerOptions.FhirJsonParserPermissive.Parse<ValueSet>(valueSet1),
@@ -691,7 +691,7 @@ public class FhirServiceTests
     }
 
     #endregion
-
+    
     #region GetValueSets Tests
 
     [Fact]
@@ -735,6 +735,6 @@ public class FhirServiceTests
         Assert.Equal("ValueSet", result.Entry[1].Resource.TypeName);
         Assert.Equal(_mockValueSets[1].Id, result.Entry[1].Resource.Id);
     }
-
+    
     #endregion
 }

@@ -42,6 +42,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication.CdcSams
         {
             get { return ClientSecret; }
             set { ClientSecret = value; }
-        }
+        }   
     }
 }

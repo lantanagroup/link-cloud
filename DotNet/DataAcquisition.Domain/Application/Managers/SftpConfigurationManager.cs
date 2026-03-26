@@ -63,7 +63,7 @@ public class SftpConfigurationManager(
     {
         using var activity = Activity.Current?.Source.StartActivity();
         activity?.SetTag(DiagnosticNames.FacilityId, organizationId);
-
+        
         if (string.IsNullOrEmpty(organizationId))
         {
             activity?.SetStatus(ActivityStatusCode.Error, "OrganizationId cannot be null or empty");
@@ -123,7 +123,7 @@ public class SftpConfigurationManager(
     {
         using var activity = Activity.Current?.Source.StartActivity();
         activity?.SetTag(DiagnosticNames.FacilityId, organizationId);
-
+        
         var existingEntity = await database.SftpConfigurationRepository
             .SingleOrDefaultAsync(q => q.Id == model.Id, cancellationToken);
 

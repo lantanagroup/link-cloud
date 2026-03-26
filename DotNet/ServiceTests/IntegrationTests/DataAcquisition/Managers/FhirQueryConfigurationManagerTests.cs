@@ -217,8 +217,8 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
                 AuthType = AuthType.OAuth.ToString(),
                 Key = "test",
                 TokenUrl = "test",
-                ClientId = "test",
-                Password = "test",
+                ClientId =  "test",
+                Password = "test",  
                 UserName = "test",
             }
         };

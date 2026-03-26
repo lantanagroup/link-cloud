@@ -40,7 +40,7 @@ public class TenantApiService : ITenantApiService
         if (!_serviceRegistry.Value.TenantService.CheckIfTenantExists)
             return true;
 
-        var tenantServiceUrl = _serviceRegistry.Value.TenantServiceApiUrl;
+       var tenantServiceUrl = _serviceRegistry.Value.TenantServiceApiUrl;
 
         if (string.IsNullOrWhiteSpace(tenantServiceUrl))
             throw new Exception("Tenant Service URL is missing.");
@@ -71,7 +71,7 @@ public class TenantApiService : ITenantApiService
         {
             return true;
         }
-
+        
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return false;

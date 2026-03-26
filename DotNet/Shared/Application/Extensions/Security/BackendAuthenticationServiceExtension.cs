@@ -29,7 +29,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
             services.AddTransient<ICreateUserToken, CreateUserToken>();
 
             if (linkBearerServiceOptions.AllowAnonymous)
-            {
+            {             
                 services.AddAuthorizationBuilder()
                    .AddPolicy("CanViewAccounts", pb => { pb.RequireAssertion(context => true); })
                    .AddPolicy("CanAdministerAccounts", pb => { pb.RequireAssertion(context => true); })
@@ -42,7 +42,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
                    .AddPolicy("CanViewReports", pb => { pb.RequireAssertion(context => true); })
                    .AddPolicy("CanGenerateReports", pb => { pb.RequireAssertion(context => true); })
                    .AddPolicy("CanGenerateEvents", pb => { pb.RequireAssertion(context => true); })
-                   .AddPolicy("IsLinkAdmin", pb => { pb.RequireAssertion(context => true); });
+                   .AddPolicy("IsLinkAdmin", pb => { pb.RequireAssertion(context => true); });                    
 
                 return services;
             }
@@ -61,16 +61,16 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
                     ValidIssuer = linkBearerServiceOptions.Authority,
                     ValidAudience = linkBearerServiceOptions.Audience,
                     NameClaimType = linkBearerServiceOptions.NameClaimType,
-                    RoleClaimType = linkBearerServiceOptions.RoleClaimType,
+                    RoleClaimType = linkBearerServiceOptions.RoleClaimType,                    
                     ValidTypes = linkBearerServiceOptions.ValidTypes, //avoid jwt confustion attacks (ie: circumvent token signature checking)
 
                     //configure validation of the token
                     ValidateAudience = linkBearerServiceOptions.ValidateToken,
                     ValidateIssuer = linkBearerServiceOptions.ValidateToken,
-                    ValidateIssuerSigningKey = linkBearerServiceOptions.ValidateToken,
+                    ValidateIssuerSigningKey = linkBearerServiceOptions.ValidateToken, 
 
                     IssuerSigningKeyResolver = (token, securityToken, kid, parameters) =>
-                    {
+                    {                             
                         string bearerKey = string.Empty;
 
                         if (linkBearerServiceOptions.SigningKey is null)
@@ -116,9 +116,9 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
                             }
                         }
                         else
-                        {
+                        { 
                             bearerKey = linkBearerServiceOptions.SigningKey;
-                        }
+                        }                       
 
                         return new[] { new SymmetricSecurityKey(Encoding.UTF8.GetBytes(bearerKey)) };
                     }

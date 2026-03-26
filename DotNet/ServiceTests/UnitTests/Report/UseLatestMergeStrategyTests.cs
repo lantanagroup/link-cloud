@@ -12,19 +12,19 @@ public class UseLatestMergeStrategyTests
 
     private readonly Mock<ILogger<UseLatestStrategy>> _loggerMock;
     private readonly UseLatestStrategy _strategy;
-
+    
     public UseLatestMergeStrategyTests()
     {
         _loggerMock = new Mock<ILogger<UseLatestStrategy>>();
         _strategy = new UseLatestStrategy(_loggerMock.Object);
     }
-
+    
     private readonly Patient _patientV1 = new()
     {
         Id = "123",
         Meta = new Meta
         {
-            Profile = [.. ProfileArrayA],
+            Profile = [..ProfileArrayA],
             LastUpdated = DateTimeOffset.Now.AddDays(-10)
         },
         Name = [new HumanName { Family = "Smith", Given = ["John"], Use = HumanName.NameUse.Official }],
@@ -55,7 +55,7 @@ public class UseLatestMergeStrategyTests
         Id = "123",
         Meta = new Meta
         {
-            Profile = [.. ProfileArrayB],
+            Profile = [..ProfileArrayB],
             LastUpdated = DateTimeOffset.Now
         },
         Name = [new HumanName { Family = "Smith", Given = ["Jonathan"], Use = HumanName.NameUse.Official }],
@@ -86,12 +86,12 @@ public class UseLatestMergeStrategyTests
     {
         // Act
         var result = (Patient)_strategy.MergeResources(_patientV1, _patientV2);
-
+        
         // Assert profile merge
         Assert.Contains("http://example.com/oldProfile1", result.Meta.Profile);
         Assert.Contains("http://example.com/oldProfile2", result.Meta.Profile);
         Assert.Contains("http://example.com/newProfile1", result.Meta.Profile);
-
+        
         // Assert other properties are from _patientV2
         Assert.NotNull(result.Meta);
         Assert.NotNull(result.Meta.Profile);
@@ -100,7 +100,7 @@ public class UseLatestMergeStrategyTests
         Assert.Equal(ContactPoint.ContactPointUse.Mobile, result.Telecom.First().Use);
         Assert.Equal("789 New Road", result.Address.First().Line.First());
     }
-
+    
     [Fact]
     public void MergeResources_DoesNotMergeMetaProfiles_WhenMergeMetaProfilesIsFalse()
     {
@@ -111,7 +111,7 @@ public class UseLatestMergeStrategyTests
         Assert.DoesNotContain("http://example.com/oldProfile1", result.Meta.Profile);
         Assert.DoesNotContain("http://example.com/oldProfile2", result.Meta.Profile);
         Assert.Contains("http://example.com/newProfile1", result.Meta.Profile);
-
+        
         // Assert other properties are from _patientV2
         Assert.NotNull(result.Meta);
         Assert.Equal(_patientV2.Meta.Profile, result.Meta.Profile); // Profiles should not be merged
@@ -120,7 +120,7 @@ public class UseLatestMergeStrategyTests
         Assert.Equal(ContactPoint.ContactPointUse.Mobile, result.Telecom.First().Use);
         Assert.Equal("789 New Road", result.Address.First().Line.First());
     }
-
+    
     [Fact]
     public void MergeResources_HandlesNullProfiles()
     {
@@ -135,7 +135,7 @@ public class UseLatestMergeStrategyTests
         Assert.NotNull(result.Meta);
         Assert.Empty(result.Meta.Profile);
     }
-
+    
     [Fact]
     public void MergeResources_CreatesMetaIfMissing()
     {
@@ -145,7 +145,7 @@ public class UseLatestMergeStrategyTests
             Id = "123",
             Meta = new Meta
             {
-                Profile = [.. ProfileArrayB]
+                Profile = [..ProfileArrayB]
             }
         };
 
@@ -158,7 +158,7 @@ public class UseLatestMergeStrategyTests
         Assert.NotNull(result.Meta);
         Assert.Contains("http://example.com/newProfile1", result.Meta.Profile);
     }
-
+    
     [Fact]
     public void MergeResources_OnMismatchedIds_LogsErrorAndReturnsOldResource()
     {
@@ -180,7 +180,7 @@ public class UseLatestMergeStrategyTests
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
     }
-
+    
     [Fact]
     public void MergeResources_ThrowsIfResourcesAreNull()
     {
@@ -188,7 +188,7 @@ public class UseLatestMergeStrategyTests
         Assert.Throws<ArgumentNullException>(() => _strategy.MergeResources(null!, new Patient()));
         Assert.Throws<ArgumentNullException>(() => _strategy.MergeResources(new Patient(), null!));
     }
-
+    
     [Fact]
     public void MergeResources_DifferentResourceTypes_LogsErrorAndReturnsOldResource()
     {

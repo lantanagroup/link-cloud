@@ -15,17 +15,17 @@ public static class ConfigureSwaggerExtension
     {
         if (!app.Configuration.GetValue<bool>(ConfigurationConstants.AppSettings.EnableSwagger, false))
             return;
-
+        
         var serviceInformation = app.Configuration
             .GetSection(ConfigurationConstants.AppSettings.ServiceInformation)
             .Get<ServiceInformation>();
-
+        
         app.UseSwagger(opts =>
         {
             opts.OpenApiVersion = OpenApiSpecVersion.OpenApi2_0;
             specAction?.Invoke(opts);
         });
-
+        
         app.UseSwaggerUI(opts =>
         {
             opts
@@ -33,7 +33,7 @@ public static class ConfigureSwaggerExtension
                     serviceInformation != null
                         ? $"{serviceInformation.ServiceName} - {serviceInformation.Version}"
                         : "Link " + Assembly.GetExecutingAssembly().GetName() + " Service");
-
+            
             uiAction?.Invoke(opts);
         });
     }

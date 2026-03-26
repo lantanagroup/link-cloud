@@ -24,7 +24,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
         private readonly IAccountServiceMetrics _metrics;
         private readonly ICreateAuditEvent _createAuditEvent;
         private readonly IRoleRepository _roleRepository;
-        private readonly ICacheService _cache;
+        private readonly ICacheService _cache;    
         private readonly IServiceScopeFactory _serviceScopeFactory;
 
         public UpdateUser(ILogger<CreateUser> logger, IUserRepository userRepository, IAccountServiceMetrics metrics, ICacheService cache, ICreateAuditEvent createAuditEvent, IRoleRepository roleRepository)
@@ -40,7 +40,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
         public async Task<bool> Execute(ClaimsPrincipal? requestor, LinkUserModel model, CancellationToken cancellationToken = default)
         {
             //generate tags for telemetry
-            List<KeyValuePair<string, object?>> tagList = [new KeyValuePair<string, object?>(DiagnosticNames.UserId, model.Id)];
+            List<KeyValuePair<string, object?>> tagList = [new KeyValuePair<string, object?>(DiagnosticNames.UserId, model.Id)];            
             //foreach (var facility in model.Facilities)
             //{
             //    var tag = new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facility);
@@ -48,9 +48,9 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
             using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("UdpateUser:Execute", tagList);
 
             try
-            {
+            { 
                 var user = await _userRepository.GetUserAsync(model.Id, cancellationToken: cancellationToken) ?? throw new ApplicationException($"User with id {model.Id} not found");
-
+                           
                 List<PropertyChangeModel> changes = GetUserDiff(model, user);
 
                 user.UserName = model.Username;
@@ -72,26 +72,26 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                 var addedRoles = model.Roles.Except(currentRoles);
                 var removedRoles = currentRoles.Except(model.Roles);
 
-                if (addedRoles.Any())
+                if(addedRoles.Any())
                 {
-                    foreach (var role in addedRoles)
+                    foreach(var role in addedRoles)
                     {
                         if (!string.IsNullOrEmpty(role))
                         {
                             var linkRole = await _roleRepository.GetRoleByNameAsync(role, cancellationToken: cancellationToken);
 
-                            if (linkRole is null)
+                            if(linkRole is null)
                             {
                                 _logger.LogRoleNotFound(role);
                                 continue;
                             }
 
                             await _userRepository.AddRoleAsync(user.Id, linkRole, cancellationToken);
-                        }
-                    }
+                        }                        
+                    }                                     
                 }
 
-                if (removedRoles.Any())
+                if(removedRoles.Any())
                 {
                     foreach (var role in removedRoles)
                     {
@@ -121,9 +121,9 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                 var addedClaims = model.UserClaims.Except(currentClaims);
                 var removedClaims = currentClaims.Except(model.UserClaims);
 
-                if (addedClaims.Any())
+                if(addedClaims.Any())
                 {
-                    foreach (var claim in addedClaims)
+                    foreach(var claim in addedClaims)
                     {
                         if (!string.IsNullOrEmpty(claim))
                         {
@@ -141,9 +141,9 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     }
                 }
 
-                if (removedClaims.Any())
+                if(removedClaims.Any())
                 {
-                    foreach (var claim in removedClaims)
+                    foreach(var claim in removedClaims)
                     {
                         if (!string.IsNullOrEmpty(claim))
                         {
@@ -192,7 +192,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                 {
                     _logger.LogCacheException(userKey, ex.Message);
                 }
-
+                        
 
                 return true;
             }
@@ -207,27 +207,27 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
         {
             List<PropertyChangeModel> changes = [];
 
-            if (user.UserName != model.Username)
+            if(user.UserName != model.Username)
             {
                 changes.Add(new PropertyChangeModel("UserName", user.UserName ?? string.Empty, model.Username));
             }
 
-            if (user.Email != model.Email)
+            if(user.Email != model.Email)
             {
                 changes.Add(new PropertyChangeModel("Email", user.Email ?? string.Empty, model.Email));
             }
 
-            if (user.FirstName != model.FirstName)
+            if(user.FirstName != model.FirstName)
             {
                 changes.Add(new PropertyChangeModel("FirstName", user.FirstName, model.FirstName));
             }
 
-            if (user.MiddleName != model.MiddleName)
+            if(user.MiddleName != model.MiddleName)
             {
                 changes.Add(new PropertyChangeModel("MiddleName", user.MiddleName ?? string.Empty, model.MiddleName ?? string.Empty));
             }
 
-            if (user.LastName != model.LastName)
+            if(user.LastName != model.LastName)
             {
                 changes.Add(new PropertyChangeModel("LastName", user.LastName, model.LastName));
             }

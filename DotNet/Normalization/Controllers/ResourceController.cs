@@ -13,8 +13,8 @@ namespace LantanaGroup.Link.Normalization.Controllers
     public class ResourceController : ControllerBase
     {
         private readonly IResourceManager _resourceManager;
-        private readonly IResourceQueries _resourceQueries;
-        public ResourceController(IResourceManager resourceManager, IResourceQueries resourceQueries)
+        private readonly IResourceQueries _resourceQueries; 
+        public ResourceController(IResourceManager resourceManager, IResourceQueries resourceQueries) 
         {
             _resourceManager = resourceManager;
             _resourceQueries = resourceQueries;
@@ -69,7 +69,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
         [HttpPost("initialize")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<ResourceModel>))]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]        
         public async Task<ActionResult<List<ResourceModel>>> Initialize()
         {
             try
@@ -88,7 +88,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(ResourceModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]        
         public async Task<ActionResult<ResourceModel>> Post(string resource)
         {
             try
@@ -116,7 +116,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [HttpPost("{resource}/bypass")]
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(ResourceModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]        
         public async Task<ActionResult<ResourceModel>> PostWithBypass(string resource)
         {
             try
@@ -144,7 +144,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [HttpDelete("{resource}")]
         [ProducesResponseType(StatusCodes.Status202Accepted)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]        
         public async Task<IActionResult> Delete(string resource)
         {
             try

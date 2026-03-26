@@ -128,8 +128,8 @@ namespace IntegrationTests.DataAcquisition.Queries
 
             // Act
             var results = (await queries.SearchAsync(new SearchReferenceResourcesModel
-            {
-                ResourceIds = ids,
+            { 
+                ResourceIds = ids, 
                 FacilityId = "Facility1"
             })).Records;
 

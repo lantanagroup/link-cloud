@@ -10,7 +10,7 @@ namespace LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 public class FHIRListDischargePayload : IPayload
 {
     public string? PayloadType { get; } = EventType.FHIRListDischarge.ToString();
-
+    
     [JsonPropertyName("patientId")]
     public string PatientId;
     [JsonPropertyName("dischargeDate")]
@@ -27,7 +27,7 @@ public class FHIRListDischargePayload : IPayload
         throw new NotImplementedException();
     }
 
-
+    
 
     public PatientEvent CreatePatientEvent(string facilityId, string correlationId)
     {

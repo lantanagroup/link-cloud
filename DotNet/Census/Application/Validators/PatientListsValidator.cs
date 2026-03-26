@@ -11,21 +11,21 @@ public static class PatientListsValidator
     //3. That the ListType/TimeFrame is valid
     public static (bool success, List<string> validationErrors) ValidatePatientLists(List<PatientListItem> lists)
     {
-        if (lists.Count != 6)
+        if(lists.Count != 6)
             return (false, new List<string> { "Must have 6 lists" });
-
+        
         Dictionary<(string, string), int> validLists = new();
-        validLists.Add((ListType.Admit.ToString(), TimeFrame.Between24To48Hours.ToString()), 0);
-        validLists.Add((ListType.Discharge.ToString(), TimeFrame.Between24To48Hours.ToString()), 0);
-        validLists.Add((ListType.Admit.ToString(), TimeFrame.LessThan24Hours.ToString()), 0);
-        validLists.Add((ListType.Discharge.ToString(), TimeFrame.LessThan24Hours.ToString()), 0);
-        validLists.Add((ListType.Admit.ToString(), TimeFrame.MoreThan48Hours.ToString()), 0);
-        validLists.Add((ListType.Discharge.ToString(), TimeFrame.MoreThan48Hours.ToString()), 0);
+        validLists.Add((ListType.Admit.ToString(), TimeFrame.Between24To48Hours.ToString()),0);
+        validLists.Add((ListType.Discharge.ToString(), TimeFrame.Between24To48Hours.ToString()),0);
+        validLists.Add((ListType.Admit.ToString(), TimeFrame.LessThan24Hours.ToString()),0);
+        validLists.Add((ListType.Discharge.ToString(), TimeFrame.LessThan24Hours.ToString()),0);
+        validLists.Add((ListType.Admit.ToString(), TimeFrame.MoreThan48Hours.ToString()),0);
+        validLists.Add((ListType.Discharge.ToString(), TimeFrame.MoreThan48Hours.ToString()),0);
 
         foreach (var list in lists)
         {
             var key = (list.ListType.ToString(), list.TimeFrame.ToString());
-            if (!validLists.ContainsKey(key))
+            if(!validLists.ContainsKey(key))
                 return (false, new List<string> { $"Invalid ListType/TimeFrame combination: {list.ListType}/{list.TimeFrame}" });
             validLists[key]++;
         }
@@ -42,7 +42,7 @@ public static class PatientListsValidator
             }
             return (false, errors);
         }
-
+        
         return (true, new List<string>());
     }
 }

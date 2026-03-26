@@ -12,7 +12,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
     public static class SearchForUsers
     {
         public static async Task<IResult> Handle(
-            HttpContext context, [FromServices] ILogger<UserEndpoints> logger, [FromServices] ISearchUsers query,
+            HttpContext context, [FromServices] ILogger<UserEndpoints> logger, [FromServices] ISearchUsers query, 
             [FromServices] IUserSearchFilterRecordFactory filterFactory,
             string? searchText,
             string? filterFacilityBy,
@@ -69,7 +69,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 
                 logger.LogSearchUsersException(ex.Message, filters);
                 throw;
-            }
+            }           
         }
     }
 }

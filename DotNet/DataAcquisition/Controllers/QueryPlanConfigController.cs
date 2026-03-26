@@ -53,7 +53,7 @@ public class QueryPlanConfigController : Controller
         [FromQuery] GetQueryPlanParameters queryParameters,
         CancellationToken cancellationToken)
     {
-        if (!ModelState.IsValid)
+        if(!ModelState.IsValid)
         {
             return BadRequest(ModelState);
         }
@@ -117,7 +117,7 @@ public class QueryPlanConfigController : Controller
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> CreateQueryPlan(
-        string facilityId,
+        string facilityId, 
         [FromBody] QueryPlanApiModel? queryPlan,
         CancellationToken cancellationToken)
     {
@@ -133,7 +133,7 @@ public class QueryPlanConfigController : Controller
                 throw new BadRequestException("facilityId is required.");
             }
 
-            if (queryPlan.Type == null)
+            if(queryPlan.Type == null)
             {
                 throw new BadRequestException("QueryPlan.Type is required.");
             }
@@ -150,7 +150,7 @@ public class QueryPlanConfigController : Controller
                 var result = await _queryPlanManager.AddAsync(new CreateQueryPlanModel
                 {
                     EHRDescription = queryPlan.EHRDescription,
-                    FacilityId = facilityId,
+                    FacilityId = facilityId,    
                     InitialQueries = queryPlan.InitialQueries,
                     SupplementalQueries = queryPlan.SupplementalQueries,
                     PlanName = queryPlan.PlanName,
@@ -170,12 +170,12 @@ public class QueryPlanConfigController : Controller
                         QueryPlan = result
                     }, result);
             }
-            else
+            else 
             {
                 return BadRequest(ModelState);
             }
         }
-        catch (IncorrectQueryPlanOrderException ex)
+        catch(IncorrectQueryPlanOrderException ex)
         {
             _logger.LogError(ex, "BadRequestException occurred.");
             return Problem(title: "Incorrect Query Order", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
@@ -200,7 +200,7 @@ public class QueryPlanConfigController : Controller
             _logger.LogError(ex, "BadRequestException occurred.");
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
-        catch (ArgumentNullException ex)
+        catch(ArgumentNullException ex)
         {
             _logger.LogError(ex, "BadRequestException occurred.");
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
@@ -270,9 +270,9 @@ public class QueryPlanConfigController : Controller
                     LookBack = queryPlan.LookBack,
                     PlanName = queryPlan.PlanName,
                     Type = queryPlan.Type.Value
-                }, cancellationToken);
+                },cancellationToken);
 
-                return result != null ? Accepted(result) : Problem("QueryPlan not updated.", statusCode: (int)HttpStatusCode.InternalServerError);
+                return result != null ? Accepted(result) : Problem("QueryPlan not updated.", statusCode: (int)HttpStatusCode.InternalServerError); 
             }
             else
             {
@@ -286,7 +286,7 @@ public class QueryPlanConfigController : Controller
         }
         catch (BadRequestException ex)
         {
-
+                
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)

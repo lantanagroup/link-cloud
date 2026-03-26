@@ -62,7 +62,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
     var serviceInformation = builder.SetupServiceInformation(CensusConstants.ServiceName, assemblyVersion);
 
-    if (serviceInformation == null)
+    if(serviceInformation == null)
     {
         throw new InvalidOperationException("Service information could not be loaded properly.");
     }
@@ -256,8 +256,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     // CORS
-    builder.Services.AddLinkCorsService(options =>
-    {
+    builder.Services.AddLinkCorsService(options => {
         options.Environment = builder.Environment;
     });
 

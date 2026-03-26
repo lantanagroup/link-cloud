@@ -78,7 +78,7 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddTransient<IEntityRepository<ResourceReferenceType>, EntityRepository<ResourceReferenceType, DataAcquisitionDbContext>>();
             builder.Services.AddScoped<IEntityRepository<SftpAcquisitionLog>, EntityRepository<SftpAcquisitionLog, DataAcquisitionDbContext>>();
             builder.Services.AddScoped<IEntityRepository<SftpConfiguration>, EntityRepository<SftpConfiguration, DataAcquisitionDbContext>>();
-
+ 
             // Register IDatabase implementation
             builder.Services.AddScoped<IDatabase, Database>();
             builder.Services.AddScoped<IQueryPlanValidator, QueryPlanValidator>();

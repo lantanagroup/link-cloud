@@ -41,7 +41,7 @@ namespace LantanaGroup.Link.Shared.Application.Health
 
         private Message<string, string> MessageBuilder(KafkaHealthCheckOptions options)
         {
-            var utcDate = DateTime.UtcNow;
+            var utcDate = DateTime.UtcNow;  
             return new Message<string, string>() { Key = _serviceName, Value = $"Service health check on {utcDate} ({utcDate.Kind})" };
         }
     }

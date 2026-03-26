@@ -77,7 +77,7 @@ public class ReportScheduledListenerTests : IClassFixture<ReportIntegrationTestF
         var population = await reportPopulationManager.FindAsync(x => x.ReportScheduleId == reportId);
         Assert.NotNull(population);
         Assert.Equal(2, population.Count);
-
+        
         var expectedJobData = new Dictionary<string, object>
         {
             { "ReportScheduleId", reportId },
@@ -86,9 +86,9 @@ public class ReportScheduledListenerTests : IClassFixture<ReportIntegrationTestF
 
         _fixture.QuartzJobHelperMock.Verify(f => f.ScheduleJob<EndOfReportPeriodJob>(
             expectedJobData,
-            It.IsAny<DateTimeOffset>(),
+            It.IsAny<DateTimeOffset>(), 
             It.IsAny<string>(),
-            It.IsAny<string>(),
+            It.IsAny<string>(), 
             It.IsAny<string>(),
             It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -301,7 +301,7 @@ public class ReportScheduledListenerTests : IClassFixture<ReportIntegrationTestF
             ReportStartDate = DateTime.UtcNow.AddDays(-1),
             ReportEndDate = DateTime.UtcNow.AddDays(30),
             Frequency = Frequency.Monthly,
-            ReportTypes = { "DE-111" },
+            ReportTypes = {  "DE-111" },
             Status = ScheduleStatus.Scheduled,
             CreateDate = DateTime.UtcNow
         };

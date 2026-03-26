@@ -6,7 +6,7 @@ public class TenantServiceRegistration
     public string? PublicTenantServiceUrl { get; set; }
     public bool CheckIfTenantExists { get; set; }
     public string? GetTenantRelativeEndpoint { get; set; }
-
+    
     public string? PublicTenantServiceApiUrl
     {
         get

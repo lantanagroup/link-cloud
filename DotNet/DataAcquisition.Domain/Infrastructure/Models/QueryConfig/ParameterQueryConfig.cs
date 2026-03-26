@@ -6,7 +6,7 @@ public class ParameterQueryConfig : IQueryConfig
     public QueryConfigType QueryConfigType { get; set; } = QueryConfigType.Parameter;
     public string ResourceType { get; set; }
     public List<IParameter> Parameters { get; set; }
-
+    
     public ParameterQueryConfig()
     {
 

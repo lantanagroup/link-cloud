@@ -1,5 +1,5 @@
 ﻿namespace Link.Authorization.Permissions
-{
+{    
     public enum LinkSystemPermissions
     {
         CanViewLogs,
@@ -13,11 +13,11 @@
         CanGenerateEvents,
         CanViewAccounts,
         CanAdministerAccounts,
-        IsLinkAdmin
+        IsLinkAdmin    
     }
 
     public enum LinkTenantPermissions
-    {
-
+    { 
+        
     }
 }

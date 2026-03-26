@@ -10,8 +10,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
         public string Name { get; set; }
         public string Description { get; set; }
 
-        public CopyLocationOperation()
-        {
+        public CopyLocationOperation() {
             Name = "Copy Location Operation";
             Description = "Copies each Location Identifier 'System' and 'Value' fields into Location.Type as a CodeableConcept";
         }

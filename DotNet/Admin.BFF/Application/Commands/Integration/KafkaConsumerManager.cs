@@ -154,7 +154,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
             _consumers.Add((consumer, cts));
 
-            Task.Run(() => _kafkaConsumerService.StartConsumer(groupId, topics, reportTrackingId, consumer, cts.Token));
+            Task.Run(() =>  _kafkaConsumerService.StartConsumer(groupId, topics, reportTrackingId, consumer, cts.Token));
 
         }
 

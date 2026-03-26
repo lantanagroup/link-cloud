@@ -12,7 +12,7 @@ public class TimeSpanConverter : JsonConverter<TimeSpan>
             var output = TimeSpan.Parse(value);
             return output;
         }
-        catch (Exception ex)
+        catch(Exception ex)
         {
             throw;
         }

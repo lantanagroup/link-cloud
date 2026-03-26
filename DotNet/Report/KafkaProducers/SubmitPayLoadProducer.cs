@@ -58,7 +58,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     }
                 });
 
-            _submitPayloadProducer.Flush();
+            _submitPayloadProducer.Flush();         
 
             return true;
         }

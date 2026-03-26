@@ -34,18 +34,18 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("DeactivateUser:Execute",
                 [
-                    new KeyValuePair<string, object?>(DiagnosticNames.UserId, userId)
+                    new KeyValuePair<string, object?>(DiagnosticNames.UserId, userId)    
                 ]);
 
             try
             {
                 var user = await _userRepository.GetUserAsync(userId, cancellationToken: cancellationToken) ?? throw new ApplicationException($"User with id {userId} not found");
-
-                if (!user.IsActive)
-                {
+                
+                if(!user.IsActive)
+                {                    
                     return true;
                 }
-
+                
                 user.IsActive = false;
 
                 if (requestor is not null)
@@ -61,7 +61,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                 }
 
                 //generate tags for telemetry
-                List<KeyValuePair<string, object?>> tagList = [new KeyValuePair<string, object?>(DiagnosticNames.UserId, userId)];
+                List<KeyValuePair<string, object?>> tagList = [ new KeyValuePair<string, object?>(DiagnosticNames.UserId, userId)];
                 foreach (var claim in user.Claims.Where(x => x.ClaimType == LinkAuthorizationConstants.LinkSystemClaims.Facility))
                 {
                     var tag = new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, claim.ClaimValue);
@@ -73,7 +73,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
                 //generate audit event
                 var auditMessage = new AuditEventMessage
-                {
+                {                    
                     Action = AuditEventType.Update,
                     EventDate = DateTime.UtcNow,
                     UserId = user.LastModifiedBy,
@@ -95,7 +95,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                 Activity.Current?.AddException(ex);
                 _logger.LogDeactivateUserException(userId.ToString(), ex.Message);
                 throw;
-            }
+            }                  
         }
     }
 }

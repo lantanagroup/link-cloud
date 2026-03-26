@@ -16,7 +16,7 @@ namespace DataAcquisition.Domain.Application.Queries
     {
         private readonly DataAcquisitionDbContext _dbContext;
 
-        public FhirQueryQueries(DataAcquisitionDbContext dbContext)
+        public FhirQueryQueries(DataAcquisitionDbContext dbContext) 
         {
             _dbContext = dbContext;
         }

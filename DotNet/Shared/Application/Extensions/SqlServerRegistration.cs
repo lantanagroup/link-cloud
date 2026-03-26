@@ -26,7 +26,7 @@ public static class SqlServerRegistration
 
                             if (string.IsNullOrEmpty(connectionString))
                                 throw new InvalidOperationException("Database connection string is null or empty.");
-
+                            
                             options.UseSqlServer(connectionString)
                                 .AddInterceptors(updateBaseEntityInterceptor);
                         }

@@ -13,7 +13,7 @@ namespace LantanaGroup.Link.Account.Persistence.Configurations
 
         private void ConfigureTable(EntityTypeBuilder<LinkUser> builder)
         {
-            builder.ToTable(name: "Users");
+            builder.ToTable( name: "Users");
 
             builder.HasKey(t => t.Id);
 

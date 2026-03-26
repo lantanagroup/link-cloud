@@ -23,7 +23,7 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
 
         public async Task<PagedUserModel> Execute(UserSearchFilterRecord filters, CancellationToken cancellationToken = default)
         {
-            using Activity? activity = ServiceActivitySource.Instance.StartActivity("SearchUsers:Execute");
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("SearchUsers:Execute");            
             activity?.EnrichWithUserSearchFilter(filters);
 
             try

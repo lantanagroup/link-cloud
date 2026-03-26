@@ -228,7 +228,7 @@ namespace IntegrationTests.Census
                 var createdResult = Assert.IsType<CreatedResult>(createResult);
                 var createdEntity = Assert.IsType<CensusConfigModel>(createdResult.Value);
                 Assert.False(createdEntity.Enabled, "The Created model should have Enabled set to false");
-
+                
 
                 // Verify no job exists
                 var jobKey = new JobKey($"{facilityId}-PatientCensusScheduled", "PatientCensusScheduled");

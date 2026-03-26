@@ -25,7 +25,7 @@ public class ValidationService
 
         InitHttpClient();
     }
-
+    
     private void InitHttpClient()
     {
         //check if the service uri is set

@@ -17,8 +17,8 @@ namespace LantanaGroup.Link.Normalization.Controllers
     public class VendorController : ControllerBase
     {
         private readonly IVendorManager _vendorManager;
-        private readonly IVendorQueries _vendorQueries;
-        public VendorController(IVendorManager vendorManager, IVendorQueries vendorQueries)
+        private readonly IVendorQueries _vendorQueries; 
+        public VendorController(IVendorManager vendorManager, IVendorQueries vendorQueries) 
         {
             _vendorManager = vendorManager;
             _vendorQueries = vendorQueries;
@@ -32,7 +32,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(vendor))
+                if(string.IsNullOrWhiteSpace(vendor))
                 {
                     return BadRequest("Required parameter 'vendor' cannot be null, empty, or whitespace.");
                 }
@@ -71,7 +71,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(VendorModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]        
         public async Task<ActionResult<VendorModel>> Post(string vendor)
         {
             try
@@ -105,7 +105,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [HttpDelete("{vendor}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]        
         public async Task<IActionResult> Delete(string vendor)
         {
             try
@@ -154,7 +154,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 {
                     foundVendor = await _vendorQueries.GetVendor(vendor);
 
-                    if (foundVendor == null)
+                    if(foundVendor == null)
                     {
                         return base.BadRequest($"No vendor by the name {vendor.Sanitize()} found.");
                     }
@@ -187,7 +187,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return base.BadRequest("Required parameter 'vendor' cannot be null, empty, or whitespace.");
                 }
 
-                if (presetId == Guid.Empty)
+                if(presetId == Guid.Empty)
                 {
                     return base.BadRequest("Required parameter 'presetId' cannot be null or empty.");
                 }
@@ -225,7 +225,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(VendorVersionOperationPresetModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]        
         public async Task<ActionResult<VendorVersionOperationPresetModel>> Post(VendorVersionOperationPresetPostModel model)
         {
             try
@@ -264,7 +264,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [HttpDelete("presets/{vendor}/{presetId}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]        
         public async Task<IActionResult> Delete(string vendor, Guid presetId)
         {
             try

@@ -23,7 +23,7 @@ public class EhrPatientList
         {
             errors.AddModelError(nameof(FhirId), "FhirId is required.");
         }
-
+        
         return errors;
     }
 }

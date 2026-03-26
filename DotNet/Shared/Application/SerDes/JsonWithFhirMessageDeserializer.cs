@@ -13,14 +13,14 @@ namespace LantanaGroup.Link.Shared.Application.SerDes
                 return default(T);
 
             string jsonContent = System.Text.Encoding.Default.GetString(data.ToArray());
-
+            
             var options = new JsonSerializerOptions();
 
             options.ForFhir(ModelInfo.ModelInspector, new FhirJsonPocoDeserializerSettings()
             {
                 DisableBase64Decoding = false,
                 Validator = null
-            });
+            });           
 
             options.AllowTrailingCommas = true;
             options.PropertyNameCaseInsensitive = true;

@@ -67,10 +67,10 @@ public class HealthChecksFilter : IDocumentFilter
                                 ["status"] = new OpenApiSchema { Type = "string" },
                                 ["description"] = new OpenApiSchema { Type = "string" },
                                 ["duration"] = new OpenApiSchema { Type = "string" },
-                                ["data"] = new OpenApiSchema
-                                {
+                                ["data"] = new OpenApiSchema 
+                                { 
                                     Type = "object",
-                                    AdditionalPropertiesAllowed = true
+                                    AdditionalPropertiesAllowed = true 
                                 }
                             }
                         }

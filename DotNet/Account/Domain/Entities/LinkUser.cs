@@ -15,7 +15,7 @@ namespace LantanaGroup.Link.Account.Domain.Entities
         public string Email { get; set; } = string.Empty;
         public string FirstName { get; set; } = string.Empty;
         public string? MiddleName { get; set; }
-        public string LastName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;     
         public DateTime? LastSeen { get; set; }
         public DateTime CreatedOn { get; set; }
         public string? CreatedBy { get; set; }
@@ -26,7 +26,7 @@ namespace LantanaGroup.Link.Account.Domain.Entities
 
 
         public virtual ICollection<LinkUserClaim> Claims { get; set; } = [];
-        public virtual ICollection<LinkUserRole> UserRoles { get; set; } = [];
+        public virtual ICollection<LinkUserRole> UserRoles { get; set; } = [];        
     }
 
     [Table("UserRoles")]
@@ -48,7 +48,7 @@ namespace LantanaGroup.Link.Account.Domain.Entities
         [MaxLength(36)]
         public Guid UserId { get; set; }
         public string? ClaimType { get; set; }
-        public string? ClaimValue { get; set; }
+        public string? ClaimValue { get; set; }     
 
         public virtual Claim ToClaim()
         {

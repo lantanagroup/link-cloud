@@ -12,9 +12,9 @@ namespace LantanaGroup.Link.Audit.Persistance.Configurations
         }
 
         private void ConfigureAuditLogTable(EntityTypeBuilder<AuditLog> builder)
-        {
+        {           
             builder.ToTable("AuditLogs");
-
+            
             builder.HasKey(b => b.Id).IsClustered();
 
             //configure strongly typed ID

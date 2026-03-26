@@ -211,6 +211,7 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         Assert.Equal("TestFacility", returnedModel.FacilityId);
         Assert.Equal(Frequency.Daily, returnedModel.Type);
         Assert.Equal("TestPlan", returnedModel.PlanName);
+        Assert.NotNull(returnedModel.CreateDate);
         Assert.NotNull(returnedModel.ModifyDate);
 
         // Verify database
@@ -363,9 +364,9 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         using var scope = _fixture.ServiceProvider.CreateScope();
         var controller = CreateController(scope);
         var model = new QueryPlanApiModel()
-        {
-            FacilityId = "",
-            Type = null
+        { 
+            FacilityId = "", 
+            Type = null 
         };
 
         // Act

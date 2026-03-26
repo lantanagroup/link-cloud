@@ -52,7 +52,7 @@ namespace IntegrationTests.Tenant
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
 
             // Register ServiceInformation using the extension method
-            var serviceInformation = builder.SetupServiceInformation(TenantConstants.ServiceName, assemblyVersion);
+           var serviceInformation = builder.SetupServiceInformation(TenantConstants.ServiceName, assemblyVersion);
 
             // Register the interceptor and DbContext
             builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();

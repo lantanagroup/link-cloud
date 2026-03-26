@@ -99,7 +99,7 @@ public class PatientDataServiceTests
             _mockLogManager.Object,
             _mockLogQueries.Object,
             _mockFhirApiService.Object,
-            _mockDistributedSemaphoreProvider.Object,
+            _mockDistributedSemaphoreProvider.Object, 
             _mockServiceProvider.Object,
             _mockPatientCensusService.Object
         );
@@ -351,7 +351,7 @@ public class PatientDataServiceTests
         _mockFhirQueryQueries
             .Setup(m => m.GetByFacilityIdAsync("facilityId", cancellationToken))
             .ReturnsAsync(fhirQueryConfig);
-
+        
         _mockLogQueries
             .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
             .ReturnsAsync(true);
@@ -418,7 +418,7 @@ public class PatientDataServiceTests
         _mockFhirQueryQueries
             .Setup(m => m.GetByFacilityIdAsync("facilityId", cancellationToken))
             .ReturnsAsync(fhirQueryConfig);
-
+        
         _mockLogQueries
             .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
             .ReturnsAsync(true);
@@ -491,7 +491,7 @@ public class PatientDataServiceTests
         _mockFhirQueryQueries
             .Setup(m => m.GetByFacilityIdAsync("facilityId", cancellationToken))
             .ReturnsAsync(fhirQueryConfig);
-
+        
         _mockLogQueries
             .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
             .ReturnsAsync(true);
@@ -563,7 +563,7 @@ public class PatientDataServiceTests
         _mockFhirQueryQueries
             .Setup(m => m.GetByFacilityIdAsync("facilityId", cancellationToken))
             .ReturnsAsync(fhirQueryConfig);
-
+        
         _mockLogQueries
             .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
             .ReturnsAsync(true);
@@ -655,7 +655,7 @@ public class PatientDataServiceTests
         _mockFhirQueryQueries
             .Setup(q => q.GetByFacilityIdAsync(facilityId, cancellationToken))
             .ReturnsAsync(fhirConfig);
-
+        
         _mockLogQueries
             .Setup(q => q.TrySetLogStatusAsync(logId, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
             .ReturnsAsync(true);
@@ -797,7 +797,7 @@ public class PatientDataServiceTests
                 }
             })
             .ReturnsAsync(logModel);
-
+        
         _mockLogQueries
             .Setup(q => q.TrySetLogStatusAsync(logId, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
             .ReturnsAsync(true);
@@ -1133,7 +1133,7 @@ public class PatientDataServiceTests
 
         // Act
         await _service.ExecuteLogRequest(request, cancellationToken);
-
+        
         // Assert: Log rescheduled ~60s from now, Failed, retry=0, note reflects default delay
         _mockLogQueries.Verify(m => m.UpdateAsync(
             It.Is<UpdateDataAcquisitionLogModel>(u =>

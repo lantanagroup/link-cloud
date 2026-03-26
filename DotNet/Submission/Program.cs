@@ -81,7 +81,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<ExternalBlobStorageSettings>(builder.Configuration.GetSection(ExternalBlobStorageSettings.Key));
 
     // Add services to the container.
-    builder.Services.AddHttpClient();
+    builder.Services.AddHttpClient();   
 
     // Add Link Security
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
@@ -94,7 +94,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.ProtectKey = builder.Configuration.GetValue<bool>("DataProtection:Enabled");
         options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
     });
-
+    
     // Add swagger spec generation
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(c =>
@@ -135,7 +135,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
         c.DocumentFilter<HealthChecksFilter>();
-    });
+    });    
 
     // Add controllers
     builder.Services.AddControllers();
@@ -156,7 +156,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<PathNamingService>();
 
     builder.Services.AddSingleton<ReportClient>();
-
+    
     // Add kafka producers
     builder.Services.AddTransient<PayloadSubmittedProducer>();
     builder.Services.AddTransient<AuditableEventOccurredProducer>();
@@ -177,7 +177,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHealthChecks()
         .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
-
+    
     // Producers
     var payloadSubmittedConfig = new ProducerConfig()
     {
@@ -212,8 +212,7 @@ static void RegisterServices(WebApplicationBuilder builder)
                     .CreateLogger();
 
     //Add CORS
-    builder.Services.AddLinkCorsService(options =>
-    {
+    builder.Services.AddLinkCorsService(options => {
         options.Environment = builder.Environment;
     });
 
@@ -237,7 +236,7 @@ static void SetupMiddleware(WebApplication app)
     app.AutoMigrateEF<SubmissionContext>();
 
     app.ConfigureSwagger();
-
+    
     if (app.Environment.IsDevelopment())
     {
         app.UseDeveloperExceptionPage();
@@ -266,7 +265,7 @@ static void SetupMiddleware(WebApplication app)
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     }).RequireCors("HealthCheckPolicy");
     app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "submission");
-
+    
     app.MapControllers();
 }
 

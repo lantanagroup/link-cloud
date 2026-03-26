@@ -14,8 +14,8 @@ namespace LantanaGroup.Link.Audit.Application.Models
         public string? Action { get; set; }
         public string? Resource { get; set; }
         public List<PropertyChangeModel>? PropertyChanges { get; set; }
-        public string? Notes { get; set; }
-
+        public string? Notes { get; set; }       
+        
         public static AuditModel FromDomain(AuditLog log)
         {
             return new AuditModel
@@ -35,15 +35,15 @@ namespace LantanaGroup.Link.Audit.Application.Models
 
         public static AuditModel FromMessage(AuditEventMessage message)
         {
-            var model = new AuditModel
-            {
+            var model =  new AuditModel
+            {                
                 FacilityId = message.FacilityId,
                 CorrelationId = message.CorrelationId,
                 ServiceName = message.ServiceName,
                 EventDate = message.EventDate,
                 User = message.User,
                 Action = message.Action.ToString(),
-                Resource = message.Resource,
+                Resource = message.Resource,              
                 Notes = message.Notes
             };
 

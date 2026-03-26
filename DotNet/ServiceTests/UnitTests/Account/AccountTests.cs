@@ -57,14 +57,14 @@ namespace UnitTests.Account
             //var testDataContext = new Mock<AccountDbContext>();
             //var dbSet = new Mock<DbSet<LinkUser>>();
             //_helper.AccountDbSetSetup(dbSet, accounts);   
-
+            
             //_mocker.Use(testDataContext);
 
             //var _accountRepository = _mocker.CreateInstance<IUserRepository>();
             //var account = await _accountRepository.GetUserByEmailAsync(AccountTestsConstants.email, false, CancellationToken.None);
 
             //Assert.NotNull(account);
-        }
+        }    
 
     }
 }

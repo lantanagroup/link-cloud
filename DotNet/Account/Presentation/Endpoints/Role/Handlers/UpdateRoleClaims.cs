@@ -46,7 +46,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers
                 logger.LogRoleClaimAssignmentException(id.ToString(), string.Join(",", model.Claims), ex.Message);
                 throw;
             }
-
+            
         }
     }
 }

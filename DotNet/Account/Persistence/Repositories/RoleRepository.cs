@@ -12,7 +12,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
         public RoleRepository(AccountDbContext dbContext)
         {
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
-        }
+        }        
 
         public async Task<bool> CreateAsync(LinkRole entity, CancellationToken cancellationToken = default)
         {
@@ -23,7 +23,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
         public async Task<bool> UpdateAsync(LinkRole entity, CancellationToken cancellationToken = default)
         {
             var currentRole = await _dbContext.Roles.FindAsync([entity.Id], cancellationToken);
-            if (currentRole is null)
+            if(currentRole is null)
             {
                 return false;
             }
@@ -35,7 +35,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
         public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
         {
             var role = await _dbContext.Roles.FindAsync([id], cancellationToken);
-            if (role is null)
+            if(role is null)
             {
                 return false;
             }
@@ -55,9 +55,9 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
                 return false;
             }
 
-            if (role.RoleClaims.Any(x => x.ClaimType == claim.Type && x.ClaimValue == claim.Value))
+            if(role.RoleClaims.Any(x => x.ClaimType == claim.Type && x.ClaimValue == claim.Value))
             {
-                return true;
+               return true;
             }
 
             role.RoleClaims.Add(new LinkRoleClaim { RoleId = roleId, ClaimType = claim.Type, ClaimValue = claim.Value });
@@ -77,13 +77,13 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
             }
 
             var roleClaim = role.RoleClaims.FirstOrDefault(x => x.ClaimType == claim.Type && x.ClaimValue == claim.Value);
-            if (roleClaim is null)
+            if(roleClaim is null)
             {
                 return true;
             }
 
             role.RoleClaims.Remove(roleClaim);
-            return await _dbContext.SaveChangesAsync(cancellationToken) > 0;
+            return await _dbContext.SaveChangesAsync(cancellationToken) > 0;            
         }
 
         public async Task<LinkRole> GetRoleAsync(Guid roleId, bool noTracking = true, CancellationToken cancellationToken = default)
@@ -114,7 +114,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
 
         public async Task<IEnumerable<LinkRole>> GetRolesAsync(CancellationToken cancellationToken = default)
         {
-            var roles = await _dbContext.Roles.AsNoTracking().ToListAsync(cancellationToken);
+            var roles = await _dbContext.Roles.AsNoTracking().ToListAsync(cancellationToken);                
 
             return roles;
         }
@@ -123,7 +123,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
         {
             var roleClaims = await _dbContext.Roles.AsNoTracking()
                 .Where(x => x.Id == roleId)
-                .SelectMany(x => x.RoleClaims)
+                .SelectMany(x => x.RoleClaims)                
                 .ToListAsync(cancellationToken);
 
             var claims = roleClaims.Select(x => x.ToClaim());

@@ -282,7 +282,7 @@ public class PatientListService : IPatientListService
 
         if (patientsToDischarge.Any())
         {
-            foreach (var patientId in patientsToDischarge)
+            foreach(var patientId in patientsToDischarge)
             {
                 var dischargeList = new PatientListItem
                 {

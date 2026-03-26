@@ -173,7 +173,7 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations
                 SortOrder.Descending => query.OrderByDescending(sortExpression),
                 _ => query
             };
-
+            
 
             var results = await query
                 .Skip((pageNumber - 1) * pageSize)

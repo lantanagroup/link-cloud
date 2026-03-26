@@ -105,7 +105,7 @@ public class FhirListQueryConfigurationManager : IFhirListQueryConfigurationMana
                 $"A FhirListConfiguration already exists for facilityId: {model.FacilityId?.SanitizeAndRemove()}");
         }
 
-        if (string.IsNullOrEmpty(model.FacilityId))
+        if(string.IsNullOrEmpty(model.FacilityId))
         {
             activity?.SetStatus(ActivityStatusCode.Error, "FacilityId cannot be null");
             throw new ArgumentNullException(nameof(model.FacilityId));
@@ -116,7 +116,7 @@ public class FhirListQueryConfigurationManager : IFhirListQueryConfigurationMana
             activity?.SetStatus(ActivityStatusCode.Error, "FhirBaseServerUrl cannot be null");
             throw new ArgumentNullException(nameof(model.FhirBaseServerUrl));
         }
-
+        
         // Verify that the facility does not already have an SFTP configuration
         // A facility can only have one census acquisition method (SFTP or FHIR List)
         var existingSftpConfig = await _database.SftpConfigurationRepository
@@ -143,7 +143,7 @@ public class FhirListQueryConfigurationManager : IFhirListQueryConfigurationMana
             CreateDate = DateTime.UtcNow,
             ModifyDate = DateTime.UtcNow,
         };
-
+        
         var newEntity = await _database.FhirListConfigurationRepository.AddAsync(entity, cancellationToken);
         await _database.FhirListConfigurationRepository.SaveChangesAsync(cancellationToken);
 
@@ -154,7 +154,7 @@ public class FhirListQueryConfigurationManager : IFhirListQueryConfigurationMana
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("FhirListQueryConfigurationManager.UpdateAsync");
         activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
-
+        
         if (string.IsNullOrEmpty(model.FacilityId))
         {
             activity?.SetStatus(ActivityStatusCode.Error, "FacilityId cannot be null");

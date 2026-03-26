@@ -42,7 +42,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
                 var role = new LinkRole
                 {
                     Name = model.Name,
-                    Description = model.Description
+                    Description = model.Description                    
                 };
 
                 //add created by if requestor is provided
@@ -63,7 +63,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
                 {
                     foreach (var claim in model.Claims)
                     {
-                        result = await _roleRepository.AddClaimAsync(role.Id,
+                        result = await _roleRepository.AddClaimAsync(role.Id, 
                             new Claim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, claim));
 
                         if (!result)
@@ -78,7 +78,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
 
                 //generate audit event
                 var auditMessage = new AuditEventMessage
-                {
+                {                    
                     Action = AuditEventType.Create,
                     EventDate = DateTime.UtcNow,
                     UserId = role.CreatedBy,

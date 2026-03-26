@@ -30,8 +30,8 @@ public class FhirQueryListConfigurationQueries : IFhirQueryListConfigurationQuer
         activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
 
         var result = await (from fl in _database.FhirListConfigurations
-                            where fl.FacilityId == facilityId
-                            select FhirListConfigurationModel.FromDomain(fl)).SingleOrDefaultAsync();
+                           where fl.FacilityId == facilityId
+                         select FhirListConfigurationModel.FromDomain(fl)).SingleOrDefaultAsync();
 
         return result;
     }

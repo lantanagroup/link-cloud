@@ -17,13 +17,13 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
         public UserRepository(ILogger<UserRepository> logger, AccountDbContext dbContext, IOptions<UserManagementSettings> userManagementOptions)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+            _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));            
             _userManagementOptions = userManagementOptions ?? throw new ArgumentNullException(nameof(userManagementOptions));
         }
 
         public async Task<bool> CreateAsync(LinkUser entity, CancellationToken cancellationToken = default)
         {
-            entity.IsActive = _userManagementOptions.Value.EnableAutomaticUserActivation;
+            entity.IsActive = _userManagementOptions.Value.EnableAutomaticUserActivation;          
 
             await _dbContext.Users.AddAsync(entity, cancellationToken);
             return await _dbContext.SaveChangesAsync(cancellationToken) > 0;
@@ -62,11 +62,11 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
                 return false;
             }
 
-            foreach (var role in roles)
+            foreach(var role in roles)
             {
                 user.UserRoles.Add(new LinkUserRole { UserId = userId, RoleId = role.Id });
             }
-
+            
             return await _dbContext.SaveChangesAsync(cancellationToken) > 0;
         }
 
@@ -107,7 +107,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
 
             foreach (var role in roles)
             {
-
+                
                 var roleToRemove = user.UserRoles.FirstOrDefault(x => x.UserId == userId && x.RoleId == role.Id);
                 if (roleToRemove is not null)
                 {
@@ -172,8 +172,8 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
             foreach (var claim in claims)
             {
                 user.Claims.Add(new LinkUserClaim { UserId = userId, ClaimType = claim.Type, ClaimValue = claim.Value });
-
-                if (await _dbContext.SaveChangesAsync(cancellationToken) > 0)
+                
+                if(await _dbContext.SaveChangesAsync(cancellationToken) > 0)
                 {
                     _logger.LogUserClaimAssignment(userId.ToString(), claim.Type, claim.Value, string.Empty);
                     addedClaims++;
@@ -209,7 +209,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
                 else
                 {
                     _logger.LogUserClaimRemovalException(userId.ToString(), claim.Type, claim.Value, "Failed to remove claim from user");
-                }
+                }                
 
                 if (await _dbContext.SaveChangesAsync(cancellationToken) > 0)
                 {
@@ -277,7 +277,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
                     .FirstOrDefaultAsync(x => x.Email == email, cancellationToken);
 
             return user;
-        }
+        }        
 
         public async Task<IEnumerable<LinkRole>> GetUserRoles(Guid userId, CancellationToken cancellationToken = default)
         {
@@ -288,6 +288,6 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
                 .ToListAsync(cancellationToken);
 
             return roles;
-        }
+        }        
     }
 }

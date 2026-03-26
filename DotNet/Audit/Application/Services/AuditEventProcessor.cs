@@ -44,7 +44,7 @@ namespace LantanaGroup.Link.Audit.Application.Services
             //create audit event                                   
             var auditEventModel = AuditModel.FromMessage(messageValue);
             _logger.LogAuditableEventConsumption(result.Message.Key, messageValue.ServiceName ?? string.Empty, auditEventModel);
-
+                        
             try
             {
                 _ = await _auditManager.CreateAuditLog(auditEventModel, cancellationToken);

@@ -21,7 +21,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
         private readonly ILogger<DeactivateUser> _logger;
         private readonly IUserRepository _userRepository;
         private readonly IAccountServiceMetrics _metrics;
-        private readonly ILinkUserModelFactory _linkUserModelFactory;
+        private readonly ILinkUserModelFactory  _linkUserModelFactory;
         private readonly ICreateAuditEvent _createAuditEvent;
 
         public RecoverUser(ILogger<DeactivateUser> logger, IUserRepository userRepository, IAccountServiceMetrics metrics, ILinkUserModelFactory linkUserModelFactory, ICreateAuditEvent createAuditEvent)
@@ -52,7 +52,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                 if (requestor is not null)
                 {
                     user.LastModifiedBy = requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
-                }
+                }                
 
                 var result = await _userRepository.UpdateAsync(user, cancellationToken);
 
@@ -73,7 +73,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
                 //generate audit event
                 var auditMessage = new AuditEventMessage
-                {
+                {                    
                     Action = AuditEventType.Update,
                     EventDate = DateTime.UtcNow,
                     UserId = user.LastModifiedBy,

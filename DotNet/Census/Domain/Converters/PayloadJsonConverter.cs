@@ -37,11 +37,11 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
         string jsonString = rootElement.GetRawText();
 
         // Try to extract payload type for discriminator-based deserialization
-        if (rootElement.TryGetProperty("PayloadType", out var payloadTypeElement) &&
+        if (rootElement.TryGetProperty("PayloadType", out var payloadTypeElement) && 
             payloadTypeElement.ValueKind == JsonValueKind.String)
         {
             string payloadType = payloadTypeElement.GetString();
-
+        
             // IMPORTANT: Create a new options instance without this converter to avoid infinite recursion
             var newOptions = new JsonSerializerOptions(options);
             // We need to clear the converters list and add all except this one
@@ -51,7 +51,7 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
             {
                 newOptions.Converters.Add(converter);
             }
-
+        
             // Now deserialize with the appropriate type based on payloadType
             switch (payloadType)
             {
@@ -59,32 +59,32 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
                 case "FHIRListAdmit":
                     string patientId = null;
                     DateTime admitDate = DateTime.MinValue;
-
+                
                     if (rootElement.TryGetProperty("PatientId", out var patientIdProp))
                         patientId = patientIdProp.GetString();
-
-                    if (rootElement.TryGetProperty("AdmitDate", out var admitDateProp) &&
+                    
+                    if (rootElement.TryGetProperty("AdmitDate", out var admitDateProp) && 
                         admitDateProp.ValueKind == JsonValueKind.String)
                     {
                         DateTime.TryParse(admitDateProp.GetString(), out admitDate);
                     }
-
+                
                     return new FHIRListAdmitPayload(patientId, admitDate);
 
-
+            
                 case "FHIRListDischarge":
                     patientId = null;
                     DateTime dischargeDate = DateTime.MinValue;
-
+                
                     if (rootElement.TryGetProperty("PatientId", out patientIdProp))
                         patientId = patientIdProp.GetString();
-
-                    if (rootElement.TryGetProperty("DischargeDate", out var dischargeDateProp) &&
+                    
+                    if (rootElement.TryGetProperty("DischargeDate", out var dischargeDateProp) && 
                         dischargeDateProp.ValueKind == JsonValueKind.String)
                     {
                         DateTime.TryParse(dischargeDateProp.GetString(), out dischargeDate);
                     }
-
+                
                     return new FHIRListDischargePayload(patientId, dischargeDate);
                 case "CernerListAdmit":
                     return JsonSerializer.Deserialize<CernerListAdmitPayload>(document);
@@ -96,7 +96,7 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
                     return null;
             }
         }
-
+    
         return null;
     }
 
@@ -130,7 +130,7 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
         {
             writer.WriteRawValue(JsonSerializer.Serialize(cernerAdmitPayload));
         }
-        else if (value is CernerListUpdatePayload cernerUpdatePayload)
+        else if (value is CernerListUpdatePayload cernerUpdatePayload) 
         {
             writer.WriteRawValue(JsonSerializer.Serialize(cernerUpdatePayload));
         }
@@ -139,4 +139,4 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
             writer.WriteRawValue(JsonSerializer.Serialize(cernerDischargePayload));
         }
     }
-}
+ }

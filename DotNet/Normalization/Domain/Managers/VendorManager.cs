@@ -32,14 +32,14 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
         public async Task<VendorModel?> CreateVendor(string vendorName)
         {
-            if (string.IsNullOrEmpty(vendorName))
+            if(string.IsNullOrEmpty(vendorName))
             {
                 throw new ArgumentNullException(nameof(vendorName));
             }
 
             var existingVendor = await _vendorQueries.GetVendor(vendorName);
 
-            if (existingVendor != null)
+            if(existingVendor != null)
             {
                 return null;
             }
@@ -96,7 +96,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
         {
             var foundVendor = await _database.Vendors.SingleOrDefaultAsync(v => v.Name == vendor);
 
-            if (foundVendor == null)
+            if(foundVendor == null)
             {
                 throw new InvalidOperationException($"No Vendor by the name of '{vendor.Sanitize()}' found.");
             }
@@ -139,7 +139,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             //Remove all of the operations that are only tied to this vendor version preset
             var orts = await _database.OperationResourceTypes.FindAsync(ort => ort.VendorVersionOperationPresets.All(vp => vp.Id == vendorVersionPresetId));
 
-            foreach (var opId in orts.Select(ort => ort.OperationId).ToList())
+            foreach(var opId in orts.Select(ort => ort.OperationId).ToList())
             {
                 await _operationManager.DeleteOperation(new DeleteOperationModel()
                 {

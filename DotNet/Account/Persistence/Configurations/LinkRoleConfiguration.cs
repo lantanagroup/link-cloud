@@ -27,7 +27,7 @@ namespace LantanaGroup.Link.Account.Persistence.Configurations
             // Each Role can have many associated RoleClaims
             builder.HasMany(e => e.RoleClaims)
                 .WithOne(e => e.Role)
-                .HasForeignKey(rc => rc.RoleId);
+                .HasForeignKey(rc => rc.RoleId);            
         }
     }
 }

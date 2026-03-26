@@ -49,7 +49,7 @@ namespace UnitTests.Account
         {
             var resultType = typeof(TResult);
 
-            if (resultType.IsGenericType && resultType.GetGenericTypeDefinition() == typeof(Task<>))
+            if(resultType.IsGenericType && resultType.GetGenericTypeDefinition() == typeof(Task<>))
             {
                 var innerType = resultType.GetGenericArguments()[0];
                 var executeMethod = typeof(TestAsyncQueryProvider<TEntity>).GetMethod(nameof(ExecuteAsyncInternal), BindingFlags.NonPublic | BindingFlags.Instance);
@@ -63,7 +63,7 @@ namespace UnitTests.Account
         private async Task<TResult> ExecuteAsyncInternal<TResult>(Expression expression, CancellationToken cancellationToken)
         {
             var result = _inner.Execute<TResult>(expression);
-            if (result is Task<TResult> taskResult)
+            if(result is Task<TResult> taskResult)
             {
                 return await taskResult.ConfigureAwait(false);
             }

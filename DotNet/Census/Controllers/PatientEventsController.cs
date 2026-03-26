@@ -50,8 +50,8 @@ public class PatientEventsController : Controller
         string? correlationId,
         DateTime? startDate,
         DateTime? endDate,
-        string? sortBy,
-        SortOrder? sortOrder,
+        string? sortBy, 
+        SortOrder? sortOrder, 
         int pageSize = 10,
         int pageNumber = 1,
         CancellationToken cancellationToken = default)
@@ -112,7 +112,7 @@ public class PatientEventsController : Controller
         {
             var patientEventFaciltyId = (await _patientEventQueries.GetPatientEventById(id, cancellationToken))?.FacilityId;
 
-            if (string.IsNullOrWhiteSpace(patientEventFaciltyId))
+            if(string.IsNullOrWhiteSpace(patientEventFaciltyId))
             {
                 await transaction.RollbackAsync(cancellationToken);
                 return NotFound($"Patient event with ID {id} not found.");

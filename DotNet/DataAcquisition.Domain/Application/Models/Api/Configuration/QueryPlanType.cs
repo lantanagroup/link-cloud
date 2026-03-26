@@ -5,8 +5,8 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Config
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum QueryPlanType
 {
-    QueryPlans,
-    Initial,
+    QueryPlans, 
+    Initial, 
     Supplemental
 }
 

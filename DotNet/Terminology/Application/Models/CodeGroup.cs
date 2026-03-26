@@ -14,7 +14,7 @@ public class CodeGroup
     public string? Url { get; set; }
     public List<Identifier> Identifiers { get; set; } = [];
     public Resource? Resource { get; set; }
-
+    
     // Key is code system URI, value is list of codes
     public Dictionary<string, List<Code>> Codes { get; set; } = new Dictionary<string, List<Code>>();
 

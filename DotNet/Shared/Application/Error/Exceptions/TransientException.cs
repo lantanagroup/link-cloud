@@ -6,12 +6,12 @@ namespace LantanaGroup.Link.Shared.Application.Error.Exceptions
     {
         public TransientException(string message) : base(message)
         {
-
+          
         }
 
         public TransientException(string message, Exception? innerEx) : base(message, innerEx)
         {
-
+            
         }
     }
 }

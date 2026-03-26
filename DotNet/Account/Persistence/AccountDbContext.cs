@@ -9,23 +9,23 @@ using System.Reflection.Emit;
 namespace LantanaGroup.Link.Account.Persistence;
 
 public class AccountDbContext : DbContext
-{
-
+{ 
+    
     public AccountDbContext() : base()
     {
     }
 
     public AccountDbContext(DbContextOptions<AccountDbContext> options) : base(options)
     {
-    }
+    }       
 
     public DbSet<LinkUser> Users { get; set; } = null!;
     public DbSet<LinkRole> Roles { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
-    {
+    {           
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AccountDbContext).Assembly);
-        base.OnModelCreating(modelBuilder);
+        base.OnModelCreating(modelBuilder);                       
     }
 
     public class AccountDbContextFactory : IDesignTimeDbContextFactory<AccountDbContext>

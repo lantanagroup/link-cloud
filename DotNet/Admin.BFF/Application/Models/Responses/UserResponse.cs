@@ -22,7 +22,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Responses
         /// The user's email address
         /// </summary>
         /// <example>jane.doe@gmail.com</example>
-        public string Email { get; set; } = string.Empty;
+        public string Email{ get; set; } = string.Empty;
 
         /// <summary>
         /// The roles assigned to the user

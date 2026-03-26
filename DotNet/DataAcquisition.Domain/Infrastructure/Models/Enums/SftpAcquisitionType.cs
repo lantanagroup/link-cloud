@@ -23,11 +23,11 @@ public class FhirVersionJsonConverter : JsonConverter<SftpAcquisitionType>
 {
     public override SftpAcquisitionType Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
-        if (Enum.TryParse<SftpAcquisitionType>(reader.GetString(), true, out var result))
+        if(Enum.TryParse<SftpAcquisitionType>(reader.GetString(), true, out var result))
         {
             return result;
         }
-
+        
         throw new JsonException($"Unable to convert \"{reader.GetString()}\" to {nameof(SftpAcquisitionType)}.");
     }
 

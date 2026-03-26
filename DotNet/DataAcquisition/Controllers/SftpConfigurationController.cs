@@ -69,7 +69,7 @@ public class SftpConfigurationController : Controller
     public async Task<ActionResult<SftpConfigurationModel>> GetSftpConfigurationById(Guid id, CancellationToken cancellationToken)
     {
         var httpContext = HttpContext;
-
+        
         // validate user access to organization before proceeding - future enhancement
 
         try
@@ -115,19 +115,19 @@ public class SftpConfigurationController : Controller
     public async Task<ActionResult<SftpConfigurationModel>> GetOrgSftpConfiguration(string organizationId, CancellationToken cancellationToken)
     {
         var httpContext = HttpContext;
-
+        
         // validate user access to organization before proceeding - future enhancement
 
         // Sanitize organizationId
         organizationId = organizationId.SanitizeAndRemove();
-
+        
         try
         {
             if (string.IsNullOrWhiteSpace(organizationId))
             {
                 return BadRequest("OrganizationId is null or empty.");
             }
-
+            
             var result = await _sftpConfigurationQueries.GetByOrganizationIdAsync(organizationId, cancellationToken);
 
             if (result is null)
@@ -200,7 +200,7 @@ public class SftpConfigurationController : Controller
 
             // Verify that the facility/organization exists
             var facilityExists = await _tenantApiService.CheckFacilityExists(organizationId, cancellationToken);
-
+            
             if (!facilityExists)
             {
                 return NotFound($"No facility found for organizationId: {organizationId}");
@@ -208,7 +208,7 @@ public class SftpConfigurationController : Controller
 
             // Default AuthType to Basic until other authentication options are supported
             sftpConfiguration.AuthenticationProtocol = AuthType.Basic;
-
+            
             // Create the configuration in the database
             var result =
                 await _sftpConfigurationManager.CreateAsync(sftpConfiguration, organizationId, cancellationToken);
@@ -291,7 +291,7 @@ public class SftpConfigurationController : Controller
 
         // Sanitize organizationId
         organizationId = organizationId.SanitizeAndRemove();
-
+        
         try
         {
             if (string.IsNullOrWhiteSpace(organizationId))
@@ -384,20 +384,20 @@ public class SftpConfigurationController : Controller
     public async Task<ActionResult> DeleteSftpConfiguration(string organizationId, string configurationId, CancellationToken cancellationToken)
     {
         var httpContext = HttpContext;
-
+        
         // validate user access to organization before proceeding - future enhancement
 
         // Sanitize organizationId
         organizationId = organizationId.SanitizeAndRemove();
-
+        
         try
         {
             if (string.IsNullOrWhiteSpace(organizationId))
             {
                 return BadRequest("OrganizationId is null or empty.");
             }
-
-            if (!Guid.TryParse(configurationId, out var configId))
+            
+            if(!Guid.TryParse(configurationId, out var configId))
             {
                 return BadRequest("The SFTP configuration Id is in an invalid format.");
             }
@@ -424,8 +424,7 @@ public class SftpConfigurationController : Controller
 
                 return Accepted(result);
             }
-            catch (OrganizationalAccessException ex)
-            {
+            catch (OrganizationalAccessException ex) {
                 _logger.LogWarning(
                     new EventId(LoggingIds.DeleteItem, "DeleteSftpConfiguration"),
                     ex,
@@ -465,12 +464,12 @@ public class SftpConfigurationController : Controller
     public async Task<ActionResult> UpdateSftpCredentials(string organizationId, SftpCredentialsModel? credentials, CancellationToken cancellationToken)
     {
         var httpContext = HttpContext;
-
+        
         // validate user access to organization before proceeding - future enhancement
 
         // Sanitize organizationId
         organizationId = organizationId.SanitizeAndRemove();
-
+        
         try
         {
             if (string.IsNullOrWhiteSpace(organizationId))
@@ -537,12 +536,12 @@ public class SftpConfigurationController : Controller
     public async Task<ActionResult<SftpCredentialStatusModel>> GetSftpCredentialStatus(string organizationId, CancellationToken cancellationToken)
     {
         var httpContext = HttpContext;
-
+        
         // validate user access to organization before proceeding - future enhancement
 
         // Sanitize organizationId
         organizationId = organizationId.SanitizeAndRemove();
-
+        
         try
         {
             if (string.IsNullOrWhiteSpace(organizationId))
@@ -588,12 +587,12 @@ public class SftpConfigurationController : Controller
     public async Task<ActionResult> DeleteSftpCredentials(string organizationId, CancellationToken cancellationToken)
     {
         var httpContext = HttpContext;
-
+        
         // validate user access to organization before proceeding - future enhancement
 
         // Sanitize organizationId
         organizationId = organizationId.SanitizeAndRemove();
-
+        
         try
         {
             if (string.IsNullOrWhiteSpace(organizationId))
