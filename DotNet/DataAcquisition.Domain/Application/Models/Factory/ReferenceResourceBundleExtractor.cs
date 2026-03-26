@@ -40,7 +40,7 @@ public class ReferenceResourceBundleExtractor
 
     private static void Walk(Base ancestor, List<Base> results, List<string> validResourceTypes)
     {
-        if (validResourceTypes.Contains(ancestor.TypeName, StringComparer.InvariantCultureIgnoreCase))
+        if (validResourceTypes.Contains(ancestor.TypeName,StringComparer.InvariantCultureIgnoreCase))
         {
             results.Add(ancestor);
         }

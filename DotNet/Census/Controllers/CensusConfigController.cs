@@ -55,7 +55,7 @@ public class CensusConfigController : Controller
 
         try
         {
-            var entity = CensusConfigModel.FromDomain(await _censusConfigManager.AddOrUpdateCensusConfig(censusConfig));
+            var entity =  CensusConfigModel.FromDomain(await _censusConfigManager.AddOrUpdateCensusConfig(censusConfig));
 
             return Created(entity.FacilityId, entity);
         }

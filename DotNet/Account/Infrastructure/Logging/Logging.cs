@@ -16,7 +16,7 @@ namespace LantanaGroup.Link.Account.Infrastructure.Logging
             AccountLoggingIds.AuditEventCreated,
             LogLevel.Information,
             "Audit event created.")]
-        public static partial void LogAuditEventCreated(this ILogger logger, [LogProperties] AuditEventMessage auditEvent);
+        public static partial void LogAuditEventCreated(this ILogger logger, [LogProperties]AuditEventMessage auditEvent);
 
         //create logger message for audit event creation exception
         [LoggerMessage(
@@ -30,6 +30,6 @@ namespace LantanaGroup.Link.Account.Infrastructure.Logging
             LogLevel.Error,
             "An exception occured while attempting to access cache {cacheKey}: {message}.")]
         public static partial void LogCacheException(this ILogger logger, string cacheKey, string message);
-
+       
     }
 }

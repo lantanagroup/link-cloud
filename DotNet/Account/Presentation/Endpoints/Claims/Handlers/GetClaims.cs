@@ -26,7 +26,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Claims.Handlers
                 logger.LogError(ex, "Error getting claims");
                 throw;
             }
-
+            
         }
     }
 }

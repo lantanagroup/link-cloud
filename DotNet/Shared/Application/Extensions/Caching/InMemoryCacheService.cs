@@ -15,10 +15,10 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Caching
 
         public T Get<T>(string key)
         {
-            if (string.IsNullOrEmpty(key)) throw new ArgumentNullException(nameof(key));
+            if (string.IsNullOrEmpty(key))  throw new ArgumentNullException(nameof(key));
 
             if (_cache.TryGetValue(key, out T value))
-                return value;
+               return value;
 
             return default(T);
         }
@@ -26,11 +26,11 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Caching
         public void Set<T>(string key, T value, TimeSpan expiration, ExpirationType expirationType = ExpirationType.Sliding)
         {
             if (string.IsNullOrEmpty(key)) throw new ArgumentNullException(nameof(key));
-
-            var options = expirationType == ExpirationType.Sliding
-                ? new MemoryCacheEntryOptions().SetSlidingExpiration(expiration).SetSize(1)
+            
+            var options = expirationType == ExpirationType.Sliding 
+                ? new MemoryCacheEntryOptions().SetSlidingExpiration(expiration).SetSize(1) 
                 : new MemoryCacheEntryOptions().SetAbsoluteExpiration(expiration).SetSize(1);
-
+            
             _cache.Set(key, value, options);
         }
 

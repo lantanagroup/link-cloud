@@ -15,7 +15,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
     {
         private readonly IDatabase _database;
         private readonly NormalizationDbContext _dbContext;
-        public OperationSequenceQueries(IDatabase database, NormalizationDbContext dbContext)
+        public OperationSequenceQueries(IDatabase database, NormalizationDbContext dbContext) 
         {
             _database = database;
             _dbContext = dbContext;
@@ -49,7 +49,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                             FacilityId = o.FacilityId,
                             Sequence = o.Sequence.HasValue ? o.Sequence.Value : default,
                             ModifyDate = o.ModifyDate,
-                            CreateDate = o.CreateDate,
+                            CreateDate = o.CreateDate,      
                             OperationResourceType = new OperationResourceTypeModel()
                             {
                                 Id = o.OperationResourceTypeId,

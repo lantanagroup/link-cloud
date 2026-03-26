@@ -28,7 +28,7 @@ public class SftpAcquisitionSettings
     /// Interval in seconds between job executions.
     /// </summary>
     public int JobIntervalSeconds { get; set; } = 30;
-
+    
     /// <summary>
     /// Maximum number of logs to process in a single batch.
     /// </summary>

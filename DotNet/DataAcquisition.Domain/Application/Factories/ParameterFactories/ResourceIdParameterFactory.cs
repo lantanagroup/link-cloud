@@ -18,13 +18,13 @@ public class ResourceIdParameterFactory : IResourceIdParameterFactory
     {
         List<string> resourceIds = await
             dataAcquisitionLogQueries.GetResourceIdsForReportPatient(request.CorrelationId, request.FacilityId, parameter.Resource);
-
+        
         if (resourceIds == null || !resourceIds.Any())
         {
             _logger.LogWarning("ResourceIdsParameter validation failed: resourceIds is null or empty. Parameter Name: {Name}", parameter.Name);
             return null;
         }
-
+        
         Int32.TryParse(parameter.Paged, out int pageSize);
 
         if (!string.IsNullOrWhiteSpace(parameter.Paged) && pageSize > 0 && resourceIds.Count > pageSize)

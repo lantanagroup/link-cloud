@@ -14,10 +14,10 @@ public static class EFMigrations
         {
             using var scope = app.Services.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<T>();
-
+            
             // Set command timeout for migrations to 30 minutes (1800 seconds)
             dbContext.Database.SetCommandTimeout(TimeSpan.FromMinutes(30));
-
+            
             dbContext.Database.Migrate();
         }
     }

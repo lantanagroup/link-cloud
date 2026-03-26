@@ -51,7 +51,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
         activity?.SetTag(DiagnosticNames.CorrelationId, model.CorrelationId);
 
-        if (model.ScheduledReport == null)
+        if(model.ScheduledReport == null)
         {
             throw new ArgumentNullException("Required property ScheduledReport must not be null");
         }
@@ -125,7 +125,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
         var log = await _database.DataAcquisitionLogRepository.GetAsync(id);
 
-        if (log == null)
+        if (log == null) 
         {
             throw new NotFoundException($"No log found for id: {id}");
         }
@@ -275,7 +275,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             throw new DataAcquisitionLogNotFoundException($"Data acquisition log with ID {updateLog.Id} not found.");
         }
 
-        if (updateLog.RetryAttempts is not null)
+        if(updateLog.RetryAttempts is not null)
         {
             existingLog.RetryAttempts = updateLog.RetryAttempts;
         }
@@ -358,14 +358,14 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
         // Use ExecuteUpdateAsync for a high-performance batch update if available on the repository/context
         // Since we are using a generic repository, we might need to fall back to a manual query or range update
-
+        
         var logs = await _database.DataAcquisitionLogRepository.FindAsync(x => logIds.Contains(x.Id), cancellationToken);
 
         if (logs.Count == 0)
         {
             throw new NotFoundException($"Data acquisition logs with IDs {string.Join(", ", logIds)} not found.");
         }
-
+        
         foreach (var entity in logs)
         {
             entity.TailSent = true;
@@ -373,7 +373,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             entity.Notes ??= new();
             entity.Notes.Add("Tail Message Sent");
         }
-
+        
         await _database.DataAcquisitionLogRepository.SaveChangesAsync(cancellationToken);
     }
 
@@ -389,7 +389,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             // Get All Active Logs For Batch
             var toThrottle = await _logQueries.GetNextEligibleBatchForFacility(facilityId, lastId, batchSize, [RequestStatus.Failed, RequestStatus.Ready, RequestStatus.Pending], executionDate, cancellationToken);
 
-            if (toThrottle.Count == 0)
+            if(toThrottle.Count == 0)
             {
                 break;
             }

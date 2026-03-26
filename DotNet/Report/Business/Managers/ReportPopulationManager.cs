@@ -79,7 +79,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     entity.GroupPopulations.Add(newGroup);
                 }
                 else
-                {
+                {                   
                     existingGroup.PopulationCodeJson = groupModel.PopulationCodeJson;
                     existingGroup.TotalPopulationCount = groupModel.TotalPopulationCount;
 
@@ -121,7 +121,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task AddRangeAsync(IEnumerable<ReportPopulationModel> models, CancellationToken cancellationToken)
         {
-            if (models == null || !models.Any())
+            if (models == null || !models.Any()) 
                 return;
 
             var entities = new List<ReportPopulation>();
@@ -266,7 +266,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     group.TotalPopulationCount += aggregate.PopulationCount;
                 }
 
-                if (!group.MeasureReportPopulations.Any(mrp => mrp.MeasureReportId == aggregateResult.MeasureReportId))
+                if(!group.MeasureReportPopulations.Any(mrp => mrp.MeasureReportId == aggregateResult.MeasureReportId))
                 {
                     group.MeasureReportPopulations.Add(new MeasureReportPopulationModel
                     {

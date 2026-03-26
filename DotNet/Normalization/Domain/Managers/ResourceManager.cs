@@ -18,7 +18,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
     {
         private readonly IDatabase _database;
         private readonly IResourceQueries _resourceQueries;
-        public ResourceManager(IDatabase database, IResourceQueries resourceQueries)
+        public ResourceManager(IDatabase database, IResourceQueries resourceQueries) 
         {
             _database = database;
             _resourceQueries = resourceQueries;
@@ -26,7 +26,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
         public async Task<ResourceModel> CreateResource(string resourceName, bool bypassTypeCheck = false)
         {
-            if (string.IsNullOrWhiteSpace(resourceName))
+            if(string.IsNullOrWhiteSpace(resourceName))
             {
                 throw new InvalidOperationException("Provided resource name cannot be null, empty, or whitepsace.");
             }
@@ -63,7 +63,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
         {
             var resourceEntity = await _database.ResourceTypes.FindAsync(r => r.Name == resource);
 
-            if (resourceEntity == null || resourceEntity.Count > 1 || resourceEntity.Count == 0)
+            if(resourceEntity == null || resourceEntity.Count > 1 || resourceEntity.Count == 0)
             {
                 throw new InvalidOperationException("An Error has occurred while deleting the Resource.");
             }

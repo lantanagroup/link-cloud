@@ -65,7 +65,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
                     var outcome = await _roleRepository.AddClaimAsync(role.Id, newClaim, cancellationToken);
 
                     if (outcome)
-                    {
+                    { 
                         _logger.LogRoleClaimAssignment(role.Id.ToString(), newClaim.Type, newClaim.Value, requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown");
                     }
                 }
@@ -86,10 +86,10 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
 
                 //Capture changes
                 List<PropertyChangeModel> changes = [];
-                if (addedClaims.Any() || removedClaims.Any())
+                if(addedClaims.Any() || removedClaims.Any())
                 {
                     changes.Add(new PropertyChangeModel("Claims", string.Join(",", currentClaims), string.Join(",", claims)));
-                }
+                }             
 
                 _logger.LogRoleUpdated(role.Name ?? string.Empty, role.LastModifiedBy ?? string.Empty, _roleModelFactory.Create(role));
 
@@ -119,14 +119,14 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
                             var userKey = $"user:{user.Email}";
                             _cache.Remove(userKey);
                         }
-                    }
-                }
+                    }                                                          
+                }            
 
                 return true;
             }
             catch (Exception)
             {
-                activity?.SetStatus(ActivityStatusCode.Error);
+                activity?.SetStatus(ActivityStatusCode.Error);                
                 throw;
             }
         }

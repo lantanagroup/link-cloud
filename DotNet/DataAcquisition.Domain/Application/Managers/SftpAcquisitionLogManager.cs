@@ -121,7 +121,7 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
     {
         using var activity = Activity.Current?.Source.StartActivity();
         activity?.AddTag(DiagnosticNames.FacilityId, model.FacilityId);
-
+        
         if (string.IsNullOrEmpty(model.FacilityId))
         {
             activity?.SetStatus(ActivityStatusCode.Error, "FacilityId cannot be empty or null");
@@ -149,7 +149,7 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
             await database.SaveChangesAsync();
 
             logger.LogInformation("Created SFTP Acquisition Log for FacilityId: {FacilityId}, FileNames: {FileNames}", model.FacilityId.Sanitize(), string.Join(", ", model.FileNames));
-
+        
             return entity.ToModel();
         }
         catch (Exception ex)
@@ -166,7 +166,7 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
     {
         using var activity = Activity.Current?.Source.StartActivity();
         activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
-
+        
 
         if (string.IsNullOrEmpty(model.FacilityId))
         {
@@ -182,7 +182,7 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
             activity?.SetStatus(ActivityStatusCode.Error, "SFTP Acquisition log not found");
             throw new DomainEntityNotFoundException($"SFTP Acquisition log with ID {model.ExternalId} not found.");
         }
-
+        
         try
         {
             // Update existing log entry
@@ -208,7 +208,7 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
             throw;
         }
     }
-
+    
     /// <inheritdoc/>
     public async Task DeleteAsync(long id, CancellationToken cancellationToken = default)
     {

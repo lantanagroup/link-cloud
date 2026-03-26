@@ -13,7 +13,7 @@ public class FHIRListAdmitPayload : IPayload
 {
     public string PayloadType { get; } = EventType.FHIRListAdmit.ToString();
     //TODO: Daniel - Do we need to add Json property names to each property? Look at CernerListAdmitPayload.
-
+    
     [JsonPropertyName("patientId")]
     public string PatientId;
     [JsonPropertyName("admitDate")]
@@ -31,7 +31,7 @@ public class FHIRListAdmitPayload : IPayload
         return new PatientEncounterBuilder(facilityId, null, AdmitDate, null, correlationId)
                 .AddPatientIdentifier(PatientId, Enums.SourceType.FHIR).GetPatientEncounter();
     }
-
+    
     public PatientEvent CreatePatientEvent(string facilityId, string correlationId)
     {
         return PatientEventFactory.Create(correlationId, PatientId, null, null, Enums.EventType.FHIRListAdmit, this, Enums.SourceType.FHIR, facilityId);

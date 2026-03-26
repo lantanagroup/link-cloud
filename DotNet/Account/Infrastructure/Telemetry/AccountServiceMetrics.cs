@@ -13,7 +13,7 @@ namespace LantanaGroup.Link.Account.Infrastructure.Telemetry
             Meter meter = meterFactory.Create(MeterName);
             AccountAddedCounter = meter.CreateCounter<long>("link_account_service.account_added.count");
             AccountActiviatedCounter = meter.CreateCounter<long>("link_account_service.account_activiated.count");
-            AccountDeactivatedCounter = meter.CreateCounter<long>("link_account_service.account_deactivated.count");
+            AccountDeactivatedCounter = meter.CreateCounter<long>("link_account_service.account_deactivated.count"); 
             AccountDeletedCounter = meter.CreateCounter<long>("link_account_service.account_deleted.count");
             AccountRestoredCounter = meter.CreateCounter<long>("link_account_service.account_restored.count");
         }

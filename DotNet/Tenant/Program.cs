@@ -199,8 +199,7 @@ namespace Tenant
             builder.Services.AddSingleton<ReportScheduledJob>();
 
             //Add CORS
-            builder.Services.AddLinkCorsService(options =>
-            {
+            builder.Services.AddLinkCorsService(options => {
                 options.Environment = builder.Environment;
             });
 

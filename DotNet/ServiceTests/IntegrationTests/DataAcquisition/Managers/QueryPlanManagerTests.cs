@@ -61,10 +61,11 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         Assert.Equal(Frequency.Daily, result.Type);
         Assert.Equal("TestEHR", result.EHRDescription);
         Assert.Equal("1d", result.LookBack);
+        Assert.NotNull(result.CreateDate);
         Assert.NotNull(result.ModifyDate);
         Assert.Equal(result.CreateDate, result.ModifyDate);
-        Assert.Single(result.InitialQueries);
-        Assert.Single(result.SupplementalQueries);
+        Assert.Equal(1, result.InitialQueries.Count);
+        Assert.Equal(1, result.SupplementalQueries.Count);
 
         // Verify database
         var savedPlan = await dbContext.QueryPlans.FirstOrDefaultAsync(q => q.FacilityId == "TestFacility" && q.Type == Frequency.Daily);
@@ -228,8 +229,8 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         Assert.Equal("2d", result.LookBack);
         Assert.Equal(created.CreateDate, result.CreateDate);
         Assert.True(result.ModifyDate > created.ModifyDate);
-        Assert.Single(result.InitialQueries);
-        Assert.Single(result.SupplementalQueries);
+        Assert.Equal(1, result.InitialQueries.Count);
+        Assert.Equal(1, result.SupplementalQueries.Count);
 
         // Verify database
         var updatedPlan = await dbContext.QueryPlans.FirstOrDefaultAsync(q => q.FacilityId == "TestFacility" && q.Type == Frequency.Daily);
@@ -656,36 +657,36 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         var model = CreateValidCreateQueryPlanModel();
         model.InitialQueries = new Dictionary<string, IQueryConfig>
         {
-            {
-                "1",
-                new ParameterQueryConfig
-                {
-                    ResourceType = "Patient",
-                    Parameters = new List<IParameter>
-                    {
-                        new LiteralParameter
-                        {
-                            Name = "id",
+            { 
+                "1", 
+                new ParameterQueryConfig 
+                { 
+                    ResourceType = "Patient", 
+                    Parameters = new List<IParameter> 
+                    { 
+                        new LiteralParameter 
+                        { 
+                            Name = "id", 
                             Literal = "123"
-                        }
-                    }
-                }
+                        } 
+                    } 
+                } 
             },
-            {
-                "2",
-                new ParameterQueryConfig
-                {
-                    ResourceType = "Encounter",
-                    Parameters = new List<IParameter>
-                    {
-                        new ResourceIdsParameter
-                        {
-                            Name = "patient",
+            { 
+                "2", 
+                new ParameterQueryConfig 
+                { 
+                    ResourceType = "Encounter", 
+                    Parameters = new List<IParameter> 
+                    { 
+                        new ResourceIdsParameter 
+                        { 
+                            Name = "patient", 
                             Resource = "Patient",
                             Paged = "50"
-                        }
-                    }
-                }
+                        } 
+                    } 
+                } 
             }
         };
         return model;

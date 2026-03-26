@@ -6,7 +6,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Config
 
 public class ResourceReferenceTypeModel
 {
-    public Guid? Id { get; set; }
+    public Guid? Id { get; set; }  
     public string FacilityId { get; set; }
     public QueryPhase QueryPhase { get; set; }
     public string? ResourceType { get; set; }

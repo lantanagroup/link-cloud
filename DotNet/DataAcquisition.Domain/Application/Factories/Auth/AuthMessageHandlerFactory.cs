@@ -12,7 +12,7 @@ public class AuthMessageHandlerFactory
         (bool isQueryParam, object authHeader) authHeader = (false, null);
         IAuth authService = authenticationRetrievalService.GetAuthenticationService(config);
 
-        if (authService == null)
+        if(authService == null)
             return (false, null);
 
         authHeader = await authService.SetAuthentication(facilityId, config);

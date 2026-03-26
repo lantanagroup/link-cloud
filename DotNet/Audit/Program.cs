@@ -114,13 +114,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     //Add database context
-    builder.Services.AddDbContext<AuditDbContext>((sp, options) =>
-    {
+    builder.Services.AddDbContext<AuditDbContext>((sp, options) => {
 
         var updateBaseEntityInterceptor = sp.GetRequiredService<UpdateBaseEntityInterceptor>();
 
-        switch (dbProvider)
-        {
+        switch(dbProvider)
+        {          
             case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
                 options
                     .UseSqlServer(databaseConnectionString)
@@ -129,7 +128,7 @@ static void RegisterServices(WebApplicationBuilder builder)
             default:
                 throw new InvalidOperationException("Database provider not supported.");
         }
-    });
+    });       
 
     //Add repositories
     builder.Services.AddScoped<IAuditRepository, AuditLogRepository>();
@@ -158,8 +157,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
     //configure CORS
-    builder.Services.AddLinkCorsService(options =>
-    {
+    builder.Services.AddLinkCorsService(options => {
         options.Environment = builder.Environment;
     });
 
@@ -175,7 +173,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
     });
 
-    builder.Services.AddControllers(options => { options.ReturnHttpNotAcceptable = true; }).AddXmlDataContractSerializerFormatters();
+    builder.Services.AddControllers(options => { options.ReturnHttpNotAcceptable = true; }).AddXmlDataContractSerializerFormatters();    
 
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
     builder.Services.AddEndpointsApiExplorer();
@@ -189,32 +187,30 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Add logging redaction
     builder.Logging.EnableRedaction();
-    builder.Services.AddRedaction(x =>
-    {
+    builder.Services.AddRedaction(x => {
 
         x.SetRedactor<StarRedactor>(new DataClassificationSet(DataTaxonomy.SensitiveData));
 
-        var hmacKey = builder.Configuration.GetValue<string>("Logging:HmacKey");
+        var hmacKey = builder.Configuration.GetValue<string>("Logging:HmacKey");        
         if (!string.IsNullOrEmpty(hmacKey))
-        {
-            x.SetHmacRedactor(opts =>
-            {
+        {           
+            x.SetHmacRedactor(opts => {
                 opts.Key = Convert.ToBase64String(Encoding.UTF8.GetBytes(hmacKey));
                 opts.KeyId = 808;
             }, new DataClassificationSet(DataTaxonomy.PiiData));
-        }
+        }        
     });
 
     // Logging using Serilog
     builder.Logging.AddSerilog();
-    var loggerOptions = new ConfigurationReaderOptions { SectionName = AuditConstants.AppSettingsSectionNames.Serilog };
+    var loggerOptions = new ConfigurationReaderOptions { SectionName = AuditConstants.AppSettingsSectionNames.Serilog };    
     Log.Logger = new LoggerConfiguration()
                     .ReadFrom.Configuration(builder.Configuration, loggerOptions)
                     .Filter.ByExcluding("RequestPath like '/health%'")
                     .Filter.ByExcluding("RequestPath like '/swagger%'")
                     //.Enrich.WithExceptionDetails()
                     .Enrich.FromLogContext()
-                    .Enrich.WithSpan()
+                    .Enrich.WithSpan()                  
                     .Enrich.With<ActivityEnricher>()
                     .CreateLogger();
 
@@ -251,7 +247,7 @@ static void SetupMiddleware(WebApplication app)
 
     // Auto migrate database
     app.AutoMigrateEF<AuditDbContext>();
-
+    
     app.UseRouting();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
     app.UseAuthentication();
@@ -259,10 +255,9 @@ static void SetupMiddleware(WebApplication app)
     app.UseAuthorization();
 
     //map health check middleware and info endpoint
-    app.MapHealthChecks("/health", new HealthCheckOptions
-    {
+    app.MapHealthChecks("/health", new HealthCheckOptions { 
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-    });
+    });  
     app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "audit");
 
     app.UseEndpoints(endpoints => endpoints.MapControllers());

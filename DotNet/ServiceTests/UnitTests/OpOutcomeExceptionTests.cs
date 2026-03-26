@@ -21,7 +21,7 @@ public class OpOutcomeExceptionTests
         Assert.Equal(message, exception.Message);
         Assert.Equal(innerException.Status, exception.Status);
         Assert.Equal(innerException.Outcome, exception.Outcome);
-
+        
         Assert.NotNull(exception.InnerException);
         Assert.Same(innerException, exception.InnerException);
         Assert.Contains("Inner message", exception.StackTrace);

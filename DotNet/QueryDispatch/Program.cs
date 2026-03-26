@@ -135,8 +135,7 @@ builder.Services.AddSingleton<QueryDispatchJob>();
 
 
 //Add problem details
-builder.Services.AddProblemDetails(options =>
-{
+builder.Services.AddProblemDetails(options => {
     options.CustomizeProblemDetails = ctx =>
     {
         ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
@@ -221,8 +220,7 @@ Log.Logger = new LoggerConfiguration()
                 .CreateLogger();
 
 //Add CORS
-builder.Services.AddLinkCorsService(options =>
-{
+builder.Services.AddLinkCorsService(options => {
     options.Environment = builder.Environment;
 });
 
@@ -280,5 +278,5 @@ static void SetupMiddleware(WebApplication app)
     }
     app.UseAuthorization();
 
-    app.UseEndpoints(endpoints => endpoints.MapControllers());
+    app.UseEndpoints(endpoints => endpoints.MapControllers());    
 }

@@ -84,7 +84,7 @@ namespace IntegrationTests.DataAcquisition.Factories
             // Assert
             var pagedResult = Assert.IsType<PagedParameterQueryFactoryResult>(result);
             Assert.Equal(2, pagedResult.SearchParamsList.Count);
-
+            
             // Page 1: lit1=val1, _id=id1,id2
             Assert.Contains(pagedResult.SearchParamsList[0], kvp => kvp.Key == "lit1" && kvp.Value == "val1");
             Assert.Contains(pagedResult.SearchParamsList[0], kvp => kvp.Key == "_id" && kvp.Value == "id1,id2");
@@ -108,7 +108,7 @@ namespace IntegrationTests.DataAcquisition.Factories
                 }
             };
             var request = new GetPatientDataRequest { CorrelationId = "corr1", FacilityId = "fac1" };
-
+            
             _dataAcquisitionLogQueriesMock
                 .Setup(q => q.GetResourceIdsForReportPatient(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new List<string> { "id1", "id2", "id3" });
@@ -123,7 +123,7 @@ namespace IntegrationTests.DataAcquisition.Factories
         [Fact]
         public async Task Build_WhenParameterFactoryReturnsNull_SkipsIt()
         {
-            // Arrange
+             // Arrange
             var config = new ParameterQueryConfig
             {
                 ResourceType = "Patient",

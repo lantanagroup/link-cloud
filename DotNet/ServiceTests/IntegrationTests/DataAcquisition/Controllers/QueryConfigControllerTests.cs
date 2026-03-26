@@ -36,8 +36,8 @@ public class QueryConfigControllerTests : IClassFixture<DataAcquisitionIntegrati
 
         var mocker = new AutoMocker();
         var tenantApiService = new Mock<ITenantApiService>();
-        tenantApiService.Setup(x => x.GetFacilityConfig(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new LantanaGroup.Link.Shared.Application.Models.Tenant.FacilityModel { TimeZone = "America/Chicago" });
+            tenantApiService.Setup(x => x.GetFacilityConfig(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new LantanaGroup.Link.Shared.Application.Models.Tenant.FacilityModel { TimeZone = "America/Chicago" });
 
         return new QueryConfigController(logger, queryConfigurationManager, queryConfigurationQueries, tenantApiService.Object);
     }

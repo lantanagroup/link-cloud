@@ -46,16 +46,16 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                             correlationId = System.Text.Encoding.UTF8.GetString(correlationHeader);
 
                             // read the exceptions
-
+                            
                             if (TryReadHeader(consumeResult.Message.Headers, out var errorBytes,
                                     "X-Exception-Message",
                                     "X-Retry-Exception-Message",
                                     "kafka_exception-message",
                                     "kafka_dlt-exception-message"))
                             {
-                                errorMessage = System.Text.Encoding.UTF8.GetString(errorBytes);
+                                errorMessage =  System.Text.Encoding.UTF8.GetString(errorBytes);
                             }
-
+                            
                             // Extract traceId from traceparent header
                             if (consumeResult.Message.Headers.TryGetLastBytes("traceparent", out var traceParentBytes))
                             {
@@ -76,7 +76,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                             }
 
                             string patientId = getPatientId(consumeResult.Message.Value);
-
+                            
                             // read the list from cache
                             string topicName = consumeResult.Topic;
                             var cacheKey = topicName + KafkaConsumerManager.delimiter + reportTrackingId;
@@ -162,7 +162,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             value = null!;
             return false;
         }
-
+        
         private bool checkReportTrackingId(string input, string reportTrackingId)
         {
             if (string.IsNullOrEmpty(input)) return false;
@@ -197,10 +197,10 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     ?.Value.ToString();
             }
             catch (JsonException ex)
-            {
-                _logger.LogWarning(ex, "Failed to parse message body for PatientId");
-                return null;
-            }
+             { 
+                 _logger.LogWarning(ex, "Failed to parse message body for PatientId"); 
+                 return null;
+             }
         }
     }
 }
@@ -208,7 +208,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 public class CorrelationCacheEntry
 {
     public string CorrelationId { get; set; }
-
+    
     public string? PatientId { get; set; }
     public string ErrorMessage { get; set; }
     public string TraceId { get; set; }

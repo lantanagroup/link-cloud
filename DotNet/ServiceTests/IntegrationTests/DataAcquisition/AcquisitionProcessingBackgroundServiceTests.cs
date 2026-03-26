@@ -21,7 +21,7 @@ public class AcquisitionProcessorBackgroundServiceTests : IClassFixture<DataAcqu
         _patientDataServiceMock = new Mock<IPatientDataService>();
     }
 
-
+   
 
     [Fact]
     public async Task ProcessWorkItem_LogNotFound_SkipsProcessing()

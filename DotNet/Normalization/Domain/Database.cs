@@ -31,16 +31,16 @@ namespace LantanaGroup.Link.Normalization.Domain
         public IEntityRepository<VendorVersion> VendorVersions { get; set; }
         public IEntityRepository<VendorVersionOperationPreset> VendorVersionOperationPresets { get; set; }
 
-        public Database(NormalizationDbContext dbContext,
-            IEntityRepository<Operation> operations,
-            IEntityRepository<OperationSequence> operationSequences,
-            IEntityRepository<ResourceType> resourceTypes,
+        public Database(NormalizationDbContext dbContext, 
+            IEntityRepository<Operation> operations, 
+            IEntityRepository<OperationSequence> operationSequences, 
+            IEntityRepository<ResourceType> resourceTypes, 
             IEntityRepository<OperationResourceType> operationResourceTypeMaps,
             IEntityRepository<Vendor> vendors,
             IEntityRepository<VendorVersion> vendorVersions,
             IEntityRepository<VendorVersionOperationPreset> vendorOperationPresets)
         {
-            _dbContext = dbContext;
+            _dbContext = dbContext; 
             Operations = operations;
             OperationSequences = operationSequences;
             ResourceTypes = resourceTypes;

@@ -29,9 +29,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                     RoleClaimType = openIdConnectOptions.RoleClaimType
                 };
 
-                options.Events.OnTokenValidated = context =>
-                {
-
+                options.Events.OnTokenValidated = context => {
+                    
                     //increment login counter
                     var metrics = context.HttpContext.RequestServices.GetRequiredService<ILinkAdminMetrics>();
                     metrics.IncrementUserLoginCounter([

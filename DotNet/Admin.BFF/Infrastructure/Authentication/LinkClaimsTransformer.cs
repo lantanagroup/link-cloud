@@ -81,8 +81,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
 
                     var invalidIdentity = new ClaimsIdentity();
                     return new ClaimsPrincipal(invalidIdentity);
-                }
-                ;
+                };
 
                 // Cache the account for 5 minutes if it is not already in the cache
                 if (cacheAccount is null)
@@ -103,7 +102,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
                         _logger.LogCacheException(userKey, ex.Message);
                     }
                 }
-            }
+            }                              
 
             // Remove the existing 'sub' claim and replace with link account id
             var existingSubClaim = identity.FindFirst(LinkAuthorizationConstants.LinkSystemClaims.Subject);
@@ -127,13 +126,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
 
             // Add role claims
             var uniqueRoleClaims = account.RoleClaims.Except(account.UserClaims);
-            foreach (var claim in uniqueRoleClaims)
+            foreach(var claim in uniqueRoleClaims)
             {
                 identity.AddClaim(new Claim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, claim));
-            }
+            }           
 
             return principal;
-
+            
 
         }
     }

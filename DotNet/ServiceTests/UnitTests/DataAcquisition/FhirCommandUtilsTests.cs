@@ -8,7 +8,7 @@ public class FhirCommandUtilsTests
     [InlineData("30", 30)]  // Positive seconds
     [InlineData("0", 60)]    // Zero seconds (immediate retry)
     [InlineData(null, 60)]  // Missing header → default 60s
-    public void ParseRetryAfter_HandlesDeltaFormats(string? headerValue, int expectedSeconds)
+    public void ParseRetryAfter_HandlesDeltaFormats(string headerValue, int expectedSeconds)
     {
         // Arrange
         var response = new HttpResponseMessage();

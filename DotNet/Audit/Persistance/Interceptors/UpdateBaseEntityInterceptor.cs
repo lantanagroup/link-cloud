@@ -25,8 +25,8 @@ namespace LantanaGroup.Link.Audit.Persistance.Interceptors
                         entry.Property(p => p.CreatedOn).CurrentValue = DateTime.UtcNow;
                         break;
                 }
-            }
-
+            }        
+            
             return base.SavingChangesAsync(eventData, result, cancellationToken);
         }
     }

@@ -32,7 +32,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
         private readonly IResourceManager _resourceManager;
         private readonly IOperationQueries _operationQueries;
         private readonly IOperationSequenceQueries _operationSequenceQueries;
-        private readonly IResourceQueries _resourceQueries;
+        private readonly IResourceQueries _resourceQueries; 
 
         public OperationManager(IDatabase database, IOperationQueries operationQueries, IOperationSequenceQueries operationSequenceQueries, IResourceQueries resourceQueries, IResourceManager resourceManager)
         {
@@ -90,10 +90,10 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 taskResult.IsSuccess = true;
                 taskResult.ObjectResult = await _operationQueries.Get(operation.Id, operation.FacilityId);
             }
-            catch (Exception ex)
+            catch(Exception ex)
             {
                 taskResult.IsSuccess = false;
-                taskResult.ErrorMessage = ex.Message + Environment.NewLine + ex.StackTrace;
+                taskResult.ErrorMessage = ex.Message + Environment.NewLine + ex.StackTrace;                
             }
 
             return taskResult;
@@ -138,7 +138,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 #endregion
 
                 var operation = await _database.Operations.GetAsync(model.Id);
-                operation.OperationResourceTypes = await _database.OperationResourceTypes.FindAsync(m => m.OperationId == model.Id);
+                operation.OperationResourceTypes = await _database.OperationResourceTypes.FindAsync(m => m.OperationId == model.Id);                
 
                 var result = await OperationServiceHelper.ValidateOperation(operation.OperationType.ToString(), model.OperationJson, model.ResourceTypes);
 
@@ -364,12 +364,12 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 throw new InvalidOperationException("No Operations provided.");
             }
 
-            if (string.IsNullOrEmpty(model.FacilityId))
+            if(string.IsNullOrEmpty(model.FacilityId))
             {
                 throw new InvalidOperationException("No FacilityId Provided");
             }
 
-            if (!model.OperationSequences.All(s => s.Sequence > 0))
+            if(!model.OperationSequences.All(s => s.Sequence > 0))
             {
                 throw new InvalidOperationException("All Sequence values must be greater than 0");
             }
@@ -405,7 +405,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 {
                     FacilityId = model.FacilityId,
                     OperationResourceTypeId = operationResourceTypeMap.Id,
-                    Sequence = sequence.Sequence,
+                    Sequence = sequence.Sequence,                   
                 });
             }
 
@@ -427,7 +427,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
             var resourceType = model.ResourceType ?? string.Empty;
 
-            var sequences = await _database.OperationSequences.FindAsync(s => s.FacilityId == model.FacilityId
+            var sequences = await _database.OperationSequences.FindAsync(s => s.FacilityId == model.FacilityId 
                                         && (resourceType == string.Empty || s.OperationResourceType.ResourceType.Name.Equals(model.ResourceType))
                                         && (model.OperationId == null || s.OperationResourceType.OperationId == model.OperationId));
 

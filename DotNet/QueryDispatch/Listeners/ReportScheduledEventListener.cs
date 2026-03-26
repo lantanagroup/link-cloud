@@ -28,8 +28,8 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
         public ReportScheduledEventListener(
             ILogger<ReportScheduledEventListener> logger,
             IKafkaConsumerFactory<string, ReportScheduledValue> kafkaConsumerFactory,
-            IQueryDispatchFactory queryDispatchFactory,
-            IProducer<string, AuditEventMessage> auditProducer,
+            IQueryDispatchFactory queryDispatchFactory, 
+            IProducer<string, AuditEventMessage> auditProducer, 
             IDeadLetterExceptionHandler<ReportScheduledEventListener, string, ReportScheduledValue> deadLetterExceptionHandler,
             IDeadLetterExceptionHandler<ReportScheduledEventListener, string, string> consumeResultDeadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory)
@@ -110,14 +110,14 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     if (existingRecord != null)
                                     {
                                         _logger.LogInformation("Facility {facilityId} found", key);
-
+										
                                         ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, reportTrackingId);
                                         await scheduledReportMgr.UpdateScheduledReport(existingRecord, scheduledReport);
                                     }
                                     else
                                     {
                                         ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, reportTrackingId);
-                                        await scheduledReportMgr.createScheduledReport(scheduledReport);
+                                        await scheduledReportMgr.createScheduledReport(scheduledReport);                                     
                                     }
 
                                     _reportScheduledConsumer.Commit(consumeResult);

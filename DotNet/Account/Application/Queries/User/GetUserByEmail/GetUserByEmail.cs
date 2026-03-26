@@ -28,14 +28,14 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
 
             try
             {
-                if (string.IsNullOrEmpty(email))
+                if(string.IsNullOrEmpty(email))
                 {
                     throw new ArgumentException("An email address is required");
                 }
 
                 var user = await _userRepository.GetUserByEmailAsync(email, cancellationToken: cancellationToken);
 
-                if (user == null)
+                if(user == null)
                 {
                     return null;
                 }

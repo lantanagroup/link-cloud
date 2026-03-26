@@ -22,10 +22,10 @@ public class ServiceInformation
         var serviceInformation = configuration
             .GetRequiredSection(SectionName)
             .Get<ServiceInformation>()!;
-
+        
         if (string.IsNullOrEmpty(serviceInformation.Version))
             serviceInformation.Version = assemblyVersion;
-
+        
         var enableSwagger = configuration.GetValue<bool>("EnableSwagger");
 
         if (enableSwagger)

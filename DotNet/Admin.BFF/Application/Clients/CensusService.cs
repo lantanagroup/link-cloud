@@ -25,19 +25,19 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
             _authenticationSchemaConfig = authenticationSchemaConfig ?? throw new ArgumentNullException(nameof(authenticationSchemaConfig));
             _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
-
+           
             InitHttpClient();
-
+            
         }
 
         public async Task<HttpResponseMessage> ServiceHealthCheck(CancellationToken cancellationToken)
-        {
+        {           
             // HTTP GET
             HttpResponseMessage response = await _client.GetAsync($"health", cancellationToken);
 
             return response;
         }
-
+        
         public async Task<LinkServiceHealthReport> LinkServiceHealthCheck(CancellationToken cancellationToken)
         {
             // HTTP GET

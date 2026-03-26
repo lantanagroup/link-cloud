@@ -140,7 +140,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                 var safeMessage = $"[{DateTime.UtcNow:O}] Processing failed: {ex.GetType().Name} - {ex.Message}";
                 log.Notes.Add(safeMessage);
                 log.Status = RequestStatus.Failed;
-
+            
                 await logQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {
                     Id = log.Id,
@@ -157,7 +157,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
 
             throw;
         }
-
+            
         try
         {
             await patientDataService.ExecuteLogRequest(

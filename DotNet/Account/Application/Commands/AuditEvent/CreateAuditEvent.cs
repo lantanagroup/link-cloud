@@ -33,7 +33,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.AuditEvent
                 // send the Audit Event
                 Headers headers = [];
 
-                if (!string.IsNullOrEmpty(model.CorrelationId))
+                if(!string.IsNullOrEmpty(model.CorrelationId))
                 {
                     headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(model.CorrelationId));
                 }
@@ -55,7 +55,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.AuditEvent
                 Activity.Current?.AddException(ex);
                 _logger.LogAuditEventCreationException(ex.Message, model);
                 throw;
-            }
+            }              
         }
     }
 }

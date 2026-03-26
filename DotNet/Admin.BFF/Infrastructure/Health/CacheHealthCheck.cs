@@ -16,8 +16,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Health
         {
             try
             {
-                var outcome = await _cache.GetAsync("healthcheck", cancellationToken);
-                return HealthCheckResult.Healthy();
+                var outcome = await _cache.GetAsync("healthcheck", cancellationToken);                
+                return HealthCheckResult.Healthy();                
             }
             catch (Exception)
             {

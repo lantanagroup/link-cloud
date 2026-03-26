@@ -139,10 +139,10 @@ namespace LantanaGroup.Link.Shared.Application.Services.SecretManager
             const string bearerKeyName = LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName;
 
             if (_secrets.ContainsKey(bearerKeyName)) return;
-
+            
             var key = GenerateRandomKey(64);
             _secrets[bearerKeyName] = key;
-
+            
             SaveSecretsToFile();
         }
 

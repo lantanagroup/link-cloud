@@ -74,7 +74,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
                 //generate audit event
                 var auditMessage = new AuditEventMessage
-                {
+                {                    
                     Action = AuditEventType.Delete,
                     EventDate = DateTime.UtcNow,
                     UserId = user.LastModifiedBy,

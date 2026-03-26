@@ -20,7 +20,7 @@ namespace Link.Authorization.Infrastructure.Requirements
                 {
                     context.Succeed(requirement);
                     return Task.CompletedTask;
-                }
+                }                
             }
 
             //check if user has a facility claim
@@ -30,7 +30,7 @@ namespace Link.Authorization.Infrastructure.Requirements
             }
 
             //check if user is authorized to access the facility
-            var facilityIdClaim = context.User.FindAll(c => c.Type == LinkAuthorizationConstants.LinkSystemClaims.Facility).ToList();
+            var facilityIdClaim = context.User.FindAll(c => c.Type == LinkAuthorizationConstants.LinkSystemClaims.Facility).ToList();           
 
             if (facilityIdClaim.Any(x => x.Value.Equals(facilityId, StringComparison.OrdinalIgnoreCase)))
             {

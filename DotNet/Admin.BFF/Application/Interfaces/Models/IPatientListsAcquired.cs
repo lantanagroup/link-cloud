@@ -7,14 +7,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Models
     {
         /// <summary>
         /// The unique identifier of the facility
-        /// </summary>
-        [Required]
+       /// </summary>
+       [Required]
         string FacilityId { get; set; }
 
         /// <summary>
-        /// List of patient identifiers acquired from the facility
+       /// List of patient identifiers acquired from the facility
         /// </summary>
         [Required]
-        List<PatientListItem> PatientLists { get; set; }
+       List<PatientListItem> PatientLists { get; set; }
     }
 }

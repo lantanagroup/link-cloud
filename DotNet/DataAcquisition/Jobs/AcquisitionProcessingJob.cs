@@ -56,9 +56,9 @@ public class AcquisitionProcessingJob : IJob
         {
             using var scope = _serviceScopeFactory.CreateScope();
             var dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
-
+            
             int failedCount = await dataAcquisitionLogQueries.FailStalledQueuedLogsAsync(15, _settings.MaxBatchesFailStalledPerRun, cancellationToken);
-
+            
             if (failedCount > 0)
             {
                 _logger.LogInformation("Successfully failed {count} stalled queued logs.", failedCount);
@@ -165,7 +165,7 @@ public class AcquisitionProcessingJob : IJob
 
                 _logger.BeginScope("Processing {count} processable requests for facility {facilityId}", requests.Count, facilityId);
 
-                var logIds = requests.Select(r => r.Id).ToList();
+        var logIds = requests.Select(r => r.Id).ToList();
                 var failedLogs = requests.Where(r => r.Status == RequestStatus.Failed).ToList();
 
                 var maxRetryAttempts = config.MaxRetries ?? DataAcquisitionLog.MaxRetryAttempts;
@@ -174,7 +174,7 @@ public class AcquisitionProcessingJob : IJob
                     .Where(r => r.RetryAttempts >= maxRetryAttempts)
                     .Select(r => r.Id)
                     .ToList();
-
+                
                 var retryableLogIds = logIds.Except(maxRetriesReachedIds).ToList();
 
                 if (maxRetriesReachedIds.Any())
@@ -187,7 +187,7 @@ public class AcquisitionProcessingJob : IJob
                     // We can't easily increment RetryAttempts in ExecuteUpdateAsync if it's null or we need different notes per record
                     // But for the job, we can assume they all get +1 and the same note if we want true bulk
                     // However, some might be Pending (RetryAttempts 0) and some Failed (RetryAttempts > 0)
-
+                    
                     // To keep it simple and safe for now, let's at least bulk update the status to Ready
                     await dataAcquisitionLogManager.UpdateStatusBatchAsync(retryableLogIds, RequestStatus.Ready, cancellationToken);
                 }
@@ -289,11 +289,11 @@ public class AcquisitionProcessingJob : IJob
                 {
                     // Parse the traceparent string (format: 00-traceId-spanId-flags)
                     ActivityContext parentContext = CreateActivityContext(message.TraceParentId);
-
+                    
                     // Start the activity with the parent context
                     using var activity = ServiceActivitySource.Instance?.StartActivity(
-                        "ProcessTailingMessage",
-                        ActivityKind.Consumer,
+                        "ProcessTailingMessage", 
+                        ActivityKind.Consumer, 
                         parentContext) ?? Activity.Current;
 
                     // Add relevant tags
@@ -305,7 +305,7 @@ public class AcquisitionProcessingJob : IJob
                         new Header(DataAcquisitionConstants.HeaderNames.CorrelationId,
                             Encoding.UTF8.GetBytes(message.CorrelationId))
                     };
-
+                    
                     string currentTraceParent;
                     if (!string.IsNullOrEmpty(message.TraceParentId))
                     {
@@ -324,9 +324,9 @@ public class AcquisitionProcessingJob : IJob
                         var newSpanId = ActivitySpanId.CreateRandom().ToHexString();
                         currentTraceParent = $"00-{newTraceId}-{newSpanId}-00";
                     }
-
+                    
                     headers.Add("traceparent", Encoding.UTF8.GetBytes(currentTraceParent));
-
+                    
                     await _resourceAcquiredProducer.ProduceAsync(
                         KafkaTopic.ResourceAcquired.ToString(),
                         new Message<ResourceKey, ResourceAcquired>
@@ -378,7 +378,7 @@ public class AcquisitionProcessingJob : IJob
                     var traceId = ActivityTraceId.CreateFromString(parts[1].AsSpan());
                     var parentSpanId = ActivitySpanId.CreateFromString(parts[2].AsSpan());
                     var flags = parts[3] == "01" ? ActivityTraceFlags.Recorded : ActivityTraceFlags.None;
-
+            
                     parentContext = new ActivityContext(traceId, parentSpanId, flags);
                 }
             }

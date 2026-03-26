@@ -39,7 +39,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("UpdateClaims:Execute");
 
             try
-            {
+            { 
                 var user = await _userRepository.GetUserAsync(userId, cancellationToken: cancellationToken) ?? throw new ApplicationException($"User with id {userId} not found");
 
                 var currentClaims = user.Claims;
@@ -57,11 +57,11 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     {
                         var newClaim = new Claim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, claim);
                         var outcome = await _userRepository.AddClaimToUserAsync(user.Id, newClaim, cancellationToken);
-                        if (outcome)
+                        if(outcome)
                         {
                             _logger.LogUserClaimAssignment(user.Id.ToString(), newClaim.Type, newClaim.Value, requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown");
                         }
-                    }
+                    }                    
                 }
 
                 foreach (var claim in removedClaims)
@@ -80,7 +80,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
                 //Capture changes
                 List<PropertyChangeModel> changes = [];
-                if (addedClaims.Any() || removedClaims.Any())
+                if(addedClaims.Any() || removedClaims.Any())
                 {
                     changes.Add(new PropertyChangeModel("Claims", string.Join(",", currentClaims), string.Join(",", claims)));
                 }
@@ -104,21 +104,21 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                 var userKey = $"user:{user.Email}";
                 try
                 {
-                    _cache.Remove(userKey);
+                   _cache.Remove(userKey);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogCacheException(userKey, ex.Message);
                 }
-
+                
                 return true;
             }
             catch (Exception)
             {
                 activity?.SetStatus(ActivityStatusCode.Error);
                 throw;
-            }
-
+            }            
+            
         }
     }
 }

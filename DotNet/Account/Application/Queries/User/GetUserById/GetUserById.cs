@@ -28,7 +28,7 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
 
             try
             {
-                if (id == Guid.Empty)
+                if(id == Guid.Empty)
                 {
                     throw new ArgumentException("A user id is required");
                 }

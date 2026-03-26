@@ -20,7 +20,7 @@ namespace LantanaGroup.Link.Account.Application.Factories.User
                 IncludeDeletedUsers = includeDeletedUsers,
                 SortBy = sortBy,
                 SortOrder = sortOrder ?? SortOrder.Descending,
-                PageSize = pageSize > maxPageSize ? maxPageSize : pageSize,
+                PageSize =  pageSize > maxPageSize ? maxPageSize : pageSize,
                 PageNumber = pageNumber
             };
         }

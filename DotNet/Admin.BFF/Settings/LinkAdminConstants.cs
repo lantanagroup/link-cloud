@@ -8,7 +8,7 @@
         {
             public const string ServiceInformation = "ServiceInformation";
             public const string CORS = "CORS";
-            public const string Serilog = "Serilog";
+            public const string Serilog = "Serilog";                        
         }
 
         public static class AuthenticationSchemes

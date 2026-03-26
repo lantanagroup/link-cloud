@@ -115,7 +115,7 @@ namespace IntegrationTests.DataAcquisition.Services
             var updatedLog = await scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>().GetAsync(referenceLog.Id);
             Assert.NotNull(updatedLog);
             Assert.NotEmpty(updatedLog.FhirQuery);
-
+            
             var fhirQuery = updatedLog.FhirQuery.First();
             Assert.Equal(updatedLog.QueryType, fhirQuery.QueryType);
             Assert.Contains("test-patient-id", fhirQuery.IdQueryParameterValues);

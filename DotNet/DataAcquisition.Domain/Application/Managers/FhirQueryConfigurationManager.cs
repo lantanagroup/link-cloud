@@ -38,7 +38,7 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
             throw new ArgumentOutOfRangeException(nameof(maxRetries), "MaxRetries must be between 0 and 10.");
         }
     }
-
+    
     public async Task<AuthenticationConfigurationModel> CreateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("FhirQueryConfigurationManager.CreateAuthenticationConfiguration");

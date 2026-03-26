@@ -37,12 +37,12 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
             _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
             _roleModelFactory = roleModelFactory ?? throw new ArgumentNullException(nameof(roleModelFactory));
             _createAuditEvent = createAuditEvent ?? throw new ArgumentNullException(nameof(createAuditEvent));
-            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache)); 
         }
 
         public async Task<bool> Execute(ClaimsPrincipal? requestor, LinkRoleModel model, CancellationToken cancellationToken = default)
         {
-            using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("UpdateRole:Execute",
+            using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("UpdateRole:Execute", 
                 [
                     new KeyValuePair<string, object?>(DiagnosticNames.Role, model.Name),
                 ]);
@@ -61,8 +61,8 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
 
                 role.Name = model.Name;
                 role.Description = model.Description;
-
-                if (requestor is not null)
+                
+                if(requestor is not null)
                 {
                     role.LastModifiedBy = requestor.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
                 }
@@ -96,7 +96,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
 
                 //capture claim changes
                 if (addedClaims.Any() || removedClaims.Any())
-                {
+                { 
                     changes.Add(new PropertyChangeModel("Claims", string.Join(",", currentClaims), string.Join(",", model.Claims)));
                 }
 
@@ -126,11 +126,11 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
                             var userKey = $"user:{user.Email}";
                             _cache.Remove(userKey);
                         }
-                    }
+                    }                    
                 }
 
                 return true;
-
+                
             }
             catch (Exception)
             {

@@ -52,7 +52,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddDataProtection()
         .SetApplicationName(builder.Configuration.GetValue<string>("DataProtection:KeyRing") ?? "Link");
     builder.Services.Configure<AcquisitionJobSettings>(builder.Configuration.GetSection(AcquisitionJobSettings.SectionName));
-
+    
 
     builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
 
@@ -70,7 +70,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.JsonSerializerOptions.Converters.Add(new ParameterConverter());
         options.JsonSerializerOptions.Converters.Add(new TimeSpanConverter());
         options.JsonSerializerOptions.ForFhir(ModelInfo.ModelInspector);
-    });
+    }); 
 
     //Add Hosted Services
     builder.Services.AddHostedService<AcquisitionProcessingScheduleService>();
@@ -138,11 +138,10 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
         c.DocumentFilter<HealthChecksFilter>();
-    });
+    });    
 
     //Add CORS
-    builder.Services.AddLinkCorsService(options =>
-    {
+    builder.Services.AddLinkCorsService(options => {
         options.Environment = builder.Environment;
     });
 

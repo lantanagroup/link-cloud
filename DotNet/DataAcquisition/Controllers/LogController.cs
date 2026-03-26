@@ -55,7 +55,7 @@ public class LogController : Controller
     public async Task<ActionResult<IPagedModel<QueryLogSummaryModel>>> Search(
         [FromQuery] LogSearchParameters? queryParameters,
         CancellationToken cancellationToken = default
-    )
+    ) 
     {
         if (queryParameters == null)
         {
@@ -66,24 +66,24 @@ public class LogController : Controller
         {
             string facilityId = string.Empty;
             string patientId = string.Empty;
-            string reportId = string.Empty;
+            string reportId = string.Empty;   
             string resourceId = string.Empty;
 
             try
             {
                 var allowedSortBy = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                     { "ExecutionDate", "CreateDate", "CompletionDate", "FacilityId", "PatientId", "QueryType", "QueryPhase", "Status", "Priority", "Id", "RetryAttempts", "IsDeleted", "ReportTrackingId" };
-
+                
                 if (!allowedSortBy.Contains(queryParameters.SortBy))
                 {
                     return BadRequest($"Invalid sortBy. Allowed values: {string.Join(", ", allowedSortBy)}");
                 }
-
+                
                 facilityId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.FacilityId);
                 patientId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.PatientId);
                 reportId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ReportId);
                 resourceId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ResourceId);
-
+                
                 var result = await _logQueries.SearchQueryLogSummaryAsync(
                     new SearchDataAcquisitionLogRequest
                     {
@@ -275,7 +275,7 @@ public class LogController : Controller
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
-
+    
     /// <summary>
     /// Get data acquisition log statistics for a report.
     /// </summary>
@@ -413,7 +413,7 @@ public class LogController : Controller
             {
                 _logger.LogWarning(new EventId(LoggingIds.UpdateItem, "UpdateLogEntry"), ex, "An Exception occurred while attempting to update a log with a id of {id}", id.Sanitize());
                 return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
-            }
+            } 
         }
         else
         {
@@ -615,7 +615,7 @@ public class LogController : Controller
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> Process(long id, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Process(long id, CancellationToken cancellationToken = default) 
     {
         if (id == default)
         {

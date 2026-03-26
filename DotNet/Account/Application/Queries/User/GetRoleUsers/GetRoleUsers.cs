@@ -24,7 +24,7 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
         public async Task<IEnumerable<GroupedUserModel>> Execute(string role, CancellationToken cancellationToken = default)
         {
             List<KeyValuePair<string, object?>> tagList = [new KeyValuePair<string, object?>(DiagnosticNames.Role, role)];
-            using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("GetUserById:Execute", tagList);
+            using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("GetUserById:Execute", tagList);                   
 
             try
             {
@@ -34,7 +34,7 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
                 }
 
                 var users = await _userRepository.GetRoleUsersAsync(role, cancellationToken);
-
+                
                 if (users is null)
                 {
                     return [];
@@ -46,7 +46,7 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
                     roleUsers.Add(_groupedUserModelFactory.Create(user));
                 }
 
-                return roleUsers;
+                return roleUsers;                
             }
             catch (Exception ex)
             {

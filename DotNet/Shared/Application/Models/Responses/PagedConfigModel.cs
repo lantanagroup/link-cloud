@@ -1,7 +1,7 @@
 ﻿
 namespace LantanaGroup.Link.Shared.Application.Models.Responses
 {
-    public class PagedConfigModel<T> where T : class
+    public class PagedConfigModel <T> where T : class
     {
         public List<T> Records { get; set; } = new List<T>();
         public PaginationMetadata Metadata { get; set; } = null!;
@@ -14,5 +14,5 @@ namespace LantanaGroup.Link.Shared.Application.Models.Responses
             Metadata = metadata;
         }
 
-    }
+     }
 }

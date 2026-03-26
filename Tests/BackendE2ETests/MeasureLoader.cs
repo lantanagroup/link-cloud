@@ -27,7 +27,7 @@ public class MeasureLoader(RestClient adminBffClient, ITestOutputHelper output, 
             var resourceName = _config.MeasureBundleLocation
                 .Replace("resource://", "", StringComparison.OrdinalIgnoreCase);
             await using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName);
-
+            
             if (stream == null)
                 throw new FileNotFoundException($"Embedded resource '{resourceName}' not found.");
 
@@ -60,7 +60,7 @@ public class MeasureLoader(RestClient adminBffClient, ITestOutputHelper output, 
 
         Measure measure = originalBundle.Entry.FirstOrDefault(e => e.Resource?.TypeName == "Measure")?.Resource as Measure ?? throw new InvalidOperationException("Measure not found in bundle.");
         this.MeasureId = measure.Id;
-
+        
         this._evaluationBundle = new Bundle
         {
             Type = Bundle.BundleType.Transaction,
@@ -83,12 +83,12 @@ public class MeasureLoader(RestClient adminBffClient, ITestOutputHelper output, 
     {
         output.WriteLine("Getting measure bundle...");
         await this.GetMeasureBundleAsync();
-
+        
         output.WriteLine("Loading measure bundle for evaluation...");
         var request = new RestRequest($"measureeval/measure-definition", Method.Put);
         request.AddJsonBody(this._evaluationBundle.ToJson());
         var response = adminBffClient.ExecuteAsync(request);
-
+        
         if (response.Result.StatusCode != System.Net.HttpStatusCode.OK)
         {
             output.WriteLine($"Failed to load measure definition: {response.Result.Content}");
@@ -101,21 +101,21 @@ public class MeasureLoader(RestClient adminBffClient, ITestOutputHelper output, 
         if (this._validationBundle != null)
         {
             output.WriteLine("Loading profile artifacts for validation...");
-
+                
             var validationTasks = this._validationBundle.Entry.Select(async validationEntry =>
             {
                 var resource = validationEntry.Resource;
                 var requestValidation = new RestRequest($"validation/artifact/RESOURCE/{resource.TypeName}-{resource.Id}", Method.Put);
                 requestValidation.AddJsonBody(await resource.ToJsonAsync());
                 var responseValidation = await adminBffClient.ExecuteAsync(requestValidation);
-
+                
                 if (responseValidation.StatusCode != System.Net.HttpStatusCode.OK)
                 {
                     output.WriteLine($"Failed to load validation resource: {responseValidation.Content}");
                     throw new Exception("Failed to load validation resource.");
                 }
             });
-
+            
             await Task.WhenAll(validationTasks);
             output.WriteLine($"{this._validationBundle.Entry.Count} validation resources successfully loaded.");
         }

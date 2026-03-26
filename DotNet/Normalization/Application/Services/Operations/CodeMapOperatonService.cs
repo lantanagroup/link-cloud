@@ -22,7 +22,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
             var sources = resource.Select(operation.FhirPath);
 
-            if (sources == null || !sources.Any())
+            if(sources == null || !sources.Any())
             {
                 return OperationResult.NoAction($"Nothing found at {operation.FhirPath}", resource);
             }
@@ -54,7 +54,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 }
             }
 
-            if (anyUpdated)
+            if(anyUpdated)
                 return OperationResult.Success(resource);
             else
                 return OperationResult.NoAction("No code maps applied.", resource);

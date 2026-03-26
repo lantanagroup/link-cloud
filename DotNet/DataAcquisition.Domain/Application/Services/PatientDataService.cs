@@ -710,7 +710,7 @@ public class PatientDataService : IPatientDataService
 
             log.RetryAttempts ??= 0;
             log.RetryAttempts++;
-
+            
             if (log.RetryAttempts >= maxRetryAttempts)
             {
                 log.Status = RequestStatus.MaxRetriesReached;

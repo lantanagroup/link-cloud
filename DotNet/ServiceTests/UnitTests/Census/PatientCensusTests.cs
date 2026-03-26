@@ -82,7 +82,7 @@ namespace UnitTests.Census
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
             var actual = Assert.IsType<PagedConfigModel<PatientEncounterModel>>(okResult.Value);
-            Assert.Single(actual.Records);
+            Assert.Equal(1, actual.Records.Count());
             Assert.Equal("TestFacility", actual.Records.First().FacilityId);
             Assert.Equal(1, actual.Metadata.TotalCount);
             Assert.Equal(1, actual.Metadata.PageNumber);
@@ -178,7 +178,7 @@ namespace UnitTests.Census
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
             var actual = Assert.IsType<PagedConfigModel<PatientEncounterModel>>(okResult.Value);
-            Assert.Single(actual.Records);
+            Assert.Equal(1, actual.Records.Count());
             Assert.Equal("TestFacility", actual.Records.First().FacilityId);
             Assert.Equal(1, actual.Metadata.TotalCount);
             Assert.Equal(1, actual.Metadata.PageNumber);

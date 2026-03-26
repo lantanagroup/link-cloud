@@ -9,7 +9,7 @@ namespace LantanaGroup.Link.Account.Infrastructure.Logging
             AccountLoggingIds.RoleCreated,
             LogLevel.Information,
             "Role {roleName} was created by {requestor}.")]
-        public static partial void LogRoleCreated(this ILogger logger, string roleName, string requestor, [LogProperties] LinkRoleModel role);
+        public static partial void LogRoleCreated(this ILogger logger, string roleName, string requestor, [LogProperties]LinkRoleModel role);
 
         [LoggerMessage(
             AccountLoggingIds.RoleCreationException,

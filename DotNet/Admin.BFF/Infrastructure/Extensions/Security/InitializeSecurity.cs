@@ -13,7 +13,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
     public static class InitializeSecurity
     {
         public static IServiceCollection AddLinkGatewaySecurity(this IServiceCollection services, IConfiguration configuration, Serilog.ILogger logger, Action<SecurityServiceOptions>? options = null)
-        {
+        { 
             var securityServiceOptions = new SecurityServiceOptions();
             options?.Invoke(securityServiceOptions);
 
@@ -52,15 +52,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                         pb.RequireAssertion(context => true);
                     });
 
-                    options.AddPolicy(PolicyNames.IsLinkAdmin, pb => { pb.RequireAssertion(context => true); });
+                    options.AddPolicy(PolicyNames.IsLinkAdmin, pb => { pb.RequireAssertion(context => true); });                    
                 });
 
                 return services;
+            
+            }              
 
-            }
-
-            var authBuilder = services.AddAuthentication(options =>
-            {
+            var authBuilder = services.AddAuthentication(options => {
                 options.DefaultScheme = LinkAdminConstants.AuthenticationSchemes.Cookie;
                 options.DefaultChallengeScheme = defaultChallengeScheme;
             });
@@ -74,8 +73,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
 
                 options.Cookie.Name = LinkAdminConstants.AuthenticationSchemes.Cookie;
                 options.Cookie.HttpOnly = configuration.GetValue<bool>("Authentication:Schemas:Cookie:HttpOnly");
-                options.Cookie.SecurePolicy = securityServiceOptions.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
-                options.Cookie.Path = configuration.GetValue<string>("Authentication:Schemas:Cookie:Path");
+                options.Cookie.SecurePolicy = securityServiceOptions.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;                
+                options.Cookie.Path = configuration.GetValue<string>("Authentication:Schemas:Cookie:Path");                
                 options.Cookie.SameSite = SameSiteMode.Strict;
                 options.LoginPath = "/api/login";
                 options.LogoutPath = "/api/logout";
@@ -141,7 +140,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                     options.AuthorizationEndpoint = configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Authorization")!;
                     options.TokenEndpoint = configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Token")!;
                     options.UserInformationEndpoint = configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:UserInformation")!;
-                    options.CallbackPath = configuration.GetValue<string>("Authentication:Schemas:Oauth2:CallbackPath");
+                    options.CallbackPath = configuration.GetValue<string>("Authentication:Schemas:Oauth2:CallbackPath");                                     
                 });
 
                 logger.Debug("Set OAuth2 Authentication Scheme: {Scheme} with the following settings: ", LinkAdminConstants.AuthenticationSchemes.Oauth2);
@@ -205,8 +204,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
             {
                 options.Environment = securityServiceOptions.Environment;
                 options.Authority = configuration.GetValue<string>("LinkTokenService:Authority") ?? LinkAuthorizationConstants.LinkBearerService.LinkBearerIssuer;
-                options.Audience = LinkAuthorizationConstants.LinkBearerService.LinkBearerAudience;
-
+                options.Audience = LinkAuthorizationConstants.LinkBearerService.LinkBearerAudience;   
+                
                 var linkTokenSigningKey = configuration.GetValue<string>("LinkTokenService:SigningKey");
                 if (!string.IsNullOrEmpty(linkTokenSigningKey))
                 {
@@ -217,8 +216,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
             // Add Authorization
             services.AddAuthorization(builder =>
             {
-                builder.AddPolicy(LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName, pb =>
-                {
+                builder.AddPolicy(LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName, pb => {
                     pb.RequireAuthenticatedUser()
                         .AddAuthenticationSchemes([.. authSchemas]);
                 });
@@ -227,12 +225,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
             });
 
             return services;
-
+        
         }
 
         public class SecurityServiceOptions
         {
-            public IWebHostEnvironment Environment { get; set; } = null!;
+            public IWebHostEnvironment Environment { get; set; } = null!;        
         }
     }
 }

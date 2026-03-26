@@ -17,7 +17,7 @@ namespace LantanaGroup.Link.Tenant.Migrations
                 type: "nvarchar(max)",
                 nullable: false,
                 defaultValue: "America/New_York");
-
+                
         }
 
         /// <inheritdoc />

@@ -16,7 +16,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         private static readonly ActivitySource _fallbackActivitySource = new ActivitySource("FallbackSource");
 
-        public DataAcquisitionRequestedProducer(IServiceScopeFactory serviceScopeFactory, IProducer<string, DataAcquisitionRequestedValue> dataAcqProducer)
+        public DataAcquisitionRequestedProducer(IServiceScopeFactory serviceScopeFactory, IProducer<string, DataAcquisitionRequestedValue> dataAcqProducer) 
         {
             _serviceScopeFactory = serviceScopeFactory;
             _dataAcqProducer = dataAcqProducer;
@@ -64,9 +64,9 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     ActivityTraceFlags.Recorded);
 
                 ActivitySource activitySource = ServiceActivitySource.Instance ?? _fallbackActivitySource;
-
+                
                 using var activity = activitySource.StartActivity(
-                    "ProduceDataAcquisitionRequested",
+                    "ProduceDataAcquisitionRequested", 
                     ActivityKind.Producer,
                     activityContext);
                 activity?.SetTag("patientId", patientId);
@@ -97,13 +97,13 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
                 };
                 headers.Add("traceparent", Encoding.UTF8.GetBytes(traceparentValue));
-
-                _dataAcqProducer.Produce(nameof(KafkaTopic.DataAcquisitionRequested),
-                    new Message<string, DataAcquisitionRequestedValue>
-                    {
-                        Key = darKey,
-                        Value = darValue,
-                        Headers = headers
+                
+                _dataAcqProducer.Produce(nameof(KafkaTopic.DataAcquisitionRequested), 
+                    new Message<string, DataAcquisitionRequestedValue> 
+                    { 
+                        Key = darKey, 
+                        Value = darValue, 
+                        Headers = headers 
                     });
 
                 _dataAcqProducer.Flush();

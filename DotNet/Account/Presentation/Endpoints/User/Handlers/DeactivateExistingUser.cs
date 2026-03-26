@@ -45,7 +45,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
                 throw;
             }
 
-
+            
         }
     }
 }

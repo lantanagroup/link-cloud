@@ -17,7 +17,7 @@ public class PathNamingService(IOptions<SubmissionServiceConfig> config, ILogger
             logger.LogError("Submission service configuration does not contain measure names.");
             throw new Exception("Submission service configuration does not contain measure names.");
         }
-
+        
         // If a URL, may contain |0.1.2 representing the version at the end of the URL
         // Remove it so that we're looking at the generic URL, not the URL specific to a measure version
         string measureWithoutVersion = measure.Contains("|") ?
@@ -52,7 +52,7 @@ public class PathNamingService(IOptions<SubmissionServiceConfig> config, ILogger
         DateTime endDate, string reportId)
     {
         string sanitizedReportId = reportId.SanitizeAndRemove();
-
+        
         //Per 2153, don't build with the trailing timestamp
         string measureShortNames = GetMeasuresShortName(measures);
         return $"{facilityId}-{measureShortNames}-{startDate.ToString(DirectoryDateFormat)}-{endDate.ToString(DirectoryDateFormat)}_{sanitizedReportId}";

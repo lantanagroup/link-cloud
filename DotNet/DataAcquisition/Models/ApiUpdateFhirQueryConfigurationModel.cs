@@ -47,6 +47,6 @@ namespace LantanaGroup.Link.DataAcquisition.Models
 
         [DataMember]
         [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
-        public string? TimeZone { get; set; }
+        public string? TimeZone { get; set; }   
     }
 }

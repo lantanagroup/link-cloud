@@ -63,7 +63,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
 
-    var serviceInformation = builder.SetupServiceInformation(AccountConstants.ServiceName, assemblyVersion);
+    var serviceInformation = builder.SetupServiceInformation(AccountConstants.ServiceName, assemblyVersion);    
 
     //Add problem details
     builder.Services.AddProblemDetailsService(options =>
@@ -98,11 +98,11 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.KeyRing = builder.Configuration.GetValue<string>("DataProtection:KeyRing") ?? "Link";
     });
 
-    var cacheType = builder.Configuration.GetValue<string>("Cache:Type") ?? "InMemory";
-    var supportedCacheTypes = new[] { "Redis", "InMemory" };
-    if (!supportedCacheTypes.Contains(cacheType))
-    {
-        Log.Logger.Warning("Unsupported cache type '{CacheType}'. Defaulting to InMemory cache.", cacheType);
+    var cacheType = builder.Configuration.GetValue<string>("Cache:Type") ?? "InMemory"; 
+    var supportedCacheTypes = new[] { "Redis", "InMemory" }; 
+    if (!supportedCacheTypes.Contains(cacheType)) 
+    { 
+        Log.Logger.Warning("Unsupported cache type '{CacheType}'. Defaulting to InMemory cache.", cacheType); 
         cacheType = "InMemory";
     }
     if (cacheType == "Redis")
@@ -155,8 +155,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
 
     //Add database context
-    builder.Services.AddDbContext<AccountDbContext>((sp, options) =>
-    {
+    builder.Services.AddDbContext<AccountDbContext>((sp, options) => {
 
         var updateBaseEntityInterceptor = sp.GetRequiredService<UpdateBaseEntityInterceptor>();
         var dbProvider = builder.Configuration.GetValue<string>(AccountConstants.AppSettingsSectionNames.DatabaseProvider);
@@ -247,16 +246,14 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Add logging redaction
     builder.Logging.EnableRedaction();
-    builder.Services.AddRedaction(x =>
-    {
+    builder.Services.AddRedaction(x => {
 
         x.SetRedactor<StarRedactor>(new DataClassificationSet(DataTaxonomy.SensitiveData));
 
         var hmacKey = builder.Configuration.GetValue<string>("Logging:HmacKey");
         if (!string.IsNullOrEmpty(hmacKey))
         {
-            x.SetHmacRedactor(opts =>
-            {
+            x.SetHmacRedactor(opts => {
                 opts.Key = Convert.ToBase64String(Encoding.UTF8.GetBytes(hmacKey));
                 opts.KeyId = 808;
             }, new DataClassificationSet(DataTaxonomy.PiiData));
@@ -278,8 +275,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Serilog.Debugging.SelfLog.Enable(Console.Error);
 
     //Add CORS
-    builder.Services.AddLinkCorsService(options =>
-    {
+    builder.Services.AddLinkCorsService(options => {
         options.Environment = builder.Environment;
     });
 
@@ -288,7 +284,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.Environment = builder.Environment;
         options.ServiceName = AccountConstants.ServiceName;
-        options.ServiceVersion = ServiceActivitySource.Version;
+        options.ServiceVersion = ServiceActivitySource.Version;              
     });
 
     builder.Services.AddSingleton<IAccountServiceMetrics, AccountServiceMetrics>();
@@ -322,7 +318,7 @@ static void SetupMiddleware(WebApplication app)
     if (!allowAnonymousAccess)
     {
         app.UseAuthentication();
-        app.UseMiddleware<UserScopeMiddleware>();
+        app.UseMiddleware<UserScopeMiddleware>();        
     }
     app.UseAuthorization();
 

@@ -21,7 +21,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.Telemetry
         {
             var elapsed = _timeProvider.GetElapsedTime(_requestStartTime);
             _histogram.Record(elapsed.TotalMilliseconds, _tags.ToArray());
-
+          
         }
     }
 }
