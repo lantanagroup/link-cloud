@@ -10,6 +10,7 @@ using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -85,7 +86,7 @@ namespace LantanaGroup.Link.Report.Listeners
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
                             await ProcessMessageAsync(result, consumeCancellationToken);
-                            consumer.Commit(result);
+                            consumer.SafeCommit(result, _logger);
                         }, cancellationToken);
 
                     }
@@ -103,12 +104,11 @@ namespace LantanaGroup.Link.Report.Listeners
                         _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 
                         var offset = ex.ConsumerRecord?.TopicPartitionOffset;
-                        consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
+                        consumer.SafeCommit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset }, _logger);
                     }
                     catch (Exception ex)
                     {
                         _exceptionLogger.Handle(ex, "Error encountered in ReportScheduledListener", LogLevel.Error);
-                        consumer.Commit();
                     }
                 }
             }
