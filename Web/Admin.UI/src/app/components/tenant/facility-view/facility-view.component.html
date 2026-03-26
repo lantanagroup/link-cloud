@@ -78,14 +78,65 @@
           <p>
         </div>
       </div>
-      <div class="right-pane">
-        <label style="margin-left: 1em; font-weight: normal; cursor: pointer;">
-          <input type="checkbox" [(ngModel)]="showDeleted" (change)="onShowDeletedChange()" />
-          Show Deleted
-        </label>
+    </div>
+
+    <div class="filter-bar">
+      <mat-form-field appearance="outline" class="compact-filter">
+        <mat-label>Status</mat-label>
+        <mat-select [(ngModel)]="statusFilter" (selectionChange)="applyFilters()">
+          <mat-option value="">Any</mat-option>
+          @for (s of statusOptions; track s) {
+            <mat-option [value]="s">{{ s === 'EndOfPeriod' ? 'End of Period' : s }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="compact-filter">
+        <mat-label>Frequency</mat-label>
+        <mat-select [(ngModel)]="frequencyFilter" (selectionChange)="applyFilters()">
+          <mat-option value="">Any</mat-option>
+          @for (f of frequencyOptions; track f) {
+            <mat-option [value]="f">{{ f }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="compact-filter">
+        <mat-label>Created Date</mat-label>
+        <input matInput [matDatepicker]="createDatePicker" [(ngModel)]="createDateFilter" (dateChange)="applyFilters()">
+        <mat-datepicker-toggle matSuffix [for]="createDatePicker"></mat-datepicker-toggle>
+        <mat-datepicker #createDatePicker></mat-datepicker>
+      </mat-form-field>
+
+      <div class="date-range-group">
+        <span class="date-range-label">Reporting Period</span>
+        <div class="date-range-fields">
+          <mat-form-field appearance="outline" class="compact-filter">
+            <mat-label>From</mat-label>
+            <input matInput [matDatepicker]="startPicker" [(ngModel)]="reportStartDateFilter" (dateChange)="applyFilters()">
+            <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
+            <mat-datepicker #startPicker></mat-datepicker>
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="compact-filter">
+            <mat-label>To</mat-label>
+            <input matInput [matDatepicker]="endPicker" [(ngModel)]="reportEndDateFilter" (dateChange)="applyFilters()">
+            <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
+            <mat-datepicker #endPicker></mat-datepicker>
+          </mat-form-field>
+        </div>
       </div>
 
+      <mat-checkbox
+        [(ngModel)]="showDeleted"
+        (change)="onShowDeletedChange()">
+        Show deleted
+      </mat-checkbox>
+
+      <div class="filter-actions">
+        <button class="link-button secondary" (click)="clearFilters()" *ngIf="hasActiveFilters()">Clear</button>
+      </div>
     </div>
+
     @if (dataSource) {
     <div class="table-container no-border">
       <table mat-table [dataSource]="dataSource" matSort (matSortChange)="onSortChange($event)" style="width: 100%; background-color: transparent">
@@ -178,8 +229,7 @@
               <span *ngIf="element.status === 'EndOfPeriod'" class="status-endOfPeriod">End of Period</span>
               <span *ngIf="element.status === 'Submitted'" class="status-submitted">Submitted</span>
             </div>
-            <div style="margin-top:5px" *ngIf="element.submitDate" [matTooltip]="element.submitDate | date:'M/d/yy h:mm:ss a'">{{element.submitDate | date:'M/d/yy HH:mm'}}</div>
-            <div style="margin-top:5px" *ngIf="!element.submitDate" [matTooltip]="element.createDate | date:'M/d/yy h:mm:ss a'">{{element.createDate | date:'M/d/yy HH:mm'}}</div>
+            <div *ngIf="element.submitReportDateTime" class="status-date">{{element.submitReportDateTime | date:'M/d/yy h:mm a'}}</div>
           </td>
         </ng-container>
 

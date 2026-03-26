@@ -17,7 +17,7 @@ namespace DataAcquisition.Domain.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.24")
+                .HasAnnotation("ProductVersion", "8.0.25")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -687,6 +687,89 @@ namespace DataAcquisition.Domain.Migrations
                     b.ToTable("DataAcquisitionLog");
                 });
 
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.EncounterLocation", b =>
+                {
+                    b.Property<int>("EncounterLocationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EncounterLocationId"));
+
+                    b.Property<DateTime>("CreateDate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasDefaultValueSql("(getutcdate())");
+
+                    b.Property<int>("EncounterMappingId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ModifiedDate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasDefaultValueSql("(getutcdate())");
+
+                    b.Property<int>("OrganizationLocationMappingId")
+                        .HasColumnType("int");
+
+                    b.HasKey("EncounterLocationId")
+                        .HasName("PK_EncounterLocation_EncounterLocationId");
+
+                    b.HasIndex(new[] { "EncounterMappingId" }, "IX_EncounterLocation_EncounterMappingId");
+
+                    b.HasIndex(new[] { "OrganizationLocationMappingId" }, "IX_EncounterLocation_OrganizationLocationMappingId");
+
+                    b.ToTable("EncounterLocation");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.EncounterMapping", b =>
+                {
+                    b.Property<int>("EncounterMappingId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EncounterMappingId"));
+
+                    b.Property<DateTime>("CreateDate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasDefaultValueSql("(getutcdate())");
+
+                    b.Property<string>("EncounterId")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("FacilityId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<bool>("MappedToOrg")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("ModifiedDate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasDefaultValueSql("(getutcdate())");
+
+                    b.Property<string>("PatientId")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("EncounterMappingId")
+                        .HasName("PK_EncounterMapping_EncounterMappingId");
+
+                    b.HasIndex(new[] { "FacilityId", "EncounterId" }, "IX_EncounterMapping_FacilityId_EncounterId");
+
+                    b.HasIndex(new[] { "FacilityId", "PatientId" }, "IX_EncounterMapping_FacilityId_PatientId");
+
+                    b.HasIndex(new[] { "FacilityId", "EncounterId" }, "UQ_EncounterMapping_FacilityId_EncounterId")
+                        .IsUnique();
+
+                    b.ToTable("EncounterMapping");
+                });
+
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirListConfiguration", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1107,6 +1190,121 @@ namespace DataAcquisition.Domain.Migrations
                     b.ToTable("ResourceReferenceType");
                 });
 
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.SftpAcquisitionLog", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AcquisitionType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Benchmarks")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("ExternalId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("FacilityId")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("FileNames")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OriginatingSpanId")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("OriginatingTraceId")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTime?>("ProcessDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("RetryAttempts")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ScheduledDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("SubType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FacilityId")
+                        .HasDatabaseName("IX_SftpAcquisitionLog_FacilityId");
+
+                    b.HasIndex("ScheduledDate")
+                        .HasDatabaseName("IX_SftpAcquisitionLog_ScheduledDate");
+
+                    b.ToTable("SftpAcquisitionLog");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.SftpConfiguration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("NEWID()");
+
+                    b.Property<string>("AcquisitionConfigurations")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("AuthenticationProtocol")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("EnableBenchmarking")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Host")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("OrganizationId")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<int>("Port")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RemoteDirectory")
+                        .HasMaxLength(4096)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("RemoveAfterProcessing")
+                        .HasColumnType("bit");
+
+                    b.Property<TimeSpan>("Timeout")
+                        .HasColumnType("time");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SftpConfiguration");
+                });
+
             modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzBlobTrigger", b =>
                 {
                     b.HasOne("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzTrigger", "Trigger")
@@ -1160,6 +1358,25 @@ namespace DataAcquisition.Domain.Migrations
                         .IsRequired();
 
                     b.Navigation("JobDetail");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.EncounterLocation", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.EncounterMapping", "EncounterMapping")
+                        .WithMany("EncounterLocations")
+                        .HasForeignKey("EncounterMappingId")
+                        .IsRequired()
+                        .HasConstraintName("FK_EncounterLocation_EncounterMapping");
+
+                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.OrganizationLocationMapping", "OrganizationLocationMapping")
+                        .WithMany("EncounterLocations")
+                        .HasForeignKey("OrganizationLocationMappingId")
+                        .IsRequired()
+                        .HasConstraintName("FK_EncounterLocation_OrganizationLocationMapping");
+
+                    b.Navigation("EncounterMapping");
+
+                    b.Navigation("OrganizationLocationMapping");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirQuery", b =>
@@ -1247,6 +1464,11 @@ namespace DataAcquisition.Domain.Migrations
                     b.Navigation("ReferenceResources");
                 });
 
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.EncounterMapping", b =>
+                {
+                    b.Navigation("EncounterLocations");
+                });
+
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirQuery", b =>
                 {
                     b.Navigation("FhirQueryResourceTypes");
@@ -1261,6 +1483,8 @@ namespace DataAcquisition.Domain.Migrations
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.OrganizationLocationMapping", b =>
                 {
+                    b.Navigation("EncounterLocations");
+
                     b.Navigation("InversePartOf");
                 });
 #pragma warning restore 612, 618
