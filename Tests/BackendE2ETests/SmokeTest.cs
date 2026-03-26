@@ -15,6 +15,7 @@ namespace LantanaGroup.Link.Tests.E2ETests;
 public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixture>
 {
     private const string FacilityId = "SmokeTestFacility";
+    private const int GenerationSeed = 20260326;
 
     private static readonly TestScenarioConfig Config = TestConfig.AdhocReportingSmokeTestConfig;
 
@@ -37,7 +38,8 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
 
     public async Task InitializeAsync()
     {
-        var (patientIds, bundles) = FhirBundleGenerator.Generate(_output, 1, 1000, "SmokePatient");
+        _output.WriteLine($"Using deterministic generation seed: {GenerationSeed}");
+        var (patientIds, bundles) = FhirBundleGenerator.Generate(_output, 1, 1000, "SmokePatient", GenerationSeed);
 
         if (Config.PatientIds.Count == 0)
         {

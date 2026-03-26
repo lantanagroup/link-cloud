@@ -21,7 +21,11 @@ public static class ConditionFactory
         Id                 = id,
         ClinicalStatus     = CC("http://terminology.hl7.org/CodeSystem/condition-clinical",   "active", "Active"),
         VerificationStatus = CC("http://terminology.hl7.org/CodeSystem/condition-ver-status", "confirmed", "Confirmed"),
-        Category           = [CC("http://terminology.hl7.org/CodeSystem/condition-category",  "encounter-diagnosis", "Encounter Diagnosis")],
+        Category           =
+        [
+            CC("http://terminology.hl7.org/CodeSystem/condition-category",  "problem-list-item", "Problem List Item"),
+            CC("http://terminology.hl7.org/CodeSystem/condition-category",  "encounter-diagnosis", "Encounter Diagnosis")
+        ],
         Severity           = CC("http://snomed.info/sct", "24484000", "Severe"),
         Code               = new CodeableConcept
         {
@@ -70,12 +74,20 @@ public static class ConditionFactory
         var severityCodes  = new[] { ("24484000","Severe"), ("6736007","Moderate"), ("255604002","Mild") };
         var (sevCode, sevDisplay) = severityCodes[seed % severityCodes.Length];
 
+        var categories = new List<CodeableConcept>
+        {
+            CC("http://terminology.hl7.org/CodeSystem/condition-category", "problem-list-item", "Problem List Item")
+        };
+
+        if (categoryCode != "problem-list-item")
+            categories.Add(CC("http://terminology.hl7.org/CodeSystem/condition-category", categoryCode, categoryCode == "problem-list-item" ? "Problem List Item" : "Encounter Diagnosis"));
+
         var condition = new Condition
         {
             Id                 = id,
             ClinicalStatus     = CC("http://terminology.hl7.org/CodeSystem/condition-clinical",   isActive ? "active" : "resolved", isActive ? "Active" : "Resolved"),
             VerificationStatus = CC("http://terminology.hl7.org/CodeSystem/condition-ver-status", "confirmed", "Confirmed"),
-            Category           = [CC("http://terminology.hl7.org/CodeSystem/condition-category",  categoryCode, categoryCode == "problem-list-item" ? "Problem List Item" : "Encounter Diagnosis")],
+            Category           = categories,
             Severity           = CC("http://snomed.info/sct", sevCode, sevDisplay),
             Code               = new CodeableConcept
             {

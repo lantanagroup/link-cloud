@@ -54,12 +54,15 @@ public static class FhirBundleGenerator
         ITestOutputHelper output,
         int patientCount = DefaultPatientCount,
         int totalResourcesPerPatient = DefaultResourcesPerPatient,
-        string patientIdPrefix = "MegaPatient")
+        string patientIdPrefix = "MegaPatient",
+        int? generationSeed = null)
     {
         var patientIds = new List<string>();
         var allEntries = new List<(string PatientId, List<Bundle.EntryComponent> Entries)>();
+        var baseSeed = generationSeed.GetValueOrDefault();
 
-        output.WriteLine($"Generating {patientCount} patients with ~{totalResourcesPerPatient} resources each...");
+        output.WriteLine($"Generating {patientCount} patients with ~{totalResourcesPerPatient} resources each..." +
+                         (generationSeed.HasValue ? $" (seed={generationSeed.Value})" : string.Empty));
 
         // ------------------------------------------------------------------
         // Shared infrastructure — uploaded once in the first chunk
@@ -89,13 +92,14 @@ public static class FhirBundleGenerator
         // ------------------------------------------------------------------
         for (var p = 0; p < patientCount; p++)
         {
+            var patientSeed      = baseSeed + p;
             var patientId        = $"{patientIdPrefix}-{p + 1:D3}";
-            var scenario         = FhirGenerationCodes.ClinicalScenarios[p % FhirGenerationCodes.ClinicalScenarios.Length];
-            var attendingPractId = sharedPractitionerIds[p % sharedPractitionerIds.Count];
-            var admittingPractId = sharedPractitionerIds[(p + 1) % sharedPractitionerIds.Count];
-            var gpPractId        = sharedPractitionerIds[(p + 2) % sharedPractitionerIds.Count];
-            var encStart         = EncounterStart(p);
-            var encEnd           = EncounterEnd(p);
+            var scenario         = FhirGenerationCodes.ClinicalScenarios[Mod(patientSeed, FhirGenerationCodes.ClinicalScenarios.Length)];
+            var attendingPractId = sharedPractitionerIds[Mod(patientSeed, sharedPractitionerIds.Count)];
+            var admittingPractId = sharedPractitionerIds[Mod(patientSeed + 1, sharedPractitionerIds.Count)];
+            var gpPractId        = sharedPractitionerIds[Mod(patientSeed + 2, sharedPractitionerIds.Count)];
+            var encStart         = EncounterStart(patientSeed);
+            var encEnd           = EncounterEnd(patientSeed);
             var encounterId      = $"{patientId}-Enc-001";
             var careTeamId       = $"{patientId}-CareTeam-001";
             var carePlanId       = $"{patientId}-CarePlan-001";
@@ -107,10 +111,10 @@ public static class FhirBundleGenerator
 
             // Core anchors — order matters: Patient → Device → Encounter → Diagnoses → Care
             entries.Add(Entry($"Patient/{patientId}",
-                PatientFactory.Generate(patientId, p, gpPractId)));
+                PatientFactory.Generate(patientId, patientSeed, gpPractId)));
 
             entries.Add(Entry($"Device/{patientDeviceId}",
-                DeviceFactory.Generate(patientDeviceId, p, patientId)));
+                DeviceFactory.Generate(patientDeviceId, patientSeed, patientId)));
 
             // Primary admission diagnosis — from the scenario
             entries.Add(Entry($"Condition/{primaryDxId}",
@@ -123,13 +127,13 @@ public static class FhirBundleGenerator
                     encounterId, patientId, encStart, encEnd,
                     attendingPractId, admittingPractId,
                     EdLocationId, IcuLocationId, StepDownLocationId, HospitalOrgId,
-                    primaryDxId, p)));
+                    primaryDxId, patientSeed)));
 
             entries.Add(Entry($"CareTeam/{careTeamId}",
                 CareTeamFactory.Generate(careTeamId, patientId, encounterId, attendingPractId, encStart, HospitalOrgId)));
 
             entries.Add(Entry($"CarePlan/{carePlanId}",
-                CarePlanFactory.Generate(carePlanId, patientId, encounterId, careTeamId, encStart, p)));
+                CarePlanFactory.Generate(carePlanId, patientId, encounterId, careTeamId, encStart, patientSeed)));
 
             var medicationIds  = new List<string>();
             var specimenIds    = new List<string>();
@@ -146,11 +150,11 @@ public static class FhirBundleGenerator
                     resourceIndex++;
                     // Combine patient seed (p) with loop counter (i) so every patient
                     // gets a distinct clinical variation even for the same resource index.
-                    var seed          = (p * 31 + i);
+                    var seed          = baseSeed + (p * 31 + i);
                     var resourceId    = $"{patientId}-{resourceType}-{resourceIndex:D5}";
                     var offset        = TimeSpan.FromMinutes((double)i / Math.Max(count, 1) * (encEnd - encStart).TotalMinutes);
                     var effectiveDate = encStart.Add(offset);
-                    var practId       = sharedPractitionerIds[(seed) % sharedPractitionerIds.Count];
+                    var practId       = sharedPractitionerIds[Mod(seed, sharedPractitionerIds.Count)];
 
                     Resource resource = resourceType switch
                     {
@@ -252,4 +256,6 @@ public static class FhirBundleGenerator
 
     private static DateTime EncounterEnd(int index) =>
         EncounterStart(index).AddDays(2 + ((index * 7) % 20)).AddHours(4);
+
+    private static int Mod(int value, int modulus) => ((value % modulus) + modulus) % modulus;
 }

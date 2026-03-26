@@ -13,7 +13,6 @@ public static class ProcedureFactory
         List<string> conditionIds)
     {
         var v       = FhirGenerationCodes.Procedures[seed % FhirGenerationCodes.Procedures.Length];
-        var outcome = ("385669000", "Successful");
         return Create(id, patientId, encounterId, performed, seed, practId, locationId, orgId,
                       v.Code, v.Display, v.BodySiteCode, v.BodySiteDisplay,
                       v.OutcomeCode, v.OutcomeDisplay,

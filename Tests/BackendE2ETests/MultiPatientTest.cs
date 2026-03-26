@@ -17,6 +17,7 @@ namespace LantanaGroup.Link.Tests.E2ETests;
 public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixture>
 {
     private const string FacilityId = "MultiPatientTestFacility";
+    private const int GenerationSeed = 20260328;
 
     private static readonly TestScenarioConfig Config = TestConfig.BuildScenarioConfig("MULTI_PATIENT_TEST");
 
@@ -39,8 +40,9 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
 
     public async Task InitializeAsync()
     {
+        _output.WriteLine($"Using deterministic generation seed: {GenerationSeed}");
         // Generate 1000 synthetic patients, each with ~100 resources
-        var (patientIds, bundles) = FhirBundleGenerator.Generate(_output, 1000, 100, "MultiPatient");
+        var (patientIds, bundles) = FhirBundleGenerator.Generate(_output, 1000, 100, "MultiPatient", GenerationSeed);
 
         // If config has no patient IDs set (the default), use generated ones
         if (Config.PatientIds.Count == 0)

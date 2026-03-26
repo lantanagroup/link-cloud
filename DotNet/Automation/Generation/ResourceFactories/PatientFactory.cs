@@ -38,10 +38,11 @@ public static class PatientFactory
         string emergencyContactPhone,
         string? gpPractitionerId = null)
     {
-        var mrn      = $"MRN-{(uint)id.GetHashCode():D9}";
-        var epi      = $"E{(uint)id.GetHashCode() & 0xFFFFFF:X6}";
-        var areaCode = 500 + Math.Abs(id.GetHashCode()) % 500;
-        var lineNum  = Math.Abs(id.GetHashCode() >> 8) % 10000;
+        var stableHash = id.GetStableHash32();
+        var mrn      = $"MRN-{stableHash:D10}";
+        var epi      = $"E{stableHash & 0xFFFFFF:X6}";
+        var areaCode = 500 + (int)(stableHash % 500);
+        var lineNum  = (int)((stableHash >> 8) % 10000);
         var phone    = $"+1 {areaCode:D3}-555-{lineNum:D4}";
 
         var patient = new Patient

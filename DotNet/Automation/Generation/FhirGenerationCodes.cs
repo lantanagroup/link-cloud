@@ -302,7 +302,7 @@ public static class FhirGenerationCodes
         ("24323-8", "Comprehensive metabolic panel - Serum or Plasma",   "CH",  "Chemistry"),
         ("24331-1", "Lipid panel - Serum or Plasma",                     "CH",  "Chemistry"),
         ("57698-3", "Lipid panel with direct LDL - Serum or Plasma",     "CH",  "Chemistry"),
-        ("24357-6", "Urinalysis panel - Urine",                          "UA",  "Urinalysis"),
+        ("24357-6", "Urinalysis panel - Urine",                          "CH",  "Chemistry"),
         ("85319-2", "Blood culture panel",                               "MB",  "Microbiology"),
         ("24627-2", "Chest X-ray AP",                                    "RAD", "Radiology"),
         ("30954-2", "Relevant diagnostic tests/laboratory data Narrative","CH",  "Chemistry"),

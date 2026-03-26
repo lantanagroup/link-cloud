@@ -64,6 +64,15 @@ public static class EncounterFactory
     {
         Id     = id,
         Status = Encounter.EncounterStatus.Finished,
+        Identifier =
+        [
+            new Identifier
+            {
+                Use = Identifier.IdentifierUse.Official,
+                System = "http://example.org/fhir/sid/encounter",
+                Value = id
+            }
+        ],
         Class  = new Coding("http://terminology.hl7.org/CodeSystem/v3-ActCode", "IMP", "inpatient encounter"),
         Type   =
         [

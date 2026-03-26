@@ -31,7 +31,7 @@ public static class DeviceFactory
                 new Device.DeviceNameComponent { Name = display, Type = DeviceNameType.UserFriendlyName }
             ],
             Manufacturer = "SyntheticMed Devices Inc.",
-            SerialNumber = $"SN-{Math.Abs(id.GetHashCode()):X8}"
+            SerialNumber = $"SN-{id.GetStableHash32():X8}"
         };
         if (patientId != null)
             device.Patient = Ref($"Patient/{patientId}");

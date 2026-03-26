@@ -34,7 +34,7 @@ public static class CoverageFactory
         Id           = id,
         Status       = FinancialResourceStatusCodes.Active,
         Type         = CC("http://terminology.hl7.org/CodeSystem/v3-ActCode", typeCode, typeDisplay),
-        SubscriberId = $"SUB-{id.GetHashCode() & 0xFFFFFF:X6}",
+        SubscriberId = $"SUB-{id.GetStableHash32() & 0xFFFFFF:X6}",
         Beneficiary  = Ref($"Patient/{patientId}"),
         Relationship = CC("http://terminology.hl7.org/CodeSystem/subscriber-relationship", "self", "Self"),
         Period       = new Period { Start = start.ToString("yyyy-MM-dd"), End = end.AddYears(1).ToString("yyyy-MM-dd") },

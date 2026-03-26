@@ -33,7 +33,8 @@ public static class ImagingStudyFactory
         string reasonCode,
         string reasonDisplay)
     {
-        var studyUid    = $"1.2.840.99999.{Math.Abs(id.GetHashCode())}.1";
+        var stableHash  = id.GetStableHash32();
+        var studyUid    = $"1.2.840.99999.{stableHash}.1";
         var seriesUid   = $"{studyUid}.1";
         var instanceUid = $"{seriesUid}.1";
 

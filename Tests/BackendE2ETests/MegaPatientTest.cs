@@ -15,6 +15,7 @@ namespace LantanaGroup.Link.Tests.E2ETests;
 public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixture>
 {
     private const string FacilityId = "MegaPatientTestFacility";
+    private const int GenerationSeed = 20260327;
 
     private static readonly TestScenarioConfig Config = TestConfig.MegaPatientTestConfig;
 
@@ -37,7 +38,8 @@ public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETe
 
     public async Task InitializeAsync()
     {
-        var (patientIds, bundles) = FhirBundleGenerator.Generate(_output);
+        _output.WriteLine($"Using deterministic generation seed: {GenerationSeed}");
+        var (patientIds, bundles) = FhirBundleGenerator.Generate(_output, generationSeed: GenerationSeed);
 
         if (Config.PatientIds.Count == 0)
         {
