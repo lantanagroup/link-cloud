@@ -1,7 +1,10 @@
-using LantanaGroup.Link.Tests.E2ETests.Helpers;
-using LantanaGroup.Link.Tests.E2ETests.Services;
-using LantanaGroup.Link.Tests.E2ETests.Validation;
+﻿using LantanaGroup.Link.Automation;
+using LantanaGroup.Link.Automation.Configuration;
+using LantanaGroup.Link.Automation.Helpers;
+using LantanaGroup.Link.Automation.Services;
+using LantanaGroup.Link.Automation.Validation;
 using RestSharp;
+using System.Reflection;
 using Xunit;
 using Task = System.Threading.Tasks.Task;
 
@@ -11,23 +14,25 @@ public sealed class SmokeTest : IAsyncLifetime
 {
     private const string FacilityId = "SmokeTestFacility";
 
-    private static readonly FhirDataLoader FhirDataLoader = new(TestConfig.ExternalFhirServerBase);
-    private static readonly TestConfig.SmokeTestConfig Config = TestConfig.AdhocReportingSmokeTestConfig;
+    private static readonly AutomationConfig AutomationCfg = TestConfig.BuildAutomationConfig();
+    private static readonly TestScenarioConfig Config = TestConfig.AdhocReportingSmokeTestConfig;
+    private static readonly FhirDataLoader FhirDataLoader = new(AutomationCfg.ExternalFhirServerBase, AutomationCfg);
+    private static readonly DatabaseConnectionFactory DbFactory = new(AutomationCfg.Database);
 
     private readonly DualOutputHelper _output;
-    private readonly RestClient _adminBffClient = AdminBffClientFactory.Create();
+    private readonly RestClient _adminBffClient = AdminBffClientFactory.Create(AutomationCfg);
     private readonly LokiScraper _lokiScraper;
 
     private FacilityApiClient FacilityApi => new(_adminBffClient, _output);
     private NormalizationApiClient NormalizationApi => new(_adminBffClient, _output);
-    private QueryConfigApiClient QueryConfigApi => new(_adminBffClient, _output);
-    private ReportApiClient ReportApi => new(_adminBffClient, _output, _lokiScraper, Config);
+    private QueryConfigApiClient QueryConfigApi => new(_adminBffClient, _output, AutomationCfg);
+    private ReportApiClient ReportApi => new(_adminBffClient, _output, _lokiScraper, AutomationCfg, Config);
     private ValidationApiClient ValidationApi => new(_adminBffClient, _output, _lokiScraper);
 
     public SmokeTest()
     {
         _output = new DualOutputHelper();
-        _lokiScraper = new LokiScraper(_output);
+        _lokiScraper = new LokiScraper(_output, AutomationCfg);
     }
 
     public async Task InitializeAsync()
@@ -36,7 +41,7 @@ public sealed class SmokeTest : IAsyncLifetime
         await FhirDataLoader.WaitForServerAsync(_output);
 
         // Load FHIR test data onto the external FHIR server
-        await FhirDataLoader.LoadEmbeddedTransactionBundles(_output);
+        await FhirDataLoader.LoadEmbeddedTransactionBundles(_output, Assembly.GetExecutingAssembly());
 
         // Initialize validation artifacts and categories (with retry)
         await ValidationApi.InitializeArtifactsAsync();
@@ -52,7 +57,7 @@ public sealed class SmokeTest : IAsyncLifetime
             await FacilityApi.DeleteAsync(FacilityId);
         }
 
-        if (TestConfig.CleanupSmokeTestData)
+        if (AutomationCfg.CleanupTestData)
         {
             FhirDataLoader.ExpungeEverything(_output);
         }
@@ -68,7 +73,7 @@ public sealed class SmokeTest : IAsyncLifetime
     public async Task ExecuteSmokeTest()
     {
         // Step 1: Load measure definition into measureeval and validation
-        var measureLoader = new MeasureLoader(_adminBffClient, _output, Config);
+        var measureLoader = new MeasureLoader(_adminBffClient, _output, Config, Assembly.GetExecutingAssembly());
         await measureLoader.LoadAsync();
 
         var measureId = measureLoader.MeasureId
@@ -90,7 +95,7 @@ public sealed class SmokeTest : IAsyncLifetime
         var reportId = await ReportApi.GenerateReportAsync(FacilityId, measureId);
 
         // Step 7: Start background diagnostics and poll until the report is submitted
-        await using var diagnostics = new BackgroundDiagnosticsMonitor(_output, _lokiScraper, Config.PatientIds.Count);
+        await using var diagnostics = new BackgroundDiagnosticsMonitor(_output, _lokiScraper, AutomationCfg, Config.PatientIds.Count);
         await diagnostics.StartAsync(FacilityId, reportId);
 
         var reportSubmitted = await ReportApi.CheckSubmissionStatusAsync(reportId, diagnostics);
@@ -110,7 +115,8 @@ public sealed class SmokeTest : IAsyncLifetime
 
         // Always write a snapshot before any assertions can kill the test.
         // This guarantees the full pipeline state is in the output for debugging.
-        await PipelineSnapshot.WriteFullSnapshotAsync(_output, FacilityId, reportId);
+        var pipelineSnapshot = new PipelineSnapshot(DbFactory);
+        await pipelineSnapshot.WriteFullSnapshotAsync(_output, FacilityId, reportId);
 
         Assert.True(reportSubmitted,
             $"Expected report with id {reportId} to be submitted but it was not. " +
@@ -132,24 +138,24 @@ public sealed class SmokeTest : IAsyncLifetime
 
         // Step 9-10: Strict database validation (snapshot is already captured above
         // even if an assertion fails here)
-        var reportDbValidator = new ReportDatabaseValidator(_output);
+        var reportDbValidator = new ReportDatabaseValidator(_output, DbFactory);
         await reportDbValidator.ValidateAllAsync(
             FacilityId,
             reportId,
             measureId,
             Config.PatientIds);
 
-        var dataAcqValidator = new DataAcquisitionDatabaseValidator(_output);
+        var dataAcqValidator = new DataAcquisitionDatabaseValidator(_output, DbFactory);
         await dataAcqValidator.ValidateAllAsync(
             FacilityId,
             reportId,
             measureId,
             Config.PatientIds);
 
-        var normalizationValidator = new NormalizationDatabaseValidator(_output);
+        var normalizationValidator = new NormalizationDatabaseValidator(_output, DbFactory);
         await normalizationValidator.ValidateAllAsync(FacilityId);
 
-        var tenantValidator = new TenantDatabaseValidator(_output);
+        var tenantValidator = new TenantDatabaseValidator(_output, DbFactory);
         await tenantValidator.ValidateAllAsync(FacilityId, measureId);
 
         // Step 11: Validation results (API-based) -- explains why FailedValidation occurs

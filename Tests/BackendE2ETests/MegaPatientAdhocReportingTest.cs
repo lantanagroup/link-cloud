@@ -1,7 +1,10 @@
-using LantanaGroup.Link.Tests.E2ETests.Helpers;
-using LantanaGroup.Link.Tests.E2ETests.Services;
-using LantanaGroup.Link.Tests.E2ETests.Validation;
+﻿using LantanaGroup.Link.Automation;
+using LantanaGroup.Link.Automation.Configuration;
+using LantanaGroup.Link.Automation.Helpers;
+using LantanaGroup.Link.Automation.Services;
+using LantanaGroup.Link.Automation.Validation;
 using RestSharp;
+using System.Reflection;
 using Xunit;
 using Task = System.Threading.Tasks.Task;
 
@@ -10,38 +13,30 @@ namespace LantanaGroup.Link.Tests.E2ETests;
 /// <summary>
 /// Stress/volume test that generates 5 synthetic patients, each with over 10,000
 /// FHIR resources, and runs them through the full ad-hoc reporting pipeline.
-///
-/// This test validates that the system can handle large patient bundles end-to-end:
-/// data acquisition, normalization, measure evaluation, report generation,
-/// submission, and database/validation state.
-///
-/// Configuration is driven by <see cref="TestConfig.MegaPatientTestConfig"/>
-/// (env prefix: MEGA_PATIENT_TEST_*). Patient IDs are auto-generated unless
-/// overridden via MEGA_PATIENT_TEST_PATIENT_IDS.
-///
-/// Polling defaults: 300 retries x 5s = 25 minutes of polling.
 /// </summary>
 public sealed class MegaPatientAdhocReportingTest : IAsyncLifetime
 {
     private const string FacilityId = "MegaPatientTestFacility";
 
-    private static readonly FhirDataLoader FhirDataLoader = new(TestConfig.ExternalFhirServerBase);
-    private static readonly TestConfig.SmokeTestConfig Config = TestConfig.MegaPatientTestConfig;
+    private static readonly AutomationConfig AutomationCfg = TestConfig.BuildAutomationConfig();
+    private static readonly TestScenarioConfig Config = TestConfig.MegaPatientTestConfig;
+    private static readonly FhirDataLoader FhirDataLoader = new(AutomationCfg.ExternalFhirServerBase, AutomationCfg);
+    private static readonly DatabaseConnectionFactory DbFactory = new(AutomationCfg.Database);
 
     private readonly DualOutputHelper _output;
-    private readonly RestClient _adminBffClient = AdminBffClientFactory.Create();
+    private readonly RestClient _adminBffClient = AdminBffClientFactory.Create(AutomationCfg);
     private readonly LokiScraper _lokiScraper;
 
     private FacilityApiClient FacilityApi => new(_adminBffClient, _output);
     private NormalizationApiClient NormalizationApi => new(_adminBffClient, _output);
-    private QueryConfigApiClient QueryConfigApi => new(_adminBffClient, _output);
-    private ReportApiClient ReportApi => new(_adminBffClient, _output, _lokiScraper, Config);
+    private QueryConfigApiClient QueryConfigApi => new(_adminBffClient, _output, AutomationCfg);
+    private ReportApiClient ReportApi => new(_adminBffClient, _output, _lokiScraper, AutomationCfg, Config);
     private ValidationApiClient ValidationApi => new(_adminBffClient, _output, _lokiScraper);
 
     public MegaPatientAdhocReportingTest()
     {
         _output = new DualOutputHelper();
-        _lokiScraper = new LokiScraper(_output);
+        _lokiScraper = new LokiScraper(_output, AutomationCfg);
     }
 
     public async Task InitializeAsync()
@@ -64,7 +59,7 @@ public sealed class MegaPatientAdhocReportingTest : IAsyncLifetime
         await FhirDataLoader.LoadTransactionBundlesFromJsonAsync(_output, bundles);
 
         // Also load any standard embedded bundles (shared test infrastructure like Lists)
-        await FhirDataLoader.LoadEmbeddedTransactionBundles(_output);
+        await FhirDataLoader.LoadEmbeddedTransactionBundles(_output, Assembly.GetExecutingAssembly());
 
         // Initialize validation artifacts and categories (with retry)
         await ValidationApi.InitializeArtifactsAsync();
@@ -80,7 +75,7 @@ public sealed class MegaPatientAdhocReportingTest : IAsyncLifetime
             await FacilityApi.DeleteAsync(FacilityId);
         }
 
-        if (TestConfig.CleanupSmokeTestData)
+        if (AutomationCfg.CleanupTestData)
         {
             FhirDataLoader.ExpungeEverything(_output);
         }
@@ -96,7 +91,7 @@ public sealed class MegaPatientAdhocReportingTest : IAsyncLifetime
     public async Task ExecuteMegaPatientTest()
     {
         // Step 1: Load measure definition into measureeval and validation
-        var measureLoader = new MeasureLoader(_adminBffClient, _output, Config);
+        var measureLoader = new MeasureLoader(_adminBffClient, _output, Config, Assembly.GetExecutingAssembly());
         await measureLoader.LoadAsync();
 
         var measureId = measureLoader.MeasureId
@@ -122,7 +117,7 @@ public sealed class MegaPatientAdhocReportingTest : IAsyncLifetime
         var reportId = await ReportApi.GenerateReportAsync(FacilityId, measureId);
 
         // Step 7: Start background diagnostics and poll until the report is submitted
-        await using var diagnostics = new BackgroundDiagnosticsMonitor(_output, _lokiScraper, Config.PatientIds.Count);
+        await using var diagnostics = new BackgroundDiagnosticsMonitor(_output, _lokiScraper, AutomationCfg, Config.PatientIds.Count);
         await diagnostics.StartAsync(FacilityId, reportId);
 
         var reportSubmitted = await ReportApi.CheckSubmissionStatusAsync(reportId, diagnostics);
@@ -141,7 +136,8 @@ public sealed class MegaPatientAdhocReportingTest : IAsyncLifetime
         await _lokiScraper.ScrapeServiceHistoryAsync(LokiScraper.Components.Report, Config.LokiScrapeWindow, "DIAG REPORT");
 
         // Always write a snapshot before any assertions can kill the test.
-        await PipelineSnapshot.WriteFullSnapshotAsync(_output, FacilityId, reportId);
+        var pipelineSnapshot = new PipelineSnapshot(DbFactory);
+        await pipelineSnapshot.WriteFullSnapshotAsync(_output, FacilityId, reportId);
 
         Assert.True(reportSubmitted,
             $"Expected report with id {reportId} to be submitted but it was not. " +
@@ -162,24 +158,24 @@ public sealed class MegaPatientAdhocReportingTest : IAsyncLifetime
         _output.WriteLine("Done generating and validating report.");
 
         // Step 9-10: Strict database validation
-        var reportDbValidator = new ReportDatabaseValidator(_output);
+        var reportDbValidator = new ReportDatabaseValidator(_output, DbFactory);
         await reportDbValidator.ValidateAllAsync(
             FacilityId,
             reportId,
             measureId,
             Config.PatientIds);
 
-        var dataAcqValidator = new DataAcquisitionDatabaseValidator(_output);
+        var dataAcqValidator = new DataAcquisitionDatabaseValidator(_output, DbFactory);
         await dataAcqValidator.ValidateAllAsync(
             FacilityId,
             reportId,
             measureId,
             Config.PatientIds);
 
-        var normalizationValidator = new NormalizationDatabaseValidator(_output);
+        var normalizationValidator = new NormalizationDatabaseValidator(_output, DbFactory);
         await normalizationValidator.ValidateAllAsync(FacilityId);
 
-        var tenantValidator = new TenantDatabaseValidator(_output);
+        var tenantValidator = new TenantDatabaseValidator(_output, DbFactory);
         await tenantValidator.ValidateAllAsync(FacilityId, measureId);
 
         // Step 11: Validation results (API-based)

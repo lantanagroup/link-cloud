@@ -1,7 +1,10 @@
-using LantanaGroup.Link.Tests.E2ETests.Helpers;
-using LantanaGroup.Link.Tests.E2ETests.Services;
-using LantanaGroup.Link.Tests.E2ETests.Validation;
+﻿using LantanaGroup.Link.Automation;
+using LantanaGroup.Link.Automation.Configuration;
+using LantanaGroup.Link.Automation.Helpers;
+using LantanaGroup.Link.Automation.Services;
+using LantanaGroup.Link.Automation.Validation;
 using RestSharp;
+using System.Reflection;
 using Xunit;
 using Task = System.Threading.Tasks.Task;
 
@@ -17,23 +20,25 @@ public sealed class MultiPatientAdhocReportingTest : IAsyncLifetime
 {
     private const string FacilityId = "MultiPatientTestFacility";
 
-    private static readonly FhirDataLoader FhirDataLoader = new(TestConfig.ExternalFhirServerBase);
-    private static readonly TestConfig.SmokeTestConfig Config = new("MULTI_PATIENT_TEST");
+    private static readonly AutomationConfig AutomationCfg = TestConfig.BuildAutomationConfig();
+    private static readonly TestScenarioConfig Config = TestConfig.BuildScenarioConfig("MULTI_PATIENT_TEST");
+    private static readonly FhirDataLoader FhirDataLoader = new(AutomationCfg.ExternalFhirServerBase, AutomationCfg);
+    private static readonly DatabaseConnectionFactory DbFactory = new(AutomationCfg.Database);
 
     private readonly DualOutputHelper _output;
-    private readonly RestClient _adminBffClient = AdminBffClientFactory.Create();
+    private readonly RestClient _adminBffClient = AdminBffClientFactory.Create(AutomationCfg);
     private readonly LokiScraper _lokiScraper;
 
     private FacilityApiClient FacilityApi => new(_adminBffClient, _output);
     private NormalizationApiClient NormalizationApi => new(_adminBffClient, _output);
-    private QueryConfigApiClient QueryConfigApi => new(_adminBffClient, _output);
-    private ReportApiClient ReportApi => new(_adminBffClient, _output, _lokiScraper, Config);
+    private QueryConfigApiClient QueryConfigApi => new(_adminBffClient, _output, AutomationCfg);
+    private ReportApiClient ReportApi => new(_adminBffClient, _output, _lokiScraper, AutomationCfg, Config);
     private ValidationApiClient ValidationApi => new(_adminBffClient, _output, _lokiScraper);
 
     public MultiPatientAdhocReportingTest()
     {
         _output = new DualOutputHelper();
-        _lokiScraper = new LokiScraper(_output);
+        _lokiScraper = new LokiScraper(_output, AutomationCfg);
     }
 
     public async Task InitializeAsync()
@@ -56,7 +61,7 @@ public sealed class MultiPatientAdhocReportingTest : IAsyncLifetime
         await FhirDataLoader.LoadTransactionBundlesFromJsonAsync(_output, bundles);
 
         // Also load any standard embedded bundles (shared test infrastructure like Lists)
-        await FhirDataLoader.LoadEmbeddedTransactionBundles(_output);
+        await FhirDataLoader.LoadEmbeddedTransactionBundles(_output, Assembly.GetExecutingAssembly());
 
         // Initialize validation artifacts and categories (with retry)
         await ValidationApi.InitializeArtifactsAsync();
@@ -72,7 +77,7 @@ public sealed class MultiPatientAdhocReportingTest : IAsyncLifetime
             await FacilityApi.DeleteAsync(FacilityId);
         }
 
-        if (TestConfig.CleanupSmokeTestData)
+        if (AutomationCfg.CleanupTestData)
         {
             FhirDataLoader.ExpungeEverything(_output);
         }
@@ -88,7 +93,7 @@ public sealed class MultiPatientAdhocReportingTest : IAsyncLifetime
     public async Task ExecuteMultiPatientTest()
     {
         // Step 1: Load measure definition into measureeval and validation
-        var measureLoader = new MeasureLoader(_adminBffClient, _output, Config);
+        var measureLoader = new MeasureLoader(_adminBffClient, _output, Config, Assembly.GetExecutingAssembly());
         await measureLoader.LoadAsync();
 
         var measureId = measureLoader.MeasureId
@@ -114,7 +119,7 @@ public sealed class MultiPatientAdhocReportingTest : IAsyncLifetime
         var reportId = await ReportApi.GenerateReportAsync(FacilityId, measureId);
 
         // Step 7: Start background diagnostics and poll until the report is submitted
-        await using var diagnostics = new BackgroundDiagnosticsMonitor(_output, _lokiScraper, Config.PatientIds.Count);
+        await using var diagnostics = new BackgroundDiagnosticsMonitor(_output, _lokiScraper, AutomationCfg, Config.PatientIds.Count);
         await diagnostics.StartAsync(FacilityId, reportId);
 
         var reportSubmitted = await ReportApi.CheckSubmissionStatusAsync(reportId, diagnostics);
@@ -133,7 +138,8 @@ public sealed class MultiPatientAdhocReportingTest : IAsyncLifetime
         await _lokiScraper.ScrapeServiceHistoryAsync(LokiScraper.Components.Report, Config.LokiScrapeWindow, "DIAG REPORT");
 
         // Always write a snapshot before any assertions can kill the test.
-        await PipelineSnapshot.WriteFullSnapshotAsync(_output, FacilityId, reportId);
+        var pipelineSnapshot = new PipelineSnapshot(DbFactory);
+        await pipelineSnapshot.WriteFullSnapshotAsync(_output, FacilityId, reportId);
 
         Assert.True(reportSubmitted,
             $"Expected report with id {reportId} to be submitted but it was not. " +

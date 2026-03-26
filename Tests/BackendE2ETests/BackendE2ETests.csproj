@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
@@ -93,6 +93,12 @@
       <ProjectReference Include="..\..\DotNet\Report\Report.csproj" />
       <ProjectReference Include="..\..\DotNet\Shared\Shared.csproj" />
       <ProjectReference Include="..\..\DotNet\Tenant\Tenant.csproj" />
+      <ProjectReference Include="..\..\..\Automation\Automation.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Helpers\" />
+      <Folder Include="Services\" />
     </ItemGroup>
 
 </Project>
