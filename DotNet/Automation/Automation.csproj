@@ -15,16 +15,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\link-cloud\DotNet\DataAcquisition.Domain\DataAcquisition.Domain.csproj" />
-    <ProjectReference Include="..\link-cloud\DotNet\Normalization\Normalization.csproj" />
-    <ProjectReference Include="..\link-cloud\DotNet\Report\Report.csproj" />
-    <ProjectReference Include="..\link-cloud\DotNet\Shared\Shared.csproj" />
-    <ProjectReference Include="..\link-cloud\DotNet\Tenant\Tenant.csproj" />
+    <None Remove="measures\NHSNAcuteCareHospitalMonthlyInitialPopulation.json" />
+    <EmbeddedResource Include="measures\NHSNAcuteCareHospitalMonthlyInitialPopulation.json" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Remove="measures\NHSNAcuteCareHospitalMonthlyInitialPopulation.json" />
-    <EmbeddedResource Include="measures\NHSNAcuteCareHospitalMonthlyInitialPopulation.json" />
+    <ProjectReference Include="..\DataAcquisition.Domain\DataAcquisition.Domain.csproj" />
+    <ProjectReference Include="..\Normalization\Normalization.csproj" />
+    <ProjectReference Include="..\Report\Report.csproj" />
+    <ProjectReference Include="..\Shared\Shared.csproj" />
+    <ProjectReference Include="..\Tenant\Tenant.csproj" />
   </ItemGroup>
 
 </Project>
