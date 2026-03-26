@@ -1,139 +1,23 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Normalization.Domain.Entities;
-using LantanaGroup.Link.Report.Data;
-using LantanaGroup.Link.Report.Data.Entities;
-using LantanaGroup.Link.Tenant.Entities;
-using LantanaGroup.Link.Tenant.Repository.Context;
-using Microsoft.EntityFrameworkCore;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Report.Domain.Enums;
 using Xunit.Abstractions;
-using DataAcquisitionLog = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog;
 
 namespace LantanaGroup.Link.Automation.Helpers;
 
 /// <summary>
 /// Non-asserting, read-only snapshot of the pipeline's database state.
-/// Used by both <see cref="ProgressMonitor"/> (real-time) and
-/// by the test's try/finally block (last-chance dump). Never throws
-/// assertion exceptions — only queries and formats results.
+/// Uses <see cref="PipelineDataReader"/> for all data retrieval.
 /// </summary>
 public class PipelineSnapshot
 {
     private readonly DatabaseConnectionFactory _dbFactory;
+    private readonly PipelineDataReader _reader;
 
     public PipelineSnapshot(DatabaseConnectionFactory dbFactory)
     {
         _dbFactory = dbFactory;
+        _reader = new PipelineDataReader(dbFactory);
     }
-
-    // ----------------------------------------------
-    //  Report DB queries
-    // ----------------------------------------------
-
-    public static async Task<ReportSchedule?> GetReportScheduleAsync(ReportDbContext db, Guid scheduleId)
-    {
-        return await db.ReportSchedule.FirstOrDefaultAsync(s => s.Id == scheduleId);
-    }
-
-    public static async Task<List<ReportEntry>> GetReportEntriesAsync(ReportDbContext db, Guid scheduleId)
-    {
-        return await db.ReportEntry
-            .Where(e => e.ReportScheduleId == scheduleId)
-            .ToListAsync();
-    }
-
-    public static async Task<List<EntryMeasureReport>> GetEntryMeasureReportsAsync(ReportDbContext db, Guid scheduleId)
-    {
-        return await db.EntryMeasureReport
-            .Include(emr => emr.ResourceCounts)
-            .Where(emr => emr.ReportEntry.ReportScheduleId == scheduleId)
-            .ToListAsync();
-    }
-
-    public static async Task<List<ScheduleReportType>> GetScheduleReportTypesAsync(ReportDbContext db, Guid scheduleId)
-    {
-        return await db.ScheduleReportType
-            .Where(rt => rt.ReportScheduleId == scheduleId)
-            .ToListAsync();
-    }
-
-    public record ResourceGroupSummary(string PatientId, string ResourceType, int Count);
-
-    public static async Task<List<ResourceGroupSummary>> GetReportResourceSummaryAsync(
-        ReportDbContext db, Guid scheduleId, string facilityId)
-    {
-        var raw = await db.ReportResource
-            .Where(r => r.ReportScheduleId == scheduleId && r.FacilityId == facilityId)
-            .GroupBy(r => new { r.PatientId, r.ResourceType })
-            .Select(g => new { g.Key.PatientId, g.Key.ResourceType, Count = g.Count() })
-            .OrderBy(x => x.PatientId).ThenBy(x => x.ResourceType)
-            .ToListAsync();
-
-        return raw.Select(x => new ResourceGroupSummary(x.PatientId, x.ResourceType, x.Count)).ToList();
-    }
-
-    public static async Task<List<ReportPopulation>> GetReportPopulationsAsync(
-        ReportDbContext db, Guid scheduleId, string facilityId)
-    {
-        return await db.ReportPopulation
-            .Include(p => p.GroupPopulations)
-                .ThenInclude(gp => gp.MeasureReportPopulations)
-            .Where(p => p.ReportScheduleId == scheduleId && p.FacilityId == facilityId)
-            .ToListAsync();
-    }
-
-    // ----------------------------------------------
-    //  DataAcquisition DB queries
-    // ----------------------------------------------
-
-    public static async Task<List<DataAcquisitionLog>> GetAcquisitionLogsAsync(
-        DataAcquisitionDbContext db, string facilityId, string reportId)
-    {
-        return await db.DataAcquisitionLogs
-            .Where(l => l.FacilityId == facilityId && l.ReportTrackingId == reportId)
-            .ToListAsync();
-    }
-
-    // ----------------------------------------------
-    //  Normalization DB queries
-    // ----------------------------------------------
-
-    public static async Task<List<Operation>> GetOperationsAsync(
-        NormalizationDbContext db, string facilityId)
-    {
-        return await db.Operations
-            .Include(o => o.OperationResourceTypes)
-                .ThenInclude(ort => ort.ResourceType)
-            .Where(o => o.FacilityId == facilityId)
-            .ToListAsync();
-    }
-
-    public static async Task<List<OperationSequence>> GetOperationSequencesAsync(
-        NormalizationDbContext db, string facilityId)
-    {
-        return await db.OperationSequences
-            .Include(os => os.OperationResourceType)
-                .ThenInclude(ort => ort.Operation)
-            .Include(os => os.OperationResourceType)
-                .ThenInclude(ort => ort.ResourceType)
-            .Where(os => os.FacilityId == facilityId)
-            .OrderBy(os => os.Sequence)
-            .ToListAsync();
-    }
-
-    // ----------------------------------------------
-    //  Tenant DB queries
-    // ----------------------------------------------
-
-    public static async Task<Facility?> GetFacilityAsync(TenantDbContext db, string facilityId)
-    {
-        return await db.Facilities
-            .FirstOrDefaultAsync(f => f.FacilityId == facilityId);
-    }
-
-    // ----------------------------------------------
-    //  Formatted summary (non-asserting)
-    // ----------------------------------------------
 
     /// <summary>
     /// Writes a complete, non-asserting pipeline snapshot to test output.
@@ -161,10 +45,7 @@ public class PipelineSnapshot
     {
         try
         {
-            await using var db = _dbFactory.CreateReportDbContext();
-
-            // Schedule
-            var schedule = await GetReportScheduleAsync(db, scheduleId);
+            var schedule = await _reader.GetReportScheduleAsync(scheduleId);
             if (schedule == null)
             {
                 output.WriteLine("[Snapshot][ReportSchedule]     NOT FOUND");
@@ -176,13 +57,11 @@ public class PipelineSnapshot
                                  $"EnableSubmission={schedule.EnableSubmission}");
             }
 
-            // Report types
-            var reportTypes = await GetScheduleReportTypesAsync(db, scheduleId);
+            var reportTypes = await _reader.GetScheduleReportTypesAsync(scheduleId);
             output.WriteLine($"[Snapshot][ScheduleReportType] {reportTypes.Count} row(s)" +
                              (reportTypes.Count > 0 ? $" | {string.Join(", ", reportTypes.Select(rt => rt.ReportType))}" : ""));
 
-            // Entries
-            var entries = await GetReportEntriesAsync(db, scheduleId);
+            var entries = await _reader.GetReportEntriesAsync(scheduleId);
             if (entries.Count == 0)
             {
                 output.WriteLine("[Snapshot][ReportEntry]         0 rows");
@@ -200,8 +79,7 @@ public class PipelineSnapshot
                                  $"Submission: {string.Join(", ", bySubmission)}");
             }
 
-            // Measure reports
-            var measureReports = await GetEntryMeasureReportsAsync(db, scheduleId);
+            var measureReports = await _reader.GetEntryMeasureReportsAsync(scheduleId);
             if (measureReports.Count == 0)
             {
                 output.WriteLine("[Snapshot][EntryMeasureReport]  0 rows");
@@ -217,14 +95,12 @@ public class PipelineSnapshot
                                  $"WithMeasureReportId: {withMrId}/{measureReports.Count}");
             }
 
-            // Resources
-            var resources = await GetReportResourceSummaryAsync(db, scheduleId, facilityId);
+            var resources = await _reader.GetReportResourceSummaryAsync(scheduleId, facilityId);
             var totalResources = resources.Sum(r => r.Count);
             var patientCount = resources.Select(r => r.PatientId).Distinct().Count();
             output.WriteLine($"[Snapshot][ReportResource]      {totalResources} resource(s) across {patientCount} patient(s)");
 
-            // Populations
-            var populations = await GetReportPopulationsAsync(db, scheduleId, facilityId);
+            var populations = await _reader.GetReportPopulationsAsync(scheduleId, facilityId);
             var groupCount = populations.SelectMany(p => p.GroupPopulations).Count();
             var mrpCount = populations.SelectMany(p => p.GroupPopulations).SelectMany(gp => gp.MeasureReportPopulations).Count();
             output.WriteLine($"[Snapshot][ReportPopulation]    {populations.Count} population(s), " +
@@ -240,9 +116,7 @@ public class PipelineSnapshot
     {
         try
         {
-            await using var db = _dbFactory.CreateDataAcquisitionDbContext();
-
-            var logs = await GetAcquisitionLogsAsync(db, facilityId, reportId);
+            var logs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
             if (logs.Count == 0)
             {
                 output.WriteLine("[Snapshot][DataAcqLog]          0 rows");
@@ -257,7 +131,6 @@ public class PipelineSnapshot
                 output.WriteLine($"[Snapshot][DataAcqLog]          {logs.Count} row(s) for {patientCount} patient(s) | " +
                                  $"{string.Join(", ", byStatus)}");
 
-                // Surface failed logs with notes
                 var failedLogs = logs
                     .Where(l => l.Status == RequestStatus.Failed || l.Status == RequestStatus.MaxRetriesReached)
                     .Take(5)
@@ -271,13 +144,11 @@ public class PipelineSnapshot
                 }
             }
 
-            // Config check
-            var hasConfig = await db.FhirQueryConfigurations.AnyAsync(c => c.FacilityId == facilityId);
+            var hasConfig = await _reader.HasFhirQueryConfigurationAsync(facilityId);
             output.WriteLine($"[Snapshot][FhirQueryConfig]     {(hasConfig ? "exists" : "NOT FOUND")}");
 
-            // Query plans
-            var planCount = await db.QueryPlans.CountAsync(qp => qp.FacilityId == facilityId);
-            output.WriteLine($"[Snapshot][QueryPlan]           {planCount} plan(s)");
+            var plans = await _reader.GetQueryPlansAsync(facilityId);
+            output.WriteLine($"[Snapshot][QueryPlan]           {plans.Count} plan(s)");
         }
         catch (Exception ex)
         {
@@ -289,9 +160,7 @@ public class PipelineSnapshot
     {
         try
         {
-            await using var db = _dbFactory.CreateNormalizationDbContext();
-
-            var operations = await GetOperationsAsync(db, facilityId);
+            var operations = await _reader.GetOperationsAsync(facilityId);
 
             if (operations.Count == 0)
             {
@@ -317,7 +186,7 @@ public class PipelineSnapshot
                 }
             }
 
-            var sequences = await GetOperationSequencesAsync(db, facilityId);
+            var sequences = await _reader.GetOperationSequencesAsync(facilityId);
 
             if (sequences.Count == 0)
             {
@@ -345,9 +214,7 @@ public class PipelineSnapshot
     {
         try
         {
-            await using var db = _dbFactory.CreateTenantDbContext();
-
-            var facility = await GetFacilityAsync(db, facilityId);
+            var facility = await _reader.GetFacilityAsync(facilityId);
 
             if (facility == null)
             {

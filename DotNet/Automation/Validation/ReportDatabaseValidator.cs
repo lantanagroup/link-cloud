@@ -1,25 +1,21 @@
 ﻿using LantanaGroup.Link.Automation.Helpers;
-using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Automation.Validation;
 
-/// <summary>
-/// Validates the Report service's database state after a smoke test run.
-/// </summary>
 public class ReportDatabaseValidator
 {
+    private const int MaxErrors = 100;
     private readonly ITestOutputHelper _output;
-    private readonly DatabaseConnectionFactory _dbFactory;
+    private readonly PipelineDataReader _reader;
 
     public ReportDatabaseValidator(ITestOutputHelper output, DatabaseConnectionFactory dbFactory)
     {
         _output = output;
-        _dbFactory = dbFactory;
+        _reader = new PipelineDataReader(dbFactory);
     }
 
     public async Task ValidateAllAsync(
@@ -28,191 +24,163 @@ public class ReportDatabaseValidator
         string expectedMeasureId,
         List<string> expectedPatientIds)
     {
-        _output.WriteLine("");
-        _output.WriteLine("=================================================================================");
-        _output.WriteLine("  REPORT DATABASE VALIDATION");
-        _output.WriteLine($"  FacilityId: {facilityId}");
-        _output.WriteLine($"  ReportId:   {reportId}");
-        _output.WriteLine("=================================================================================");
+        var errors = new List<string>();
 
-        var scheduleId = Guid.Parse(reportId);
+        try
+        {
+            var scheduleId = Guid.Parse(reportId);
 
-        await using var db = _dbFactory.CreateReportDbContext();
+            await ValidateReportSchedule(scheduleId, facilityId, errors);
+            await ValidateScheduleReportTypes(scheduleId, expectedMeasureId, errors);
+            await ValidateReportEntries(scheduleId, facilityId, expectedPatientIds, errors);
+            await ValidateEntryMeasureReports(scheduleId, expectedMeasureId, expectedPatientIds.Count, errors);
+            await ValidateReportResources(scheduleId, facilityId, expectedPatientIds, errors);
+            await ValidateReportPopulations(scheduleId, facilityId, expectedMeasureId, errors);
+        }
+        catch (Exception ex)
+        {
+            AddError(errors, $"Unhandled exception during report DB validation: {ex.Message}");
+        }
 
-        await ValidateReportSchedule(db, scheduleId, facilityId);
-        await ValidateScheduleReportTypes(db, scheduleId, expectedMeasureId);
-        await ValidateReportEntries(db, scheduleId, facilityId, expectedPatientIds);
-        await ValidateEntryMeasureReports(db, scheduleId, expectedMeasureId, expectedPatientIds.Count);
-        await ValidateReportResources(db, scheduleId, facilityId, expectedPatientIds);
-        await ValidateReportPopulations(db, scheduleId, facilityId, expectedMeasureId);
+        if (errors.Count == 0)
+        {
+            _output.WriteLine("REPORT DATABASE VALIDATION: Passed");
+            return;
+        }
 
-        _output.WriteLine("---------------------------------------------------------------------------------");
-        _output.WriteLine("  REPORT DATABASE VALIDATION COMPLETE");
-        _output.WriteLine("---------------------------------------------------------------------------------");
-        _output.WriteLine("");
+        _output.WriteLine($"REPORT DATABASE VALIDATION: Failed ({errors.Count} issue(s))");
+        foreach (var error in errors)
+        {
+            _output.WriteLine($"  - {error}");
+        }
+
+        throw new InvalidOperationException($"REPORT DATABASE VALIDATION failed with {errors.Count} issue(s).");
     }
 
-    private async Task ValidateReportSchedule(ReportDbContext db, Guid scheduleId, string facilityId)
+    private static void AddError(List<string> errors, string message)
     {
-        _output.WriteLine("");
-        _output.WriteLine("  --- ReportSchedule ---");
-
-        var schedule = await PipelineSnapshot.GetReportScheduleAsync(db, scheduleId);
-
-        Assert.NotNull(schedule);
-        Assert.Equal(facilityId, schedule.FacilityId);
-        Assert.Equal(Frequency.Adhoc, schedule.Frequency);
-        Assert.Equal(AdHocType.Manual, schedule.AdHocType);
-        Assert.Equal(ScheduleStatus.Submitted, schedule.Status);
-        Assert.True(schedule.EnableSubmission, "EnableSubmission should be true (BypassSubmission=false)");
-        Assert.True(schedule.EndOfReportPeriodJobHasRun, "EndOfReportPeriodJobHasRun should be true for ad-hoc reports");
-        Assert.False(string.IsNullOrWhiteSpace(schedule.PayloadRootUri), "PayloadRootUri should be set");
-        Assert.True(schedule.ReportStartDate < schedule.ReportEndDate, "StartDate should be before EndDate");
-
-        _output.WriteLine($"      FacilityId        = {schedule.FacilityId}");
-        _output.WriteLine($"      Frequency         = {schedule.Frequency}");
-        _output.WriteLine($"      AdHocType         = {schedule.AdHocType}");
-        _output.WriteLine($"      Status            = {schedule.Status}");
-        _output.WriteLine($"      ReportPeriod      = {schedule.ReportStartDate:O} to {schedule.ReportEndDate:O}");
-        _output.WriteLine("  --- ReportSchedule PASSED ---");
+        if (errors.Count < MaxErrors)
+            errors.Add(message);
     }
 
-    private async Task ValidateScheduleReportTypes(ReportDbContext db, Guid scheduleId, string expectedMeasureId)
+    private async Task ValidateReportSchedule(Guid scheduleId, string facilityId, List<string> errors)
     {
-        _output.WriteLine("");
-        _output.WriteLine("  --- ScheduleReportType ---");
+        var schedule = await _reader.GetReportScheduleAsync(scheduleId);
+        if (schedule == null)
+        {
+            AddError(errors, "ReportSchedule row not found.");
+            return;
+        }
 
-        var reportTypes = await PipelineSnapshot.GetScheduleReportTypesAsync(db, scheduleId);
-
-        Assert.Single(reportTypes);
-        Assert.Equal(expectedMeasureId, reportTypes[0].ReportType);
-
-        _output.WriteLine($"      ReportType        = {reportTypes[0].ReportType}");
-        _output.WriteLine("  --- ScheduleReportType PASSED ---");
+        if (schedule.FacilityId != facilityId) AddError(errors, $"ReportSchedule.FacilityId mismatch: expected {facilityId}, actual {schedule.FacilityId}");
+        if (schedule.Frequency != Frequency.Adhoc) AddError(errors, $"ReportSchedule.Frequency mismatch: expected {Frequency.Adhoc}, actual {schedule.Frequency}");
+        if (schedule.AdHocType != AdHocType.Manual) AddError(errors, $"ReportSchedule.AdHocType mismatch: expected {AdHocType.Manual}, actual {schedule.AdHocType}");
+        if (schedule.Status != ScheduleStatus.Submitted) AddError(errors, $"ReportSchedule.Status mismatch: expected {ScheduleStatus.Submitted}, actual {schedule.Status}");
+        if (!schedule.EnableSubmission) AddError(errors, "ReportSchedule.EnableSubmission should be true.");
+        if (!schedule.EndOfReportPeriodJobHasRun) AddError(errors, "ReportSchedule.EndOfReportPeriodJobHasRun should be true.");
+        if (string.IsNullOrWhiteSpace(schedule.PayloadRootUri)) AddError(errors, "ReportSchedule.PayloadRootUri should be populated.");
+        if (schedule.ReportStartDate >= schedule.ReportEndDate) AddError(errors, "ReportSchedule.ReportStartDate must be before ReportEndDate.");
     }
 
-    private async Task ValidateReportEntries(
-        ReportDbContext db, Guid scheduleId, string facilityId, List<string> expectedPatientIds)
+    private async Task ValidateScheduleReportTypes(Guid scheduleId, string expectedMeasureId, List<string> errors)
     {
-        _output.WriteLine("");
-        _output.WriteLine("  --- ReportEntry ---");
+        var reportTypes = await _reader.GetScheduleReportTypesAsync(scheduleId);
+        if (reportTypes.Count != 1)
+        {
+            AddError(errors, $"Expected exactly 1 ScheduleReportType row, found {reportTypes.Count}.");
+            return;
+        }
 
-        var entries = await PipelineSnapshot.GetReportEntriesAsync(db, scheduleId);
+        if (reportTypes[0].ReportType != expectedMeasureId)
+            AddError(errors, $"ScheduleReportType.ReportType mismatch: expected {expectedMeasureId}, actual {reportTypes[0].ReportType}");
+    }
 
-        Assert.Equal(expectedPatientIds.Count, entries.Count);
+    private async Task ValidateReportEntries(Guid scheduleId, string facilityId, List<string> expectedPatientIds, List<string> errors)
+    {
+        var entries = await _reader.GetReportEntriesAsync(scheduleId);
+
+        if (entries.Count != expectedPatientIds.Count)
+            AddError(errors, $"ReportEntry count mismatch: expected {expectedPatientIds.Count}, actual {entries.Count}");
 
         var foundPatientIds = entries.Select(e => e.PatientId).OrderBy(p => p).ToList();
         var sortedExpected = expectedPatientIds.OrderBy(p => p).ToList();
-        Assert.Equal(sortedExpected, foundPatientIds);
+        if (!foundPatientIds.SequenceEqual(sortedExpected))
+            AddError(errors, $"ReportEntry patient IDs mismatch. expected=[{string.Join(",", sortedExpected)}], actual=[{string.Join(",", foundPatientIds)}]");
 
         foreach (var entry in entries)
         {
-            Assert.Equal(facilityId, entry.FacilityId);
-            Assert.Equal(SubmissionStatus.Submitted, entry.SubmissionStatus);
+            if (entry.FacilityId != facilityId)
+                AddError(errors, $"ReportEntry {entry.Id} FacilityId mismatch: expected {facilityId}, actual {entry.FacilityId}");
 
-            _output.WriteLine($"      Patient {entry.PatientId,-12} ReportingStatus={entry.ReportingStatus}, SubmissionStatus={entry.SubmissionStatus}");
+            if (entry.SubmissionStatus != SubmissionStatus.Submitted)
+                AddError(errors, $"ReportEntry {entry.Id} SubmissionStatus should be {SubmissionStatus.Submitted}, actual {entry.SubmissionStatus}");
         }
-
-        _output.WriteLine("  --- ReportEntry PASSED ---");
     }
 
-    private async Task ValidateEntryMeasureReports(
-        ReportDbContext db, Guid scheduleId, string expectedMeasureId, int expectedPatientCount)
+    private async Task ValidateEntryMeasureReports(Guid scheduleId, string expectedMeasureId, int expectedPatientCount, List<string> errors)
     {
-        _output.WriteLine("");
-        _output.WriteLine("  --- EntryMeasureReport ---");
+        var reports = await _reader.GetEntryMeasureReportsAsync(scheduleId);
 
-        var reports = await PipelineSnapshot.GetEntryMeasureReportsAsync(db, scheduleId);
-
-        Assert.Equal(expectedPatientCount, reports.Count);
+        if (reports.Count != expectedPatientCount)
+            AddError(errors, $"EntryMeasureReport count mismatch: expected {expectedPatientCount}, actual {reports.Count}");
 
         foreach (var report in reports)
         {
-            Assert.Equal(expectedMeasureId, report.ReportType);
-            Assert.False(string.IsNullOrWhiteSpace(report.MeasureReportId),
-                $"MeasureReportId should be populated for EntryMeasureReport Id={report.Id}");
+            if (report.ReportType != expectedMeasureId)
+                AddError(errors, $"EntryMeasureReport {report.Id} ReportType mismatch: expected {expectedMeasureId}, actual {report.ReportType}");
 
-            var resourceCountSummary = report.ResourceCounts.Any()
-                ? string.Join(", ", report.ResourceCounts.Select(rc => $"{rc.ResourceType}={rc.ResourceCount}"))
-                : "(none)";
-
-            _output.WriteLine($"      Id={report.Id}");
-            _output.WriteLine($"        Type            = {report.ReportType}");
-            _output.WriteLine($"        Status          = {report.Status}");
-            _output.WriteLine($"        MeasureReportId = {report.MeasureReportId}");
-            _output.WriteLine($"        ResourceCounts  = [{resourceCountSummary}]");
+            if (string.IsNullOrWhiteSpace(report.MeasureReportId))
+                AddError(errors, $"EntryMeasureReport {report.Id} MeasureReportId should be populated.");
         }
-
-        _output.WriteLine("  --- EntryMeasureReport PASSED ---");
     }
 
-    private async Task ValidateReportResources(
-        ReportDbContext db, Guid scheduleId, string facilityId, List<string> expectedPatientIds)
+    private async Task ValidateReportResources(Guid scheduleId, string facilityId, List<string> expectedPatientIds, List<string> errors)
     {
-        _output.WriteLine("");
-        _output.WriteLine("  --- ReportResource ---");
-
-        var resources = await PipelineSnapshot.GetReportResourceSummaryAsync(db, scheduleId, facilityId);
-        var patientsWithResources = resources.Select(r => r.PatientId).Distinct().ToList();
+        var resources = await _reader.GetReportResourceSummaryAsync(scheduleId, facilityId);
+        var patientsWithResources = resources.Select(r => r.PatientId).Distinct().ToHashSet();
 
         foreach (var patientId in expectedPatientIds)
         {
-            Assert.Contains(patientId, patientsWithResources);
-
-            var patientResources = resources.Where(r => r.PatientId == patientId).ToList();
-            var totalCount = patientResources.Sum(r => r.Count);
-            _output.WriteLine($"      Patient {patientId,-12} {totalCount} resources across {patientResources.Count} types");
+            if (!patientsWithResources.Contains(patientId))
+                AddError(errors, $"No ReportResource rows found for expected patient {patientId}.");
         }
-
-        _output.WriteLine("  --- ReportResource PASSED ---");
     }
 
-    private async Task ValidateReportPopulations(
-        ReportDbContext db, Guid scheduleId, string facilityId, string expectedMeasureId)
+    private async Task ValidateReportPopulations(Guid scheduleId, string facilityId, string expectedMeasureId, List<string> errors)
     {
-        _output.WriteLine("");
-        _output.WriteLine("  --- ReportPopulation ---");
+        var populations = await _reader.GetReportPopulationsAsync(scheduleId, facilityId);
 
-        var populations = await PipelineSnapshot.GetReportPopulationsAsync(db, scheduleId, facilityId);
-
-        Assert.True(populations.Count > 0, "Expected at least one ReportPopulation row");
+        if (populations.Count == 0)
+        {
+            AddError(errors, "Expected at least one ReportPopulation row.");
+            return;
+        }
 
         foreach (var pop in populations)
         {
-            Assert.Equal(expectedMeasureId, pop.ReportType);
-            _output.WriteLine($"      Population Id     = {pop.Id}");
-            _output.WriteLine($"        Measure         = {pop.Measure}");
-            _output.WriteLine($"        ReportType      = {pop.ReportType}");
+            if (pop.ReportType != expectedMeasureId)
+                AddError(errors, $"ReportPopulation {pop.Id} ReportType mismatch: expected {expectedMeasureId}, actual {pop.ReportType}");
 
-            Assert.True(pop.GroupPopulations.Count > 0,
-                $"Expected GroupPopulations for ReportPopulation Id={pop.Id}");
+            if (pop.GroupPopulations.Count == 0)
+            {
+                AddError(errors, $"ReportPopulation {pop.Id} has no GroupPopulations.");
+                continue;
+            }
 
             foreach (var gp in pop.GroupPopulations)
             {
-                Assert.False(string.IsNullOrWhiteSpace(gp.PopulationCodeJson),
-                    $"PopulationCodeJson should not be empty for GroupPopulation Id={gp.Id}");
-                Assert.NotEqual("{}", gp.PopulationCodeJson.Trim());
+                if (string.IsNullOrWhiteSpace(gp.PopulationCodeJson) || gp.PopulationCodeJson.Trim() == "{}")
+                    AddError(errors, $"GroupPopulation {gp.Id} PopulationCodeJson is empty/invalid.");
 
-                Assert.True(gp.MeasureReportPopulations.Count > 0,
-                    $"Expected at least one MeasureReportPopulation for GroupPopulation Id={gp.Id} (PopulationId={gp.PopulationId})");
-
-                _output.WriteLine($"        GroupPopulation Id={gp.Id}");
-                _output.WriteLine($"          PopulationId       = {gp.PopulationId}");
-                _output.WriteLine($"          TotalCount         = {gp.TotalPopulationCount}");
-                _output.WriteLine($"          PopulationCodeJson = {gp.PopulationCodeJson}");
+                if (gp.MeasureReportPopulations.Count == 0)
+                    AddError(errors, $"GroupPopulation {gp.Id} has no MeasureReportPopulation rows.");
 
                 foreach (var mrp in gp.MeasureReportPopulations)
                 {
-                    Assert.False(string.IsNullOrWhiteSpace(mrp.MeasureReportId),
-                        $"MeasureReportId should be set on MeasureReportPopulation Id={mrp.Id}");
-
-                    _output.WriteLine($"          MeasureReportPopulation Id={mrp.Id}");
-                    _output.WriteLine($"            MeasureReportId  = {mrp.MeasureReportId}");
-                    _output.WriteLine($"            PopulationCount  = {mrp.PopulationCount}");
+                    if (string.IsNullOrWhiteSpace(mrp.MeasureReportId))
+                        AddError(errors, $"MeasureReportPopulation {mrp.Id} MeasureReportId should be populated.");
                 }
             }
         }
-
-        _output.WriteLine("  --- ReportPopulation PASSED ---");
     }
 }

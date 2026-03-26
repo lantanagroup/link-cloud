@@ -26,6 +26,7 @@
 
     <ItemGroup>
         <PackageReference Include="Hl7.Fhir.R4" Version="5.*" />
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.*" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
         <PackageReference Include="Moq.AutoMock" Version="*-*" />
         <PackageReference Include="coverlet.collector" Version="6.*">

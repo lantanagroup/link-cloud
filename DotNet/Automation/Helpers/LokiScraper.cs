@@ -396,4 +396,126 @@ public class LokiScraper
             return null;
         }
     }
+
+    public async Task<List<string>> GetServiceExceptionLinesAsync(string componentName, TimeSpan lookback, int limit = 20)
+    {
+        var end = DateTime.UtcNow;
+        var start = end - lookback;
+        var startUnix = ((DateTimeOffset)start).ToUnixTimeMilliseconds() * 1000000;
+        var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
+
+        var query = $"{{app=\"link-cloud\", component=\"{componentName}\"}} |~ \"(?i)(exception|fatal|unhandled|stack\\s*trace|critical)\" !~ \"(?i)({HarmlessPatterns}|Unknown message ID)\"";
+
+        var request = new RestRequest("/loki/api/v1/query_range");
+        request.AddParameter("query", query);
+        request.AddParameter("start", startUnix.ToString());
+        request.AddParameter("end", endUnix.ToString());
+        request.AddParameter("limit", limit.ToString());
+
+        var lines = new List<string>();
+
+        try
+        {
+            var response = await _lokiClient.ExecuteAsync(request);
+            if (response.StatusCode != HttpStatusCode.OK || response.Content == null)
+                return lines;
+
+            var jsonResponse = JObject.Parse(response.Content);
+            var results = jsonResponse["data"]?["result"] as JArray;
+            if (results == null)
+                return lines;
+
+            foreach (var result in results)
+            {
+                var values = result["values"] as JArray;
+                if (values == null) continue;
+
+                foreach (var value in values)
+                {
+                    var logLine = value[1]?.ToString();
+                    if (string.IsNullOrWhiteSpace(logLine)) continue;
+
+                    var formatted = FormatLogLine(logLine, 220);
+                    if (!lines.Contains(formatted))
+                        lines.Add(formatted);
+                }
+            }
+        }
+        catch
+        {
+            // Intentionally silent: callers treat empty result as no detected exceptions.
+        }
+
+        return lines;
+    }
+
+    public async Task<string?> GetValidationActivitySummaryAsync(TimeSpan lookback)
+    {
+        var end = DateTime.UtcNow;
+        var start = end - lookback;
+        var startUnix = ((DateTimeOffset)start).ToUnixTimeMilliseconds() * 1000000;
+        var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
+
+        var query = $"{{app=\"link-cloud\", component=\"{Components.Validation}\"}} |~ \"(?i)(validate|validated|artifact|category|result|resource)\" !~ \"(?i)({HarmlessPatterns})\"";
+        var request = new RestRequest("/loki/api/v1/query_range");
+        request.AddParameter("query", query);
+        request.AddParameter("start", startUnix.ToString());
+        request.AddParameter("end", endUnix.ToString());
+        request.AddParameter("limit", "200");
+
+        try
+        {
+            var response = await _lokiClient.ExecuteAsync(request);
+            if (response.StatusCode != HttpStatusCode.OK || response.Content == null)
+                return null;
+
+            var jsonResponse = JObject.Parse(response.Content);
+            var results = jsonResponse["data"]?["result"] as JArray;
+            if (results == null)
+                return null;
+
+            var logCount = 0;
+            var patientIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var result in results)
+            {
+                var values = result["values"] as JArray;
+                if (values == null) continue;
+
+                foreach (var value in values)
+                {
+                    var logLine = value[1]?.ToString();
+                    if (string.IsNullOrWhiteSpace(logLine)) continue;
+                    logCount++;
+
+                    var patientMarker = "patient";
+                    var idx = logLine.IndexOf(patientMarker, StringComparison.OrdinalIgnoreCase);
+                    if (idx >= 0)
+                    {
+                        var tail = logLine[idx..];
+                        var tokens = tail.Split([' ', ',', ';', '"', '\'', ']', '[', ')', '('], StringSplitOptions.RemoveEmptyEntries);
+                        var token = tokens.FirstOrDefault(t => t.Contains('-') || t.Any(char.IsDigit));
+                        if (!string.IsNullOrWhiteSpace(token) && token.Length <= 40)
+                            patientIds.Add(token.Trim());
+                    }
+                }
+            }
+
+            if (logCount == 0)
+                return null;
+
+            if (patientIds.Count > 0)
+            {
+                var sample = string.Join(", ", patientIds.Take(3));
+                var suffix = patientIds.Count > 3 ? $" (+{patientIds.Count - 3} more)" : "";
+                return $"processing validation activity for {sample}{suffix} ({logCount} log lines/{lookback.TotalSeconds:F0}s)";
+            }
+
+            return $"processing validation activity ({logCount} log lines/{lookback.TotalSeconds:F0}s)";
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }

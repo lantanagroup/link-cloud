@@ -1,100 +1,97 @@
 ﻿using LantanaGroup.Link.Automation.Helpers;
-using LantanaGroup.Link.Tenant.Repository.Context;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Automation.Validation;
 
-/// <summary>
-/// Validates the Tenant service's database state after a smoke test run.
-/// </summary>
 public class TenantDatabaseValidator
 {
+    private const int MaxErrors = 100;
     private readonly ITestOutputHelper _output;
-    private readonly DatabaseConnectionFactory _dbFactory;
+    private readonly PipelineDataReader _reader;
 
     public TenantDatabaseValidator(ITestOutputHelper output, DatabaseConnectionFactory dbFactory)
     {
         _output = output;
-        _dbFactory = dbFactory;
+        _reader = new PipelineDataReader(dbFactory);
     }
 
     public async Task ValidateAllAsync(string facilityId, string expectedMeasureId)
     {
-        _output.WriteLine("");
-        _output.WriteLine("=================================================================================");
-        _output.WriteLine("  TENANT DATABASE VALIDATION");
-        _output.WriteLine($"  FacilityId: {facilityId}");
-        _output.WriteLine("=================================================================================");
+        var errors = new List<string>();
 
-        await using var db = _dbFactory.CreateTenantDbContext();
+        try
+        {
+            await ValidateFacilityExists(facilityId, errors);
+            await ValidateFacilityProperties(facilityId, errors);
+            await ValidateScheduledReports(facilityId, expectedMeasureId, errors);
+        }
+        catch (Exception ex)
+        {
+            AddError(errors, $"Unhandled exception during tenant DB validation: {ex.Message}");
+        }
 
-        await ValidateFacilityExists(db, facilityId);
-        await ValidateFacilityProperties(db, facilityId);
-        await ValidateScheduledReports(db, facilityId, expectedMeasureId);
+        if (errors.Count == 0)
+        {
+            _output.WriteLine("TENANT DATABASE VALIDATION: Passed");
+            return;
+        }
 
-        _output.WriteLine("---------------------------------------------------------------------------------");
-        _output.WriteLine("  TENANT DATABASE VALIDATION COMPLETE");
-        _output.WriteLine("---------------------------------------------------------------------------------");
-        _output.WriteLine("");
+        _output.WriteLine($"TENANT DATABASE VALIDATION: Failed ({errors.Count} issue(s))");
+        foreach (var error in errors)
+        {
+            _output.WriteLine($"  - {error}");
+        }
+
+        throw new InvalidOperationException($"TENANT DATABASE VALIDATION failed with {errors.Count} issue(s).");
     }
 
-    private async Task ValidateFacilityExists(TenantDbContext db, string facilityId)
+    private static void AddError(List<string> errors, string message)
     {
-        _output.WriteLine("");
-        _output.WriteLine("  --- Facility Exists ---");
-
-        var facility = await PipelineSnapshot.GetFacilityAsync(db, facilityId);
-
-        Assert.NotNull(facility);
-        Assert.Equal(facilityId, facility.FacilityId);
-
-        _output.WriteLine($"      Id         = {facility.Id}");
-        _output.WriteLine($"      FacilityId = {facility.FacilityId}");
-        _output.WriteLine("  --- Facility Exists PASSED ---");
+        if (errors.Count < MaxErrors)
+            errors.Add(message);
     }
 
-    private async Task ValidateFacilityProperties(TenantDbContext db, string facilityId)
+    private async Task ValidateFacilityExists(string facilityId, List<string> errors)
     {
-        _output.WriteLine("");
-        _output.WriteLine("  --- FacilityProperties ---");
+        var facility = await _reader.GetFacilityAsync(facilityId);
+        if (facility == null)
+        {
+            AddError(errors, $"Facility {facilityId} not found.");
+            return;
+        }
 
-        var facility = await PipelineSnapshot.GetFacilityAsync(db, facilityId);
-        Assert.NotNull(facility);
-
-        Assert.False(string.IsNullOrWhiteSpace(facility.FacilityName), "FacilityName should be set");
-        Assert.False(string.IsNullOrWhiteSpace(facility.TimeZone), "TimeZone should be set");
-        Assert.False(facility.IsDeleted, "Facility should not be soft-deleted");
-        Assert.True(facility.CreateDate > DateTime.MinValue, "CreateDate should be populated");
-
-        _output.WriteLine($"      FacilityName = {facility.FacilityName}");
-        _output.WriteLine($"      TimeZone     = {facility.TimeZone}");
-        _output.WriteLine($"      IsDeleted    = {facility.IsDeleted}");
-        _output.WriteLine($"      CreateDate   = {facility.CreateDate:O}");
-        _output.WriteLine("  --- FacilityProperties PASSED ---");
+        if (facility.FacilityId != facilityId)
+            AddError(errors, $"FacilityId mismatch: expected {facilityId}, actual {facility.FacilityId}");
     }
 
-    private async Task ValidateScheduledReports(TenantDbContext db, string facilityId, string expectedMeasureId)
+    private async Task ValidateFacilityProperties(string facilityId, List<string> errors)
     {
-        _output.WriteLine("");
-        _output.WriteLine("  --- ScheduledReports ---");
+        var facility = await _reader.GetFacilityAsync(facilityId);
+        if (facility == null)
+            return;
 
-        var facility = await PipelineSnapshot.GetFacilityAsync(db, facilityId);
-        Assert.NotNull(facility);
+        if (string.IsNullOrWhiteSpace(facility.FacilityName)) AddError(errors, "FacilityName should be populated.");
+        if (string.IsNullOrWhiteSpace(facility.TimeZone)) AddError(errors, "TimeZone should be populated.");
+        if (facility.IsDeleted) AddError(errors, "Facility should not be soft-deleted.");
+        if (facility.CreateDate <= DateTime.MinValue) AddError(errors, "CreateDate should be populated.");
+    }
 
-        Assert.NotNull(facility.ScheduledReports);
+    private async Task ValidateScheduledReports(string facilityId, string expectedMeasureId, List<string> errors)
+    {
+        var facility = await _reader.GetFacilityAsync(facilityId);
+        if (facility == null)
+            return;
+
+        if (facility.ScheduledReports == null)
+        {
+            AddError(errors, "ScheduledReports should be populated.");
+            return;
+        }
 
         var monthly = facility.ScheduledReports.Monthly ?? [];
-        Assert.True(monthly.Length > 0,
-            "Expected at least one Monthly scheduled report measure but found none");
-        Assert.Contains(expectedMeasureId, monthly);
-
-        var daily = facility.ScheduledReports.Daily ?? [];
-        var weekly = facility.ScheduledReports.Weekly ?? [];
-
-        _output.WriteLine($"      Monthly = [{string.Join(", ", monthly)}]");
-        _output.WriteLine($"      Daily   = [{string.Join(", ", daily)}]");
-        _output.WriteLine($"      Weekly  = [{string.Join(", ", weekly)}]");
-        _output.WriteLine("  --- ScheduledReports PASSED ---");
+        if (monthly.Length == 0)
+            AddError(errors, "Expected at least one Monthly scheduled report measure.");
+        else if (!monthly.Contains(expectedMeasureId))
+            AddError(errors, $"Monthly scheduled reports do not contain expected measure {expectedMeasureId}.");
     }
 }

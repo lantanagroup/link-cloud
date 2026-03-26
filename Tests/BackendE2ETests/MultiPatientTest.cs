@@ -2,7 +2,6 @@
 using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.Automation.Helpers;
 using LantanaGroup.Link.Automation.Services;
-using RestSharp;
 using Xunit;
 using Task = System.Threading.Tasks.Task;
 
@@ -14,29 +13,27 @@ namespace LantanaGroup.Link.Tests.E2ETests;
 ///
 /// Configuration is driven by MULTI_PATIENT_TEST_* environment variables.
 /// </summary>
-public sealed class MultiPatientTest : IAsyncLifetime
+public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixture>
 {
     private const string FacilityId = "MultiPatientTestFacility";
 
-    private static readonly AutomationConfig AutomationCfg = TestConfig.BuildAutomationConfig();
     private static readonly TestScenarioConfig Config = TestConfig.BuildScenarioConfig("MULTI_PATIENT_TEST");
-    private static readonly FhirDataLoader FhirDataLoader = new(AutomationCfg.ExternalFhirServerBase, AutomationCfg);
-    private static readonly DatabaseConnectionFactory DbFactory = new(AutomationCfg.Database);
 
-    private readonly DualOutputHelper _output;
-    private readonly RestClient _adminBffClient = AdminBffClientFactory.Create(AutomationCfg);
-    private readonly LokiScraper _lokiScraper;
+    private readonly TestServices _tesetServices;
 
-    private FacilityApiClient FacilityApi => new(_adminBffClient, _output);
-    private NormalizationApiClient NormalizationApi => new(_adminBffClient, _output);
-    private QueryConfigApiClient QueryConfigApi => new(_adminBffClient, _output, AutomationCfg);
-    private ReportApiClient ReportApi => new(_adminBffClient, _output, _lokiScraper, AutomationCfg, Config);
-    private ValidationApiClient ValidationApi => new(_adminBffClient, _output, _lokiScraper);
+    private AutomationConfig AutomationCfg => _tesetServices.AutomationCfg;
+    private DualOutputHelper _output => _tesetServices.Output;
+    private FhirDataLoader FhirDataLoader => _tesetServices.FhirDataLoader;
 
-    public MultiPatientTest()
+    private FacilityApiClient FacilityApi => _tesetServices.CreateFacilityApi();
+    private NormalizationApiClient NormalizationApi => _tesetServices.CreateNormalizationApi();
+    private QueryConfigApiClient QueryConfigApi => _tesetServices.CreateQueryConfigApi();
+    private ReportApiClient ReportApi => _tesetServices.CreateReportApi(Config);
+    private ValidationApiClient ValidationApi => _tesetServices.CreateValidationApi();
+
+    public MultiPatientTest(BackendE2ETestFixture fixture)
     {
-        _output = new DualOutputHelper();
-        _lokiScraper = new LokiScraper(_output, AutomationCfg);
+        _tesetServices = fixture.GetTestServices();
     }
 
     public async Task InitializeAsync()
@@ -76,11 +73,6 @@ public sealed class MultiPatientTest : IAsyncLifetime
         {
             FhirDataLoader.ExpungeEverything(_output);
         }
-
-        if (Config.RemoveReport)
-        {
-            // TODO: Delete report
-        }
     }
 
     [Fact]
@@ -88,7 +80,7 @@ public sealed class MultiPatientTest : IAsyncLifetime
     public async Task ExecuteMultiPatientTest()
     {
         // Step 1: Load measure definition into measureeval and validation
-        var measureLoader = new MeasureLoader(_adminBffClient, _output, Config);
+        var measureLoader = new MeasureLoader(_tesetServices.AdminBffClient, _output, Config);
         await measureLoader.LoadAsync();
 
         var measureId = measureLoader.MeasureId
@@ -114,7 +106,7 @@ public sealed class MultiPatientTest : IAsyncLifetime
         var reportId = await ReportApi.GenerateReportAsync(FacilityId, measureId);
 
         // Step 7: Start background diagnostics and poll until the report is submitted
-        await using var diagnostics = new BackgroundDiagnosticsMonitor(_output, _lokiScraper, AutomationCfg, Config.PatientIds.Count);
+        await using var diagnostics = new BackgroundDiagnosticsMonitor(_output, _tesetServices.LokiScraper, AutomationCfg, Config.PatientIds.Count);
         await diagnostics.StartAsync(FacilityId, reportId);
 
         var reportSubmitted = await ReportApi.CheckSubmissionStatusAsync(reportId, diagnostics);
@@ -124,7 +116,7 @@ public sealed class MultiPatientTest : IAsyncLifetime
         // Keep diagnostics output concise: rely on live background monitoring above,
         // and capture a single DB snapshot before assertions.
         // Always write a snapshot before any assertions can kill the test.
-        var pipelineSnapshot = new PipelineSnapshot(DbFactory);
+        var pipelineSnapshot = _tesetServices.CreatePipelineSnapshot();
         await pipelineSnapshot.WriteFullSnapshotAsync(_output, FacilityId, reportId);
 
         Assert.True(reportSubmitted,

@@ -1147,18 +1147,7 @@ public static class FhirBundleGenerator
     private static object MakeDiagnosticReport(string id, string patientId, string encounterId,
         DateTime effective, int index, List<string> observationIds, string practId)
     {
-        var labReports = new[]
-        {
-            ("58410-2", "CBC panel - Blood by Automated count",    "LAB"),
-            ("24323-8", "Comprehensive metabolic panel - Serum",   "LAB"),
-            ("24331-1", "Lipid panel - Serum or Plasma",           "LAB"),
-            ("57698-3", "Lipid panel with direct LDL",             "LAB"),
-            ("24357-6", "Urinalysis panel",                        "LAB"),
-            ("47519-4", "History of Procedures Document",          "LP29684-5"),
-            ("11488-4", "Consult Note",                            "LP29684-5"),
-        };
-
-        var rpt = labReports[index % labReports.Length];
+        var rpt = LabReports[index % LabReports.Length];
         var resultRefs = observationIds.Count > 0
             ? observationIds.Skip(index % Math.Max(observationIds.Count, 1))
                             .Take(3)
@@ -1175,7 +1164,7 @@ public static class FhirBundleGenerator
                     new Dictionary<string, object>
                     {
                         ["system"]  = "http://terminology.hl7.org/CodeSystem/v2-0074",
-                        ["code"]    = rpt.Item3,
+                        ["code"]    = rpt.CategoryCode,
                         ["display"] = "Laboratory"
                     }
                 }
@@ -1264,12 +1253,14 @@ public static class FhirBundleGenerator
 
     private static object MakeCoverage(string id, string patientId, DateTime start, DateTime end, int index)
     {
+        // type codes must be valid http://terminology.hl7.org/CodeSystem/v3-ActCode values.
+        // PUBLICPOL = public insurance program (Medicare/Medicaid), EHCPOL = private health policy.
         var payors = new[]
         {
-            ("Medicare",  "1-800-MEDICARE",  "MC"),
-            ("Medicaid",  "1-800-MEDICAID",  "MD"),
-            ("BlueCross", "1-800-BCBS",      "BC"),
-            ("Aetna",     "1-800-AETNA",     "AE"),
+            ("Medicare",  "PUBLICPOL", "Public Health Insurance Policy"),
+            ("Medicaid",  "PUBLICPOL", "Public Health Insurance Policy"),
+            ("BlueCross", "EHCPOL",    "Extended Healthcare Policy"),
+            ("Aetna",     "EHCPOL",    "Extended Healthcare Policy"),
         };
         var payor = payors[index % payors.Length];
 
@@ -1279,7 +1270,7 @@ public static class FhirBundleGenerator
             ["id"] = id,
             ["status"] = "active",
             ["type"] = CodeableConcept("http://terminology.hl7.org/CodeSystem/v3-ActCode",
-                payor.Item3, payor.Item1),
+                payor.Item2, payor.Item3),
             ["subscriberId"] = $"SUB-{id.GetHashCode() & 0xFFFFFF:X6}",
             ["beneficiary"] = Ref($"Patient/{patientId}"),
             ["relationship"] = CodeableConcept("http://terminology.hl7.org/CodeSystem/subscriber-relationship",
@@ -1294,9 +1285,11 @@ public static class FhirBundleGenerator
             {
                 new Dictionary<string, object>
                 {
+                    // type is required (min 1) by the ACH profile
                     ["type"] = CodeableConcept("http://terminology.hl7.org/CodeSystem/coverage-class",
                         "plan", "Plan"),
-                    ["value"] = $"{payor.Item3}-PLAN-{index % 5 + 1:D3}",
+                    // value is required (min 1) by the base Coverage profile
+                    ["value"] = $"{payor.Item2}-PLAN-{index % 5 + 1:D3}",
                     ["name"] = $"{payor.Item1} Plan {index % 5 + 1}"
                 }
             }
@@ -1519,7 +1512,8 @@ public static class FhirBundleGenerator
                 {
                     ["role"] = new object[]
                     {
-                        CodeableConcept("http://snomed.info/sct", "17561000", "Cardiologist")
+                        CodeableConcept("http://terminology.hl7.org/CodeSystem/snomed",
+                            "17561000", "Cardiologist")
                     },
                     ["member"] = new Dictionary<string, object>
                     {
@@ -1977,4 +1971,15 @@ public static class FhirBundleGenerator
 
         return cc;
     }
+
+    private static readonly (string Code, string Display, string CategoryCode)[] LabReports =
+    [
+        ("58410-2", "CBC panel - Blood by Automated count",    "LAB"),
+        ("24323-8", "Comprehensive metabolic panel - Serum",   "LAB"),
+        ("24331-1", "Lipid panel - Serum or Plasma",           "LAB"),
+        ("57698-3", "Lipid panel with direct LDL",             "LAB"),
+        ("24357-6", "Urinalysis panel",                        "LAB"),
+        ("47519-4", "History of Procedures Document",          "LAB"),
+        ("11488-4", "Consult Note",                            "LAB"),
+    ];
 }

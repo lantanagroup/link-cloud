@@ -1,138 +1,120 @@
 ﻿using LantanaGroup.Link.Automation.Helpers;
 using LantanaGroup.Link.Normalization.Domain.Entities;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Automation.Validation;
 
-/// <summary>
-/// Validates the Normalization service's database state after a smoke test run.
-/// </summary>
 public class NormalizationDatabaseValidator
 {
+    private const int MaxErrors = 100;
     private readonly ITestOutputHelper _output;
-    private readonly DatabaseConnectionFactory _dbFactory;
+    private readonly PipelineDataReader _reader;
 
     public NormalizationDatabaseValidator(ITestOutputHelper output, DatabaseConnectionFactory dbFactory)
     {
         _output = output;
-        _dbFactory = dbFactory;
+        _reader = new PipelineDataReader(dbFactory);
     }
 
     public async Task ValidateAllAsync(string facilityId)
     {
-        _output.WriteLine("");
-        _output.WriteLine("=================================================================================");
-        _output.WriteLine("  NORMALIZATION DATABASE VALIDATION");
-        _output.WriteLine($"  FacilityId: {facilityId}");
-        _output.WriteLine("=================================================================================");
+        var errors = new List<string>();
 
-        await using var db = _dbFactory.CreateNormalizationDbContext();
-
-        await ValidateOperations(db, facilityId);
-        await ValidateOperationResourceTypes(db, facilityId);
-        await ValidateOperationSequences(db, facilityId);
-
-        _output.WriteLine("---------------------------------------------------------------------------------");
-        _output.WriteLine("  NORMALIZATION DATABASE VALIDATION COMPLETE");
-        _output.WriteLine("---------------------------------------------------------------------------------");
-        _output.WriteLine("");
-    }
-
-    private async Task ValidateOperations(NormalizationDbContext db, string facilityId)
-    {
-        _output.WriteLine("");
-        _output.WriteLine("  --- Operation ---");
-
-        var operations = await PipelineSnapshot.GetOperationsAsync(db, facilityId);
-
-        Assert.True(operations.Count > 0,
-            $"Expected at least 1 Operation for FacilityId={facilityId} but found none");
-
-        foreach (var op in operations)
+        try
         {
-            Assert.False(string.IsNullOrWhiteSpace(op.OperationType),
-                $"OperationType should be set for Operation Id={op.Id}");
-            Assert.False(string.IsNullOrWhiteSpace(op.OperationJson),
-                $"OperationJson should be set for Operation Id={op.Id}");
-            Assert.False(op.IsDisabled,
-                $"Operation Id={op.Id} should not be disabled");
-
-            var resourceTypes = op.OperationResourceTypes
-                .Select(ort => ort.ResourceType?.Name ?? "(unknown)")
-                .ToList();
-
-            _output.WriteLine($"      Id            = {op.Id}");
-            _output.WriteLine($"        Type          = {op.OperationType}");
-            _output.WriteLine($"        Name          = {op.Name}");
-            _output.WriteLine($"        ResourceTypes = [{string.Join(", ", resourceTypes)}]");
-            _output.WriteLine($"        Disabled      = {op.IsDisabled}");
+            await ValidateOperations(facilityId, errors);
+            await ValidateOperationResourceTypes(facilityId, errors);
+            await ValidateOperationSequences(facilityId, errors);
+        }
+        catch (Exception ex)
+        {
+            AddError(errors, $"Unhandled exception during normalization DB validation: {ex.Message}");
         }
 
-        _output.WriteLine("  --- Operation PASSED ---");
-    }
-
-    private async Task ValidateOperationResourceTypes(NormalizationDbContext db, string facilityId)
-    {
-        _output.WriteLine("");
-        _output.WriteLine("  --- OperationResourceType ---");
-
-        var operations = await PipelineSnapshot.GetOperationsAsync(db, facilityId);
-
-        foreach (var op in operations)
+        if (errors.Count == 0)
         {
-            Assert.True(op.OperationResourceTypes.Count > 0,
-                $"Expected at least 1 OperationResourceType for Operation Id={op.Id} " +
-                $"(Type={op.OperationType}) but found none");
-
-            foreach (var ort in op.OperationResourceTypes)
-            {
-                Assert.NotNull(ort.ResourceType);
-                Assert.False(string.IsNullOrWhiteSpace(ort.ResourceType.Name),
-                    $"ResourceType.Name should be set for OperationResourceType Id={ort.Id}");
-
-                _output.WriteLine($"      Operation {op.Id} -> ResourceType={ort.ResourceType.Name} (OrtId={ort.Id})");
-            }
-        }
-
-        _output.WriteLine("  --- OperationResourceType PASSED ---");
-    }
-
-    private async Task ValidateOperationSequences(NormalizationDbContext db, string facilityId)
-    {
-        _output.WriteLine("");
-        _output.WriteLine("  --- OperationSequence ---");
-
-        var sequences = await PipelineSnapshot.GetOperationSequencesAsync(db, facilityId);
-
-        if (sequences.Count == 0)
-        {
-            _output.WriteLine("      No OperationSequence rows found (sequences are optional)");
-            _output.WriteLine("  --- OperationSequence PASSED ---");
+            _output.WriteLine("NORMALIZATION DATABASE VALIDATION: Passed");
             return;
         }
 
-        foreach (var seq in sequences)
+        _output.WriteLine($"NORMALIZATION DATABASE VALIDATION: Failed ({errors.Count} issue(s))");
+        foreach (var error in errors)
         {
-            Assert.NotNull(seq.OperationResourceType);
-            Assert.NotNull(seq.OperationResourceType.Operation);
-            Assert.NotNull(seq.OperationResourceType.ResourceType);
-
-            var opType = seq.OperationResourceType.Operation.OperationType;
-            var resType = seq.OperationResourceType.ResourceType.Name;
-
-            _output.WriteLine($"      Id={seq.Id}: Sequence={seq.Sequence}, OperationType={opType}, ResourceType={resType}");
+            _output.WriteLine($"  - {error}");
         }
 
-        var sequenceNumbers = sequences
-            .Where(s => s.Sequence.HasValue)
-            .Select(s => s.Sequence!.Value)
-            .ToList();
+        throw new InvalidOperationException($"NORMALIZATION DATABASE VALIDATION failed with {errors.Count} issue(s).");
+    }
 
-        var distinctCount = sequenceNumbers.Distinct().Count();
-        Assert.Equal(sequenceNumbers.Count, distinctCount);
+    private static void AddError(List<string> errors, string message)
+    {
+        if (errors.Count < MaxErrors)
+            errors.Add(message);
+    }
 
-        _output.WriteLine($"      {sequences.Count} sequence(s) with unique ordering");
-        _output.WriteLine("  --- OperationSequence PASSED ---");
+    private async Task ValidateOperations(string facilityId, List<string> errors)
+    {
+        var operations = await _reader.GetOperationsAsync(facilityId);
+
+        if (operations.Count == 0)
+        {
+            AddError(errors, $"Expected at least 1 Operation for facility {facilityId} but found none.");
+            return;
+        }
+
+        foreach (var op in operations)
+        {
+            if (string.IsNullOrWhiteSpace(op.OperationType)) AddError(errors, $"Operation {op.Id} OperationType should be populated.");
+            if (string.IsNullOrWhiteSpace(op.OperationJson)) AddError(errors, $"Operation {op.Id} OperationJson should be populated.");
+            if (op.IsDisabled) AddError(errors, $"Operation {op.Id} should not be disabled.");
+        }
+    }
+
+    private async Task ValidateOperationResourceTypes(string facilityId, List<string> errors)
+    {
+        var operations = await _reader.GetOperationsAsync(facilityId);
+
+        foreach (var op in operations)
+        {
+            if (op.OperationResourceTypes.Count == 0)
+            {
+                AddError(errors, $"Operation {op.Id} ({op.OperationType}) has no OperationResourceTypes.");
+                continue;
+            }
+
+            foreach (var ort in op.OperationResourceTypes)
+            {
+                if (ort.ResourceType == null)
+                    AddError(errors, $"OperationResourceType {ort.Id} has null ResourceType.");
+                else if (string.IsNullOrWhiteSpace(ort.ResourceType.Name))
+                    AddError(errors, $"OperationResourceType {ort.Id} ResourceType.Name should be populated.");
+            }
+        }
+    }
+
+    private async Task ValidateOperationSequences(string facilityId, List<string> errors)
+    {
+        var sequences = await _reader.GetOperationSequencesAsync(facilityId);
+
+        if (sequences.Count == 0)
+            return;
+
+        foreach (var seq in sequences)
+        {
+            if (seq.OperationResourceType == null)
+            {
+                AddError(errors, $"OperationSequence {seq.Id} OperationResourceType is null.");
+                continue;
+            }
+
+            if (seq.OperationResourceType.Operation == null)
+                AddError(errors, $"OperationSequence {seq.Id} OperationResourceType.Operation is null.");
+            if (seq.OperationResourceType.ResourceType == null)
+                AddError(errors, $"OperationSequence {seq.Id} OperationResourceType.ResourceType is null.");
+        }
+
+        var sequenceNumbers = sequences.Where(s => s.Sequence.HasValue).Select(s => s.Sequence!.Value).ToList();
+        if (sequenceNumbers.Distinct().Count() != sequenceNumbers.Count)
+            AddError(errors, "OperationSequence values are not unique.");
     }
 }

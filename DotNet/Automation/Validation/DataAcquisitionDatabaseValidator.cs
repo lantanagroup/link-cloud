@@ -1,25 +1,20 @@
 ﻿using LantanaGroup.Link.Automation.Helpers;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
-using Microsoft.EntityFrameworkCore;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Automation.Validation;
 
-/// <summary>
-/// Validates the DataAcquisition service's database state after a smoke test run.
-/// </summary>
 public class DataAcquisitionDatabaseValidator
 {
+    private const int MaxErrors = 100;
     private readonly ITestOutputHelper _output;
-    private readonly DatabaseConnectionFactory _dbFactory;
+    private readonly PipelineDataReader _reader;
 
     public DataAcquisitionDatabaseValidator(ITestOutputHelper output, DatabaseConnectionFactory dbFactory)
     {
         _output = output;
-        _dbFactory = dbFactory;
+        _reader = new PipelineDataReader(dbFactory);
     }
 
     public async Task ValidateAllAsync(
@@ -28,164 +23,123 @@ public class DataAcquisitionDatabaseValidator
         string expectedMeasureId,
         List<string> expectedPatientIds)
     {
-        _output.WriteLine("");
-        _output.WriteLine("=================================================================================");
-        _output.WriteLine("  DATA ACQUISITION DATABASE VALIDATION");
-        _output.WriteLine($"  FacilityId: {facilityId}");
-        _output.WriteLine($"  ReportId:   {reportId}");
-        _output.WriteLine("=================================================================================");
+        var errors = new List<string>();
 
-        await using var db = _dbFactory.CreateDataAcquisitionDbContext();
+        try
+        {
+            await ValidateFhirQueryConfiguration(facilityId, errors);
+            await ValidateQueryPlans(facilityId, expectedMeasureId, errors);
+            await ValidateDataAcquisitionLogs(facilityId, reportId, expectedPatientIds, errors);
+            await ValidateFhirQueries(facilityId, reportId, errors);
+            await ValidateReferenceResources(facilityId, errors);
+        }
+        catch (Exception ex)
+        {
+            AddError(errors, $"Unhandled exception during data acquisition DB validation: {ex.Message}");
+        }
 
-        await ValidateFhirQueryConfiguration(db, facilityId);
-        await ValidateQueryPlans(db, facilityId, expectedMeasureId);
-        await ValidateDataAcquisitionLogs(db, facilityId, reportId, expectedPatientIds);
-        await ValidateFhirQueries(db, facilityId, reportId);
-        await ValidateReferenceResources(db, facilityId);
+        if (errors.Count == 0)
+        {
+            _output.WriteLine("DATA ACQUISITION DATABASE VALIDATION: Passed");
+            return;
+        }
 
-        _output.WriteLine("---------------------------------------------------------------------------------");
-        _output.WriteLine("  DATA ACQUISITION DATABASE VALIDATION COMPLETE");
-        _output.WriteLine("---------------------------------------------------------------------------------");
-        _output.WriteLine("");
+        _output.WriteLine($"DATA ACQUISITION DATABASE VALIDATION: Failed ({errors.Count} issue(s))");
+        foreach (var error in errors)
+        {
+            _output.WriteLine($"  - {error}");
+        }
+
+        throw new InvalidOperationException($"DATA ACQUISITION DATABASE VALIDATION failed with {errors.Count} issue(s).");
     }
 
-    private async Task ValidateFhirQueryConfiguration(DataAcquisitionDbContext db, string facilityId)
+    private static void AddError(List<string> errors, string message)
     {
-        _output.WriteLine("");
-        _output.WriteLine("  --- FhirQueryConfiguration ---");
-
-        var config = await db.FhirQueryConfigurations
-            .FirstOrDefaultAsync(c => c.FacilityId == facilityId);
-
-        Assert.NotNull(config);
-        Assert.False(string.IsNullOrWhiteSpace(config.FhirServerBaseUrl), "FhirServerBaseUrl should be set");
-        Assert.True(config.MaxConcurrentRequests > 0, "MaxConcurrentRequests should be > 0");
-        Assert.True(config.MaxRetries > 0, "MaxRetries should be > 0");
-
-        _output.WriteLine($"      FhirServerBaseUrl     = {config.FhirServerBaseUrl}");
-        _output.WriteLine($"      MaxConcurrentRequests = {config.MaxConcurrentRequests}");
-        _output.WriteLine($"      MaxRetries            = {config.MaxRetries}");
-        _output.WriteLine("  --- FhirQueryConfiguration PASSED ---");
+        if (errors.Count < MaxErrors)
+            errors.Add(message);
     }
 
-    private async Task ValidateQueryPlans(DataAcquisitionDbContext db, string facilityId, string expectedMeasureId)
+    private async Task ValidateFhirQueryConfiguration(string facilityId, List<string> errors)
     {
-        _output.WriteLine("");
-        _output.WriteLine("  --- QueryPlan ---");
+        var hasConfig = await _reader.HasFhirQueryConfigurationAsync(facilityId);
+        if (!hasConfig)
+            AddError(errors, "FhirQueryConfiguration not found.");
+    }
 
-        var queryPlans = await db.QueryPlans
-            .Where(qp => qp.FacilityId == facilityId)
-            .ToListAsync();
+    private async Task ValidateQueryPlans(string facilityId, string expectedMeasureId, List<string> errors)
+    {
+        var queryPlans = await _reader.GetQueryPlansAsync(facilityId);
 
-        Assert.True(queryPlans.Count >= 2,
-            $"Expected at least 2 query plans (Discharge + Monthly) but found {queryPlans.Count}");
+        if (queryPlans.Count < 2)
+            AddError(errors, $"Expected at least 2 query plans (Discharge + Monthly), found {queryPlans.Count}.");
 
         var dischargePlan = queryPlans.FirstOrDefault(qp => qp.Type == Frequency.Discharge);
-        Assert.NotNull(dischargePlan);
-        Assert.Equal(expectedMeasureId, dischargePlan.PlanName);
-        Assert.True(dischargePlan.InitialQueries?.Count > 0, "Discharge plan should have InitialQueries");
-        Assert.True(dischargePlan.SupplementalQueries?.Count > 0, "Discharge plan should have SupplementalQueries");
-
-        _output.WriteLine($"      Discharge Plan:");
-        _output.WriteLine($"        PlanName            = {dischargePlan.PlanName}");
-        _output.WriteLine($"        InitialQueries      = {dischargePlan.InitialQueries?.Count}");
-        _output.WriteLine($"        SupplementalQueries = {dischargePlan.SupplementalQueries?.Count}");
+        if (dischargePlan == null)
+        {
+            AddError(errors, "Discharge query plan not found.");
+        }
+        else
+        {
+            if (dischargePlan.PlanName != expectedMeasureId) AddError(errors, $"Discharge plan name mismatch: expected {expectedMeasureId}, actual {dischargePlan.PlanName}");
+            if (dischargePlan.InitialQueries?.Count <= 0) AddError(errors, "Discharge plan InitialQueries should be populated.");
+            if (dischargePlan.SupplementalQueries?.Count <= 0) AddError(errors, "Discharge plan SupplementalQueries should be populated.");
+        }
 
         var monthlyPlan = queryPlans.FirstOrDefault(qp => qp.Type == Frequency.Monthly);
-        Assert.NotNull(monthlyPlan);
-        Assert.Equal(expectedMeasureId, monthlyPlan.PlanName);
-        Assert.True(monthlyPlan.InitialQueries?.Count > 0, "Monthly plan should have InitialQueries");
-        Assert.True(monthlyPlan.SupplementalQueries?.Count > 0, "Monthly plan should have SupplementalQueries");
-
-        _output.WriteLine($"      Monthly Plan:");
-        _output.WriteLine($"        PlanName            = {monthlyPlan.PlanName}");
-        _output.WriteLine($"        InitialQueries      = {monthlyPlan.InitialQueries?.Count}");
-        _output.WriteLine($"        SupplementalQueries = {monthlyPlan.SupplementalQueries?.Count}");
-        _output.WriteLine("  --- QueryPlan PASSED ---");
+        if (monthlyPlan == null)
+        {
+            AddError(errors, "Monthly query plan not found.");
+        }
+        else
+        {
+            if (monthlyPlan.PlanName != expectedMeasureId) AddError(errors, $"Monthly plan name mismatch: expected {expectedMeasureId}, actual {monthlyPlan.PlanName}");
+            if (monthlyPlan.InitialQueries?.Count <= 0) AddError(errors, "Monthly plan InitialQueries should be populated.");
+            if (monthlyPlan.SupplementalQueries?.Count <= 0) AddError(errors, "Monthly plan SupplementalQueries should be populated.");
+        }
     }
 
-    private async Task ValidateDataAcquisitionLogs(
-        DataAcquisitionDbContext db, string facilityId, string reportId, List<string> expectedPatientIds)
+    private async Task ValidateDataAcquisitionLogs(string facilityId, string reportId, List<string> expectedPatientIds, List<string> errors)
     {
-        _output.WriteLine("");
-        _output.WriteLine("  --- DataAcquisitionLog ---");
-
-        var logs = await PipelineSnapshot.GetAcquisitionLogsAsync(db, facilityId, reportId);
-
-        Assert.True(logs.Count > 0,
-            $"Expected DataAcquisitionLog rows for ReportTrackingId={reportId} but found none");
+        var logs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
+        if (logs.Count == 0)
+        {
+            AddError(errors, $"Expected DataAcquisitionLog rows for report {reportId} but found none.");
+            return;
+        }
 
         var patientsInLogs = logs
             .Where(l => l.PatientId != null)
             .Select(l => l.PatientId!)
             .Distinct()
-            .OrderBy(p => p)
-            .ToList();
+            .ToHashSet();
 
         foreach (var patientId in expectedPatientIds)
         {
-            Assert.Contains(patientId, patientsInLogs);
+            if (!patientsInLogs.Contains(patientId))
+                AddError(errors, $"No DataAcquisitionLog rows found for expected patient {patientId}.");
         }
 
         var failedLogs = logs.Where(l => l.Status == RequestStatus.Failed || l.Status == RequestStatus.MaxRetriesReached).ToList();
-        Assert.True(failedLogs.Count == 0,
-            $"Found {failedLogs.Count} failed log(s): " +
-            string.Join(", ", failedLogs.Select(l => $"Id={l.Id} Patient={l.PatientId} Status={l.Status}")));
-
-        var completedCount = logs.Count(l => l.Status == RequestStatus.Completed);
-        _output.WriteLine($"      Total Logs   = {logs.Count}");
-        _output.WriteLine($"      Completed    = {completedCount}");
-        _output.WriteLine($"      Patients     = {expectedPatientIds.Count}");
-
-        foreach (var patientId in expectedPatientIds)
+        foreach (var failed in failedLogs.Take(10))
         {
-            var patientLogs = logs.Where(l => l.PatientId == patientId).ToList();
-            var statusBreakdown = patientLogs
-                .GroupBy(l => l.Status)
-                .Select(g => $"{g.Key}={g.Count()}");
-            _output.WriteLine($"      Patient {patientId,-12} {patientLogs.Count} log(s) [{string.Join(", ", statusBreakdown)}]");
+            AddError(errors, $"Failed acquisition log: Id={failed.Id}, Patient={failed.PatientId}, Status={failed.Status}");
         }
 
-        _output.WriteLine("  --- DataAcquisitionLog PASSED ---");
+        if (failedLogs.Count > 10)
+            AddError(errors, $"Additional failed acquisition logs omitted: {failedLogs.Count - 10}");
     }
 
-    private async Task ValidateFhirQueries(DataAcquisitionDbContext db, string facilityId, string reportId)
+    private async Task ValidateFhirQueries(string facilityId, string reportId, List<string> errors)
     {
-        _output.WriteLine("");
-        _output.WriteLine("  --- FhirQuery ---");
-
-        var queries = await db.FhirQueries
-            .Include(q => q.FhirQueryResourceTypes)
-            .Where(q => q.FacilityId == facilityId &&
-                        q.DataAcquisitionLog.ReportTrackingId == reportId)
-            .ToListAsync();
-
-        Assert.True(queries.Count > 0, "Expected FhirQuery rows for this report but found none");
-
-        var byType = queries.GroupBy(q => q.QueryType)
-            .Select(g => $"{g.Key}={g.Count()}");
-        _output.WriteLine($"      Total Queries = {queries.Count}");
-        _output.WriteLine($"      By Type       = {string.Join(", ", byType)}");
-        _output.WriteLine("  --- FhirQuery PASSED ---");
+        var queries = await _reader.GetFhirQueriesForReportAsync(facilityId, reportId);
+        if (queries.Count == 0)
+            AddError(errors, "Expected FhirQuery rows for this report but found none.");
     }
 
-    private async Task ValidateReferenceResources(DataAcquisitionDbContext db, string facilityId)
+    private async Task ValidateReferenceResources(string facilityId, List<string> errors)
     {
-        _output.WriteLine("");
-        _output.WriteLine("  --- ReferenceResources ---");
-
-        var resources = await db.ReferenceResources
-            .Where(r => r.FacilityId == facilityId)
-            .GroupBy(r => new { r.ResourceType, r.QueryPhase })
-            .Select(g => new { g.Key.ResourceType, g.Key.QueryPhase, Count = g.Count() })
-            .OrderBy(x => x.ResourceType)
-            .ToListAsync();
-
-        Assert.True(resources.Count > 0, "Expected ReferenceResources rows for the facility but found none");
-
-        var totalCount = resources.Sum(r => r.Count);
-        _output.WriteLine($"      Total Resources   = {totalCount}");
-        _output.WriteLine($"      Type/Phase Groups = {resources.Count}");
-        _output.WriteLine("  --- ReferenceResources PASSED ---");
+        var groupCount = await _reader.GetReferenceResourceGroupCountAsync(facilityId);
+        if (groupCount == 0)
+            AddError(errors, "Expected ReferenceResources rows for the facility but found none.");
     }
 }

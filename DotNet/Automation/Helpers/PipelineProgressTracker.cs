@@ -15,7 +15,7 @@ public class PipelineProgressTracker
     private readonly ITestOutputHelper _output;
     private readonly int _expectedPatientCount;
     private readonly int _totalUnits;
-    private readonly DatabaseConnectionFactory _dbFactory;
+    private readonly PipelineDataReader _reader;
     private int _lastReportedPercent = -1;
     private string? _lastProgressBar;
 
@@ -42,7 +42,7 @@ public class PipelineProgressTracker
     {
         _output = output;
         _expectedPatientCount = expectedPatientCount;
-        _dbFactory = dbFactory;
+        _reader = new PipelineDataReader(dbFactory);
         _totalUnits = (expectedPatientCount * 4) + 2;
     }
 
@@ -54,9 +54,7 @@ public class PipelineProgressTracker
             var completedUnits = 0;
             var stageDetails = new List<string>();
 
-            await using var reportDb = _dbFactory.CreateReportDbContext();
-
-            var schedule = await PipelineSnapshot.GetReportScheduleAsync(reportDb, scheduleId);
+            var schedule = await _reader.GetReportScheduleAsync(scheduleId);
             if (schedule != null)
             {
                 completedUnits++;
@@ -78,10 +76,7 @@ public class PipelineProgressTracker
                 return;
             }
 
-            var entries = await reportDb.ReportEntry
-                .Include(e => e.MeasureReports)
-                .Where(e => e.ReportScheduleId == scheduleId)
-                .ToListAsync();
+            var entries = await _reader.GetReportEntriesWithMeasureReportsAsync(scheduleId);
 
             var patientsEvaluated = 0;
             var patientsValidated = 0;
@@ -113,8 +108,7 @@ public class PipelineProgressTracker
             stageDetails.Add($"valid={patientsValidated}/{_expectedPatientCount}");
             stageDetails.Add($"submit={patientsSubmitted}/{_expectedPatientCount}");
 
-            await using var acqDb = _dbFactory.CreateDataAcquisitionDbContext();
-            var logs = await PipelineSnapshot.GetAcquisitionLogsAsync(acqDb, facilityId, reportId);
+            var logs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
 
             var patientsAcquired = logs
                 .Where(l => l.Status == RequestStatus.Completed && l.PatientId != null)

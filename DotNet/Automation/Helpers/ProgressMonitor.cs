@@ -19,7 +19,7 @@ public class ProgressMonitor
     private readonly ITestOutputHelper _output;
     private readonly PipelineProgressTracker? _progressTracker;
     private readonly LokiScraper? _lokiScraper;
-    private readonly DatabaseConnectionFactory _dbFactory;
+    private readonly PipelineDataReader _reader;
 
     private string? _lastScheduleStatus;
     private int _lastReportEntryCount;
@@ -45,9 +45,10 @@ public class ProgressMonitor
     {
         _output = output;
         _lokiScraper = lokiScraper;
-        _dbFactory = new DatabaseConnectionFactory(config.Database);
+        var dbFactory = new DatabaseConnectionFactory(config.Database);
+        _reader = new PipelineDataReader(dbFactory);
         _progressTracker = expectedPatientCount > 0
-            ? new PipelineProgressTracker(output, expectedPatientCount, _dbFactory)
+            ? new PipelineProgressTracker(output, expectedPatientCount, dbFactory)
             : null;
     }
 
@@ -91,14 +92,19 @@ public class ProgressMonitor
 
         _output.WriteLine(heartbeat);
 
-        // When the DB progress bar isn't moving, query Loki for service activity
-        if (_lokiScraper != null && _progressTracker?.StalledStage != null)
+        if (_lokiScraper == null)
+            return;
+
+        var measureEvalActivity = await _lokiScraper.GetMeasureEvalActivitySummaryAsync(TimeSpan.FromSeconds(60));
+        if (measureEvalActivity != null)
         {
-            var activity = await _lokiScraper.GetMeasureEvalActivitySummaryAsync(TimeSpan.FromSeconds(60));
-            if (activity != null)
-            {
-                _output.WriteLine($"[DIAG] MeasureEval: {activity}");
-            }
+            _output.WriteLine($"[DIAG] MeasureEval is active: {measureEvalActivity}");
+        }
+
+        var validationActivity = await _lokiScraper.GetValidationActivitySummaryAsync(TimeSpan.FromSeconds(60));
+        if (validationActivity != null)
+        {
+            _output.WriteLine($"[DIAG] Validation is active: {validationActivity}");
         }
     }
 
@@ -106,10 +112,9 @@ public class ProgressMonitor
     {
         try
         {
-            await using var db = _dbFactory.CreateReportDbContext();
             var scheduleId = Guid.Parse(reportId);
 
-            var schedule = await PipelineSnapshot.GetReportScheduleAsync(db, scheduleId);
+            var schedule = await _reader.GetReportScheduleAsync(scheduleId);
             if (schedule == null)
             {
                 if (_lastScheduleStatus != "NOT_FOUND")
@@ -127,7 +132,7 @@ public class ProgressMonitor
                 _lastScheduleStatus = currentStatus;
             }
 
-            var entries = await PipelineSnapshot.GetReportEntriesAsync(db, scheduleId);
+            var entries = await _reader.GetReportEntriesAsync(scheduleId);
 
             var total = entries.Count;
             var submitted = entries.Count(e => e.SubmissionStatus == SubmissionStatus.Submitted);
@@ -170,9 +175,7 @@ public class ProgressMonitor
     {
         try
         {
-            await using var db = _dbFactory.CreateDataAcquisitionDbContext();
-
-            var logs = await PipelineSnapshot.GetAcquisitionLogsAsync(db, facilityId, reportId);
+            var logs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
 
             var total = logs.Count;
             var completed = logs.Count(l => l.Status == RequestStatus.Completed);
