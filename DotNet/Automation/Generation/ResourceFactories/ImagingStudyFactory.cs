@@ -8,10 +8,10 @@ public static class ImagingStudyFactory
     /// <summary>Generate an ImagingStudy from the pool using a seed index.</summary>
     public static ImagingStudy Generate(
         string id, string patientId, string encounterId,
-        DateTime started, int seed, string locationId)
+        DateTime started, int seed, string locationId, string interpreterPractitionerId)
     {
         var v = FhirGenerationCodes.ImagingStudies[seed % FhirGenerationCodes.ImagingStudies.Length];
-        return Create(id, patientId, encounterId, started, locationId,
+        return Create(id, patientId, encounterId, started, locationId, interpreterPractitionerId,
                       v.SnomedCode, v.Display, v.Modality,
                       v.BodySiteCode, v.BodySiteDisplay,
                       v.ReasonCode, v.ReasonDisplay);
@@ -24,6 +24,7 @@ public static class ImagingStudyFactory
         string encounterId,
         DateTime started,
         string locationId,
+        string interpreterPractitionerId,
         string snomedCode,
         string display,
         string modality,
@@ -58,7 +59,7 @@ public static class ImagingStudyFactory
             ProcedureCode     = [Snomed(snomedCode, display)],
             ReasonCode        = [Snomed(reasonCode, reasonDisplay)],
             Location          = Ref($"Location/{locationId}"),
-            Interpreter       = [Ref($"Organization/{FhirBundleGenerator.HospitalOrgId}", "Radiology Department")],
+            Interpreter       = [Ref($"Practitioner/{interpreterPractitionerId}", "Radiologist")],
             Note              = [new Annotation { Text = new Markdown($"Study performed for: {reasonDisplay}. Interpreted by radiology.") }],
             Series =
             [
