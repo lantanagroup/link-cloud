@@ -247,6 +247,7 @@
           <th mat-header-cell *matHeaderCellDef>Action</th>
           <td mat-cell *matCellDef="let element">
             <button type="button"
+                    *ngIf="element.status === 'Submitted'"
                     class="link-button secondary" [disabled]="element.isDeleted"
                     (click)="onResubmit(element.id, element.facilityId)">
               <fa-icon [icon]="faRotate"></fa-icon>
