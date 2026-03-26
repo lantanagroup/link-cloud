@@ -54,7 +54,7 @@
         /// The allowed origins
         /// </summary>
         public string[]? AllowedOrigins { get; set; }
-        
+
         /// <summary>
         /// Allow all origins (ignore "AllowedOrigins")
         /// </summary>

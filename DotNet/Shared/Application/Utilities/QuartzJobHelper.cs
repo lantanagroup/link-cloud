@@ -46,7 +46,7 @@ public class QuartzJobHelper : IQuartzJobHelper
 
         await scheduler.ScheduleJob(job, trigger, ct);
 
-       _logger.LogInformation("Scheduled job {Identity} in group {Group} to start at {StartAt}", identity, group, startAt);
+        _logger.LogInformation("Scheduled job {Identity} in group {Group} to start at {StartAt}", identity, group, startAt);
     }
 
     public async Task DeleteJob(string identity, string group, CancellationToken ct = default)

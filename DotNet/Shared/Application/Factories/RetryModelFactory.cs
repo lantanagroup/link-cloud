@@ -13,7 +13,7 @@ namespace LantanaGroup.Link.Shared.Application.Factories
         [GeneratedRegex(@"-Retry$", RegexOptions.IgnoreCase, "en-US")]
         private static partial Regex RetrySuffix();
 
-        public RetryModel CreateRetryModel(ConsumeResult<string, string> consumeResult, ConsumerSettings consumerSettings) 
+        public RetryModel CreateRetryModel(ConsumeResult<string, string> consumeResult, ConsumerSettings consumerSettings)
         {
             Dictionary<string, string> headers = new Dictionary<string, string>();
             foreach (var header in consumeResult.Message.Headers)
@@ -47,7 +47,7 @@ namespace LantanaGroup.Link.Shared.Application.Factories
                 CorrelationId = headers.FirstOrDefault(x => x.Key == KafkaConstants.HeaderConstants.CorrelationId).Value ?? "",
                 Headers = headers
             };
-            
+
             return retryEntity;
         }
     }

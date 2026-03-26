@@ -22,7 +22,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
 
                 default:
                     throw new ArgumentException("Invalid secret manager");
-            }            
+            }
 
             return services;
         }

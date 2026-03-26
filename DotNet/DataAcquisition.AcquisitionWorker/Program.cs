@@ -42,7 +42,8 @@ builder.Services.AddSingleton<AcquisitionProcessorBackgroundService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<AcquisitionProcessorBackgroundService>());
 
 //Add CORS
-builder.Services.AddLinkCorsService(options => {
+builder.Services.AddLinkCorsService(options =>
+{
     options.Environment = builder.Environment;
 });
 

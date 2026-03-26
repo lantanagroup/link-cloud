@@ -16,13 +16,13 @@ namespace UnitTests.Audit
     public class AuditEventProcessorTests
     {
         private readonly Mock<ILogger<AuditEventProcessor>> _logger = new();
-        private readonly Mock<IAuditManager> _auditManagerMock = new();        
+        private readonly Mock<IAuditManager> _auditManagerMock = new();
 
         [Fact]
         public async Task AuditEventProcessor_ShouldNotAcceptNullMessageResults()
-        {                        
+        {
             AuditEventProcessor proccessor = new(_logger.Object, _auditManagerMock.Object);
-            ConsumeResult<string, AuditEventMessage>? result = null;            
+            ConsumeResult<string, AuditEventMessage>? result = null;
 
             await Assert.ThrowsAsync<DeadLetterException>(() => proccessor.ProcessAuditEvent(result, It.IsAny<CancellationToken>()));
         }
@@ -33,9 +33,9 @@ namespace UnitTests.Audit
             AuditEventProcessor proccessor = new(_logger.Object, _auditManagerMock.Object);
             ConsumeResult<string, AuditEventMessage>? result = new()
             {
-                Message = new Message<string, AuditEventMessage>() 
-                { 
-                    Value = null,  
+                Message = new Message<string, AuditEventMessage>()
+                {
+                    Value = null,
                     Headers = new Headers(),
                     Key = "TestKey"
                 }
@@ -43,7 +43,7 @@ namespace UnitTests.Audit
 
             await Assert.ThrowsAsync<DeadLetterException>(() => proccessor.ProcessAuditEvent(result, It.IsAny<CancellationToken>()));
 
-        }        
+        }
 
         [Fact]
         public async Task AuditEventProcessor_CanCreateAnAuditEvent()
@@ -72,7 +72,7 @@ namespace UnitTests.Audit
 
             _auditManagerMock.Setup(x => x.CreateAuditLog(It.IsAny<AuditModel>(), default)).ReturnsAsync(new AuditLog());
             AuditEventProcessor proccessor = new(_logger.Object, _auditManagerMock.Object);
-            var outcome = await proccessor.ProcessAuditEvent(result, It.IsAny<CancellationToken>());            
+            var outcome = await proccessor.ProcessAuditEvent(result, It.IsAny<CancellationToken>());
 
             Assert.True(outcome);
         }

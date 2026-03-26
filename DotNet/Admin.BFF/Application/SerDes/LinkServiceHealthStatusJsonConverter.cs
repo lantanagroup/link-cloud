@@ -13,7 +13,7 @@ public class LinkServiceHealthStatusJsonConverter : JsonConverter<LinkServiceHea
         {
             return (LinkServiceHealthStatus)type;
         }
-        
+
         throw new JsonException("Invalid value for LinkServiceHealthStatus");
     }
 

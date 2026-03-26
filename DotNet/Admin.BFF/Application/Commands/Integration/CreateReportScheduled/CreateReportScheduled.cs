@@ -33,12 +33,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 {
                     throw new ArgumentException("FacilityId cannot be null or empty");
                 }
-                
+
                 var headers = new Headers
                 {
                     { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(correlationId) }
                 };
-                
+
                 DateTime endDate;
 
                 if (double.TryParse(model.Delay, out double delay))
@@ -58,18 +58,18 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     _logger.LogWarning("Invalid delay value '{Delay}'. Using default delay of {DefaultDelay} minutes", HtmlInputSanitizer.Sanitize(model.Delay), DEFAULT_DELAY_MINUTES);
                     endDate = DateTime.UtcNow.AddMinutes(DEFAULT_DELAY_MINUTES); // default to 5 minutes
                 }
-               
-                 var normalizedEndDate = new DateTime(endDate.Year, endDate.Month, endDate.Day, endDate.Hour, endDate.Minute, 0, DateTimeKind.Utc);
-                 if (model.ReportTypes == null || !model.ReportTypes.Any())
-                 {
+
+                var normalizedEndDate = new DateTime(endDate.Year, endDate.Month, endDate.Day, endDate.Hour, endDate.Minute, 0, DateTimeKind.Utc);
+                if (model.ReportTypes == null || !model.ReportTypes.Any())
+                {
                     throw new ArgumentException("At least one report type must be specified", nameof(model.ReportTypes));
-                 }
-                
-                 if (!Enum.IsDefined(typeof(Frequency), model.Frequency))
-                 {
+                }
+
+                if (!Enum.IsDefined(typeof(Frequency), model.Frequency))
+                {
                     throw new ArgumentException("Invalid frequency value", nameof(model.Frequency));
-                 }
-                
+                }
+
                 if (model.StartDate >= normalizedEndDate)
                 {
                     throw new ArgumentException("Start date must be earlier than end date", nameof(model.StartDate));

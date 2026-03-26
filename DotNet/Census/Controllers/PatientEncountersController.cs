@@ -166,7 +166,7 @@ public class PatientEncountersController : Controller
 
         try
         {
-            await _patientEncounterQueries.RebuildPatientEncounterTable(facilityId, correlationId,cancellationToken: cancellationToken);
+            await _patientEncounterQueries.RebuildPatientEncounterTable(facilityId, correlationId, cancellationToken: cancellationToken);
         }
         catch (Exception ex)
         {

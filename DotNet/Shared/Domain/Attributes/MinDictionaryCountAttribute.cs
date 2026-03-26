@@ -11,7 +11,7 @@ public class MinDictionaryCountAttribute : ValidationAttribute
     public MinDictionaryCountAttribute(int minCount)
     {
         if (minCount < 0) throw new ArgumentOutOfRangeException(nameof(minCount), "minCount must be non-negative.");
-            _minCount = minCount;
+        _minCount = minCount;
     }
 
     protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)

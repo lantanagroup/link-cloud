@@ -237,7 +237,7 @@ public class DataAcquisitionDbContext : DbContext
         modelBuilder.Entity<ResourceReferenceType>()
             .Property(b => b.QueryPhase)
             .HasConversion(new EnumToStringConverter<QueryPhase>());
-        
+
         //-------------------SftpAcquisitionLog-------------------
         modelBuilder.Entity<SftpAcquisitionLog>(entity =>
         {
@@ -292,7 +292,7 @@ public class DataAcquisitionDbContext : DbContext
                     c => c == null ? 0 : c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
                     c => c == null ? null : c.ToList()));
         });
-        
+
         //-------------------SftpConfiguration-------------------
         modelBuilder.Entity<SftpConfiguration>(entity =>
         {

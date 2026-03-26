@@ -108,7 +108,7 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
         return key;
     }
 
-    
+
     protected override string ExtractCorrelationId(ConsumeResult<string, DataAcquisitionRequested> consumeResult)
     {
         var cIBytes = consumeResult.Headers

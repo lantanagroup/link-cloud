@@ -18,8 +18,8 @@ namespace LantanaGroup.Link.Submission.Controllers;
 public class SubmissionController(
     ILogger<SubmissionController> logger,
     IOptions<SubmissionServiceConfig> config,
-    PathNamingService pathNamingService, 
-    IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions, 
+    PathNamingService pathNamingService,
+    IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions,
     IOptions<LinkTokenServiceSettings> tokenServiceSettings,
     ICreateSystemToken createSystemToken,
     IHttpClientFactory httpClientFactory,
@@ -58,9 +58,9 @@ public class SubmissionController(
             logger.LogError("Report Service API Url is missing from Service Registry.");
             throw new Exception("Report Service API Url is missing from Service Registry.");
         }
-        
+
         HttpClient client = httpClientFactory.CreateClient();
-        
+
         if (!linkBearerServiceOptions.Value.AllowAnonymous)
         {
             if (tokenServiceSettings.Value.SigningKey is null)
@@ -70,7 +70,7 @@ public class SubmissionController(
             var token = await createSystemToken.ExecuteAsync(tokenServiceSettings.Value.SigningKey, 5);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
-        
+
         string reportUrl = $"{serviceRegistry.Value.ReportServiceApiUrl.TrimEnd('/')}/schedules/{sanitizedReportId.SanitizeAndRemove()}";
         var reportResponse = await client.GetAsync(reportUrl);
 
@@ -79,7 +79,7 @@ public class SubmissionController(
             logger.LogError("Report service return {StatusCode} for {ReportUrl}: {ReasonPhrase}", reportResponse.StatusCode, reportUrl.Sanitize(), reportResponse.ReasonPhrase.Sanitize());
             return StatusCode((int)reportResponse.StatusCode, "Unable to retrieve report metadata.");
         }
-        
+
         var jsonResponse = System.Text.Json.JsonDocument.Parse(
             await reportResponse.Content.ReadAsStringAsync());
 
@@ -95,10 +95,10 @@ public class SubmissionController(
             : await blobStorageService.DownloadFromInternalAsync(payloadRootUri.GetString());
 
         var compressedData = this.CompressFiles(files);
-        
+
         return File(compressedData, "application/zip", $"{sanitizedReportId}.zip");
     }
-    
+
     /**
      * Compresses the contents of the specified files into a ZIP archive (in memory) and returns it as a byte array.
      * <returns>A byte array containing the compressed data of the specified files as a ZIP archive.</returns>

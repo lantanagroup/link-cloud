@@ -253,7 +253,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton(typeof(ITransientExceptionHandler<,,>), typeof(TransientExceptionHandler<,,>));
     builder.Services.AddSingleton(typeof(IDeadLetterExceptionHandler<,,>), typeof(DeadLetterExceptionHandler<,,>));
 
-    builder.Services.AddLinkCorsService(options => {
+    builder.Services.AddLinkCorsService(options =>
+    {
         options.Environment = builder.Environment;
     });
 
