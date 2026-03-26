@@ -15,6 +15,11 @@ public static class TestConfig
     public static OAuthConfig FhirServerOAuth => new("FHIRSERVER");
     public static BasicAuthConfig FhirServerBasicAuth => new("FHIRSERVER");
     public static SmokeTestConfig AdhocReportingSmokeTestConfig => new("ADHOC_REPORTING_SMOKE_TEST");
+    public static SmokeTestConfig MegaPatientTestConfig => new("MEGA_PATIENT_TEST",
+        defaultPatientIds: [],
+        defaultPollingIntervalSeconds: 5,
+        defaultMaxRetryCount: 300,
+        defaultLokiScrapeWindowMinutes: 20);
 
     public static class FhirQueryConfig
     {
@@ -37,14 +42,51 @@ public static class TestConfig
         return reader.ReadToEnd();
     }
 
-    public class SmokeTestConfig(string prefix)
+    public class SmokeTestConfig
     {
-        public string MeasureBundleLocation => Environment.GetEnvironmentVariable($"{prefix}_MEASURE_BUNDLE_PATH") ?? "resource://LantanaGroup.Link.Tests.BackendE2ETests.measures.NHSNAcuteCareHospitalMonthlyInitialPopulation.json";
-        public string StartDate => Environment.GetEnvironmentVariable($"{prefix}_START_DATE") ?? "2023-01-01T00:00:00Z";
-        public string EndDate => Environment.GetEnvironmentVariable($"{prefix}_END_DATE") ?? "2023-12-31T23:59:59Z";
-        public List<string> PatientIds = Environment.GetEnvironmentVariable($"{prefix}_PATIENT_IDS")?.Split(',')?.ToList() ?? ["207727"];
-        public bool RemoveFacilityConfig = bool.Parse(Environment.GetEnvironmentVariable($"{prefix}_REMOVE_FACILITY_CONFIG") ?? "true");
-        public bool RemoveReport = Environment.GetEnvironmentVariable($"{prefix}_REMOVE_REPORT")?.ToLower() == "true";
+        private readonly string _prefix;
+
+        public SmokeTestConfig(
+            string prefix,
+            List<string>? defaultPatientIds = null,
+            int defaultPollingIntervalSeconds = 3,
+            int defaultMaxRetryCount = 60,
+            int defaultLokiScrapeWindowMinutes = 5)
+        {
+            _prefix = prefix;
+            MeasureBundleLocation = Environment.GetEnvironmentVariable($"{prefix}_MEASURE_BUNDLE_PATH") ?? "resource://LantanaGroup.Link.Tests.BackendE2ETests.measures.NHSNAcuteCareHospitalMonthlyInitialPopulation.json";
+            StartDate = Environment.GetEnvironmentVariable($"{prefix}_START_DATE") ?? "2023-01-01T00:00:00Z";
+            EndDate = Environment.GetEnvironmentVariable($"{prefix}_END_DATE") ?? "2023-12-31T23:59:59Z";
+            PatientIds = Environment.GetEnvironmentVariable($"{prefix}_PATIENT_IDS")?.Split(',')?.ToList() ?? defaultPatientIds ?? ["207727"];
+            RemoveFacilityConfig = bool.Parse(Environment.GetEnvironmentVariable($"{prefix}_REMOVE_FACILITY_CONFIG") ?? "true");
+            RemoveReport = Environment.GetEnvironmentVariable($"{prefix}_REMOVE_REPORT")?.ToLower() == "true";
+            PollingIntervalSeconds = int.Parse(Environment.GetEnvironmentVariable($"{prefix}_POLLING_INTERVAL_SECONDS") ?? defaultPollingIntervalSeconds.ToString());
+            MaxRetryCount = int.Parse(Environment.GetEnvironmentVariable($"{prefix}_MAX_RETRY_COUNT") ?? defaultMaxRetryCount.ToString());
+            DownloadFileName = Environment.GetEnvironmentVariable($"{prefix}_DOWNLOAD_FILENAME") ?? $"{prefix.ToLower().Replace('_', '-')}-submission.zip";
+            LokiScrapeWindowMinutes = int.Parse(Environment.GetEnvironmentVariable($"{prefix}_LOKI_SCRAPE_WINDOW_MINUTES") ?? defaultLokiScrapeWindowMinutes.ToString());
+        }
+
+        public string MeasureBundleLocation { get; }
+        public string StartDate { get; }
+        public string EndDate { get; }
+        public List<string> PatientIds { get; set; }
+        public bool RemoveFacilityConfig { get; }
+        public bool RemoveReport { get; }
+        public int PollingIntervalSeconds { get; }
+        public int MaxRetryCount { get; }
+        public string DownloadFileName { get; }
+        public int LokiScrapeWindowMinutes { get; }
+
+        /// <summary>
+        /// The maximum wall-clock time the polling loop will run,
+        /// computed from <see cref="MaxRetryCount"/> × <see cref="PollingIntervalSeconds"/>.
+        /// </summary>
+        public TimeSpan MaxPollingDuration => TimeSpan.FromSeconds(MaxRetryCount * PollingIntervalSeconds);
+
+        /// <summary>
+        /// The Loki scrape window as a <see cref="TimeSpan"/>.
+        /// </summary>
+        public TimeSpan LokiScrapeWindow => TimeSpan.FromMinutes(LokiScrapeWindowMinutes);
     }
 
     public class BasicAuthConfig(string prefix)

@@ -10,6 +10,26 @@ public class FacilityApiClient(RestClient client, ITestOutputHelper output)
     public async Task<RestResponse> CreateAsync(string facilityId, string? measure)
     {
         output.WriteLine("Creating facility...");
+
+        var response = await SendCreateRequestAsync(facilityId, measure);
+
+        // If the facility already exists (e.g., leftover from a previous failed run),
+        // delete it and retry so the test can proceed cleanly.
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            output.WriteLine($"Facility creation returned BadRequest — attempting cleanup and retry. Response: {response.Content}");
+            await DeleteAsync(facilityId);
+            response = await SendCreateRequestAsync(facilityId, measure);
+        }
+
+        Assert.True(response.StatusCode == HttpStatusCode.Created,
+            $"Expected HTTP 201 Created for facility creation but got {response.StatusCode}: {response.Content}");
+
+        return response;
+    }
+
+    private async Task<RestResponse> SendCreateRequestAsync(string facilityId, string? measure)
+    {
         var request = new RestRequest("/Facility", Method.Post);
         request.AddHeader("Content-Type", "application/json");
 
@@ -27,13 +47,7 @@ public class FacilityApiClient(RestClient client, ITestOutputHelper output)
         };
 
         request.AddJsonBody(body);
-
-        var response = await client.ExecuteAsync(request);
-
-        Assert.True(response.StatusCode == HttpStatusCode.Created,
-            $"Expected HTTP 201 Created for facility creation but got {response.StatusCode}");
-
-        return response;
+        return await client.ExecuteAsync(request);
     }
 
     public async Task DeleteAsync(string facilityId)

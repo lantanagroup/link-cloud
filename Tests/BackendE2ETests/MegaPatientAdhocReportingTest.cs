@@ -7,12 +7,26 @@ using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Tests.E2ETests;
 
-public sealed class AdhocReportingSmokeTest : IAsyncLifetime
+/// <summary>
+/// Stress/volume test that generates 5 synthetic patients, each with over 10,000
+/// FHIR resources, and runs them through the full ad-hoc reporting pipeline.
+///
+/// This test validates that the system can handle large patient bundles end-to-end:
+/// data acquisition, normalization, measure evaluation, report generation,
+/// submission, and database/validation state.
+///
+/// Configuration is driven by <see cref="TestConfig.MegaPatientTestConfig"/>
+/// (env prefix: MEGA_PATIENT_TEST_*). Patient IDs are auto-generated unless
+/// overridden via MEGA_PATIENT_TEST_PATIENT_IDS.
+///
+/// Polling defaults: 300 retries x 5s = 25 minutes of polling.
+/// </summary>
+public sealed class MegaPatientAdhocReportingTest : IAsyncLifetime
 {
-    private const string FacilityId = "SmokeTestFacility";
+    private const string FacilityId = "MegaPatientTestFacility";
 
     private static readonly FhirDataLoader FhirDataLoader = new(TestConfig.ExternalFhirServerBase);
-    private static readonly TestConfig.SmokeTestConfig Config = TestConfig.AdhocReportingSmokeTestConfig;
+    private static readonly TestConfig.SmokeTestConfig Config = TestConfig.MegaPatientTestConfig;
 
     private readonly DualOutputHelper _output;
     private readonly RestClient _adminBffClient = AdminBffClientFactory.Create();
@@ -24,7 +38,7 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
     private ReportApiClient ReportApi => new(_adminBffClient, _output, _lokiScraper, Config);
     private ValidationApiClient ValidationApi => new(_adminBffClient, _output, _lokiScraper);
 
-    public AdhocReportingSmokeTest()
+    public MegaPatientAdhocReportingTest()
     {
         _output = new DualOutputHelper();
         _lokiScraper = new LokiScraper(_output);
@@ -32,10 +46,24 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        // Wait for FHIR server before uploading bundles
+        // Generate synthetic patients and load them onto the FHIR server
+        var (patientIds, bundles) = FhirBundleGenerator.Generate(_output);
+
+        // If config has no patient IDs set (the default), use generated ones
+        if (Config.PatientIds.Count == 0)
+        {
+            Config.PatientIds = patientIds;
+        }
+
+        _output.WriteLine($"Patient IDs for test: [{string.Join(", ", Config.PatientIds)}]");
+
+        // Wait for FHIR server before uploading large volume of bundles
         await FhirDataLoader.WaitForServerAsync(_output);
 
-        // Load FHIR test data onto the external FHIR server
+        // Load the generated bundles
+        await FhirDataLoader.LoadTransactionBundlesFromJsonAsync(_output, bundles);
+
+        // Also load any standard embedded bundles (shared test infrastructure like Lists)
         await FhirDataLoader.LoadEmbeddedTransactionBundles(_output);
 
         // Initialize validation artifacts and categories (with retry)
@@ -64,8 +92,8 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
     }
 
     [Fact]
-    [Trait("Category", "AdhocReportingSmokeTest")]
-    public async Task ExecuteSmokeTest()
+    [Trait("Category", "MegaPatientTest")]
+    public async Task ExecuteMegaPatientTest()
     {
         // Step 1: Load measure definition into measureeval and validation
         var measureLoader = new MeasureLoader(_adminBffClient, _output, Config);
@@ -73,6 +101,10 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
 
         var measureId = measureLoader.MeasureId
             ?? throw new InvalidOperationException("MeasureLoader did not produce a MeasureId");
+
+        _output.WriteLine($"MeasureId: {measureId}");
+        _output.WriteLine($"Patients : {Config.PatientIds.Count}");
+        _output.WriteLine($"Polling  : {Config.MaxRetryCount} retries x {Config.PollingIntervalSeconds}s = {Config.MaxPollingDuration.TotalSeconds:F0}s max");
 
         // Step 2: Create facility
         await FacilityApi.CreateAsync(FacilityId, measureId);
@@ -109,7 +141,6 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
         await _lokiScraper.ScrapeServiceHistoryAsync(LokiScraper.Components.Report, Config.LokiScrapeWindow, "DIAG REPORT");
 
         // Always write a snapshot before any assertions can kill the test.
-        // This guarantees the full pipeline state is in the output for debugging.
         await PipelineSnapshot.WriteFullSnapshotAsync(_output, FacilityId, reportId);
 
         Assert.True(reportSubmitted,
@@ -130,8 +161,7 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
 
         _output.WriteLine("Done generating and validating report.");
 
-        // Step 9-10: Strict database validation (snapshot is already captured above
-        // even if an assertion fails here)
+        // Step 9-10: Strict database validation
         var reportDbValidator = new ReportDatabaseValidator(_output);
         await reportDbValidator.ValidateAllAsync(
             FacilityId,
@@ -152,7 +182,7 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
         var tenantValidator = new TenantDatabaseValidator(_output);
         await tenantValidator.ValidateAllAsync(FacilityId, measureId);
 
-        // Step 11: Validation results (API-based) -- explains why FailedValidation occurs
+        // Step 11: Validation results (API-based)
         var validationResultsValidator = new ValidationResultsValidator(_adminBffClient, _output);
         await validationResultsValidator.ValidateAllAsync(
             FacilityId,
