@@ -8,6 +8,7 @@ using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -57,7 +58,7 @@ public class PayloadSubmittedListener(
                     await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                     {
                         await ProcessMessageAsync(result, consumeCancellationToken);
-                        consumer.Commit(result);
+                        consumer.SafeCommit(result, logger);
                     }, cancellationToken);
                 }
                 catch (ConsumeException ex)
@@ -76,12 +77,11 @@ public class PayloadSubmittedListener(
                     }
 
                     var offset = ex.ConsumerRecord?.TopicPartitionOffset;
-                    consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
+                    consumer.SafeCommit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset }, logger);
                 }
                 catch (Exception ex)
                 {
                     exceptionLogger.Handle(ex, "Error encountered in PayloadSubmittedListener", LogLevel.Error);
-                    consumer.Commit();
                 }
             }
         }
