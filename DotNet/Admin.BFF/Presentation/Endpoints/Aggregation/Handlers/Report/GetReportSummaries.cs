@@ -18,14 +18,15 @@ public static class GetReportSummaries
         string? reportType = null,
         DateTime? reportStartDate = null,
         DateTime? reportEndDate = null,
-        ScheduleStatus? status = null,
+        ScheduleStatus[]? status = null,
         bool? endOfReportPeriodJobHasRun = null,
         bool includeDeleted = false,
         string? sortBy = null,
         SortOrder? sortOrder = null,
         int pageNumber = 1,
         int pageSize = 10,
-        DateOnly? createDate = null
+        DateOnly? createDate = null,
+        string? reportScheduleId = null
         )
     {
         try
@@ -44,14 +45,15 @@ public static class GetReportSummaries
                 reportType,
                 reportStartDate,
                 reportEndDate,
-                status,
+                statuses: status,
                 endOfReportPeriodJobHasRun,
                 includeDeleted,
                 sortBy,
                 sortOrder,
                 pageNumber,
                 pageSize,
-                createDate
+                createDate,
+                reportScheduleId
                 );
 
             if (!response.IsSuccessStatusCode)
