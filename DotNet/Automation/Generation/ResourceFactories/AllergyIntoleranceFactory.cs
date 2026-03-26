@@ -7,12 +7,13 @@ public static class AllergyIntoleranceFactory
 {
     /// <summary>Generate an AllergyIntolerance from the pool using a seed index.</summary>
     public static AllergyIntolerance Generate(
-        string id, string patientId, DateTime recorded, int seed)
+        string id, string patientId, DateTime recorded, int seed, string recorderPractitionerId)
     {
         var v = FhirGenerationCodes.Allergies[seed % FhirGenerationCodes.Allergies.Length];
         return Create(id, patientId, recorded, seed, v.Code, v.Display,
                       v.ManifestationCode, v.ManifestationDisplay,
-                      v.Severity, v.ExposureRoute);
+                      v.Severity, v.ExposureRoute,
+                      recorderPractitionerId);
     }
 
     /// <summary>Create an AllergyIntolerance with caller-supplied substance values.</summary>
@@ -26,7 +27,8 @@ public static class AllergyIntoleranceFactory
         string manifestationCode,
         string manifestationDisplay,
         string severityStr,
-        string exposureRouteCode)
+        string exposureRouteCode,
+        string recorderPractitionerId)
     {
         var categories    = new[] { AllergyIntolerance.AllergyIntoleranceCategory.Medication, AllergyIntolerance.AllergyIntoleranceCategory.Food, AllergyIntolerance.AllergyIntoleranceCategory.Environment, AllergyIntolerance.AllergyIntoleranceCategory.Biologic };
         var criticalities = new[] { AllergyIntolerance.AllergyIntoleranceCriticality.Low, AllergyIntolerance.AllergyIntoleranceCriticality.High, AllergyIntolerance.AllergyIntoleranceCriticality.UnableToAssess };
@@ -48,7 +50,7 @@ public static class AllergyIntoleranceFactory
             Code                = new CodeableConcept { Coding = [new Coding("http://snomed.info/sct", snomedCode, display)], Text = display },
             Patient             = Ref($"Patient/{patientId}"),
             RecordedDateElement = new FhirDateTime(recorded),
-            Recorder            = Ref($"Organization/{FhirBundleGenerator.HospitalOrgId}"),
+            Recorder            = Ref($"Practitioner/{recorderPractitionerId}", "Documenting Practitioner"),
             Reaction =
             [
                 new AllergyIntolerance.ReactionComponent

@@ -164,7 +164,7 @@ public static class FhirBundleGenerator
                         "Coverage"                 => CoverageFactory.Generate(resourceId, patientId, encStart, encEnd, seed),
                         "Specimen"                 => SpecimenFactory.Generate(resourceId, patientId, effectiveDate, seed, specimenIds, practId),
                         "Medication"               => MedicationFactory.Generate(resourceId, seed, medicationIds),
-                        "AllergyIntolerance"       => AllergyIntoleranceFactory.Generate(resourceId, patientId, encStart, seed),
+                        "AllergyIntolerance"       => AllergyIntoleranceFactory.Generate(resourceId, patientId, encStart, seed, practId),
                         "Immunization"             => ImmunizationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalLocationId),
                         "ImagingStudy"             => ImagingStudyFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalLocationId),
                         "CareTeam"                 => CareTeamFactory.Generate(resourceId, patientId, encounterId, attendingPractId, effectiveDate, HospitalOrgId),
