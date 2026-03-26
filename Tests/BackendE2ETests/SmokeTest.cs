@@ -7,7 +7,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Tests.E2ETests;
 
-public sealed class AdhocReportingSmokeTest : IAsyncLifetime
+public sealed class SmokeTest : IAsyncLifetime
 {
     private const string FacilityId = "SmokeTestFacility";
 
@@ -24,7 +24,7 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
     private ReportApiClient ReportApi => new(_adminBffClient, _output, _lokiScraper, Config);
     private ValidationApiClient ValidationApi => new(_adminBffClient, _output, _lokiScraper);
 
-    public AdhocReportingSmokeTest()
+    public SmokeTest()
     {
         _output = new DualOutputHelper();
         _lokiScraper = new LokiScraper(_output);
@@ -64,7 +64,7 @@ public sealed class AdhocReportingSmokeTest : IAsyncLifetime
     }
 
     [Fact]
-    [Trait("Category", "AdhocReportingSmokeTest")]
+    [Trait("Category", "SmokeTest")]
     public async Task ExecuteSmokeTest()
     {
         // Step 1: Load measure definition into measureeval and validation
