@@ -70,14 +70,15 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             string? reportType = null,
             DateTime? reportStartDate = null,
             DateTime? reportEndDate = null,
-            ScheduleStatus? status = null,
+            ScheduleStatus[]? statuses = null,
             bool? endOfReportPeriodJobHasRun = null,
             bool includeDeleted = false,
             string? sortBy = null,
             SortOrder? sortOrder = null,
             int pageNumber = 1,
             int pageSize = 10,
-            DateOnly? createDate = null
+            DateOnly? createDate = null,
+            string? reportScheduleId = null
             )
         {
             // HTTP GET
@@ -125,10 +126,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 queryParams["reportEndDate"] = reportEndDate.Value.ToString("o");
             }
 
-            if (status.HasValue)
-            {
-                queryParams["status"] = status.Value.ToString();
-            }
+            // status handled separately below (supports multiple values)
 
             if (endOfReportPeriodJobHasRun.HasValue)
             {
@@ -155,7 +153,17 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 queryParams["createDate"] = createDate.Value.ToString("yyyy-MM-dd");
             }
 
+            if (!string.IsNullOrWhiteSpace(reportScheduleId))
+            {
+                queryParams["id"] = reportScheduleId;
+            }
+
             var relativeUrl = QueryHelpers.AddQueryString("api/schedules/search", queryParams);
+            if (statuses != null && statuses.Length > 0)
+            {
+                foreach (var s in statuses)
+                    relativeUrl = QueryHelpers.AddQueryString(relativeUrl, "status", s.ToString());
+            }
 
             var response = await _client.GetAsync(relativeUrl, cancellationToken);
 
