@@ -44,16 +44,16 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Generate Link Admin JWT");
 
-            if(string.IsNullOrEmpty(_linkTokenServiceConfig.Value.Authority))
+            if (string.IsNullOrEmpty(_linkTokenServiceConfig.Value.Authority))
             {
                 throw new ArgumentNullException(nameof(_linkTokenServiceConfig.Value.Authority));
             }
-            
+
             try
             {
                 string bearerKey = string.Empty;
                 var protector = _dataProtectionProvider.CreateProtector(LinkAdminConstants.LinkDataProtectors.LinkSigningKey);
-                byte[] encodedKey = [];                
+                byte[] encodedKey = [];
 
                 if (_linkTokenServiceConfig.Value.SigningKey is null)
                 {
@@ -99,17 +99,17 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                         {
                             encodedKey = Encoding.UTF8.GetBytes(bearerKey);
                         }
-                    }                   
+                    }
                 }
                 else
-                { 
+                {
                     bearerKey = _linkTokenServiceConfig.Value.SigningKey;
                     encodedKey = Encoding.UTF8.GetBytes(bearerKey);
-                }          
+                }
 
-                var credentials = new SigningCredentials(new SymmetricSecurityKey(encodedKey), SecurityAlgorithms.HmacSha512);                
+                var credentials = new SigningCredentials(new SymmetricSecurityKey(encodedKey), SecurityAlgorithms.HmacSha512);
 
-                var token = new JwtSecurityToken(                                    
+                var token = new JwtSecurityToken(
                     issuer: _linkTokenServiceConfig.Value.Authority,
                     audience: LinkAuthorizationConstants.LinkBearerService.LinkBearerAudience,
                     claims: user.Claims,
@@ -117,7 +117,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                     signingCredentials: credentials
                 );
 
-                var jwt = new JwtSecurityTokenHandler().WriteToken(token);                
+                var jwt = new JwtSecurityTokenHandler().WriteToken(token);
 
                 var userId = user.Claims.First(c => c.Type == "sub").Value;
                 _logger.LogLinkAdminTokenGenerated(DateTime.UtcNow, userId);
@@ -142,7 +142,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                 Activity.Current?.AddException(ex);
                 throw;
             }
-            
+
         }
     }
 }

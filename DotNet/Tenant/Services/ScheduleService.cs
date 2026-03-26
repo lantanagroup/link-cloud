@@ -37,7 +37,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-            _scheduler =  await _schedulerFactory.GetScheduler(cancellationToken);
+            _scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
 
             using (var scope = _scopeFactory.CreateScope())
             {
@@ -160,7 +160,7 @@ namespace LantanaGroup.Link.Tenant.Services
         {
             string jobName = $"{facility.FacilityId}-{frequency}";
             JobKey jobKey = new JobKey(jobName, nameof(KafkaTopic.ReportScheduled));
-            
+
             var job = await _scheduler!.GetJobDetail(jobKey, cancellationToken);
 
             if (job == null)
@@ -255,7 +255,7 @@ namespace LantanaGroup.Link.Tenant.Services
                     IReadOnlyCollection<ITrigger> triggers = await _scheduler.GetTriggersOfJob(jobKey, cancellationToken);
                     foreach (ITrigger trigger in triggers)
                     {
-                        _logger.LogInformation("Job details - Group: {Group}, JobName: {JobName}, Description: {Description}, TriggerName: {TriggerName}, TriggerGroup: {TriggerGroup}, TriggerType: {TriggerType}, State: {State}", 
+                        _logger.LogInformation("Job details - Group: {Group}, JobName: {JobName}, Description: {Description}, TriggerName: {TriggerName}, TriggerGroup: {TriggerGroup}, TriggerType: {TriggerType}, State: {State}",
                             group, jobKey.Name, detail.Description, trigger.Key.Name, trigger.Key.Group, trigger.GetType().Name, await _scheduler.GetTriggerState(trigger.Key, cancellationToken));
                         DateTimeOffset? nextFireTime = trigger.GetNextFireTimeUtc();
                         if (nextFireTime.HasValue)

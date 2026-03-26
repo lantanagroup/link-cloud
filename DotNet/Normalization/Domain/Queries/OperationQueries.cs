@@ -18,7 +18,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
     {
         private readonly IDatabase _database;
         private readonly NormalizationDbContext _dbContext;
-        public OperationQueries(IDatabase database, NormalizationDbContext dbContext) 
+        public OperationQueries(IDatabase database, NormalizationDbContext dbContext)
         {
             _database = database;
             _dbContext = dbContext;
@@ -99,7 +99,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                             })).ToList()
                         };
 
-            if(!string.IsNullOrEmpty(model.FacilityId) && model.VendorId != null)
+            if (!string.IsNullOrEmpty(model.FacilityId) && model.VendorId != null)
             {
                 query = query.Where(o => o.FacilityId == model.FacilityId || o.VendorPresets.Any(vp => vp.VendorVersion.VendorId == model.VendorId));
             }
@@ -127,7 +127,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 query = query.Where(q => !q.IsDisabled);
             }
 
-            if(model.OperationType.HasValue)
+            if (model.OperationType.HasValue)
             {
                 var opType = model.OperationType.ToString();
                 query = query.Where(q => q.OperationType == opType);
@@ -142,7 +142,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 SortOrder.Descending => query.OrderByDescending(SetSortBy<OperationModel>(sortBy)),
                 _ => query
             };
-            
+
             var pageNumber = model.PageNumber ?? 1;
             var pageSize = model.PageSize ?? 10;
 
@@ -152,7 +152,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
-            
+
             return new PagedConfigModel<OperationModel>()
             {
                 Records = records,

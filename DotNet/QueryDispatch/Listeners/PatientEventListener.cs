@@ -61,14 +61,16 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
             return Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
         }
 
-        private async void StartConsumerLoop(CancellationToken cancellationToken) {
+        private async void StartConsumerLoop(CancellationToken cancellationToken)
+        {
             var config = new ConsumerConfig()
             {
                 GroupId = QueryDispatchConstants.ServiceName,
                 EnableAutoCommit = false
             };
 
-            using (var _patientEventConsumer = _kafkaConsumerFactory.CreateConsumer(config)) {
+            using (var _patientEventConsumer = _kafkaConsumerFactory.CreateConsumer(config))
+            {
                 try
                 {
                     _patientEventConsumer.Subscribe(nameof(KafkaTopic.PatientEvent));
@@ -97,7 +99,8 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     PatientEventValue value = consumeResult.Message.Value;
 
-                                    if (value.EventType != PatientEvents.Discharge.ToString()) {
+                                    if (value.EventType != PatientEvents.Discharge.ToString())
+                                    {
                                         _logger.LogInformation("Patient {PatientId} has event type of {EventType}. Ignoring.", HtmlInputSanitizer.Sanitize(value.PatientId), HtmlInputSanitizer.Sanitize(value.EventType));
                                         _patientEventConsumer.Commit(consumeResult);
                                         return;
@@ -117,18 +120,18 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     _logger.LogInformation("Consumed Patient Event for: Facility '{FacilityId}'. PatientId '{PatientId}' with a event type of {EventType}", HtmlInputSanitizer.Sanitize(consumeResult.Message.Key), HtmlInputSanitizer.Sanitize(value.PatientId), HtmlInputSanitizer.Sanitize(value.EventType));
 
                                     //ScheduledReportEntity scheduledReport = getScheduledReportQuery.Execute(consumeResult.Message.Key);
-                                    var scheduledReport  =  await scheduledReportRepository.FirstOrDefaultAsync(x => x.FacilityId == consumeResult.Message.Key);
+                                    var scheduledReport = await scheduledReportRepository.FirstOrDefaultAsync(x => x.FacilityId == consumeResult.Message.Key);
 
                                     if (scheduledReport == null)
                                     {
-                                       throw new TransientException("PatientEventListener: scheduleReport is null.");
+                                        throw new TransientException("PatientEventListener: scheduleReport is null.");
                                     }
 
                                     var now = DateTime.UtcNow;
                                     scheduledReport.ReportPeriods = scheduledReport.ReportPeriods.Where(r => r.StartDate <= now && r.EndDate >= now).ToList();
 
                                     // QueryDispatchConfigurationEntity dispatchSchedule = await queryDispatchConfigurationQuery.Execute(consumeResult.Message.Key);
-                                    QueryDispatchConfigurationEntity dispatchSchedule= await queryDispatchConfigurationRepo.FirstOrDefaultAsync(x => x.FacilityId == consumeResult.Message.Key);
+                                    QueryDispatchConfigurationEntity dispatchSchedule = await queryDispatchConfigurationRepo.FirstOrDefaultAsync(x => x.FacilityId == consumeResult.Message.Key);
 
                                     if (dispatchSchedule == null)
                                     {
@@ -198,7 +201,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                             _consumeResultDeadLetterExceptionHandler.HandleConsumeException(e, facilityId);
 
                             _patientEventConsumer.Commit();
-                        }                        
+                        }
                     }
                     _patientEventConsumer.Close();
                     _patientEventConsumer.Dispose();
@@ -215,12 +218,12 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
         private void ProduceAuditEvent(AuditEventMessage auditValue, Headers headers)
         {
 
-                _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
-                {
-                    Value = auditValue,
-                    Headers = headers
-                });
-            
+            _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
+            {
+                Value = auditValue,
+                Headers = headers
+            });
+
         }
     }
 }

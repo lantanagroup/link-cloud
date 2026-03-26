@@ -43,14 +43,14 @@ public interface ISftpAcquisitionLogQueries
 }
 
 public class SftpAcquisitionLogQueries(
-    ILogger<SftpAcquisitionLogQueries> logger, 
+    ILogger<SftpAcquisitionLogQueries> logger,
     DataAcquisitionDbContext dbContext) : ISftpAcquisitionLogQueries
 {
     public async Task<SftpAcquisitionLog?> GetByIdAsync(long id, CancellationToken cancellationToken)
     {
         using var activity = Activity.Current?.Source.StartActivity();
         activity?.SetTag(DiagnosticNames.EntityId, id);
-        
+
         try
         {
             var sftpLog = await dbContext.SftpAcquisitionLogs.FirstOrDefaultAsync(x => x.Id == id, cancellationToken: cancellationToken);
@@ -62,14 +62,14 @@ public class SftpAcquisitionLogQueries(
             logger.LogError(ex, "Error retrieving SFTP Acquisition Log with Id: {Id}", id);
             throw;
         }
-        
+
     }
-    
+
     public async Task<SftpAcquisitionLog?> GetByExternalIdAsync(Guid id, CancellationToken cancellationToken)
     {
         using var activity = Activity.Current?.Source.StartActivity();
         activity?.SetTag(DiagnosticNames.EntityId, id);
-        
+
         try
         {
             var sftpLog = await dbContext.SftpAcquisitionLogs.FirstOrDefaultAsync(x => x.ExternalId == id, cancellationToken: cancellationToken);
@@ -81,7 +81,7 @@ public class SftpAcquisitionLogQueries(
             logger.LogError(ex, "Error retrieving SFTP Acquisition Log with Id: {Id}", id);
             throw;
         }
-        
+
     }
 
     public async Task<PagedSftpAcquisitionLogModel> SearchAsync(SftpLogSearchParameters queryParameters, CancellationToken cancellationToken)
@@ -95,17 +95,17 @@ public class SftpAcquisitionLogQueries(
             var query = dbContext.SftpAcquisitionLogs
                 .AsNoTracking()
                 .AsQueryable();
-            
-            if(!string.IsNullOrEmpty(queryParameters.FacilityId))
+
+            if (!string.IsNullOrEmpty(queryParameters.FacilityId))
                 query = query.Where(x => x.FacilityId == queryParameters.FacilityId);
 
-            if(queryParameters.Status.HasValue)
+            if (queryParameters.Status.HasValue)
                 query = query.Where(x => x.Status == queryParameters.Status.Value);
 
-            if(queryParameters.AcquisitionType.HasValue)
+            if (queryParameters.AcquisitionType.HasValue)
                 query = query.Where(x => x.AcquisitionType == queryParameters.AcquisitionType.Value);
 
-            if(queryParameters.SubType.HasValue)
+            if (queryParameters.SubType.HasValue)
                 query = query.Where(x => x.SubType == queryParameters.SubType.Value);
 
             query = queryParameters.SortOrder switch
@@ -114,9 +114,9 @@ public class SftpAcquisitionLogQueries(
                 SortOrder.Descending => query.OrderByDescending(SetSortBy<SftpAcquisitionLog>(queryParameters.SortBy)),
                 _ => query
             };
-                
+
             var total = await query.CountAsync(cancellationToken);
-            
+
             var logs = await query
                 .Skip((queryParameters.PageNumber - 1) * queryParameters.PageSize)
                 .Take(queryParameters.PageSize)
@@ -141,7 +141,7 @@ public class SftpAcquisitionLogQueries(
             throw;
         }
     }
-    
+
     public async Task<List<SftpAcquisitionLog>> GetPendingLogsAsync(
         SftpAcquisitionType acquisitionType,
         int limit,

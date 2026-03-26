@@ -70,7 +70,7 @@ public static class DistributedLockSettingsExtensions
             throw new ArgumentNullException(nameof(distributedLockSettings), "DistributedLockSettings section is missing in the configuration.");
         }
 
-        distributedLockSettings =  distributedLockSettings.BuildDistributedLockSettings(services, configuration, connectionStringKey);
+        distributedLockSettings = distributedLockSettings.BuildDistributedLockSettings(services, configuration, connectionStringKey);
 
         if (string.IsNullOrWhiteSpace(distributedLockSettings.ConnectionString))
         {

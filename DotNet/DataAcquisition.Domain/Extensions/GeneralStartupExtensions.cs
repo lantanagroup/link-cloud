@@ -72,7 +72,7 @@ public static class GeneralStartupExtensions
         //Add Quartz scheduler with SQL persistence
         var connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
         builder.Services.RegisterQuartzDatabase(connectionString);
-        
+
         builder.RegisterMonitoring();
         builder.Services.RegisterConfigs(builder.Configuration);
         builder.RegisterEntityFramework();
@@ -310,7 +310,7 @@ public static class GeneralStartupExtensions
         //Factories - Producer
         var kafkaConnection = configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>() ?? throw new Exception("Missing Kafka Connection Settings");
         var producerConfig = new ProducerConfig { CompressionType = CompressionType.Zstd };
-        
+
         services.RegisterKafkaProducer<string, object>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, string>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, DataAcquisitionRequested>(kafkaConnection, producerConfig);
@@ -352,7 +352,8 @@ public static class GeneralStartupExtensions
 
     public static void RegisterProblemDetails(this IServiceCollection services, IHostingEnvironment environment)
     {
-        services.AddProblemDetails(options => {
+        services.AddProblemDetails(options =>
+        {
             options.CustomizeProblemDetails = ctx =>
             {
                 if (string.IsNullOrEmpty(ctx.ProblemDetails.Detail))

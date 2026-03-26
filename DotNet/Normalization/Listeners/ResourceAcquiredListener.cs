@@ -100,7 +100,7 @@ public class ResourceAcquiredListener : BackgroundService
         {
             ConsumeResult<ResourceKey, ResourceAcquiredMessage>? message = default;
             try
-            {                
+            {
                 await kafkaConsumer.ConsumeWithInstrumentation(async (result, CancellationToken) =>
                 {
                     try
@@ -113,9 +113,9 @@ public class ResourceAcquiredListener : BackgroundService
                         }
 
                         if (
-                        message.Message.Value == null 
-                            || ((message.Message.Value.Resource == null 
-                                || string.IsNullOrWhiteSpace(message.Message.Value.QueryType) 
+                        message.Message.Value == null
+                            || ((message.Message.Value.Resource == null
+                                || string.IsNullOrWhiteSpace(message.Message.Value.QueryType)
                                 || message.Message.Value.ScheduledReports == null)
                                && !message.Message.Value.AcquisitionComplete)
                         )
@@ -169,8 +169,8 @@ public class ResourceAcquiredListener : BackgroundService
                             ResourceType = resource.TypeName,
                         });
 
-                        if(sequences != null && sequences.Count > 0)
-                        { 
+                        if (sequences != null && sequences.Count > 0)
+                        {
                             sequences.Sort((a, b) => a.Sequence.CompareTo(b.Sequence));
 
                             foreach (var sequence in sequences)
@@ -267,12 +267,12 @@ public class ResourceAcquiredListener : BackgroundService
                 }
                 else
                 {
-                    kafkaConsumer.Commit( new List<TopicPartitionOffset> {
+                    kafkaConsumer.Commit(new List<TopicPartitionOffset> {
                         offset
                     });
                 }
                 continue;
-            }            
+            }
         }
     }
 

@@ -18,14 +18,14 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers
 
                 return Results.Ok(roles);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.AddException(ex);
                 logger.LogFindRolesException(ex.Message);
                 throw;
             }
-            
+
         }
 
     }
