@@ -172,11 +172,9 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             ""FacilityId"": """ + TestConfig.SingleMeasureAdHocFacility + @""",
             ""FhirServerBaseUrl"": """ + TestConfig.InternalFhirServerBase + @""",
             ""Authentication"": null,
-            ""QueryPlanIds"": [
-            """ + TestConfig.MeasureAch + @"""
-                ],
             ""MaxConcurrentRequests"": """ + TestConfig.FhirQueryConfig.MaxConcurrentRequests + @""",
             ""MaxRetries"": 3,
+            ""QueryLag"": """ + TestConfig.FhirQueryConfig.QueryLag + @""",
             ""TimeZone"": ""America/Chicago""
             }";
             request.AddStringBody(body, DataFormat.Json);

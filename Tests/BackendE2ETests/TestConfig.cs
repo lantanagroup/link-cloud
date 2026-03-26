@@ -32,11 +32,12 @@ public static class TestConfig
     public const string singleMeasureAdHocTestPatient_Nine = "patient-9i6Xi6uG2WjuGxHTmpbin4ct2ZwevRwTWhIkJkRjVFZ4C.ndjson";
     public const string singleMeasureAdHocTestPatient_Ten = "patient-5ieWogP3EGV24Kus8QsGh6rpmUaJBP5Hl0nCSJJXmh6TI.ndjson";
 
-    public static class FhirQueryConfig
+        public static class FhirQueryConfig
     {
         public const int MaxConcurrentRequests = 8;
         public static readonly TimeSpan MinAcquisitionPullTime = TimeSpan.FromHours(1);
         public static readonly TimeSpan MaxAcquisitionPullTime = TimeSpan.FromHours(24);
+        public static readonly string QueryLag = "PT0S";
         public static readonly string TimeZone = "America/New_York";
     }
 
