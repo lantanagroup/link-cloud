@@ -26,7 +26,7 @@
         public const string RecipientCount = "recipient.count";
         public const string ReportType = "report.type";
         public const string PeriodStart = "period.start";
-        public const string PeriodEnd = "period.end";        
+        public const string PeriodEnd = "period.end";
         public const string UserId = "user.id";
         public const string UserName = "user.name";
         public const string Email = "email";

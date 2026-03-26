@@ -26,8 +26,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Filters
                     return await next(context);
                 }
 
-                return Results.BadRequest(validationResult.Errors.ToResponse());                
-            }        
+                return Results.BadRequest(validationResult.Errors.ToResponse());
+            }
 
             return await next(context);
         }

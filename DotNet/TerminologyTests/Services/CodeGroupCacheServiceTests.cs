@@ -23,13 +23,13 @@ public class CodeGroupCacheServiceTests
         _loggerMock = new Mock<ILogger<CodeGroupCacheService>>();
         _config = new TerminologyConfig { Path = "/test/path" };
     }
-    
+
     [Fact]
     public async Task LoadCache_ShouldAttemptToLoadFilesFromEachDirectory()
     {
         var mockCache = new Mock<IMemoryCache>();
         var mockConfig = new Mock<IOptions<TerminologyConfig>>();
-        
+
         mockConfig.Setup(x => x.Value).Returns(_config);
 
         // Create test service with mocked file system methods
@@ -40,7 +40,7 @@ public class CodeGroupCacheServiceTests
         {
             CallBase = true
         };
-        
+
         mockService
             .Setup(s => s.DirectoryExists(It.IsAny<string>()))
             .Returns(true);
@@ -70,7 +70,7 @@ public class CodeGroupCacheServiceTests
         mockService
             .Setup(s => s.ReadAllTextAsync("test.json"))
             .ReturnsAsync("{ \"resourceType\": \"ValueSet\", \"id\": \"valueset\" }");
-        
+
         mockService
             .Setup(s => s.ReadAllTextAsync("test.csv"))
             .ReturnsAsync("system,code,display\r\n" +
@@ -114,7 +114,7 @@ public class CodeGroupCacheServiceTests
     {
         var mockCache = new Mock<IMemoryCache>();
         var mockConfig = new Mock<IOptions<TerminologyConfig>>();
-        
+
         mockConfig.Setup(x => x.Value).Returns(_config);
 
         // Create test service with mocked file system methods
@@ -125,7 +125,7 @@ public class CodeGroupCacheServiceTests
         {
             CallBase = true
         };
-        
+
         // Arrange
         var codeGroup = new CodeGroup
         {
@@ -142,7 +142,7 @@ public class CodeGroupCacheServiceTests
         using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
 
         // Act & Assert
-        var ex = Assert.Throws<InvalidOperationException>(() => 
+        var ex = Assert.Throws<InvalidOperationException>(() =>
             mockService.Object.ProcessCodeSystemCsv(codeGroup, csv));
 
         Assert.Contains("CodeSystem CSV must have exactly 2 columns", ex.Message);
@@ -192,7 +192,7 @@ http://test.system,123,Test Display,Extra Value";
     {
         var mockCache = new Mock<IMemoryCache>();
         var mockConfig = new Mock<IOptions<TerminologyConfig>>();
-        
+
         mockConfig.Setup(x => x.Value).Returns(_config);
 
         // Create test service with mocked file system methods
@@ -231,9 +231,9 @@ http://test.system,123,Test Display,Extra Value";
 
         // Act
         mockService.Object.ProcessValueSetCsv(codeGroup, csv);
-        
+
         // Verify that processing resulted in calling SetGroup with correct CodeGroup
-        mockService.Verify(x => x.SetCodeGroup(It.Is<CodeGroup>(cg => 
+        mockService.Verify(x => x.SetCodeGroup(It.Is<CodeGroup>(cg =>
             cg.Id == "test-id" &&
             cg.Type == CodeGroup.CodeGroupTypes.ValueSet &&
             cg.Url == "http://test.valueset" &&
@@ -243,7 +243,7 @@ http://test.system,123,Test Display,Extra Value";
             cg.Codes["http://test.system"][0].Value == "123" &&
             cg.Codes["http://test.system"][0].Display == "Test Display" &&
             cg.Codes["http://test.system"][1].Value == "456" &&
-            cg.Codes["http://test.system"][1].Display == "Another Display")), 
+            cg.Codes["http://test.system"][1].Display == "Another Display")),
             Times.Once);
     }
 
@@ -252,7 +252,7 @@ http://test.system,123,Test Display,Extra Value";
     {
         var mockCache = new Mock<IMemoryCache>();
         var mockConfig = new Mock<IOptions<TerminologyConfig>>();
-        
+
         mockConfig.Setup(x => x.Value).Returns(_config);
 
         // Create test service with mocked file system methods
@@ -291,9 +291,9 @@ http://test.system,123,Test Display,Extra Value";
 
         // Act
         mockService.Object.ProcessCodeSystemCsv(codeGroup, csv);
-        
+
         // Verify that processing resulted in calling SetGroup with correct CodeGroup
-        mockService.Verify(x => x.SetCodeGroup(It.Is<CodeGroup>(cg => 
+        mockService.Verify(x => x.SetCodeGroup(It.Is<CodeGroup>(cg =>
             cg.Id == "test-id" &&
             cg.Type == CodeGroup.CodeGroupTypes.CodeSystem &&
             cg.Url == "http://test.codesystem" &&
@@ -303,7 +303,7 @@ http://test.system,123,Test Display,Extra Value";
             cg.Codes["http://test.codesystem"][0].Value == "123" &&
             cg.Codes["http://test.codesystem"][0].Display == "Test Display" &&
             cg.Codes["http://test.codesystem"][1].Value == "456" &&
-            cg.Codes["http://test.codesystem"][1].Display == "Another Display")), 
+            cg.Codes["http://test.codesystem"][1].Display == "Another Display")),
             Times.Once);
     }
 }

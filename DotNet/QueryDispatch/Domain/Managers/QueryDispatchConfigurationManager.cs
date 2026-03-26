@@ -66,24 +66,24 @@ namespace QueryDispatch.Domain.Managers
 
 
 
-                    var auditMessage = new AuditEventMessage
-                    {
-                        FacilityId = config.FacilityId,
-                        ServiceName = QueryDispatchConstants.ServiceName,
-                        Action = AuditEventType.Update,
-                        EventDate = DateTime.UtcNow,
-                        PropertyChanges = propertyChanges,
-                        Resource = typeof(QueryDispatchConfigurationEntity).Name,
-                        Notes = $"Updated query dispatch configuration {config.Id} for facility {config.FacilityId}"
-                    };
+                var auditMessage = new AuditEventMessage
+                {
+                    FacilityId = config.FacilityId,
+                    ServiceName = QueryDispatchConstants.ServiceName,
+                    Action = AuditEventType.Update,
+                    EventDate = DateTime.UtcNow,
+                    PropertyChanges = propertyChanges,
+                    Resource = typeof(QueryDispatchConfigurationEntity).Name,
+                    Notes = $"Updated query dispatch configuration {config.Id} for facility {config.FacilityId}"
+                };
 
-                    _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
-                    {
-                        Value = auditMessage
-                    });
+                _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
+                {
+                    Value = auditMessage
+                });
 
-                    _producer.Flush();
-                
+                _producer.Flush();
+
             }
             catch (Exception ex)
             {
@@ -103,23 +103,23 @@ namespace QueryDispatch.Domain.Managers
                 _logger.LogInformation("Created query dispatch configuration for facility {FacilityId}", HtmlInputSanitizer.Sanitize(config.FacilityId));
 
 
-                    var auditMessage = new AuditEventMessage
-                    {
-                        FacilityId = config.FacilityId,
-                        ServiceName = QueryDispatchConstants.ServiceName,
-                        Action = AuditEventType.Create,
-                        EventDate = DateTime.UtcNow,
-                        Resource = typeof(QueryDispatchConfigurationEntity).Name,
-                        Notes = $"Created query dispatch configuration {config.Id} for facility {config.FacilityId}"
-                    };
+                var auditMessage = new AuditEventMessage
+                {
+                    FacilityId = config.FacilityId,
+                    ServiceName = QueryDispatchConstants.ServiceName,
+                    Action = AuditEventType.Create,
+                    EventDate = DateTime.UtcNow,
+                    Resource = typeof(QueryDispatchConfigurationEntity).Name,
+                    Notes = $"Created query dispatch configuration {config.Id} for facility {config.FacilityId}"
+                };
 
-                    _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
-                    {
-                        Value = auditMessage
-                    });
+                _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
+                {
+                    Value = auditMessage
+                });
 
-                    _producer.Flush();
-                
+                _producer.Flush();
+
 
             }
             catch (Exception ex)
@@ -140,7 +140,7 @@ namespace QueryDispatch.Domain.Managers
 
                 var config = await _repository.FirstOrDefaultAsync(x => x.FacilityId == facilityId);
 
-                if(config == null)
+                if (config == null)
                 {
                     return;
                 }
@@ -149,26 +149,26 @@ namespace QueryDispatch.Domain.Managers
                 _logger.LogInformation("Deleted query dispatch configuration for facility {FacilityId}", HtmlInputSanitizer.Sanitize(facilityId));
 
 
-                    var auditMessage = new AuditEventMessage
-                    {
-                        FacilityId = facilityId,
-                        ServiceName = QueryDispatchConstants.ServiceName,
-                        Action = AuditEventType.Delete,
-                        EventDate = DateTime.UtcNow,
-                        Resource = typeof(QueryDispatchConfigurationEntity).Name,
-                        Notes = $"Deleted query dispatch configuration for facility {facilityId}"
-                    };
+                var auditMessage = new AuditEventMessage
+                {
+                    FacilityId = facilityId,
+                    ServiceName = QueryDispatchConstants.ServiceName,
+                    Action = AuditEventType.Delete,
+                    EventDate = DateTime.UtcNow,
+                    Resource = typeof(QueryDispatchConfigurationEntity).Name,
+                    Notes = $"Deleted query dispatch configuration for facility {facilityId}"
+                };
 
-                    _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
-                    {
-                        Value = auditMessage
-                    });
+                _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
+                {
+                    Value = auditMessage
+                });
 
-                    _producer.Flush();
-                
+                _producer.Flush();
+
 
                 await ScheduleService.DeleteJob(facilityId, await _schedulerFactory.GetScheduler());
-                
+
                 return;
             }
             catch (Exception ex)

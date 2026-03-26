@@ -43,7 +43,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 });
 
             tokenEndpoints.MapGet("/refresh-key", (Delegate)RefreshKey)
-                .RequireAuthorization([PolicyNames.IsLinkAdmin])                
+                .RequireAuthorization([PolicyNames.IsLinkAdmin])
                 .Produces<KeyRefreshedResponse>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
@@ -58,15 +58,15 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 
         public async Task<IResult> CreateToken(HttpContext context)
         {
-            if(!_tokenServiceconfig.Value.EnableTokenGenerationEndpoint)
+            if (!_tokenServiceconfig.Value.EnableTokenGenerationEndpoint)
             {
                 return Results.BadRequest("Token generation is disabled.");
             }
 
-            try 
+            try
             {
                 var user = context.User;
-                
+
                 var token = await _createLinkBearerToken.ExecuteAsync(user, _tokenServiceconfig.Value.TokenLifespan);
 
                 _logger.LogLinkAdminTokenGenerated(DateTime.UtcNow, user.Claims.First(c => c.Type == "sub")?.Value ?? "subject missing");
@@ -80,12 +80,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 _logger.LogLinkAdminTokenGenerationException(ex.Message);
                 throw;
             }
-            
+
         }
 
         public async Task<IResult> RefreshKey(HttpContext context)
         {
-            try 
+            try
             {
                 var result = await _refreshSigningKey.ExecuteAsync(context.User);
                 _logger.LogLinkAdminTokenKeyRefreshed(DateTime.UtcNow);
@@ -103,7 +103,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 _logger.LogLinkAdminTokenGenerationException(ex.Message);
                 throw;
             }
-            
+
         }
 
 

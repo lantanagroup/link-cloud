@@ -223,7 +223,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
                 return await SingleAsync(r => r.Id == entity.Id);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 _logger.LogError(ex, "Error adding new ReportSchedule");
                 await transaction.RollbackAsync();
@@ -260,7 +260,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 predicate = predicate.And(q => q.ReportEndDate <= reportEndDate.Value);
 
             if (createDate.HasValue)
-            { 
+            {
                 var dayStart = createDate.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
                 var dayEnd = dayStart.AddDays(1);
                 predicate = predicate.And(q => q.CreateDate >= dayStart && q.CreateDate < dayEnd);

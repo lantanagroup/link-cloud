@@ -394,7 +394,7 @@ namespace IntegrationTests.Normalization
             _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
 
             Assert.NotEmpty(modifiedResource.Note);
-            Assert.Equal(1, modifiedResource.Note.Count);
+            Assert.Single(modifiedResource.Note);
             var note = modifiedResource.Note[0];
             Assert.NotNull(note.Text);
             Assert.Equal("325", note.Text);
@@ -1418,7 +1418,7 @@ namespace IntegrationTests.Normalization
             var resource = parser.Parse<Encounter>(text);
 
             var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
-            
+
             Assert.Equal(OperationStatus.NoAction, operationResult.SuccessCode);
             Assert.Contains("Condition was not met", operationResult.ErrorMessage);
 
@@ -1540,7 +1540,7 @@ namespace IntegrationTests.Normalization
             var resource = parser.Parse<Encounter>(text);
 
             var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
-            
+
             Assert.Equal(OperationStatus.NoAction, operationResult.SuccessCode);
             Assert.Contains("Condition was not met", operationResult.ErrorMessage);
 
@@ -1662,7 +1662,7 @@ namespace IntegrationTests.Normalization
             var resource = parser.Parse<Encounter>(text);
 
             var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
-            
+
             Assert.Equal(OperationStatus.NoAction, operationResult.SuccessCode);
             Assert.Contains("Condition was not met", operationResult.ErrorMessage);
 
@@ -1784,7 +1784,7 @@ namespace IntegrationTests.Normalization
             var resource = parser.Parse<Encounter>(text);
 
             var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
-            
+
             Assert.Equal(OperationStatus.NoAction, operationResult.SuccessCode);
             Assert.Contains("Condition was not met", operationResult.ErrorMessage);
 
@@ -1906,7 +1906,7 @@ namespace IntegrationTests.Normalization
             var resource = parser.Parse<Encounter>(text);
 
             var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
-            
+
             Assert.Equal(OperationStatus.NoAction, operationResult.SuccessCode);
             Assert.Contains("Condition was not met", operationResult.ErrorMessage);
 
@@ -2028,7 +2028,7 @@ namespace IntegrationTests.Normalization
             var resource = parser.Parse<Encounter>(text);
 
             var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
-            
+
             Assert.Equal(OperationStatus.NoAction, operationResult.SuccessCode);
             Assert.Contains("Condition was not met", operationResult.ErrorMessage);
 
@@ -2150,7 +2150,7 @@ namespace IntegrationTests.Normalization
             var resource = parser.Parse<Encounter>(text);
 
             var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
-            
+
             Assert.Equal(OperationStatus.NoAction, operationResult.SuccessCode);
             Assert.Contains("Condition was not met", operationResult.ErrorMessage);
 
@@ -2272,7 +2272,7 @@ namespace IntegrationTests.Normalization
             var resource = parser.Parse<Encounter>(text);
 
             var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
-            
+
             Assert.Equal(OperationStatus.NoAction, operationResult.SuccessCode);
             Assert.Contains("Condition was not met", operationResult.ErrorMessage);
 

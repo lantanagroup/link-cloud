@@ -8,7 +8,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 {
     public static class GetUsersByFacility
     {
-        public static async Task<IResult> Handle(HttpContext context, string id, 
+        public static async Task<IResult> Handle(HttpContext context, string id,
             [FromServices] ILogger<UserEndpoints> logger, [FromServices] IGetFacilityUsers query)
         {
             try
@@ -30,7 +30,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
                 Activity.Current?.AddException(ex);
                 logger.LogFindUsersException(ex.Message);
                 throw;
-            }            
+            }
         }
     }
 }
