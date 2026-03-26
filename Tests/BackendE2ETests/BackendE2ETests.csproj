@@ -16,6 +16,15 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <Compile Remove="Helpers\**" />
+      <Compile Remove="Services\**" />
+      <EmbeddedResource Remove="Helpers\**" />
+      <EmbeddedResource Remove="Services\**" />
+      <None Remove="Helpers\**" />
+      <None Remove="Services\**" />
+    </ItemGroup>
+
+    <ItemGroup>
         <PackageReference Include="Hl7.Fhir.R4" Version="5.*" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
         <PackageReference Include="Moq.AutoMock" Version="*-*" />
@@ -94,11 +103,6 @@
       <ProjectReference Include="..\..\DotNet\Shared\Shared.csproj" />
       <ProjectReference Include="..\..\DotNet\Tenant\Tenant.csproj" />
       <ProjectReference Include="..\..\..\Automation\Automation.csproj" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Folder Include="Helpers\" />
-      <Folder Include="Services\" />
     </ItemGroup>
 
 </Project>
