@@ -55,20 +55,6 @@
       }
     </mat-form-field>
 
-    <mat-form-field appearance="outline">
-      <mat-label>Vendor</mat-label>
-      <mat-select formControlName="vendor" [placeholder]="'Select a vendor'" [disabled]="viewOnly">
-        @for (vendor of vendors; track vendor) {
-          <mat-option [disabled]="viewOnly" [value]="vendor">
-            {{ vendor }}
-          </mat-option>
-        }
-      </mat-select>
-      @if (vendorControl.hasError('required')) {
-        <mat-error>A vendor is <strong>required</strong></mat-error>
-      }
-    </mat-form-field>
-
     <div class="scheduled-reports-container">
       <span class="title">Scheduled Reports</span>
 
