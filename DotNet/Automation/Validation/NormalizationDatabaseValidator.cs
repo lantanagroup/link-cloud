@@ -1,16 +1,15 @@
 ﻿using LantanaGroup.Link.Automation.Helpers;
-using LantanaGroup.Link.Normalization.Domain.Entities;
-using Xunit.Abstractions;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.Automation.Validation;
 
 public class NormalizationDatabaseValidator
 {
     private const int MaxErrors = 100;
-    private readonly ITestOutputHelper _output;
+    private readonly IAutomationOutput _output;
     private readonly PipelineDataReader _reader;
 
-    public NormalizationDatabaseValidator(ITestOutputHelper output, DatabaseConnectionFactory dbFactory)
+    public NormalizationDatabaseValidator(IAutomationOutput output, DatabaseConnectionFactory dbFactory)
     {
         _output = output;
         _reader = new PipelineDataReader(dbFactory);

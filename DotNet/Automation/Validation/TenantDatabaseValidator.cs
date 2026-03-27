@@ -1,15 +1,14 @@
 ﻿using LantanaGroup.Link.Automation.Helpers;
-using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Automation.Validation;
 
 public class TenantDatabaseValidator
 {
     private const int MaxErrors = 100;
-    private readonly ITestOutputHelper _output;
+    private readonly IAutomationOutput _output;
     private readonly PipelineDataReader _reader;
 
-    public TenantDatabaseValidator(ITestOutputHelper output, DatabaseConnectionFactory dbFactory)
+    public TenantDatabaseValidator(IAutomationOutput output, DatabaseConnectionFactory dbFactory)
     {
         _output = output;
         _reader = new PipelineDataReader(dbFactory);

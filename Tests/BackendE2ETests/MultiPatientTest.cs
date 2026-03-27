@@ -50,6 +50,13 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
             Config.PatientIds = patientIds;
         }
 
+        await GeneratedFhirDataSnapshotWriter.WriteIfChangedAsync(
+            _output,
+            nameof(MultiPatientTest),
+            GenerationSeed,
+            Config.PatientIds,
+            bundles);
+
         _output.WriteLine($"Patient IDs for test: [{string.Join(", ", Config.PatientIds.Take(10))}...]");
 
         // Wait for FHIR server before uploading large volume of bundles
@@ -109,12 +116,19 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
         var reportId = await ReportApi.GenerateReportAsync(FacilityId, measureId);
 
         // Step 7: Start background diagnostics and poll until the report is submitted
-        await using var diagnostics = new BackgroundDiagnosticsMonitor(_output, _tesetServices.LokiScraper, AutomationCfg, Config.PatientIds.Count);
+        await using var diagnostics = new BackgroundDiagnosticsMonitor(
+            _output,
+            _tesetServices.LokiScraper,
+            AutomationCfg,
+            Config.PatientIds.Count,
+            forwardInternalLogsToOutput: false);
+        await using var watcher = DiagnosticsEventWatcher.Start(diagnostics, _output);
         await diagnostics.StartAsync(FacilityId, reportId);
 
         var reportSubmitted = await ReportApi.CheckSubmissionStatusAsync(reportId, diagnostics);
 
         await diagnostics.StopAsync();
+        await watcher.StopAsync();
 
         // Keep diagnostics output concise: rely on live background monitoring above,
         // and capture a single DB snapshot before assertions.
@@ -128,6 +142,7 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
 
         // Step 8: Download and validate the report contents
         var downloadedResources = await ReportApi.DownloadReportAsync(FacilityId, reportId);
+        var internalAbsResources = await ReportApi.DownloadReportAsync(FacilityId, reportId, external: false);
 
         Assert.True(downloadedResources.ContainsKey("manifest.ndjson"),
             "Expected report to include manifest.ndjson but it was not");
@@ -139,6 +154,16 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
         }
 
         _output.WriteLine("Done generating and validating report.");
+
+        await _tesetServices.CreateReportAbsManifestValidator().ValidateAllAsync(
+            internalAbsResources,
+            Config.PatientIds,
+            measureId,
+            Config.StartDate,
+            Config.EndDate,
+            FacilityId,
+            reportId,
+            GeneratedFhirDataSnapshotWriter.GetSnapshotDirectory(nameof(MultiPatientTest)));
     }
 }
 

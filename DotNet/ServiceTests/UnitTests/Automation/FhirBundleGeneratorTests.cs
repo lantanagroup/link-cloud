@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Automation.Generation;
+using LantanaGroup.Link.Automation.Helpers;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using Xunit.Abstractions;
 
@@ -566,7 +567,7 @@ public class FhirBundleGeneratorTests
         Assert.True(resources.ContainsKey(refValue), $"{context} missing referenced resource: {refValue}");
     }
 
-    private sealed class NullOutputHelper : ITestOutputHelper
+    private sealed class NullOutputHelper : IAutomationOutput
     {
         public void WriteLine(string message) { }
         public void WriteLine(string format, params object[] args) { }

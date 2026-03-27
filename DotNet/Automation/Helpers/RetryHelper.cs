@@ -1,6 +1,4 @@
-﻿using Xunit.Abstractions;
-
-namespace LantanaGroup.Link.Automation.Helpers;
+﻿namespace LantanaGroup.Link.Automation.Helpers;
 
 public static class RetryHelper
 {
@@ -8,7 +6,7 @@ public static class RetryHelper
         Func<Task> action,
         TimeSpan timeout,
         TimeSpan delay,
-        ITestOutputHelper? output = null,
+        IAutomationOutput? output = null,
         LokiScraper? lokiScraper = null)
     {
         var start = DateTime.UtcNow;

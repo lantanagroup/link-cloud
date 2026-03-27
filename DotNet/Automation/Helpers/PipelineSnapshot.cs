@@ -1,6 +1,5 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Report.Domain.Enums;
-using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Automation.Helpers;
 
@@ -24,7 +23,7 @@ public class PipelineSnapshot
     /// Safe to call at any point — never throws.
     /// </summary>
     public async Task WriteFullSnapshotAsync(
-        ITestOutputHelper output,
+        IAutomationOutput output,
         string facilityId,
         string reportId)
     {
@@ -41,7 +40,7 @@ public class PipelineSnapshot
         output.WriteLine("\n=== END SNAPSHOT ===\n");
     }
 
-    private async Task WriteReportSnapshot(ITestOutputHelper output, string facilityId, Guid scheduleId)
+    private async Task WriteReportSnapshot(IAutomationOutput output, string facilityId, Guid scheduleId)
     {
         try
         {
@@ -112,7 +111,7 @@ public class PipelineSnapshot
         }
     }
 
-    private async Task WriteDataAcquisitionSnapshot(ITestOutputHelper output, string facilityId, string reportId)
+    private async Task WriteDataAcquisitionSnapshot(IAutomationOutput output, string facilityId, string reportId)
     {
         try
         {
@@ -156,7 +155,7 @@ public class PipelineSnapshot
         }
     }
 
-    private async Task WriteNormalizationSnapshot(ITestOutputHelper output, string facilityId)
+    private async Task WriteNormalizationSnapshot(IAutomationOutput output, string facilityId)
     {
         try
         {
@@ -210,7 +209,7 @@ public class PipelineSnapshot
         }
     }
 
-    private async Task WriteTenantSnapshot(ITestOutputHelper output, string facilityId)
+    private async Task WriteTenantSnapshot(IAutomationOutput output, string facilityId)
     {
         try
         {
@@ -241,7 +240,7 @@ public class PipelineSnapshot
     }
 
     private async Task WriteValidationSnapshot(
-        ITestOutputHelper output,
+        IAutomationOutput output,
         string facilityId,
         string reportId)
     {

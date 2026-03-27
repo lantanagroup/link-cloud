@@ -1,14 +1,9 @@
-﻿using Xunit.Abstractions;
-
-namespace LantanaGroup.Link.Automation.Helpers;
+﻿namespace LantanaGroup.Link.Automation.Helpers;
 
 /// <summary>
-/// Adapts <see cref="ITestOutputHelper"/> to write directly to <see cref="Console"/>.
-/// The CI workflow uses --logger "console;verbosity=detailed" which captures
-/// Console.WriteLine output, so ITestOutputHelper is not needed and would
-/// cause duplicate lines.
+/// Writes automation diagnostics directly to <see cref="Console"/>.
 /// </summary>
-public class DualOutputHelper : ITestOutputHelper
+public class DualOutputHelper : IAutomationOutput
 {
     public void WriteLine(string message)
     {

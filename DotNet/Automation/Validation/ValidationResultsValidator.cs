@@ -1,22 +1,20 @@
 ﻿using LantanaGroup.Link.Automation.Helpers;
+using Newtonsoft.Json.Linq;
 using RestSharp;
-using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Automation.Validation;
 
 /// <summary>
-/// Exception-focused validation check.
-///
-/// This validator does not fail on ordinary FHIR validation result content.
-/// It only fails when Validation service/API-level exception conditions are detected.
+/// Validates that validation pipeline produced results for each expected patient and
+/// no unhandled exceptions are present in Validation logs.
 /// </summary>
 public class ValidationResultsValidator
 {
     private readonly RestClient _client;
-    private readonly ITestOutputHelper _output;
+    private readonly IAutomationOutput _output;
     private readonly LokiScraper? _lokiScraper;
 
-    public ValidationResultsValidator(RestClient client, ITestOutputHelper output, LokiScraper? lokiScraper = null)
+    public ValidationResultsValidator(RestClient client, IAutomationOutput output, LokiScraper? lokiScraper = null)
     {
         _client = client;
         _output = output;

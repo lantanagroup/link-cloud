@@ -2,17 +2,17 @@
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
-using Xunit.Abstractions;
+using Microsoft.EntityFrameworkCore;
 
 namespace LantanaGroup.Link.Automation.Validation;
 
 public class ReportDatabaseValidator
 {
     private const int MaxErrors = 100;
-    private readonly ITestOutputHelper _output;
+    private readonly IAutomationOutput _output;
     private readonly PipelineDataReader _reader;
 
-    public ReportDatabaseValidator(ITestOutputHelper output, DatabaseConnectionFactory dbFactory)
+    public ReportDatabaseValidator(IAutomationOutput output, DatabaseConnectionFactory dbFactory)
     {
         _output = output;
         _reader = new PipelineDataReader(dbFactory);

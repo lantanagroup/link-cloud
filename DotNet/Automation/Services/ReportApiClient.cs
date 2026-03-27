@@ -6,8 +6,6 @@ using LantanaGroup.Link.Automation.Helpers;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using Newtonsoft.Json.Linq;
 using RestSharp;
-using Xunit;
-using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Automation.Services;
@@ -15,12 +13,12 @@ namespace LantanaGroup.Link.Automation.Services;
 public class ReportApiClient
 {
     private readonly RestClient _client;
-    private readonly ITestOutputHelper _output;
+    private readonly IAutomationOutput _output;
     private readonly LokiScraper _lokiScraper;
     private readonly TestScenarioConfig _config;
     private readonly AutomationConfig _automationConfig;
 
-    public ReportApiClient(RestClient client, ITestOutputHelper output, LokiScraper lokiScraper, AutomationConfig automationConfig, TestScenarioConfig config)
+    public ReportApiClient(RestClient client, IAutomationOutput output, LokiScraper lokiScraper, AutomationConfig automationConfig, TestScenarioConfig config)
     {
         _client = client;
         _output = output;
@@ -44,23 +42,23 @@ public class ReportApiClient
         request.AddJsonBody(body);
 
         var response = await _client.ExecuteAsync(request);
-        Assert.True(response.StatusCode == HttpStatusCode.OK,
+        AutomationInvariant.Require(response.StatusCode == HttpStatusCode.OK,
             $"Generate Report - Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
 
-        Assert.True(response.ContentType != null,
+        AutomationInvariant.Require(response.ContentType != null,
             $"Expected Content-Type to be set but received {response.ContentType}");
-        Assert.True(response.ContentType.Contains("application/json"),
+        AutomationInvariant.Require(response.ContentType.Contains("application/json"),
             $"Expected Content-Type to be application/json but received {response.ContentType}");
-        Assert.False(string.IsNullOrWhiteSpace(response.Content),
+        AutomationInvariant.Require(!string.IsNullOrWhiteSpace(response.Content),
             $"Expected Content to be set but received {response.Content}");
 
         var generateReportResponse = JObject.Parse(response.Content);
 
-        Assert.True(generateReportResponse.ContainsKey("reportId"),
+        AutomationInvariant.Require(generateReportResponse.ContainsKey("reportId"),
             $"Expected response to include ReportId but received {generateReportResponse}");
 
         var reportId = generateReportResponse["reportId"]?.ToString();
-        Assert.False(string.IsNullOrWhiteSpace(reportId),
+        AutomationInvariant.Require(!string.IsNullOrWhiteSpace(reportId),
             $"Expected ReportId to be set but received {reportId}");
 
         return reportId!;
@@ -121,15 +119,15 @@ public class ReportApiClient
         return false;
     }
 
-    public async Task<Dictionary<string, object>> DownloadReportAsync(string facilityId, string reportId)
+    public async Task<Dictionary<string, object>> DownloadReportAsync(string facilityId, string reportId, bool external = true)
     {
         _output.WriteLine($"Downloading report {reportId}...");
-        var request = new RestRequest($"submission/{facilityId}/{reportId}?external=true", Method.Get);
+        var request = new RestRequest($"submission/{facilityId}/{reportId}?external={external.ToString().ToLowerInvariant()}", Method.Get);
         var response = await _client.ExecuteAsync(request);
-        Assert.True(response.StatusCode == HttpStatusCode.OK,
+        AutomationInvariant.Require(response.StatusCode == HttpStatusCode.OK,
             $"Download Report - Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
 
-        Assert.True(response.ContentType?.Contains("application/zip"),
+        AutomationInvariant.Require(response.ContentType?.Contains("application/zip") == true,
             $"Expected Content-Type to be application/zip but received {response.ContentType}");
 
         var responseDictionary = new Dictionary<string, object>();

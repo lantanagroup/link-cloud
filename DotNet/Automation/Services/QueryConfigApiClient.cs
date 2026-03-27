@@ -3,18 +3,16 @@ using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.Automation.Helpers;
 using Newtonsoft.Json.Linq;
 using RestSharp;
-using Xunit;
-using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Automation.Services;
 
 public class QueryConfigApiClient
 {
     private readonly RestClient _client;
-    private readonly ITestOutputHelper _output;
+    private readonly IAutomationOutput _output;
     private readonly AutomationConfig _config;
 
-    public QueryConfigApiClient(RestClient client, ITestOutputHelper output, AutomationConfig config)
+    public QueryConfigApiClient(RestClient client, IAutomationOutput output, AutomationConfig config)
     {
         _client = client;
         _output = output;
@@ -37,7 +35,7 @@ public class QueryConfigApiClient
         var response = await _client.ExecuteAsync(request);
         if (response.StatusCode != HttpStatusCode.Created)
             _output.WriteLine($"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
-        Assert.True(response.StatusCode == HttpStatusCode.Created,
+        AutomationInvariant.Require(response.StatusCode == HttpStatusCode.Created,
             $"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
     }
 
@@ -58,7 +56,7 @@ public class QueryConfigApiClient
         var response = await _client.ExecuteAsync(request);
         if (response.StatusCode != HttpStatusCode.Created)
             _output.WriteLine($"Expected HTTP 201 Created for {type} query plan but received {response.StatusCode}: {response.Content}");
-        Assert.True(response.StatusCode == HttpStatusCode.Created,
+        AutomationInvariant.Require(response.StatusCode == HttpStatusCode.Created,
             $"Expected HTTP 201 Created for {type} query plan but received {response.StatusCode}: {response.Content}");
     }
 }

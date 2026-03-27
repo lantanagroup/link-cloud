@@ -1,10 +1,10 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Automation.Configuration;
+using LantanaGroup.Link.Automation.Helpers;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using RestSharp;
 using System.Reflection;
-using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Automation;
@@ -12,7 +12,7 @@ namespace LantanaGroup.Link.Automation;
 public class MeasureLoader
 {
     private readonly RestClient _adminBffClient;
-    private readonly ITestOutputHelper _output;
+    private readonly IAutomationOutput _output;
     private readonly TestScenarioConfig _config;
     private readonly Assembly? _resourceAssembly;
     private readonly FhirJsonParser _parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
@@ -28,7 +28,7 @@ public class MeasureLoader
     /// The assembly to load embedded resources from when MeasureBundleLocation uses the "resource://" scheme.
     /// If null, defaults to the calling assembly.
     /// </param>
-    public MeasureLoader(RestClient adminBffClient, ITestOutputHelper output, TestScenarioConfig config, Assembly? resourceAssembly = null)
+    public MeasureLoader(RestClient adminBffClient, IAutomationOutput output, TestScenarioConfig config, Assembly? resourceAssembly = null)
     {
         _adminBffClient = adminBffClient;
         _output = output;

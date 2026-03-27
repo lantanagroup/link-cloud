@@ -1,8 +1,8 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Automation.Generation.ResourceFactories;
+using LantanaGroup.Link.Automation.Helpers;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using System.Text.Json;
-using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Automation.Generation;
 
@@ -51,7 +51,7 @@ public static class FhirBundleGenerator
     ];
 
     public static (List<string> PatientIds, List<(string Name, string Json)> Bundles) Generate(
-        ITestOutputHelper output,
+        IAutomationOutput output,
         int patientCount = DefaultPatientCount,
         int totalResourcesPerPatient = DefaultResourcesPerPatient,
         string patientIdPrefix = "MegaPatient",

@@ -1,5 +1,5 @@
 ﻿using LantanaGroup.Link.Automation.Configuration;
-using Xunit.Abstractions;
+using LantanaGroup.Link.Automation.Helpers;
 
 namespace LantanaGroup.Link.Automation;
 
@@ -44,7 +44,7 @@ public class FhirDataLoader
     /// <summary>
     /// Waits for the FHIR server to respond to a metadata request.
     /// </summary>
-    public async Task WaitForServerAsync(ITestOutputHelper output, TimeSpan? timeout = null)
+    public async Task WaitForServerAsync(IAutomationOutput output, TimeSpan? timeout = null)
     {
         var maxWait = timeout ?? TimeSpan.FromSeconds(60);
         var start = DateTime.UtcNow;
@@ -83,7 +83,7 @@ public class FhirDataLoader
     /// Loads embedded FHIR transaction bundles from the specified assembly.
     /// The assembly should contain embedded resources matching the pattern ".fhir_server_data.*.json".
     /// </summary>
-    public async Task LoadEmbeddedTransactionBundles(ITestOutputHelper output, Assembly? resourceAssembly = null)
+    public async Task LoadEmbeddedTransactionBundles(IAutomationOutput output, Assembly? resourceAssembly = null)
     {
         output.WriteLine("Loading data onto FHIR server...");
         var assembly = resourceAssembly ?? Assembly.GetCallingAssembly();
@@ -151,7 +151,7 @@ public class FhirDataLoader
         }
     }
 
-    public void DeleteResourcesWithExpunge(ITestOutputHelper output)
+    public void DeleteResourcesWithExpunge(IAutomationOutput output)
     {
         output.WriteLine("Removing data from FHIR server...");
 
@@ -176,7 +176,7 @@ public class FhirDataLoader
         }
     }
 
-    public void ExpungeEverything(ITestOutputHelper output)
+    public void ExpungeEverything(IAutomationOutput output)
     {
         output.WriteLine("Removing data from FHIR server...");
 
@@ -210,7 +210,7 @@ public class FhirDataLoader
     /// Used by tests that generate bundles at runtime.
     /// </summary>
     public async Task LoadTransactionBundlesFromJsonAsync(
-        ITestOutputHelper output,
+        IAutomationOutput output,
         IReadOnlyList<(string Name, string Json)> bundles)
     {
         output.WriteLine($"Loading {bundles.Count} generated bundles onto FHIR server...");
@@ -271,7 +271,10 @@ public class FhirDataLoader
     }
 
     private async Task<RestResponse> PostBundleWithRetryAsync(
-        string bundleJson, string name, string progress, ITestOutputHelper output)
+        string bundleJson,
+        string bundleName,
+        string requestPath,
+        IAutomationOutput output)
     {
         var delay = InitialRetryDelay;
         RestResponse? lastResponse = null;
@@ -291,28 +294,28 @@ public class FhirDataLoader
             if (lastResponse.IsSuccessful)
             {
                 if (attempt > 1)
-                    output.WriteLine($"  {progress} Posted {name} => {lastResponse.StatusCode} (succeeded on attempt {attempt})");
+                    output.WriteLine($"  {requestPath} Posted {bundleName} => {lastResponse.StatusCode} (succeeded on attempt {attempt})");
                 else
-                    output.WriteLine($"  {progress} Posted {name} => {lastResponse.StatusCode}");
+                    output.WriteLine($"  {requestPath} Posted {bundleName} => {lastResponse.StatusCode}");
                 return lastResponse;
             }
 
             var statusCode = (int)lastResponse.StatusCode;
             if (statusCode != 0 && statusCode < 500)
             {
-                output.WriteLine($"  {progress} Posted {name} => {lastResponse.StatusCode} (non-retryable)");
+                output.WriteLine($"  {requestPath} Posted {bundleName} => {lastResponse.StatusCode} (non-retryable)");
                 return lastResponse;
             }
 
             if (attempt < MaxRetries)
             {
-                output.WriteLine($"  {progress} Posted {name} => {lastResponse.StatusCode} (attempt {attempt}/{MaxRetries}, retrying in {delay.TotalSeconds:F0}s...)");
+                output.WriteLine($"  {requestPath} Posted {bundleName} => {lastResponse.StatusCode} (attempt {attempt}/{MaxRetries}, retrying in {delay.TotalSeconds:F0}s...)");
                 await Task.Delay(delay);
                 delay *= 2;
             }
             else
             {
-                output.WriteLine($"  {progress} Posted {name} => {lastResponse.StatusCode} (attempt {attempt}/{MaxRetries}, giving up)");
+                output.WriteLine($"  {requestPath} Posted {bundleName} => {lastResponse.StatusCode} (attempt {attempt}/{MaxRetries}, giving up)");
             }
         }
 

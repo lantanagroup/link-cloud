@@ -6,7 +6,6 @@ using LantanaGroup.Link.Automation.Validation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using RestSharp;
-using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Tests.E2ETests;
 
@@ -31,13 +30,13 @@ public sealed class BackendE2ETestFixture : IDisposable
         builder.Services.AddSingleton(automationCfg);
 
         // Output helper (console-based for CI)
-        builder.Services.AddSingleton<ITestOutputHelper, DualOutputHelper>();
         builder.Services.AddSingleton<DualOutputHelper>();
+        builder.Services.AddSingleton<IAutomationOutput>(sp => sp.GetRequiredService<DualOutputHelper>());
 
         // Infrastructure
         builder.Services.AddSingleton(sp => new DatabaseConnectionFactory(sp.GetRequiredService<AutomationConfig>().Database));
         builder.Services.AddSingleton(sp => AdminBffClientFactory.Create(sp.GetRequiredService<AutomationConfig>()));
-        builder.Services.AddSingleton(sp => new LokiScraper(sp.GetRequiredService<ITestOutputHelper>(), sp.GetRequiredService<AutomationConfig>()));
+        builder.Services.AddSingleton(sp => new LokiScraper(sp.GetRequiredService<IAutomationOutput>(), sp.GetRequiredService<AutomationConfig>()));
         builder.Services.AddSingleton(sp => new FhirDataLoader(sp.GetRequiredService<AutomationConfig>().ExternalFhirServerBase, sp.GetRequiredService<AutomationConfig>()));
         builder.Services.AddSingleton<PipelineDataReader>();
 
@@ -46,18 +45,19 @@ public sealed class BackendE2ETestFixture : IDisposable
         builder.Services.AddTransient<NormalizationApiClient>();
         builder.Services.AddTransient(sp => new QueryConfigApiClient(
             sp.GetRequiredService<RestClient>(),
-            sp.GetRequiredService<ITestOutputHelper>(),
+            sp.GetRequiredService<IAutomationOutput>(),
             sp.GetRequiredService<AutomationConfig>()));
         builder.Services.AddTransient<ValidationApiClient>();
 
         // Validators (transient)
         builder.Services.AddTransient<ReportDatabaseValidator>();
+        builder.Services.AddTransient<ReportAbsManifestValidator>();
         builder.Services.AddTransient<DataAcquisitionDatabaseValidator>();
         builder.Services.AddTransient<NormalizationDatabaseValidator>();
         builder.Services.AddTransient<TenantDatabaseValidator>();
         builder.Services.AddTransient(sp => new ValidationResultsValidator(
             sp.GetRequiredService<RestClient>(),
-            sp.GetRequiredService<ITestOutputHelper>(),
+            sp.GetRequiredService<IAutomationOutput>(),
             sp.GetRequiredService<LokiScraper>()));
 
         // Snapshot / diagnostics

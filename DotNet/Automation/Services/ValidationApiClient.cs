@@ -1,12 +1,10 @@
 ﻿using System.Net;
 using LantanaGroup.Link.Automation.Helpers;
 using RestSharp;
-using Xunit;
-using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Automation.Services;
 
-public class ValidationApiClient(RestClient client, ITestOutputHelper output, LokiScraper lokiScraper)
+public class ValidationApiClient(RestClient client, IAutomationOutput output, LokiScraper lokiScraper)
 {
     public async Task InitializeArtifactsAsync()
     {
@@ -16,7 +14,7 @@ public class ValidationApiClient(RestClient client, ITestOutputHelper output, Lo
             var request = new RestRequest("validation/artifact/$initialize", Method.Post);
             request.Timeout = TimeSpan.FromSeconds(120);
             var response = await client.ExecuteAsync(request);
-            Assert.True(response.StatusCode == HttpStatusCode.OK,
+            AutomationInvariant.Require(response.StatusCode == HttpStatusCode.OK,
                 $"Initialize Validation Artifacts - Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}.");
         }, TimeSpan.FromMinutes(3), TimeSpan.FromSeconds(10), output, lokiScraper);
     }
@@ -29,7 +27,7 @@ public class ValidationApiClient(RestClient client, ITestOutputHelper output, Lo
             var request = new RestRequest("validation/category/$initialize", Method.Post);
             request.Timeout = TimeSpan.FromSeconds(60);
             var response = await client.ExecuteAsync(request);
-            Assert.True(response.StatusCode == HttpStatusCode.OK,
+            AutomationInvariant.Require(response.StatusCode == HttpStatusCode.OK,
                 $"Initialize Validation Categories - Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}.");
         }, TimeSpan.FromSeconds(90), TimeSpan.FromSeconds(10), output, lokiScraper);
     }

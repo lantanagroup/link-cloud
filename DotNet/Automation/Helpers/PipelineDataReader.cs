@@ -24,6 +24,7 @@ public class PipelineDataReader
     }
 
     public record ResourceGroupSummary(string PatientId, string ResourceType, int Count);
+    public record ReportResourceIdentity(string PatientId, string ResourceType, string ResourceId);
 
     // Report DB
     public async Task<ReportSchedule?> GetReportScheduleAsync(Guid scheduleId)
@@ -84,6 +85,23 @@ public class PipelineDataReader
             .Include(p => p.GroupPopulations)
                 .ThenInclude(gp => gp.MeasureReportPopulations)
             .Where(p => p.ReportScheduleId == scheduleId && p.FacilityId == facilityId)
+            .ToListAsync();
+    }
+
+    public async Task<List<ReportResourceIdentity>> GetReportResourceIdentitiesAsync(Guid scheduleId, string facilityId)
+    {
+        await using var db = _dbFactory.CreateReportDbContext();
+        return await db.ReportResource
+            .Where(r => r.ReportScheduleId == scheduleId && r.FacilityId == facilityId)
+            .Select(r => new ReportResourceIdentity(r.PatientId, r.ResourceType, r.ResourceId))
+            .ToListAsync();
+    }
+
+    public async Task<List<ReportEntry>> GetSubmittedReportEntriesAsync(Guid scheduleId)
+    {
+        await using var db = _dbFactory.CreateReportDbContext();
+        return await db.ReportEntry
+            .Where(e => e.ReportScheduleId == scheduleId && e.SubmissionStatus == LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus.Submitted)
             .ToListAsync();
     }
 

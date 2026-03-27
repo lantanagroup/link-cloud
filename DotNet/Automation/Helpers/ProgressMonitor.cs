@@ -1,24 +1,18 @@
 ﻿using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Report.Domain.Enums;
-using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Automation.Helpers;
 
 /// <summary>
 /// Central progress aggregation hub for test pipeline output.
-/// Combines database state monitoring, progress bar rendering, Loki service
-/// activity queries, stall detection, and periodic heartbeats into a single
-/// coherent stream of test output.
+/// Combines database state monitoring, progress bar rendering, and stall detection
+/// into a single coherent stream of test output.
 /// </summary>
 public class ProgressMonitor
 {
-    private const int HeartbeatInterval = 12; // ~60s at 5s poll interval
-    private static readonly TimeSpan StallWarningThreshold = TimeSpan.FromSeconds(120);
-
-    private readonly ITestOutputHelper _output;
+    private readonly IAutomationOutput _output;
     private readonly PipelineProgressTracker? _progressTracker;
-    private readonly LokiScraper? _lokiScraper;
     private readonly PipelineDataReader _reader;
 
     private string? _lastScheduleStatus;
@@ -27,8 +21,6 @@ public class ProgressMonitor
     private int _lastAcqLogCount;
     private int _lastCompletedAcqCount;
     private string? _lastAcqBreakdown;
-    private int _checkCount;
-    private readonly DateTime _startTime = DateTime.UtcNow;
 
     /// <summary>
     /// Returns the pipeline stage that appears stalled, or null if progress
@@ -41,10 +33,9 @@ public class ProgressMonitor
     /// </summary>
     public TimeSpan StallDuration => _progressTracker?.StallDuration ?? TimeSpan.Zero;
 
-    public ProgressMonitor(ITestOutputHelper output, int expectedPatientCount, LokiScraper? lokiScraper, AutomationConfig config)
+    public ProgressMonitor(IAutomationOutput output, int expectedPatientCount, LokiScraper? lokiScraper, AutomationConfig config)
     {
         _output = output;
-        _lokiScraper = lokiScraper;
         var dbFactory = new DatabaseConnectionFactory(config.Database);
         _reader = new PipelineDataReader(dbFactory);
         _progressTracker = expectedPatientCount > 0
@@ -54,12 +45,11 @@ public class ProgressMonitor
 
     /// <summary>
     /// Runs a single progress check cycle: database state, progress bar,
-    /// heartbeat with service activity, and stall detection.
+    /// and stall detection.
     /// Returns true if a critical failure is detected.
     /// </summary>
     public async Task<bool> CheckProgressAsync(string facilityId, string reportId)
     {
-        _checkCount++;
         var hasCriticalFailure = false;
 
         hasCriticalFailure |= await CheckReportProgress(facilityId, reportId);
@@ -70,42 +60,7 @@ public class ProgressMonitor
             await _progressTracker.UpdateAsync(facilityId, reportId);
         }
 
-        if (_checkCount % HeartbeatInterval == 0)
-        {
-            await PrintHeartbeatAsync();
-        }
-
         return hasCriticalFailure;
-    }
-
-    private async Task PrintHeartbeatAsync()
-    {
-        var elapsed = DateTime.UtcNow - _startTime;
-        var heartbeat = $"[DIAG] Heartbeat -- {elapsed.TotalSeconds:F0}s elapsed, " +
-                        $"schedule={_lastScheduleStatus ?? "?"}, " +
-                        $"entries={_lastReportEntryCount}, acqLogs={_lastAcqLogCount}";
-
-        if (_progressTracker != null && StallDuration > StallWarningThreshold && StalledStage != null)
-        {
-            heartbeat += $" | STALLED at '{StalledStage}' for {StallDuration.TotalSeconds:F0}s";
-        }
-
-        _output.WriteLine(heartbeat);
-
-        if (_lokiScraper == null)
-            return;
-
-        var measureEvalActivity = await _lokiScraper.GetMeasureEvalActivitySummaryAsync(TimeSpan.FromSeconds(60));
-        if (measureEvalActivity != null)
-        {
-            _output.WriteLine($"[DIAG] MeasureEval is active: {measureEvalActivity}");
-        }
-
-        var validationActivity = await _lokiScraper.GetValidationActivitySummaryAsync(TimeSpan.FromSeconds(60));
-        if (validationActivity != null)
-        {
-            _output.WriteLine($"[DIAG] Validation is active: {validationActivity}");
-        }
     }
 
     private async Task<bool> CheckReportProgress(string facilityId, string reportId)
@@ -195,21 +150,26 @@ public class ProgressMonitor
                 _lastAcqBreakdown = breakdown;
             }
 
-            if (failed > 0 || maxRetries > 0)
+            if (maxRetries > 0)
             {
-                var problemLogs = logs
-                    .Where(l => l.Status == RequestStatus.Failed || l.Status == RequestStatus.MaxRetriesReached)
+                var terminalLogs = logs
+                    .Where(l => l.Status == RequestStatus.MaxRetriesReached)
                     .Take(5)
                     .ToList();
 
-                foreach (var log in problemLogs)
+                foreach (var log in terminalLogs)
                 {
                     var notes = log.Notes.Count > 0 ? string.Join(" | ", log.Notes.Take(3)) : "(no notes)";
-                    _output.WriteLine($"[DIAG][DataAcq] CRITICAL: FAILED Log Id={log.Id}, Patient={log.PatientId}, " +
+                    _output.WriteLine($"[DIAG][DataAcq] CRITICAL: TERMINAL Log Id={log.Id}, Patient={log.PatientId}, " +
                                      $"Status={log.Status}, Phase={log.QueryPhase}, Notes={notes}");
                 }
 
                 return true;
+            }
+
+            if (failed > 0)
+            {
+                _output.WriteLine($"[DIAG][DataAcq] WARN: {failed} log(s) currently in Failed status (retriable). Monitoring for recovery...");
             }
         }
         catch (Exception ex)

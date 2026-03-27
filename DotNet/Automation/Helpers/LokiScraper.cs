@@ -2,17 +2,16 @@
 using LantanaGroup.Link.Automation.Configuration;
 using Newtonsoft.Json.Linq;
 using RestSharp;
-using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Automation.Helpers;
 
 public class LokiScraper
 {
-    private readonly ITestOutputHelper _output;
+    private readonly IAutomationOutput _output;
     private readonly RestClient _lokiClient;
     private DateTime _lastQueryTime = DateTime.UtcNow;
 
-    public LokiScraper(ITestOutputHelper output, AutomationConfig config)
+    public LokiScraper(IAutomationOutput output, AutomationConfig config)
     {
         _output = output;
         _lokiClient = new RestClient(config.LokiBaseUrl);

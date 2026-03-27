@@ -4,7 +4,6 @@ using Confluent.Kafka;
 using LantanaGroup.Link.Automation.Configuration;
 using Newtonsoft.Json.Linq;
 using RestSharp;
-using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Automation.Helpers;
 
@@ -23,7 +22,7 @@ public class KafkaErrorMonitor : IAsyncDisposable
     private readonly string _kafkaUser;
     private readonly string _kafkaPassword;
 
-    private readonly ITestOutputHelper _output;
+    private readonly IAutomationOutput _output;
     private IConsumer<string, string>? _consumer;
     private CancellationTokenSource? _cts;
     private Task? _listenerTask;
@@ -35,7 +34,7 @@ public class KafkaErrorMonitor : IAsyncDisposable
     public IReadOnlyList<string> CapturedErrors => [.. _capturedErrors];
     public bool HasErrors => !_capturedErrors.IsEmpty;
 
-    public KafkaErrorMonitor(ITestOutputHelper output, AutomationConfig config)
+    public KafkaErrorMonitor(IAutomationOutput output, AutomationConfig config)
     {
         _output = output;
         _kafkaBootstrapServers = config.Kafka.BootstrapServers;

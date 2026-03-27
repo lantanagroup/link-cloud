@@ -1,11 +1,10 @@
 ﻿using System.Net;
+using LantanaGroup.Link.Automation.Helpers;
 using RestSharp;
-using Xunit;
-using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Automation.Services;
 
-public class FacilityApiClient(RestClient client, ITestOutputHelper output)
+public class FacilityApiClient(RestClient client, IAutomationOutput output)
 {
     public async Task<RestResponse> CreateAsync(string facilityId, string? measure)
     {
@@ -20,7 +19,7 @@ public class FacilityApiClient(RestClient client, ITestOutputHelper output)
             response = await SendCreateRequestAsync(facilityId, measure);
         }
 
-        Assert.True(response.StatusCode == HttpStatusCode.Created,
+        AutomationInvariant.Require(response.StatusCode == HttpStatusCode.Created,
             $"Expected HTTP 201 Created for facility creation but got {response.StatusCode}: {response.Content}");
 
         return response;

@@ -38,6 +38,7 @@ public sealed class TestServices
         new(AdminBffClient, Output, LokiScraper, AutomationCfg, config);
 
     public ReportDatabaseValidator CreateReportValidator() => _services.GetRequiredService<ReportDatabaseValidator>();
+    public ReportAbsManifestValidator CreateReportAbsManifestValidator() => _services.GetRequiredService<ReportAbsManifestValidator>();
     public DataAcquisitionDatabaseValidator CreateDataAcqValidator() => _services.GetRequiredService<DataAcquisitionDatabaseValidator>();
     public NormalizationDatabaseValidator CreateNormalizationValidator() => _services.GetRequiredService<NormalizationDatabaseValidator>();
     public TenantDatabaseValidator CreateTenantValidator() => _services.GetRequiredService<TenantDatabaseValidator>();

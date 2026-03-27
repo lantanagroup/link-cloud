@@ -2,7 +2,6 @@
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
 using Microsoft.EntityFrameworkCore;
-using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Automation.Helpers;
 
@@ -12,7 +11,7 @@ namespace LantanaGroup.Link.Automation.Helpers;
 /// </summary>
 public class PipelineProgressTracker
 {
-    private readonly ITestOutputHelper _output;
+    private readonly IAutomationOutput _output;
     private readonly int _expectedPatientCount;
     private readonly int _totalUnits;
     private readonly PipelineDataReader _reader;
@@ -38,7 +37,7 @@ public class PipelineProgressTracker
     /// </summary>
     public string? StalledStage => _stalledStage;
 
-    public PipelineProgressTracker(ITestOutputHelper output, int expectedPatientCount, DatabaseConnectionFactory dbFactory)
+    public PipelineProgressTracker(IAutomationOutput output, int expectedPatientCount, DatabaseConnectionFactory dbFactory)
     {
         _output = output;
         _expectedPatientCount = expectedPatientCount;

@@ -1,11 +1,10 @@
 ﻿using System.Net;
+using LantanaGroup.Link.Automation.Helpers;
 using RestSharp;
-using Xunit;
-using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Automation.Services;
 
-public class NormalizationApiClient(RestClient client, ITestOutputHelper output)
+public class NormalizationApiClient(RestClient client, IAutomationOutput output)
 {
     public async Task CreateConfigAsync(string facilityId)
     {
@@ -31,7 +30,7 @@ public class NormalizationApiClient(RestClient client, ITestOutputHelper output)
         request.AddJsonBody(body);
 
         var response = await client.ExecuteAsync(request);
-        Assert.True(response.StatusCode == HttpStatusCode.Created,
+        AutomationInvariant.Require(response.StatusCode == HttpStatusCode.Created,
             $"Response was not 201 Created {response.StatusCode}: {response.Content}");
     }
 }

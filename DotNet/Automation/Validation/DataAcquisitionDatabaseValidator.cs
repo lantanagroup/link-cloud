@@ -1,17 +1,16 @@
 ﻿using LantanaGroup.Link.Automation.Helpers;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
-using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Automation.Validation;
 
 public class DataAcquisitionDatabaseValidator
 {
     private const int MaxErrors = 100;
-    private readonly ITestOutputHelper _output;
+    private readonly IAutomationOutput _output;
     private readonly PipelineDataReader _reader;
 
-    public DataAcquisitionDatabaseValidator(ITestOutputHelper output, DatabaseConnectionFactory dbFactory)
+    public DataAcquisitionDatabaseValidator(IAutomationOutput output, DatabaseConnectionFactory dbFactory)
     {
         _output = output;
         _reader = new PipelineDataReader(dbFactory);

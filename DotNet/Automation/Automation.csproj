@@ -10,8 +10,6 @@
   <ItemGroup>
     <PackageReference Include="Hl7.Fhir.R4" Version="5.*" />
     <PackageReference Include="RestSharp" Version="112.*" />
-    <PackageReference Include="xunit.abstractions" Version="2.*" />
-    <PackageReference Include="xunit.assert" Version="2.*" />
   </ItemGroup>
 
   <ItemGroup>
