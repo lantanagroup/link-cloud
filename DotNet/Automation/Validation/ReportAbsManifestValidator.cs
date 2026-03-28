@@ -366,27 +366,31 @@ public class ReportAbsManifestValidator
         foreach (var extra in unexpectedInAbs)
             AddError(errors, $"ABS patient artifacts contain unexpected resource not present in ReportResource table: {extra}.");
 
-        var expectedByPatient = reportResources
-            .GroupBy(r => r.PatientId)
-            .ToDictionary(g => g.Key, g => g.Select(r => ToResourceKey(r.ResourceType, r.ResourceId)).ToHashSet(StringComparer.OrdinalIgnoreCase), StringComparer.Ordinal);
+        var reportCountMap = ToCountMap(
+            (await _reader.GetReportResourceCountsByPatientTypeAsync(scheduleId, facilityId))
+            .Select(x => (x.PatientId, x.ResourceType, x.Count)));
 
-        var actualByPatient = patientResources
-            .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType) &&
-                        !string.IsNullOrWhiteSpace(r.ResourceId) &&
-                        !IsAbsSupplementalType(r.ResourceType))
-            .GroupBy(r => r.PatientId)
-            .ToDictionary(g => g.Key, g => g.Select(r => ToResourceKey(r.ResourceType, r.ResourceId)).ToHashSet(StringComparer.OrdinalIgnoreCase), StringComparer.Ordinal);
+        var absCountMap = ToCountMap(
+            patientResources
+                .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType) && !string.IsNullOrWhiteSpace(r.ResourceId) && !IsAbsSupplementalType(r.ResourceType))
+                .GroupBy(r => new { r.PatientId, r.ResourceType })
+                .Select(g => (g.Key.PatientId, g.Key.ResourceType, g.Count())));
 
-        foreach (var patientId in expectedByPatient.Keys.Union(actualByPatient.Keys, StringComparer.Ordinal))
-        {
-            expectedByPatient.TryGetValue(patientId, out var expectedSet);
-            actualByPatient.TryGetValue(patientId, out var actualSet);
-            expectedSet ??= [];
-            actualSet ??= [];
+        CompareCountMapsExact("ReportResource->ABS", reportCountMap, absCountMap, errors);
 
-            if (expectedSet.Count != actualSet.Count)
-                AddError(errors, $"Patient resource count mismatch for {patientId}: ReportResource={expectedSet.Count}, ABS={actualSet.Count}.");
-        }
+        var measureEvalCountMap = ToCountMap(
+            (await _reader.GetMeasureEvalResourceCountsByPatientTypeAsync(scheduleId))
+            .Select(x => (x.PatientId, x.ResourceType, x.Count)));
+
+        CompareCountMapsExact("MeasureEval->ReportResource", measureEvalCountMap, reportCountMap, errors);
+        CompareCountMapsExact("MeasureEval->ABS", measureEvalCountMap, absCountMap, errors);
+
+        var dataAcqCountMap = ToCountMap(
+            (await _reader.GetDataAcquisitionResourceCountsByPatientTypeAsync(facilityId, reportId))
+            .Select(x => (x.PatientId, x.ResourceType, x.Count)));
+
+        CompareCountMapsMinimum("DataAcquisition->ReportResource", dataAcqCountMap, reportCountMap, errors);
+        CompareCountMapsMinimum("DataAcquisition->ABS", dataAcqCountMap, absCountMap, errors);
 
         var acquisitionLogs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
         var acquiredKeys = acquisitionLogs
@@ -649,6 +653,67 @@ public class ReportAbsManifestValidator
 
     private static bool IsAbsSupplementalType(string resourceType) =>
         AbsSupplementalResourceTypes.Contains(resourceType, StringComparer.OrdinalIgnoreCase);
+
+    private static Dictionary<(string PatientId, string ResourceType), int> ToCountMap(
+        IEnumerable<(string PatientId, string ResourceType, int Count)> source)
+    {
+        var map = new Dictionary<(string PatientId, string ResourceType), int>();
+
+        foreach (var row in source)
+        {
+            if (string.IsNullOrWhiteSpace(row.PatientId) || string.IsNullOrWhiteSpace(row.ResourceType))
+                continue;
+
+            var key = (row.PatientId, row.ResourceType);
+            map[key] = map.TryGetValue(key, out var existing) ? existing + row.Count : row.Count;
+        }
+
+        return map;
+    }
+
+    private static void CompareCountMapsExact(
+        string sourceName,
+        Dictionary<(string PatientId, string ResourceType), int> expected,
+        Dictionary<(string PatientId, string ResourceType), int> actual,
+        List<string> errors)
+    {
+        var keys = expected.Keys.Union(actual.Keys).ToList();
+
+        foreach (var key in keys)
+        {
+            expected.TryGetValue(key, out var expectedCount);
+            actual.TryGetValue(key, out var actualCount);
+
+            if (expectedCount != actualCount)
+            {
+                AddError(errors,
+                    $"{sourceName} count mismatch for patient={key.PatientId}, type={key.ResourceType}: expected={expectedCount}, actual={actualCount}.");
+            }
+        }
+    }
+
+    private static void CompareCountMapsMinimum(
+        string sourceName,
+        Dictionary<(string PatientId, string ResourceType), int> minimumExpected,
+        Dictionary<(string PatientId, string ResourceType), int> actual,
+        List<string> errors)
+    {
+        foreach (var (key, minCount) in minimumExpected)
+        {
+            if (!actual.TryGetValue(key, out var actualCount))
+            {
+                AddError(errors,
+                    $"{sourceName} missing patient/type in downstream layer: patient={key.PatientId}, type={key.ResourceType}, expectedAtLeast={minCount}, actual=0.");
+                continue;
+            }
+
+            if (actualCount > minCount)
+            {
+                AddError(errors,
+                    $"{sourceName} upstream count lower than downstream for patient={key.PatientId}, type={key.ResourceType}: upstream={minCount}, downstream={actualCount}.");
+            }
+        }
+    }
 
     private sealed record AbsResourceRecord(string SourceFile, string PatientId, string ResourceType, string ResourceId, JsonElement Resource);
 }

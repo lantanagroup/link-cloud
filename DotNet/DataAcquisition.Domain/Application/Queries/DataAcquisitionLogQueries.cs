@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Polly;
 using Polly.Retry;
 using Microsoft.Data.SqlClient;
@@ -901,7 +901,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             _dbContext.DataAcquisitionLogs.Update(existingLog);
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            return await GetAsync(updateLog.Id.Value, cancellationToken);
+            return DataAcquisitionLogModel.FromDomain(existingLog);
         });
     }
 }

@@ -11,9 +11,12 @@ namespace LantanaGroup.Link.Automation.Helpers;
 /// </summary>
 public class ProgressMonitor
 {
+    private const int ActivityCheckInterval = 6; // ~30s with 5s polling
+
     private readonly IAutomationOutput _output;
     private readonly PipelineProgressTracker? _progressTracker;
     private readonly PipelineDataReader _reader;
+    private readonly LokiScraper? _lokiScraper;
 
     private string? _lastScheduleStatus;
     private int _lastReportEntryCount;
@@ -21,6 +24,9 @@ public class ProgressMonitor
     private int _lastAcqLogCount;
     private int _lastCompletedAcqCount;
     private string? _lastAcqBreakdown;
+    private int _progressCheckCount;
+    private string? _lastMeasureEvalActivity;
+    private string? _lastValidationActivity;
 
     /// <summary>
     /// Returns the pipeline stage that appears stalled, or null if progress
@@ -36,6 +42,7 @@ public class ProgressMonitor
     public ProgressMonitor(IAutomationOutput output, int expectedPatientCount, LokiScraper? lokiScraper, AutomationConfig config)
     {
         _output = output;
+        _lokiScraper = lokiScraper;
         var dbFactory = new DatabaseConnectionFactory(config.Database);
         _reader = new PipelineDataReader(dbFactory);
         _progressTracker = expectedPatientCount > 0
@@ -45,11 +52,12 @@ public class ProgressMonitor
 
     /// <summary>
     /// Runs a single progress check cycle: database state, progress bar,
-    /// and stall detection.
+    /// activity confirmation, and stall detection.
     /// Returns true if a critical failure is detected.
     /// </summary>
     public async Task<bool> CheckProgressAsync(string facilityId, string reportId)
     {
+        _progressCheckCount++;
         var hasCriticalFailure = false;
 
         hasCriticalFailure |= await CheckReportProgress(facilityId, reportId);
@@ -60,7 +68,32 @@ public class ProgressMonitor
             await _progressTracker.UpdateAsync(facilityId, reportId);
         }
 
+        await CheckPipelineActivityAsync();
+
         return hasCriticalFailure;
+    }
+
+    private async Task CheckPipelineActivityAsync()
+    {
+        if (_lokiScraper == null)
+            return;
+
+        if (_progressCheckCount % ActivityCheckInterval != 0)
+            return;
+
+        var measureEvalActivity = await _lokiScraper.GetMeasureEvalActivitySummaryAsync(TimeSpan.FromSeconds(60));
+        if (!string.IsNullOrWhiteSpace(measureEvalActivity) && !string.Equals(measureEvalActivity, _lastMeasureEvalActivity, StringComparison.Ordinal))
+        {
+            _output.WriteLine($"[DIAG][MeasureEval] Active: {measureEvalActivity}");
+            _lastMeasureEvalActivity = measureEvalActivity;
+        }
+
+        var validationActivity = await _lokiScraper.GetValidationActivitySummaryAsync(TimeSpan.FromSeconds(60));
+        if (!string.IsNullOrWhiteSpace(validationActivity) && !string.Equals(validationActivity, _lastValidationActivity, StringComparison.Ordinal))
+        {
+            _output.WriteLine($"[DIAG][Validation] Active: {validationActivity}");
+            _lastValidationActivity = validationActivity;
+        }
     }
 
     private async Task<bool> CheckReportProgress(string facilityId, string reportId)

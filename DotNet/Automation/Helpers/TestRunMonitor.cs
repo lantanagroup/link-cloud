@@ -38,7 +38,7 @@ public sealed class TestRunMonitor
         _criticalEventEmitted = false;
     }
 
-    public async Task RunCycleAsync(CancellationToken cancellationToken)
+    public async Task RunCycleAsync(CancellationToken cancellationToken, bool forceAllProbes = false)
     {
         State.IncrementCycle();
 
@@ -59,8 +59,12 @@ public sealed class TestRunMonitor
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (_lastProbeRunUtc.TryGetValue(probe.Name, out var lastRun) && now - lastRun < probe.Interval)
+            if (!forceAllProbes &&
+                _lastProbeRunUtc.TryGetValue(probe.Name, out var lastRun) &&
+                now - lastRun < probe.Interval)
+            {
                 continue;
+            }
 
             _lastProbeRunUtc[probe.Name] = now;
 

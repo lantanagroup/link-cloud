@@ -10,10 +10,24 @@ public class FacilityApiClient(RestClient client, IAutomationOutput output)
     {
         output.WriteLine("Creating facility...");
 
+        var existingFacility = await GetFacilityAsync(facilityId);
+        if (existingFacility.StatusCode == HttpStatusCode.OK)
+        {
+            output.WriteLine($"Facility '{facilityId}' already exists. Skipping create.");
+            return existingFacility;
+        }
+
         var response = await SendCreateRequestAsync(facilityId, measure);
 
         if (response.StatusCode == HttpStatusCode.BadRequest)
         {
+            existingFacility = await GetFacilityAsync(facilityId);
+            if (existingFacility.StatusCode == HttpStatusCode.OK)
+            {
+                output.WriteLine($"Facility '{facilityId}' already exists (detected after create attempt). Skipping create.");
+                return existingFacility;
+            }
+
             output.WriteLine($"Facility creation returned BadRequest — attempting cleanup and retry. Response: {response.Content}");
             await DeleteAsync(facilityId);
             response = await SendCreateRequestAsync(facilityId, measure);
@@ -44,6 +58,12 @@ public class FacilityApiClient(RestClient client, IAutomationOutput output)
         };
 
         request.AddJsonBody(body);
+        return await client.ExecuteAsync(request);
+    }
+
+    private async Task<RestResponse> GetFacilityAsync(string facilityId)
+    {
+        var request = new RestRequest($"/Facility/{facilityId}", Method.Get);
         return await client.ExecuteAsync(request);
     }
 

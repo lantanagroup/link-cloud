@@ -20,6 +20,7 @@ public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETe
     private static readonly TestScenarioConfig Config = TestConfig.MegaPatientTestConfig;
 
     private readonly TestServices _b;
+    private List<(string Name, string Json)> _generatedBundles = [];
 
     private AutomationConfig AutomationCfg => _b.AutomationCfg;
     private DualOutputHelper _output => _b.Output;
@@ -40,6 +41,7 @@ public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETe
     {
         _output.WriteLine($"Using deterministic generation seed: {GenerationSeed}");
         var (patientIds, bundles) = FhirBundleGenerator.Generate(_output, generationSeed: GenerationSeed);
+        _generatedBundles = bundles;
 
         if (Config.PatientIds.Count == 0)
         {
@@ -90,7 +92,9 @@ public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETe
 
         _output.WriteLine($"MeasureId: {measureId}");
         _output.WriteLine($"Patients : {Config.PatientIds.Count}");
-        _output.WriteLine($"Polling  : {Config.MaxRetryCount} retries x {Config.PollingIntervalSeconds}s = {Config.MaxPollingDuration.TotalSeconds:F0}s max");
+        _output.WriteLine(
+            $"Submission polling timeout: up to {Config.MaxPollingDuration.TotalMinutes:F1} minutes " +
+            $"({Config.MaxRetryCount} checks every {Config.PollingIntervalSeconds} seconds).");
 
         // Step 2: Create facility.
         await FacilityApi.CreateAsync(FacilityId, measureId);
@@ -153,6 +157,19 @@ public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETe
             FacilityId,
             reportId,
             GeneratedFhirDataSnapshotWriter.GetSnapshotDirectory(nameof(MegaPatientTest)));
+
+        await ValidationBaselineManager.ValidateOrCreateAsync(
+            _output,
+            _b.DataReader,
+            nameof(MegaPatientTest),
+            FacilityId,
+            reportId,
+            measureId,
+            Config.StartDate,
+            Config.EndDate,
+            Config.PatientIds,
+            _generatedBundles,
+            internalAbsResources);
 
         // Step 9-10: Strict database validation.
         await _b.CreateReportValidator().ValidateAllAsync(FacilityId, reportId, measureId, Config.PatientIds);

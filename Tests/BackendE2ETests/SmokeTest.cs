@@ -20,6 +20,7 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
     private static readonly TestScenarioConfig Config = TestConfig.AdhocReportingSmokeTestConfig;
 
     private readonly TestServices _b;
+    private List<(string Name, string Json)> _generatedBundles = [];
 
     private AutomationConfig AutomationCfg => _b.AutomationCfg;
     private DualOutputHelper _output => _b.Output;
@@ -40,6 +41,7 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
     {
         _output.WriteLine($"Using deterministic generation seed: {GenerationSeed}");
         var (patientIds, bundles) = FhirBundleGenerator.Generate(_output, 1, 1000, "SmokePatient", GenerationSeed);
+        _generatedBundles = bundles;
 
         if (Config.PatientIds.Count == 0)
         {
@@ -150,6 +152,19 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
             FacilityId,
             reportId,
             GeneratedFhirDataSnapshotWriter.GetSnapshotDirectory(nameof(SmokeTest)));
+
+        await ValidationBaselineManager.ValidateOrCreateAsync(
+            _output,
+            _b.DataReader,
+            nameof(SmokeTest),
+            FacilityId,
+            reportId,
+            measureId,
+            Config.StartDate,
+            Config.EndDate,
+            Config.PatientIds,
+            _generatedBundles,
+            internalAbsResources);
 
         // Step 9-10: Strict database validation.
         await _b.CreateReportValidator().ValidateAllAsync(FacilityId, reportId, measureId, Config.PatientIds);

@@ -19,9 +19,12 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
     private const string FacilityId = "MultiPatientTestFacility";
     private const int GenerationSeed = 20260328;
 
-    private static readonly TestScenarioConfig Config = TestConfig.BuildScenarioConfig("MULTI_PATIENT_TEST");
+    private static readonly TestScenarioConfig Config = TestConfig.BuildScenarioConfig(
+        "MULTI_PATIENT_TEST",
+        defaultPatientIds: []);
 
     private readonly TestServices _tesetServices;
+    private List<(string Name, string Json)> _generatedBundles = [];
 
     private AutomationConfig AutomationCfg => _tesetServices.AutomationCfg;
     private DualOutputHelper _output => _tesetServices.Output;
@@ -43,6 +46,7 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
         _output.WriteLine($"Using deterministic generation seed: {GenerationSeed}");
         // Generate 1000 synthetic patients, each with ~100 resources
         var (patientIds, bundles) = FhirBundleGenerator.Generate(_output, 1000, 100, "MultiPatient", GenerationSeed);
+        _generatedBundles = bundles;
 
         // If config has no patient IDs set (the default), use generated ones
         if (Config.PatientIds.Count == 0)
@@ -98,7 +102,9 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
 
         _output.WriteLine($"MeasureId: {measureId}");
         _output.WriteLine($"Patients : {Config.PatientIds.Count}");
-        _output.WriteLine($"Polling  : {Config.MaxRetryCount} retries x {Config.PollingIntervalSeconds}s = {Config.MaxPollingDuration.TotalSeconds:F0}s max");
+        _output.WriteLine(
+            $"Submission polling timeout: up to {Config.MaxPollingDuration.TotalMinutes:F1} minutes " +
+            $"({Config.MaxRetryCount} checks every {Config.PollingIntervalSeconds} seconds).");
 
         // Step 2: Create facility
         await FacilityApi.CreateAsync(FacilityId, measureId);
@@ -164,6 +170,19 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
             FacilityId,
             reportId,
             GeneratedFhirDataSnapshotWriter.GetSnapshotDirectory(nameof(MultiPatientTest)));
+
+        await ValidationBaselineManager.ValidateOrCreateAsync(
+            _output,
+            _tesetServices.DataReader,
+            nameof(MultiPatientTest),
+            FacilityId,
+            reportId,
+            measureId,
+            Config.StartDate,
+            Config.EndDate,
+            Config.PatientIds,
+            _generatedBundles,
+            internalAbsResources);
     }
 }
 

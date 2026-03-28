@@ -25,6 +25,7 @@ public class PipelineDataReader
 
     public record ResourceGroupSummary(string PatientId, string ResourceType, int Count);
     public record ReportResourceIdentity(string PatientId, string ResourceType, string ResourceId);
+    public record PatientResourceTypeCount(string PatientId, string ResourceType, int Count);
 
     // Report DB
     public async Task<ReportSchedule?> GetReportScheduleAsync(Guid scheduleId)
@@ -173,5 +174,51 @@ public class PipelineDataReader
     {
         await using var db = _dbFactory.CreateTenantDbContext();
         return await db.Facilities.FirstOrDefaultAsync(f => f.FacilityId == facilityId);
+    }
+
+    public async Task<List<PatientResourceTypeCount>> GetReportResourceCountsByPatientTypeAsync(Guid scheduleId, string facilityId)
+    {
+        await using var db = _dbFactory.CreateReportDbContext();
+        var rows = await db.ReportResource
+            .Where(r => r.ReportScheduleId == scheduleId && r.FacilityId == facilityId)
+            .GroupBy(r => new { r.PatientId, r.ResourceType })
+            .Select(g => new PatientResourceTypeCount(g.Key.PatientId, g.Key.ResourceType, g.Count()))
+            .ToListAsync();
+
+        return rows;
+    }
+
+    public async Task<List<PatientResourceTypeCount>> GetMeasureEvalResourceCountsByPatientTypeAsync(Guid scheduleId)
+    {
+        await using var db = _dbFactory.CreateReportDbContext();
+
+        var rows = await db.EntryMeasureReport
+            .Where(emr => emr.ReportEntry.ReportScheduleId == scheduleId)
+            .SelectMany(emr => emr.ResourceCounts.Select(rc => new PatientResourceTypeCount(
+                emr.ReportEntry.PatientId,
+                rc.ResourceType,
+                rc.ResourceCount)))
+            .ToListAsync();
+
+        return rows
+            .GroupBy(r => new { r.PatientId, r.ResourceType })
+            .Select(g => new PatientResourceTypeCount(g.Key.PatientId, g.Key.ResourceType, g.Sum(x => x.Count)))
+            .ToList();
+    }
+
+    public async Task<List<PatientResourceTypeCount>> GetDataAcquisitionResourceCountsByPatientTypeAsync(string facilityId, string reportId)
+    {
+        var logs = await GetAcquisitionLogsAsync(facilityId, reportId);
+
+        var counts = logs
+            .Where(l => !string.IsNullOrWhiteSpace(l.PatientId) && l.Status == LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus.Completed)
+            .SelectMany(l => (l.ResourceAcquiredIds ?? [])
+                .Where(id => !string.IsNullOrWhiteSpace(id) && id.Contains('/'))
+                .Select(id => new { PatientId = l.PatientId!, ResourceType = id.Split('/')[0] }))
+            .GroupBy(x => new { x.PatientId, x.ResourceType })
+            .Select(g => new PatientResourceTypeCount(g.Key.PatientId, g.Key.ResourceType, g.Count()))
+            .ToList();
+
+        return counts;
     }
 }

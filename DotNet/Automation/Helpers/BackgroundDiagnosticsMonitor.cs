@@ -111,6 +111,19 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
     {
         if (_cts == null) return;
 
+        try
+        {
+            await _monitor.RunCycleAsync(CancellationToken.None, forceAllProbes: true);
+        }
+        catch (Exception ex)
+        {
+            await PublishEventAsync(
+                AutomationMonitorEventType.MonitorLoopError,
+                MonitorIssueSeverity.Warning,
+                "Monitor",
+                $"Final monitor cycle error before stop: {ex.Message}");
+        }
+
         await PublishEventAsync(
             AutomationMonitorEventType.RunStopping,
             MonitorIssueSeverity.Info,

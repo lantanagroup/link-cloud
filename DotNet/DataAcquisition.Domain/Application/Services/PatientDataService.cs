@@ -477,20 +477,8 @@ public class PatientDataService : IPatientDataService
 
             if (successfullyUpdatedLog)
             {
-                //3. set to "Processing"
+                // Status already atomically set in TrySetLogStatusAsync; keep in-memory copy aligned.
                 log.Status = RequestStatus.Processing;
-                await _dataAcquisitionLogQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
-                {
-                    Id = log.Id,
-                    ResourceAcquiredIds = log.ResourceAcquiredIds,
-                    RetryAttempts = log.RetryAttempts,
-                    CompletionDate = log.CompletionDate,
-                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
-                    TraceId = log.TraceId,
-                    ExecutionDate = log.ExecutionDate,
-                    Notes = log.Notes,
-                    Status = log.Status,
-                }, cancellationToken);
 
                 //3. start timer
                 Stopwatch stopwatch = new Stopwatch();

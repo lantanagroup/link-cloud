@@ -1,112 +1,91 @@
-# End-to-End (E2E) Test Project
+﻿# BackendE2ETests
 
 ## Overview
 
-This project is designed to execute end-to-end (E2E) tests for validating the functionality and behavior of the system.
-It ensures that all the services work together seamlessly within the system by routing requests through the **Admin BFF
-** service.
+`BackendE2ETests` validates end-to-end Link reporting flows against a running Link environment.
 
-## Key Features
+The tests exercise the pipeline by:
 
-- **Testing Framework:** This project uses **XUnit** as the testing framework.
-- **Admin BFF Service:** All tests communicate with the **Admin BFF service**, which acts as a proxy. The tests never
-  communicate directly with individual microservices but rely on the Admin BFF for all interactions.
-- **Docker Compatibility:** Tests can run in complete isolation of an external Docker Compose infrastructure to ensure
-  repeatability and deterministic results.
-- **Self-Contained Test Data:** All test data required during execution is embedded within the project. No external
-  internet dependency is needed to fetch the test data.
-- **Environment Cleanup:** Any data created during the tests is thoroughly cleaned up after execution, ensuring the
-  environment is restored to its initial state.
-- **Environment Variables Support:** Tests can be configured via environment variables when necessary, allowing for
-  customization of the test environment and behavior without modifying the codebase.
+1. generating deterministic synthetic FHIR data,
+2. loading data into FHIR,
+3. creating tenant/query/normalization/report configuration,
+4. running report generation and submission,
+5. validating downloaded ABS artifacts and pipeline persistence layers.
 
-## Prerequisites
+## Test suites
 
-- .NET 8.0 SDK must be installed.
-- Docker (optional, only required if you wish to run the tests in complete isolation).
+- `SmokeTest` - single-patient, fast feedback path.
+- `MegaPatientTest` - high-volume scenario.
+- `MultiPatientTest` - multi-patient volume scenario.
 
-## Running the Tests
+## Project behavior highlights
 
-To execute the tests locally, follow these steps:
+- **Deterministic generation** using explicit seeds.
+- **Background diagnostics monitoring** with event-driven output.
+- **Deep ABS validation** via `ReportAbsManifestValidator`.
+- **Baseline comparison** for static test scenarios via `ValidationBaselineManager`.
+- **FHIR snapshot output** saved locally only when generated bundle content changes.
 
-1. Build the project:
-   ```bash
-   dotnet build
-   ```
+## Running
 
-2. Run the tests:
-   ```bash
-   dotnet test
-   ```
+From repo root:
 
-If you want to run the tests using the Docker Compose infrastructure, ensure the services are up and running:
+```bash
+dotnet test Tests/BackendE2ETests/BackendE2ETests.csproj
+```
 
-   ```bash
-   docker-compose up
-   ```
+## Configuration (environment variables)
 
-### Configuring
+Primary environment variables used by `TestConfig` include:
 
-The `TestConfig` class supports configurable properties that are sourced from environment variables. Environment 
-variables can be specified on the host machine (i.e. Windows > Start > "Edit environment variables for your account")
-or they can be specified in a `.runsettings` file in the root of the repository.
+| Variable | Purpose | Default |
+|---|---|---|
+| `EXTERNAL_FHIR_SERVER_BASE_URL` | FHIR base URL reachable from test host | `http://localhost:6157/fhir` |
+| `INTERNAL_FHIR_SERVER_BASE_URL` | FHIR base URL reachable from Link services | `http://fhir-server:8080/fhir` |
+| `ADMIN_BFF_BASE_URL` | Admin BFF API base URL | `http://localhost:8063/api` |
+| `LOKI_BASE_URL` | Loki base URL for diagnostics scraping | `http://localhost:3100` |
+| `CLEANUP_SMOKE_TEST_DATA` | Whether to expunge FHIR data during cleanup | `false` |
+| `*_REMOVE_FACILITY_CONFIG` | Whether tests remove facility config during cleanup | `false` |
 
-| Environment Variable                                | Description                                                                                                                                | Default Value                |
-|-----------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|------------------------------|
-| EXTERNAL_FHIR_SERVER_BASE_URL                       | Base URL for FHIR server from where the tests are being executed                                                                           | http://localhost:6157/fhir   |
-| INTERNAL_FHIR_SERVER_BASE_URL                       | Base URL for FHIR server from where link services are deployed/running (i.e. within the docker network)                                    | http://fhir-server:8080/fhir |
-| ADMIN_BFF_BASE_URL                                  | Base URL for Admin BFF service API                                                                                                         | http://localhost:8063/api    |
-| ADHOC_REPORTING_SMOKE_<br/>TEST_MEASURE_BUNDLE_PATH | Path to the measure bundle file used in smoke tests                                                                                        | resource://...ACH...json     |
-| ADMINBFF_OAUTH_SHOULD_AUTHENTICATE                  | Flag to enable OAuth authentication for Admin BFF                                                                                          | false                        |
-| ADMINBFF_OAUTH_TOKEN_ENDPOINT                       | OAuth token endpoint URL for Admin BFF authentication                                                                                      |                              |
-| ADMINBFF_OAUTH_CLIENT_ID                            | OAuth client ID for Admin BFF authentication                                                                                               |                              |
-| ADMINBFF_OAUTH_USERNAME                             | Username for Admin BFF OAuth authentication                                                                                                |                              |
-| ADMINBFF_OAUTH_PASSWORD                             | Password for Admin BFF OAuth authentication                                                                                                |                              |
-| ADMINBFF_OAUTH_SCOPE                                | OAuth scope for Admin BFF authentication                                                                                                   |                              |
-| FHIRSERVER_OAUTH_SHOULD_AUTHENTICATE                | Flag to enable OAuth authentication for FHIR server                                                                                        | false                        |
-| FHIRSERVER_OAUTH_TOKEN_ENDPOINT                     | OAuth token endpoint URL for FHIR server authentication                                                                                    |                              |
-| FHIRSERVER_OAUTH_CLIENT_ID                          | OAuth client ID for FHIR server authentication                                                                                             |                              |
-| FHIRSERVER_OAUTH_USERNAME                           | Username for FHIR server OAuth authentication                                                                                              |                              |
-| FHIRSERVER_OAUTH_PASSWORD                           | Password for FHIR server OAuth authentication                                                                                              |                              |
-| FHIRSERVER_OAUTH_SCOPE                              | OAuth scope for FHIR server authentication                                                                                                 |                              |
-| FHIRSERVER_BASICAUTH_SHOULD_AUTHENTICATE            | Whether to pass basic credentials as authentication to the FHIR server. If both OAUTH and BASICAUTH are specified, OAUTH takes precedence. | false                        | 
-| FHIRSERVER_BASICAUTH_USERNAME                       | Username for basic authentication with the FHIR server.                                                                                    |                              |
-| FHIRSERVER_BASICAUTH_PASSWORD                       | Password for basic authentication with the FHIR server.                                                                                    |                              |
+Also see scenario-specific values in `TestConfig` for `ADHOC_REPORTING_SMOKE_TEST`, `MEGA_PATIENT_TEST`, and `MULTI_PATIENT_TEST` prefixes.
 
-The default values/settings are configured to support running the BackendE2ETests within the docker environment as specified by the `/docker-compose.yml` file.
+## Generated FHIR snapshots
 
-> Note: If using the Rider IDE for development/testing, you need to configure the test settings in Rider to use `.runsettings` in the `Build, Execution, Deployment > Unit Testing > Test Runner > Test Settings` section.
+Generated bundles are written under:
 
-## Test Data
+- `E2E_GENERATED_FHIR_OUTPUT_PATH` (if set), otherwise
+- `generated-fhir-snapshots/<TestName>` beneath test runtime output base.
 
-- Test data resides within the **E2ETests** project.
-- The tests are pre-configured to load and utilize this data during execution.
+Writes are hash-gated (skip write when content is unchanged).
 
-## Cleanup
+## Baseline validation
 
-Post execution, all test-created data in the environment is cleaned up. This ensures that the tests leave no residual
-data that might interfere with subsequent test runs.
+`ValidationBaselineManager` stores and compares baseline documents for static test scenarios.
 
-## End-to-End Tests
+Default baseline location:
 
-### Smoke Test
+- `Tests/BackendE2ETests/Baselines/<TestName>.baseline.json`
 
-This smoke test ensures that the core functionality of the system's adhoc and historical reporting capabilities are
-working as expected. It validates the interaction between services via the **Admin BFF** service. The test performs the
-following steps:
+Optional override:
 
-1. **Load Data on a FHIR Server**: Populate the FHIR server with the necessary test data, ensuring the data is structured correctly for testing purposes.
+- `E2E_BASELINE_DIR`
 
-2. **Load a Measure into the MeasureEval and Validation Services**:
-    - Store a predefined measure into the **MeasureEval** service, which is responsible for evaluating measures.
-    - The measure's validationa rtifacts are also loaded into the **Validation** service to verify its compliance with the expected standards.
+Regeneration switch:
 
-3. **Configure a Tenant for the FHIR Server**: Set up a dedicated tenant configuration associated with the FHIR server. This is a minimal configuration that indicates how to query and normalize.
+- `E2E_BASELINE_REGENERATE=true` to regenerate baseline files.
 
-4. **Generate an Adhoc Report**:
-    - Trigger the generation of an adhoc report using the data and measures loaded into the system. This tests the report generation workflow from input processing to report creation.
-    - Polls the Admin BFF service on an interval to check when the report is submitted, and proceeds when it has been submitted
+If no baseline exists, tests create one automatically.
 
-5. **Download the Report Data**: Retrieve the generated report data.
+## Diagnostics output
 
-6. **Validate the Report Data**: Verify the downloaded report data against expected results to ensure accuracy and completeness.
+Tests consume diagnostics events and render concise output lines.
+Noisy cadence events are suppressed, while important pipeline, issue, and stop/failure signals are preserved.
+
+## Cleanup behavior
+
+Cleanup is configurable and intentionally conservative by default:
+
+- facility deletion disabled by default
+- FHIR expunge disabled by default
+
+Enable cleanup explicitly through environment variables when desired.
