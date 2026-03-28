@@ -901,7 +901,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             _dbContext.DataAcquisitionLogs.Update(existingLog);
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            return DataAcquisitionLogModel.FromDomain(existingLog);
+            return await GetAsync(updateLog.Id.Value, cancellationToken);
         });
     }
 }
