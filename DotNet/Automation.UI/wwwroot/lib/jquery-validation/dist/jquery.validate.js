@@ -1065,11 +1065,23 @@ $.extend( $.validator, {
 
 			// If radio/checkbox, validate first element in group instead
 			if ( this.checkable( element ) ) {
-				element = this.findByName( element.name );
+				var group = this.findByName( element.name ).not( this.settings.ignore );
+				return group[ 0 ];
 			}
 
-			// Always apply ignore filter
-			return $( element ).not( this.settings.ignore )[ 0 ];
+			// Normalize potential jQuery object/array to a DOM element
+			if ( element && element.jquery ) {
+				element = element[ 0 ];
+			} else if ( Array.isArray( element ) ) {
+				element = element[ 0 ];
+			}
+
+			// Always apply ignore filter for non-checkable elements
+			if ( element && !$( element ).is( this.settings.ignore ) ) {
+				return element;
+			}
+
+			return undefined;
 		},
 
 		checkable: function( element ) {
