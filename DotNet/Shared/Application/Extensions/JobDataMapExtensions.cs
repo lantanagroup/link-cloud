@@ -53,9 +53,6 @@ public static class JobDataMapExtensions
         {
             if (storedValue is string storedString)
             {
-                if (string.IsNullOrWhiteSpace(storedString))
-                    return default;
-
                 try
                 {
                     var deserialized = JsonSerializer.Deserialize<string>(storedString);

@@ -111,6 +111,20 @@ public class JobDataMapExtensionsTests
         Assert.Equal("plain", resolved);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void GetObject_String_EmptyOrWhitespace_RoundTrips(string input)
+    {
+        var map = new JobDataMap();
+
+        map.PutObject("name", input);
+
+        var resolved = map.GetObject<string>("name");
+
+        Assert.Equal(input, resolved);
+    }
+
     [Fact]
     public void GetObject_WhitespaceString_ReturnsDefaultForNonString()
     {
