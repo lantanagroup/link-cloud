@@ -86,7 +86,7 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
     [Trait("Category", "RegenerateReportTest")]
     public async Task ExecuteRegenerateReportTest()
     {
-        var measureLoader = new MeasureLoader(_b.AdminBffClient, Output, _config);
+        var measureLoader = new MeasureLoader(_b.MeasureEvalClient, _b.SdkValidationClient, Output, _config);
         await measureLoader.LoadAsync();
 
         var measureId = measureLoader.MeasureId

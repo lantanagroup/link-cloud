@@ -94,7 +94,7 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
     public async Task ExecuteMultiPatientTest()
     {
         // Step 1: Load measure definition into measureeval and validation
-        var measureLoader = new MeasureLoader(_tesetServices.AdminBffClient, _output, Config);
+        var measureLoader = new MeasureLoader(_tesetServices.MeasureEvalClient, _tesetServices.SdkValidationClient, _output, Config);
         await measureLoader.LoadAsync();
 
         var measureId = measureLoader.MeasureId

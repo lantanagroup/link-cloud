@@ -1,4 +1,5 @@
-﻿using Flurl.Http;
+﻿using System.Text.Json;
+using Flurl.Http;
 using LantanaGroup.Link.Sdk.ApiClient;
 using System.Net;
 
@@ -25,6 +26,17 @@ public sealed class ValidationServiceClient : LinkApiClientBase
         var response = await Request("validation/category/$initialize")
             .AllowAnyHttpStatus()
             .PostAsync(cancellationToken: cancellationToken);
+
+        return response.ResponseMessage.StatusCode;
+    }
+
+    public async Task<HttpStatusCode> UpsertResourceArtifactAsync(string artifactId, string resourceJson, CancellationToken cancellationToken = default)
+    {
+        using var doc = JsonDocument.Parse(resourceJson);
+
+        var response = await Request($"validation/artifact/RESOURCE/{artifactId}")
+            .AllowAnyHttpStatus()
+            .PutJsonAsync(doc.RootElement, cancellationToken: cancellationToken);
 
         return response.ResponseMessage.StatusCode;
     }

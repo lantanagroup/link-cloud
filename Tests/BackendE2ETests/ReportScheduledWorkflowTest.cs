@@ -88,7 +88,7 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
     [Trait("Category", "ReportScheduledWorkflowTest")]
     public async Task ExecuteReportScheduledWorkflowTest()
     {
-        var measureLoader = new MeasureLoader(_b.AdminBffClient, Output, _config);
+        var measureLoader = new MeasureLoader(_b.MeasureEvalClient, _b.SdkValidationClient, Output, _config);
         await measureLoader.LoadAsync();
 
         var measureId = measureLoader.MeasureId
@@ -99,7 +99,7 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
         await QueryConfigApi.CreateQueryPlanAsync(_facilityId, measureId, "Epic");
         await QueryConfigApi.CreateQueryConfigAsync(_facilityId);
 
-        var reportId = await ProduceReportScheduledEventAsync(_facilityId, measureId, TimeSpan.FromSeconds(30));
+        var reportId = await ProduceReportScheduledEventAsync(_facilityId, measureId, TimeSpan.FromMinutes(2));
         await WaitForScheduleCreationAsync(reportId);
         await ProduceAdmitPatientEventAsync(_facilityId, _config.PatientIds[0]);
 

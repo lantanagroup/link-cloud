@@ -29,7 +29,14 @@ public sealed class TestServices
     public FhirDataLoader FhirDataLoader => _services.GetRequiredService<FhirDataLoader>();
     public DatabaseConnectionFactory DbFactory => _services.GetRequiredService<DatabaseConnectionFactory>();
     public PipelineDataReader DataReader => _services.GetRequiredService<PipelineDataReader>();
+
+    public FacilityServiceClient FacilityClient => _services.GetRequiredService<FacilityServiceClient>();
+    public NormalizationServiceClient NormalizationClient => _services.GetRequiredService<NormalizationServiceClient>();
+    public DataAcquisitionServiceClient DataAcquisitionClient => _services.GetRequiredService<DataAcquisitionServiceClient>();
     public ReportServiceClient ReportClient => _services.GetRequiredService<ReportServiceClient>();
+    public MeasureEvalServiceClient MeasureEvalClient => _services.GetRequiredService<MeasureEvalServiceClient>();
+    public ValidationServiceClient SdkValidationClient => _services.GetRequiredService<ValidationServiceClient>();
+    public CensusServiceClient CensusClient => _services.GetRequiredService<CensusServiceClient>();
 
     public FacilityApiClient CreateFacilityApi() => _services.GetRequiredService<FacilityApiClient>();
     public NormalizationApiClient CreateNormalizationApi() => _services.GetRequiredService<NormalizationApiClient>();

@@ -2,8 +2,9 @@
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.Automation.Helpers;
+using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.SerDes;
-using RestSharp;
+using System.Net;
 using System.Reflection;
 using Task = System.Threading.Tasks.Task;
 
@@ -11,7 +12,8 @@ namespace LantanaGroup.Link.Automation;
 
 public class MeasureLoader
 {
-    private readonly RestClient _adminBffClient;
+    private readonly MeasureEvalServiceClient _measureEvalClient;
+    private readonly ValidationServiceClient _validationClient;
     private readonly IAutomationOutput _output;
     private readonly TestScenarioConfig _config;
     private readonly Assembly? _resourceAssembly;
@@ -21,16 +23,15 @@ public class MeasureLoader
     private Bundle? _evaluationBundle;
     private Bundle? _validationBundle;
 
-    /// <param name="adminBffClient">REST client for the Admin BFF API.</param>
-    /// <param name="output">Test output helper.</param>
-    /// <param name="config">The scenario config containing the measure bundle location.</param>
-    /// <param name="resourceAssembly">
-    /// The assembly to load embedded resources from when MeasureBundleLocation uses the "resource://" scheme.
-    /// If null, defaults to the calling assembly.
-    /// </param>
-    public MeasureLoader(RestClient adminBffClient, IAutomationOutput output, TestScenarioConfig config, Assembly? resourceAssembly = null)
+    public MeasureLoader(
+        MeasureEvalServiceClient measureEvalClient,
+        ValidationServiceClient validationClient,
+        IAutomationOutput output,
+        TestScenarioConfig config,
+        Assembly? resourceAssembly = null)
     {
-        _adminBffClient = adminBffClient;
+        _measureEvalClient = measureEvalClient;
+        _validationClient = validationClient;
         _output = output;
         _config = config;
         _resourceAssembly = resourceAssembly;
@@ -59,14 +60,8 @@ public class MeasureLoader
         else if (_config.MeasureBundleLocation.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
                  _config.MeasureBundleLocation.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {
-            var client = new RestClient();
-            var request = new RestRequest(_config.MeasureBundleLocation, Method.Get);
-            var response = await client.ExecuteAsync(request);
-
-            if (!response.IsSuccessful)
-                throw new Exception($"Failed to fetch bundle from {_config.MeasureBundleLocation}: {response.ErrorMessage}");
-
-            return response.Content;
+            using var client = new HttpClient();
+            return await client.GetStringAsync(_config.MeasureBundleLocation);
         }
 
         throw new NotSupportedException($"Unsupported path type: {_config.MeasureBundleLocation}");
@@ -107,17 +102,14 @@ public class MeasureLoader
         await this.GetMeasureBundleAsync();
 
         _output.WriteLine("Loading measure bundle for evaluation...");
-        var request = new RestRequest($"measureeval/measure-definition", Method.Put);
-        request.AddJsonBody(this._evaluationBundle.ToJson());
-        var response = await _adminBffClient.ExecuteAsync(request);
+        var putStatus = await _measureEvalClient.PutMeasureDefinitionAsync(this._evaluationBundle!.ToJson());
 
-        if (response.StatusCode != System.Net.HttpStatusCode.OK)
+        if (putStatus != HttpStatusCode.OK)
         {
-            _output.WriteLine($"Failed to load measure definition: {response.Content}");
+            _output.WriteLine($"Failed to load measure definition: HTTP {putStatus}");
             throw new Exception("Failed to load measure definition.");
         }
 
-        // Verify the definition was persisted by reading it back
         await VerifyMeasureDefinitionAsync();
 
         if (this._validationBundle != null)
@@ -126,14 +118,13 @@ public class MeasureLoader
 
             var validationTasks = this._validationBundle.Entry.Select(async validationEntry =>
             {
-                var resource = validationEntry.Resource;
-                var requestValidation = new RestRequest($"validation/artifact/RESOURCE/{resource.TypeName}-{resource.Id}", Method.Put);
-                requestValidation.AddJsonBody(await resource.ToJsonAsync());
-                var responseValidation = await _adminBffClient.ExecuteAsync(requestValidation);
+                var resource = validationEntry.Resource!;
+                var artifactId = $"{resource.TypeName}-{resource.Id}";
+                var status = await _validationClient.UpsertResourceArtifactAsync(artifactId, await resource.ToJsonAsync());
 
-                if (responseValidation.StatusCode != System.Net.HttpStatusCode.OK)
+                if (status != HttpStatusCode.OK)
                 {
-                    _output.WriteLine($"Failed to load validation resource: {responseValidation.Content}");
+                    _output.WriteLine($"Failed to load validation resource '{artifactId}': HTTP {status}");
                     throw new Exception("Failed to load validation resource.");
                 }
             });
@@ -147,12 +138,11 @@ public class MeasureLoader
     {
         try
         {
-            var verifyRequest = new RestRequest($"measureeval/measure-definition/{MeasureId}", Method.Get);
-            var verifyResponse = await _adminBffClient.ExecuteAsync(verifyRequest);
+            var (status, content) = await _measureEvalClient.GetMeasureDefinitionAsync(MeasureId!);
 
-            if (verifyResponse.StatusCode == System.Net.HttpStatusCode.OK && verifyResponse.Content != null)
+            if (status == HttpStatusCode.OK && content != null)
             {
-                var json = Newtonsoft.Json.Linq.JObject.Parse(verifyResponse.Content);
+                var json = Newtonsoft.Json.Linq.JObject.Parse(content);
                 var id = json["id"]?.ToString() ?? "(unknown)";
                 var bundle = json["bundle"];
                 var entryCount = (bundle?["entry"] as Newtonsoft.Json.Linq.JArray)?.Count ?? 0;
@@ -168,7 +158,7 @@ public class MeasureLoader
             }
             else
             {
-                _output.WriteLine($"  WARNING: Could not verify measure definition (HTTP {verifyResponse.StatusCode})");
+                _output.WriteLine($"  WARNING: Could not verify measure definition (HTTP {status})");
             }
         }
         catch (Exception ex)

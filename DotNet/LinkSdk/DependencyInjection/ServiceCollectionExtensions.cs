@@ -18,6 +18,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ReportServiceClient>();
         services.AddTransient<ValidationServiceClient>();
         services.AddTransient<CensusServiceClient>();
+        services.AddTransient<MeasureEvalServiceClient>();
 
         return services;
     }

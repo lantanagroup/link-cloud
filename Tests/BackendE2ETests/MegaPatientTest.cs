@@ -84,7 +84,7 @@ public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETe
     public async Task ExecuteMegaPatientTest()
     {
         // Step 1: Load measure definition into MeasureEval and Validation.
-        var measureLoader = new MeasureLoader(_b.AdminBffClient, _output, Config);
+        var measureLoader = new MeasureLoader(_b.MeasureEvalClient, _b.SdkValidationClient, _output, Config);
         await measureLoader.LoadAsync();
 
         var measureId = measureLoader.MeasureId

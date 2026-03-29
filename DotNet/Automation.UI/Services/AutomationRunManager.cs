@@ -66,6 +66,8 @@ public class AutomationRunManager : IAutomationRunManager
             var adminBffClient = services.GetRequiredService<RestSharp.RestClient>();
             var lokiScraper = services.GetRequiredService<LokiScraper>();
             var fhirDataLoader = services.GetRequiredService<FhirDataLoader>();
+            var measureEvalClient = services.GetRequiredService<LantanaGroup.Link.Sdk.Clients.MeasureEvalServiceClient>();
+            var sdkValidationClient = services.GetRequiredService<LantanaGroup.Link.Sdk.Clients.ValidationServiceClient>();
 
             var facilityApi = services.GetRequiredService<FacilityApiClient>();
             var normalizationApi = services.GetRequiredService<NormalizationApiClient>();
@@ -94,7 +96,7 @@ public class AutomationRunManager : IAutomationRunManager
             await validationApi.InitializeArtifactsAsync();
             await validationApi.InitializeCategoriesAsync();
 
-            var measureLoader = new MeasureLoader(adminBffClient, output, scenarioConfig);
+            var measureLoader = new MeasureLoader(measureEvalClient, sdkValidationClient, output, scenarioConfig);
             await measureLoader.LoadAsync();
             var measureId = measureLoader.MeasureId ?? throw new InvalidOperationException("MeasureLoader did not produce a MeasureId");
 
