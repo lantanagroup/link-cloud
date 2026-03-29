@@ -3,6 +3,8 @@ using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.Automation.Helpers;
 using LantanaGroup.Link.Automation.Services;
 using LantanaGroup.Link.Automation.Validation;
+using LantanaGroup.Link.Sdk.ApiClient;
+using LantanaGroup.Link.Sdk.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using RestSharp;
@@ -36,6 +38,16 @@ public sealed class BackendE2ETestFixture : IDisposable
         // Infrastructure
         builder.Services.AddSingleton(sp => new DatabaseConnectionFactory(sp.GetRequiredService<AutomationConfig>().Database));
         builder.Services.AddSingleton(sp => AdminBffClientFactory.Create(sp.GetRequiredService<AutomationConfig>()));
+
+        var sdkSettings = new ApiClientSettings
+        {
+            BaseUrl = automationCfg.AdminBffBase,
+            BearerToken = automationCfg.AdminBffOAuth.ShouldAuthenticate
+                ? AuthHelper.GetBearerToken(automationCfg.AdminBffOAuth)
+                : null
+        };
+        builder.Services.AddLinkSdk(sdkSettings);
+
         builder.Services.AddSingleton(sp => new LokiScraper(sp.GetRequiredService<IAutomationOutput>(), sp.GetRequiredService<AutomationConfig>()));
         builder.Services.AddSingleton(sp => new FhirDataLoader(sp.GetRequiredService<AutomationConfig>().ExternalFhirServerBase, sp.GetRequiredService<AutomationConfig>()));
         builder.Services.AddSingleton<PipelineDataReader>();
@@ -43,10 +55,7 @@ public sealed class BackendE2ETestFixture : IDisposable
         // API clients (transient — lightweight wrappers)
         builder.Services.AddTransient<FacilityApiClient>();
         builder.Services.AddTransient<NormalizationApiClient>();
-        builder.Services.AddTransient(sp => new QueryConfigApiClient(
-            sp.GetRequiredService<RestClient>(),
-            sp.GetRequiredService<IAutomationOutput>(),
-            sp.GetRequiredService<AutomationConfig>()));
+        builder.Services.AddTransient<QueryConfigApiClient>();
         builder.Services.AddTransient<ValidationApiClient>();
 
         // Validators (transient)
@@ -55,10 +64,7 @@ public sealed class BackendE2ETestFixture : IDisposable
         builder.Services.AddTransient<DataAcquisitionDatabaseValidator>();
         builder.Services.AddTransient<NormalizationDatabaseValidator>();
         builder.Services.AddTransient<TenantDatabaseValidator>();
-        builder.Services.AddTransient(sp => new ValidationResultsValidator(
-            sp.GetRequiredService<RestClient>(),
-            sp.GetRequiredService<IAutomationOutput>(),
-            sp.GetRequiredService<LokiScraper>()));
+        builder.Services.AddTransient<ValidationResultsValidator>();
 
         // Snapshot / diagnostics
         builder.Services.AddTransient<PipelineSnapshot>();

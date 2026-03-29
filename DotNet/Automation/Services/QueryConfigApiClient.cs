@@ -1,48 +1,47 @@
-﻿using System.Net;
-using LantanaGroup.Link.Automation.Configuration;
+﻿using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.Automation.Helpers;
-using Newtonsoft.Json.Linq;
-using RestSharp;
+using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using System.Net;
 
 namespace LantanaGroup.Link.Automation.Services;
 
 public class QueryConfigApiClient
 {
-    private readonly RestClient _client;
+    private readonly DataAcquisitionServiceClient _dataAcqClient;
     private readonly IAutomationOutput _output;
     private readonly AutomationConfig _config;
 
-    public QueryConfigApiClient(RestClient client, IAutomationOutput output, AutomationConfig config)
+    public QueryConfigApiClient(DataAcquisitionServiceClient dataAcqClient, IAutomationOutput output, AutomationConfig config)
     {
-        _client = client;
+        _dataAcqClient = dataAcqClient;
         _output = output;
         _config = config;
     }
 
     public async Task CreateQueryConfigAsync(string facilityId)
     {
-        if (await QueryConfigExistsAsync(facilityId))
+        _output.WriteLine("Creating query config...");
+        var body = new CreateFhirQueryConfigurationRequestApiModel
+        {
+            FacilityId = facilityId,
+            FhirServerBaseUrl = _config.InternalFhirServerBase,
+            MaxConcurrentRequests = _config.FhirQuery.MaxConcurrentRequests,
+            MaxRetries = 3
+        };
+
+        var status = await _dataAcqClient.CreateFhirQueryConfigurationAsync(body);
+
+        if (status == HttpStatusCode.Conflict)
         {
             _output.WriteLine($"Query config for facility '{facilityId}' already exists. Skipping create.");
             return;
         }
 
-        _output.WriteLine("Creating query config...");
-        var request = new RestRequest("data/fhirQueryConfiguration", Method.Post);
-        var body = new JObject
-        {
-            ["FacilityId"] = facilityId,
-            ["FhirServerBaseUrl"] = _config.InternalFhirServerBase,
-            ["MaxConcurrentRequests"] = _config.FhirQuery.MaxConcurrentRequests,
-            ["MaxRetries"] = 3
-        };
-        request.AddJsonBody(body.ToString(), "application/json");
-
-        var response = await _client.ExecuteAsync(request);
-        if (response.StatusCode != HttpStatusCode.Created)
-            _output.WriteLine($"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
-        AutomationInvariant.Require(response.StatusCode == HttpStatusCode.Created,
-            $"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
+        if (status != HttpStatusCode.Created)
+            _output.WriteLine($"Expected HTTP 201 Created but received {status}");
+        AutomationInvariant.Require(status == HttpStatusCode.Created,
+            $"Expected HTTP 201 Created but received {status}");
     }
 
     public async Task CreateQueryPlanAsync(string facilityId, string? measureId, string ehrDescription)
@@ -55,54 +54,29 @@ public class QueryConfigApiClient
 
     private async Task PostQueryPlan(string facilityId, string? measureId, string ehrDescription, string type)
     {
-        if (await QueryPlanExistsAsync(facilityId, type))
+        var jBody = QueryPlanBuilder.BuildQueryPlan(facilityId, measureId, ehrDescription, type);
+        var body = new CreateQueryPlanRequestApiModel
+        {
+            PlanName = jBody.Value<string>("PlanName"),
+            FacilityId = jBody.Value<string>("FacilityId") ?? facilityId,
+            EHRDescription = jBody.Value<string>("EHRDescription") ?? ehrDescription,
+            LookBack = jBody.Value<string>("LookBack") ?? "P0D",
+            Type = jBody.Value<string>("Type") ?? type,
+            InitialQueries = jBody["InitialQueries"]?.ToObject<Dictionary<string, object>>() ?? new Dictionary<string, object>(),
+            SupplementalQueries = jBody["SupplementalQueries"]?.ToObject<Dictionary<string, object>>() ?? new Dictionary<string, object>()
+        };
+
+        var status = await _dataAcqClient.CreateQueryPlanAsync(facilityId, body);
+
+        if (status == HttpStatusCode.Conflict)
         {
             _output.WriteLine($"{type} query plan for facility '{facilityId}' already exists. Skipping create.");
             return;
         }
 
-        var body = QueryPlanBuilder.BuildQueryPlan(facilityId, measureId, ehrDescription, type);
-        var request = new RestRequest($"data/{facilityId}/QueryPlan", Method.Post);
-        request.AddJsonBody(body.ToString(), "application/json");
-
-        var response = await _client.ExecuteAsync(request);
-        if (response.StatusCode != HttpStatusCode.Created)
-            _output.WriteLine($"Expected HTTP 201 Created for {type} query plan but received {response.StatusCode}: {response.Content}");
-        AutomationInvariant.Require(response.StatusCode == HttpStatusCode.Created,
-            $"Expected HTTP 201 Created for {type} query plan but received {response.StatusCode}: {response.Content}");
-    }
-
-    private async Task<bool> QueryConfigExistsAsync(string facilityId)
-    {
-        var request = new RestRequest($"data/{facilityId}/fhirQueryConfiguration", Method.Get);
-        var response = await _client.ExecuteAsync(request);
-
-        if (response.StatusCode == HttpStatusCode.OK)
-            return true;
-
-        if (response.StatusCode == HttpStatusCode.NotFound)
-            return false;
-
-        AutomationInvariant.Require(false,
-            $"Unexpected status while checking query config existence for '{facilityId}': {response.StatusCode} {response.Content}");
-        return false;
-    }
-
-    private async Task<bool> QueryPlanExistsAsync(string facilityId, string type)
-    {
-        var request = new RestRequest($"data/{facilityId}/QueryPlan", Method.Get);
-        request.AddQueryParameter("type", type);
-
-        var response = await _client.ExecuteAsync(request);
-
-        if (response.StatusCode == HttpStatusCode.OK)
-            return true;
-
-        if (response.StatusCode == HttpStatusCode.NotFound)
-            return false;
-
-        AutomationInvariant.Require(false,
-            $"Unexpected status while checking {type} query plan existence for '{facilityId}': {response.StatusCode} {response.Content}");
-        return false;
+        if (status != HttpStatusCode.Created)
+            _output.WriteLine($"Expected HTTP 201 Created for {type} query plan but received {status}");
+        AutomationInvariant.Require(status == HttpStatusCode.Created,
+            $"Expected HTTP 201 Created for {type} query plan but received {status}");
     }
 }

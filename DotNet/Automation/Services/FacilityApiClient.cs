@@ -1,70 +1,65 @@
 ﻿using System.Net;
 using LantanaGroup.Link.Automation.Helpers;
-using RestSharp;
+using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 
 namespace LantanaGroup.Link.Automation.Services;
 
-public class FacilityApiClient(RestClient client, IAutomationOutput output)
+public class FacilityApiClient(
+    FacilityServiceClient facilityClient,
+    NormalizationServiceClient normalizationClient,
+    DataAcquisitionServiceClient dataAcqClient,
+    IAutomationOutput output)
 {
-    public async Task<RestResponse> CreateAsync(string facilityId, string? measure)
+    public async Task<HttpStatusCode> CreateAsync(string facilityId, string? measure)
     {
         output.WriteLine("Creating facility...");
 
-        var existingFacility = await GetFacilityAsync(facilityId);
-        if (existingFacility.StatusCode == HttpStatusCode.OK)
+        var existingFacilityStatus = await facilityClient.GetAsync(facilityId);
+        if (existingFacilityStatus == HttpStatusCode.OK)
         {
             output.WriteLine($"Facility '{facilityId}' already exists. Skipping create.");
-            return existingFacility;
+            return existingFacilityStatus;
         }
 
-        var response = await SendCreateRequestAsync(facilityId, measure);
+        var responseStatus = await SendCreateRequestAsync(facilityId, measure);
 
-        if (response.StatusCode == HttpStatusCode.BadRequest)
+        if (responseStatus == HttpStatusCode.BadRequest)
         {
-            existingFacility = await GetFacilityAsync(facilityId);
-            if (existingFacility.StatusCode == HttpStatusCode.OK)
+            existingFacilityStatus = await facilityClient.GetAsync(facilityId);
+            if (existingFacilityStatus == HttpStatusCode.OK)
             {
                 output.WriteLine($"Facility '{facilityId}' already exists (detected after create attempt). Skipping create.");
-                return existingFacility;
+                return existingFacilityStatus;
             }
 
-            output.WriteLine($"Facility creation returned BadRequest — attempting cleanup and retry. Response: {response.Content}");
+            output.WriteLine("Facility creation returned BadRequest — attempting cleanup and retry.");
             await DeleteAsync(facilityId);
-            response = await SendCreateRequestAsync(facilityId, measure);
+            responseStatus = await SendCreateRequestAsync(facilityId, measure);
         }
 
-        AutomationInvariant.Require(response.StatusCode == HttpStatusCode.Created,
-            $"Expected HTTP 201 Created for facility creation but got {response.StatusCode}: {response.Content}");
+        AutomationInvariant.Require(responseStatus == HttpStatusCode.Created,
+            $"Expected HTTP 201 Created for facility creation but got {responseStatus}");
 
-        return response;
+        return responseStatus;
     }
 
-    private async Task<RestResponse> SendCreateRequestAsync(string facilityId, string? measure)
+    private async Task<HttpStatusCode> SendCreateRequestAsync(string facilityId, string? measure)
     {
-        var request = new RestRequest("/Facility", Method.Post);
-        request.AddHeader("Content-Type", "application/json");
-
-        var body = new
+        var body = new FacilityModel
         {
             FacilityId = facilityId,
             FacilityName = facilityId,
             TimeZone = "America/Chicago",
-            ScheduledReports = new
+            ScheduledReports = new TenantScheduledReportConfig
             {
-                monthly = measure != null ? new[] { measure } : Array.Empty<string>(),
-                daily = Array.Empty<string>(),
-                weekly = Array.Empty<string>()
+                Monthly = measure != null ? [measure] : [],
+                Daily = [],
+                Weekly = []
             }
         };
 
-        request.AddJsonBody(body);
-        return await client.ExecuteAsync(request);
-    }
-
-    private async Task<RestResponse> GetFacilityAsync(string facilityId)
-    {
-        var request = new RestRequest($"/Facility/{facilityId}", Method.Get);
-        return await client.ExecuteAsync(request);
+        return await facilityClient.CreateAsync(body);
     }
 
     public async Task DeleteAsync(string facilityId)
@@ -76,47 +71,42 @@ public class FacilityApiClient(RestClient client, IAutomationOutput output)
         );
 
         output.WriteLine("Deleting facility...");
-        var request = new RestRequest($"/Facility/{facilityId}", Method.Delete);
-        var response = await client.ExecuteAsync(request);
+        var status = await facilityClient.DeleteAsync(facilityId);
 
-        if (response.StatusCode != HttpStatusCode.NoContent)
-            output.WriteLine($"Expected HTTP 204 No Content for facility deletion but received {response.StatusCode}: {response.Content}");
+        if (status != HttpStatusCode.NoContent)
+            output.WriteLine($"Expected HTTP 204 No Content for facility deletion but received {status}");
     }
 
     private async Task DeleteNormalizationAsync(string facilityId)
     {
         output.WriteLine("Deleting facility normalization...");
-        var request = new RestRequest($"/normalization/operations/facility/{facilityId}", Method.Delete);
-        var response = await client.ExecuteAsync(request);
+        var status = await normalizationClient.DeleteFacilityOperationsAsync(facilityId);
 
-        if (response.StatusCode != HttpStatusCode.NoContent)
-            output.WriteLine($"Expected HTTP 204 No Content for normalization deletion but received {response.StatusCode}: {response.Content}");
+        if (status != HttpStatusCode.NoContent)
+            output.WriteLine($"Expected HTTP 204 No Content for normalization deletion but received {status}");
     }
 
     private async Task DeleteQueryPlanAsync(string facilityId)
     {
         output.WriteLine("Deleting facility discharge query plan...");
-        var request = new RestRequest($"/data/{facilityId}/QueryPlan?type=Discharge", Method.Delete);
-        var response = await client.ExecuteAsync(request);
+        var status = await dataAcqClient.DeleteQueryPlanAsync(facilityId, "Discharge");
 
-        if (response.StatusCode != HttpStatusCode.Accepted)
-            output.WriteLine($"Expected HTTP 202 Accepted for discharge query plan deletion but received {response.StatusCode}: {response.Content}");
+        if (status != HttpStatusCode.Accepted)
+            output.WriteLine($"Expected HTTP 202 Accepted for discharge query plan deletion but received {status}");
 
         output.WriteLine("Deleting facility monthly query plan...");
-        request = new RestRequest($"/data/{facilityId}/QueryPlan?type=Monthly", Method.Delete);
-        response = await client.ExecuteAsync(request);
+        status = await dataAcqClient.DeleteQueryPlanAsync(facilityId, "Monthly");
 
-        if (response.StatusCode != HttpStatusCode.Accepted)
-            output.WriteLine($"Expected HTTP 202 Accepted for monthly query plan deletion but received {response.StatusCode}: {response.Content}");
+        if (status != HttpStatusCode.Accepted)
+            output.WriteLine($"Expected HTTP 202 Accepted for monthly query plan deletion but received {status}");
     }
 
     private async Task DeleteQueryConfigAsync(string facilityId)
     {
         output.WriteLine("Deleting facility query config...");
-        var request = new RestRequest($"/data/{facilityId}/fhirQueryConfiguration", Method.Delete);
-        var response = await client.ExecuteAsync(request);
+        var status = await dataAcqClient.DeleteFhirQueryConfigurationAsync(facilityId);
 
-        if (response.StatusCode != HttpStatusCode.Accepted)
-            output.WriteLine($"Expected HTTP 202 Accepted for query config deletion but received {response.StatusCode}: {response.Content}");
+        if (status != HttpStatusCode.Accepted)
+            output.WriteLine($"Expected HTTP 202 Accepted for query config deletion but received {status}");
     }
 }

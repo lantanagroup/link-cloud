@@ -1,12 +1,10 @@
 ﻿using LantanaGroup.Link.Automation.Configuration;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Report.Domain.Enums;
 
 namespace LantanaGroup.Link.Automation.Helpers;
 
 /// <summary>
 /// Central progress aggregation hub for test pipeline output.
-/// Combines database state monitoring, progress bar rendering, and stall detection
+/// Combines service-state monitoring, progress bar rendering, and stall detection
 /// into a single coherent stream of test output.
 /// </summary>
 public class ProgressMonitor
@@ -39,14 +37,13 @@ public class ProgressMonitor
     /// </summary>
     public TimeSpan StallDuration => _progressTracker?.StallDuration ?? TimeSpan.Zero;
 
-    public ProgressMonitor(IAutomationOutput output, int expectedPatientCount, LokiScraper? lokiScraper, AutomationConfig config)
+    public ProgressMonitor(IAutomationOutput output, int expectedPatientCount, LokiScraper? lokiScraper, PipelineDataReader reader)
     {
         _output = output;
         _lokiScraper = lokiScraper;
-        var dbFactory = new DatabaseConnectionFactory(config.Database);
-        _reader = new PipelineDataReader(dbFactory);
+        _reader = reader;
         _progressTracker = expectedPatientCount > 0
-            ? new PipelineProgressTracker(output, expectedPatientCount, dbFactory)
+            ? new PipelineProgressTracker(output, expectedPatientCount, reader)
             : null;
     }
 
@@ -88,6 +85,10 @@ public class ProgressMonitor
             _lastMeasureEvalActivity = measureEvalActivity;
         }
 
+        // Validation activity is meaningful only after acquisition has produced work for downstream services.
+        if (_lastAcqLogCount <= 0)
+            return;
+
         var validationActivity = await _lokiScraper.GetValidationActivitySummaryAsync(TimeSpan.FromSeconds(60));
         if (!string.IsNullOrWhiteSpace(validationActivity) && !string.Equals(validationActivity, _lastValidationActivity, StringComparison.Ordinal))
         {
@@ -113,7 +114,7 @@ public class ProgressMonitor
                 return false;
             }
 
-            var currentStatus = schedule.Status.ToString();
+            var currentStatus = schedule.Status ?? "unknown";
             if (currentStatus != _lastScheduleStatus)
             {
                 _output.WriteLine($"[DIAG][Report] Schedule status changed: {_lastScheduleStatus ?? "(none)"} -> {currentStatus}");
@@ -123,15 +124,15 @@ public class ProgressMonitor
             var entries = await _reader.GetReportEntriesAsync(scheduleId);
 
             var total = entries.Count;
-            var submitted = entries.Count(e => e.SubmissionStatus == SubmissionStatus.Submitted);
-            var pending = entries.Count(e => e.SubmissionStatus == SubmissionStatus.PendingValidation);
-            var submitting = entries.Count(e => e.SubmissionStatus == SubmissionStatus.Submitting);
-            var failed = entries.Count(e => e.SubmissionStatus == SubmissionStatus.FailedSubmission);
+            var submitted = entries.Count(e => string.Equals(e.SubmissionStatus, "Submitted", StringComparison.OrdinalIgnoreCase));
+            var pending = entries.Count(e => string.Equals(e.SubmissionStatus, "PendingValidation", StringComparison.OrdinalIgnoreCase));
+            var submitting = entries.Count(e => string.Equals(e.SubmissionStatus, "Submitting", StringComparison.OrdinalIgnoreCase));
+            var failed = entries.Count(e => string.Equals(e.SubmissionStatus, "FailedSubmission", StringComparison.OrdinalIgnoreCase));
 
-            var identified = entries.Count(e => e.ReportingStatus == ReportingStatus.PatientIdentified);
-            var pendingValidation = entries.Count(e => e.ReportingStatus == ReportingStatus.PendingValidation);
-            var passedValidation = entries.Count(e => e.ReportingStatus == ReportingStatus.PassedValidation);
-            var failedValidation = entries.Count(e => e.ReportingStatus == ReportingStatus.FailedValidation);
+            var identified = entries.Count(e => string.Equals(e.ReportingStatus, "PatientIdentified", StringComparison.OrdinalIgnoreCase));
+            var pendingValidation = entries.Count(e => string.Equals(e.ReportingStatus, "PendingValidation", StringComparison.OrdinalIgnoreCase));
+            var passedValidation = entries.Count(e => string.Equals(e.ReportingStatus, "PassedValidation", StringComparison.OrdinalIgnoreCase));
+            var failedValidation = entries.Count(e => string.Equals(e.ReportingStatus, "FailedValidation", StringComparison.OrdinalIgnoreCase));
 
             var breakdown = $"identified={identified}, pendingValidation={pendingValidation}, " +
                             $"passed={passedValidation}, failedValidation={failedValidation} | " +
@@ -166,11 +167,11 @@ public class ProgressMonitor
             var logs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
 
             var total = logs.Count;
-            var completed = logs.Count(l => l.Status == RequestStatus.Completed);
-            var failed = logs.Count(l => l.Status == RequestStatus.Failed);
-            var maxRetries = logs.Count(l => l.Status == RequestStatus.MaxRetriesReached);
-            var processing = logs.Count(l => l.Status == RequestStatus.Processing);
-            var pending = logs.Count(l => l.Status == RequestStatus.Pending);
+            var completed = logs.Count(l => string.Equals(l.Status, "Completed", StringComparison.OrdinalIgnoreCase));
+            var failed = logs.Count(l => string.Equals(l.Status, "Failed", StringComparison.OrdinalIgnoreCase));
+            var maxRetries = logs.Count(l => string.Equals(l.Status, "MaxRetriesReached", StringComparison.OrdinalIgnoreCase));
+            var processing = logs.Count(l => string.Equals(l.Status, "Processing", StringComparison.OrdinalIgnoreCase));
+            var pending = logs.Count(l => string.Equals(l.Status, "Pending", StringComparison.OrdinalIgnoreCase));
 
             var breakdown = $"completed={completed}, processing={processing}, " +
                             $"pending={pending}, failed={failed}, maxRetries={maxRetries}";
@@ -186,7 +187,7 @@ public class ProgressMonitor
             if (maxRetries > 0)
             {
                 var terminalLogs = logs
-                    .Where(l => l.Status == RequestStatus.MaxRetriesReached)
+                    .Where(l => string.Equals(l.Status, "MaxRetriesReached", StringComparison.OrdinalIgnoreCase))
                     .Take(5)
                     .ToList();
 

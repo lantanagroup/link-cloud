@@ -9,6 +9,7 @@
   - Bulk loading transaction bundles into FHIR
 - **Service orchestration clients**
   - Facility, normalization, query config, report, and validation API clients (`Services/*`)
+  - Backed by Flurl-based SDK clients from `DotNet/LinkSdk`
 - **Diagnostics and monitoring**
   - Background diagnostics monitor
   - Event stream model for diagnostics consumption

@@ -6,12 +6,10 @@ using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
-using Moq.Protected;
-using System.Net;
-using System.Text;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report.Listeners;
@@ -216,8 +214,7 @@ public class GenerateReportListenerTests : IClassFixture<ReportIntegrationTestFi
     public async Task ProcessMessageAsync_NewAdHocCensus_NoPatientIds_FetchesFromCensusAndCreatesEntries()
     {
         _fixture.DataAcquisitionRequestedKafkaProducerMock.Reset();
-        _fixture.HttpClientFactoryMock.Reset();
-        SetupCensusHttpMock();
+        SetupCensusLinkSdkMock();
 
         using var scope = _fixture.ScopeFactory.CreateScope();
         var listener = scope.ServiceProvider.GetRequiredService<GenerateReportListener>();
@@ -372,35 +369,10 @@ public class GenerateReportListenerTests : IClassFixture<ReportIntegrationTestFi
             Times.AtLeastOnce);
     }
 
-    private void SetupCensusHttpMock()
+    private void SetupCensusLinkSdkMock()
     {
-        var mockHandler = new Mock<HttpMessageHandler>(MockBehavior.Strict);
-
-        var censusJson = @"{
-                ""resourceType"": ""List"",
-                ""status"": ""current"",
-                ""mode"": ""snapshot"",
-                ""entry"": [
-                    { ""item"": { ""reference"": ""Patient/pat-census-1"" } },
-                    { ""item"": { ""reference"": ""Patient/pat-census-2"" } }
-                ]
-            }";
-
-        mockHandler.Protected()
-            .Setup<Task<HttpResponseMessage>>(
-                "SendAsync",
-                ItExpr.IsAny<HttpRequestMessage>(),
-                ItExpr.IsAny<CancellationToken>())
-            .ReturnsAsync(new HttpResponseMessage
-            {
-                StatusCode = HttpStatusCode.OK,
-                Content = new StringContent(censusJson, Encoding.UTF8, "application/json")
-            });
-
-        var httpClient = new HttpClient(mockHandler.Object);
-
-        _fixture.HttpClientFactoryMock
-            .Setup(f => f.CreateClient(It.IsAny<string>()))
-            .Returns(httpClient);
+        _fixture.LinkSdkClientFactoryMock
+            .Setup(x => x.GetAdmittedPatientIdsAsync(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(["pat-census-1", "pat-census-2"]);
     }
 }

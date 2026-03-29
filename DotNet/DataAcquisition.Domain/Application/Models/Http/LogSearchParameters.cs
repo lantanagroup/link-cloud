@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
 public class LogSearchParameters : GenericLogSearchParameters

@@ -21,6 +21,7 @@ using Microsoft.Extensions.Logging;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 
 namespace IntegrationTests.DataAcquisition;
 

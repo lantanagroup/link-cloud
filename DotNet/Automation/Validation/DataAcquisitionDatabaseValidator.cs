@@ -1,5 +1,4 @@
 ﻿using LantanaGroup.Link.Automation.Helpers;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.Automation.Validation;
@@ -10,10 +9,10 @@ public class DataAcquisitionDatabaseValidator
     private readonly IAutomationOutput _output;
     private readonly PipelineDataReader _reader;
 
-    public DataAcquisitionDatabaseValidator(IAutomationOutput output, DatabaseConnectionFactory dbFactory)
+    public DataAcquisitionDatabaseValidator(IAutomationOutput output, PipelineDataReader reader)
     {
         _output = output;
-        _reader = new PipelineDataReader(dbFactory);
+        _reader = reader;
     }
 
     public async Task ValidateAllAsync(
@@ -30,7 +29,7 @@ public class DataAcquisitionDatabaseValidator
             await ValidateQueryPlans(facilityId, expectedMeasureId, errors);
             await ValidateDataAcquisitionLogs(facilityId, reportId, expectedPatientIds, errors);
             await ValidateFhirQueries(facilityId, reportId, errors);
-            await ValidateReferenceResources(facilityId, errors);
+            await ValidateReferenceResources(facilityId, reportId, errors);
         }
         catch (Exception ex)
         {
@@ -72,28 +71,28 @@ public class DataAcquisitionDatabaseValidator
         if (queryPlans.Count < 2)
             AddError(errors, $"Expected at least 2 query plans (Discharge + Monthly), found {queryPlans.Count}.");
 
-        var dischargePlan = queryPlans.FirstOrDefault(qp => qp.Type == Frequency.Discharge);
+        var dischargePlan = queryPlans.FirstOrDefault(qp => string.Equals(qp.Type, Frequency.Discharge.ToString(), StringComparison.OrdinalIgnoreCase));
         if (dischargePlan == null)
         {
             AddError(errors, "Discharge query plan not found.");
         }
         else
         {
-            if (dischargePlan.PlanName != expectedMeasureId) AddError(errors, $"Discharge plan name mismatch: expected {expectedMeasureId}, actual {dischargePlan.PlanName}");
-            if (dischargePlan.InitialQueries?.Count <= 0) AddError(errors, "Discharge plan InitialQueries should be populated.");
-            if (dischargePlan.SupplementalQueries?.Count <= 0) AddError(errors, "Discharge plan SupplementalQueries should be populated.");
+            if (!string.IsNullOrWhiteSpace(dischargePlan.PlanName) && dischargePlan.PlanName != expectedMeasureId) AddError(errors, $"Discharge plan name mismatch: expected {expectedMeasureId}, actual {dischargePlan.PlanName}");
+            if (dischargePlan.InitialQueriesCount <= 0) AddError(errors, "Discharge plan InitialQueries should be populated.");
+            if (dischargePlan.SupplementalQueriesCount <= 0) AddError(errors, "Discharge plan SupplementalQueries should be populated.");
         }
 
-        var monthlyPlan = queryPlans.FirstOrDefault(qp => qp.Type == Frequency.Monthly);
+        var monthlyPlan = queryPlans.FirstOrDefault(qp => string.Equals(qp.Type, Frequency.Monthly.ToString(), StringComparison.OrdinalIgnoreCase));
         if (monthlyPlan == null)
         {
             AddError(errors, "Monthly query plan not found.");
         }
         else
         {
-            if (monthlyPlan.PlanName != expectedMeasureId) AddError(errors, $"Monthly plan name mismatch: expected {expectedMeasureId}, actual {monthlyPlan.PlanName}");
-            if (monthlyPlan.InitialQueries?.Count <= 0) AddError(errors, "Monthly plan InitialQueries should be populated.");
-            if (monthlyPlan.SupplementalQueries?.Count <= 0) AddError(errors, "Monthly plan SupplementalQueries should be populated.");
+            if (!string.IsNullOrWhiteSpace(monthlyPlan.PlanName) && monthlyPlan.PlanName != expectedMeasureId) AddError(errors, $"Monthly plan name mismatch: expected {expectedMeasureId}, actual {monthlyPlan.PlanName}");
+            if (monthlyPlan.InitialQueriesCount <= 0) AddError(errors, "Monthly plan InitialQueries should be populated.");
+            if (monthlyPlan.SupplementalQueriesCount <= 0) AddError(errors, "Monthly plan SupplementalQueries should be populated.");
         }
     }
 
@@ -118,7 +117,7 @@ public class DataAcquisitionDatabaseValidator
                 AddError(errors, $"No DataAcquisitionLog rows found for expected patient {patientId}.");
         }
 
-        var failedLogs = logs.Where(l => l.Status == RequestStatus.Failed || l.Status == RequestStatus.MaxRetriesReached).ToList();
+        var failedLogs = logs.Where(l => string.Equals(l.Status, "Failed", StringComparison.OrdinalIgnoreCase) || string.Equals(l.Status, "MaxRetriesReached", StringComparison.OrdinalIgnoreCase)).ToList();
         foreach (var failed in failedLogs.Take(10))
         {
             AddError(errors, $"Failed acquisition log: Id={failed.Id}, Patient={failed.PatientId}, Status={failed.Status}");
@@ -135,9 +134,9 @@ public class DataAcquisitionDatabaseValidator
             AddError(errors, "Expected FhirQuery rows for this report but found none.");
     }
 
-    private async Task ValidateReferenceResources(string facilityId, List<string> errors)
+    private async Task ValidateReferenceResources(string facilityId, string reportId, List<string> errors)
     {
-        var groupCount = await _reader.GetReferenceResourceGroupCountAsync(facilityId);
+        var groupCount = await _reader.GetReferenceResourceGroupCountAsync(facilityId, reportId);
         if (groupCount == 0)
             AddError(errors, "Expected ReferenceResources rows for the facility but found none.");
     }

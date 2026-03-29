@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
@@ -8,7 +8,9 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using LantanaGroup.Link.Shared.Settings;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
@@ -738,6 +740,120 @@ public class LogController : Controller
         catch (Exception ex)
         {
             _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "ProcessByFilter"), ex, "An Exception occurred while attempting to process logs by filter.");
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Get paged detailed data acquisition logs with full log payload.
+    /// Intended for diagnostics and automation validation scenarios.
+    /// </summary>
+    [HttpGet("detailed")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<DataAcquisitionLogModel>))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<PagedConfigModel<DataAcquisitionLogModel>>> SearchDetailed(
+        [FromQuery] string? facilityId = null,
+        [FromQuery] string? reportId = null,
+        [FromQuery] string? patientId = null,
+        [FromQuery] int pageSize = 100,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] string? sortBy = "Id",
+        [FromQuery] LantanaGroup.Link.Shared.Application.Enums.SortOrder sortOrder = LantanaGroup.Link.Shared.Application.Enums.SortOrder.Ascending,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (pageSize < 1 || pageSize > 5000)
+                pageSize = 100;
+            if (pageNumber < 1)
+                pageNumber = 1;
+
+            var result = await _logQueries.SearchAsync(new SearchDataAcquisitionLogRequest
+            {
+                FacilityId = facilityId?.SanitizeAndRemove(),
+                ReportTrackingId = reportId?.SanitizeAndRemove(),
+                PatientId = patientId?.SanitizeAndRemove(),
+                PageSize = pageSize,
+                PageNumber = pageNumber,
+                SortBy = string.IsNullOrWhiteSpace(sortBy) ? "Id" : sortBy,
+                SortOrder = sortOrder
+            }, cancellationToken);
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.ListItems, "SearchDetailed"), ex,
+                "An exception occurred while searching detailed data acquisition logs.");
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Get all ResourceAcquiredIds from completed logs for a facility/report pair.
+    /// Intended for automation reconciliation.
+    /// </summary>
+    [HttpGet("report/{reportId}/acquired-resource-ids")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<string>))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<List<string>>> GetAcquiredResourceIdsForReport(
+        [FromRoute] string reportId,
+        [FromQuery] string facilityId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(reportId))
+            return BadRequest("reportId cannot be null or empty.");
+
+        if (string.IsNullOrWhiteSpace(facilityId))
+            return BadRequest("facilityId cannot be null or empty.");
+
+        try
+        {
+            var pageNumber = 1;
+            const int pageSize = 1000;
+            var results = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            while (true)
+            {
+                var page = await _logQueries.SearchAsync(new SearchDataAcquisitionLogRequest
+                {
+                    FacilityId = facilityId.SanitizeAndRemove(),
+                    ReportTrackingId = reportId.SanitizeAndRemove(),
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    SortBy = "Id",
+                    SortOrder = LantanaGroup.Link.Shared.Application.Enums.SortOrder.Ascending
+                }, cancellationToken);
+
+                if (page?.Records == null || page.Records.Count == 0)
+                    break;
+
+                foreach (var log in page.Records)
+                {
+                    if (log.Status != RequestStatus.Completed)
+                        continue;
+
+                    if (log.ResourceAcquiredIds == null)
+                        continue;
+
+                    foreach (var id in log.ResourceAcquiredIds.Where(x => !string.IsNullOrWhiteSpace(x) && x.Contains('/')))
+                        results.Add(id);
+                }
+
+                if (page.Records.Count < pageSize)
+                    break;
+
+                pageNumber++;
+            }
+
+            return Ok(results.ToList());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetAcquiredResourceIdsForReport"), ex,
+                "An exception occurred while attempting to get acquired resource ids for report {reportId}", reportId.Sanitize());
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }

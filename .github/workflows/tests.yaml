@@ -1,4 +1,4 @@
-name: "Tests"
+﻿name: "Tests"
 
 on:
 #  schedule:
@@ -30,7 +30,7 @@ jobs:
         id: should
         shell: bash
         run: |
-          # For PRs, pass base�HEAD; for other events, the script will fallback
+          # For PRs, pass base…HEAD; for other events, the script will fallback
           chmod +x Scripts/should-run-smoke-test.sh
           result=$(Scripts/should-run-smoke-test.sh "origin/${{ github.base_ref }}...HEAD")
           echo "$result"
@@ -83,8 +83,8 @@ jobs:
           name: service-logs
           path: service-logs/
 
-      - name: Run Backend E2E Smoke Tests
-        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=SmokeTest" --logger "trx;LogFileName=test-results.trx" --logger "console;verbosity=detailed"
+      - name: Run Backend E2E Smoke + Scheduled Workflow Tests
+        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=SmokeTest|Category=ReportScheduledWorkflowTest" --logger "trx;LogFileName=test-results.trx" --logger "console;verbosity=detailed"
         env:
           SMOKE_TEST_DOWNLOAD_PATH: ./Tests/BackendE2ETests/TestResults/
 

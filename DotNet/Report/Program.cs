@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Core;
@@ -122,8 +122,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.RegisterQuartzDatabase(connectionString);
     builder.Services.AddSingleton<IQuartzJobHelper, QuartzJobHelper>();
 
-    builder.Services.AddHttpClient();
-
     builder.Services.AddTransient<IKafkaConsumerFactory<string, GenerateReportValue>, KafkaConsumerFactory<string, GenerateReportValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, ReportScheduledValue>, KafkaConsumerFactory<string, ReportScheduledValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
@@ -228,6 +226,7 @@ static void RegisterServices(WebApplicationBuilder builder)
             KafkaTopic.ValidationCompleteRetry.GetStringValue(),
         ]));
 
+    builder.Services.AddHostedService<RetryScheduleService>();
     builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<GenerateReportListener>();
     builder.Services.AddHostedService<ReportScheduledListener>();
@@ -242,7 +241,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<SubmitPayloadProducer>();
     builder.Services.AddTransient<ReadyForValidationProducer>();
     builder.Services.AddTransient<DataAcquisitionRequestedProducer>();
-    builder.Services.AddTransient<ITenantApiService, TenantApiService>();
+    builder.Services.AddTransient<ILinkSdkClientFactory, LinkSdkClientFactory>();
     builder.Services.AddSingleton<BlobStorageService>();
 
     builder.Services.AddTransient<AuditableEventOccurredProducer>();

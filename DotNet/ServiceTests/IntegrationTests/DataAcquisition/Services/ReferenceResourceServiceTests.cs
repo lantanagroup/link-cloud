@@ -6,10 +6,11 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
-using RequestStatusEnum = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
@@ -76,7 +77,7 @@ namespace IntegrationTests.DataAcquisition.Services
                 ScheduledReport = new ScheduledReport { ReportTrackingId = "TestReport", StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow },
                 QueryPhase = QueryPhase.Initial,
                 QueryType = FhirQueryType.Search,
-                Status = RequestStatusEnum.Pending,
+                Status = RequestStatus.Pending,
                 Priority = AcquisitionPriority.Normal
             });
 
@@ -88,7 +89,7 @@ namespace IntegrationTests.DataAcquisition.Services
                 ScheduledReport = new ScheduledReport { ReportTrackingId = "TestReport", StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow },
                 QueryPhase = QueryPhase.Initial,
                 QueryType = FhirQueryType.Search,
-                Status = RequestStatusEnum.Pending,
+                Status = RequestStatus.Pending,
                 Priority = AcquisitionPriority.Normal,
                 FhirQuery = new List<CreateFhirQueryModel>
                 {

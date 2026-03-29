@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Report.Domain.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 
 namespace LantanaGroup.Link.Report.Models;
 public class ReportEntryModel

@@ -1,21 +1,19 @@
 ﻿using System.Net;
 using LantanaGroup.Link.Automation.Helpers;
-using RestSharp;
+using LantanaGroup.Link.Sdk.Clients;
 
 namespace LantanaGroup.Link.Automation.Services;
 
-public class ValidationApiClient(RestClient client, IAutomationOutput output, LokiScraper lokiScraper)
+public class ValidationApiClient(ValidationServiceClient validationClient, IAutomationOutput output, LokiScraper lokiScraper)
 {
     public async Task InitializeArtifactsAsync()
     {
         output.WriteLine("Initializing validation artifacts...");
         await RetryHelper.RetryUntilSuccess(async () =>
         {
-            var request = new RestRequest("validation/artifact/$initialize", Method.Post);
-            request.Timeout = TimeSpan.FromSeconds(120);
-            var response = await client.ExecuteAsync(request);
-            AutomationInvariant.Require(response.StatusCode == HttpStatusCode.OK,
-                $"Initialize Validation Artifacts - Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}.");
+            var status = await validationClient.InitializeArtifactsAsync();
+            AutomationInvariant.Require(status == HttpStatusCode.OK,
+                $"Initialize Validation Artifacts - Expected HTTP 200 OK but received {status}.");
         }, TimeSpan.FromMinutes(3), TimeSpan.FromSeconds(10), output, lokiScraper);
     }
 
@@ -24,11 +22,9 @@ public class ValidationApiClient(RestClient client, IAutomationOutput output, Lo
         output.WriteLine("Initializing validation categories...");
         await RetryHelper.RetryUntilSuccess(async () =>
         {
-            var request = new RestRequest("validation/category/$initialize", Method.Post);
-            request.Timeout = TimeSpan.FromSeconds(60);
-            var response = await client.ExecuteAsync(request);
-            AutomationInvariant.Require(response.StatusCode == HttpStatusCode.OK,
-                $"Initialize Validation Categories - Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}.");
+            var status = await validationClient.InitializeCategoriesAsync();
+            AutomationInvariant.Require(status == HttpStatusCode.OK,
+                $"Initialize Validation Categories - Expected HTTP 200 OK but received {status}.");
         }, TimeSpan.FromSeconds(90), TimeSpan.FromSeconds(10), output, lokiScraper);
     }
 }

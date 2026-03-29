@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using LantanaGroup.Link.Shared.Application.Extensions;
+using Microsoft.Extensions.Logging;
 using Quartz;
 
 namespace LantanaGroup.Link.Shared.Application.Utilities;
@@ -30,10 +31,16 @@ public class QuartzJobHelper : IQuartzJobHelper
     {
         var scheduler = await _schedulerFactory.GetScheduler(ct);
 
+        var map = new JobDataMap();
+        foreach (var kv in jobData)
+        {
+            map.PutObject(kv.Key, kv.Value);
+        }
+
         var job = JobBuilder.Create<TJob>()
             .WithIdentity(identity, group)
             .WithDescription(description ?? identity)
-            .UsingJobData(new JobDataMap(jobData))
+            .UsingJobData(map)
             .StoreDurably()
             .RequestRecovery(true)
             .Build();

@@ -7,6 +7,7 @@ using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using Microsoft.Extensions.DependencyInjection;
 using System.Text;
 using SystemTask = System.Threading.Tasks.Task;

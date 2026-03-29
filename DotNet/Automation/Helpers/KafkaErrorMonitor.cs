@@ -34,6 +34,11 @@ public class KafkaErrorMonitor : IAsyncDisposable
     public IReadOnlyList<string> CapturedErrors => [.. _capturedErrors];
     public bool HasErrors => !_capturedErrors.IsEmpty;
 
+    private const int DefaultValuePreviewLength = 500;
+    private const int DefaultHeaderPreviewLength = 100;
+    private const int ResourceNormalizedValuePreviewLength = 4000;
+    private const int ResourceNormalizedHeaderPreviewLength = 2000;
+
     public KafkaErrorMonitor(IAutomationOutput output, AutomationConfig config)
     {
         _output = output;
@@ -136,9 +141,27 @@ public class KafkaErrorMonitor : IAsyncDisposable
                     var topic = result.Topic;
                     var key = result.Message.Key ?? "(null)";
                     var value = result.Message.Value ?? "(null)";
-                    var headers = ExtractHeaders(result.Message.Headers);
 
-                    var message = $"[DIAG][Kafka][{topic}] Key={key}{headers} Value={Truncate(value, 500)}";
+                    var isResourceNormalizedError =
+                        topic.Equals("ResourceNormalized-Error", StringComparison.OrdinalIgnoreCase);
+
+                    var headerPreviewLength = isResourceNormalizedError
+                        ? ResourceNormalizedHeaderPreviewLength
+                        : DefaultHeaderPreviewLength;
+
+                    var valuePreviewLength = isResourceNormalizedError
+                        ? ResourceNormalizedValuePreviewLength
+                        : DefaultValuePreviewLength;
+
+                    var headers = ExtractHeaders(result.Message.Headers, headerPreviewLength);
+                    var resourceSummary = isResourceNormalizedError
+                        ? TryBuildResourceNormalizedSummary(value)
+                        : null;
+
+                    var message = $"[DIAG][Kafka][{topic}] Key={key}{headers} Value={Truncate(value, valuePreviewLength)}";
+                    if (!string.IsNullOrWhiteSpace(resourceSummary))
+                        message += $" | Parsed={resourceSummary}";
+
                     _output.WriteLine(message);
                     _capturedErrors.Add(message);
                 }
@@ -187,7 +210,7 @@ public class KafkaErrorMonitor : IAsyncDisposable
         }
     }
 
-    private static string ExtractHeaders(Headers? headers)
+    private static string ExtractHeaders(Headers? headers, int maxLengthPerHeaderValue)
     {
         if (headers == null || headers.Count == 0) return "";
 
@@ -199,7 +222,12 @@ public class KafkaErrorMonitor : IAsyncDisposable
                 var value = header.GetValueBytes() != null
                     ? Encoding.UTF8.GetString(header.GetValueBytes())
                     : "(null)";
-                parts.Add($"{header.Key}={Truncate(value, 100)}");
+
+                var limit = ShouldUseExtendedHeaderLimit(header.Key)
+                    ? 12000
+                    : maxLengthPerHeaderValue;
+
+                parts.Add($"{header.Key}={Truncate(value, limit)}");
             }
             catch
             {
@@ -208,6 +236,33 @@ public class KafkaErrorMonitor : IAsyncDisposable
         }
 
         return parts.Count > 0 ? $" Headers=[{string.Join(", ", parts)}]" : "";
+    }
+
+    private static bool ShouldUseExtendedHeaderLimit(string headerKey)
+    {
+        return headerKey.Contains("exception-stacktrace", StringComparison.OrdinalIgnoreCase)
+               || headerKey.Contains("exception-message", StringComparison.OrdinalIgnoreCase)
+               || headerKey.Contains("exception-cause", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? TryBuildResourceNormalizedSummary(string rawValue)
+    {
+        try
+        {
+            var json = JObject.Parse(rawValue);
+            var patientId = json["PatientId"]?.ToString();
+            var queryType = json["QueryType"]?.ToString();
+            var reportableEvent = json["ReportableEvent"]?.ToString();
+            var resourceType = json["Resource"]?["resourceType"]?.ToString();
+            var resourceId = json["Resource"]?["id"]?.ToString();
+            var scheduledCount = json["ScheduledReports"] is JArray reports ? reports.Count : 0;
+
+            return $"patientId={patientId ?? "(null)"}, queryType={queryType ?? "(null)"}, reportableEvent={reportableEvent ?? "(null)"}, resourceType={resourceType ?? "(null)"}, resourceId={resourceId ?? "(null)"}, scheduledReports={scheduledCount}";
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static string Truncate(string value, int maxLength)

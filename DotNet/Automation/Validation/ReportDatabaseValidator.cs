@@ -1,8 +1,6 @@
 ﻿using LantanaGroup.Link.Automation.Helpers;
-using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace LantanaGroup.Link.Automation.Validation;
 
@@ -12,17 +10,19 @@ public class ReportDatabaseValidator
     private readonly IAutomationOutput _output;
     private readonly PipelineDataReader _reader;
 
-    public ReportDatabaseValidator(IAutomationOutput output, DatabaseConnectionFactory dbFactory)
+    public ReportDatabaseValidator(IAutomationOutput output, PipelineDataReader reader)
     {
         _output = output;
-        _reader = new PipelineDataReader(dbFactory);
+        _reader = reader;
     }
 
     public async Task ValidateAllAsync(
         string facilityId,
         string reportId,
         string expectedMeasureId,
-        List<string> expectedPatientIds)
+        List<string> expectedPatientIds,
+        Frequency expectedFrequency = Frequency.Adhoc,
+        string? expectedAdHocType = "Manual")
     {
         var errors = new List<string>();
 
@@ -30,7 +30,7 @@ public class ReportDatabaseValidator
         {
             var scheduleId = Guid.Parse(reportId);
 
-            await ValidateReportSchedule(scheduleId, facilityId, errors);
+            await ValidateReportSchedule(scheduleId, facilityId, expectedFrequency, expectedAdHocType, errors);
             await ValidateScheduleReportTypes(scheduleId, expectedMeasureId, errors);
             await ValidateReportEntries(scheduleId, facilityId, expectedPatientIds, errors);
             await ValidateEntryMeasureReports(scheduleId, expectedMeasureId, expectedPatientIds.Count, errors);
@@ -63,7 +63,7 @@ public class ReportDatabaseValidator
             errors.Add(message);
     }
 
-    private async Task ValidateReportSchedule(Guid scheduleId, string facilityId, List<string> errors)
+    private async Task ValidateReportSchedule(Guid scheduleId, string facilityId, Frequency expectedFrequency, string? expectedAdHocType, List<string> errors)
     {
         var schedule = await _reader.GetReportScheduleAsync(scheduleId);
         if (schedule == null)
@@ -73,9 +73,19 @@ public class ReportDatabaseValidator
         }
 
         if (schedule.FacilityId != facilityId) AddError(errors, $"ReportSchedule.FacilityId mismatch: expected {facilityId}, actual {schedule.FacilityId}");
-        if (schedule.Frequency != Frequency.Adhoc) AddError(errors, $"ReportSchedule.Frequency mismatch: expected {Frequency.Adhoc}, actual {schedule.Frequency}");
-        if (schedule.AdHocType != AdHocType.Manual) AddError(errors, $"ReportSchedule.AdHocType mismatch: expected {AdHocType.Manual}, actual {schedule.AdHocType}");
-        if (schedule.Status != ScheduleStatus.Submitted) AddError(errors, $"ReportSchedule.Status mismatch: expected {ScheduleStatus.Submitted}, actual {schedule.Status}");
+        if (!string.Equals(schedule.Frequency, expectedFrequency.ToString(), StringComparison.OrdinalIgnoreCase)) AddError(errors, $"ReportSchedule.Frequency mismatch: expected {expectedFrequency}, actual {schedule.Frequency}");
+
+        if (expectedAdHocType == null)
+        {
+            if (!string.IsNullOrWhiteSpace(schedule.AdHocType))
+                AddError(errors, $"ReportSchedule.AdHocType mismatch: expected null/empty, actual {schedule.AdHocType}");
+        }
+        else if (!string.Equals(schedule.AdHocType, expectedAdHocType, StringComparison.OrdinalIgnoreCase))
+        {
+            AddError(errors, $"ReportSchedule.AdHocType mismatch: expected {expectedAdHocType}, actual {schedule.AdHocType}");
+        }
+
+        if (!string.Equals(schedule.Status, ScheduleStatus.Submitted.ToString(), StringComparison.OrdinalIgnoreCase)) AddError(errors, $"ReportSchedule.Status mismatch: expected {ScheduleStatus.Submitted}, actual {schedule.Status}");
         if (!schedule.EnableSubmission) AddError(errors, "ReportSchedule.EnableSubmission should be true.");
         if (!schedule.EndOfReportPeriodJobHasRun) AddError(errors, "ReportSchedule.EndOfReportPeriodJobHasRun should be true.");
         if (string.IsNullOrWhiteSpace(schedule.PayloadRootUri)) AddError(errors, "ReportSchedule.PayloadRootUri should be populated.");
@@ -112,8 +122,8 @@ public class ReportDatabaseValidator
             if (entry.FacilityId != facilityId)
                 AddError(errors, $"ReportEntry {entry.Id} FacilityId mismatch: expected {facilityId}, actual {entry.FacilityId}");
 
-            if (entry.SubmissionStatus != SubmissionStatus.Submitted)
-                AddError(errors, $"ReportEntry {entry.Id} SubmissionStatus should be {SubmissionStatus.Submitted}, actual {entry.SubmissionStatus}");
+            if (!string.Equals(entry.SubmissionStatus, "Submitted", StringComparison.OrdinalIgnoreCase))
+                AddError(errors, $"ReportEntry {entry.Id} SubmissionStatus should be Submitted, actual {entry.SubmissionStatus}");
         }
     }
 
@@ -159,26 +169,26 @@ public class ReportDatabaseValidator
         foreach (var pop in populations)
         {
             if (pop.ReportType != expectedMeasureId)
-                AddError(errors, $"ReportPopulation {pop.Id} ReportType mismatch: expected {expectedMeasureId}, actual {pop.ReportType}");
+                AddError(errors, $"ReportPopulation ReportType mismatch: expected {expectedMeasureId}, actual {pop.ReportType}");
 
             if (pop.GroupPopulations.Count == 0)
             {
-                AddError(errors, $"ReportPopulation {pop.Id} has no GroupPopulations.");
+                AddError(errors, "ReportPopulation has no GroupPopulations.");
                 continue;
             }
 
             foreach (var gp in pop.GroupPopulations)
             {
                 if (string.IsNullOrWhiteSpace(gp.PopulationCodeJson) || gp.PopulationCodeJson.Trim() == "{}")
-                    AddError(errors, $"GroupPopulation {gp.Id} PopulationCodeJson is empty/invalid.");
+                    AddError(errors, "GroupPopulation PopulationCodeJson is empty/invalid.");
 
                 if (gp.MeasureReportPopulations.Count == 0)
-                    AddError(errors, $"GroupPopulation {gp.Id} has no MeasureReportPopulation rows.");
+                    AddError(errors, "GroupPopulation has no MeasureReportPopulation rows.");
 
                 foreach (var mrp in gp.MeasureReportPopulations)
                 {
                     if (string.IsNullOrWhiteSpace(mrp.MeasureReportId))
-                        AddError(errors, $"MeasureReportPopulation {mrp.Id} MeasureReportId should be populated.");
+                        AddError(errors, "MeasureReportPopulation MeasureReportId should be populated.");
                 }
             }
         }

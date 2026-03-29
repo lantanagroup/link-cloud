@@ -1,7 +1,4 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Report.Domain.Enums;
-
-namespace LantanaGroup.Link.Automation.Helpers;
+﻿namespace LantanaGroup.Link.Automation.Helpers;
 
 /// <summary>
 /// Non-asserting, read-only snapshot of the pipeline's database state.
@@ -12,10 +9,10 @@ public class PipelineSnapshot
     private readonly DatabaseConnectionFactory _dbFactory;
     private readonly PipelineDataReader _reader;
 
-    public PipelineSnapshot(DatabaseConnectionFactory dbFactory)
+    public PipelineSnapshot(DatabaseConnectionFactory dbFactory, PipelineDataReader reader)
     {
         _dbFactory = dbFactory;
-        _reader = new PipelineDataReader(dbFactory);
+        _reader = reader;
     }
 
     /// <summary>
@@ -131,7 +128,7 @@ public class PipelineSnapshot
                                  $"{string.Join(", ", byStatus)}");
 
                 var failedLogs = logs
-                    .Where(l => l.Status == RequestStatus.Failed || l.Status == RequestStatus.MaxRetriesReached)
+                    .Where(l => string.Equals(l.Status, "Failed", StringComparison.OrdinalIgnoreCase) || string.Equals(l.Status, "MaxRetriesReached", StringComparison.OrdinalIgnoreCase))
                     .Take(5)
                     .ToList();
 
@@ -177,9 +174,7 @@ public class PipelineSnapshot
 
                 foreach (var op in operations)
                 {
-                    var resourceTypes = op.OperationResourceTypes
-                        .Select(ort => ort.ResourceType?.Name ?? "(unknown)")
-                        .ToList();
+                    var resourceTypes = op.ResourceTypes;
                     output.WriteLine($"[Snapshot][NormOperation]         Id={op.Id}, Type={op.OperationType}, " +
                                      $"Name={op.Name}, ResourceTypes=[{string.Join(", ", resourceTypes)}]");
                 }
@@ -196,8 +191,8 @@ public class PipelineSnapshot
                 output.WriteLine($"[Snapshot][NormSequence]        {sequences.Count} sequence(s)");
                 foreach (var seq in sequences)
                 {
-                    var opType = seq.OperationResourceType?.Operation?.OperationType ?? "(unknown)";
-                    var resType = seq.OperationResourceType?.ResourceType?.Name ?? "(unknown)";
+                    var opType = seq.OperationType ?? "(unknown)";
+                    var resType = seq.ResourceType ?? "(unknown)";
                     output.WriteLine($"[Snapshot][NormSequence]          Id={seq.Id}, Sequence={seq.Sequence}, " +
                                      $"OperationType={opType}, ResourceType={resType}");
                 }

@@ -3,6 +3,7 @@ using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.Automation.Helpers;
 using LantanaGroup.Link.Automation.Services;
 using LantanaGroup.Link.Automation.Validation;
+using LantanaGroup.Link.Sdk.Clients;
 using Microsoft.Extensions.DependencyInjection;
 using RestSharp;
 
@@ -28,6 +29,7 @@ public sealed class TestServices
     public FhirDataLoader FhirDataLoader => _services.GetRequiredService<FhirDataLoader>();
     public DatabaseConnectionFactory DbFactory => _services.GetRequiredService<DatabaseConnectionFactory>();
     public PipelineDataReader DataReader => _services.GetRequiredService<PipelineDataReader>();
+    public ReportServiceClient ReportClient => _services.GetRequiredService<ReportServiceClient>();
 
     public FacilityApiClient CreateFacilityApi() => _services.GetRequiredService<FacilityApiClient>();
     public NormalizationApiClient CreateNormalizationApi() => _services.GetRequiredService<NormalizationApiClient>();
@@ -35,7 +37,7 @@ public sealed class TestServices
     public ValidationApiClient CreateValidationApi() => _services.GetRequiredService<ValidationApiClient>();
 
     public ReportApiClient CreateReportApi(TestScenarioConfig config) =>
-        new(AdminBffClient, Output, LokiScraper, AutomationCfg, config);
+        new(_services.GetRequiredService<ReportServiceClient>(), Output, LokiScraper, AutomationCfg, config);
 
     public ReportDatabaseValidator CreateReportValidator() => _services.GetRequiredService<ReportDatabaseValidator>();
     public ReportAbsManifestValidator CreateReportAbsManifestValidator() => _services.GetRequiredService<ReportAbsManifestValidator>();

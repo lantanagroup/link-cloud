@@ -8,10 +8,10 @@ public class TenantDatabaseValidator
     private readonly IAutomationOutput _output;
     private readonly PipelineDataReader _reader;
 
-    public TenantDatabaseValidator(IAutomationOutput output, DatabaseConnectionFactory dbFactory)
+    public TenantDatabaseValidator(IAutomationOutput output, PipelineDataReader reader)
     {
         _output = output;
-        _reader = new PipelineDataReader(dbFactory);
+        _reader = reader;
     }
 
     public async Task ValidateAllAsync(string facilityId, string expectedMeasureId)

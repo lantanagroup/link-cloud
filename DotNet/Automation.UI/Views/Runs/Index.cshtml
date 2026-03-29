@@ -1,0 +1,132 @@
+﻿@model IReadOnlyList<Automation.UI.Models.AutomationRunSummary>
+@using Automation.UI.Models
+@{
+    ViewData["Title"] = "Automation Runs";
+}
+
+<div class="container mt-4">
+    <h2>Automation UI</h2>
+    <p class="text-muted">Kick off automation scenarios and monitor live run output.</p>
+
+    <div class="card mb-4">
+        <div class="card-header">Start Scenario</div>
+        <div class="card-body">
+            <form asp-action="Start" method="post" class="row g-3">
+                @Html.AntiForgeryToken()
+                <div class="col-md-4">
+                    <label class="form-label" for="scenarioSelect">Scenario</label>
+                    <select class="form-select" id="scenarioSelect" name="Scenario">
+                        <option value="@AutomationScenarioKind.SmokeTest">SmokeTest</option>
+                        <option value="@AutomationScenarioKind.MultiPatientTest">MultiPatientTest</option>
+                        <option value="@AutomationScenarioKind.MegaPatientTest">MegaPatientTest</option>
+                        <option value="@AutomationScenarioKind.Custom">Custom</option>
+                    </select>
+                </div>
+
+                <div id="customScenarioOptions" class="row g-3" style="display:none;">
+                    <div class="col-12">
+                        <hr class="my-1" />
+                        <h6 class="mb-0">Custom Scenario Configuration</h6>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label" for="PatientCount">Patient Count</label>
+                        <input class="form-control" type="number" min="1" max="10000" id="PatientCount" name="PatientCount" value="10" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="ResourcesPerPatient">Resources / Patient</label>
+                        <input class="form-control" type="number" min="1" max="10000" id="ResourcesPerPatient" name="ResourcesPerPatient" value="250" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="PatientPrefix">Patient Prefix</label>
+                        <input class="form-control" type="text" id="PatientPrefix" name="PatientPrefix" value="CustomPatient" maxlength="64" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="Seed">Seed</label>
+                        <input class="form-control" type="number" min="1" id="Seed" name="Seed" value="20260329" />
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label" for="PollingIntervalSeconds">Polling Interval (sec)</label>
+                        <input class="form-control" type="number" min="1" max="120" id="PollingIntervalSeconds" name="PollingIntervalSeconds" value="3" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="MaxRetryCount">Max Retry Count</label>
+                        <input class="form-control" type="number" min="1" max="5000" id="MaxRetryCount" name="MaxRetryCount" value="120" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="LokiScrapeWindowMinutes">Loki Window (min)</label>
+                        <input class="form-control" type="number" min="1" max="240" id="LokiScrapeWindowMinutes" name="LokiScrapeWindowMinutes" value="10" />
+                    </div>
+
+                    <div class="col-md-3 d-flex align-items-end">
+                        <div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="RemoveFacilityConfig" name="RemoveFacilityConfig" value="true" checked />
+                                <input type="hidden" name="RemoveFacilityConfig" value="false" />
+                                <label class="form-check-label" for="RemoveFacilityConfig">Remove Facility Config</label>
+                            </div>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" id="CleanupTestData" name="CleanupTestData" value="true" checked />
+                                <input type="hidden" name="CleanupTestData" value="false" />
+                                <label class="form-check-label" for="CleanupTestData">Cleanup Test Data</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-3 d-flex align-items-end">
+                    <button class="btn btn-primary" type="submit">Start Run</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Recent Runs</div>
+        <div class="table-responsive">
+            <table class="table table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th>Run Id</th>
+                        <th>Scenario</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Finished</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var run in Model)
+                {
+                    <tr>
+                        <td><code>@run.RunId</code></td>
+                        <td>@run.Scenario</td>
+                        <td>
+                            <span class="badge @(run.Status == AutomationRunStatus.Succeeded ? "bg-success" : run.Status == AutomationRunStatus.Failed ? "bg-danger" : "bg-secondary")">@run.Status</span>
+                        </td>
+                        <td>@run.CreatedAt.LocalDateTime</td>
+                        <td>@(run.FinishedAt?.LocalDateTime.ToString() ?? "-")</td>
+                        <td><a asp-action="Details" asp-route-id="@run.RunId" class="btn btn-sm btn-outline-primary">Open</a></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const scenarioSelect = document.getElementById('scenarioSelect');
+        const customOptions = document.getElementById('customScenarioOptions');
+        const customScenarioValue = '@AutomationScenarioKind.Custom';
+
+        function toggleCustomOptions() {
+            customOptions.style.display = scenarioSelect.value === customScenarioValue ? 'flex' : 'none';
+        }
+
+        scenarioSelect.addEventListener('change', toggleCustomOptions);
+        toggleCustomOptions();
+    })();
+</script>

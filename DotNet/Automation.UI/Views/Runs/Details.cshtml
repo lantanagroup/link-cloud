@@ -1,0 +1,59 @@
+﻿@model Automation.UI.Models.AutomationRunSummary
+@{
+    ViewData["Title"] = "Run Details";
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>Run <code>@Model.RunId</code></h3>
+        <a asp-action="Index" class="btn btn-outline-secondary">Back</a>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <div><strong>Scenario:</strong> <span id="scenario">@Model.Scenario</span></div>
+            <div><strong>Status:</strong> <span id="status">@Model.Status</span></div>
+            <div><strong>Error:</strong> <span id="error">@(Model.Error ?? "-")</span></div>
+            <div><strong>Started:</strong> <span id="started">@(Model.StartedAt?.ToString("u") ?? "-")</span></div>
+            <div><strong>Finished:</strong> <span id="finished">@(Model.FinishedAt?.ToString("u") ?? "-")</span></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Live Logs</div>
+        <div class="card-body">
+            <pre id="logBox" style="height: 500px; overflow:auto; background:#111; color:#ddd; padding:12px;">@string.Join("\n", Model.Logs)</pre>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+<script>
+    (function () {
+        const runId = '@Model.RunId';
+        const logBox = document.getElementById('logBox');
+
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl('/hubs/runs')
+            .withAutomaticReconnect()
+            .build();
+
+        function appendLog(line) {
+            if (!line) return;
+            logBox.textContent += (logBox.textContent ? '\n' : '') + line;
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        connection.on('log', appendLog);
+        connection.on('status', (run) => {
+            document.getElementById('status').textContent = run.status;
+            document.getElementById('error').textContent = run.error || '-';
+            document.getElementById('started').textContent = run.startedAt || '-';
+            document.getElementById('finished').textContent = run.finishedAt || '-';
+        });
+
+        connection.start()
+            .then(() => connection.invoke('SubscribeRun', runId))
+            .catch(err => appendLog('[signalr] ' + err));
+    })();
+</script>

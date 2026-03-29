@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Automation.Helpers;
+﻿using System.Net;
+using LantanaGroup.Link.Automation.Helpers;
 using Newtonsoft.Json.Linq;
 using RestSharp;
 
@@ -10,13 +11,13 @@ namespace LantanaGroup.Link.Automation.Validation;
 /// </summary>
 public class ValidationResultsValidator
 {
-    private readonly RestClient _client;
+    private readonly LantanaGroup.Link.Sdk.Clients.ValidationServiceClient _validationClient;
     private readonly IAutomationOutput _output;
     private readonly LokiScraper? _lokiScraper;
 
-    public ValidationResultsValidator(RestClient client, IAutomationOutput output, LokiScraper? lokiScraper = null)
+    public ValidationResultsValidator(LantanaGroup.Link.Sdk.Clients.ValidationServiceClient validationClient, IAutomationOutput output, LokiScraper? lokiScraper = null)
     {
-        _client = client;
+        _validationClient = validationClient;
         _output = output;
         _lokiScraper = lokiScraper;
     }
@@ -32,12 +33,10 @@ public class ValidationResultsValidator
         // Lightweight API availability check.
         try
         {
-            var req = new RestRequest($"validation/result/{facilityId}/{reportId}", Method.Get);
-            req.AddParameter("severity", "WARNING");
-            var resp = await _client.ExecuteAsync(req);
-            if (!resp.IsSuccessful)
+            var status = await _validationClient.GetValidationResultsAsync(facilityId, reportId, "WARNING");
+            if (status != HttpStatusCode.OK)
             {
-                errors.Add($"Validation API call failed with status {(int)resp.StatusCode} {resp.StatusCode}");
+                errors.Add($"Validation API call failed with status {(int)status} {status}");
             }
         }
         catch (Exception ex)

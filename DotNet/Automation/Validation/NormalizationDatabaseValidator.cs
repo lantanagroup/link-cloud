@@ -9,10 +9,10 @@ public class NormalizationDatabaseValidator
     private readonly IAutomationOutput _output;
     private readonly PipelineDataReader _reader;
 
-    public NormalizationDatabaseValidator(IAutomationOutput output, DatabaseConnectionFactory dbFactory)
+    public NormalizationDatabaseValidator(IAutomationOutput output, PipelineDataReader reader)
     {
         _output = output;
-        _reader = new PipelineDataReader(dbFactory);
+        _reader = reader;
     }
 
     public async Task ValidateAllAsync(string facilityId)
@@ -75,18 +75,16 @@ public class NormalizationDatabaseValidator
 
         foreach (var op in operations)
         {
-            if (op.OperationResourceTypes.Count == 0)
+            if (op.ResourceTypes.Count == 0)
             {
                 AddError(errors, $"Operation {op.Id} ({op.OperationType}) has no OperationResourceTypes.");
                 continue;
             }
 
-            foreach (var ort in op.OperationResourceTypes)
+            foreach (var resourceType in op.ResourceTypes)
             {
-                if (ort.ResourceType == null)
-                    AddError(errors, $"OperationResourceType {ort.Id} has null ResourceType.");
-                else if (string.IsNullOrWhiteSpace(ort.ResourceType.Name))
-                    AddError(errors, $"OperationResourceType {ort.Id} ResourceType.Name should be populated.");
+                if (string.IsNullOrWhiteSpace(resourceType))
+                    AddError(errors, $"Operation {op.Id} has an empty ResourceType name.");
             }
         }
     }
@@ -100,16 +98,10 @@ public class NormalizationDatabaseValidator
 
         foreach (var seq in sequences)
         {
-            if (seq.OperationResourceType == null)
-            {
-                AddError(errors, $"OperationSequence {seq.Id} OperationResourceType is null.");
-                continue;
-            }
-
-            if (seq.OperationResourceType.Operation == null)
-                AddError(errors, $"OperationSequence {seq.Id} OperationResourceType.Operation is null.");
-            if (seq.OperationResourceType.ResourceType == null)
-                AddError(errors, $"OperationSequence {seq.Id} OperationResourceType.ResourceType is null.");
+            if (string.IsNullOrWhiteSpace(seq.OperationType))
+                AddError(errors, $"OperationSequence {seq.Id} OperationType is null.");
+            if (string.IsNullOrWhiteSpace(seq.ResourceType))
+                AddError(errors, $"OperationSequence {seq.Id} ResourceType is null.");
         }
 
         var sequenceNumbers = sequences.Where(s => s.Sequence.HasValue).Select(s => s.Sequence!.Value).ToList();

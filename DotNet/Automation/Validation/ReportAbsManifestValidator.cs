@@ -1,6 +1,5 @@
 ﻿using System.Text.Json;
 using LantanaGroup.Link.Automation.Helpers;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 
 namespace LantanaGroup.Link.Automation.Validation;
 
@@ -28,10 +27,10 @@ public class ReportAbsManifestValidator
     private readonly IAutomationOutput _output;
     private readonly PipelineDataReader _reader;
 
-    public ReportAbsManifestValidator(IAutomationOutput output, DatabaseConnectionFactory dbFactory)
+    public ReportAbsManifestValidator(IAutomationOutput output, PipelineDataReader reader)
     {
         _output = output;
-        _reader = new PipelineDataReader(dbFactory);
+        _reader = reader;
     }
 
     public async Task ValidateAllAsync(
@@ -338,7 +337,7 @@ public class ReportAbsManifestValidator
                 continue;
             }
 
-            if (entry.ReportingStatus != LantanaGroup.Link.Report.Domain.Enums.ReportingStatus.FailedValidation)
+            if (!string.Equals(entry.ReportingStatus, "FailedValidation", StringComparison.OrdinalIgnoreCase))
             {
                 AddError(errors,
                     $"Patient artifact for {patientId} contains OperationOutcome but ReportEntry.ReportingStatus is {entry.ReportingStatus} (expected FailedValidation).");
@@ -394,7 +393,7 @@ public class ReportAbsManifestValidator
 
         var acquisitionLogs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
         var acquiredKeys = acquisitionLogs
-            .Where(l => l.Status == RequestStatus.Completed)
+            .Where(l => string.Equals(l.Status, "Completed", StringComparison.OrdinalIgnoreCase))
             .SelectMany(l => l.ResourceAcquiredIds ?? [])
             .Where(r => !string.IsNullOrWhiteSpace(r) && r.Contains('/'))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);

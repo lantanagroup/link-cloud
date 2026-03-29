@@ -1,13 +1,10 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
-using Microsoft.EntityFrameworkCore;
 
 namespace LantanaGroup.Link.Automation.Helpers;
 
 /// <summary>
-/// Computes a coarse pipeline progress percentage by querying the Report and
-/// DataAcquisition databases, and detects pipeline stalls.
+/// Computes a coarse pipeline progress percentage by querying service APIs through LinkSdk,
+/// and detects pipeline stalls.
 /// </summary>
 public class PipelineProgressTracker
 {
@@ -37,11 +34,11 @@ public class PipelineProgressTracker
     /// </summary>
     public string? StalledStage => _stalledStage;
 
-    public PipelineProgressTracker(IAutomationOutput output, int expectedPatientCount, DatabaseConnectionFactory dbFactory)
+    public PipelineProgressTracker(IAutomationOutput output, int expectedPatientCount, PipelineDataReader reader)
     {
         _output = output;
         _expectedPatientCount = expectedPatientCount;
-        _reader = new PipelineDataReader(dbFactory);
+        _reader = reader;
         _totalUnits = (expectedPatientCount * 4) + 2;
     }
 
@@ -58,7 +55,7 @@ public class PipelineProgressTracker
             {
                 completedUnits++;
 
-                if (schedule.Status == ScheduleStatus.Submitted)
+                if (string.Equals(schedule.Status, ScheduleStatus.Submitted.ToString(), StringComparison.OrdinalIgnoreCase))
                 {
                     completedUnits++;
                     stageDetails.Add("report=finalized");
@@ -89,14 +86,14 @@ public class PipelineProgressTracker
                     completedUnits++;
                 }
 
-                if (entry.ReportingStatus is ReportingStatus.PassedValidation
-                    or ReportingStatus.FailedValidation)
+                if (string.Equals(entry.ReportingStatus, "PassedValidation", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(entry.ReportingStatus, "FailedValidation", StringComparison.OrdinalIgnoreCase))
                 {
                     patientsValidated++;
                     completedUnits++;
                 }
 
-                if (entry.SubmissionStatus == SubmissionStatus.Submitted)
+                if (string.Equals(entry.SubmissionStatus, "Submitted", StringComparison.OrdinalIgnoreCase))
                 {
                     patientsSubmitted++;
                     completedUnits++;
@@ -110,7 +107,7 @@ public class PipelineProgressTracker
             var logs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
 
             var patientsAcquired = logs
-                .Where(l => l.Status == RequestStatus.Completed && l.PatientId != null)
+                .Where(l => string.Equals(l.Status, "Completed", StringComparison.OrdinalIgnoreCase) && l.PatientId != null)
                 .Select(l => l.PatientId)
                 .Distinct()
                 .Count();

@@ -1,7 +1,5 @@
-﻿using LantanaGroup.Link.Automation.Configuration;
+using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.Automation.Helpers;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Report.Domain.Enums;
 
 namespace LantanaGroup.Link.Automation.Validation;
 
@@ -33,12 +31,12 @@ public class MilestoneValidationOrchestrator
 
     public MilestoneValidationOrchestrator(
         IAutomationOutput output,
-        AutomationConfig config,
+        PipelineDataReader reader,
         int expectedPatientCount)
     {
         _output = output;
         _expectedPatientCount = expectedPatientCount;
-        _reader = new PipelineDataReader(new DatabaseConnectionFactory(config.Database));
+        _reader = reader;
     }
 
     public async Task CheckAsync(string facilityId, string reportId)
@@ -134,14 +132,14 @@ public class MilestoneValidationOrchestrator
         if (logs.Count == 0)
             return;
 
-        var maxRetries = logs.Count(l => l.Status == RequestStatus.MaxRetriesReached);
+        var maxRetries = logs.Count(l => string.Equals(l.Status, "MaxRetriesReached", StringComparison.OrdinalIgnoreCase));
         if (maxRetries > 0)
         {
             RecordIssue($"Data acquisition terminal failures detected: {maxRetries} max-retry log(s).", critical: true);
             return;
         }
 
-        var failed = logs.Count(l => l.Status == RequestStatus.Failed);
+        var failed = logs.Count(l => string.Equals(l.Status, "Failed", StringComparison.OrdinalIgnoreCase));
         if (failed > 0)
             RecordIssue($"Data acquisition has {failed} retriable failed log(s); waiting for retry recovery.", critical: false);
 
@@ -149,7 +147,7 @@ public class MilestoneValidationOrchestrator
             return;
 
         var completedPatients = logs
-            .Where(l => l.Status == RequestStatus.Completed && !string.IsNullOrWhiteSpace(l.PatientId))
+            .Where(l => string.Equals(l.Status, "Completed", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(l.PatientId))
             .Select(l => l.PatientId!)
             .Distinct(StringComparer.Ordinal)
             .Count();
@@ -190,14 +188,14 @@ public class MilestoneValidationOrchestrator
         if (entries.Count == 0)
             return;
 
-        var failedSubmission = entries.Count(e => e.SubmissionStatus == SubmissionStatus.FailedSubmission);
+        var failedSubmission = entries.Count(e => string.Equals(e.SubmissionStatus, "FailedSubmission", StringComparison.OrdinalIgnoreCase));
         if (failedSubmission > 0)
         {
             RecordIssue($"Submission failures detected: {failedSubmission} ReportEntry row(s) in FailedSubmission.", critical: true);
             return;
         }
 
-        var submitted = entries.Count(e => e.SubmissionStatus == SubmissionStatus.Submitted);
+        var submitted = entries.Count(e => string.Equals(e.SubmissionStatus, "Submitted", StringComparison.OrdinalIgnoreCase));
         if (_expectedPatientCount > 0 && submitted < _expectedPatientCount)
             return;
 

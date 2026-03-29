@@ -455,7 +455,8 @@ public class LokiScraper
         var startUnix = ((DateTimeOffset)start).ToUnixTimeMilliseconds() * 1000000;
         var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
 
-        var query = $"{{app=\"link-cloud\", component=\"{Components.Validation}\"}} |~ \"(?i)(validate|validated|artifact|category|result|resource)\" !~ \"(?i)({HarmlessPatterns})\"";
+        // Focus on ReadyForValidation processing lines emitted by the consumer.
+        var query = $"{{app=\"link-cloud\", component=\"{Components.Validation}\"}} |= \"Processing\" |= \"patient\" |= \"report\" !~ \"(?i)({HarmlessPatterns})\"";
         var request = new RestRequest("/loki/api/v1/query_range");
         request.AddParameter("query", query);
         request.AddParameter("start", startUnix.ToString());

@@ -1,11 +1,11 @@
 ﻿using System.Net;
-using System.Text.Json;
 using LantanaGroup.Link.Automation.Helpers;
-using RestSharp;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
+using LantanaGroup.Link.Sdk.Clients;
 
 namespace LantanaGroup.Link.Automation.Services;
 
-public class NormalizationApiClient(RestClient client, IAutomationOutput output)
+public class NormalizationApiClient(NormalizationServiceClient normalizationClient, IAutomationOutput output)
 {
     public async Task CreateConfigAsync(string facilityId)
     {
@@ -16,13 +16,12 @@ public class NormalizationApiClient(RestClient client, IAutomationOutput output)
         }
 
         output.WriteLine("Creating normalization config...");
-        var request = new RestRequest("normalization/Operations", Method.Post);
 
-        var body = new
+        var body = new CreateNormalizationOperationRequestApiModel
         {
-            ResourceTypes = new[] { "Location" },
+            ResourceTypes = ["Location"],
             FacilityId = facilityId,
-            Operation = new
+            Operation = new CreateNormalizationOperationDetailsApiModel
             {
                 OperationType = "CopyProperty",
                 Name = "Copy Location Identifier to Type",
@@ -31,45 +30,24 @@ public class NormalizationApiClient(RestClient client, IAutomationOutput output)
                 TargetFhirPath = "type[0].coding.code"
             },
             Description = "Copy Location Identifier to Code",
-            VendorIds = Array.Empty<string>()
+            VendorIds = []
         };
 
-        request.AddJsonBody(body);
-
-        var response = await client.ExecuteAsync(request);
-        AutomationInvariant.Require(response.StatusCode == HttpStatusCode.Created,
-            $"Response was not 201 Created {response.StatusCode}: {response.Content}");
+        var status = await normalizationClient.CreateOperationAsync(body);
+        AutomationInvariant.Require(status == HttpStatusCode.Created,
+            $"Response was not 201 Created {status}");
     }
 
     private async Task<bool> NormalizationConfigExistsAsync(string facilityId)
     {
-        var request = new RestRequest($"normalization/Operations/facility/{facilityId}", Method.Get);
-        request.AddQueryParameter("includeDisabled", "true");
-        request.AddQueryParameter("pageSize", "1");
-        request.AddQueryParameter("pageNumber", "1");
+        var (status, response) = await normalizationClient.SearchFacilityOperationsAsync(facilityId);
 
-        var response = await client.ExecuteAsync(request);
-
-        if (response.StatusCode == HttpStatusCode.NotFound)
+        if (status == HttpStatusCode.NotFound)
             return false;
 
-        AutomationInvariant.Require(response.StatusCode == HttpStatusCode.OK,
-            $"Unexpected status while checking normalization config existence for '{facilityId}': {response.StatusCode} {response.Content}");
+        AutomationInvariant.Require(status == HttpStatusCode.OK,
+            $"Unexpected status while checking normalization config existence for '{facilityId}': {status}");
 
-        if (string.IsNullOrWhiteSpace(response.Content))
-            return false;
-
-        try
-        {
-            using var doc = JsonDocument.Parse(response.Content);
-            if (!doc.RootElement.TryGetProperty("records", out var records) || records.ValueKind != JsonValueKind.Array)
-                return false;
-
-            return records.GetArrayLength() > 0;
-        }
-        catch
-        {
-            return false;
-        }
+        return response?.Records?.Count > 0;
     }
 }

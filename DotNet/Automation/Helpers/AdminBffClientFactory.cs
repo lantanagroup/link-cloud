@@ -5,32 +5,13 @@ namespace LantanaGroup.Link.Automation.Helpers;
 
 public static class AdminBffClientFactory
 {
-    private static RestClient? _instance;
-    private static readonly object Lock = new();
-
     public static RestClient Create(AutomationConfig config)
     {
-        if (_instance != null)
-            return _instance;
-
-        lock (Lock)
-        {
-            _instance ??= CreateAuthenticatedClient(config);
-        }
-
-        return _instance;
+        return CreateAuthenticatedClient(config);
     }
 
-    /// <summary>
-    /// Resets the cached client instance. Useful when switching configurations
-    /// between test runs or when targeting a different environment.
-    /// </summary>
     public static void Reset()
     {
-        lock (Lock)
-        {
-            _instance = null;
-        }
     }
 
     private static RestClient CreateAuthenticatedClient(AutomationConfig config)

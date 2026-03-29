@@ -1,17 +1,7 @@
-﻿using System.Linq;
-using System.Threading.Tasks;
-using DataAcquisition.Domain.Application.Models;
-using IntegrationTests.DataAcquisition;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using RequestStatusEnum = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
-using LantanaGroup.Link.Shared.Application.Models;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Xunit;
-using ResourceType = Hl7.Fhir.Model.ResourceType;
 
 namespace IntegrationTests.DataAcquisition.Managers
 {

@@ -3,14 +3,14 @@ using Hl7.Fhir.Rest;
 using LantanaGroup.Link.Report.Application.Core;
 using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
-using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 
@@ -21,7 +21,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
         private readonly ILogger<ReportManifestProducer> _logger;
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly MeasureReportAggregator _aggregator;
-        private readonly ITenantApiService _tenantApiService;
+        private readonly ILinkSdkClientFactory _linkSdkClientFactory;
         private readonly BlobStorageService _blobStorageService;
         private readonly SubmitPayloadProducer _payloadSubmittedProducer;
         private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
@@ -31,7 +31,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             ILogger<ReportManifestProducer> logger,
             IServiceScopeFactory serviceScopeFactory,
             MeasureReportAggregator aggregator,
-            ITenantApiService tenantApiService,
+            ILinkSdkClientFactory linkSdkClientFactory,
             BlobStorageService blobStorageService,
             SubmitPayloadProducer payloadSubmittedProducer,
             AuditableEventOccurredProducer auditableEventOccurredProducer)
@@ -39,7 +39,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _logger = logger;
             _serviceScopeFactory = serviceScopeFactory;
             _aggregator = aggregator;
-            _tenantApiService = tenantApiService;
+            _linkSdkClientFactory = linkSdkClientFactory;
             _blobStorageService = blobStorageService;
             _payloadSubmittedProducer = payloadSubmittedProducer;
             _auditableEventOccurredProducer = auditableEventOccurredProducer;
@@ -50,7 +50,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
             var reportEntries = await database.ReportEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
 
-            var facilityConfig = await _tenantApiService.GetFacilityConfig(schedule.FacilityId, CancellationToken.None);
+            FacilityModel? facilityConfig = await _linkSdkClientFactory.GetFacilityConfigAsync(schedule.FacilityId, CancellationToken.None);
 
             if (facilityConfig == null)
             {

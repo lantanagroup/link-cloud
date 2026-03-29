@@ -18,6 +18,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
@@ -55,6 +56,7 @@ namespace IntegrationTests.Report
         public Mock<IProducer<string, AuditEventMessage>> AuditableEventKafkaProducerMock { get; private set; } = new();
 
         public Mock<ITenantApiService> TenantApiServiceMock { get; } = new();
+        public Mock<ILinkSdkClientFactory> LinkSdkClientFactoryMock { get; } = new();
         public Mock<IHttpClientFactory> HttpClientFactoryMock { get; } = new();
         public Mock<IQuartzJobHelper> QuartzJobHelperMock { get; } = new();
         public Mock<IKafkaConsumerFactory<string, ReportScheduledValue>> ReportScheduledConsumerFactoryMock { get; } = new();
@@ -127,7 +129,7 @@ namespace IntegrationTests.Report
             builder.Services.AddTransient<PatientAggregator>();
             builder.Services.AddTransient<MeasureReportAggregator>();
             builder.Services.AddSingleton<BlobStorageService>();
-            builder.Services.AddSingleton<ITenantApiService>(TenantApiServiceMock.Object);
+            builder.Services.AddSingleton<ILinkSdkClientFactory>(LinkSdkClientFactoryMock.Object);
             builder.Services.AddSingleton<IHttpClientFactory>(HttpClientFactoryMock.Object);
 
             builder.Services.AddLogging();
@@ -160,7 +162,7 @@ namespace IntegrationTests.Report
                     new Mock<ILogger<ReportManifestProducer>>().Object,
                     sp.GetRequiredService<IServiceScopeFactory>(),
                     new MeasureReportAggregator(new Mock<ILogger<MeasureReportAggregator>>().Object, sp.GetRequiredService<IReportPopulationManager>()),
-                    TenantApiServiceMock.Object,
+                    LinkSdkClientFactoryMock.Object,
                     sp.GetRequiredService<BlobStorageService>(),
                     sp.GetRequiredService<SubmitPayloadProducer>(),
                     sp.GetRequiredService<AuditableEventOccurredProducer>()));
@@ -202,6 +204,14 @@ namespace IntegrationTests.Report
             builder.Services.Configure<ServiceRegistry>(opts => opts.CensusServiceUrl = "http://localhost:8080");
             builder.Services.Configure<LinkTokenServiceSettings>(opts => opts.SigningKey = "test-signing-key");
             builder.Services.Configure<BackendAuthenticationServiceExtension.LinkBearerServiceOptions>(opts => opts.AllowAnonymous = true);
+
+            LinkSdkClientFactoryMock
+                .Setup(x => x.GetFacilityConfigAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Returns((string facilityId, CancellationToken ct) => TenantApiServiceMock.Object.GetFacilityConfig(facilityId, ct));
+
+            LinkSdkClientFactoryMock
+                .Setup(x => x.GetAdmittedPatientIdsAsync(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync([]);
 
             _host = builder.Build();
             await _host.StartAsync();

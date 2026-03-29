@@ -109,11 +109,11 @@ public class MeasureLoader
         _output.WriteLine("Loading measure bundle for evaluation...");
         var request = new RestRequest($"measureeval/measure-definition", Method.Put);
         request.AddJsonBody(this._evaluationBundle.ToJson());
-        var response = _adminBffClient.ExecuteAsync(request);
+        var response = await _adminBffClient.ExecuteAsync(request);
 
-        if (response.Result.StatusCode != System.Net.HttpStatusCode.OK)
+        if (response.StatusCode != System.Net.HttpStatusCode.OK)
         {
-            _output.WriteLine($"Failed to load measure definition: {response.Result.Content}");
+            _output.WriteLine($"Failed to load measure definition: {response.Content}");
             throw new Exception("Failed to load measure definition.");
         }
 

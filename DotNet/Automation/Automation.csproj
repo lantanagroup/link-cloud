@@ -1,5 +1,4 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -18,11 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DataAcquisition.Domain\DataAcquisition.Domain.csproj" />
-    <ProjectReference Include="..\Normalization\Normalization.csproj" />
-    <ProjectReference Include="..\Report\Report.csproj" />
+    <ProjectReference Include="..\LinkSdk\LinkSdk.csproj" />
     <ProjectReference Include="..\Shared\Shared.csproj" />
-    <ProjectReference Include="..\Tenant\Tenant.csproj" />
   </ItemGroup>
-
 </Project>
