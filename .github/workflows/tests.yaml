@@ -62,8 +62,8 @@ jobs:
       - name: Build services with cache
         run: |
           docker buildx bake --file docker-compose.yml \
-            --set *.cache-from=type=gha \
-            --set *.cache-to=type=gha \
+            --set *.cache-from=type=gha,scope=e2e-docker \
+            --set *.cache-to=type=gha,scope=e2e-docker \
             --set *.output=type=docker   # <-- makes images visible to `docker compose`
       - name: Start services
         run: docker compose up --no-build -d
@@ -80,11 +80,11 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: service-logs
+          name: smoke-service-logs
           path: service-logs/
 
-      - name: Run Backend E2E Smoke + Scheduled Workflow Tests
-        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=SmokeTest|Category=ReportScheduledWorkflowTest" --logger "trx;LogFileName=test-results.trx" --logger "console;verbosity=detailed"
+      - name: Run Backend E2E Smoke Tests
+        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=SmokeTest" --logger "trx;LogFileName=smoke-test-results.trx" --logger "console;verbosity=detailed"
         env:
           SMOKE_TEST_DOWNLOAD_PATH: ./Tests/BackendE2ETests/TestResults/
 
@@ -92,15 +92,70 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
-          path: ./Tests/BackendE2ETests/TestResults/test-results.trx
+          name: smoke-test-results
+          path: ./Tests/BackendE2ETests/TestResults/smoke-test-results.trx
 
       - name: Upload submission ZIP
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: smoke-submission-zip
           path: ./Tests/BackendE2ETests/TestResults/adhoc-reporting-smoke-test-submission.zip
+
+  docker-build-and-run-report-scheduled:
+    name: Report Scheduled E2E Test with Docker Compose
+    runs-on: [docker-16core-64gb]
+    timeout-minutes: 20
+
+    needs: changes
+    if: ${{ needs.changes.outputs.run_job == 'true' }}
+
+    env:
+      PROJECT_NAME: link
+      HEALTH_CHECK_TIMEOUT: 60
+      CHECK_INTERVAL: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build services with cache
+        run: |
+          docker buildx bake --file docker-compose.yml \
+            --set *.cache-from=type=gha,scope=e2e-docker \
+            --set *.cache-to=type=gha,scope=e2e-docker \
+            --set *.output=type=docker
+
+      - name: Start services
+        run: docker compose up --no-build -d
+
+      - name: Wait for services to start
+        run: sleep 10
+
+      - name: Wait for Services to Become Healthy
+        run: |
+          chmod +x Scripts/check_health.sh
+          Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
+
+      - name: Upload Logs on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-scheduled-service-logs
+          path: service-logs/
+
+      - name: Run Backend E2E Report Scheduled Test
+        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=ReportScheduledWorkflowTest" --logger "trx;LogFileName=report-scheduled-test-results.trx" --logger "console;verbosity=detailed"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-scheduled-test-results
+          path: ./Tests/BackendE2ETests/TestResults/report-scheduled-test-results.trx
 
   integration-tests:
     name: Integration Tests
