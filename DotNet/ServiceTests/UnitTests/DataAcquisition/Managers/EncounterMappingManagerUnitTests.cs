@@ -1,0 +1,150 @@
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using Moq;
+using System.Linq.Expressions;
+using Xunit;
+using Task = System.Threading.Tasks.Task;
+
+namespace UnitTests.DataAcquisition.Managers;
+
+[Trait("Category", "UnitTests")]
+public class EncounterMappingManagerUnitTests
+{
+    private readonly Mock<IDatabase> _mockDatabase;
+    private readonly Mock<IEntityRepository<EncounterMapping>> _mockMappingRepo;
+    private readonly Mock<IEntityRepository<EncounterLocation>> _mockLocationRepo;
+    private readonly EncounterMappingManager _manager;
+
+    public EncounterMappingManagerUnitTests()
+    {
+        _mockDatabase = new Mock<IDatabase>();
+        _mockMappingRepo = new Mock<IEntityRepository<EncounterMapping>>();
+        _mockLocationRepo = new Mock<IEntityRepository<EncounterLocation>>();
+
+        _mockDatabase.Setup(d => d.EncounterMappingRepository).Returns(_mockMappingRepo.Object);
+        _mockDatabase.Setup(d => d.EncounterLocationRepository).Returns(_mockLocationRepo.Object);
+
+        _manager = new EncounterMappingManager(_mockDatabase.Object);
+    }
+
+    [Fact]
+    public void Constructor_NullDatabase_ThrowsArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() => new EncounterMappingManager(null!));
+    }
+
+    [Fact]
+    public async Task CreateAsync_SetsDatesAndMapsToEntity()
+    {
+        // Arrange
+        var model = new CreateEncounterMappingModel
+        {
+            FacilityId = "Fac1",
+            EncounterId = "Enc1",
+            PatientId = "Pat1",
+            MappedToOrg = true
+        };
+
+        EncounterMapping capturedEntity = null!;
+        _mockMappingRepo.Setup(r => r.AddAsync(It.IsAny<EncounterMapping>(), It.IsAny<CancellationToken>()))
+            .Callback<EncounterMapping, CancellationToken>((e, c) => capturedEntity = e);
+
+        // Act
+        await _manager.CreateAsync(model);
+
+        // Assert
+        Assert.NotNull(capturedEntity);
+        Assert.Equal("Fac1", capturedEntity.FacilityId);
+        Assert.Equal("Enc1", capturedEntity.EncounterId);
+        Assert.Equal("Pat1", capturedEntity.PatientId);
+        Assert.True(capturedEntity.MappedToOrg);
+        Assert.NotEqual(default, capturedEntity.CreateDate);
+        Assert.Equal(capturedEntity.CreateDate, capturedEntity.ModifiedDate);
+        _mockDatabase.Verify(d => d.SaveChangesAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateByIdAsync_UpdatesModifiedDate()
+    {
+        // Arrange
+        var existing = new EncounterMapping
+        {
+            EncounterMappingId = 1,
+            CreateDate = DateTime.UtcNow.AddDays(-1),
+            ModifiedDate = DateTime.UtcNow.AddDays(-1)
+        };
+
+        _mockMappingRepo.Setup(r => r.GetAsync(1, default)).ReturnsAsync(existing);
+
+        var updateModel = new UpdateEncounterMappingModel { MappedToOrg = true };
+
+        // Act
+        await _manager.UpdateByIdAsync(1, updateModel);
+
+        // Assert
+        Assert.True(existing.MappedToOrg);
+        Assert.True(existing.ModifiedDate > existing.CreateDate);
+        _mockMappingRepo.Verify(r => r.Update(existing), Times.Once);
+        _mockDatabase.Verify(d => d.SaveChangesAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateByIdAsync_PartialUpdate_OnlyUpdatesProvidedFields()
+    {
+        // Arrange
+        var existing = new EncounterMapping
+        {
+            EncounterMappingId = 1,
+            MappedToOrg = false,
+            ModifiedDate = DateTime.UtcNow.AddDays(-1)
+        };
+
+        _mockMappingRepo.Setup(r => r.GetAsync(1, default)).ReturnsAsync(existing);
+
+        // Update with null OrganizationLocationMappingIds should NOT touch locations
+        var updateModel = new UpdateEncounterMappingModel 
+        { 
+            MappedToOrg = true,
+            OrganizationLocationMappingIds = null 
+        };
+
+        // Act
+        await _manager.UpdateByIdAsync(1, updateModel);
+
+        // Assert
+        Assert.True(existing.MappedToOrg);
+        _mockLocationRepo.Verify(r => r.FindAsync(It.IsAny<Expression<Func<EncounterLocation, bool>>>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SearchAsync_AppliesFiltersCorrectly()
+    {
+        // Arrange
+        var searchModel = new EncounterMappingSearchModel
+        {
+            FacilityId = "Fac1",
+            MappedToOrg = true
+        };
+
+        var mockQueries = new EncounterMappingQueries(_mockDatabase.Object);
+        var expectedResults = new List<EncounterMapping>
+        {
+            new EncounterMapping { EncounterMappingId = 1, FacilityId = "Fac1", MappedToOrg = true }
+        };
+
+        _mockMappingRepo.Setup(r => r.FindAsync(It.IsAny<Expression<Func<EncounterMapping, bool>>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expectedResults);
+
+        // Act
+        var result = await mockQueries.SearchAsync(searchModel, 1, 10);
+
+        // Assert
+        Assert.Single(result.Records);
+        Assert.Equal("Fac1", result.Records.First().FacilityId);
+        _mockMappingRepo.Verify(r => r.FindAsync(It.IsAny<Expression<Func<EncounterMapping, bool>>>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+}
