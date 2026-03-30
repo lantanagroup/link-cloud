@@ -17,7 +17,7 @@ public class FacilityApiClient(RestClient client, ITestOutputHelper output)
         // delete it and retry so the test can proceed cleanly.
         if (response.StatusCode == HttpStatusCode.BadRequest)
         {
-            output.WriteLine($"Facility creation returned BadRequest � attempting cleanup and retry. Response: {response.Content}");
+            output.WriteLine($"Facility creation returned BadRequest - attempting cleanup and retry. Response: {response.Content}");
             await DeleteAsync(facilityId);
             response = await SendCreateRequestAsync(facilityId, measure);
         }

@@ -26,7 +26,7 @@ export class TenantService {
       facilityId: facilityId,
       facilityName: facilityName,
       timeZone: timeZone,
-      vendor: vendor ?? undefined,
+      vendor: vendor,
       scheduledReports: scheduledReports
     };
 
@@ -46,7 +46,7 @@ export class TenantService {
       facilityId: facilityId,
       facilityName: facilityName,
       timeZone: timeZone,
-      vendor: vendor ?? undefined,
+      vendor: vendor,
       scheduledReports: scheduledReports
     };
 
