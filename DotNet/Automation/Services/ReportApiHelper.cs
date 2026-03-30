@@ -1,5 +1,5 @@
 ﻿using System.IO.Compression;
-using System.Net;
+using Flurl.Http;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.Automation.Helpers;
@@ -10,19 +10,17 @@ using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Automation.Services;
 
-public class ReportApiClient
+public class ReportApiHelper
 {
     private readonly ReportServiceClient _reportClient;
     private readonly IAutomationOutput _output;
-    private readonly LokiScraper _lokiScraper;
     private readonly TestScenarioConfig _config;
     private readonly AutomationConfig _automationConfig;
 
-    public ReportApiClient(ReportServiceClient reportClient, IAutomationOutput output, LokiScraper lokiScraper, AutomationConfig automationConfig, TestScenarioConfig config)
+    public ReportApiHelper(ReportServiceClient reportClient, IAutomationOutput output, AutomationConfig automationConfig, TestScenarioConfig config)
     {
         _reportClient = reportClient;
         _output = output;
-        _lokiScraper = lokiScraper;
         _config = config;
         _automationConfig = automationConfig;
     }
@@ -39,15 +37,12 @@ public class ReportApiClient
             PatientIds = _config.PatientIds
         };
 
-        var (status, payload) = await _reportClient.GenerateAdhocReportAsync(facilityId, body);
-        AutomationInvariant.Require(status == HttpStatusCode.OK,
-            $"Generate Report - Expected HTTP 200 OK but received {status}");
+        var payload = await _reportClient.GenerateAdhocReportAsync(facilityId, body);
 
-        var reportId = payload?.ReportId;
-        AutomationInvariant.Require(reportId.HasValue && reportId.Value != Guid.Empty,
+        AutomationInvariant.Require(payload?.ReportId != null && payload.ReportId != Guid.Empty,
             "Expected response to include reportId but received empty payload.");
 
-        return reportId!.Value.ToString();
+        return payload!.ReportId.ToString();
     }
 
     public async Task<bool> CheckSubmissionStatusAsync(string reportId, BackgroundDiagnosticsMonitor? diagnostics = null)
@@ -68,11 +63,10 @@ public class ReportApiClient
                 return false;
             }
 
-            var (statusCode, schedule) = await _reportClient.GetScheduleAsync(reportId);
             string currentStatus;
-
-            if (statusCode == HttpStatusCode.OK)
+            try
             {
+                var schedule = await _reportClient.GetScheduleAsync(reportId);
                 currentStatus = schedule?.Status.ToString() ?? "unknown";
 
                 if (string.Equals(currentStatus, "Submitted", StringComparison.OrdinalIgnoreCase))
@@ -81,9 +75,9 @@ public class ReportApiClient
                     return true;
                 }
             }
-            else
+            catch (FlurlHttpException ex)
             {
-                currentStatus = $"HTTP {(int)statusCode}";
+                currentStatus = $"HTTP {ex.StatusCode}";
             }
 
             if (currentStatus != lastStatus)
@@ -103,9 +97,7 @@ public class ReportApiClient
     {
         _output.WriteLine($"Downloading report {reportId}...");
 
-        var (status, bytes, contentType, body) = await _reportClient.DownloadSubmissionAsync(facilityId, reportId, external);
-        AutomationInvariant.Require(status == HttpStatusCode.OK,
-            $"Download Report - Expected HTTP 200 OK but received {status}: {body}");
+        var (bytes, contentType) = await _reportClient.DownloadSubmissionAsync(facilityId, reportId, external);
 
         AutomationInvariant.Require(contentType?.Contains("application/zip") == true,
             $"Expected Content-Type to be application/zip but received {contentType}");

@@ -1,4 +1,4 @@
-﻿using System.Net;
+﻿using Flurl.Http;
 using LantanaGroup.Link.Automation.Helpers;
 using Newtonsoft.Json.Linq;
 using RestSharp;
@@ -33,11 +33,11 @@ public class ValidationResultsValidator
         // Lightweight API availability check.
         try
         {
-            var status = await _validationClient.GetValidationResultsAsync(facilityId, reportId, "WARNING");
-            if (status != HttpStatusCode.OK)
-            {
-                errors.Add($"Validation API call failed with status {(int)status} {status}");
-            }
+            await _validationClient.GetValidationResultsAsync(facilityId, reportId, "WARNING");
+        }
+        catch (FlurlHttpException ex)
+        {
+            errors.Add($"Validation API call failed with status {ex.StatusCode}");
         }
         catch (Exception ex)
         {

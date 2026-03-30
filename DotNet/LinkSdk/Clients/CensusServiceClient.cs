@@ -3,7 +3,6 @@ using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Census;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Sdk.ApiClient;
-using System.Net;
 
 namespace LantanaGroup.Link.Sdk.Clients;
 
@@ -14,67 +13,44 @@ public sealed class CensusServiceClient : LinkApiClientBase
     {
     }
 
-    public async Task<(HttpStatusCode StatusCode, CensusConfigApiModel? Response)> CreateCensusConfigAsync(
+    public Task<CensusConfigApiModel> CreateCensusConfigAsync(
         CensusConfigApiModel request,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await Request("census/config")
-            .AllowAnyHttpStatus()
-            .PostJsonAsync(request, cancellationToken: cancellationToken);
+        CancellationToken cancellationToken = default) =>
+        Request("census/config")
+            .PostJsonAsync(request, cancellationToken: cancellationToken)
+            .ReceiveJson<CensusConfigApiModel>();
 
-        return (response.ResponseMessage.StatusCode, await ReadJsonAsync<CensusConfigApiModel>(response));
-    }
-
-    public async Task<(HttpStatusCode StatusCode, CensusConfigApiModel? Response)> GetCensusConfigAsync(
+    public Task<CensusConfigApiModel> GetCensusConfigAsync(
         string facilityId,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await Request($"census/config/{facilityId}")
-            .AllowAnyHttpStatus()
-            .GetAsync(cancellationToken: cancellationToken);
+        CancellationToken cancellationToken = default) =>
+        Request($"census/config/{facilityId}")
+            .GetJsonAsync<CensusConfigApiModel>(cancellationToken: cancellationToken);
 
-        return (response.ResponseMessage.StatusCode, await ReadJsonAsync<CensusConfigApiModel>(response));
-    }
-
-    public async Task<(HttpStatusCode StatusCode, CensusConfigApiModel? Response)> UpdateCensusConfigAsync(
+    public Task<CensusConfigApiModel> UpdateCensusConfigAsync(
         string facilityId,
         CensusConfigApiModel request,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await Request($"census/config/{facilityId}")
-            .AllowAnyHttpStatus()
-            .PutJsonAsync(request, cancellationToken: cancellationToken);
+        CancellationToken cancellationToken = default) =>
+        Request($"census/config/{facilityId}")
+            .PutJsonAsync(request, cancellationToken: cancellationToken)
+            .ReceiveJson<CensusConfigApiModel>();
 
-        return (response.ResponseMessage.StatusCode, await ReadJsonAsync<CensusConfigApiModel>(response));
-    }
-
-    public async Task<HttpStatusCode> DeleteCensusConfigAsync(
+    public Task DeleteCensusConfigAsync(
         string facilityId,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await Request($"census/config/{facilityId}")
-            .AllowAnyHttpStatus()
+        CancellationToken cancellationToken = default) =>
+        Request($"census/config/{facilityId}")
             .DeleteAsync(cancellationToken: cancellationToken);
 
-        return response.ResponseMessage.StatusCode;
-    }
-
-    public async Task<(HttpStatusCode StatusCode, CensusFhirListApiModel? Response)> GetAdmittedPatientsAsync(
+    public Task<CensusFhirListApiModel> GetAdmittedPatientsAsync(
         string facilityId,
         DateTime startDate,
         DateTime endDate,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await Request($"census/{facilityId}/history/admitted")
+        CancellationToken cancellationToken = default) =>
+        Request($"census/{facilityId}/history/admitted")
             .SetQueryParam("startDate", startDate)
             .SetQueryParam("endDate", endDate)
-            .AllowAnyHttpStatus()
-            .GetAsync(cancellationToken: cancellationToken);
+            .GetJsonAsync<CensusFhirListApiModel>(cancellationToken: cancellationToken);
 
-        return (response.ResponseMessage.StatusCode, await ReadJsonAsync<CensusFhirListApiModel>(response));
-    }
-
-    public async Task<(HttpStatusCode StatusCode, PagedConfigModel<CensusPatientEncounterApiModel>? Response)> GetCurrentPatientEncountersAsync(
+    public Task<PagedConfigModel<CensusPatientEncounterApiModel>> GetCurrentPatientEncountersAsync(
         string facilityId,
         string? correlationId = null,
         string? sortBy = null,
@@ -86,18 +62,16 @@ public sealed class CensusServiceClient : LinkApiClientBase
         var request = Request("census/patient-encounters/current")
             .SetQueryParam("facilityId", facilityId)
             .SetQueryParam("pageSize", pageSize)
-            .SetQueryParam("pageNumber", pageNumber)
-            .AllowAnyHttpStatus();
+            .SetQueryParam("pageNumber", pageNumber);
 
         if (!string.IsNullOrWhiteSpace(correlationId)) request = request.SetQueryParam("correlationId", correlationId);
         if (!string.IsNullOrWhiteSpace(sortBy)) request = request.SetQueryParam("sortBy", sortBy);
         if (sortOrder.HasValue) request = request.SetQueryParam("sortOrder", sortOrder.Value.ToString());
 
-        var response = await request.GetAsync(cancellationToken: cancellationToken);
-        return (response.ResponseMessage.StatusCode, await ReadJsonAsync<PagedConfigModel<CensusPatientEncounterApiModel>>(response));
+        return request.GetJsonAsync<PagedConfigModel<CensusPatientEncounterApiModel>>(cancellationToken: cancellationToken);
     }
 
-    public async Task<(HttpStatusCode StatusCode, PagedConfigModel<CensusPatientEncounterApiModel>? Response)> GetHistoricalPatientEncountersAsync(
+    public Task<PagedConfigModel<CensusPatientEncounterApiModel>> GetHistoricalPatientEncountersAsync(
         string facilityId,
         DateTime dateThreshold,
         string? correlationId = null,
@@ -111,33 +85,29 @@ public sealed class CensusServiceClient : LinkApiClientBase
             .SetQueryParam("facilityId", facilityId)
             .SetQueryParam("dateThreshold", dateThreshold)
             .SetQueryParam("pageSize", pageSize)
-            .SetQueryParam("pageNumber", pageNumber)
-            .AllowAnyHttpStatus();
+            .SetQueryParam("pageNumber", pageNumber);
 
         if (!string.IsNullOrWhiteSpace(correlationId)) request = request.SetQueryParam("correlationId", correlationId);
         if (!string.IsNullOrWhiteSpace(sortBy)) request = request.SetQueryParam("sortBy", sortBy);
         if (sortOrder.HasValue) request = request.SetQueryParam("sortOrder", sortOrder.Value.ToString());
 
-        var response = await request.GetAsync(cancellationToken: cancellationToken);
-        return (response.ResponseMessage.StatusCode, await ReadJsonAsync<PagedConfigModel<CensusPatientEncounterApiModel>>(response));
+        return request.GetJsonAsync<PagedConfigModel<CensusPatientEncounterApiModel>>(cancellationToken: cancellationToken);
     }
 
-    public async Task<HttpStatusCode> RebuildPatientEncountersAsync(
+    public Task RebuildPatientEncountersAsync(
         string facilityId,
         string? correlationId = null,
         CancellationToken cancellationToken = default)
     {
         var request = Request("census/patient-encounters/rebuild")
-            .SetQueryParam("facilityId", facilityId)
-            .AllowAnyHttpStatus();
+            .SetQueryParam("facilityId", facilityId);
 
         if (!string.IsNullOrWhiteSpace(correlationId)) request = request.SetQueryParam("correlationId", correlationId);
 
-        var response = await request.PostAsync(cancellationToken: cancellationToken);
-        return response.ResponseMessage.StatusCode;
+        return request.PostAsync(cancellationToken: cancellationToken);
     }
 
-    public async Task<(HttpStatusCode StatusCode, PagedConfigModel<CensusPatientEventApiModel>? Response)> GetPatientEventsAsync(
+    public Task<PagedConfigModel<CensusPatientEventApiModel>> GetPatientEventsAsync(
         string facilityId,
         string? correlationId = null,
         DateTime? startDate = null,
@@ -151,8 +121,7 @@ public sealed class CensusServiceClient : LinkApiClientBase
         var request = Request("census/patient-events")
             .SetQueryParam("facilityId", facilityId)
             .SetQueryParam("pageSize", pageSize)
-            .SetQueryParam("pageNumber", pageNumber)
-            .AllowAnyHttpStatus();
+            .SetQueryParam("pageNumber", pageNumber);
 
         if (!string.IsNullOrWhiteSpace(correlationId)) request = request.SetQueryParam("correlationId", correlationId);
         if (startDate.HasValue) request = request.SetQueryParam("startDate", startDate.Value);
@@ -160,29 +129,18 @@ public sealed class CensusServiceClient : LinkApiClientBase
         if (!string.IsNullOrWhiteSpace(sortBy)) request = request.SetQueryParam("sortBy", sortBy);
         if (sortOrder.HasValue) request = request.SetQueryParam("sortOrder", sortOrder.Value.ToString());
 
-        var response = await request.GetAsync(cancellationToken: cancellationToken);
-        return (response.ResponseMessage.StatusCode, await ReadJsonAsync<PagedConfigModel<CensusPatientEventApiModel>>(response));
+        return request.GetJsonAsync<PagedConfigModel<CensusPatientEventApiModel>>(cancellationToken: cancellationToken);
     }
 
-    public async Task<HttpStatusCode> DeletePatientEventAsync(
+    public Task DeletePatientEventAsync(
         string id,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await Request($"census/patient-events/{id}")
-            .AllowAnyHttpStatus()
+        CancellationToken cancellationToken = default) =>
+        Request($"census/patient-events/{id}")
             .DeleteAsync(cancellationToken: cancellationToken);
 
-        return response.ResponseMessage.StatusCode;
-    }
-
-    public async Task<HttpStatusCode> DeletePatientEventsByCorrelationAsync(
+    public Task DeletePatientEventsByCorrelationAsync(
         string correlationId,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await Request($"census/patient-events/visit/{correlationId}")
-            .AllowAnyHttpStatus()
+        CancellationToken cancellationToken = default) =>
+        Request($"census/patient-events/visit/{correlationId}")
             .DeleteAsync(cancellationToken: cancellationToken);
-
-        return response.ResponseMessage.StatusCode;
-    }
 }

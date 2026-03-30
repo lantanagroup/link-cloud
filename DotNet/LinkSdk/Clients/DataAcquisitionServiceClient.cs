@@ -3,7 +3,6 @@ using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Sdk.ApiClient;
 using Newtonsoft.Json;
-using System.Net;
 using System.Net.Http;
 
 namespace LantanaGroup.Link.Sdk.Clients;
@@ -15,124 +14,89 @@ public sealed class DataAcquisitionServiceClient : LinkApiClientBase
     {
     }
 
-    public async Task<HttpStatusCode> GetFhirQueryConfigurationAsync(string facilityId, CancellationToken cancellationToken = default)
-    {
-        var response = await Request($"data/{facilityId}/fhirQueryConfiguration")
-            .AllowAnyHttpStatus()
+    public Task GetFhirQueryConfigurationAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        Request($"data/{facilityId}/fhirQueryConfiguration")
             .GetAsync(cancellationToken: cancellationToken);
 
-        return response.ResponseMessage.StatusCode;
-    }
-
-    public async Task<HttpStatusCode> CreateFhirQueryConfigurationAsync(CreateFhirQueryConfigurationRequestApiModel request, CancellationToken cancellationToken = default)
-    {
-        var response = await Request("data/fhirQueryConfiguration")
-            .AllowAnyHttpStatus()
+    public Task CreateFhirQueryConfigurationAsync(
+        CreateFhirQueryConfigurationRequestApiModel request,
+        CancellationToken cancellationToken = default) =>
+        Request("data/fhirQueryConfiguration")
             .PostJsonAsync(request, cancellationToken: cancellationToken);
 
-        return response.ResponseMessage.StatusCode;
-    }
-
-    public async Task<HttpStatusCode> DeleteFhirQueryConfigurationAsync(string facilityId, CancellationToken cancellationToken = default)
-    {
-        var response = await Request($"data/{facilityId}/fhirQueryConfiguration")
-            .AllowAnyHttpStatus()
-            .DeleteAsync(cancellationToken: cancellationToken);
-
-        return response.ResponseMessage.StatusCode;
-    }
-
-    public async Task<HttpStatusCode> GetQueryPlanAsync(string facilityId, string type, CancellationToken cancellationToken = default)
-    {
-        var response = await Request($"data/{facilityId}/QueryPlan")
-            .SetQueryParam("type", type)
-            .AllowAnyHttpStatus()
-            .GetAsync(cancellationToken: cancellationToken);
-
-        return response.ResponseMessage.StatusCode;
-    }
-
-    public async Task<HttpStatusCode> CreateQueryPlanAsync(string facilityId, CreateQueryPlanRequestApiModel request, CancellationToken cancellationToken = default)
-    {
-        var requestJson = JsonConvert.SerializeObject(request);
-
-        var response = await Request($"data/{facilityId}/QueryPlan")
-            .WithHeader("Content-Type", "application/json")
-            .AllowAnyHttpStatus()
-            .SendStringAsync(HttpMethod.Post, requestJson, cancellationToken: cancellationToken);
-
-        return response.ResponseMessage.StatusCode;
-    }
-
-    public async Task<HttpStatusCode> DeleteQueryPlanAsync(string facilityId, string type, CancellationToken cancellationToken = default)
-    {
-        var response = await Request($"data/{facilityId}/QueryPlan")
-            .SetQueryParam("type", type)
-            .AllowAnyHttpStatus()
-            .DeleteAsync(cancellationToken: cancellationToken);
-
-        return response.ResponseMessage.StatusCode;
-    }
-
-    public async Task<(HttpStatusCode StatusCode, PagedConfigModel<DataAcquisitionLogApiModel>? Response)> SearchAcquisitionLogsAsync(
+    public Task DeleteFhirQueryConfigurationAsync(
         string facilityId,
-        string reportId,
-        int pageSize = 5000,
-        int pageNumber = 1,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await Request("data/acquisition-logs")
-            .SetQueryParam("facilityId", facilityId)
-            .SetQueryParam("reportId", reportId)
-            .SetQueryParam("pageSize", pageSize)
-            .SetQueryParam("pageNumber", pageNumber)
-            .SetQueryParam("sortBy", "Id")
-            .SetQueryParam("sortOrder", "Ascending")
-            .AllowAnyHttpStatus()
+        CancellationToken cancellationToken = default) =>
+        Request($"data/{facilityId}/fhirQueryConfiguration")
+            .DeleteAsync(cancellationToken: cancellationToken);
+
+    public Task GetQueryPlanAsync(
+        string facilityId,
+        string type,
+        CancellationToken cancellationToken = default) =>
+        Request($"data/{facilityId}/QueryPlan")
+            .SetQueryParam("type", type)
             .GetAsync(cancellationToken: cancellationToken);
 
-        return (response.ResponseMessage.StatusCode, await ReadJsonAsync<PagedConfigModel<DataAcquisitionLogApiModel>>(response));
-    }
+    public Task CreateQueryPlanAsync(
+        string facilityId,
+        CreateQueryPlanRequestApiModel request,
+        CancellationToken cancellationToken = default) =>
+        Request($"data/{facilityId}/QueryPlan")
+            .WithHeader("Content-Type", "application/json")
+            .SendStringAsync(HttpMethod.Post, JsonConvert.SerializeObject(request), cancellationToken: cancellationToken);
 
-    public async Task<(HttpStatusCode StatusCode, DataAcquisitionLogStatusStatisticsApiModel? Response)> GetReportStatusCountsAsync(string reportId, CancellationToken cancellationToken = default)
-    {
-        var response = await Request($"data/acquisition-logs/report/{reportId}/status-counts")
-            .AllowAnyHttpStatus()
-            .GetAsync(cancellationToken: cancellationToken);
+    public Task DeleteQueryPlanAsync(
+        string facilityId,
+        string type,
+        CancellationToken cancellationToken = default) =>
+        Request($"data/{facilityId}/QueryPlan")
+            .SetQueryParam("type", type)
+            .DeleteAsync(cancellationToken: cancellationToken);
 
-        return (response.ResponseMessage.StatusCode, await ReadJsonAsync<DataAcquisitionLogStatusStatisticsApiModel>(response));
-    }
-
-    public async Task<(HttpStatusCode StatusCode, PagedConfigModel<DataAcquisitionLogApiModel>? Response)> SearchDetailedAcquisitionLogsAsync(
+    public Task<PagedConfigModel<DataAcquisitionLogApiModel>> SearchAcquisitionLogsAsync(
         string facilityId,
         string reportId,
         int pageSize = 100,
         int pageNumber = 1,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await Request("data/acquisition-logs/detailed")
+        CancellationToken cancellationToken = default) =>
+        Request("data/acquisition-logs")
             .SetQueryParam("facilityId", facilityId)
             .SetQueryParam("reportId", reportId)
             .SetQueryParam("pageSize", pageSize)
             .SetQueryParam("pageNumber", pageNumber)
             .SetQueryParam("sortBy", "Id")
             .SetQueryParam("sortOrder", "Ascending")
-            .AllowAnyHttpStatus()
-            .GetAsync(cancellationToken: cancellationToken);
+            .GetJsonAsync<PagedConfigModel<DataAcquisitionLogApiModel>>(cancellationToken: cancellationToken);
 
-        return (response.ResponseMessage.StatusCode, await ReadJsonAsync<PagedConfigModel<DataAcquisitionLogApiModel>>(response));
-    }
+    public Task<DataAcquisitionLogStatusStatisticsApiModel> GetReportStatusCountsAsync(
+        string reportId,
+        CancellationToken cancellationToken = default) =>
+        Request($"data/acquisition-logs/report/{reportId}/status-counts")
+            .GetJsonAsync<DataAcquisitionLogStatusStatisticsApiModel>(cancellationToken: cancellationToken);
 
-    public async Task<(HttpStatusCode StatusCode, List<string>? Response)> GetAcquiredResourceIdsForReportAsync(
+    public Task<PagedConfigModel<DataAcquisitionLogApiModel>> SearchDetailedAcquisitionLogsAsync(
         string facilityId,
         string reportId,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await Request($"data/acquisition-logs/report/{reportId}/acquired-resource-ids")
+        int pageSize = 100,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default) =>
+        Request("data/acquisition-logs/detailed")
             .SetQueryParam("facilityId", facilityId)
-            .AllowAnyHttpStatus()
-            .GetAsync(cancellationToken: cancellationToken);
+            .SetQueryParam("reportId", reportId)
+            .SetQueryParam("pageSize", pageSize)
+            .SetQueryParam("pageNumber", pageNumber)
+            .SetQueryParam("sortBy", "Id")
+            .SetQueryParam("sortOrder", "Ascending")
+            .GetJsonAsync<PagedConfigModel<DataAcquisitionLogApiModel>>(cancellationToken: cancellationToken);
 
-        return (response.ResponseMessage.StatusCode, await ReadJsonAsync<List<string>>(response));
-    }
+    public Task<List<string>> GetAcquiredResourceIdsForReportAsync(
+        string facilityId,
+        string reportId,
+        CancellationToken cancellationToken = default) =>
+        Request($"data/acquisition-logs/report/{reportId}/acquired-resource-ids")
+            .SetQueryParam("facilityId", facilityId)
+            .GetJsonAsync<List<string>>(cancellationToken: cancellationToken);
 }

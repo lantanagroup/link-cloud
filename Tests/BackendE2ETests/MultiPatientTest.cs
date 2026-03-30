@@ -30,11 +30,8 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
     private DualOutputHelper _output => _tesetServices.Output;
     private FhirDataLoader FhirDataLoader => _tesetServices.FhirDataLoader;
 
-    private FacilityApiClient FacilityApi => _tesetServices.CreateFacilityApi();
-    private NormalizationApiClient NormalizationApi => _tesetServices.CreateNormalizationApi();
-    private QueryConfigApiClient QueryConfigApi => _tesetServices.CreateQueryConfigApi();
-    private ReportApiClient ReportApi => _tesetServices.CreateReportApi(Config);
-    private ValidationApiClient ValidationApi => _tesetServices.CreateValidationApi();
+    private ReportApiHelper ReportApi => _tesetServices.CreateReportHelper(Config);
+    private ValidationApiHelper ValidationApi => _tesetServices.CreateValidationHelper();
 
     public MultiPatientTest(BackendE2ETestFixture fixture)
     {
@@ -80,7 +77,7 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
 
         if (Config.RemoveFacilityConfig)
         {
-            await FacilityApi.DeleteAsync(FacilityId);
+            await SdkSetupHelper.CleanupFacilityAsync(_tesetServices, FacilityId);
         }
 
         if (AutomationCfg.CleanupTestData)
@@ -107,16 +104,16 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
             $"({Config.MaxRetryCount} checks every {Config.PollingIntervalSeconds} seconds).");
 
         // Step 2: Create facility
-        await FacilityApi.CreateAsync(FacilityId, measureId);
+        await SdkSetupHelper.EnsureFacilityAsync(_tesetServices, FacilityId, measureId);
 
         // Step 3: Create normalization config
-        await NormalizationApi.CreateConfigAsync(FacilityId);
+        await SdkSetupHelper.EnsureNormalizationConfigAsync(_tesetServices, FacilityId);
 
         // Step 4: Create query plans (Discharge + Monthly)
-        await QueryConfigApi.CreateQueryPlanAsync(FacilityId, measureId, "Epic");
+        await SdkSetupHelper.EnsureQueryPlansAsync(_tesetServices, FacilityId, measureId, "Epic");
 
         // Step 5: Create FHIR query config
-        await QueryConfigApi.CreateQueryConfigAsync(FacilityId);
+        await SdkSetupHelper.EnsureQueryConfigAsync(_tesetServices, FacilityId);
 
         // Step 6: Generate the ad-hoc report
         var reportId = await ReportApi.GenerateReportAsync(FacilityId, measureId);

@@ -2,7 +2,6 @@
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Sdk.ApiClient;
-using System.Net;
 
 namespace LantanaGroup.Link.Sdk.Clients;
 
@@ -13,48 +12,34 @@ public sealed class NormalizationServiceClient : LinkApiClientBase
     {
     }
 
-    public async Task<(HttpStatusCode StatusCode, PagedConfigModel<NormalizationOperationApiModel>? Response)> SearchFacilityOperationsAsync(
+    public Task<PagedConfigModel<NormalizationOperationApiModel>> SearchFacilityOperationsAsync(
         string facilityId,
         bool includeDisabled = true,
         int pageSize = 100,
         int pageNumber = 1,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await Request($"normalization/Operations/facility/{facilityId}")
+        CancellationToken cancellationToken = default) =>
+        Request($"normalization/Operations/facility/{facilityId}")
             .SetQueryParam("includeDisabled", includeDisabled)
             .SetQueryParam("pageSize", pageSize)
             .SetQueryParam("pageNumber", pageNumber)
-            .AllowAnyHttpStatus()
-            .GetAsync(cancellationToken: cancellationToken);
+            .GetJsonAsync<PagedConfigModel<NormalizationOperationApiModel>>(cancellationToken: cancellationToken);
 
-        return (response.ResponseMessage.StatusCode, await ReadJsonAsync<PagedConfigModel<NormalizationOperationApiModel>>(response));
-    }
-
-    public async Task<HttpStatusCode> CreateOperationAsync(CreateNormalizationOperationRequestApiModel requestBody, CancellationToken cancellationToken = default)
-    {
-        var response = await Request("normalization/Operations")
-            .AllowAnyHttpStatus()
+    public Task CreateOperationAsync(
+        CreateNormalizationOperationRequestApiModel requestBody,
+        CancellationToken cancellationToken = default) =>
+        Request("normalization/Operations")
             .PostJsonAsync(requestBody, cancellationToken: cancellationToken);
 
-        return response.ResponseMessage.StatusCode;
-    }
-
-    public async Task<HttpStatusCode> DeleteFacilityOperationsAsync(string facilityId, CancellationToken cancellationToken = default)
-    {
-        var response = await Request($"normalization/operations/facility/{facilityId}")
-            .AllowAnyHttpStatus()
+    public Task DeleteFacilityOperationsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        Request($"normalization/operations/facility/{facilityId}")
             .DeleteAsync(cancellationToken: cancellationToken);
 
-        return response.ResponseMessage.StatusCode;
-    }
-
-    public async Task<(HttpStatusCode StatusCode, List<NormalizationOperationSequenceApiModel>? Response)> GetOperationSequencesAsync(string facilityId, CancellationToken cancellationToken = default)
-    {
-        var response = await Request("normalization/OperationSequence")
+    public Task<List<NormalizationOperationSequenceApiModel>> GetOperationSequencesAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        Request("normalization/OperationSequence")
             .SetQueryParam("facilityId", facilityId)
-            .AllowAnyHttpStatus()
-            .GetAsync(cancellationToken: cancellationToken);
-
-        return (response.ResponseMessage.StatusCode, await ReadJsonAsync<List<NormalizationOperationSequenceApiModel>>(response));
-    }
+            .GetJsonAsync<List<NormalizationOperationSequenceApiModel>>(cancellationToken: cancellationToken);
 }

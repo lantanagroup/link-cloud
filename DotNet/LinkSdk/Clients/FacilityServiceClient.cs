@@ -1,7 +1,6 @@
 ﻿using Flurl.Http;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Sdk.ApiClient;
-using System.Net;
 
 namespace LantanaGroup.Link.Sdk.Clients;
 
@@ -12,39 +11,22 @@ public sealed class FacilityServiceClient : LinkApiClientBase
     {
     }
 
-    public async Task<HttpStatusCode> CreateAsync(FacilityModel request, CancellationToken cancellationToken = default)
-    {
-        var response = await Request("/Facility")
-            .AllowAnyHttpStatus()
-            .PostJsonAsync(request, cancellationToken: cancellationToken);
+    public Task<FacilityModel> CreateAsync(
+        FacilityModel request,
+        CancellationToken cancellationToken = default) =>
+        Request("/Facility")
+            .PostJsonAsync(request, cancellationToken: cancellationToken)
+            .ReceiveJson<FacilityModel>();
 
-        return response.ResponseMessage.StatusCode;
-    }
+    public Task<FacilityModel> GetAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        Request($"/Facility/{facilityId}")
+            .GetJsonAsync<FacilityModel>(cancellationToken: cancellationToken);
 
-    public async Task<HttpStatusCode> GetAsync(string facilityId, CancellationToken cancellationToken = default)
-    {
-        var response = await Request($"/Facility/{facilityId}")
-            .AllowAnyHttpStatus()
-            .GetAsync(cancellationToken: cancellationToken);
-
-        return response.ResponseMessage.StatusCode;
-    }
-
-    public async Task<HttpStatusCode> DeleteAsync(string facilityId, CancellationToken cancellationToken = default)
-    {
-        var response = await Request($"/Facility/{facilityId}")
-            .AllowAnyHttpStatus()
+    public Task DeleteAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        Request($"/Facility/{facilityId}")
             .DeleteAsync(cancellationToken: cancellationToken);
-
-        return response.ResponseMessage.StatusCode;
-    }
-
-    public async Task<(HttpStatusCode StatusCode, FacilityModel? Response)> GetDetailsAsync(string facilityId, CancellationToken cancellationToken = default)
-    {
-        var response = await Request($"/Facility/{facilityId}")
-            .AllowAnyHttpStatus()
-            .GetAsync(cancellationToken: cancellationToken);
-
-        return (response.ResponseMessage.StatusCode, await ReadJsonAsync<FacilityModel>(response));
-    }
 }

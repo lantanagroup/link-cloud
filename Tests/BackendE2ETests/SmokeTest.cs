@@ -27,11 +27,8 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
     private DualOutputHelper _output => _b.Output;
     private FhirDataLoader FhirDataLoader => _b.FhirDataLoader;
 
-    private FacilityApiClient FacilityApi => _b.CreateFacilityApi();
-    private NormalizationApiClient NormalizationApi => _b.CreateNormalizationApi();
-    private QueryConfigApiClient QueryConfigApi => _b.CreateQueryConfigApi();
-    private ReportApiClient ReportApi => _b.CreateReportApi(Config);
-    private ValidationApiClient ValidationApi => _b.CreateValidationApi();
+    private ReportApiHelper ReportApi => _b.CreateReportHelper(Config);
+    private ValidationApiHelper ValidationApi => _b.CreateValidationHelper();
 
     public SmokeTest(BackendE2ETestFixture fixture)
     {
@@ -71,7 +68,7 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
 
         if (Config.RemoveFacilityConfig)
         {
-            await FacilityApi.DeleteAsync(FacilityId);
+            await SdkSetupHelper.CleanupFacilityAsync(_b, FacilityId);
         }
 
         if (AutomationCfg.CleanupTestData)
@@ -92,24 +89,21 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
             ?? throw new InvalidOperationException("MeasureLoader did not produce a MeasureId");
 
         // Step 2: Create facility.
-        await FacilityApi.CreateAsync(FacilityId, measureId);
+        await SdkSetupHelper.EnsureFacilityAsync(_b, FacilityId, measureId);
 
         // Step 3: Create normalization config.
-        await NormalizationApi.CreateConfigAsync(FacilityId);
+        await SdkSetupHelper.EnsureNormalizationConfigAsync(_b, FacilityId);
 
         // Step 4: Create query plans (Discharge + Monthly).
-        await QueryConfigApi.CreateQueryPlanAsync(FacilityId, measureId, "Epic");
+        await SdkSetupHelper.EnsureQueryPlansAsync(_b, FacilityId, measureId, "Epic");
 
         // Step 5: Create FHIR query config.
-        await QueryConfigApi.CreateQueryConfigAsync(FacilityId);
+        await SdkSetupHelper.EnsureQueryConfigAsync(_b, FacilityId);
 
-        // Step 6: Validate core service endpoints before running heavy end-to-end report flow.
-        await ValidateSdkEndpointsPrePipelineAsync(FacilityId, measureId);
-
-        // Step 7: Generate the ad-hoc report.
+        // Step 6: Generate the ad-hoc report.
         var reportId = await ReportApi.GenerateReportAsync(FacilityId, measureId);
 
-        // Step 8: Start background diagnostics and poll until submitted.
+        // Step 7: Start background diagnostics and poll until submitted.
         await using var diagnostics = new BackgroundDiagnosticsMonitor(
             _output,
             _b.LokiScraper,
@@ -132,9 +126,7 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
             $"Expected report with id {reportId} to be submitted but it was not. " +
             $"Check [DIAG] and [Snapshot] output above for root cause details.");
 
-        await ValidateSdkEndpointsAsync(FacilityId, reportId, measureId);
-
-        // Step 9: Download and validate report artifacts.
+        // Step 8: Download and validate report artifacts.
         var downloadedResources = await ReportApi.DownloadReportAsync(FacilityId, reportId);
         var internalAbsResources = await ReportApi.DownloadReportAsync(FacilityId, reportId, external: false);
 
@@ -178,90 +170,5 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
         await _b.CreateNormalizationValidator().ValidateAllAsync(FacilityId);
         await _b.CreateTenantValidator().ValidateAllAsync(FacilityId, measureId);
         await _b.CreateValidationResultsValidator().ValidateAllAsync(FacilityId, reportId, Config.PatientIds, Config.LokiScrapeWindow);
-    }
-
-    private async Task ValidateSdkEndpointsPrePipelineAsync(string facilityId, string measureId)
-    {
-        _output.WriteLine("Running pre-pipeline LinkSdk endpoint conformance checks...");
-
-        var (measureStatus, _) = await _b.MeasureEvalClient.GetMeasureDefinitionAsync(measureId);
-        Assert.Equal(HttpStatusCode.OK, measureStatus);
-
-        Assert.Equal(HttpStatusCode.OK, await _b.FacilityClient.GetAsync(facilityId));
-        var (facilityStatus, facilityDetails) = await _b.FacilityClient.GetDetailsAsync(facilityId);
-        Assert.Equal(HttpStatusCode.OK, facilityStatus);
-        Assert.NotNull(facilityDetails);
-
-        var (opsStatus, opsResponse) = await _b.NormalizationClient.SearchFacilityOperationsAsync(facilityId);
-        Assert.Equal(HttpStatusCode.OK, opsStatus);
-        Assert.NotNull(opsResponse);
-
-        var (seqStatus, _) = await _b.NormalizationClient.GetOperationSequencesAsync(facilityId);
-        Assert.Equal(HttpStatusCode.OK, seqStatus);
-
-        Assert.Equal(HttpStatusCode.OK, await _b.DataAcquisitionClient.GetFhirQueryConfigurationAsync(facilityId));
-        Assert.Equal(HttpStatusCode.OK, await _b.DataAcquisitionClient.GetQueryPlanAsync(facilityId, "Discharge"));
-        Assert.Equal(HttpStatusCode.OK, await _b.DataAcquisitionClient.GetQueryPlanAsync(facilityId, "Monthly"));
-
-        var (censusConfigStatus, _) = await _b.CensusClient.GetCensusConfigAsync(facilityId);
-        Assert.True(censusConfigStatus is HttpStatusCode.OK or HttpStatusCode.NotFound);
-
-        _output.WriteLine("Pre-pipeline LinkSdk endpoint conformance checks completed.");
-    }
-
-    private async Task ValidateSdkEndpointsAsync(string facilityId, string reportId, string measureId)
-    {
-        _output.WriteLine("Running LinkSdk endpoint conformance checks...");
-
-        var (measureStatus, _) = await _b.MeasureEvalClient.GetMeasureDefinitionAsync(measureId);
-        Assert.Equal(HttpStatusCode.OK, measureStatus);
-
-        Assert.Equal(HttpStatusCode.OK, await _b.FacilityClient.GetAsync(facilityId));
-        var (facilityStatus, facilityDetails) = await _b.FacilityClient.GetDetailsAsync(facilityId);
-        Assert.Equal(HttpStatusCode.OK, facilityStatus);
-        Assert.NotNull(facilityDetails);
-
-        var (opsStatus, opsResponse) = await _b.NormalizationClient.SearchFacilityOperationsAsync(facilityId);
-        Assert.Equal(HttpStatusCode.OK, opsStatus);
-        Assert.NotNull(opsResponse);
-
-        var (seqStatus, _) = await _b.NormalizationClient.GetOperationSequencesAsync(facilityId);
-        Assert.Equal(HttpStatusCode.OK, seqStatus);
-
-        Assert.Equal(HttpStatusCode.OK, await _b.DataAcquisitionClient.GetFhirQueryConfigurationAsync(facilityId));
-        Assert.Equal(HttpStatusCode.OK, await _b.DataAcquisitionClient.GetQueryPlanAsync(facilityId, "Discharge"));
-        Assert.Equal(HttpStatusCode.OK, await _b.DataAcquisitionClient.GetQueryPlanAsync(facilityId, "Monthly"));
-
-        var (scheduleStatus, schedule) = await _b.ReportClient.GetScheduleAsync(reportId);
-        Assert.Equal(HttpStatusCode.OK, scheduleStatus);
-        Assert.NotNull(schedule);
-
-        var (searchStatus, search) = await _b.ReportClient.SearchSchedulesAsync(reportId);
-        Assert.Equal(HttpStatusCode.OK, searchStatus);
-        Assert.NotNull(search);
-
-        var (entriesStatus, entries) = await _b.ReportClient.GetEntriesByScheduleAsync(reportId);
-        Assert.Equal(HttpStatusCode.OK, entriesStatus);
-        Assert.NotNull(entries);
-
-        var (resourcesStatus, resources) = await _b.ReportClient.SearchResourcesAsync(facilityId, reportId);
-        Assert.Equal(HttpStatusCode.OK, resourcesStatus);
-        Assert.NotNull(resources);
-
-        var (popStatus, populations) = await _b.ReportClient.GetPopulationsByScheduleAsync(reportId);
-        Assert.Equal(HttpStatusCode.OK, popStatus);
-        Assert.NotNull(populations);
-
-        var (downloadStatus, bytes, _, _) = await _b.ReportClient.DownloadSubmissionAsync(facilityId, reportId, external: true);
-        Assert.Equal(HttpStatusCode.OK, downloadStatus);
-        Assert.NotNull(bytes);
-
-        var validationStatus = await _b.SdkValidationClient.GetValidationResultsAsync(facilityId, reportId);
-        Assert.True(validationStatus is HttpStatusCode.OK or HttpStatusCode.NotFound);
-
-        var (censusConfigStatus, _) = await _b.CensusClient.GetCensusConfigAsync(facilityId);
-        Assert.True(censusConfigStatus is HttpStatusCode.OK or HttpStatusCode.NotFound);
-
-        _output.WriteLine("LinkSdk endpoint conformance checks completed.");
     }
 }

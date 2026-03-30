@@ -1,4 +1,4 @@
-version: '3.4'
+﻿version: '3.4'
 
 #### services and ports
 ## fhir_server: 6157
@@ -125,6 +125,7 @@ services:
     environment:
       AZURE_STORAGE_CONNECTION_STRING: ${AZURITE_CONNECTION_STRING}
     command: bash -c 'az storage container create -n ${INTERNAL_BLOB_CONTAINER_NAME}; az storage container create -n ${EXTERNAL_BLOB_CONTAINER_NAME}'
+    restart: "no"
     depends_on:
       azurite:
         condition: service_healthy
@@ -777,6 +778,8 @@ services:
         condition: service_completed_successfully
       mssql_init:
         condition: service_completed_successfully
+      azurite_init:
+        condition: service_completed_successfully
       otel-collector:
         condition: service_started
       loki:
@@ -814,6 +817,8 @@ services:
       kafka_init:
         condition: service_completed_successfully
       mssql_init:
+        condition: service_completed_successfully
+      azurite_init:
         condition: service_completed_successfully
       otel-collector:
         condition: service_started

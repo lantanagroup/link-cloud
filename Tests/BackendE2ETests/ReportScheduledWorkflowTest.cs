@@ -1,7 +1,8 @@
-﻿using System.Globalization;
+﻿using Flurl.Http;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Globalization;
 using Confluent.Kafka;
 using LantanaGroup.Link.Automation;
 using LantanaGroup.Link.Automation.Configuration;
@@ -39,10 +40,7 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
     private DualOutputHelper Output => _b.Output;
     private FhirDataLoader FhirDataLoader => _b.FhirDataLoader;
 
-    private FacilityApiClient FacilityApi => _b.CreateFacilityApi();
-    private NormalizationApiClient NormalizationApi => _b.CreateNormalizationApi();
-    private QueryConfigApiClient QueryConfigApi => _b.CreateQueryConfigApi();
-    private ValidationApiClient ValidationApi => _b.CreateValidationApi();
+    private ValidationApiHelper ValidationApi => _b.CreateValidationHelper();
 
     public ReportScheduledWorkflowTest(BackendE2ETestFixture fixture)
     {
@@ -78,7 +76,7 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
         Output.WriteLine("Cleaning up...\n");
 
         if (_config.RemoveFacilityConfig)
-            await FacilityApi.DeleteAsync(_facilityId);
+            await SdkSetupHelper.CleanupFacilityAsync(_b, _facilityId);
 
         if (AutomationCfg.CleanupTestData)
             FhirDataLoader.ExpungeEverything(Output);
@@ -94,12 +92,12 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
         var measureId = measureLoader.MeasureId
             ?? throw new InvalidOperationException("MeasureLoader did not produce a MeasureId");
 
-        await FacilityApi.CreateAsync(_facilityId, measureId);
-        await NormalizationApi.CreateConfigAsync(_facilityId);
-        await QueryConfigApi.CreateQueryPlanAsync(_facilityId, measureId, "Epic");
-        await QueryConfigApi.CreateQueryConfigAsync(_facilityId);
+        await SdkSetupHelper.EnsureFacilityAsync(_b, _facilityId, measureId);
+        await SdkSetupHelper.EnsureNormalizationConfigAsync(_b, _facilityId);
+        await SdkSetupHelper.EnsureQueryPlansAsync(_b, _facilityId, measureId, "Epic");
+        await SdkSetupHelper.EnsureQueryConfigAsync(_b, _facilityId);
 
-        var reportId = await ProduceReportScheduledEventAsync(_facilityId, measureId, TimeSpan.FromMinutes(2));
+        var reportId = await ProduceReportScheduledEventAsync(_facilityId, measureId, TimeSpan.FromMinutes(1));
         await WaitForScheduleCreationAsync(reportId);
         await ProduceAdmitPatientEventAsync(_facilityId, _config.PatientIds[0]);
 
@@ -112,7 +110,7 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
         await using var watcher = DiagnosticsEventWatcher.Start(diagnostics, Output);
 
         await diagnostics.StartAsync(_facilityId, reportId);
-        var submitted = await _b.CreateReportApi(_config).CheckSubmissionStatusAsync(reportId, diagnostics);
+        var submitted = await _b.CreateReportHelper(_config).CheckSubmissionStatusAsync(reportId, diagnostics);
         await diagnostics.StopAsync();
         await watcher.StopAsync();
 
@@ -127,7 +125,7 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
         Assert.True(submitted,
             $"Expected scheduled workflow report {reportId} to be submitted but it was not.");
 
-        var reportApi = _b.CreateReportApi(_config);
+        var reportApi = _b.CreateReportHelper(_config);
         var downloadedResources = await reportApi.DownloadReportAsync(_facilityId, reportId);
         var internalAbsResources = await reportApi.DownloadReportAsync(_facilityId, reportId, external: false);
 
@@ -200,11 +198,15 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
 
         while (DateTime.UtcNow - started < timeout)
         {
-            var (status, schedule) = await _b.ReportClient.GetScheduleAsync(reportId);
-            if (status == HttpStatusCode.OK && schedule != null)
+            try
             {
+                var schedule = await _b.ReportClient.GetScheduleAsync(reportId);
                 Output.WriteLine($"Report schedule detected before patient-event publish (status={schedule.Status}).");
                 return;
+            }
+            catch (FlurlHttpException ex) when (ex.StatusCode == 404)
+            {
+                // not visible yet — keep polling
             }
 
             await Task.Delay(delay);

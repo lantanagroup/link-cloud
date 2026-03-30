@@ -29,6 +29,10 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Compile Include="Helpers\SdkSetupHelper.cs" />
+    </ItemGroup>
+
+    <ItemGroup>
         <PackageReference Include="Hl7.Fhir.R4" Version="5.*" />
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.*" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />

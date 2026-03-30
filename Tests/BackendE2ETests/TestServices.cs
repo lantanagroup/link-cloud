@@ -38,13 +38,10 @@ public sealed class TestServices
     public ValidationServiceClient SdkValidationClient => _services.GetRequiredService<ValidationServiceClient>();
     public CensusServiceClient CensusClient => _services.GetRequiredService<CensusServiceClient>();
 
-    public FacilityApiClient CreateFacilityApi() => _services.GetRequiredService<FacilityApiClient>();
-    public NormalizationApiClient CreateNormalizationApi() => _services.GetRequiredService<NormalizationApiClient>();
-    public QueryConfigApiClient CreateQueryConfigApi() => _services.GetRequiredService<QueryConfigApiClient>();
-    public ValidationApiClient CreateValidationApi() => _services.GetRequiredService<ValidationApiClient>();
+    public ValidationApiHelper CreateValidationHelper() => _services.GetRequiredService<ValidationApiHelper>();
 
-    public ReportApiClient CreateReportApi(TestScenarioConfig config) =>
-        new(_services.GetRequiredService<ReportServiceClient>(), Output, LokiScraper, AutomationCfg, config);
+    public ReportApiHelper CreateReportHelper(TestScenarioConfig config) =>
+        new(_services.GetRequiredService<ReportServiceClient>(), Output, AutomationCfg, config);
 
     public ReportDatabaseValidator CreateReportValidator() => _services.GetRequiredService<ReportDatabaseValidator>();
     public ReportAbsManifestValidator CreateReportAbsManifestValidator() => _services.GetRequiredService<ReportAbsManifestValidator>();

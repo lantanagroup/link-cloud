@@ -52,11 +52,8 @@ public sealed class BackendE2ETestFixture : IDisposable
         builder.Services.AddSingleton(sp => new FhirDataLoader(sp.GetRequiredService<AutomationConfig>().ExternalFhirServerBase, sp.GetRequiredService<AutomationConfig>()));
         builder.Services.AddSingleton<PipelineDataReader>();
 
-        // API clients (transient — lightweight wrappers)
-        builder.Services.AddTransient<FacilityApiClient>();
-        builder.Services.AddTransient<NormalizationApiClient>();
-        builder.Services.AddTransient<QueryConfigApiClient>();
-        builder.Services.AddTransient<ValidationApiClient>();
+        // Helpers
+        builder.Services.AddTransient<ValidationApiHelper>();
 
         // Validators (transient)
         builder.Services.AddTransient<ReportDatabaseValidator>();

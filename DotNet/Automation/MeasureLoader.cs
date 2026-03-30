@@ -4,7 +4,6 @@ using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.Automation.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.SerDes;
-using System.Net;
 using System.Reflection;
 using Task = System.Threading.Tasks.Task;
 
@@ -102,13 +101,7 @@ public class MeasureLoader
         await this.GetMeasureBundleAsync();
 
         _output.WriteLine("Loading measure bundle for evaluation...");
-        var putStatus = await _measureEvalClient.PutMeasureDefinitionAsync(this._evaluationBundle!.ToJson());
-
-        if (putStatus != HttpStatusCode.OK)
-        {
-            _output.WriteLine($"Failed to load measure definition: HTTP {putStatus}");
-            throw new Exception("Failed to load measure definition.");
-        }
+        await _measureEvalClient.PutMeasureDefinitionAsync(this._evaluationBundle!.ToJson());
 
         await VerifyMeasureDefinitionAsync();
 
@@ -120,13 +113,7 @@ public class MeasureLoader
             {
                 var resource = validationEntry.Resource!;
                 var artifactId = $"{resource.TypeName}-{resource.Id}";
-                var status = await _validationClient.UpsertResourceArtifactAsync(artifactId, await resource.ToJsonAsync());
-
-                if (status != HttpStatusCode.OK)
-                {
-                    _output.WriteLine($"Failed to load validation resource '{artifactId}': HTTP {status}");
-                    throw new Exception("Failed to load validation resource.");
-                }
+                await _validationClient.UpsertResourceArtifactAsync(artifactId, await resource.ToJsonAsync());
             });
 
             await Task.WhenAll(validationTasks);
@@ -138,28 +125,20 @@ public class MeasureLoader
     {
         try
         {
-            var (status, content) = await _measureEvalClient.GetMeasureDefinitionAsync(MeasureId!);
+            var content = await _measureEvalClient.GetMeasureDefinitionAsync(MeasureId!);
+            var json = Newtonsoft.Json.Linq.JObject.Parse(content);
+            var id = json["id"]?.ToString() ?? "(unknown)";
+            var bundle = json["bundle"];
+            var entryCount = (bundle?["entry"] as Newtonsoft.Json.Linq.JArray)?.Count ?? 0;
 
-            if (status == HttpStatusCode.OK && content != null)
-            {
-                var json = Newtonsoft.Json.Linq.JObject.Parse(content);
-                var id = json["id"]?.ToString() ?? "(unknown)";
-                var bundle = json["bundle"];
-                var entryCount = (bundle?["entry"] as Newtonsoft.Json.Linq.JArray)?.Count ?? 0;
+            var resourceTypes = (bundle?["entry"] as Newtonsoft.Json.Linq.JArray)?
+                .Select(e => e["resource"]?["resourceType"]?.ToString() ?? "unknown")
+                .GroupBy(t => t)
+                .Select(g => $"{g.Key}={g.Count()}")
+                .ToList() ?? [];
 
-                var resourceTypes = (bundle?["entry"] as Newtonsoft.Json.Linq.JArray)?
-                    .Select(e => e["resource"]?["resourceType"]?.ToString() ?? "unknown")
-                    .GroupBy(t => t)
-                    .Select(g => $"{g.Key}={g.Count()}")
-                    .ToList() ?? [];
-
-                _output.WriteLine($"  MeasureEval definition verified: id={id}, entries={entryCount}");
-                _output.WriteLine($"  Resource types: {string.Join(", ", resourceTypes)}");
-            }
-            else
-            {
-                _output.WriteLine($"  WARNING: Could not verify measure definition (HTTP {status})");
-            }
+            _output.WriteLine($"  MeasureEval definition verified: id={id}, entries={entryCount}");
+            _output.WriteLine($"  Resource types: {string.Join(", ", resourceTypes)}");
         }
         catch (Exception ex)
         {

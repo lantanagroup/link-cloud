@@ -1,11 +1,12 @@
-﻿using LantanaGroup.Link.Shared.Application.Extensions.Security;
-using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Models.Tenant;
+﻿using Flurl.Http;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Census;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using Microsoft.Extensions.Options;
-using System.Net;
 
 namespace LantanaGroup.Link.Report.Services;
 
@@ -40,9 +41,15 @@ public class LinkSdkClientFactory : ILinkSdkClientFactory
             ?? throw new InvalidOperationException("Tenant Service URL is missing.");
 
         var client = new FacilityServiceClient(await BuildSettingsAsync(baseUrl, cancellationToken));
-        var (status, facility) = await client.GetDetailsAsync(facilityId, cancellationToken);
 
-        return status == HttpStatusCode.OK ? facility : null;
+        try
+        {
+            return await client.GetAsync(facilityId, cancellationToken);
+        }
+        catch (FlurlHttpException ex) when (ex.StatusCode == 404)
+        {
+            return null;
+        }
     }
 
     public async Task<List<string>> GetAdmittedPatientIdsAsync(string facilityId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
@@ -51,10 +58,16 @@ public class LinkSdkClientFactory : ILinkSdkClientFactory
             ?? throw new InvalidOperationException("Census Service URL is missing.");
 
         var client = new CensusServiceClient(await BuildSettingsAsync(baseUrl, cancellationToken));
-        var (status, censusList) = await client.GetAdmittedPatientsAsync(facilityId, startDate, endDate, cancellationToken);
 
-        if (status != HttpStatusCode.OK || censusList == null)
+        CensusFhirListApiModel censusList;
+        try
+        {
+            censusList = await client.GetAdmittedPatientsAsync(facilityId, startDate, endDate, cancellationToken);
+        }
+        catch (FlurlHttpException ex) when (ex.StatusCode == 404)
+        {
             return [];
+        }
 
         return censusList.Entry?
             .Where(e => !string.IsNullOrWhiteSpace(e.Item?.Reference))

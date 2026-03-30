@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using Flurl.Http;
 using LantanaGroup.Link.Sdk.Clients;
 
 namespace LantanaGroup.Link.Automation.Helpers;
@@ -58,10 +59,7 @@ public class PipelineDataReader
 
     public async Task<ReportScheduleInfo?> GetReportScheduleAsync(Guid scheduleId)
     {
-        var (status, page) = await _reportClient.SearchSchedulesAsync(scheduleId.ToString());
-        if (status != HttpStatusCode.OK)
-            return null;
-
+        var page = await _reportClient.SearchSchedulesAsync(scheduleId.ToString());
         var record = page?.Records?.FirstOrDefault();
         if (record == null)
             return null;
@@ -83,8 +81,8 @@ public class PipelineDataReader
 
     public async Task<List<ReportEntryInfo>> GetReportEntriesWithMeasureReportsAsync(Guid scheduleId)
     {
-        var (status, entries) = await _reportClient.GetEntriesByScheduleAsync(scheduleId.ToString());
-        if (status != HttpStatusCode.OK || entries == null)
+        var entries = await _reportClient.GetEntriesByScheduleAsync(scheduleId.ToString());
+        if (entries == null)
             return [];
 
         return entries.Select(e =>
@@ -142,8 +140,8 @@ public class PipelineDataReader
 
     public async Task<List<ReportPopulationInfo>> GetReportPopulationsAsync(Guid scheduleId, string facilityId)
     {
-        var (status, pops) = await _reportClient.GetPopulationsByScheduleAsync(scheduleId.ToString());
-        if (status != HttpStatusCode.OK || pops == null)
+        var pops = await _reportClient.GetPopulationsByScheduleAsync(scheduleId.ToString());
+        if (pops == null)
             return [];
 
         return pops.Select(p => new ReportPopulationInfo(
@@ -161,8 +159,8 @@ public class PipelineDataReader
 
         while (true)
         {
-            var (status, page) = await _reportClient.SearchResourcesAsync(facilityId, scheduleId.ToString(), pageSize: pageSize, pageNumber: pageNumber);
-            if (status != HttpStatusCode.OK || page?.Records == null || page.Records.Count == 0)
+            var page = await _reportClient.SearchResourcesAsync(facilityId, scheduleId.ToString(), pageSize: pageSize, pageNumber: pageNumber);
+            if (page?.Records == null || page.Records.Count == 0)
                 break;
 
             results.AddRange(page.Records.Select(r => new ReportResourceIdentity(r.PatientId, r.ResourceType, r.ResourceId)));
@@ -190,8 +188,8 @@ public class PipelineDataReader
 
         while (true)
         {
-            var (status, page) = await _dataAcqClient.SearchDetailedAcquisitionLogsAsync(facilityId, reportId, pageSize: pageSize, pageNumber: pageNumber);
-            if (status != HttpStatusCode.OK || page?.Records == null || page.Records.Count == 0)
+            var page = await _dataAcqClient.SearchDetailedAcquisitionLogsAsync(facilityId, reportId, pageSize: pageSize, pageNumber: pageNumber);
+            if (page?.Records == null || page.Records.Count == 0)
                 break;
 
             results.AddRange(page.Records.Select(log => new AcquisitionLogInfo(
@@ -214,8 +212,15 @@ public class PipelineDataReader
 
     public async Task<bool> HasFhirQueryConfigurationAsync(string facilityId)
     {
-        var status = await _dataAcqClient.GetFhirQueryConfigurationAsync(facilityId);
-        return status == HttpStatusCode.OK;
+        try
+        {
+            await _dataAcqClient.GetFhirQueryConfigurationAsync(facilityId);
+            return true;
+        }
+        catch (FlurlHttpException ex) when (ex.StatusCode == 404)
+        {
+            return false;
+        }
     }
 
     public async Task<List<QueryPlanInfo>> GetQueryPlansAsync(string facilityId)
@@ -223,9 +228,12 @@ public class PipelineDataReader
         var list = new List<QueryPlanInfo>();
         foreach (var type in new[] { "Discharge", "Monthly" })
         {
-            var status = await _dataAcqClient.GetQueryPlanAsync(facilityId, type);
-            if (status == HttpStatusCode.OK)
+            try
+            {
+                await _dataAcqClient.GetQueryPlanAsync(facilityId, type);
                 list.Add(new QueryPlanInfo(type, null, 1, 1));
+            }
+            catch (FlurlHttpException ex) when (ex.StatusCode == 404) { }
         }
 
         return list;
@@ -263,8 +271,8 @@ public class PipelineDataReader
 
         while (true)
         {
-            var (status, page) = await _normalizationClient.SearchFacilityOperationsAsync(facilityId, includeDisabled: true, pageSize: pageSize, pageNumber: pageNumber);
-            if (status != HttpStatusCode.OK || page?.Records == null || page.Records.Count == 0)
+            var page = await _normalizationClient.SearchFacilityOperationsAsync(facilityId, includeDisabled: true, pageSize: pageSize, pageNumber: pageNumber);
+            if (page?.Records == null || page.Records.Count == 0)
                 break;
 
             results.AddRange(page.Records.Select(op => new OperationInfo(
@@ -289,8 +297,8 @@ public class PipelineDataReader
 
     public async Task<List<OperationSequenceInfo>> GetOperationSequencesAsync(string facilityId)
     {
-        var (status, sequences) = await _normalizationClient.GetOperationSequencesAsync(facilityId);
-        if (status != HttpStatusCode.OK || sequences == null)
+        var sequences = await _normalizationClient.GetOperationSequencesAsync(facilityId);
+        if (sequences == null)
             return [];
 
         return sequences.Select(s => new OperationSequenceInfo(
@@ -302,20 +310,27 @@ public class PipelineDataReader
 
     public async Task<FacilityInfo?> GetFacilityAsync(string facilityId)
     {
-        var (status, facility) = await _facilityClient.GetDetailsAsync(facilityId);
-        if (status != HttpStatusCode.OK || facility == null)
-            return null;
+        try
+        {
+            var facility = await _facilityClient.GetAsync(facilityId);
+            if (facility == null)
+                return null;
 
-        return new FacilityInfo(
-            facility.FacilityId ?? facilityId,
-            facility.FacilityName,
-            facility.TimeZone,
-            facility.IsDeleted ?? false,
-            null,
-            new FacilityScheduledReports(
-                facility.ScheduledReports?.Monthly ?? [],
-                facility.ScheduledReports?.Daily ?? [],
-                facility.ScheduledReports?.Weekly ?? []));
+            return new FacilityInfo(
+                facility.FacilityId ?? facilityId,
+                facility.FacilityName,
+                facility.TimeZone,
+                facility.IsDeleted ?? false,
+                null,
+                new FacilityScheduledReports(
+                    facility.ScheduledReports?.Monthly ?? [],
+                    facility.ScheduledReports?.Daily ?? [],
+                    facility.ScheduledReports?.Weekly ?? []));
+        }
+        catch (FlurlHttpException ex) when (ex.StatusCode == 404)
+        {
+            return null;
+        }
     }
 
     public async Task<List<PatientResourceTypeCount>> GetReportResourceCountsByPatientTypeAsync(Guid scheduleId, string facilityId)
@@ -357,12 +372,9 @@ public class PipelineDataReader
 
     public async Task<HashSet<string>> GetAcquiredResourceIdsForReportAsync(string facilityId, string reportId)
     {
-        var (status, ids) = await _dataAcqClient.GetAcquiredResourceIdsForReportAsync(facilityId, reportId);
-        if (status != HttpStatusCode.OK || ids == null)
-            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        return ids
+        var ids = await _dataAcqClient.GetAcquiredResourceIdsForReportAsync(facilityId, reportId);
+        return ids?
             .Where(x => !string.IsNullOrWhiteSpace(x) && x.Contains('/'))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     }
 }

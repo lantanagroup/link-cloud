@@ -1,5 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using Automation.UI.Models;
+using Flurl.Http;
 using LantanaGroup.Link.Automation;
 using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.Automation.Generation;
@@ -8,6 +9,9 @@ using LantanaGroup.Link.Automation.Services;
 using LantanaGroup.Link.Automation.Validation;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.DependencyInjection;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
 
@@ -69,12 +73,9 @@ public class AutomationRunManager : IAutomationRunManager
             var measureEvalClient = services.GetRequiredService<LantanaGroup.Link.Sdk.Clients.MeasureEvalServiceClient>();
             var sdkValidationClient = services.GetRequiredService<LantanaGroup.Link.Sdk.Clients.ValidationServiceClient>();
 
-            var facilityApi = services.GetRequiredService<FacilityApiClient>();
-            var normalizationApi = services.GetRequiredService<NormalizationApiClient>();
-            var queryConfigApi = services.GetRequiredService<QueryConfigApiClient>();
-            var validationApi = services.GetRequiredService<ValidationApiClient>();
-            var reportApi = new ReportApiClient(services.GetRequiredService<LantanaGroup.Link.Sdk.Clients.ReportServiceClient>(), output, lokiScraper, _automationConfig, scenarioConfig);
+            var reportHelper = new ReportApiHelper(services.GetRequiredService<LantanaGroup.Link.Sdk.Clients.ReportServiceClient>(), output, _automationConfig, scenarioConfig);
 
+            var validationHelper = services.GetRequiredService<ValidationApiHelper>();
             var reportValidator = services.GetRequiredService<ReportDatabaseValidator>();
             var reportAbsValidator = services.GetRequiredService<ReportAbsManifestValidator>();
             var dataAcqValidator = services.GetRequiredService<DataAcquisitionDatabaseValidator>();
@@ -93,8 +94,8 @@ public class AutomationRunManager : IAutomationRunManager
             await fhirDataLoader.WaitForServerAsync(output);
             await fhirDataLoader.LoadTransactionBundlesFromJsonAsync(output, bundles);
 
-            await validationApi.InitializeArtifactsAsync();
-            await validationApi.InitializeCategoriesAsync();
+            await validationHelper.InitializeArtifactsAsync();
+            await validationHelper.InitializeCategoriesAsync();
 
             var measureLoader = new MeasureLoader(measureEvalClient, sdkValidationClient, output, scenarioConfig);
             await measureLoader.LoadAsync();
@@ -102,17 +103,17 @@ public class AutomationRunManager : IAutomationRunManager
 
             var facilityId = $"{state.Scenario}-{state.RunId:N}".Substring(0, Math.Min(48, $"{state.Scenario}-{state.RunId:N}".Length));
 
-            await facilityApi.CreateAsync(facilityId, measureId);
-            await normalizationApi.CreateConfigAsync(facilityId);
-            await queryConfigApi.CreateQueryPlanAsync(facilityId, measureId, "Epic");
-            await queryConfigApi.CreateQueryConfigAsync(facilityId);
+            await EnsureFacilityAsync(services, output, facilityId, measureId);
+            await EnsureNormalizationConfigAsync(services, output, facilityId);
+            await EnsureQueryPlansAsync(services, output, facilityId, measureId, "Epic");
+            await EnsureQueryConfigAsync(services, output, facilityId);
 
-            var reportId = await reportApi.GenerateReportAsync(facilityId, measureId);
+            var reportId = await reportHelper.GenerateReportAsync(facilityId, measureId);
 
             await using (var diagnostics = new BackgroundDiagnosticsMonitor(output, lokiScraper, _automationConfig, scenarioConfig.PatientIds.Count, forwardInternalLogsToOutput: true))
             {
                 await diagnostics.StartAsync(facilityId, reportId);
-                var submitted = await reportApi.CheckSubmissionStatusAsync(reportId, diagnostics);
+                var submitted = await reportHelper.CheckSubmissionStatusAsync(reportId, diagnostics);
                 await diagnostics.StopAsync();
 
                 if (!submitted)
@@ -121,8 +122,8 @@ public class AutomationRunManager : IAutomationRunManager
 
             await pipelineSnapshot.WriteFullSnapshotAsync(output, facilityId, reportId);
 
-            var downloadedResources = await reportApi.DownloadReportAsync(facilityId, reportId);
-            var internalAbsResources = await reportApi.DownloadReportAsync(facilityId, reportId, external: false);
+            var downloadedResources = await reportHelper.DownloadReportAsync(facilityId, reportId);
+            var internalAbsResources = await reportHelper.DownloadReportAsync(facilityId, reportId, external: false);
 
             if (!downloadedResources.ContainsKey("manifest.ndjson"))
                 throw new InvalidOperationException("Expected report to include manifest.ndjson but it was not");
@@ -152,7 +153,7 @@ public class AutomationRunManager : IAutomationRunManager
             await validationResultsValidator.ValidateAllAsync(facilityId, reportId, scenarioConfig.PatientIds, scenarioConfig.LokiScrapeWindow);
 
             if (scenarioConfig.RemoveFacilityConfig)
-                await facilityApi.DeleteAsync(facilityId);
+                await CleanupFacilityAsync(services, output, facilityId);
 
             if (state.Options.CleanupTestData)
                 fhirDataLoader.ExpungeEverything(output);
@@ -196,11 +197,7 @@ public class AutomationRunManager : IAutomationRunManager
         services.AddSingleton(sp => new DatabaseConnectionFactory(sp.GetRequiredService<AutomationConfig>().Database));
         services.AddSingleton<PipelineDataReader>();
 
-        services.AddTransient<FacilityApiClient>();
-        services.AddTransient<NormalizationApiClient>();
-        services.AddTransient<QueryConfigApiClient>();
-        services.AddTransient<ValidationApiClient>();
-
+        services.AddTransient<ValidationApiHelper>();
         services.AddTransient<ReportDatabaseValidator>();
         services.AddTransient<ReportAbsManifestValidator>();
         services.AddTransient<DataAcquisitionDatabaseValidator>();
@@ -210,6 +207,169 @@ public class AutomationRunManager : IAutomationRunManager
         services.AddTransient<PipelineSnapshot>();
 
         return services.BuildServiceProvider();
+    }
+
+    private static async Task EnsureFacilityAsync(IServiceProvider services, IAutomationOutput output, string facilityId, string? measureId)
+    {
+        var facilityClient = services.GetRequiredService<LantanaGroup.Link.Sdk.Clients.FacilityServiceClient>();
+
+        try
+        {
+            await facilityClient.GetAsync(facilityId);
+            output.WriteLine($"Facility '{facilityId}' already exists. Skipping create.");
+            return;
+        }
+        catch (FlurlHttpException ex) when (ex.StatusCode == 404)
+        {
+        }
+
+        await facilityClient.CreateAsync(new FacilityModel
+        {
+            FacilityId = facilityId,
+            FacilityName = facilityId,
+            TimeZone = "America/Chicago",
+            ScheduledReports = new TenantScheduledReportConfig
+            {
+                Monthly = measureId != null ? [measureId] : [],
+                Daily = [],
+                Weekly = []
+            }
+        });
+    }
+
+    private static async Task EnsureNormalizationConfigAsync(IServiceProvider services, IAutomationOutput output, string facilityId)
+    {
+        var normalizationClient = services.GetRequiredService<LantanaGroup.Link.Sdk.Clients.NormalizationServiceClient>();
+
+        try
+        {
+            var response = await normalizationClient.SearchFacilityOperationsAsync(facilityId);
+            if (response?.Records?.Count > 0)
+            {
+                output.WriteLine($"Normalization config for facility '{facilityId}' already exists. Skipping create.");
+                return;
+            }
+        }
+        catch (FlurlHttpException ex) when (ex.StatusCode == 404)
+        {
+        }
+
+        await normalizationClient.CreateOperationAsync(new CreateNormalizationOperationRequestApiModel
+        {
+            ResourceTypes = ["Location"],
+            FacilityId = facilityId,
+            Operation = new CreateNormalizationOperationDetailsApiModel
+            {
+                OperationType = "CopyProperty",
+                Name = "Copy Location Identifier to Type",
+                Description = "A Test Operation",
+                SourceFhirPath = "identifier.value",
+                TargetFhirPath = "type[0].coding.code"
+            },
+            Description = "Copy Location Identifier to Code",
+            VendorIds = []
+        });
+    }
+
+    private static async Task EnsureQueryPlansAsync(IServiceProvider services, IAutomationOutput output, string facilityId, string? measureId, string ehrDescription)
+    {
+        await EnsureQueryPlanAsync(services, output, facilityId, measureId, ehrDescription, "Discharge");
+        await EnsureQueryPlanAsync(services, output, facilityId, measureId, ehrDescription, "Monthly");
+    }
+
+    private static async Task EnsureQueryPlanAsync(IServiceProvider services, IAutomationOutput output, string facilityId, string? measureId, string ehrDescription, string type)
+    {
+        var dataAcqClient = services.GetRequiredService<LantanaGroup.Link.Sdk.Clients.DataAcquisitionServiceClient>();
+        var jBody = QueryPlanBuilder.BuildQueryPlan(facilityId, measureId, ehrDescription, type);
+        var body = new CreateQueryPlanRequestApiModel
+        {
+            PlanName = jBody.Value<string>("PlanName"),
+            FacilityId = jBody.Value<string>("FacilityId") ?? facilityId,
+            EHRDescription = jBody.Value<string>("EHRDescription") ?? ehrDescription,
+            LookBack = jBody.Value<string>("LookBack") ?? "P0D",
+            Type = jBody.Value<string>("Type") ?? type,
+            InitialQueries = jBody["InitialQueries"]?.ToObject<Dictionary<string, object>>() ?? new Dictionary<string, object>(),
+            SupplementalQueries = jBody["SupplementalQueries"]?.ToObject<Dictionary<string, object>>() ?? new Dictionary<string, object>()
+        };
+
+        try
+        {
+            await dataAcqClient.CreateQueryPlanAsync(facilityId, body);
+        }
+        catch (FlurlHttpException ex)
+        {
+            if (await IsAlreadyExistsAsync(ex))
+            {
+                output.WriteLine($"{type} query plan for facility '{facilityId}' already exists. Skipping create.");
+                return;
+            }
+
+            throw;
+        }
+    }
+
+    private static async Task EnsureQueryConfigAsync(IServiceProvider services, IAutomationOutput output, string facilityId)
+    {
+        var dataAcqClient = services.GetRequiredService<LantanaGroup.Link.Sdk.Clients.DataAcquisitionServiceClient>();
+        var config = services.GetRequiredService<AutomationConfig>();
+
+        try
+        {
+            await dataAcqClient.CreateFhirQueryConfigurationAsync(new CreateFhirQueryConfigurationRequestApiModel
+            {
+                FacilityId = facilityId,
+                FhirServerBaseUrl = config.InternalFhirServerBase,
+                MaxConcurrentRequests = config.FhirQuery.MaxConcurrentRequests,
+                MaxRetries = 3
+            });
+        }
+        catch (FlurlHttpException ex)
+        {
+            if (await IsAlreadyExistsAsync(ex))
+            {
+                output.WriteLine($"Query config for facility '{facilityId}' already exists. Skipping create.");
+                return;
+            }
+
+            throw;
+        }
+    }
+
+    private static async Task CleanupFacilityAsync(IServiceProvider services, IAutomationOutput output, string facilityId)
+    {
+        var normalizationClient = services.GetRequiredService<LantanaGroup.Link.Sdk.Clients.NormalizationServiceClient>();
+        var dataAcqClient = services.GetRequiredService<LantanaGroup.Link.Sdk.Clients.DataAcquisitionServiceClient>();
+        var facilityClient = services.GetRequiredService<LantanaGroup.Link.Sdk.Clients.FacilityServiceClient>();
+
+        await TryDelete(async () => await normalizationClient.DeleteFacilityOperationsAsync(facilityId), output, "Normalization deletion");
+        await TryDelete(async () => await dataAcqClient.DeleteQueryPlanAsync(facilityId, "Discharge"), output, "Discharge query plan deletion");
+        await TryDelete(async () => await dataAcqClient.DeleteQueryPlanAsync(facilityId, "Monthly"), output, "Monthly query plan deletion");
+        await TryDelete(async () => await dataAcqClient.DeleteFhirQueryConfigurationAsync(facilityId), output, "Query config deletion");
+        await TryDelete(async () => await facilityClient.DeleteAsync(facilityId), output, "Facility deletion");
+    }
+
+    private static async Task TryDelete(Func<Task> action, IAutomationOutput output, string opName)
+    {
+        try
+        {
+            await action();
+        }
+        catch (FlurlHttpException ex)
+        {
+            output.WriteLine($"{opName} failed: HTTP {ex.StatusCode}");
+        }
+    }
+
+    private static async Task<bool> IsAlreadyExistsAsync(FlurlHttpException ex)
+    {
+        if (ex.StatusCode == 409)
+            return true;
+
+        if (ex.StatusCode != 400)
+            return false;
+
+        var body = await ex.GetResponseStringAsync();
+        return body?.Contains("already exists", StringComparison.OrdinalIgnoreCase) == true;
     }
 
     private static TestScenarioConfig BuildScenarioConfig(AutomationScenarioKind scenario, ResolvedRunOptions options)

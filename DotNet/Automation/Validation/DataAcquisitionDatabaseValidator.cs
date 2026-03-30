@@ -19,7 +19,8 @@ public class DataAcquisitionDatabaseValidator
         string facilityId,
         string reportId,
         string expectedMeasureId,
-        List<string> expectedPatientIds)
+        List<string> expectedPatientIds,
+        bool expectDataAcquisitionData = true)
     {
         var errors = new List<string>();
 
@@ -27,9 +28,9 @@ public class DataAcquisitionDatabaseValidator
         {
             await ValidateFhirQueryConfiguration(facilityId, errors);
             await ValidateQueryPlans(facilityId, expectedMeasureId, errors);
-            await ValidateDataAcquisitionLogs(facilityId, reportId, expectedPatientIds, errors);
-            await ValidateFhirQueries(facilityId, reportId, errors);
-            await ValidateReferenceResources(facilityId, reportId, errors);
+            await ValidateDataAcquisitionLogs(facilityId, reportId, expectedPatientIds, errors, expectDataAcquisitionData);
+            await ValidateFhirQueries(facilityId, reportId, errors, expectDataAcquisitionData);
+            await ValidateReferenceResources(facilityId, reportId, errors, expectDataAcquisitionData);
         }
         catch (Exception ex)
         {
@@ -96,9 +97,17 @@ public class DataAcquisitionDatabaseValidator
         }
     }
 
-    private async Task ValidateDataAcquisitionLogs(string facilityId, string reportId, List<string> expectedPatientIds, List<string> errors)
+    private async Task ValidateDataAcquisitionLogs(string facilityId, string reportId, List<string> expectedPatientIds, List<string> errors, bool expectDataAcquisitionData)
     {
         var logs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
+
+        if (!expectDataAcquisitionData)
+        {
+            if (logs.Count > 0)
+                AddError(errors, $"Expected no DataAcquisitionLog rows for report {reportId} but found {logs.Count}.");
+            return;
+        }
+
         if (logs.Count == 0)
         {
             AddError(errors, $"Expected DataAcquisitionLog rows for report {reportId} but found none.");
@@ -127,16 +136,32 @@ public class DataAcquisitionDatabaseValidator
             AddError(errors, $"Additional failed acquisition logs omitted: {failedLogs.Count - 10}");
     }
 
-    private async Task ValidateFhirQueries(string facilityId, string reportId, List<string> errors)
+    private async Task ValidateFhirQueries(string facilityId, string reportId, List<string> errors, bool expectDataAcquisitionData)
     {
         var queries = await _reader.GetFhirQueriesForReportAsync(facilityId, reportId);
+
+        if (!expectDataAcquisitionData)
+        {
+            if (queries.Count > 0)
+                AddError(errors, $"Expected no FhirQuery rows for report {reportId} but found {queries.Count}.");
+            return;
+        }
+
         if (queries.Count == 0)
             AddError(errors, "Expected FhirQuery rows for this report but found none.");
     }
 
-    private async Task ValidateReferenceResources(string facilityId, string reportId, List<string> errors)
+    private async Task ValidateReferenceResources(string facilityId, string reportId, List<string> errors, bool expectDataAcquisitionData)
     {
         var groupCount = await _reader.GetReferenceResourceGroupCountAsync(facilityId, reportId);
+
+        if (!expectDataAcquisitionData)
+        {
+            if (groupCount > 0)
+                AddError(errors, $"Expected no ReferenceResources rows for report {reportId} but found {groupCount} groups.");
+            return;
+        }
+
         if (groupCount == 0)
             AddError(errors, "Expected ReferenceResources rows for the facility but found none.");
     }
