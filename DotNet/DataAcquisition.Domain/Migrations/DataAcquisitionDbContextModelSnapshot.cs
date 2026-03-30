@@ -17,7 +17,7 @@ namespace DataAcquisition.Domain.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.24")
+                .HasAnnotation("ProductVersion", "8.0.25")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -810,6 +810,9 @@ namespace DataAcquisition.Domain.Migrations
 
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
+
+                    b.Property<TimeSpan?>("QueryLag")
+                        .HasColumnType("time");
 
                     b.HasKey("Id");
 

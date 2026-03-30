@@ -38,6 +38,7 @@ public static class TestConfig
         public static readonly TimeSpan MinAcquisitionPullTime = TimeSpan.FromHours(1);
         public static readonly TimeSpan MaxAcquisitionPullTime = TimeSpan.FromHours(24);
         public static readonly string TimeZone = "America/New_York";
+        public static readonly string QueryLag = "PT0S";
     }
 
     public static readonly string[] SingleMeasureExpectedFiles =

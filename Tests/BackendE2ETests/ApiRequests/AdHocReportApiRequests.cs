@@ -172,10 +172,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             ""FacilityId"": """ + TestConfig.SingleMeasureAdHocFacility + @""",
             ""FhirServerBaseUrl"": """ + TestConfig.InternalFhirServerBase + @""",
             ""Authentication"": null,
-            ""QueryPlanIds"": [
-            """ + TestConfig.MeasureAch + @"""
-                ],
-            ""MaxConcurrentRequests"": """ + TestConfig.FhirQueryConfig.MaxConcurrentRequests + @""",
+            ""MaxConcurrentRequests"": " + TestConfig.FhirQueryConfig.MaxConcurrentRequests + @",
             ""MaxRetries"": 3,
             ""TimeZone"": ""America/Chicago""
             }";
@@ -207,7 +204,7 @@ namespace LantanaGroup.Link.Tests.BackendE2ETests.ApiRequests
             }
             else
             {
-                output.WriteLine("🔴  Query was not successfully configured. Create_SingleMeasure_FHIRQueryConfigByFacility_AdHoc() FAILED");
+                output.WriteLine($"🔴  Query was not successfully configured. Status: {responseCode}. Content: {response.Content}. Create_SingleMeasure_FHIRQueryConfigByFacility_AdHoc() FAILED");
                 Assert.Fail();
             }
         }

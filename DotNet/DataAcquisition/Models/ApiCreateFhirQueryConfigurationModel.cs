@@ -42,6 +42,11 @@ namespace LantanaGroup.Link.DataAcquisition.Models
         public TimeSpan? MaxAcquisitionPullTime { get; set; }
 
         [DataMember]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonConverter(typeof(TimeSpanConverter))]
+        public TimeSpan? QueryLag { get; set; }
+
+        [DataMember]
         [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
         public string? TimeZone { get; set; }   
     }

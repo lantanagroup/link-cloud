@@ -250,6 +250,13 @@ public class PatientDataService : IPatientDataService
                         ? AcquisitionPriority.High
                         : AcquisitionPriority.Normal;
 
+                    var executionDate = DateTime.UtcNow;
+                    if (fhirQueryConfiguration.QueryLag.HasValue &&
+                        request.ConsumeResult.Message.Value.ReportableEvent == ReportableEvent.Discharge)
+                    {
+                        executionDate = executionDate.Add(fhirQueryConfiguration.QueryLag.Value);
+                    }
+
                     try
                     {
                         await _dataAcquisitionLogManager.CreateAsync(
@@ -259,7 +266,7 @@ public class PatientDataService : IPatientDataService
                                 CorrelationId = request.CorrelationId,
                                 PatientId = request.ConsumeResult.Message.Value.PatientId,
                                 Priority = priority,
-                                ExecutionDate = System.DateTime.UtcNow,
+                                ExecutionDate = executionDate,
                                 ReportableEvent = request.ConsumeResult.Message.Value.ReportableEvent,
                                 Status = RequestStatus.Pending,
                                 FhirVersion = "R4",

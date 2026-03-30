@@ -121,6 +121,7 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
             Authentication = model.Authentication?.ToDomain(),
             MaxAcquisitionPullTime = model.MaxAcquisitionPullTime,
             MinAcquisitionPullTime = model.MinAcquisitionPullTime,
+            QueryLag = model.QueryLag,
             FacilityId = model.FacilityId,
             FhirServerBaseUrl = model.FhirServerBaseUrl,
             MaxConcurrentRequests = model.MaxConcurrentRequests,
@@ -164,6 +165,7 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
         existingEntity.MaxRetries = model.MaxRetries;
         existingEntity.MinAcquisitionPullTime = model.MinAcquisitionPullTime;
         existingEntity.MaxAcquisitionPullTime = model.MaxAcquisitionPullTime;
+        existingEntity.QueryLag = model.QueryLag;
 
         await _database.FhirQueryConfigurationRepository.SaveChangesAsync();
 

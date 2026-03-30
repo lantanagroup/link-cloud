@@ -45,21 +45,21 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
     public async Task DisposeAsync()
     {
-        output.WriteLine("Cleaning up...\n");
-
-        if (TestConfig.AdhocReportingSmokeTestConfig.RemoveFacilityConfig)
-        {
-            await DeleteFacility();
-        }
-
-        // Clear all data from the FHIR server
-        if (TestConfig.CleanupSmokeTestData)
-            FhirDataLoader.ExpungeEverything(output);
-
-        if (TestConfig.AdhocReportingSmokeTestConfig.RemoveReport)
-        {
-            // TODO: Delete report
-        }
+        // output.WriteLine("Cleaning up...\n");
+        //
+        // if (TestConfig.AdhocReportingSmokeTestConfig.RemoveFacilityConfig)
+        // {
+        //     await DeleteFacility();
+        // }
+        //
+        // // Clear all data from the FHIR server
+        // if (TestConfig.CleanupSmokeTestData)
+        //     FhirDataLoader.ExpungeEverything(output);
+        //
+        // if (TestConfig.AdhocReportingSmokeTestConfig.RemoveReport)
+        // {
+        //     // TODO: Delete report
+        // }
     }
 
     [Fact]
@@ -323,7 +323,8 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
             ["FacilityId"] = FacilityId,
             ["FhirServerBaseUrl"] = TestConfig.InternalFhirServerBase,
             ["MaxConcurrentRequests"] = TestConfig.FhirQueryConfig.MaxConcurrentRequests,
-            ["MaxRetries"] = 3
+            ["MaxRetries"] = 3,
+            ["QueryLag"] = TestConfig.FhirQueryConfig.QueryLag
         };
         request.AddJsonBody(body.ToString(), "application/json");
         var response = await AdminBffClient.ExecuteAsync(request);
