@@ -10,6 +10,7 @@ public class CreateFhirQueryConfigurationModel
     public int? MaxConcurrentRequests { get; set; } = 1;
     public TimeSpan? MinAcquisitionPullTime { get; set; }
     public TimeSpan? MaxAcquisitionPullTime { get; set; }
+    public TimeSpan? QueryLag { get; set; }
     public int? MaxRetries { get; set; }
     public string? TimeZone { get; set; } = null;
     public DateTime? CreateDate { get; set; }
