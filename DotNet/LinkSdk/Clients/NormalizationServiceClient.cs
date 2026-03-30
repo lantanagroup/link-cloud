@@ -1,16 +1,26 @@
 ﻿using Flurl.Http;
+using LantanaGroup.Link.Sdk.ApiClient;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
-using LantanaGroup.Link.Sdk.ApiClient;
+using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.Sdk.Clients;
 
-public sealed class NormalizationServiceClient : LinkApiClientBase
+public class NormalizationServiceClient : LinkApiClientBase, INormalizationServiceClient
 {
-    public NormalizationServiceClient(ApiClientSettings settings)
-        : base(settings)
-    {
-    }
+    public NormalizationServiceClient(
+        IOptions<ServiceRegistry> serviceRegistry,
+        IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> bearerOptions,
+        IOptions<LinkTokenServiceSettings> tokenServiceSettings,
+        ICreateSystemToken tokenService)
+        : base(
+            serviceRegistry.Value.NormalizationServiceApiUrl
+                ?? throw new InvalidOperationException("Normalization service URL is not configured in ServiceRegistry."),
+            bearerOptions, tokenServiceSettings, tokenService)
+    { }
 
     public Task<PagedConfigModel<NormalizationOperationApiModel>> SearchFacilityOperationsAsync(
         string facilityId,
@@ -33,8 +43,8 @@ public sealed class NormalizationServiceClient : LinkApiClientBase
     public Task DeleteFacilityOperationsAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
-        Request($"normalization/operations/facility/{facilityId}")
-            .DeleteAsync(cancellationToken: cancellationToken);
+        DeleteOrIgnoreAsync(() => Request($"normalization/operations/facility/{facilityId}")
+            .DeleteAsync(cancellationToken: cancellationToken));
 
     public Task<List<NormalizationOperationSequenceApiModel>> GetOperationSequencesAsync(
         string facilityId,

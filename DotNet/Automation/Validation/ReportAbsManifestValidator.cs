@@ -41,9 +41,13 @@ public class ReportAbsManifestValidator
         string expectedEndDate,
         string? facilityId = null,
         string? reportId = null,
-        string? generatedSnapshotDirectory = null)
+        string? generatedSnapshotDirectory = null,
+        IReadOnlyCollection<string>? expectedManifestPatientListIds = null)
     {
         var errors = new List<string>();
+
+        var expectedSubmittedPatientIds = expectedPatientIds;
+        var expectedListPatientIds = expectedManifestPatientListIds ?? expectedSubmittedPatientIds;
 
         if (!internalAbsResources.TryGetValue("manifest.ndjson", out var manifestObj) || manifestObj is not string manifestNdjson)
         {
@@ -52,7 +56,7 @@ public class ReportAbsManifestValidator
             return;
         }
 
-        var expectedPatientFiles = expectedPatientIds
+        var expectedPatientFiles = expectedSubmittedPatientIds
             .Select(id => $"patient-{id}.ndjson")
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -71,12 +75,12 @@ public class ReportAbsManifestValidator
             AddError(errors, $"Unexpected patient artifact in internal ABS: {extra}");
 
         var manifestResources = ParseNdjson(manifestNdjson, "manifest.ndjson", errors);
-        ValidateManifest(manifestResources, expectedPatientIds, expectedMeasureId, expectedStartDate, expectedEndDate, errors);
+        ValidateManifest(manifestResources, expectedListPatientIds, expectedMeasureId, expectedStartDate, expectedEndDate, errors);
 
         var parsedPatientResources = new List<AbsResourceRecord>();
         var patientMeasureReportIds = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var patientId in expectedPatientIds)
+        foreach (var patientId in expectedSubmittedPatientIds)
         {
             var fileName = $"patient-{patientId}.ndjson";
             if (!internalAbsResources.TryGetValue(fileName, out var patientObj) || patientObj is not string patientNdjson)
@@ -386,6 +390,7 @@ public class ReportAbsManifestValidator
 
         var dataAcqCountMap = ToCountMap(
             (await _reader.GetDataAcquisitionResourceCountsByPatientTypeAsync(facilityId, reportId))
+            .Where(x => submittedPatients.Contains(x.PatientId))
             .Select(x => (x.PatientId, x.ResourceType, x.Count)));
 
         CompareCountMapsMinimum("DataAcquisition->ReportResource", dataAcqCountMap, reportCountMap, errors);

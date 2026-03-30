@@ -171,4 +171,100 @@ public static class EncounterFactory
         ],
         ServiceProvider = Ref($"Organization/{orgId}", "General Test Hospital")
     };
+
+    /// <summary>
+    /// Create an ambulatory (outpatient) Encounter that will NOT qualify for
+    /// inpatient/ED/observation-based measure Initial Populations.
+    /// Uses class=AMB, a single outpatient clinic location, and no hospitalization component.
+    /// </summary>
+    public static Encounter CreateAmbulatory(
+        string id,
+        string patientId,
+        DateTime start,
+        DateTime end,
+        string attendingPractId,
+        string outpatientLocationId,
+        string orgId,
+        string primaryDiagnosisConditionId,
+        string reasonSnomedCode,
+        string reasonDisplay,
+        string reasonIcdCode) => new()
+    {
+        Id     = id,
+        Status = Encounter.EncounterStatus.Finished,
+        Identifier =
+        [
+            new Identifier
+            {
+                Use = Identifier.IdentifierUse.Official,
+                System = "http://example.org/fhir/sid/encounter",
+                Value = id
+            }
+        ],
+        Class  = new Coding("http://terminology.hl7.org/CodeSystem/v3-ActCode", "AMB", "ambulatory"),
+        Type   =
+        [
+            new CodeableConcept
+            {
+                Coding = [new Coding("http://snomed.info/sct", "11429006", "Consultation")],
+                Text   = "Outpatient consultation"
+            }
+        ],
+        ServiceType = new CodeableConcept
+        {
+            Coding = [new Coding("http://terminology.hl7.org/CodeSystem/service-type", "305", "General Medicine")],
+            Text   = "General Medicine"
+        },
+        Priority = CC("http://terminology.hl7.org/CodeSystem/v3-ActPriority", "R", "routine"),
+        Subject  = Ref($"Patient/{patientId}", $"Patient {patientId}"),
+        Participant =
+        [
+            new Encounter.ParticipantComponent
+            {
+                Type =
+                [
+                    new CodeableConcept
+                    {
+                        Coding = [new Coding("http://terminology.hl7.org/CodeSystem/v3-ParticipationType", "ATND", "attender")],
+                        Text   = "Attending"
+                    }
+                ],
+                Period     = new Period { StartElement = new FhirDateTime(start), EndElement = new FhirDateTime(end) },
+                Individual = Ref($"Practitioner/{attendingPractId}", "Attending Physician")
+            }
+        ],
+        Period = new Period { StartElement = new FhirDateTime(start), EndElement = new FhirDateTime(end) },
+        Length = new Duration { Value = (decimal)(end - start).TotalHours, Unit = "hours", System = "http://unitsofmeasure.org", Code = "h" },
+        ReasonCode =
+        [
+            new CodeableConcept
+            {
+                Coding =
+                [
+                    new Coding("http://snomed.info/sct",            reasonSnomedCode, reasonDisplay),
+                    new Coding("http://hl7.org/fhir/sid/icd-10-cm", reasonIcdCode,    reasonDisplay)
+                ],
+                Text = reasonDisplay
+            }
+        ],
+        Diagnosis =
+        [
+            new Encounter.DiagnosisComponent
+            {
+                Condition = Ref($"Condition/{primaryDiagnosisConditionId}"),
+                Use       = CC("http://terminology.hl7.org/CodeSystem/diagnosis-role", "AD", "Admission diagnosis"),
+                Rank      = 1
+            }
+        ],
+        Location =
+        [
+            new Encounter.LocationComponent
+            {
+                Location = Ref($"Location/{outpatientLocationId}", "Outpatient Clinic"),
+                Status   = Encounter.EncounterLocationStatus.Completed,
+                Period   = new Period { StartElement = new FhirDateTime(start), EndElement = new FhirDateTime(end) }
+            }
+        ],
+        ServiceProvider = Ref($"Organization/{orgId}", "General Test Hospital")
+    };
 }

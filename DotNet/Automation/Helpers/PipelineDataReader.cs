@@ -1,21 +1,20 @@
-﻿using System.Net;
-using Flurl.Http;
+﻿using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
 
 namespace LantanaGroup.Link.Automation.Helpers;
 
 public class PipelineDataReader
 {
-    private readonly ReportServiceClient _reportClient;
-    private readonly DataAcquisitionServiceClient _dataAcqClient;
-    private readonly NormalizationServiceClient _normalizationClient;
-    private readonly FacilityServiceClient _facilityClient;
+    private readonly IReportServiceClient _reportClient;
+    private readonly IDataAcquisitionServiceClient _dataAcqClient;
+    private readonly INormalizationServiceClient _normalizationClient;
+    private readonly IFacilityServiceClient _facilityClient;
 
     public PipelineDataReader(
-        ReportServiceClient reportClient,
-        DataAcquisitionServiceClient dataAcqClient,
-        NormalizationServiceClient normalizationClient,
-        FacilityServiceClient facilityClient)
+        IReportServiceClient reportClient,
+        IDataAcquisitionServiceClient dataAcqClient,
+        INormalizationServiceClient normalizationClient,
+        IFacilityServiceClient facilityClient)
     {
         _reportClient = reportClient;
         _dataAcqClient = dataAcqClient;
@@ -210,30 +209,16 @@ public class PipelineDataReader
         return results;
     }
 
-    public async Task<bool> HasFhirQueryConfigurationAsync(string facilityId)
-    {
-        try
-        {
-            await _dataAcqClient.GetFhirQueryConfigurationAsync(facilityId);
-            return true;
-        }
-        catch (FlurlHttpException ex) when (ex.StatusCode == 404)
-        {
-            return false;
-        }
-    }
+    public Task<bool> HasFhirQueryConfigurationAsync(string facilityId) =>
+        _dataAcqClient.HasFhirQueryConfigurationAsync(facilityId);
 
     public async Task<List<QueryPlanInfo>> GetQueryPlansAsync(string facilityId)
     {
         var list = new List<QueryPlanInfo>();
         foreach (var type in new[] { "Discharge", "Monthly" })
         {
-            try
-            {
-                await _dataAcqClient.GetQueryPlanAsync(facilityId, type);
+            if (await _dataAcqClient.HasQueryPlanAsync(facilityId, type))
                 list.Add(new QueryPlanInfo(type, null, 1, 1));
-            }
-            catch (FlurlHttpException ex) when (ex.StatusCode == 404) { }
         }
 
         return list;
@@ -310,27 +295,20 @@ public class PipelineDataReader
 
     public async Task<FacilityInfo?> GetFacilityAsync(string facilityId)
     {
-        try
-        {
-            var facility = await _facilityClient.GetAsync(facilityId);
-            if (facility == null)
-                return null;
-
-            return new FacilityInfo(
-                facility.FacilityId ?? facilityId,
-                facility.FacilityName,
-                facility.TimeZone,
-                facility.IsDeleted ?? false,
-                null,
-                new FacilityScheduledReports(
-                    facility.ScheduledReports?.Monthly ?? [],
-                    facility.ScheduledReports?.Daily ?? [],
-                    facility.ScheduledReports?.Weekly ?? []));
-        }
-        catch (FlurlHttpException ex) when (ex.StatusCode == 404)
-        {
+        var facility = await _facilityClient.GetAsync(facilityId);
+        if (facility == null)
             return null;
-        }
+
+        return new FacilityInfo(
+            facility.FacilityId ?? facilityId,
+            facility.FacilityName,
+            facility.TimeZone,
+            facility.IsDeleted ?? false,
+            null,
+            new FacilityScheduledReports(
+                facility.ScheduledReports?.Monthly ?? [],
+                facility.ScheduledReports?.Daily ?? [],
+                facility.ScheduledReports?.Weekly ?? []));
     }
 
     public async Task<List<PatientResourceTypeCount>> GetReportResourceCountsByPatientTypeAsync(Guid scheduleId, string facilityId)

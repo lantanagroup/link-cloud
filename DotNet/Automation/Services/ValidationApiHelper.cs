@@ -3,7 +3,7 @@ using LantanaGroup.Link.Sdk.Clients;
 
 namespace LantanaGroup.Link.Automation.Services;
 
-public class ValidationApiHelper(ValidationServiceClient validationClient, IAutomationOutput output, LokiScraper lokiScraper)
+public class ValidationApiHelper(IValidationServiceClient validationClient, IAutomationOutput output, LokiScraper lokiScraper)
 {
     public async Task InitializeArtifactsAsync()
     {

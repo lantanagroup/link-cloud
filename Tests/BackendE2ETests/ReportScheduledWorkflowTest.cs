@@ -1,5 +1,4 @@
-﻿using Flurl.Http;
-using System.Net;
+﻿using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Globalization;
@@ -17,10 +16,10 @@ using Task = System.Threading.Tasks.Task;
 namespace LantanaGroup.Link.Tests.E2ETests;
 
 /// <summary>
-/// End-to-end test for ReportScheduledListener path:
-/// produce ReportScheduled integration event, create patient entry via PatientEvent,
-/// and validate full pipeline completion after Quartz executes EndOfReportPeriodJob.
-/// </summary>
+    /// End-to-end test for ReportScheduledListener path:
+    /// produce ReportScheduled integration event, create patient entry via PatientEvent,
+    /// and validate full pipeline completion after Quartz executes EndOfReportPeriodJob.
+    /// </summary>
 public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixture>
 {
     private const int GenerationSeed = 20260326;
@@ -106,11 +105,12 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
             _b.LokiScraper,
             AutomationCfg,
             _config.PatientIds.Count,
-            forwardInternalLogsToOutput: false);
+            forwardInternalLogsToOutput: false,
+            pipelineReader: _b.DataReader);
         await using var watcher = DiagnosticsEventWatcher.Start(diagnostics, Output);
 
         await diagnostics.StartAsync(_facilityId, reportId);
-        var submitted = await _b.CreateReportHelper(_config).CheckSubmissionStatusAsync(reportId, diagnostics);
+        var submitted = await _b.CreateReportHelper().CheckSubmissionStatusAsync(reportId, _config, diagnostics);
         await diagnostics.StopAsync();
         await watcher.StopAsync();
 
@@ -125,9 +125,9 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
         Assert.True(submitted,
             $"Expected scheduled workflow report {reportId} to be submitted but it was not.");
 
-        var reportApi = _b.CreateReportHelper(_config);
-        var downloadedResources = await reportApi.DownloadReportAsync(_facilityId, reportId);
-        var internalAbsResources = await reportApi.DownloadReportAsync(_facilityId, reportId, external: false);
+        var reportApi = _b.CreateReportHelper();
+        var downloadedResources = await reportApi.DownloadReportAsync(_facilityId, reportId, _config);
+        var internalAbsResources = await reportApi.DownloadReportAsync(_facilityId, reportId, _config, external: false);
 
         Assert.True(downloadedResources.ContainsKey("manifest.ndjson"),
             "Expected scheduled workflow report to include manifest.ndjson but it was not");
@@ -198,15 +198,11 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
 
         while (DateTime.UtcNow - started < timeout)
         {
-            try
+            var schedule = await _b.ReportClient.GetScheduleAsync(reportId);
+            if (schedule != null)
             {
-                var schedule = await _b.ReportClient.GetScheduleAsync(reportId);
                 Output.WriteLine($"Report schedule detected before patient-event publish (status={schedule.Status}).");
                 return;
-            }
-            catch (FlurlHttpException ex) when (ex.StatusCode == 404)
-            {
-                // not visible yet — keep polling
             }
 
             await Task.Delay(delay);

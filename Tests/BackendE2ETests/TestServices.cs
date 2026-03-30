@@ -30,18 +30,18 @@ public sealed class TestServices
     public DatabaseConnectionFactory DbFactory => _services.GetRequiredService<DatabaseConnectionFactory>();
     public PipelineDataReader DataReader => _services.GetRequiredService<PipelineDataReader>();
 
-    public FacilityServiceClient FacilityClient => _services.GetRequiredService<FacilityServiceClient>();
-    public NormalizationServiceClient NormalizationClient => _services.GetRequiredService<NormalizationServiceClient>();
-    public DataAcquisitionServiceClient DataAcquisitionClient => _services.GetRequiredService<DataAcquisitionServiceClient>();
-    public ReportServiceClient ReportClient => _services.GetRequiredService<ReportServiceClient>();
-    public MeasureEvalServiceClient MeasureEvalClient => _services.GetRequiredService<MeasureEvalServiceClient>();
-    public ValidationServiceClient SdkValidationClient => _services.GetRequiredService<ValidationServiceClient>();
-    public CensusServiceClient CensusClient => _services.GetRequiredService<CensusServiceClient>();
+    public IFacilityServiceClient FacilityClient => _services.GetRequiredService<IFacilityServiceClient>();
+    public INormalizationServiceClient NormalizationClient => _services.GetRequiredService<INormalizationServiceClient>();
+    public IDataAcquisitionServiceClient DataAcquisitionClient => _services.GetRequiredService<IDataAcquisitionServiceClient>();
+    public IReportServiceClient ReportClient => _services.GetRequiredService<IReportServiceClient>();
+    public IMeasureEvalServiceClient MeasureEvalClient => _services.GetRequiredService<IMeasureEvalServiceClient>();
+    public IValidationServiceClient SdkValidationClient => _services.GetRequiredService<IValidationServiceClient>();
+    public ICensusServiceClient CensusClient => _services.GetRequiredService<ICensusServiceClient>();
 
     public ValidationApiHelper CreateValidationHelper() => _services.GetRequiredService<ValidationApiHelper>();
 
-    public ReportApiHelper CreateReportHelper(TestScenarioConfig config) =>
-        new(_services.GetRequiredService<ReportServiceClient>(), Output, AutomationCfg, config);
+    public ReportApiHelper CreateReportHelper() =>
+        new(_services.GetRequiredService<IReportServiceClient>(), Output, AutomationCfg);
 
     public ReportDatabaseValidator CreateReportValidator() => _services.GetRequiredService<ReportDatabaseValidator>();
     public ReportAbsManifestValidator CreateReportAbsManifestValidator() => _services.GetRequiredService<ReportAbsManifestValidator>();

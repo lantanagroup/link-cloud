@@ -1,18 +1,26 @@
 ﻿using Flurl.Http;
+using LantanaGroup.Link.Sdk.ApiClient;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
-using LantanaGroup.Link.Sdk.ApiClient;
-using Newtonsoft.Json;
-using System.Net.Http;
+using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.Sdk.Clients;
 
-public sealed class DataAcquisitionServiceClient : LinkApiClientBase
+public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionServiceClient
 {
-    public DataAcquisitionServiceClient(ApiClientSettings settings)
-        : base(settings)
-    {
-    }
+    public DataAcquisitionServiceClient(
+        IOptions<ServiceRegistry> serviceRegistry,
+        IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> bearerOptions,
+        IOptions<LinkTokenServiceSettings> tokenServiceSettings,
+        ICreateSystemToken tokenService)
+        : base(
+            serviceRegistry.Value.DataAcquisitionServiceApiUrl
+                ?? throw new InvalidOperationException("DataAcquisition service URL is not configured in ServiceRegistry."),
+            bearerOptions, tokenServiceSettings, tokenService)
+    { }
 
     public Task GetFhirQueryConfigurationAsync(
         string facilityId,
@@ -20,17 +28,23 @@ public sealed class DataAcquisitionServiceClient : LinkApiClientBase
         Request($"data/{facilityId}/fhirQueryConfiguration")
             .GetAsync(cancellationToken: cancellationToken);
 
-    public Task CreateFhirQueryConfigurationAsync(
+    public Task<bool> HasFhirQueryConfigurationAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        ExistsAsync(() => Request($"data/{facilityId}/fhirQueryConfiguration")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<bool> CreateFhirQueryConfigurationAsync(
         CreateFhirQueryConfigurationRequestApiModel request,
         CancellationToken cancellationToken = default) =>
-        Request("data/fhirQueryConfiguration")
-            .PostJsonAsync(request, cancellationToken: cancellationToken);
+        CreateOrExistsAsync(() => Request("data/fhirQueryConfiguration")
+            .PostJsonAsync(request, cancellationToken: cancellationToken));
 
     public Task DeleteFhirQueryConfigurationAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
-        Request($"data/{facilityId}/fhirQueryConfiguration")
-            .DeleteAsync(cancellationToken: cancellationToken);
+        DeleteOrIgnoreAsync(() => Request($"data/{facilityId}/fhirQueryConfiguration")
+            .DeleteAsync(cancellationToken: cancellationToken));
 
     public Task GetQueryPlanAsync(
         string facilityId,
@@ -40,21 +54,31 @@ public sealed class DataAcquisitionServiceClient : LinkApiClientBase
             .SetQueryParam("type", type)
             .GetAsync(cancellationToken: cancellationToken);
 
-    public Task CreateQueryPlanAsync(
+    public Task<bool> HasQueryPlanAsync(
+        string facilityId,
+        string type,
+        CancellationToken cancellationToken = default) =>
+        ExistsAsync(() => Request($"data/{facilityId}/QueryPlan")
+            .SetQueryParam("type", type)
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<bool> CreateQueryPlanAsync(
         string facilityId,
         CreateQueryPlanRequestApiModel request,
         CancellationToken cancellationToken = default) =>
-        Request($"data/{facilityId}/QueryPlan")
+        CreateOrExistsAsync(() => Request($"data/{facilityId}/QueryPlan")
             .WithHeader("Content-Type", "application/json")
-            .SendStringAsync(HttpMethod.Post, JsonConvert.SerializeObject(request), cancellationToken: cancellationToken);
+            .SendStringAsync(HttpMethod.Post,
+                Newtonsoft.Json.JsonConvert.SerializeObject(request),
+                cancellationToken: cancellationToken));
 
     public Task DeleteQueryPlanAsync(
         string facilityId,
         string type,
         CancellationToken cancellationToken = default) =>
-        Request($"data/{facilityId}/QueryPlan")
+        DeleteOrIgnoreAsync(() => Request($"data/{facilityId}/QueryPlan")
             .SetQueryParam("type", type)
-            .DeleteAsync(cancellationToken: cancellationToken);
+            .DeleteAsync(cancellationToken: cancellationToken));
 
     public Task<PagedConfigModel<DataAcquisitionLogApiModel>> SearchAcquisitionLogsAsync(
         string facilityId,
@@ -71,11 +95,11 @@ public sealed class DataAcquisitionServiceClient : LinkApiClientBase
             .SetQueryParam("sortOrder", "Ascending")
             .GetJsonAsync<PagedConfigModel<DataAcquisitionLogApiModel>>(cancellationToken: cancellationToken);
 
-    public Task<DataAcquisitionLogStatusStatisticsApiModel> GetReportStatusCountsAsync(
+    public Task<DataAcquisitionLogStatusStatisticsApiModel?> GetReportStatusCountsAsync(
         string reportId,
         CancellationToken cancellationToken = default) =>
-        Request($"data/acquisition-logs/report/{reportId}/status-counts")
-            .GetJsonAsync<DataAcquisitionLogStatusStatisticsApiModel>(cancellationToken: cancellationToken);
+        GetOrDefaultAsync(() => Request($"data/acquisition-logs/report/{reportId}/status-counts")
+            .GetJsonAsync<DataAcquisitionLogStatusStatisticsApiModel>(cancellationToken: cancellationToken));
 
     public Task<PagedConfigModel<DataAcquisitionLogApiModel>> SearchDetailedAcquisitionLogsAsync(
         string facilityId,

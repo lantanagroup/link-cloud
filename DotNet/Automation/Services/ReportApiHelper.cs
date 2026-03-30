@@ -1,5 +1,5 @@
 ﻿using System.IO.Compression;
-using Flurl.Http;
+using LantanaGroup.Link.Sdk.ApiClient;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.Automation.Helpers;
@@ -12,29 +12,27 @@ namespace LantanaGroup.Link.Automation.Services;
 
 public class ReportApiHelper
 {
-    private readonly ReportServiceClient _reportClient;
+    private readonly IReportServiceClient _reportClient;
     private readonly IAutomationOutput _output;
-    private readonly TestScenarioConfig _config;
     private readonly AutomationConfig _automationConfig;
 
-    public ReportApiHelper(ReportServiceClient reportClient, IAutomationOutput output, AutomationConfig automationConfig, TestScenarioConfig config)
+    public ReportApiHelper(IReportServiceClient reportClient, IAutomationOutput output, AutomationConfig config)
     {
         _reportClient = reportClient;
         _output = output;
-        _config = config;
-        _automationConfig = automationConfig;
+        _automationConfig = config;
     }
 
-    public async Task<string> GenerateReportAsync(string facilityId, string measureId)
+    public async Task<string> GenerateReportAsync(string facilityId, string measureId, TestScenarioConfig config)
     {
         _output.WriteLine("Generating report...");
         var body = new AdHocReportRequest
         {
             BypassSubmission = false,
-            StartDate = DateTime.Parse(_config.StartDate),
-            EndDate = DateTime.Parse(_config.EndDate),
+            StartDate = DateTime.Parse(config.StartDate),
+            EndDate = DateTime.Parse(config.EndDate),
             ReportTypes = [measureId],
-            PatientIds = _config.PatientIds
+            PatientIds = config.PatientIds
         };
 
         var payload = await _reportClient.GenerateAdhocReportAsync(facilityId, body);
@@ -45,10 +43,10 @@ public class ReportApiHelper
         return payload!.ReportId.ToString();
     }
 
-    public async Task<bool> CheckSubmissionStatusAsync(string reportId, BackgroundDiagnosticsMonitor? diagnostics = null)
+    public async Task<bool> CheckSubmissionStatusAsync(string reportId, TestScenarioConfig config, BackgroundDiagnosticsMonitor? diagnostics = null)
     {
-        var pollingIntervalSeconds = _config.PollingIntervalSeconds;
-        var maxRetryCount = _config.MaxRetryCount;
+        var pollingIntervalSeconds = config.PollingIntervalSeconds;
+        var maxRetryCount = config.MaxRetryCount;
 
         _output.WriteLine($"Polling for report submission (reportId={reportId}, max {maxRetryCount * pollingIntervalSeconds}s)...");
 
@@ -64,20 +62,20 @@ public class ReportApiHelper
             }
 
             string currentStatus;
-            try
+            var schedule = await _reportClient.GetScheduleAsync(reportId);
+            if (schedule == null)
             {
-                var schedule = await _reportClient.GetScheduleAsync(reportId);
-                currentStatus = schedule?.Status.ToString() ?? "unknown";
+                currentStatus = "not found";
+            }
+            else
+            {
+                currentStatus = schedule.Status.ToString() ?? "unknown";
 
                 if (string.Equals(currentStatus, "Submitted", StringComparison.OrdinalIgnoreCase))
                 {
                     _output.WriteLine($"Report submitted (after {retry * pollingIntervalSeconds}s).");
                     return true;
                 }
-            }
-            catch (FlurlHttpException ex)
-            {
-                currentStatus = $"HTTP {ex.StatusCode}";
             }
 
             if (currentStatus != lastStatus)
@@ -93,7 +91,7 @@ public class ReportApiHelper
         return false;
     }
 
-    public async Task<Dictionary<string, object>> DownloadReportAsync(string facilityId, string reportId, bool external = true)
+    public async Task<Dictionary<string, object>> DownloadReportAsync(string facilityId, string reportId, TestScenarioConfig config, bool external = true)
     {
         _output.WriteLine($"Downloading report {reportId}...");
 
@@ -109,7 +107,7 @@ public class ReportApiHelper
             if (!Directory.Exists(_automationConfig.DownloadPath))
                 Directory.CreateDirectory(_automationConfig.DownloadPath);
 
-            var downloadPath = Path.Combine(_automationConfig.DownloadPath, _config.DownloadFileName);
+            var downloadPath = Path.Combine(_automationConfig.DownloadPath, config.DownloadFileName);
             await File.WriteAllBytesAsync(downloadPath, bytes);
             _output.WriteLine($"Report downloaded to {downloadPath}");
         }

@@ -45,7 +45,7 @@ public class EndOfReportPeriodJobTests
         await database.ReportScheduledRepository.AddAsync(schedule);
         await database.ReportPopulationRepository.SaveChangesAsync();
 
-        _fixture.TenantApiServiceMock.Setup(t => t.GetFacilityConfig(Moq.It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _fixture.FacilityServiceClientMock.Setup(x => x.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new FacilityModel { FacilityId = facilityId });
 
         _fixture.SubmitPayloadKafkaProducerMock

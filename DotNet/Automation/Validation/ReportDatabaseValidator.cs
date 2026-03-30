@@ -22,19 +22,21 @@ public class ReportDatabaseValidator
         string expectedMeasureId,
         List<string> expectedPatientIds,
         Frequency expectedFrequency = Frequency.Adhoc,
-        string? expectedAdHocType = "Manual")
+        string? expectedAdHocType = "Manual",
+        List<string>? expectedSubmittedPatientIds = null)
     {
         var errors = new List<string>();
 
         try
         {
             var scheduleId = Guid.Parse(reportId);
+            var expectedSubmitted = expectedSubmittedPatientIds ?? expectedPatientIds;
 
             await ValidateReportSchedule(scheduleId, facilityId, expectedFrequency, expectedAdHocType, errors);
             await ValidateScheduleReportTypes(scheduleId, expectedMeasureId, errors);
-            await ValidateReportEntries(scheduleId, facilityId, expectedPatientIds, errors);
+            await ValidateReportEntries(scheduleId, facilityId, expectedPatientIds, expectedSubmitted, errors);
             await ValidateEntryMeasureReports(scheduleId, expectedMeasureId, expectedPatientIds.Count, errors);
-            await ValidateReportResources(scheduleId, facilityId, expectedPatientIds, errors);
+            await ValidateReportResources(scheduleId, facilityId, expectedSubmitted, errors);
             await ValidateReportPopulations(scheduleId, facilityId, expectedMeasureId, errors);
         }
         catch (Exception ex)
@@ -105,7 +107,12 @@ public class ReportDatabaseValidator
             AddError(errors, $"ScheduleReportType.ReportType mismatch: expected {expectedMeasureId}, actual {reportTypes[0].ReportType}");
     }
 
-    private async Task ValidateReportEntries(Guid scheduleId, string facilityId, List<string> expectedPatientIds, List<string> errors)
+    private async Task ValidateReportEntries(
+        Guid scheduleId,
+        string facilityId,
+        List<string> expectedPatientIds,
+        List<string> expectedSubmittedPatientIds,
+        List<string> errors)
     {
         var entries = await _reader.GetReportEntriesAsync(scheduleId);
 
@@ -117,13 +124,27 @@ public class ReportDatabaseValidator
         if (!foundPatientIds.SequenceEqual(sortedExpected))
             AddError(errors, $"ReportEntry patient IDs mismatch. expected=[{string.Join(",", sortedExpected)}], actual=[{string.Join(",", foundPatientIds)}]");
 
+        var submittedSet = expectedSubmittedPatientIds.ToHashSet(StringComparer.Ordinal);
+
         foreach (var entry in entries)
         {
             if (entry.FacilityId != facilityId)
                 AddError(errors, $"ReportEntry {entry.Id} FacilityId mismatch: expected {facilityId}, actual {entry.FacilityId}");
 
-            if (!string.Equals(entry.SubmissionStatus, "Submitted", StringComparison.OrdinalIgnoreCase))
-                AddError(errors, $"ReportEntry {entry.Id} SubmissionStatus should be Submitted, actual {entry.SubmissionStatus}");
+            if (submittedSet.Contains(entry.PatientId))
+            {
+                if (!string.Equals(entry.SubmissionStatus, "Submitted", StringComparison.OrdinalIgnoreCase))
+                    AddError(errors, $"ReportEntry {entry.Id} for patient {entry.PatientId} should be Submitted, actual {entry.SubmissionStatus}");
+            }
+            else
+            {
+                var isNotEligible =
+                    string.Equals(entry.SubmissionStatus, "NotEligable", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(entry.SubmissionStatus, "NotEligible", StringComparison.OrdinalIgnoreCase);
+
+                if (!isNotEligible)
+                    AddError(errors, $"ReportEntry {entry.Id} for non-submitted patient {entry.PatientId} should be NotEligible/NotEligable, actual {entry.SubmissionStatus}");
+            }
         }
     }
 

@@ -1,24 +1,25 @@
-﻿using LantanaGroup.Link.Sdk.ApiClient;
-using LantanaGroup.Link.Sdk.Clients;
+﻿using LantanaGroup.Link.Sdk.Clients;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LantanaGroup.Link.Sdk.DependencyInjection;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddLinkSdk(this IServiceCollection services, ApiClientSettings settings)
+    /// <summary>
+    /// Registers all Link SDK service clients.
+    /// Requires <c>IOptions&lt;ServiceRegistry&gt;</c>, <c>IOptions&lt;LinkBearerServiceOptions&gt;</c>,
+    /// <c>IOptions&lt;LinkTokenServiceSettings&gt;</c>, and <c>ICreateSystemToken</c> to be available in DI.
+    /// Each client resolves its own base URL from <c>ServiceRegistry</c>.
+    /// </summary>
+    public static IServiceCollection AddLinkSdk(this IServiceCollection services)
     {
-        ArgumentNullException.ThrowIfNull(settings);
-
-        services.AddSingleton(settings);
-
-        services.AddTransient<FacilityServiceClient>();
-        services.AddTransient<NormalizationServiceClient>();
-        services.AddTransient<DataAcquisitionServiceClient>();
-        services.AddTransient<ReportServiceClient>();
-        services.AddTransient<ValidationServiceClient>();
-        services.AddTransient<CensusServiceClient>();
-        services.AddTransient<MeasureEvalServiceClient>();
+        services.AddSingleton<IFacilityServiceClient, FacilityServiceClient>();
+        services.AddSingleton<ICensusServiceClient, CensusServiceClient>();
+        services.AddSingleton<IDataAcquisitionServiceClient, DataAcquisitionServiceClient>();
+        services.AddSingleton<INormalizationServiceClient, NormalizationServiceClient>();
+        services.AddSingleton<IReportServiceClient, ReportServiceClient>();
+        services.AddSingleton<IMeasureEvalServiceClient, MeasureEvalServiceClient>();
+        services.AddSingleton<IValidationServiceClient, ValidationServiceClient>();
 
         return services;
     }

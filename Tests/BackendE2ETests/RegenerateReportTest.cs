@@ -1,5 +1,4 @@
-﻿using Flurl.Http;
-using System.Net;
+﻿using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Globalization;
@@ -119,11 +118,12 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
             _b.LokiScraper,
             AutomationCfg,
             _config.PatientIds.Count,
-            forwardInternalLogsToOutput: false);
+            forwardInternalLogsToOutput: false,
+            pipelineReader: _b.DataReader);
         await using var sourceWatcher = DiagnosticsEventWatcher.Start(sourceDiagnostics, Output);
 
         await sourceDiagnostics.StartAsync(_facilityId, sourceReportId);
-        var sourceSubmitted = await _b.CreateReportHelper(_config).CheckSubmissionStatusAsync(sourceReportId, sourceDiagnostics);
+        var sourceSubmitted = await _b.CreateReportHelper().CheckSubmissionStatusAsync(sourceReportId, _config, sourceDiagnostics);
         await sourceDiagnostics.StopAsync();
         await sourceWatcher.StopAsync();
 
@@ -139,11 +139,12 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
             _b.LokiScraper,
             AutomationCfg,
             _config.PatientIds.Count,
-            forwardInternalLogsToOutput: false);
+            forwardInternalLogsToOutput: false,
+            pipelineReader: _b.DataReader);
         await using var regenWatcher = DiagnosticsEventWatcher.Start(regenDiagnostics, Output);
 
         await regenDiagnostics.StartAsync(_facilityId, regeneratedReportId);
-        var regeneratedSubmitted = await _b.CreateReportHelper(_config).CheckSubmissionStatusAsync(regeneratedReportId, regenDiagnostics);
+        var regeneratedSubmitted = await _b.CreateReportHelper().CheckSubmissionStatusAsync(regeneratedReportId, _config, regenDiagnostics);
         await regenDiagnostics.StopAsync();
         await regenWatcher.StopAsync();
 
@@ -154,9 +155,9 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
             $"Expected regenerated report {regeneratedReportId} to be submitted but it was not.");
 
         // Step 4: Validate regenerated report artifacts.
-        var reportApi = _b.CreateReportHelper(_config);
-        var downloadedResources = await reportApi.DownloadReportAsync(_facilityId, regeneratedReportId);
-        var internalAbsResources = await reportApi.DownloadReportAsync(_facilityId, regeneratedReportId, external: false);
+        var reportApi = _b.CreateReportHelper();
+        var downloadedResources = await reportApi.DownloadReportAsync(_facilityId, regeneratedReportId, _config);
+        var internalAbsResources = await reportApi.DownloadReportAsync(_facilityId, regeneratedReportId, _config, external: false);
 
         Assert.True(downloadedResources.ContainsKey("manifest.ndjson"),
             "Expected regenerated report to include manifest.ndjson but it was not");
@@ -264,9 +265,9 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
 
         while (DateTime.UtcNow - started < timeout)
         {
-            try
+            var schedule = await _b.ReportClient.GetScheduleAsync(reportId);
+            if (schedule != null)
             {
-                var schedule = await _b.ReportClient.GetScheduleAsync(reportId);
                 var scheduleStatus = schedule.Status.ToString();
 
                 if (string.Equals(scheduleStatus, "EndOfPeriod", StringComparison.OrdinalIgnoreCase))
@@ -278,10 +279,6 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
 
                 Output.WriteLine($"Report schedule detected (status={scheduleStatus}, after {(DateTime.UtcNow - started).TotalSeconds:F1}s).");
                 return;
-            }
-            catch (FlurlHttpException ex) when (ex.StatusCode == 404)
-            {
-                // not visible yet — keep polling
             }
 
             await Task.Delay(poll);

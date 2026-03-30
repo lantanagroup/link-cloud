@@ -1,5 +1,4 @@
-﻿using Flurl.Http;
-using LantanaGroup.Link.Automation;
+﻿using LantanaGroup.Link.Automation;
 using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.Automation.Helpers;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Census;
@@ -204,8 +203,8 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
         var rangeStart = DateTime.SpecifyKind(DateTime.Parse(_config.StartDate), DateTimeKind.Utc);
         var rangeEnd = DateTime.SpecifyKind(DateTime.Parse(_config.EndDate), DateTimeKind.Utc);
 
-        await RunAllowingStatusAsync(results, "Census.GetAdmittedPatients", () =>
-            _b.CensusClient.GetAdmittedPatientsAsync(_facilityId, rangeStart, rangeEnd), 404);
+        await RunAsync(results, "Census.GetAdmittedPatients",
+            () => _b.CensusClient.GetAdmittedPatientsAsync(_facilityId, rangeStart, rangeEnd));
 
         await RunAsync(results, "Census.GetCurrentPatientEncounters",
             () => _b.CensusClient.GetCurrentPatientEncountersAsync(_facilityId));
@@ -216,60 +215,44 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
         await RunAsync(results, "Census.RebuildPatientEncounters",
             () => _b.CensusClient.RebuildPatientEncountersAsync(_facilityId));
 
-        string? patientEventId = null;
-        await RunAllowingStatusAsync(results, "Census.GetPatientEvents", async () =>
-        {
-            var events = await _b.CensusClient.GetPatientEventsAsync(_facilityId);
-            patientEventId = events?.Records?.FirstOrDefault()?.Id;
-        }, 404);
+        await RunAsync(results, "Census.GetPatientEvents",
+            () => _b.CensusClient.GetPatientEventsAsync(_facilityId));
 
-        await RunAllowingStatusAsync(results, "Census.DeletePatientEvent", async () =>
-        {
-            await _b.CensusClient.DeletePatientEventAsync(patientEventId ?? Guid.NewGuid().ToString());
-        }, 404);
+        await RunAsync(results, "Census.DeletePatientEvent",
+            () => _b.CensusClient.DeletePatientEventAsync(Guid.NewGuid().ToString()));
 
-        await RunAllowingStatusAsync(results, "Census.DeletePatientEventsByCorrelation", async () =>
-        {
-            await _b.CensusClient.DeletePatientEventsByCorrelationAsync(Guid.NewGuid().ToString());
-        }, 404);
+        await RunAsync(results, "Census.DeletePatientEventsByCorrelation",
+            () => _b.CensusClient.DeletePatientEventsByCorrelationAsync(Guid.NewGuid().ToString()));
 
-        var reportProbeId = Guid.NewGuid().ToString();
-
-        await RunAllowingStatusAsync(results, "Report.GetSchedule",
-            () => _b.ReportClient.GetScheduleAsync(reportProbeId), 404);
+        await RunAsync(results, "Report.GetSchedule",
+            () => _b.ReportClient.GetScheduleAsync(Guid.NewGuid().ToString()));
 
         await RunAsync(results, "Report.SearchSchedules",
-            () => _b.ReportClient.SearchSchedulesAsync(reportProbeId));
+            () => _b.ReportClient.SearchSchedulesAsync(Guid.NewGuid().ToString()));
 
-        await RunAllowingStatusAsync(results, "Report.GetEntriesBySchedule",
-            () => _b.ReportClient.GetEntriesByScheduleAsync(reportProbeId), 404);
+        await RunAsync(results, "Report.GetEntriesBySchedule",
+            () => _b.ReportClient.GetEntriesByScheduleAsync(Guid.NewGuid().ToString()));
 
-        await RunAllowingStatusAsync(results, "Report.SearchResources",
-            () => _b.ReportClient.SearchResourcesAsync(_facilityId, reportProbeId), 404);
+        await RunAsync(results, "Report.SearchResources",
+            () => _b.ReportClient.SearchResourcesAsync(_facilityId, Guid.NewGuid().ToString()));
 
-        await RunAllowingStatusAsync(results, "Report.GetPopulationsBySchedule",
-            () => _b.ReportClient.GetPopulationsByScheduleAsync(reportProbeId), 404);
-
-        await RunAllowingStatusAsync(results, "Report.DownloadSubmission.External",
-            () => _b.ReportClient.DownloadSubmissionAsync(_facilityId, reportProbeId, external: true), 404);
-
-        await RunAllowingStatusAsync(results, "Report.DownloadSubmission.Internal",
-            () => _b.ReportClient.DownloadSubmissionAsync(_facilityId, reportProbeId, external: false), 404);
+        await RunAsync(results, "Report.GetPopulationsBySchedule",
+            () => _b.ReportClient.GetPopulationsByScheduleAsync(Guid.NewGuid().ToString()));
 
         await RunAsync(results, "DataAcq.SearchAcquisitionLogs",
-            () => _b.DataAcquisitionClient.SearchAcquisitionLogsAsync(_facilityId, reportProbeId));
+            () => _b.DataAcquisitionClient.SearchAcquisitionLogsAsync(_facilityId, Guid.NewGuid().ToString()));
 
         await RunAsync(results, "DataAcq.SearchDetailedAcquisitionLogs",
-            () => _b.DataAcquisitionClient.SearchDetailedAcquisitionLogsAsync(_facilityId, reportProbeId));
+            () => _b.DataAcquisitionClient.SearchDetailedAcquisitionLogsAsync(_facilityId, Guid.NewGuid().ToString()));
 
-        await RunAllowingStatusAsync(results, "DataAcq.GetReportStatusCounts",
-            () => _b.DataAcquisitionClient.GetReportStatusCountsAsync(reportProbeId), 404);
+        await RunAsync(results, "DataAcq.GetReportStatusCounts",
+            () => _b.DataAcquisitionClient.GetReportStatusCountsAsync(Guid.NewGuid().ToString()));
 
         await RunAsync(results, "DataAcq.GetAcquiredResourceIdsForReport",
-            () => _b.DataAcquisitionClient.GetAcquiredResourceIdsForReportAsync(_facilityId, reportProbeId));
+            () => _b.DataAcquisitionClient.GetAcquiredResourceIdsForReportAsync(_facilityId, Guid.NewGuid().ToString()));
 
-        await RunAllowingStatusAsync(results, "Validation.GetValidationResults",
-            () => _b.SdkValidationClient.GetValidationResultsAsync(_facilityId, reportProbeId), 404);
+        await RunAsync(results, "Validation.GetValidationResults",
+            () => _b.SdkValidationClient.GetValidationResultsAsync(_facilityId, Guid.NewGuid().ToString()));
 
         if (_monthlyPlanCreated)
         {
@@ -340,24 +323,7 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
         }
         catch (Exception ex)
         {
-            results.AddError(name, ex is FlurlHttpException fex ? $"HTTP {fex.StatusCode}" : ex.Message);
-        }
-    }
-
-    private async Task RunAllowingStatusAsync(ApiRunResults results, string name, Func<Task> action, params int[] allowedStatusCodes)
-    {
-        try
-        {
-            await action();
-            results.AddSuccess(name);
-        }
-        catch (FlurlHttpException ex) when (ex.StatusCode is int status && allowedStatusCodes.Contains(status))
-        {
-            results.AddSuccess(name, $"HTTP {status} accepted");
-        }
-        catch (Exception ex)
-        {
-            results.AddError(name, ex is FlurlHttpException fex ? $"HTTP {fex.StatusCode}" : ex.Message);
+            results.AddError(name, ex.Message);
         }
     }
 
@@ -382,7 +348,7 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
             }
         }
 
-        results.AddError(name, last is FlurlHttpException fex ? $"HTTP {fex.StatusCode}" : (last?.Message ?? "timed out"));
+        results.AddError(name, last?.Message ?? "timed out");
     }
 
     private static Task Try(Func<Task> action) =>

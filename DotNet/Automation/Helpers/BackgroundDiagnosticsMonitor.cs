@@ -85,19 +85,9 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
 
     private static PipelineDataReader BuildPipelineReader(AutomationConfig config)
     {
-        var settings = new LantanaGroup.Link.Sdk.ApiClient.ApiClientSettings
-        {
-            BaseUrl = config.AdminBffBase,
-            BearerToken = config.AdminBffOAuth.ShouldAuthenticate
-                ? AuthHelper.GetBearerToken(config.AdminBffOAuth)
-                : null
-        };
-
-        return new PipelineDataReader(
-            new LantanaGroup.Link.Sdk.Clients.ReportServiceClient(settings),
-            new LantanaGroup.Link.Sdk.Clients.DataAcquisitionServiceClient(settings),
-            new LantanaGroup.Link.Sdk.Clients.NormalizationServiceClient(settings),
-            new LantanaGroup.Link.Sdk.Clients.FacilityServiceClient(settings));
+        throw new InvalidOperationException(
+            "Standalone client construction is no longer supported. " +
+            "Pass a PipelineDataReader instance via the constructor.");
     }
 
     public IAsyncEnumerable<AutomationMonitorEvent> StreamEventsAsync(CancellationToken cancellationToken = default)

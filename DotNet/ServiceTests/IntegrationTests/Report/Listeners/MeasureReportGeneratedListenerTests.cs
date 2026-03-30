@@ -158,7 +158,7 @@ public class MeasureReportGeneratedListenerTests : IClassFixture<ReportIntegrati
     public async Task ProcessMessageAsync_AllNonReportable_UpdatesAndProducesManifest()
     {
         _fixture.SubmitPayloadKafkaProducerMock.Reset();
-        _fixture.TenantApiServiceMock.Setup(x => x.GetFacilityConfig(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _fixture.FacilityServiceClientMock.Setup(x => x.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new FacilityModel { FacilityName = "Test Facility" });
 
         using var scope = _fixture.ScopeFactory.CreateScope();
@@ -211,7 +211,7 @@ public class MeasureReportGeneratedListenerTests : IClassFixture<ReportIntegrati
     public async Task ProcessMessageAsync_NotReadyForAggregation_ProducesManifest()
     {
         _fixture.SubmitPayloadKafkaProducerMock.Reset();
-        _fixture.TenantApiServiceMock.Setup(x => x.GetFacilityConfig(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _fixture.FacilityServiceClientMock.Setup(x => x.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new FacilityModel { FacilityName = "Test Facility" });
 
         using var scope = _fixture.ScopeFactory.CreateScope();
@@ -306,7 +306,7 @@ public class MeasureReportGeneratedListenerTests : IClassFixture<ReportIntegrati
         var facilityId = "test-facility-016";
 
         _fixture.ReadyForValidationKafkaProducerMock.Reset();
-        _fixture.TenantApiServiceMock.Setup(x => x.GetFacilityConfig(facilityId, It.IsAny<CancellationToken>()))
+        _fixture.FacilityServiceClientMock.Setup(x => x.GetAsync(facilityId, It.IsAny<CancellationToken>()))
                     .ReturnsAsync(new FacilityModel { FacilityId = facilityId, FacilityName = "Test Facility" });
 
         using var scope = _fixture.ScopeFactory.CreateScope();

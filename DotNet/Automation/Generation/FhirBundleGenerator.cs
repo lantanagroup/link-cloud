@@ -27,6 +27,7 @@ public static class FhirBundleGenerator
     public const string IcuLocationId       = "Gen-Location-ICU";
     public const string EdLocationId        = "Gen-Location-ED";
     public const string StepDownLocationId  = "Gen-Location-StepDown";
+    public const string OutpatientLocationId = "Gen-Location-Outpatient";
     public const string HospitalOrgId       = "Gen-Org-Hospital";
 
     private static readonly (string ResourceType, double Fraction)[] ResourceDistribution =
@@ -74,6 +75,7 @@ public static class FhirBundleGenerator
             Entry($"Location/{IcuLocationId}",           LocationFactory.Generate(IcuLocationId,      "ICU",  "Intensive Care Unit",   HospitalOrgId)),
             Entry($"Location/{EdLocationId}",            LocationFactory.Generate(EdLocationId,        "ER",   "Emergency Department",  HospitalOrgId)),
             Entry($"Location/{StepDownLocationId}",      LocationFactory.Generate(StepDownLocationId,  "HU",   "Step-Down Unit",        HospitalOrgId)),
+            Entry($"Location/{OutpatientLocationId}",    LocationFactory.Create(OutpatientLocationId, "OF",   "Outpatient Clinic",     HospitalOrgId)),
             Entry("Device/Gen-Device-PulseOx",      DeviceFactory.Create("Gen-Device-PulseOx",    "706689003", "Pulse oximeter",                             null)),
             Entry("Device/Gen-Device-Ventilator",   DeviceFactory.Create("Gen-Device-Ventilator", "706172005", "Ventilator",                                 null)),
             Entry("Device/Gen-Device-CPAP",         DeviceFactory.Create("Gen-Device-CPAP",       "10776007",  "Continuous positive airway pressure device", null)),
@@ -223,6 +225,268 @@ public static class FhirBundleGenerator
         }
 
         output.WriteLine($"Generated {bundles.Count} transaction bundles for {patientCount} patients.");
+        return (patientIds, bundles);
+    }
+
+    /// <summary>
+    /// Generate patients with explicit measure-eligibility profiles.
+    /// Each <see cref="PatientProfile"/> controls whether the patient qualifies
+    /// for the measure's Initial Population. Seeds are deterministic and repeatable.
+    /// <para>
+    /// This method does NOT alter the existing <see cref="Generate"/> code path.
+    /// </para>
+    /// </summary>
+    public static (List<string> PatientIds, List<(string Name, string Json)> Bundles) GenerateWithProfiles(
+        IAutomationOutput output,
+        IReadOnlyList<PatientProfile> profiles,
+        int totalResourcesPerPatient = DefaultResourcesPerPatient,
+        string patientIdPrefix = "ProfilePatient",
+        int? generationSeed = null)
+    {
+        return GenerateWithProfiles(
+            output,
+            ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation,
+            profiles,
+            totalResourcesPerPatient,
+            patientIdPrefix,
+            generationSeed);
+    }
+
+    /// <summary>
+    /// Generate patients with explicit measure-eligibility profiles in the context
+    /// of a designated measure.
+    /// </summary>
+    public static (List<string> PatientIds, List<(string Name, string Json)> Bundles) GenerateWithProfiles(
+        IAutomationOutput output,
+        ProfiledMeasureType measure,
+        IReadOnlyList<PatientProfile> profiles,
+        int totalResourcesPerPatient = DefaultResourcesPerPatient,
+        string patientIdPrefix = "ProfilePatient",
+        int? generationSeed = null)
+    {
+        if (profiles == null)
+            throw new ArgumentNullException(nameof(profiles));
+
+        if (profiles.Count == 0)
+            throw new ArgumentException("At least one patient profile is required.", nameof(profiles));
+
+        return measure switch
+        {
+            ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation =>
+                GenerateWithProfilesForNhsn(
+                    output,
+                    profiles,
+                    totalResourcesPerPatient,
+                    patientIdPrefix,
+                    generationSeed),
+            _ => throw new ArgumentOutOfRangeException(nameof(measure), measure, null)
+        };
+    }
+
+    private static (List<string> PatientIds, List<(string Name, string Json)> Bundles) GenerateWithProfilesForNhsn(
+        IAutomationOutput output,
+        IReadOnlyList<PatientProfile> profiles,
+        int totalResourcesPerPatient = DefaultResourcesPerPatient,
+        string patientIdPrefix = "ProfilePatient",
+        int? generationSeed = null)
+    {
+        var patientIds = new List<string>();
+        var allEntries = new List<(string PatientId, List<Bundle.EntryComponent> Entries)>();
+        var baseSeed = generationSeed.GetValueOrDefault();
+
+        var qualifyingCount = profiles.Count(p => p.Eligibility == MeasureEligibility.Qualifying);
+        var nonQualifyingCount = profiles.Count - qualifyingCount;
+        output.WriteLine($"Generating {profiles.Count} profiled patients ({qualifyingCount} qualifying, {nonQualifyingCount} non-qualifying) " +
+                         $"with ~{totalResourcesPerPatient} resources each..." +
+                         (generationSeed.HasValue ? $" (seed={generationSeed.Value})" : string.Empty));
+
+        // ------------------------------------------------------------------
+        // Shared infrastructure — same as Generate(), plus outpatient location
+        // ------------------------------------------------------------------
+        var sharedEntries = new List<Bundle.EntryComponent>
+        {
+            Entry($"Organization/{HospitalOrgId}",       OrganizationFactory.Generate(HospitalOrgId)),
+            Entry($"Location/{HospitalLocationId}",      LocationFactory.Generate(HospitalLocationId, "HOSP", "Main Hospital",        HospitalOrgId)),
+            Entry($"Location/{IcuLocationId}",           LocationFactory.Generate(IcuLocationId,      "ICU",  "Intensive Care Unit",   HospitalOrgId)),
+            Entry($"Location/{EdLocationId}",            LocationFactory.Generate(EdLocationId,        "ER",   "Emergency Department",  HospitalOrgId)),
+            Entry($"Location/{StepDownLocationId}",      LocationFactory.Generate(StepDownLocationId,  "HU",   "Step-Down Unit",        HospitalOrgId)),
+            Entry($"Location/{OutpatientLocationId}",    LocationFactory.Create(OutpatientLocationId, "OF",   "Outpatient Clinic",     HospitalOrgId)),
+            Entry("Device/Gen-Device-PulseOx",      DeviceFactory.Create("Gen-Device-PulseOx",    "706689003", "Pulse oximeter",                             null)),
+            Entry("Device/Gen-Device-Ventilator",   DeviceFactory.Create("Gen-Device-Ventilator", "706172005", "Ventilator",                                 null)),
+            Entry("Device/Gen-Device-CPAP",         DeviceFactory.Create("Gen-Device-CPAP",       "10776007",  "Continuous positive airway pressure device", null)),
+        };
+
+        var sharedPractitionerIds = new List<string>();
+        for (var pi = 0; pi < FhirGenerationCodes.Practitioners.Length; pi++)
+        {
+            var practId = $"{patientIdPrefix}-Pract-{pi + 1:D3}";
+            sharedPractitionerIds.Add(practId);
+            sharedEntries.Add(Entry($"Practitioner/{practId}", PractitionerFactory.Generate(practId, pi)));
+        }
+
+        // ------------------------------------------------------------------
+        // Per-patient generation — profile-driven
+        // ------------------------------------------------------------------
+        for (var p = 0; p < profiles.Count; p++)
+        {
+            var profile          = profiles[p];
+            var patientSeed      = baseSeed + (profile.SeedOffset ?? p);
+            var patientId        = $"{patientIdPrefix}-{p + 1:D3}";
+            var scenario         = FhirGenerationCodes.ClinicalScenarios[Mod(patientSeed, FhirGenerationCodes.ClinicalScenarios.Length)];
+            var attendingPractId = sharedPractitionerIds[Mod(patientSeed, sharedPractitionerIds.Count)];
+            var admittingPractId = sharedPractitionerIds[Mod(patientSeed + 1, sharedPractitionerIds.Count)];
+            var gpPractId        = sharedPractitionerIds[Mod(patientSeed + 2, sharedPractitionerIds.Count)];
+            var encounterId      = $"{patientId}-Enc-001";
+            var careTeamId       = $"{patientId}-CareTeam-001";
+            var carePlanId       = $"{patientId}-CarePlan-001";
+            var patientDeviceId  = $"{patientId}-Device-001";
+            var primaryDxId      = $"{patientId}-Condition-primary";
+            patientIds.Add(patientId);
+
+            // Encounter dates: qualifying patients use measurement-period dates,
+            // non-qualifying use dates well outside the measurement period.
+            DateTime encStart, encEnd;
+            if (profile.Eligibility == MeasureEligibility.Qualifying)
+            {
+                encStart = EncounterStart(patientSeed);
+                encEnd   = EncounterEnd(patientSeed);
+            }
+            else
+            {
+                // Place encounter 2 years before the measurement period so it
+                // structurally cannot overlap. Vary by seed for realism.
+                encStart = new DateTime(2020, 1 + (Mod(patientSeed, 6)), 1 + (Mod(patientSeed * 3, 28)),
+                                        8 + Mod(patientSeed, 4), 0, 0, DateTimeKind.Utc);
+                encEnd   = encStart.AddHours(2 + Mod(patientSeed, 4));
+            }
+
+            var entries = new List<Bundle.EntryComponent>();
+
+            entries.Add(Entry($"Patient/{patientId}",
+                PatientFactory.Generate(patientId, patientSeed, gpPractId)));
+
+            entries.Add(Entry($"Device/{patientDeviceId}",
+                DeviceFactory.Generate(patientDeviceId, patientSeed, patientId)));
+
+            entries.Add(Entry($"Condition/{primaryDxId}",
+                ConditionFactory.CreatePrimary(
+                    primaryDxId, patientId, encounterId, encStart,
+                    scenario.PrimaryDxSnomed, scenario.PrimaryDxDisplay, scenario.PrimaryDxIcd)));
+
+            if (profile.Eligibility == MeasureEligibility.Qualifying)
+            {
+                // Inpatient encounter — qualifies via class, type, and location
+                entries.Add(Entry($"Encounter/{encounterId}",
+                    EncounterFactory.Generate(
+                        encounterId, patientId, encStart, encEnd,
+                        attendingPractId, admittingPractId,
+                        EdLocationId, IcuLocationId, StepDownLocationId, HospitalOrgId,
+                        primaryDxId, patientSeed)));
+            }
+            else
+            {
+                // Ambulatory encounter — class=AMB, outpatient location, outside measurement period
+                entries.Add(Entry($"Encounter/{encounterId}",
+                    EncounterFactory.CreateAmbulatory(
+                        encounterId, patientId, encStart, encEnd,
+                        attendingPractId, OutpatientLocationId, HospitalOrgId,
+                        primaryDxId,
+                        scenario.PrimaryDxSnomed, scenario.PrimaryDxDisplay, scenario.PrimaryDxIcd)));
+            }
+
+            entries.Add(Entry($"CareTeam/{careTeamId}",
+                CareTeamFactory.Generate(careTeamId, patientId, encounterId, attendingPractId, encStart, HospitalOrgId)));
+
+            entries.Add(Entry($"CarePlan/{carePlanId}",
+                CarePlanFactory.Generate(carePlanId, patientId, encounterId, careTeamId, encStart, patientSeed)));
+
+            // Bulk resources — identical seed-driven loop as Generate()
+            var medicationIds  = new List<string>();
+            var specimenIds    = new List<string>();
+            var observationIds = new List<string>();
+            var conditionIds   = new List<string> { primaryDxId };
+            var resourceIndex  = 0;
+
+            foreach (var (resourceType, fraction) in ResourceDistribution)
+            {
+                var count = Math.Max(1, (int)(totalResourcesPerPatient * fraction));
+
+                for (var i = 0; i < count; i++)
+                {
+                    resourceIndex++;
+                    var seed          = baseSeed + (p * 31 + i);
+                    var resourceId    = $"{patientId}-{resourceType}-{resourceIndex:D5}";
+                    var offset        = TimeSpan.FromMinutes((double)i / Math.Max(count, 1) * (encEnd - encStart).TotalMinutes);
+                    var effectiveDate = encStart.Add(offset);
+                    var practId       = sharedPractitionerIds[Mod(seed, sharedPractitionerIds.Count)];
+
+                    Resource resource = resourceType switch
+                    {
+                        "Observation"              => ObservationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, specimenIds, observationIds),
+                        "Condition"                => ConditionFactory.Generate(resourceId, patientId, encounterId, effectiveDate, encEnd, seed, conditionIds),
+                        "Procedure"                => ProcedureFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, HospitalLocationId, HospitalOrgId, conditionIds),
+                        "MedicationRequest"        => MedicationRequestFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, conditionIds),
+                        "MedicationAdministration" => MedicationAdministrationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, medicationIds, practId),
+                        "DiagnosticReport"         => DiagnosticReportFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, observationIds, specimenIds, practId),
+                        "ServiceRequest"           => ServiceRequestFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, conditionIds),
+                        "Coverage"                 => CoverageFactory.Generate(resourceId, patientId, encStart, encEnd, seed),
+                        "Specimen"                 => SpecimenFactory.Generate(resourceId, patientId, effectiveDate, seed, specimenIds, practId),
+                        "Medication"               => MedicationFactory.Generate(resourceId, seed, medicationIds),
+                        "AllergyIntolerance"       => AllergyIntoleranceFactory.Generate(resourceId, patientId, encStart, seed, practId),
+                        "Immunization"             => ImmunizationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalLocationId),
+                        "ImagingStudy"             => ImagingStudyFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalLocationId, practId),
+                        "CareTeam"                 => CareTeamFactory.Generate(resourceId, patientId, encounterId, attendingPractId, effectiveDate, HospitalOrgId),
+                        "CarePlan"                 => CarePlanFactory.Generate(resourceId, patientId, encounterId, careTeamId, effectiveDate, seed),
+                        "DocumentReference"        => DocumentReferenceFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalOrgId, attendingPractId),
+                        "Provenance"               => ProvenanceFactory.Generate(resourceId, patientId, encounterId, effectiveDate, practId, HospitalOrgId),
+                        _ => throw new InvalidOperationException($"Unknown resource type: {resourceType}")
+                    };
+
+                    entries.Add(Entry($"{resourceType}/{resourceId}", resource));
+                }
+            }
+
+            var listId = $"SyntheticList-{patientIdPrefix}-{patientId}";
+            entries.Add(Entry($"List/{listId}",
+                CensusListFactory.Generate(listId, patientId, patientIdPrefix, encStart)));
+
+            var tag = profile.Eligibility == MeasureEligibility.Qualifying ? "QUALIFYING" : "NON-QUALIFYING";
+            output.WriteLine($"  Patient {patientId}: {entries.Count} entries [{tag}] | scenario={scenario.PrimaryDxDisplay} | " +
+                             $"encounter={encounterId} ({encStart:yyyy-MM-dd} → {encEnd:yyyy-MM-dd})");
+
+            allEntries.Add((patientId, entries));
+        }
+
+        // ------------------------------------------------------------------
+        // Chunk into transaction bundles — same as Generate()
+        // ------------------------------------------------------------------
+        var bundles          = new List<(string Name, string Json)>();
+        var currentChunk     = new List<Bundle.EntryComponent>(sharedEntries);
+        var currentPatientId = "shared";
+        var chunkIndex       = 0;
+
+        foreach (var (patientId, entries) in allEntries)
+        {
+            currentPatientId = patientId;
+            foreach (var entry in entries)
+            {
+                currentChunk.Add(entry);
+                if (currentChunk.Count >= MaxEntriesPerBundle)
+                {
+                    chunkIndex++;
+                    bundles.Add(($"{currentPatientId}_chunk{chunkIndex:D2}", Serialize(currentChunk)));
+                    currentChunk = [];
+                }
+            }
+        }
+
+        if (currentChunk.Count > 0)
+        {
+            chunkIndex++;
+            bundles.Add(($"{currentPatientId}_chunk{chunkIndex:D2}", Serialize(currentChunk)));
+        }
+
+        output.WriteLine($"Generated {bundles.Count} transaction bundles for {profiles.Count} profiled patients.");
         return (patientIds, bundles);
     }
 

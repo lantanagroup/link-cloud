@@ -5,6 +5,7 @@ using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
+using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -26,7 +27,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ITransientExceptionHandler<GenerateReportListener, string, GenerateReportValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<GenerateReportListener, string, GenerateReportValue> _deadLetterExceptionHandler;
         private readonly IServiceScopeFactory _serviceScopeFactory;
-        private readonly ILinkSdkClientFactory _linkSdkClientFactory;
+        private readonly ICensusServiceClient _censusClient;
 
         private readonly DataAcquisitionRequestedProducer _dataAcqProducer;
         private readonly IProducer<string, EvaluationRequestedValue> _evaluationProducer;
@@ -42,7 +43,7 @@ namespace LantanaGroup.Link.Report.Listeners
             ITransientExceptionHandler<GenerateReportListener, string, GenerateReportValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<GenerateReportListener, string, GenerateReportValue> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory,
-            ILinkSdkClientFactory linkSdkClientFactory,
+            ICensusServiceClient censusClient,
             DataAcquisitionRequestedProducer dataAcqProducer,
             IProducer<string, EvaluationRequestedValue> evaluationProducer,
             BlobStorageService blobStorageService,
@@ -52,7 +53,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
-            _linkSdkClientFactory = linkSdkClientFactory ?? throw new ArgumentNullException(nameof(linkSdkClientFactory));
+            _censusClient = censusClient ?? throw new ArgumentNullException(nameof(censusClient));
 
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
@@ -345,7 +346,13 @@ namespace LantanaGroup.Link.Report.Listeners
         private async Task<List<string>> GetPatientList(string facilityId, DateTime startDate, DateTime enddate)
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
-            var patientIds = await _linkSdkClientFactory.GetAdmittedPatientIdsAsync(facilityId, startDate, enddate, cts.Token);
+            var censusList = await _censusClient.GetAdmittedPatientsAsync(facilityId, startDate, enddate, cts.Token);
+
+            var patientIds = censusList?.Entry?
+                .Where(e => !string.IsNullOrWhiteSpace(e.Item?.Reference))
+                .Select(e => e.Item!.Reference!.Split('/').Last())
+                .Distinct()
+                .ToList() ?? [];
 
             if (patientIds.Count == 0)
                 throw new TransientException("Response from Census service is not successful: empty or unavailable patient list");

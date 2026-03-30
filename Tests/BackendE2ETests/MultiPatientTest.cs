@@ -30,7 +30,8 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
     private DualOutputHelper _output => _tesetServices.Output;
     private FhirDataLoader FhirDataLoader => _tesetServices.FhirDataLoader;
 
-    private ReportApiHelper ReportApi => _tesetServices.CreateReportHelper(Config);
+    private ReportApiHelper ReportApi => _tesetServices.CreateReportHelper();
+
     private ValidationApiHelper ValidationApi => _tesetServices.CreateValidationHelper();
 
     public MultiPatientTest(BackendE2ETestFixture fixture)
@@ -116,7 +117,7 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
         await SdkSetupHelper.EnsureQueryConfigAsync(_tesetServices, FacilityId);
 
         // Step 6: Generate the ad-hoc report
-        var reportId = await ReportApi.GenerateReportAsync(FacilityId, measureId);
+        var reportId = await ReportApi.GenerateReportAsync(FacilityId, measureId, Config);
 
         // Step 7: Start background diagnostics and poll until the report is submitted
         await using var diagnostics = new BackgroundDiagnosticsMonitor(
@@ -124,11 +125,12 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
             _tesetServices.LokiScraper,
             AutomationCfg,
             Config.PatientIds.Count,
-            forwardInternalLogsToOutput: false);
+            forwardInternalLogsToOutput: false,
+            pipelineReader: _tesetServices.DataReader);
         await using var watcher = DiagnosticsEventWatcher.Start(diagnostics, _output);
         await diagnostics.StartAsync(FacilityId, reportId);
 
-        var reportSubmitted = await ReportApi.CheckSubmissionStatusAsync(reportId, diagnostics);
+        var reportSubmitted = await ReportApi.CheckSubmissionStatusAsync(reportId, Config, diagnostics);
 
         await diagnostics.StopAsync();
         await watcher.StopAsync();
@@ -144,8 +146,8 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
             $"Check [DIAG] and [Snapshot] output above for root cause details.");
 
         // Step 8: Download and validate the report contents
-        var downloadedResources = await ReportApi.DownloadReportAsync(FacilityId, reportId);
-        var internalAbsResources = await ReportApi.DownloadReportAsync(FacilityId, reportId, external: false);
+        var downloadedResources = await ReportApi.DownloadReportAsync(FacilityId, reportId, Config);
+        var internalAbsResources = await ReportApi.DownloadReportAsync(FacilityId, reportId, Config, external: false);
 
         Assert.True(downloadedResources.ContainsKey("manifest.ndjson"),
             "Expected report to include manifest.ndjson but it was not");

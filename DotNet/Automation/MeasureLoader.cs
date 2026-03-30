@@ -11,20 +11,21 @@ namespace LantanaGroup.Link.Automation;
 
 public class MeasureLoader
 {
-    private readonly MeasureEvalServiceClient _measureEvalClient;
-    private readonly ValidationServiceClient _validationClient;
+    private readonly IMeasureEvalServiceClient _measureEvalClient;
+    private readonly IValidationServiceClient _validationClient;
     private readonly IAutomationOutput _output;
     private readonly TestScenarioConfig _config;
     private readonly Assembly? _resourceAssembly;
     private readonly FhirJsonParser _parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
 
-    public string? MeasureId;
+    public string? MeasureId { get; private set; }
+
     private Bundle? _evaluationBundle;
     private Bundle? _validationBundle;
 
     public MeasureLoader(
-        MeasureEvalServiceClient measureEvalClient,
-        ValidationServiceClient validationClient,
+        IMeasureEvalServiceClient measureEvalClient,
+        IValidationServiceClient validationClient,
         IAutomationOutput output,
         TestScenarioConfig config,
         Assembly? resourceAssembly = null)

@@ -1,7 +1,8 @@
 ﻿@model IReadOnlyList<Automation.UI.Models.AutomationRunSummary>
-@using Automation.UI.Models
 @{
     ViewData["Title"] = "Automation Runs";
+    var qualifyingValue = (int)MeasureEligibility.Qualifying;
+    var nonQualifyingValue = (int)MeasureEligibility.NonQualifying;
 }
 
 <div class="container mt-4">
@@ -11,7 +12,7 @@
     <div class="card mb-4">
         <div class="card-header">Start Scenario</div>
         <div class="card-body">
-            <form asp-action="Start" method="post" class="row g-3">
+            <form asp-action="Start" method="post" class="row g-3" id="scenarioForm">
                 @Html.AntiForgeryToken()
                 <div class="col-md-4">
                     <label class="form-label" for="scenarioSelect">Scenario</label>
@@ -29,7 +30,17 @@
                         <h6 class="mb-0">Custom Scenario Configuration</h6>
                     </div>
 
-                    <div class="col-md-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="SelectedMeasure">Measure</label>
+                        <select class="form-select" id="SelectedMeasure" name="SelectedMeasure">
+                            <option value="@ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation">@ProfiledMeasureCatalog.GetDisplayName(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
+                            </option>
+                        </select>
+                        <div class="form-text">Both measure loading and profile generation run in this selected
+                            measure context.</div>
+                    </div>
+
+                    <div class="col-md-3" id="patientCountGroup">
                         <label class="form-label" for="PatientCount">Patient Count</label>
                         <input class="form-control" type="number" min="1" max="10000" id="PatientCount" name="PatientCount" value="10" />
                     </div>
@@ -37,6 +48,7 @@
                         <label class="form-label" for="ResourcesPerPatient">Resources / Patient</label>
                         <input class="form-control" type="number" min="1" max="10000" id="ResourcesPerPatient" name="ResourcesPerPatient" value="250" />
                     </div>
+
                     <div class="col-md-3">
                         <label class="form-label" for="PatientPrefix">Patient Prefix</label>
                         <input class="form-control" type="text" id="PatientPrefix" name="PatientPrefix" value="CustomPatient" maxlength="64" />
@@ -70,6 +82,52 @@
                                 <input class="form-check-input" type="checkbox" id="CleanupTestData" name="CleanupTestData" value="true" checked />
                                 <input type="hidden" name="CleanupTestData" value="false" />
                                 <label class="form-check-label" for="CleanupTestData">Cleanup Test Data</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Data Generation Mode -->
+                    <div class="col-12 mt-3">
+                        <hr class="my-1" />
+                        <h6 class="mb-2">Data Generation Mode</h6>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="generationMode" id="modeStandard" value="standard" checked />
+                            <label class="form-check-label" for="modeStandard">Standard (random)</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="generationMode" id="modeMeasure" value="measure" />
+                            <label class="form-check-label" for="modeMeasure">Measure Eligibility (per-patient profiles)</label>
+                        </div>
+                    </div>
+
+                    <!-- Measure Eligibility Profile Builder -->
+                    <div id="profileBuilder" class="col-12" style="display:none;">
+                        <div class="card bg-light mt-2">
+                            <div class="card-body py-2">
+                                <p class="text-muted small mb-2">
+                                    Each row defines one patient in the context of the selected measure above.
+                                    <strong>Qualifying</strong> patients are generated to meet initial-population criteria.
+                                    <strong>Non-Qualifying</strong> patients are generated to miss initial-population criteria.
+                                    The patient count field above is ignored when profiles are defined &mdash; patient count
+                                    is determined by the number of rows here.
+                                </p>
+                                <table class="table table-sm table-bordered mb-2" id="profileTable">
+                                    <thead>
+                                        <tr>
+                                            <th style="width:50px">#</th>
+                                            <th>Eligibility</th>
+                                            <th style="width:160px">Seed Offset (optional)</th>
+                                            <th style="width:50px"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="profileRows">
+                                    </tbody>
+                                </table>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-sm btn-outline-success" id="addQualifying">+ Qualifying</button>
+                                    <button type="button" class="btn btn-sm btn-outline-warning" id="addNonQualifying">+ Non-Qualifying</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="addPreset">+ Preset (2Q / 2NQ)</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -118,15 +176,103 @@
 
 <script>
     (function () {
-        const scenarioSelect = document.getElementById('scenarioSelect');
-        const customOptions = document.getElementById('customScenarioOptions');
-        const customScenarioValue = '@AutomationScenarioKind.Custom';
+        var CUSTOM_VALUE = '@AutomationScenarioKind.Custom';
+        var QUALIFYING = '@qualifyingValue';
+        var NON_QUALIFYING = '@nonQualifyingValue';
+
+        var scenarioSelect = document.getElementById('scenarioSelect');
+        var customOptions = document.getElementById('customScenarioOptions');
+        var profileBuilder = document.getElementById('profileBuilder');
+        var patientCountGroup = document.getElementById('patientCountGroup');
+        var profileRows = document.getElementById('profileRows');
+        var modeRadios = document.querySelectorAll('input[name="generationMode"]');
 
         function toggleCustomOptions() {
-            customOptions.style.display = scenarioSelect.value === customScenarioValue ? 'flex' : 'none';
+            if (scenarioSelect.value === CUSTOM_VALUE) {
+                customOptions.style.display = 'flex';
+                toggleProfileBuilder();
+            } else {
+                customOptions.style.display = 'none';
+                profileBuilder.style.display = 'none';
+            }
         }
 
+        function toggleProfileBuilder() {
+            var checked = document.querySelector('input[name="generationMode"]:checked');
+            var mode = checked ? checked.value : 'standard';
+            var isMeasureMode = (mode === 'measure');
+
+            profileBuilder.style.display = isMeasureMode ? 'block' : 'none';
+            if (patientCountGroup) {
+                patientCountGroup.style.display = isMeasureMode ? 'none' : '';
+            }
+        }
+
+        for (var i = 0; i < modeRadios.length; i++) {
+            modeRadios[i].addEventListener('change', toggleProfileBuilder);
+        }
         scenarioSelect.addEventListener('change', toggleCustomOptions);
+
+        function addProfileRow(eligibility, seedOffset) {
+            var idx = profileRows.children.length;
+            var isQ = (eligibility === QUALIFYING);
+            var label = isQ ? 'Qualifying' : 'Non-Qualifying';
+            var badgeClass = isQ ? 'bg-success' : 'bg-warning text-dark';
+            var seedVal = (seedOffset != null) ? seedOffset : '';
+
+            var tr = document.createElement('tr');
+            tr.innerHTML =
+                '<td class="align-middle text-center">' + (idx + 1) + '</td>' +
+                '<td class="align-middle">' +
+                    '<span class="badge ' + badgeClass + '">' + label + '</span>' +
+                    '<input type="hidden" name="PatientProfiles[' + idx + '].Eligibility" value="' + eligibility + '" />' +
+                '</td>' +
+                '<td><input class="form-control form-control-sm" type="number" name="PatientProfiles[' + idx + '].SeedOffset" value="' + seedVal + '" placeholder="auto" /></td>' +
+                '<td class="align-middle text-center"><button type="button" class="btn btn-sm btn-outline-danger btn-remove-row">&times;</button></td>';
+            profileRows.appendChild(tr);
+            reindexRows();
+        }
+
+        function reindexRows() {
+            var rows = profileRows.children;
+            for (var i = 0; i < rows.length; i++) {
+                var tr = rows[i];
+                tr.querySelector('td:first-child').textContent = i + 1;
+                var eligInput = tr.querySelector('input[type="hidden"]');
+                var seedInput = tr.querySelector('input[type="number"]');
+                eligInput.name = 'PatientProfiles[' + i + '].Eligibility';
+                seedInput.name = 'PatientProfiles[' + i + '].SeedOffset';
+            }
+        }
+
+        profileRows.addEventListener('click', function (e) {
+            if (e.target.closest('.btn-remove-row')) {
+                e.target.closest('tr').remove();
+                reindexRows();
+            }
+        });
+
+        document.getElementById('addQualifying').addEventListener('click', function () {
+            addProfileRow(QUALIFYING, null);
+        });
+        document.getElementById('addNonQualifying').addEventListener('click', function () {
+            addProfileRow(NON_QUALIFYING, null);
+        });
+        document.getElementById('addPreset').addEventListener('click', function () {
+            addProfileRow(QUALIFYING, null);
+            addProfileRow(QUALIFYING, null);
+            addProfileRow(NON_QUALIFYING, null);
+            addProfileRow(NON_QUALIFYING, null);
+        });
+
+        document.getElementById('scenarioForm').addEventListener('submit', function () {
+            var checked = document.querySelector('input[name="generationMode"]:checked');
+            var mode = checked ? checked.value : 'standard';
+            if (mode !== 'measure') {
+                profileRows.innerHTML = '';
+            }
+        });
+
         toggleCustomOptions();
     })();
 </script>

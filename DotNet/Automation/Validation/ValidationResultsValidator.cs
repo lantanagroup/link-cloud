@@ -1,7 +1,4 @@
-﻿using Flurl.Http;
-using LantanaGroup.Link.Automation.Helpers;
-using Newtonsoft.Json.Linq;
-using RestSharp;
+﻿using LantanaGroup.Link.Automation.Helpers;
 
 namespace LantanaGroup.Link.Automation.Validation;
 
@@ -11,11 +8,11 @@ namespace LantanaGroup.Link.Automation.Validation;
 /// </summary>
 public class ValidationResultsValidator
 {
-    private readonly LantanaGroup.Link.Sdk.Clients.ValidationServiceClient _validationClient;
+    private readonly LantanaGroup.Link.Sdk.Clients.IValidationServiceClient _validationClient;
     private readonly IAutomationOutput _output;
     private readonly LokiScraper? _lokiScraper;
 
-    public ValidationResultsValidator(LantanaGroup.Link.Sdk.Clients.ValidationServiceClient validationClient, IAutomationOutput output, LokiScraper? lokiScraper = null)
+    public ValidationResultsValidator(LantanaGroup.Link.Sdk.Clients.IValidationServiceClient validationClient, IAutomationOutput output, LokiScraper? lokiScraper = null)
     {
         _validationClient = validationClient;
         _output = output;
@@ -33,11 +30,9 @@ public class ValidationResultsValidator
         // Lightweight API availability check.
         try
         {
-            await _validationClient.GetValidationResultsAsync(facilityId, reportId, "WARNING");
-        }
-        catch (FlurlHttpException ex)
-        {
-            errors.Add($"Validation API call failed with status {ex.StatusCode}");
+            var result = await _validationClient.GetValidationResultsAsync(facilityId, reportId, "WARNING");
+            if (result == null)
+                errors.Add("Validation API returned no results (not found).");
         }
         catch (Exception ex)
         {

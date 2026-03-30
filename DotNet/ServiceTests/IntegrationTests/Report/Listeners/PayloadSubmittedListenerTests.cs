@@ -117,7 +117,7 @@ public class PayloadSubmittedListenerTests : IClassFixture<ReportIntegrationTest
     public async Task ProcessMessageAsync_MeasureReportSubmissionEntry_UpdatesEntryAndProducesManifest()
     {
         _fixture.SubmitPayloadKafkaProducerMock.Reset();
-        _fixture.TenantApiServiceMock.Setup(x => x.GetFacilityConfig(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _fixture.FacilityServiceClientMock.Setup(x => x.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new FacilityModel { FacilityName = "Test Facility" });
 
         using var scope = _fixture.ScopeFactory.CreateScope();

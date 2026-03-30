@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Automation.Configuration;
+﻿using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.Automation.Helpers;
 
 namespace LantanaGroup.Link.Automation.Validation;
@@ -24,6 +24,12 @@ public class MilestoneValidationOrchestrator
     private readonly int _expectedPatientCount;
     private readonly HashSet<Milestone> _completed = [];
     private readonly List<string> _issues = [];
+
+    // Prevent eager AcquisitionCompleted when additional DataAcq logs are still being emitted.
+    private static readonly TimeSpan AcquisitionCompletionStabilizationWindow = TimeSpan.FromSeconds(12);
+    private DateTime? _acquisitionCompletionCandidateSinceUtc;
+    private int _acquisitionCompletionCandidateLogCount;
+    private int _acquisitionCompletionCandidateCompletedPatients;
 
     public bool HasCriticalFailure { get; private set; }
     public IReadOnlyCollection<Milestone> CompletedMilestones => _completed;
@@ -136,6 +142,7 @@ public class MilestoneValidationOrchestrator
         if (maxRetries > 0)
         {
             RecordIssue($"Data acquisition terminal failures detected: {maxRetries} max-retry log(s).", critical: true);
+            ResetAcquisitionCompletionCandidate();
             return;
         }
 
@@ -152,11 +159,48 @@ public class MilestoneValidationOrchestrator
             .Distinct(StringComparer.Ordinal)
             .Count();
 
+        // Must satisfy basic completion criteria first.
         if (completedPatients < _expectedPatientCount)
+        {
+            ResetAcquisitionCompletionCandidate();
+            return;
+        }
+
+        // Guardrail: if any in-flight statuses exist, do not complete.
+        var inFlight = logs.Count(l =>
+            string.Equals(l.Status, "Pending", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(l.Status, "Processing", StringComparison.OrdinalIgnoreCase));
+
+        if (inFlight > 0)
+        {
+            ResetAcquisitionCompletionCandidate();
+            return;
+        }
+
+        // Debounce: require stable log-count and completed-patient count across a short window.
+        var nowUtc = DateTime.UtcNow;
+        if (_acquisitionCompletionCandidateSinceUtc == null ||
+            _acquisitionCompletionCandidateLogCount != logs.Count ||
+            _acquisitionCompletionCandidateCompletedPatients != completedPatients)
+        {
+            _acquisitionCompletionCandidateSinceUtc = nowUtc;
+            _acquisitionCompletionCandidateLogCount = logs.Count;
+            _acquisitionCompletionCandidateCompletedPatients = completedPatients;
+            return;
+        }
+
+        if ((nowUtc - _acquisitionCompletionCandidateSinceUtc.Value) < AcquisitionCompletionStabilizationWindow)
             return;
 
         _completed.Add(Milestone.AcquisitionCompleted);
-        _output.WriteLine($"[DIAG][Milestone] Reached: AcquisitionCompleted ({completedPatients}/{_expectedPatientCount} patients)");
+        _output.WriteLine($"[DIAG][Milestone] Reached: AcquisitionCompleted ({completedPatients}/{_expectedPatientCount} patients, stable logs={logs.Count})");
+    }
+
+    private void ResetAcquisitionCompletionCandidate()
+    {
+        _acquisitionCompletionCandidateSinceUtc = null;
+        _acquisitionCompletionCandidateLogCount = 0;
+        _acquisitionCompletionCandidateCompletedPatients = 0;
     }
 
     private async Task CheckMeasureReportsGenerated(Guid scheduleId)
