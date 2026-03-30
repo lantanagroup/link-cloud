@@ -45,21 +45,21 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
     public async Task DisposeAsync()
     {
-        output.WriteLine("Cleaning up...\n");
-
-        if (TestConfig.AdhocReportingSmokeTestConfig.RemoveFacilityConfig)
-        {
-            await DeleteFacility();
-        }
-
-        // Clear all data from the FHIR server
-        if (TestConfig.CleanupSmokeTestData)
-            FhirDataLoader.ExpungeEverything(output);
-
-        if (TestConfig.AdhocReportingSmokeTestConfig.RemoveReport)
-        {
-            // TODO: Delete report
-        }
+        // output.WriteLine("Cleaning up...\n");
+        //
+        // if (TestConfig.AdhocReportingSmokeTestConfig.RemoveFacilityConfig)
+        // {
+        //     await DeleteFacility();
+        // }
+        //
+        // // Clear all data from the FHIR server
+        // if (TestConfig.CleanupSmokeTestData)
+        //     FhirDataLoader.ExpungeEverything(output);
+        //
+        // if (TestConfig.AdhocReportingSmokeTestConfig.RemoveReport)
+        // {
+        //     // TODO: Delete report
+        // }
     }
 
     [Fact]
