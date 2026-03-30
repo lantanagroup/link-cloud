@@ -13,6 +13,7 @@ public class FhirQueryConfigurationModel
     public int? MaxConcurrentRequests { get; set; } = 1;
     public TimeSpan? MinAcquisitionPullTime { get; set; }
     public TimeSpan? MaxAcquisitionPullTime { get; set; }
+    public TimeSpan? QueryLag { get; set; }
     public int? MaxRetries { get; set; }
     public DateTime? CreateDate { get; set; }
     public DateTime? ModifyDate { get; set; }
@@ -31,6 +32,7 @@ public class FhirQueryConfigurationModel
             MaxConcurrentRequests = entity.MaxConcurrentRequests,
             MinAcquisitionPullTime = entity.MinAcquisitionPullTime,
             MaxAcquisitionPullTime = entity.MaxAcquisitionPullTime,
+            QueryLag = entity.QueryLag,
             MaxRetries = entity.MaxRetries,
             CreateDate = entity.CreateDate,
             ModifyDate = entity.ModifyDate

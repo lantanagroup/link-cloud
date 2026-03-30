@@ -292,6 +292,104 @@ public class PatientDataServiceTests
     }
 
     [Fact]
+    public async Task CreateLogEntries_ShouldApplyQueryLag_WhenDischargeEventAndQueryLagConfigured()
+    {
+        // Arrange
+        var queryLag = TimeSpan.FromMinutes(30);
+        var dataAcqRequested = new DataAcquisitionRequested
+        {
+            PatientId = "patient-123",
+            ReportableEvent = ReportableEvent.Discharge,
+            QueryType = "Initial",
+            ScheduledReports = new List<ScheduledReport>
+            {
+                new ScheduledReport
+                {
+                    ReportTypes = new List<string> { "measure-1" },
+                    Frequency = Frequency.Discharge,
+                    StartDate = DateTime.UtcNow,
+                    EndDate = DateTime.UtcNow.AddDays(1),
+                    ReportTrackingId = "tracking-1"
+                }
+            }
+        };
+
+        var consumeResult = new ConsumeResult<string, DataAcquisitionRequested>
+        {
+            Message = new Message<string, DataAcquisitionRequested>
+            {
+                Value = dataAcqRequested
+            }
+        };
+
+        var request = new GetPatientDataRequest
+        {
+            ConsumeResult = consumeResult,
+            FacilityId = "facility-1",
+            CorrelationId = "corr-1",
+            QueryPlanType = QueryPlanType.Initial
+        };
+        var cancellationToken = CancellationToken.None;
+
+        var fhirQueryConfig = new FhirQueryConfigurationModel
+        {
+            FacilityId = "facility-1",
+            FhirServerBaseUrl = "http://example.com",
+            QueryLag = queryLag
+        };
+
+        var queryPlan = new QueryPlanModel
+        {
+            FacilityId = "facility-1",
+            Type = Frequency.Discharge,
+            InitialQueries = new Dictionary<string, IQueryConfig>
+            {
+                { "q1", new ReferenceQueryConfig { ResourceType = ResourceType.Patient.ToString() } }
+            },
+            SupplementalQueries = new Dictionary<string, IQueryConfig>()
+        };
+
+        _mockFhirQueryQueries
+            .Setup(m => m.GetByFacilityIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(fhirQueryConfig);
+
+        _mockQueryPlanQueries
+            .Setup(m => m.SearchAsync(It.IsAny<SearchQueryPlanModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PagedConfigModel<QueryPlanModel> { Records = [queryPlan] });
+
+        CreateDataAcquisitionLogModel capturedModel = null;
+        _mockLogManager
+            .Setup(manager => manager.CreateAsync(It.IsAny<CreateDataAcquisitionLogModel>(), cancellationToken))
+            .Callback<CreateDataAcquisitionLogModel, CancellationToken>((model, ct) => capturedModel = model)
+            .ReturnsAsync(new DataAcquisitionLogModel());
+
+        _mockQueryListProcessor
+            .Setup(p => p.Process(
+                It.IsAny<IOrderedEnumerable<KeyValuePair<string, IQueryConfig>>>(),
+                It.IsAny<GetPatientDataRequest>(),
+                It.IsAny<FhirQueryConfigurationModel>(),
+                It.IsAny<QueryPlanModel>(),
+                It.IsAny<List<ResourceReferenceType>>(),
+                It.IsAny<string>(),
+                It.IsAny<ScheduledReport>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var startTime = DateTime.UtcNow;
+        await _service.CreateLogEntries(request, cancellationToken);
+        var endTime = DateTime.UtcNow;
+
+        // Assert
+        _mockLogManager.Verify(manager => manager.CreateAsync(It.IsAny<CreateDataAcquisitionLogModel>(), cancellationToken), Times.Once);
+        Assert.NotNull(capturedModel);
+        
+        var expectedExecutionDate = startTime.Add(queryLag);
+        // Allow for some minor clock drift during test execution
+        Assert.True(capturedModel.ExecutionDate >= expectedExecutionDate && capturedModel.ExecutionDate <= endTime.Add(queryLag));
+    }
+
+    [Fact]
     public async Task CreateLogEntries_ShouldThrowException_WhenRequestIsNull()
     {
         // Arrange
