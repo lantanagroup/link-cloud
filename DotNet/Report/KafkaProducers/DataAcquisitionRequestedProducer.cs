@@ -73,6 +73,14 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 activity?.SetTag("facilityId", schedule.FacilityId);
                 activity?.SetTag("reportScheduleId", schedule.Id);
 
+                var reportStartDateUtc = schedule.ReportStartDate.Kind == DateTimeKind.Utc
+                    ? schedule.ReportStartDate
+                    : DateTime.SpecifyKind(schedule.ReportStartDate, DateTimeKind.Utc);
+
+                var reportEndDateUtc = schedule.ReportEndDate.Kind == DateTimeKind.Utc
+                    ? schedule.ReportEndDate
+                    : DateTime.SpecifyKind(schedule.ReportEndDate, DateTimeKind.Utc);
+
                 var darKey = schedule.FacilityId;
                 var darValue = new DataAcquisitionRequestedValue()
                 {

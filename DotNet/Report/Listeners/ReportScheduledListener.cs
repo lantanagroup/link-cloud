@@ -183,11 +183,15 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 reportSchedule = await reportScheduleManager.AddAsync(reportSchedule, cancellationToken);
 
+                var reportEndDateUtc = reportSchedule.ReportEndDate.Kind == DateTimeKind.Utc
+                    ? reportSchedule.ReportEndDate
+                    : DateTime.SpecifyKind(reportSchedule.ReportEndDate, DateTimeKind.Utc);
+
                 await _quartzJobHelper.ScheduleJob<EndOfReportPeriodJob>(new Dictionary<string, object>
                 {
                     { "ReportScheduleId", reportSchedule.Id },
                     { "FacilityId", reportSchedule.FacilityId }
-                }, reportSchedule.ReportEndDate, reportSchedule.Id.ToString(), ReportConstants.MeasureReportSubmissionScheduler.Group, $"{reportSchedule.Id}-{reportSchedule.ReportEndDate}");
+                }, new DateTimeOffset(reportEndDateUtc), reportSchedule.Id.ToString(), ReportConstants.MeasureReportSubmissionScheduler.Group, $"{reportSchedule.Id}-{reportSchedule.ReportEndDate}");
             }
             catch (DeadLetterException ex)
             {
