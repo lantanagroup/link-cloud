@@ -49,7 +49,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers
                 Activity.Current?.AddException(ex);
                 logger.LogRoleDeletionException(id.ToString(), ex.Message);
                 throw;
-            }            
+            }
         }
     }
 }

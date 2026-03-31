@@ -9,7 +9,7 @@ namespace UnitTests.Shared
         [Theory]
         [InlineData(null)]
         [InlineData("")]
-        public void GetReportName_InvalidFacilityId_ThrowsArgumentException(string facilityId)
+        public void GetReportName_InvalidFacilityId_ThrowsArgumentException(string? facilityId)
         {
             // Arrange
             var scheduleId = Guid.NewGuid();

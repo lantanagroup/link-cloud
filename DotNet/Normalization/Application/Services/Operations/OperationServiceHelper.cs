@@ -822,7 +822,8 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                         return (false, builder.ToString());
                     }
                 }
-                else if (operation is CopyLocationOperation) { 
+                else if (operation is CopyLocationOperation)
+                {
                     //No validation needed for CopyLocationOperation
                 }
                 else

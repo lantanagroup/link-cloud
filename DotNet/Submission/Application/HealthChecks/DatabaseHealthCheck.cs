@@ -13,8 +13,8 @@ public class DatabaseHealthCheck(SubmissionContext context) : IHealthCheck
         try
         {
             var canConnect = await _context.Database.CanConnectAsync(cancellationToken);
-            return canConnect 
-                ? HealthCheckResult.Healthy(nameof(HealthCheckType.Database)) 
+            return canConnect
+                ? HealthCheckResult.Healthy(nameof(HealthCheckType.Database))
                 : HealthCheckResult.Unhealthy(nameof(HealthCheckType.Database));
         }
         catch (Exception ex)

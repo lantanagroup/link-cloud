@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace LantanaGroup.Link.Shared.Application.Models.Kafka
 {
-    public class CernerPatientsAcquired 
+    public class CernerPatientsAcquired
     {
         public List<CernerEncounters> PatientEncounters { get; set; }
     }

@@ -14,8 +14,8 @@ namespace QueryDispatch.Domain.Managers
 
     public interface IPatientDispatchManager
     {
-        public  Task<string> createPatientDispatch(PatientDispatchEntity patientDispatch);
-        public  Task<bool> deletePatientDispatch(string facilityId, string patientId);
+        public Task<string> createPatientDispatch(PatientDispatchEntity patientDispatch);
+        public Task<bool> deletePatientDispatch(string facilityId, string patientId);
     }
 
     public class PatientDispatchManager : IPatientDispatchManager
@@ -49,29 +49,29 @@ namespace QueryDispatch.Domain.Managers
 
                 await ScheduleService.CreateJobAndTrigger(patientDispatch, await _schedulerFactory.GetScheduler());
 
-                    var headers = new Headers
+                var headers = new Headers
                     {
                         { "X-Correlation-Id", Guid.NewGuid().ToByteArray() }
                     };
 
-                    var auditMessage = new AuditEventMessage
-                    {
-                        FacilityId = patientDispatch.FacilityId,
-                        ServiceName = QueryDispatchConstants.ServiceName,
-                        Action = AuditEventType.Create,
-                        EventDate = DateTime.UtcNow,
-                        Resource = typeof(PatientDispatchEntity).Name,
-                        Notes = $"Created patient dispatch for patient id {HtmlInputSanitizer.Sanitize(patientDispatch.PatientId)} in facility {HtmlInputSanitizer.Sanitize(patientDispatch.FacilityId)}"
-                    };
+                var auditMessage = new AuditEventMessage
+                {
+                    FacilityId = patientDispatch.FacilityId,
+                    ServiceName = QueryDispatchConstants.ServiceName,
+                    Action = AuditEventType.Create,
+                    EventDate = DateTime.UtcNow,
+                    Resource = typeof(PatientDispatchEntity).Name,
+                    Notes = $"Created patient dispatch for patient id {HtmlInputSanitizer.Sanitize(patientDispatch.PatientId)} in facility {HtmlInputSanitizer.Sanitize(patientDispatch.FacilityId)}"
+                };
 
-                    _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
-                    {
-                        Value = auditMessage,
-                        Headers = headers
-                    });
+                _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
+                {
+                    Value = auditMessage,
+                    Headers = headers
+                });
 
-                    _producer.Flush();
-                
+                _producer.Flush();
+
                 return patientDispatch.FacilityId;
             }
             catch (Exception ex)
@@ -93,29 +93,29 @@ namespace QueryDispatch.Domain.Managers
                 _logger.LogInformation("Deleted Patient Dispatch record for patient id {PatientId} in facility {FacilityId}", HtmlInputSanitizer.Sanitize(patientId), HtmlInputSanitizer.Sanitize(facilityId));
 
 
-                    var headers = new Headers
+                var headers = new Headers
                         {
                             { "X-Correlation-Id", Guid.NewGuid().ToByteArray() }
                         };
 
-                    var auditMessage = new AuditEventMessage
-                    {
-                        FacilityId = facilityId,
-                        ServiceName = QueryDispatchConstants.ServiceName,
-                        Action = AuditEventType.Delete,
-                        EventDate = DateTime.UtcNow,
-                        Resource = typeof(PatientDispatchEntity).Name,
-                        Notes = $"Deleted Patient Dispatch record for patient id {patientId} in facility {facilityId}"
-                    };
+                var auditMessage = new AuditEventMessage
+                {
+                    FacilityId = facilityId,
+                    ServiceName = QueryDispatchConstants.ServiceName,
+                    Action = AuditEventType.Delete,
+                    EventDate = DateTime.UtcNow,
+                    Resource = typeof(PatientDispatchEntity).Name,
+                    Notes = $"Deleted Patient Dispatch record for patient id {patientId} in facility {facilityId}"
+                };
 
-                    _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
-                    {
-                        Value = auditMessage,
-                        Headers = headers
-                    });
+                _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
+                {
+                    Value = auditMessage,
+                    Headers = headers
+                });
 
-                    _producer.Flush();
-                
+                _producer.Flush();
+
 
                 return true;
 

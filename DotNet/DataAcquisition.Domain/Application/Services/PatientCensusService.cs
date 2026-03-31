@@ -159,7 +159,7 @@ public class PatientCensusService : IPatientCensusService
                 {
                     activity?.SetStatus(ActivityStatusCode.Error, "Timeframe is null for list");
                     activity?.AddTag("fhir.list.id", x.FhirId);
-                    activity?.AddTag("fhir.list.internal.id", x.InternalId );
+                    activity?.AddTag("fhir.list.internal.id", x.InternalId);
                     _logger.LogError("TimeFrame is null for list {listId} for facility {facilityId}.", x.FhirId, facilityId);
                 }
 
@@ -167,7 +167,7 @@ public class PatientCensusService : IPatientCensusService
                 {
                     activity?.SetStatus(ActivityStatusCode.Error, "Status is null for list");
                     activity?.AddTag("fhir.list.id", x.FhirId);
-                    activity?.AddTag("fhir.list.internal.id", x.InternalId );
+                    activity?.AddTag("fhir.list.internal.id", x.InternalId);
                     _logger.LogError("Status is null for list {listId} for facility {facilityId}.", x.FhirId, facilityId);
                 }
 
@@ -291,7 +291,7 @@ public class PatientCensusService : IPatientCensusService
                     TimeFrame = ConvertToTimeFrame(query.CensusTimeFrame.Value),
                     PatientIds = fhirList.Entry.Select(x => x.Item?.ReferenceElement.Value.SplitReference().Trim()).ToList() ?? [],
                 });
-                
+
             }
             catch (TimeoutException timeoutEx)
             {
@@ -337,7 +337,7 @@ public class PatientCensusService : IPatientCensusService
             ExecutionDate = log.ExecutionDate,
             Notes = log.Notes,
             Status = log.Status,
-            TraceId = log.TraceId,  
+            TraceId = log.TraceId,
         }, cancellationToken);
 
         if (updatedLog == null)

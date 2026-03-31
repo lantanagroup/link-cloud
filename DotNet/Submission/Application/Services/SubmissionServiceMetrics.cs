@@ -6,10 +6,10 @@ namespace LantanaGroup.Link.Submission.Application.Services
 {
     public class SubmissionServiceMetrics : ISubmissionServiceMetrics
     {
-        public const string MeterName = $"Link.{SubmissionConstants.ServiceName}";   
+        public const string MeterName = $"Link.{SubmissionConstants.ServiceName}";
 
         public SubmissionServiceMetrics(IMeterFactory meterFactory)
-        {         
+        {
             Meter meter = meterFactory.Create(MeterName);
             ResourcesSubmittedCounter = meter.CreateCounter<long>("link_submission_service.resources_submitted.count");
             ResourceTypeCounter = meter.CreateCounter<long>("link_submission_service.resource_type_submitted.count");
@@ -66,7 +66,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
             MedicationCodeCounter.Add(count, tags.ToArray());
         }
 
-        public Counter<long> MedicationRequestCounter{ get; private set; }
+        public Counter<long> MedicationRequestCounter { get; private set; }
         public void IncrementMedicationRequestCounter(int count, List<KeyValuePair<string, object?>> tags)
         {
             MedicationRequestCounter.Add(count, tags.ToArray());

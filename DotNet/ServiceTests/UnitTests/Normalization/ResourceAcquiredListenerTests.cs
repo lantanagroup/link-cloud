@@ -42,7 +42,7 @@ public class ResourceAcquiredListenerTests
         _transientExceptionHandlerMock = new Mock<ITransientExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage>>();
         _metricsMock = new Mock<INormalizationServiceMetrics>();
         _producerMock = new Mock<IProducer<ResourceKey, ResourceNormalizedMessage>>();
-        
+
         // Mocking services that might not have parameterless constructors or are classes
         _copyPropertyOperationServiceMock = new Mock<CopyPropertyOperationService>(new Mock<ILogger<CopyPropertyOperationService>>().Object, null);
         _codeMapOperationServiceMock = new Mock<CodeMapOperationService>(new Mock<ILogger<CodeMapOperationService>>().Object, null);
@@ -103,7 +103,7 @@ public class ResourceAcquiredListenerTests
         Assert.NotNull(methodInfo);
 
         var task = (Task)methodInfo.Invoke(listener, new object[] { consumeResult, facilityId, correlationId, resource });
-        
+
         var exception = await Assert.ThrowsAsync<TransientException>(() => task);
         Assert.Contains("Failed to produce ResourceNormalized message", exception.Message);
         Assert.Same(produceException, exception.InnerException);
@@ -171,7 +171,7 @@ public class ResourceAcquiredListenerTests
         Assert.NotNull(methodInfo);
 
         var task = (Task)methodInfo.Invoke(listener, new object[] { consumeResultNull, facilityId, correlationId, resource });
-        
+
         var exception = await Assert.ThrowsAsync<TransientException>(() => task);
         Assert.Contains("Failed to produce ResourceNormalized message", exception.Message);
         Assert.Same(produceExceptionNull, exception.InnerException);

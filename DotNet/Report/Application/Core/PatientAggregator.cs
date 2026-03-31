@@ -23,9 +23,9 @@ namespace LantanaGroup.Link.Report.Application.Core
         private readonly BlobStorageSettings _settings;
 
         public PatientAggregator(
-            IReportServiceMetrics metrics, 
+            IReportServiceMetrics metrics,
             IReportEntryManager reportEntryManager,
-            BlobStorageService blobStorageService, 
+            BlobStorageService blobStorageService,
             IOptions<BlobStorageSettings> settings)
         {
             _metrics = metrics ?? throw new ArgumentException(nameof(metrics));
@@ -38,9 +38,9 @@ namespace LantanaGroup.Link.Report.Application.Core
 
         public async Task<AggregateResult> AggregateToABS(string patientId, ReportScheduleModel reportSchedule)
         {
-            if (_containerClient == null) 
+            if (_containerClient == null)
             {
-                throw new Exception($"Blob Container Client could not be initialized when attempting to run patient aggregator (ReportId = {reportSchedule.Id}, PatientId = {patientId}, FacilityId = {reportSchedule.FacilityId}).");    
+                throw new Exception($"Blob Container Client could not be initialized when attempting to run patient aggregator (ReportId = {reportSchedule.Id}, PatientId = {patientId}, FacilityId = {reportSchedule.FacilityId}).");
             }
 
             AggregateResult aggregateResult = new AggregateResult();

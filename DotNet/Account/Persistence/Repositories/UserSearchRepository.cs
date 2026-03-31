@@ -63,7 +63,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
             if (!includeDeletedUsers)
             {
                 query = query.Where(x => !x.IsDeleted);
-            }              
+            }
             #endregion
 
             query = sortOrder switch
@@ -109,7 +109,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
                     (x.Email != null && x.Email.Contains(searchText)) ||
                     (x.UserName != null && x.UserName.Contains(searchText))
                 );
-            }            
+            }
 
             //filter by role
             if (filterRoleBy is not null && filterRoleBy.Length > 0)

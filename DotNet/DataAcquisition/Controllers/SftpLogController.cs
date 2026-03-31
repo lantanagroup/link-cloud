@@ -42,7 +42,7 @@ public class SftpLogController : ControllerBase
         _tenantApiService = tenantApiService;
         _createValidator = createValidator;
     }
-    
+
     /// <summary>
     /// Search SFTP logs
     /// </summary>
@@ -63,14 +63,14 @@ public class SftpLogController : ControllerBase
             SortBy = DefaultSortBy,
             PageSize = DefaultLogPageSize
         };
-        
+
         // Store httpContext so that it is not lost during processing
         var httpContext = HttpContext;
 
         try
         {
             var searchResults = await _queries.SearchAsync(queryParameters, cancellationToken);
-            
+
             return Ok(searchResults);
         }
         catch (Exception)
@@ -81,7 +81,7 @@ public class SftpLogController : ControllerBase
                 statusCode: StatusCodes.Status500InternalServerError);
         }
     }
-    
+
     /// <summary>
     /// Get SFTP log by external ID
     /// </summary>
@@ -102,17 +102,17 @@ public class SftpLogController : ControllerBase
         {
             return BadRequest("Invalid SFTP Acquisition log ID.");
         }
-        
+
         // Store httpContext so that it is not lost during processing
         var httpContext = HttpContext;
 
         try
         {
             var log = await _queries.GetByExternalIdAsync(id, cancellationToken);
-        
+
             if (log is null)
                 return NotFound();
-        
+
             return Ok(log.ToModel());
         }
         catch (Exception)
@@ -123,7 +123,7 @@ public class SftpLogController : ControllerBase
                 statusCode: StatusCodes.Status500InternalServerError);
         }
     }
-    
+
     /// <summary>
     /// Create SFTP log
     /// </summary>

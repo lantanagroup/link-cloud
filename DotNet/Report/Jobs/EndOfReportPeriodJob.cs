@@ -63,7 +63,7 @@ namespace LantanaGroup.Link.Report.Jobs
 
                 // Fetch the schedule from the database
                 schedule = await reportScheduledManager.SingleOrDefaultAsync(r => r.Id == scheduleId);
-                
+
                 if (schedule == null)
                 {
                     _logger.LogWarning("ReportSchedule {ScheduleId} not found", scheduleId);
@@ -71,7 +71,7 @@ namespace LantanaGroup.Link.Report.Jobs
                 }
 
                 _logger.LogInformation("Executing EndOfReportPeriodJob for ScheduleId {ScheduleId}", schedule.Id);
-                
+
                 var manifestProduced = await reportManifestProducer.Produce(schedule);
 
                 if (!manifestProduced)

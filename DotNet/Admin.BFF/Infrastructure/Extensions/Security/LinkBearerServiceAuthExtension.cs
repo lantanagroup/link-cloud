@@ -11,7 +11,7 @@ using System.Text;
 namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
 {
     public static class LinkBearerServiceAuthExtension
-    {        
+    {
         public static IServiceCollection AddLinkBearerServiceAuthentication(this IServiceCollection services, Serilog.ILogger logger, Action<LinkBearerServiceOptions>? options)
         {
             var linkBearerServiceOptions = new LinkBearerServiceOptions();
@@ -72,7 +72,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                                 }
 
                                 //protect the bearer key and store it in the cache
-                                try 
+                                try
                                 {
                                     if (linkBearerServiceOptions.ProtectKey)
                                     {
@@ -86,7 +86,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                                 catch (Exception ex)
                                 {
                                     logger.Error(ex, "An exception occured while attempting to store cache {cacheKey}: {message}.", LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, ex.Message);
-                                }                                
+                                }
                             }
                             else
                             {

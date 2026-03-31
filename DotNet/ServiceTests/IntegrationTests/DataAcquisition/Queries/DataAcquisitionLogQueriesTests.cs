@@ -37,7 +37,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var pendingLog = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            
+
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = "TestFacility",
@@ -60,7 +60,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var failedLog = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            
+
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = "TestFacility",
@@ -84,7 +84,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var ineligibleLog = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            
+
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = "TestFacility",
@@ -150,7 +150,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log1 = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            
+
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = facilityId,
@@ -169,7 +169,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log2 = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            
+
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = facilityId,
@@ -189,7 +189,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var incompleteLog = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            
+
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = facilityId,
@@ -435,8 +435,8 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            
-            
+
+
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = "TestFacility",
@@ -486,8 +486,8 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            
-            
+
+
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = facilityId,
@@ -562,8 +562,8 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var incompleteLog = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            
-            
+
+
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = facilityId,
@@ -582,7 +582,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
                     FacilityId = "TestFacility",
                     IsReference = false,
                     QueryType = FhirQueryType.Read,
-                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } } 
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } }
                 }
             },
             ScheduledReport = new ScheduledReport
@@ -598,8 +598,8 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var referenceLog = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            
-            
+
+
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = facilityId,
@@ -618,7 +618,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
                     FacilityId = "TestFacility",
                     IsReference = true,
                     QueryType = FhirQueryType.Read,
-                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } } 
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } }
                 }
             },
             ScheduledReport = new ScheduledReport
@@ -658,8 +658,8 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log1 = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            
-            
+
+
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = facilityId,
@@ -681,8 +681,8 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log2 = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            
-            
+
+
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = facilityId,
@@ -733,8 +733,8 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            
-            
+
+
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = "TestFacility",
@@ -818,8 +818,8 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            
-            
+
+
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = "TestFacility",
@@ -908,8 +908,8 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log1 = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            
-            
+
+
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = "TestFacility",
@@ -931,16 +931,16 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             ResourceAcquiredIds = new List<string> { "Patient/123" },
             FhirQueries = new List<FhirQuery>
             {
-                new FhirQuery 
-                {   MeasureId = "test", 
-                    FacilityId = "TestFacility", 
-                    FhirQueryResourceTypes = new List<FhirQueryResourceType> 
-                    {  
-                        new FhirQueryResourceType() 
-                        { 
+                new FhirQuery
+                {   MeasureId = "test",
+                    FacilityId = "TestFacility",
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType>
+                    {
+                        new FhirQueryResourceType()
+                        {
                             ResourceType = Hl7.Fhir.Model.ResourceType.Patient
-                        } 
-                    } 
+                        }
+                    }
                 }
             }
         };
@@ -1000,16 +1000,16 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             ResourceAcquiredIds = new List<string>(),
             FhirQueries = new List<FhirQuery>
             {
-                new FhirQuery 
-                {   MeasureId = "test", 
-                    FacilityId = facilityId, 
-                    FhirQueryResourceTypes = new List<FhirQueryResourceType> 
-                    {  
-                        new FhirQueryResourceType() 
-                        { 
+                new FhirQuery
+                {   MeasureId = "test",
+                    FacilityId = facilityId,
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType>
+                    {
+                        new FhirQueryResourceType()
+                        {
                             ResourceType = Hl7.Fhir.Model.ResourceType.Patient
-                        } 
-                    } 
+                        }
+                    }
                 }
             }
         };
@@ -1047,8 +1047,8 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            
-            
+
+
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = facilityId,
@@ -1093,8 +1093,8 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log1 = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            
-            
+
+
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = "Facility1",
@@ -1116,8 +1116,8 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log2 = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            
-            
+
+
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = "Facility2",
@@ -1139,8 +1139,8 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var log3 = new DataAcquisitionLog
         {
             FhirVersion = "test",
-            
-            
+
+
             TraceId = Guid.NewGuid().ToString(),
 
             FacilityId = "Facility1",
@@ -1191,8 +1191,8 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             var log = new DataAcquisitionLog
             {
                 FhirVersion = "test",
-                
-                
+
+
                 TraceId = Guid.NewGuid().ToString(),
 
                 FacilityId = facilityId,
@@ -1268,7 +1268,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         // Refresh stalled log from DB
         await dbContext.Entry(stalledLog).ReloadAsync();
         Assert.Equal(RequestStatus.Failed, stalledLog.Status);
-        
+
         // Note: The notes check was removed as notes are no longer appended in bulk updates
         // to maintain high performance and avoid LINQ translation errors.
 

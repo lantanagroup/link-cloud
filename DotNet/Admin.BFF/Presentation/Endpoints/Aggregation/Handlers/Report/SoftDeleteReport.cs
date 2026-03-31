@@ -133,5 +133,5 @@ public static class SoftDeleteReport
             return null;
         }
     }
-    
+
 }

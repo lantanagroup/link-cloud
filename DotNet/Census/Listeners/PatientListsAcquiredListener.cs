@@ -80,7 +80,7 @@ public class PatientListsAcquiredListener : BackgroundService
                     await kafkaConsumer.ConsumeWithInstrumentation((Func<ConsumeResult<string, PatientListMessage>?, CancellationToken, Task>)(async (result, CancellationToken) =>
                     {
                         rawmessage = result;
-                        
+
                         try
                         {
                             if (rawmessage != null)
@@ -97,7 +97,7 @@ public class PatientListsAcquiredListener : BackgroundService
                                 }
 
                                 var facilityId = rawmessage.Key ?? throw new DeadLetterException("FacilityId is null.", new MissingFacilityIdException("No Facility ID provided. Unable to process message."));
-                                
+
                                 if (rawmessage.Message.Value == null)
                                 {
                                     throw new DeadLetterException("Message value is null", new Exception("No message value provided. Unable to process message."));
@@ -115,7 +115,8 @@ public class PatientListsAcquiredListener : BackgroundService
                                     {
                                         if (resp is PatientEventResponse per && per.PatientEvent != null)
                                         {
-                                            if (rawmessage.Message.Value.PatientLists.Any(list => list.PatientIds.Contains(per.PatientEvent.PatientId))) { 
+                                            if (rawmessage.Message.Value.PatientLists.Any(list => list.PatientIds.Contains(per.PatientEvent.PatientId)))
+                                            {
                                                 per.PatientEvent.ReportTrackingId = rawmessage.Message.Value.ReportTrackingId;
                                             }
                                         }
@@ -130,7 +131,7 @@ public class PatientListsAcquiredListener : BackgroundService
                                     else
                                         await _eventProducerService.ProduceEventsAsync(facilityId, responseMessages, cancellationToken);
                                 }
-                                catch(SqlException ex)
+                                catch (SqlException ex)
                                 {
                                     throw new TransientException("DB Error processing message: " + ex.Message, ex);
                                 }
@@ -142,7 +143,7 @@ public class PatientListsAcquiredListener : BackgroundService
                                 {
                                     if (ex is DeadLetterException || ex is TransientException)
                                         throw;
-                                   
+
                                     throw new TransientException("Error processing message: " + ex.Message, ex);
                                 }
                             }
@@ -194,9 +195,9 @@ public class PatientListsAcquiredListener : BackgroundService
         }
         catch (OperationCanceledException ex)
         {
-            _logger.LogInformation("Stopped census consumer for topic '{topic}' at {dateTime}", KafkaTopic.PatientListsAcquired, DateTime.UtcNow );
+            _logger.LogInformation("Stopped census consumer for topic '{topic}' at {dateTime}", KafkaTopic.PatientListsAcquired, DateTime.UtcNow);
             kafkaConsumer.Close();
             kafkaConsumer.Dispose();
         }
-    } 
+    }
 }

@@ -71,8 +71,8 @@ public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionInteg
                     QueryParameters = new List<string>() { "Test "},
                     ResourceTypes = new List<ResourceType>() { ResourceType.Patient },
                     MeasureId = "TestMeasureId",
-                    ResourceReferenceTypes = new List<CreateResourceReferenceTypeModel>() 
-                    { 
+                    ResourceReferenceTypes = new List<CreateResourceReferenceTypeModel>()
+                    {
                         new CreateResourceReferenceTypeModel
                         {
                             FacilityId = "TestFacility",

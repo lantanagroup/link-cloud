@@ -56,7 +56,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                     policy.AllowAnyMethod();
                     policy.AllowAnyOrigin();
                 });
-                
+
                 options.AddPolicy("ApiInfoPolicy", policy =>
                 {
                     policy.AllowAnyHeader();

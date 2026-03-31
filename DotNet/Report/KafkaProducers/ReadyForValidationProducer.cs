@@ -66,14 +66,14 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             var reportEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportEntryManager>();
             var entry = await reportEntryManager.GetEntry(scheduleId, patientId);
 
-            if (entry == null) 
+            if (entry == null)
             {
                 throw new Exception($"No report entry record was found (ReportId = {scheduleId}, FacilityId = {facilityId}).");
             }
 
             entry.ReportingStatus = Domain.Enums.ReportingStatus.PendingValidation;
             entry.SubmissionStatus = Domain.Enums.SubmissionStatus.PendingValidation;
-            
+
             await reportEntryManager.UpdateAsync(entry, CancellationToken.None);
         }
     }

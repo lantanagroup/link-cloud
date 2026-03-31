@@ -9,7 +9,7 @@ using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Mo
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Models;
 
-public class DataAcquisitionLogModel 
+public class DataAcquisitionLogModel
 {
     public long Id { get; init; }
     public string FacilityId { get; set; }

@@ -13,7 +13,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 {
     public class AuthEndpoints : IApi
     {
-        private readonly ILogger<AuthEndpoints> _logger; 
+        private readonly ILogger<AuthEndpoints> _logger;
         private readonly IOptions<AuthenticationSchemaConfig> _authSchemaOptions;
 
         public AuthEndpoints(ILogger<AuthEndpoints> logger, IOptions<AuthenticationSchemaConfig> oauthOptions)
@@ -26,19 +26,19 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
         {
             var authEndpoints = app.MapGroup("/api")
                 .WithOpenApi(x => new OpenApiOperation(x)
-                {                    
+                {
                     Tags = new List<OpenApiTag> { new() { Name = "Auth" } }
                 });
 
-            authEndpoints.MapGet("/login", Login)                
+            authEndpoints.MapGet("/login", Login)
                 .AllowAnonymous()
                 .Produces(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
                 .WithOpenApi(x => new OpenApiOperation(x)
-                 {
-                     Summary = "Login to Link",
-                     Description = "Initiates the login process for link"                    
-                 });
+                {
+                    Summary = "Login to Link",
+                    Description = "Initiates the login process for link"
+                });
 
             authEndpoints.MapGet("/user", GetUser)
                 .RequireAuthorization(LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName)
@@ -52,7 +52,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 });
 
             authEndpoints.MapGet("/logout", Logout)
-                .RequireAuthorization(LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName)               
+                .RequireAuthorization(LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName)
                 .Produces<object>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
@@ -66,7 +66,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
         }
 
         public IResult Login(HttpContext context)
-        {            
+        {
             var RedirectLink = "/api/info";
             var referer = context.Request.Headers.Referer.ToString();
             referer = (referer.ToString().IndexOf('/') > 0) ? referer[..referer.LastIndexOf('/')] : referer;
@@ -80,9 +80,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             return Results.Challenge(
                 properties: new AuthenticationProperties
                 {
-                    RedirectUri = RedirectLink, 
+                    RedirectUri = RedirectLink,
                 },
-                authenticationSchemes: [_authSchemaOptions.Value.DefaultChallengeScheme]); 
+                authenticationSchemes: [_authSchemaOptions.Value.DefaultChallengeScheme]);
         }
 
         public IResult GetUser(HttpContext context)
@@ -91,7 +91,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             if (context.User.Identity is not ClaimsIdentity claimsIdentity)
             {
                 return Results.Problem("No claims found in the current user identity", statusCode: StatusCodes.Status500InternalServerError);
-            }            
+            }
 
             UserResponse user = UserResponse.FromClaims(claimsIdentity);
 
@@ -122,7 +122,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                  authenticationSchemes: [LinkAdminConstants.AuthenticationSchemes.Cookie]);
             }
         }
-          
-        
+
+
     }
 }

@@ -19,7 +19,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
     public class VendorQueries : IVendorQueries
     {
         private readonly NormalizationDbContext _dbContext;
-        public VendorQueries(NormalizationDbContext dbContext) 
+        public VendorQueries(NormalizationDbContext dbContext)
         {
             _dbContext = dbContext;
         }
@@ -48,12 +48,12 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
         public async Task<VendorVersionModel> GetVendorVersion(Guid vendorId)
         {
             var query = from vv in _dbContext.VendorVersions
-                              where vv.VendorId == vendorId
-                              select new VendorVersionModel()
-                              {
-                                  Id = vv.Id,
-                                  VendorId = vv.VendorId
-                              };
+                        where vv.VendorId == vendorId
+                        select new VendorVersionModel()
+                        {
+                            Id = vv.Id,
+                            VendorId = vv.VendorId
+                        };
 
             return await query.FirstAsync();
         }

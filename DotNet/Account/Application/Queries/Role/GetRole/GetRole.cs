@@ -25,7 +25,7 @@ namespace LantanaGroup.Link.Account.Application.Queries.Role
 
             try
             {
-                var role = await _roleRepository.GetRoleAsync(roleId, cancellationToken: cancellationToken);                    
+                var role = await _roleRepository.GetRoleAsync(roleId, cancellationToken: cancellationToken);
 
                 return _linkRoleModelFactory.Create(role);
             }

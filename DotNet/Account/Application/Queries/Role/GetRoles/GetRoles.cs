@@ -26,14 +26,14 @@ namespace LantanaGroup.Link.Account.Application.Queries.Role
             try
             {
                 var roles = await _roleRepository.GetRolesAsync(cancellationToken);
-                
+
                 var roleList = roles.Select(x => _listRoleModelFactory.Create(x)).ToList();
 
                 return roleList;
             }
             catch (Exception)
             {
-                Activity.Current?.SetStatus(ActivityStatusCode.Error);             
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 throw;
             }
         }

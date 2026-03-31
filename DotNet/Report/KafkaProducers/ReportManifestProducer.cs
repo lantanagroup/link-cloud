@@ -52,7 +52,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             var facilityConfig = await _tenantApiService.GetFacilityConfig(schedule.FacilityId, CancellationToken.None);
 
-            if (facilityConfig == null) 
+            if (facilityConfig == null)
             {
                 throw new Exception($"Facility config was not found when attempting to generate a report manifest (ReportId = {schedule.Id}, FacilityId = {schedule.FacilityId});");
             }
@@ -110,14 +110,15 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public virtual async Task<bool> Produce(ReportScheduleModel schedule, string correlationId = null)
         {
-            if (!schedule.EndOfReportPeriodJobHasRun) {
+            if (!schedule.EndOfReportPeriodJobHasRun)
+            {
                 return false;
             }
 
             var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
 
             var reportEntries = await database.ReportEntryRepository.FindAsync(x => x.FacilityId == schedule.FacilityId && x.ReportScheduleId == schedule.Id);
-            
+
             foreach (var entry in reportEntries)
             {
                 if ((entry.ReportingStatus == ReportingStatus.NotReportable || entry.ReportingStatus == ReportingStatus.PassedValidation || entry.ReportingStatus == ReportingStatus.FailedValidation) && (entry.SubmissionStatus == SubmissionStatus.Submitted || entry.SubmissionStatus == SubmissionStatus.NotEligable))

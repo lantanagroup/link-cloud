@@ -13,7 +13,7 @@ public class ResourceTypeJsonConverter : JsonConverter<ResourceType>
         {
             return (ResourceType)type;
         }
-        
+
         throw new JsonException("Invalid value for HL7.Fhir.R4.ResourceType");
     }
 

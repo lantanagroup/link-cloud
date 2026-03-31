@@ -24,7 +24,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         private readonly IOptions<ServiceRegistry> _serviceRegistry;
         private readonly IOptions<AuthenticationSchemaConfig> _authenticationSchemaConfig;
         private readonly IServiceScopeFactory _scopeFactory;
-        
+
         public ReportService(ILogger<ReportService> logger, HttpClient client, IOptions<ServiceRegistry> serviceRegistry, IOptions<AuthenticationSchemaConfig> authenticationSchemaConfig, IServiceScopeFactory scopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -37,13 +37,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         }
 
         public async Task<HttpResponseMessage> ServiceHealthCheck(CancellationToken cancellationToken)
-        {            
+        {
             // HTTP GET
             var response = await _client.GetAsync($"health", cancellationToken);
 
             return response;
         }
-        
+
         public async Task<LinkServiceHealthReport> LinkServiceHealthCheck(CancellationToken cancellationToken)
         {
             // HTTP GET
@@ -61,7 +61,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 return new LinkServiceHealthReport { Service = "Report", Status = HealthStatus.Unhealthy };
             }
         }
-        
+
         public async Task<HttpResponseMessage> ReportSummaryList(
             ClaimsPrincipal user,
             CancellationToken cancellationToken,
@@ -85,7 +85,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
             {
                 var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
-                
+
                 //create a bearer token for the system account
                 var token = await createLinkBearerToken.ExecuteAsync(user, 2);
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);

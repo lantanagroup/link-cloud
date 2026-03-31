@@ -13,7 +13,8 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
             var problemDetailsOptions = new ProblemDetailsOptions();
             options?.Invoke(problemDetailsOptions);
 
-            services.AddProblemDetails(options => {
+            services.AddProblemDetails(options =>
+            {
                 options.CustomizeProblemDetails = ctx =>
                 {
                     if (ctx.HttpContext.Response.StatusCode == (int)HttpStatusCode.InternalServerError)

@@ -6,9 +6,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.System.Hanlders
 
 public static class GetSystemHealth
 {
-    public static async Task<IResult> Handle(HttpContext context, 
+    public static async Task<IResult> Handle(HttpContext context,
         HealthCheckService healthCheckService,
-        AccountService accountService, 
+        AccountService accountService,
         AuditService auditService,
         CensusService censusService,
         DataAcquisitionService dataAcquisitionService,
@@ -21,7 +21,7 @@ public static class GetSystemHealth
         ValidationService validationService,
         TerminologyService terminologyService)
     {
-        
+
         var dotNetHealthCheckTasks = new List<Task<LinkServiceHealthReport>>
         {
             accountService.LinkServiceHealthCheck(context.RequestAborted),
@@ -35,7 +35,7 @@ public static class GetSystemHealth
             tenantService.LinkServiceHealthCheck(context.RequestAborted),
             terminologyService.LinkServiceHealthCheck(context.RequestAborted)
         };
-        
+
         // Get Admin BFF health
         var bffHealthReport = await healthCheckService.CheckHealthAsync(context.RequestAborted);
         var bffLinkReport = new LinkServiceHealthReport
@@ -54,7 +54,7 @@ public static class GetSystemHealth
 
         //if we upgrade to .NET 9, we can use Task.WhenEach
         var results = await Task.WhenAll(dotNetHealthCheckTasks);
-        
+
         //TODO: improve integration with java services
         var measureEvalHealthCheckResult = await measureEvalService.LinkServiceHealthCheck(context.RequestAborted);
         var measureEvalHealthSummary = LinkServiceHealthReportExtensions.FromDomain(measureEvalHealthCheckResult);
@@ -62,12 +62,12 @@ public static class GetSystemHealth
         var validationHealthCheckResult = await validationService.LinkServiceHealthCheck(context.RequestAborted);
         var validationHealthSummary = LinkServiceHealthReportExtensions.FromDomain(validationHealthCheckResult);
         validationHealthSummary.CacheConnection = LinkServiceHealthStatus.NotApplicable;
-        
+
         var healthSummary = results.Select(LinkServiceHealthReportExtensions.FromDomain).ToList();
         healthSummary.Add(LinkServiceHealthReportExtensions.FromDomain(bffLinkReport));
         healthSummary.Add(measureEvalHealthSummary);
         healthSummary.Add(validationHealthSummary);
-        
+
         return Results.Ok(healthSummary);
     }
 }

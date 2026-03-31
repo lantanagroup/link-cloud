@@ -74,9 +74,9 @@ public class CensusConfigManager : ICensusConfigManager
             existingEntity.ScheduledTrigger = entity.ScheduledTrigger;
             existingEntity.ModifyDate = DateTime.UtcNow;
             existingEntity.Enabled = entity.Enabled ?? true; // Default to true if not specified
-            
+
             await using var transaction = await _patienteventQueries.StartTransaction(cancellationToken);
-            
+
             try
             {
                 await _censusConfigRepository.UpdateAsync(existingEntity, cancellationToken);
@@ -123,10 +123,10 @@ public class CensusConfigManager : ICensusConfigManager
                 // Only create jobs if enabled
                 if (existingEntity.Enabled == true)
                 {
-                    await _censusSchedulingRepo.AddJobForFacility(existingEntity, 
+                    await _censusSchedulingRepo.AddJobForFacility(existingEntity,
                         await _schedulerFactory.GetScheduler(cancellationToken));
                 }
-                
+
                 await _patienteventQueries.CommitTransaction(transaction, cancellationToken);
             }
             catch (Exception ex)

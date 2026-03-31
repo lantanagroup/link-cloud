@@ -147,7 +147,7 @@ public class FhirApiService : IFhirApiService
             if (ex.Status == HttpStatusCode.NotFound || ex.Status == HttpStatusCode.Gone || ex.Outcome != null)
             {
                 string note = $"[{DateTime.UtcNow}] HTTP {ex.Status} returned for Read operation. See application logs for details.";
-                
+
                 log.Notes ??= new List<string>();
                 log.Notes.Add(note);
                 _logger.LogError(ex, "FhirOperationException for log {LogId} with facility {FacilityId}: {note}", log.Id, log.FacilityId, note);

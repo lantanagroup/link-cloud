@@ -9,7 +9,7 @@ namespace LantanaGroup.Link.QueryDispatch.Domain.Entities
     {
         [BsonRepresentation(BsonType.String)]
         public QueryDispatchConstants.EventType Event { get; set; }
-        
+
         /// <summary>
         /// The ISO-8601 formatted trigger time to generate a DataAcquisitionRequested event.
         /// </summary>

@@ -38,7 +38,7 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
         var encounterManager = _fixture.ServiceProvider.GetRequiredService<IPatientEncounterManager>();
         var encounterQueries = _fixture.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
         var censusConfigManager = _fixture.ServiceProvider.GetRequiredService<ICensusConfigManager>();
-        
+
         // Create PatientListService manually like the other test class does
         var patientListService = new LantanaGroup.Link.Census.Application.Services.PatientListService(
             new Microsoft.Extensions.Logging.Abstractions.NullLogger<
@@ -233,7 +233,7 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
     {
         // Take a sample of patients to validate event sequencing
         var samplePatientIds = patientIds.Take(5).ToList();
-    
+
         foreach (var patientId in samplePatientIds)
         {
             // Get all events for this patient, ordered by timestamp
@@ -241,19 +241,19 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
                 .Where(e => e.SourcePatientId == patientId)
                 .OrderBy(e => e.CreateDate)
                 .ToList();
-            
+
             _output.WriteLine($"Validating event sequence for patient {patientId} with {patientEvents.Count} events");
-        
+
             if (patientEvents.Count == 0)
                 continue;
-            
+
             // Basic validation rules:
             // 1. A discharge event must always be preceded by at least one admit event
             // 2. The timestamp of a discharge should be after its corresponding admit
-        
+
             bool hasHadAdmit = false;
             DateTime? lastAdmitTime = null;
-        
+
             foreach (var evt in patientEvents)
             {
                 if (evt.EventType == EventType.FHIRListAdmit)
@@ -265,11 +265,11 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
                 {
                     // A discharge must be preceded by at least one admit
                     Assert.True(hasHadAdmit, $"Patient {patientId} has a discharge event without a prior admit event");
-                
+
                     // The discharge timestamp should be after the last admit
                     if (lastAdmitTime.HasValue)
                     {
-                        Assert.True(((FHIRListDischargePayload)evt.Payload).DischargeDate >= lastAdmitTime.Value, 
+                        Assert.True(((FHIRListDischargePayload)evt.Payload).DischargeDate >= lastAdmitTime.Value,
                             $"Patient {patientId} has a discharge event with timestamp {((FHIRListDischargePayload)evt.Payload).DischargeDate} before the admit timestamp {lastAdmitTime.Value}");
                     }
                 }

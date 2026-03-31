@@ -94,7 +94,7 @@ public class ReferenceResourceService : IReferenceResourceService
             ResourceIds = validReferenceResources.Select(x => x.Reference.SplitReference()).ToList(),
             PageSize = int.MaxValue
         })).Records;
-            
+
 
         resources.AddRange(existingReferenceResources.Select(x => FhirResourceDeserializer.DeserializeFhirResource(x)));
 

@@ -40,15 +40,15 @@ public class PatientEventListenerTests : IClassFixture<ReportIntegrationTestFixt
             ReportStartDate = DateTime.UtcNow.AddDays(-30),
             ReportEndDate = DateTime.UtcNow.AddDays(30),
             Frequency = Frequency.Monthly,
-            ReportTypes = { "DE-111", "DE-222" }, 
+            ReportTypes = { "DE-111", "DE-222" },
             Status = ScheduleStatus.Scheduled,
             EndOfReportPeriodJobHasRun = false,
             CreateDate = DateTime.UtcNow
         };
         await reportScheduledManager.AddAsync(schedule, CancellationToken.None);
 
-        var patientEventValue = new PatientEventValue 
-        { 
+        var patientEventValue = new PatientEventValue
+        {
             EventType = PatientEvents.Admit.ToString(),
             PatientId = "12345"
         };
@@ -200,7 +200,8 @@ public class PatientEventListenerTests : IClassFixture<ReportIntegrationTestFixt
             Message = new Message<string, PatientEventValue>
             {
                 Key = "test-facility-",
-                Value = new PatientEventValue() {
+                Value = new PatientEventValue()
+                {
                     EventType = PatientEvents.Admit.ToString(),
                     PatientId = "12345"
                 }
@@ -230,7 +231,7 @@ public class PatientEventListenerTests : IClassFixture<ReportIntegrationTestFixt
             Message = new Message<string, PatientEventValue>
             {
                 Key = string.Empty,
-                Value = new PatientEventValue() 
+                Value = new PatientEventValue()
                 {
                     EventType = PatientEvents.Admit.ToString(),
                     PatientId = "12345"
