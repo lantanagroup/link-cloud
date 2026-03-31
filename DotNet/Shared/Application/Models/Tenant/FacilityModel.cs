@@ -1,5 +1,6 @@
 ﻿using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
+using LantanaGroup.Link.Shared.Application.Enums;
 
 namespace LantanaGroup.Link.Shared.Application.Models.Tenant
 {
@@ -21,7 +22,10 @@ namespace LantanaGroup.Link.Shared.Application.Models.Tenant
         public string TimeZone { get; set; } = string.Empty;
         
         [JsonPropertyName("isDeleted")]
-        public bool? IsDeleted { get; set; } 
+        public bool? IsDeleted { get; set; }
+
+        [JsonPropertyName("vendor")]
+        public Vendor? Vendor { get; set; }
 
         [JsonPropertyName("scheduledReports")]
         public TenantScheduledReportConfig ScheduledReports { get; set; } = new TenantScheduledReportConfig();

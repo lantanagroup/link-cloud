@@ -2,6 +2,7 @@
 #nullable disable
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Tenant.Data.Entities;
 
 namespace LantanaGroup.Link.Tenant.Entities;
@@ -25,6 +26,8 @@ public class Facility
     public DateTime CreateDate { get; set; }
 
     public DateTime? ModifyDate { get; set; }
+
+    public Vendor? Vendor { get; set; }
 
     [Required]
     public ScheduledReportModel ScheduledReports { get; set; } = null!;

@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Shared.Application.Interfaces;
+﻿using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -112,6 +113,7 @@ public class FacilityControllerTests
             FacilityId = facilityId,
             FacilityName = facilityName,
             TimeZone = "America/Chicago",
+            Vendor = Vendor.Epic,
             ScheduledReports = new TenantScheduledReportConfig { Daily = new string[] { }, Weekly = new string[] { }, Monthly = new string[] { } }
         };
 
@@ -138,6 +140,7 @@ public class FacilityControllerTests
             FacilityId = facilityId,
             FacilityName = "Updated Name",
             TimeZone = "America/New_York",
+            Vendor = Vendor.Epic,
             ScheduledReports = new TenantScheduledReportConfig { Daily = new string[] { "NewReport" }, Weekly = new string[] { }, Monthly = new string[] { } }
         };
 

@@ -12,6 +12,9 @@ namespace LantanaGroup.Link.Tenant.Data.Repository.Mappings
 
             builder.HasKey(b => b.Id).IsClustered(false);
 
+            builder.Property(f => f.Vendor)
+                .HasMaxLength(50);
+
             builder.OwnsOne(facilityConfig => facilityConfig.ScheduledReports, navBuilder =>
             {
                 navBuilder.ToJson();
