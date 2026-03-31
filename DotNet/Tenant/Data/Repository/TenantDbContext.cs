@@ -18,6 +18,11 @@ public partial class TenantDbContext : DbContext
     public virtual DbSet<Facility> Facilities { get; set; }
 
 
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        configurationBuilder.Properties<Enum>().HaveConversion<string>();
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfiguration(new FacilityConfigMap());
