@@ -12,6 +12,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'" />
   <ItemGroup>
+    <None Include=".github\workflows\auto-format.yml" />
     <None Include=".github\workflows\tests.yaml" />
     <None Include="docker-compose.yml" />
     <None Include=".dockerignore" />
