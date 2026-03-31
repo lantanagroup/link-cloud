@@ -110,6 +110,7 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
                     FacilityName = f.FacilityName,
                     TimeZone = f.TimeZone,
                     IsDeleted = f.IsDeleted,
+                    Vendor = f.Vendor,
                     ScheduledReports = new TenantScheduledReportConfig
                     {
                         Daily = f.ScheduledReports.Daily,

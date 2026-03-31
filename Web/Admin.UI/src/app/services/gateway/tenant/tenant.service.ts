@@ -7,6 +7,7 @@ import {
   IScheduledReportModel,
   PagedFacilityConfigModel
 } from 'src/app/interfaces/tenant/facility-config-model.interface';
+import {Vendor} from 'src/app/interfaces/tenant/vendor.enum';
 import {Observable, catchError, map, tap, of} from 'rxjs';
 import {IEntityCreatedResponse} from 'src/app/interfaces/entity-created-response.model';
 import {AppConfigService} from '../../app-config.service';
@@ -20,11 +21,12 @@ export class TenantService {
   }
 
 
-  createFacility(facilityId: string, facilityName: string, timeZone: string, scheduledReports: IScheduledReportModel): Observable<IEntityCreatedResponse> {
+  createFacility(facilityId: string, facilityName: string, timeZone: string, scheduledReports: IScheduledReportModel, vendor?: Vendor): Observable<IEntityCreatedResponse> {
     let facility: IFacilityConfigModel = {
       facilityId: facilityId,
       facilityName: facilityName,
       timeZone: timeZone,
+      vendor: vendor,
       scheduledReports: scheduledReports
     };
 
@@ -38,12 +40,13 @@ export class TenantService {
       )
   }
 
-  updateFacility(id: string, facilityId: string, facilityName: string, timeZone: string, scheduledReports: IScheduledReportModel): Observable<IEntityCreatedResponse> {
+  updateFacility(id: string, facilityId: string, facilityName: string, timeZone: string, scheduledReports: IScheduledReportModel, vendor?: Vendor): Observable<IEntityCreatedResponse> {
     let facility: IFacilityConfigModel = {
       id: id,
       facilityId: facilityId,
       facilityName: facilityName,
       timeZone: timeZone,
+      vendor: vendor,
       scheduledReports: scheduledReports
     };
 
