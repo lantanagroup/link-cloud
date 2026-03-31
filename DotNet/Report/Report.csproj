@@ -18,12 +18,16 @@
 
 	<ItemGroup>
 		<Compile Remove="Attributes\**" />
+		<Compile Remove="Jobs\JobStoreFactories\**" />
 		<Compile Remove="Repositories\**" />
 		<Content Remove="Attributes\**" />
+		<Content Remove="Jobs\JobStoreFactories\**" />
 		<Content Remove="Repositories\**" />
 		<EmbeddedResource Remove="Attributes\**" />
+		<EmbeddedResource Remove="Jobs\JobStoreFactories\**" />
 		<EmbeddedResource Remove="Repositories\**" />
 		<None Remove="Attributes\**" />
+		<None Remove="Jobs\JobStoreFactories\**" />
 		<None Remove="Repositories\**" />
 	</ItemGroup>
 
@@ -67,7 +71,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Folder Include="Jobs\JobStoreFactories\" />
 	  <Folder Include="Migrations\" />
 	</ItemGroup>
 
