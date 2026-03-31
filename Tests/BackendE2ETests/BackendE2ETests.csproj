@@ -16,20 +16,13 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Compile Remove="Helpers\**" />
       <Compile Remove="Services\**" />
-      <EmbeddedResource Remove="Helpers\**" />
       <EmbeddedResource Remove="Services\**" />
-      <None Remove="Helpers\**" />
       <None Remove="Services\**" />
     </ItemGroup>
 
     <ItemGroup>
       <EmbeddedResource Include="Baselines\*.baseline.json" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Compile Include="Helpers\SdkSetupHelper.cs" />
     </ItemGroup>
 
     <ItemGroup>

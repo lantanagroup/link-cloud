@@ -1,4 +1,5 @@
 ﻿using Automation.UI.Models;
+using Automation.UI.Services;
 using LantanaGroup.Link.Automation;
 using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.Automation.Generation;
@@ -21,16 +22,19 @@ public class AutomationRunManager : IAutomationRunManager
     private readonly IHubContext<RunHub> _hub;
     private readonly AutomationConfig _automationConfig;
     private readonly ILogger<AutomationRunManager> _logger;
+    private readonly IServiceProvider _hostServices;
     private readonly ConcurrentDictionary<Guid, MutableRunState> _runs = new();
 
     public AutomationRunManager(
         IHubContext<RunHub> hub,
         IOptions<AutomationConfig> automationConfig,
-        ILogger<AutomationRunManager> logger)
+        ILogger<AutomationRunManager> logger,
+        IServiceProvider hostServices)
     {
         _hub = hub;
         _automationConfig = automationConfig.Value;
         _logger = logger;
+        _hostServices = hostServices;
     }
 
     public Task<Guid> StartAsync(StartScenarioRequest request, CancellationToken cancellationToken = default)
@@ -71,7 +75,7 @@ public class AutomationRunManager : IAutomationRunManager
             var measureEvalClient = services.GetRequiredService<IMeasureEvalServiceClient>();
             var sdkValidationClient = services.GetRequiredService<IValidationServiceClient>();
 
-            var reportHelper = new ReportApiHelper(services.GetRequiredService<IReportServiceClient>(), output, _automationConfig);
+            var reportHelper = services.GetRequiredService<ReportApiHelper>();
 
             var validationHelper = services.GetRequiredService<ValidationApiHelper>();
             var reportValidator = services.GetRequiredService<ReportDatabaseValidator>();
@@ -228,28 +232,11 @@ public class AutomationRunManager : IAutomationRunManager
         services.AddSingleton(_automationConfig);
         services.AddSingleton(output);
 
-        // ServiceRegistry — point all services at AdminBFF base
-        var bffBase = _automationConfig.AdminBffBase.TrimEnd('/');
-        if (bffBase.EndsWith("/api")) bffBase = bffBase[..^4];
-
-        services.Configure<ServiceRegistry>(opts =>
-        {
-            opts.TenantService = new TenantServiceRegistration { TenantServiceUrl = bffBase };
-            opts.CensusServiceUrl = bffBase;
-            opts.DataAcquisitionServiceUrl = bffBase;
-            opts.NormalizationServiceUrl = bffBase;
-            opts.ReportServiceUrl = bffBase;
-            opts.MeasureServiceUrl = bffBase;
-            opts.ValidationServiceUrl = bffBase;
-            opts.SubmissionServiceUrl = bffBase;
-        });
-
-        services.Configure<BackendAuthenticationServiceExtension.LinkBearerServiceOptions>(opts =>
-        {
-            opts.AllowAnonymous = true;
-        });
-        services.Configure<LinkTokenServiceSettings>(_ => { });
-        services.AddSingleton<ICreateSystemToken, NoOpSystemToken>();
+        // Forward host-level configuration into the per-run container
+        services.AddSingleton(_hostServices.GetRequiredService<IOptions<ServiceRegistry>>());
+        services.AddSingleton(_hostServices.GetRequiredService<IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions>>());
+        services.AddSingleton(_hostServices.GetRequiredService<IOptions<LinkTokenServiceSettings>>());
+        services.AddSingleton(_hostServices.GetRequiredService<ICreateSystemToken>());
 
         services.AddLinkSdk();
 
@@ -259,6 +246,7 @@ public class AutomationRunManager : IAutomationRunManager
             .AddSingleton<PipelineDataReader>();
 
         services.AddTransient<ValidationApiHelper>();
+        services.AddTransient<ReportApiHelper>();
         services.AddTransient<ReportDatabaseValidator>();
         services.AddTransient<ReportAbsManifestValidator>();
         services.AddTransient<DataAcquisitionDatabaseValidator>();
@@ -268,11 +256,6 @@ public class AutomationRunManager : IAutomationRunManager
         services.AddTransient<PipelineSnapshot>();
 
         return services.BuildServiceProvider();
-    }
-
-    private sealed class NoOpSystemToken : ICreateSystemToken
-    {
-        public Task<string> ExecuteAsync(string key, int timespan) => Task.FromResult(string.Empty);
     }
 
     private static TestScenarioConfig BuildScenarioConfig(AutomationScenarioKind scenario, ResolvedRunOptions options)

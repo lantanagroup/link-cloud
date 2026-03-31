@@ -14,9 +14,8 @@ namespace LantanaGroup.Link.Tests.E2ETests;
 
 /// <summary>
 /// Shared xUnit fixture for BackendE2ETests.
-/// Builds a proper DI container with all automation services registered,
-/// following the same Host.CreateApplicationBuilder() pattern used by
-/// the ServiceTests integration test fixtures.
+/// Builds a DI container with all automation services registered.
+/// Tests resolve services directly from <see cref="ServiceProvider"/>.
 /// </summary>
 public sealed class BackendE2ETestFixture : IDisposable
 {
@@ -39,22 +38,17 @@ public sealed class BackendE2ETestFixture : IDisposable
         // Infrastructure
         builder.Services.AddSingleton(sp => new DatabaseConnectionFactory(sp.GetRequiredService<AutomationConfig>().Database));
 
-        // ServiceRegistry — point all services at AdminBFF base for E2E tests
-        // The AdminBFF YARP proxy routes api/census/*, api/data/*, etc. to the real services.
-        // ServiceRegistry expects raw base URLs (without /api) since *ApiUrl properties append /api.
-        var bffBase = automationCfg.AdminBffBase.TrimEnd('/');
-        if (bffBase.EndsWith("/api")) bffBase = bffBase[..^4];
-
+        // ServiceRegistry — point each service directly at its host
         builder.Services.Configure<ServiceRegistry>(opts =>
         {
-            opts.TenantService = new TenantServiceRegistration { TenantServiceUrl = bffBase };
-            opts.CensusServiceUrl = bffBase;
-            opts.DataAcquisitionServiceUrl = bffBase;
-            opts.NormalizationServiceUrl = bffBase;
-            opts.ReportServiceUrl = bffBase;
-            opts.MeasureServiceUrl = bffBase;
-            opts.ValidationServiceUrl = bffBase;
-            opts.SubmissionServiceUrl = bffBase;
+            opts.TenantService = new TenantServiceRegistration { TenantServiceUrl = TestConfig.TenantServiceBase };
+            opts.CensusServiceUrl = TestConfig.CensusServiceBase;
+            opts.DataAcquisitionServiceUrl = TestConfig.DataAcquisitionServiceBase;
+            opts.NormalizationServiceUrl = TestConfig.NormalizationServiceBase;
+            opts.ReportServiceUrl = TestConfig.ReportServiceBase;
+            opts.MeasureServiceUrl = TestConfig.MeasureServiceBase;
+            opts.ValidationServiceUrl = TestConfig.ValidationServiceBase;
+            opts.SubmissionServiceUrl = TestConfig.SubmissionServiceBase;
         });
 
         // Auth — E2E tests use anonymous
@@ -65,16 +59,19 @@ public sealed class BackendE2ETestFixture : IDisposable
         builder.Services.Configure<LinkTokenServiceSettings>(_ => { });
         builder.Services.AddSingleton<ICreateSystemToken, NoOpSystemToken>();
 
+        // LinkSdk clients (IFacilityServiceClient, IReportServiceClient, etc.)
         builder.Services.AddLinkSdk();
 
+        // Automation infrastructure
         builder.Services.AddSingleton(sp => new LokiScraper(sp.GetRequiredService<IAutomationOutput>(), sp.GetRequiredService<AutomationConfig>()));
         builder.Services.AddSingleton(sp => new FhirDataLoader(sp.GetRequiredService<AutomationConfig>().ExternalFhirServerBase, sp.GetRequiredService<AutomationConfig>()));
         builder.Services.AddSingleton<PipelineDataReader>();
 
         // Helpers
         builder.Services.AddTransient<ValidationApiHelper>();
+        builder.Services.AddTransient<ReportApiHelper>();
 
-        // Validators (transient)
+        // Validators
         builder.Services.AddTransient<ReportDatabaseValidator>();
         builder.Services.AddTransient<ReportAbsManifestValidator>();
         builder.Services.AddTransient<DataAcquisitionDatabaseValidator>();
@@ -89,8 +86,6 @@ public sealed class BackendE2ETestFixture : IDisposable
         _host.StartAsync().GetAwaiter().GetResult();
         ServiceProvider = _host.Services;
     }
-
-    public TestServices GetTestServices() => new(ServiceProvider);
 
     public void Dispose()
     {

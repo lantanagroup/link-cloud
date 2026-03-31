@@ -13,12 +13,16 @@ namespace LantanaGroup.Link.Automation.Services;
 public class ReportApiHelper
 {
     private readonly IReportServiceClient _reportClient;
+    private readonly IFacilityServiceClient _facilityClient;
+    private readonly ISubmissionServiceClient _submissionClient;
     private readonly IAutomationOutput _output;
     private readonly AutomationConfig _automationConfig;
 
-    public ReportApiHelper(IReportServiceClient reportClient, IAutomationOutput output, AutomationConfig config)
+    public ReportApiHelper(IReportServiceClient reportClient, IFacilityServiceClient facilityClient, ISubmissionServiceClient submissionClient, IAutomationOutput output, AutomationConfig config)
     {
         _reportClient = reportClient;
+        _facilityClient = facilityClient;
+        _submissionClient = submissionClient;
         _output = output;
         _automationConfig = config;
     }
@@ -35,7 +39,7 @@ public class ReportApiHelper
             PatientIds = config.PatientIds
         };
 
-        var payload = await _reportClient.GenerateAdhocReportAsync(facilityId, body);
+        var payload = await _facilityClient.GenerateAdhocReportAsync(facilityId, body);
 
         AutomationInvariant.Require(payload?.ReportId != null && payload.ReportId != Guid.Empty,
             "Expected response to include reportId but received empty payload.");
@@ -95,7 +99,7 @@ public class ReportApiHelper
     {
         _output.WriteLine($"Downloading report {reportId}...");
 
-        var (bytes, contentType) = await _reportClient.DownloadSubmissionAsync(facilityId, reportId, external);
+        var (bytes, contentType) = await _submissionClient.DownloadSubmissionAsync(facilityId, reportId, external);
 
         AutomationInvariant.Require(contentType?.Contains("application/zip") == true,
             $"Expected Content-Type to be application/zip but received {contentType}");

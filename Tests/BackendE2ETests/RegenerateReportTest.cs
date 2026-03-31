@@ -7,10 +7,13 @@ using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.Automation.Generation;
 using LantanaGroup.Link.Automation.Helpers;
 using LantanaGroup.Link.Automation.Services;
+using LantanaGroup.Link.Automation.Validation;
+using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using Task = System.Threading.Tasks.Task;
 
@@ -18,12 +21,6 @@ namespace LantanaGroup.Link.Tests.E2ETests;
 
 /// <summary>
 /// End-to-end test for the regenerate workflow.
-///
-/// Source report follows the production scheduled-report path:
-///   ReportScheduled → PatientEvent (Admit) → DataAcq → full pipeline → Submitted.
-///
-/// Regenerated report exercises:
-///   GenerateReportListener (Regenerate=true) → EvaluationRequested → MeasureEval reuses prior data.
 /// </summary>
 public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixture>
 {
@@ -36,19 +33,17 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
         defaultMaxRetryCount: 140,
         defaultLokiScrapeWindowMinutes: 10);
 
-    private readonly TestServices _b;
+    private readonly IServiceProvider _sp;
     private readonly string _facilityId = $"RegenTest-{Guid.NewGuid():N}";
     private List<(string Name, string Json)> _generatedBundles = [];
 
-    private AutomationConfig AutomationCfg => _b.AutomationCfg;
-    private DualOutputHelper Output => _b.Output;
-    private FhirDataLoader FhirDataLoader => _b.FhirDataLoader;
-
-    private ValidationApiHelper ValidationApi => _b.CreateValidationHelper();
+    private AutomationConfig AutomationCfg => _sp.GetRequiredService<AutomationConfig>();
+    private DualOutputHelper Output => _sp.GetRequiredService<DualOutputHelper>();
+    private FhirDataLoader FhirDataLoader => _sp.GetRequiredService<FhirDataLoader>();
 
     public RegenerateReportTest(BackendE2ETestFixture fixture)
     {
-        _b = fixture.GetTestServices();
+        _sp = fixture.ServiceProvider;
         _config.RemoveFacilityConfig = true;
     }
 
@@ -71,8 +66,9 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
         await FhirDataLoader.WaitForServerAsync(Output);
         await FhirDataLoader.LoadTransactionBundlesFromJsonAsync(Output, bundles);
 
-        await ValidationApi.InitializeArtifactsAsync();
-        await ValidationApi.InitializeCategoriesAsync();
+        var validationApi = _sp.GetRequiredService<ValidationApiHelper>();
+        await validationApi.InitializeArtifactsAsync();
+        await validationApi.InitializeCategoriesAsync();
     }
 
     public async Task DisposeAsync()
@@ -80,7 +76,13 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
         Output.WriteLine("Cleaning up...\n");
 
         if (_config.RemoveFacilityConfig)
-            await SdkSetupHelper.CleanupFacilityAsync(_b, _facilityId);
+        {
+            await FacilitySetupHelper.CleanupFacilityAsync(
+                _sp.GetRequiredService<IFacilityServiceClient>(),
+                _sp.GetRequiredService<INormalizationServiceClient>(),
+                _sp.GetRequiredService<IDataAcquisitionServiceClient>(),
+                Output, _facilityId);
+        }
 
         if (AutomationCfg.CleanupTestData)
             FhirDataLoader.ExpungeEverything(Output);
@@ -90,17 +92,24 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
     [Trait("Category", "RegenerateReportTest")]
     public async Task ExecuteRegenerateReportTest()
     {
-        var measureLoader = new MeasureLoader(_b.MeasureEvalClient, _b.SdkValidationClient, Output, _config);
+        var measureLoader = new MeasureLoader(
+            _sp.GetRequiredService<IMeasureEvalServiceClient>(),
+            _sp.GetRequiredService<IValidationServiceClient>(),
+            Output, _config);
         await measureLoader.LoadAsync();
 
         var measureId = measureLoader.MeasureId
             ?? throw new InvalidOperationException("MeasureLoader did not produce a MeasureId");
 
         // Step 1: Set up facility and all service configurations.
-        await SdkSetupHelper.EnsureFacilityAsync(_b, _facilityId, measureId);
-        await SdkSetupHelper.EnsureNormalizationConfigAsync(_b, _facilityId);
-        await SdkSetupHelper.EnsureQueryPlansAsync(_b, _facilityId, measureId, "Epic");
-        await SdkSetupHelper.EnsureQueryConfigAsync(_b, _facilityId);
+        await FacilitySetupHelper.EnsureFacilityAsync(
+            _sp.GetRequiredService<IFacilityServiceClient>(), Output, _facilityId, measureId);
+        await FacilitySetupHelper.EnsureNormalizationConfigAsync(
+            _sp.GetRequiredService<INormalizationServiceClient>(), Output, _facilityId);
+        await FacilitySetupHelper.EnsureQueryPlansAsync(
+            _sp.GetRequiredService<IDataAcquisitionServiceClient>(), Output, _facilityId, measureId, "Epic");
+        await FacilitySetupHelper.EnsureQueryConfigAsync(
+            _sp.GetRequiredService<IDataAcquisitionServiceClient>(), AutomationCfg, Output, _facilityId);
 
         // Step 2: Create source report via the scheduled-report production path.
         //   a) Produce ReportScheduled → creates the report schedule.
@@ -110,17 +119,19 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
         await WaitForScheduleCreationAsync(sourceReportId);
         await ProduceAdmitPatientEventAsync(_facilityId, _config.PatientIds[0]);
 
+        var lokiScraper = _sp.GetRequiredService<LokiScraper>();
+        var dataReader = _sp.GetRequiredService<PipelineDataReader>();
+        var reportApi = _sp.GetRequiredService<ReportApiHelper>();
+
         await using var sourceDiagnostics = new BackgroundDiagnosticsMonitor(
-            Output,
-            _b.LokiScraper,
-            AutomationCfg,
+            Output, lokiScraper, AutomationCfg,
             _config.PatientIds.Count,
             forwardInternalLogsToOutput: false,
-            pipelineReader: _b.DataReader);
+            pipelineReader: dataReader);
         await using var sourceWatcher = DiagnosticsEventWatcher.Start(sourceDiagnostics, Output);
 
         await sourceDiagnostics.StartAsync(_facilityId, sourceReportId);
-        var sourceSubmitted = await _b.CreateReportHelper().CheckSubmissionStatusAsync(sourceReportId, _config, sourceDiagnostics);
+        var sourceSubmitted = await reportApi.CheckSubmissionStatusAsync(sourceReportId, _config, sourceDiagnostics);
         await sourceDiagnostics.StopAsync();
         await sourceWatcher.StopAsync();
 
@@ -132,34 +143,29 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
         var regeneratedReportId = await RegenerateAsync(_facilityId, sourceReportId);
 
         await using var regenDiagnostics = new BackgroundDiagnosticsMonitor(
-            Output,
-            _b.LokiScraper,
-            AutomationCfg,
+            Output, lokiScraper, AutomationCfg,
             _config.PatientIds.Count,
             forwardInternalLogsToOutput: false,
-            pipelineReader: _b.DataReader);
+            pipelineReader: dataReader);
         await using var regenWatcher = DiagnosticsEventWatcher.Start(regenDiagnostics, Output);
 
         await regenDiagnostics.StartAsync(_facilityId, regeneratedReportId);
-        var regeneratedSubmitted = await _b.CreateReportHelper().CheckSubmissionStatusAsync(regeneratedReportId, _config, regenDiagnostics);
+        var regeneratedSubmitted = await reportApi.CheckSubmissionStatusAsync(regeneratedReportId, _config, regenDiagnostics);
         await regenDiagnostics.StopAsync();
         await regenWatcher.StopAsync();
 
-        var pipelineSnapshot = _b.CreatePipelineSnapshot();
+        var pipelineSnapshot = _sp.GetRequiredService<PipelineSnapshot>();
         await pipelineSnapshot.WriteFullSnapshotAsync(Output, _facilityId, regeneratedReportId);
 
         Assert.True(regeneratedSubmitted,
             $"Expected regenerated report {regeneratedReportId} to be submitted but it was not.");
 
-        // Fetch the actual schedule dates — the regenerated report inherits dates from the
-        // source scheduled report, which uses wall-clock end date and timezone-adjusted start.
-        var regenSchedule = await _b.ReportClient.GetScheduleAsync(regeneratedReportId)
+        var regenSchedule = await _sp.GetRequiredService<IReportServiceClient>().GetScheduleAsync(regeneratedReportId)
             ?? throw new InvalidOperationException($"Schedule {regeneratedReportId} not found after submission.");
         var actualStartDate = regenSchedule.ReportStartDate.ToUniversalTime().ToString("o");
         var actualEndDate = regenSchedule.ReportEndDate.ToUniversalTime().ToString("o");
 
         // Step 4: Validate regenerated report artifacts.
-        var reportApi = _b.CreateReportHelper();
         var downloadedResources = await reportApi.DownloadReportAsync(_facilityId, regeneratedReportId, _config);
         var internalAbsResources = await reportApi.DownloadReportAsync(_facilityId, regeneratedReportId, _config, external: false);
 
@@ -172,7 +178,7 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
                 $"Expected regenerated report to include patient-{patientId}.ndjson but it was not");
         }
 
-        await _b.CreateReportAbsManifestValidator().ValidateAllAsync(
+        await _sp.GetRequiredService<ReportAbsManifestValidator>().ValidateAllAsync(
             internalAbsResources,
             _config.PatientIds,
             measureId,
@@ -184,8 +190,7 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
             expectDataAcquisitionData: false);
 
         await ValidationBaselineManager.ValidateOrCreateAsync(
-            Output,
-            _b.DataReader,
+            Output, dataReader,
             nameof(RegenerateReportTest),
             _facilityId,
             regeneratedReportId,
@@ -195,16 +200,15 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
             internalAbsResources);
 
         // Step 5: Database-level validation.
-        await _b.CreateReportValidator().ValidateAllAsync(
-            _facilityId,
-            regeneratedReportId,
+        await _sp.GetRequiredService<ReportDatabaseValidator>().ValidateAllAsync(
+            _facilityId, regeneratedReportId,
             measureId,
             _config.PatientIds,
             expectedFrequency: Frequency.Adhoc);
-        await _b.CreateDataAcqValidator().ValidateAllAsync(_facilityId, regeneratedReportId, measureId, _config.PatientIds, expectDataAcquisitionData: false);
-        await _b.CreateNormalizationValidator().ValidateAllAsync(_facilityId);
-        await _b.CreateTenantValidator().ValidateAllAsync(_facilityId, measureId);
-        await _b.CreateValidationResultsValidator().ValidateAllAsync(_facilityId, regeneratedReportId, _config.PatientIds, _config.LokiScrapeWindow);
+        await _sp.GetRequiredService<DataAcquisitionDatabaseValidator>().ValidateAllAsync(_facilityId, regeneratedReportId, measureId, _config.PatientIds, expectDataAcquisitionData: false);
+        await _sp.GetRequiredService<NormalizationDatabaseValidator>().ValidateAllAsync(_facilityId);
+        await _sp.GetRequiredService<TenantDatabaseValidator>().ValidateAllAsync(_facilityId, measureId);
+        await _sp.GetRequiredService<ValidationResultsValidator>().ValidateAllAsync(_facilityId, regeneratedReportId, _config.PatientIds, _config.LokiScrapeWindow);
     }
 
     private async Task<string> ProduceReportScheduledEventAsync(string facilityId, string measureId, TimeSpan delay)
@@ -278,7 +282,7 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
 
         while (DateTime.UtcNow - started < timeout)
         {
-            var schedule = await _b.ReportClient.GetScheduleAsync(reportId);
+            var schedule = await _sp.GetRequiredService<IReportServiceClient>().GetScheduleAsync(reportId);
             if (schedule != null)
             {
                 var scheduleStatus = schedule.Status.ToString();
@@ -360,7 +364,7 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
     {
         Output.WriteLine($"Regenerating report from source reportId={sourceReportId}…");
 
-        var payload = await _b.FacilityClient.RegenerateReportAsync(facilityId, new RegenerateReportRequest
+        var payload = await _sp.GetRequiredService<IFacilityServiceClient>().RegenerateReportAsync(facilityId, new RegenerateReportRequest
         {
             ReportId = sourceReportId,
             BypassSubmission = false

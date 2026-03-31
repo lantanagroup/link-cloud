@@ -1,10 +1,13 @@
-﻿using LantanaGroup.Link.Automation;
+﻿using Flurl.Http;
+using LantanaGroup.Link.Automation;
 using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.Automation.Helpers;
+using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Census;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using Task = System.Threading.Tasks.Task;
 
@@ -16,7 +19,7 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
         "API_STABILITY_TEST",
         defaultPatientIds: []);
 
-    private readonly TestServices _b;
+    private readonly IServiceProvider _sp;
     private readonly string _facilityId = $"ApiStabilityTest-{Guid.NewGuid():N}";
 
     private bool _facilityCreated;
@@ -26,9 +29,21 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
     private bool _normalizationCreated;
     private bool _censusConfigCreated;
 
+    // Resolve clients once for readability
+    private IAutomationOutput Output => _sp.GetRequiredService<DualOutputHelper>();
+    private AutomationConfig AutomationCfg => _sp.GetRequiredService<AutomationConfig>();
+    private IFacilityServiceClient FacilityClient => _sp.GetRequiredService<IFacilityServiceClient>();
+    private IDataAcquisitionServiceClient DataAcqClient => _sp.GetRequiredService<IDataAcquisitionServiceClient>();
+    private INormalizationServiceClient NormalizationClient => _sp.GetRequiredService<INormalizationServiceClient>();
+    private ICensusServiceClient CensusClient => _sp.GetRequiredService<ICensusServiceClient>();
+    private IReportServiceClient ReportClient => _sp.GetRequiredService<IReportServiceClient>();
+    private ISubmissionServiceClient SubmissionClient => _sp.GetRequiredService<ISubmissionServiceClient>();
+    private IMeasureEvalServiceClient MeasureEvalClient => _sp.GetRequiredService<IMeasureEvalServiceClient>();
+    private IValidationServiceClient ValidationClient => _sp.GetRequiredService<IValidationServiceClient>();
+
     public ApiStabilityTest(BackendE2ETestFixture fixture)
     {
-        _b = fixture.GetTestServices();
+        _sp = fixture.ServiceProvider;
         _config.RemoveFacilityConfig = true;
     }
 
@@ -40,37 +55,37 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
             return;
 
         if (_monthlyPlanCreated)
-            await Try(() => _b.DataAcquisitionClient.DeleteQueryPlanAsync(_facilityId, "Monthly"));
+            await Try(() => DataAcqClient.DeleteQueryPlanAsync(_facilityId, "Monthly"));
         if (_dischargePlanCreated)
-            await Try(() => _b.DataAcquisitionClient.DeleteQueryPlanAsync(_facilityId, "Discharge"));
+            await Try(() => DataAcqClient.DeleteQueryPlanAsync(_facilityId, "Discharge"));
         if (_queryConfigCreated)
-            await Try(() => _b.DataAcquisitionClient.DeleteFhirQueryConfigurationAsync(_facilityId));
+            await Try(() => DataAcqClient.DeleteFhirQueryConfigurationAsync(_facilityId));
         if (_normalizationCreated)
-            await Try(() => _b.NormalizationClient.DeleteFacilityOperationsAsync(_facilityId));
+            await Try(() => NormalizationClient.DeleteFacilityOperationsAsync(_facilityId));
         if (_censusConfigCreated)
-            await Try(() => _b.CensusClient.DeleteCensusConfigAsync(_facilityId));
+            await Try(() => CensusClient.DeleteCensusConfigAsync(_facilityId));
         if (_facilityCreated)
-            await Try(() => _b.FacilityClient.DeleteAsync(_facilityId));
+            await Try(() => FacilityClient.DeleteAsync(_facilityId));
     }
 
     [Fact]
     [Trait("Category", "ApiStabilityTest")]
     public async Task ExecuteApiStabilityTest()
     {
-        var results = new ApiRunResults(_b.Output);
+        var results = new ApiRunResults(Output);
 
         await RunWithRetryAsync(results, "Validation.InitializeArtifacts",
-            () => _b.SdkValidationClient.InitializeArtifactsAsync(),
+            () => ValidationClient.InitializeArtifactsAsync(),
             timeout: TimeSpan.FromMinutes(3), retryDelay: TimeSpan.FromSeconds(10));
 
         await RunWithRetryAsync(results, "Validation.InitializeCategories",
-            () => _b.SdkValidationClient.InitializeCategoriesAsync(),
+            () => ValidationClient.InitializeCategoriesAsync(),
             timeout: TimeSpan.FromMinutes(3), retryDelay: TimeSpan.FromSeconds(10));
 
         string? measureId = null;
         await RunAsync(results, "MeasureLoader.Load", async () =>
         {
-            var measureLoader = new MeasureLoader(_b.MeasureEvalClient, _b.SdkValidationClient, _b.Output, _config);
+            var measureLoader = new MeasureLoader(MeasureEvalClient, ValidationClient, Output, _config);
             await measureLoader.LoadAsync();
             measureId = measureLoader.MeasureId;
             if (string.IsNullOrWhiteSpace(measureId))
@@ -85,13 +100,13 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
         }
 
         await RunAsync(results, "MeasureEval.GetMeasureDefinition",
-            () => _b.MeasureEvalClient.GetMeasureDefinitionAsync(measureId));
+            () => MeasureEvalClient.GetMeasureDefinitionAsync(measureId));
 
         await RunAsync(results, "Validation.UpsertResourceArtifact", async () =>
         {
             var artifactId = $"OperationOutcome-{Guid.NewGuid():N}";
             var payload = $"{{\"resourceType\":\"OperationOutcome\",\"id\":\"{Guid.NewGuid():N}\",\"issue\":[{{\"severity\":\"information\",\"code\":\"informational\",\"diagnostics\":\"ApiStabilityTest artifact\"}}]}}";
-            await _b.SdkValidationClient.UpsertResourceArtifactAsync(artifactId, payload);
+            await ValidationClient.UpsertResourceArtifactAsync(artifactId, payload);
         });
 
         var facilityBody = new FacilityModel
@@ -109,49 +124,52 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
 
         await RunAsync(results, "Facility.Create", async () =>
         {
-            await _b.FacilityClient.CreateAsync(facilityBody);
+            await FacilityClient.CreateAsync(facilityBody);
             _facilityCreated = true;
         });
 
         await RunAsync(results, "Facility.Get",
-            () => _b.FacilityClient.GetAsync(_facilityId));
+            () => FacilityClient.GetAsync(_facilityId));
+
+        await RunAsync(results, "Facility.CheckFacilityExists",
+            () => FacilityClient.CheckFacilityExistsAsync(_facilityId));
 
         var queryConfigRequest = new CreateFhirQueryConfigurationRequestApiModel
         {
             FacilityId = _facilityId,
-            FhirServerBaseUrl = _b.AutomationCfg.InternalFhirServerBase,
-            MaxConcurrentRequests = _b.AutomationCfg.FhirQuery.MaxConcurrentRequests,
+            FhirServerBaseUrl = AutomationCfg.InternalFhirServerBase,
+            MaxConcurrentRequests = AutomationCfg.FhirQuery.MaxConcurrentRequests,
             MaxRetries = 3
         };
 
         await RunAsync(results, "DataAcq.CreateFhirQueryConfiguration", async () =>
         {
-            await _b.DataAcquisitionClient.CreateFhirQueryConfigurationAsync(queryConfigRequest);
+            await DataAcqClient.CreateFhirQueryConfigurationAsync(queryConfigRequest);
             _queryConfigCreated = true;
         });
 
         await RunAsync(results, "DataAcq.GetFhirQueryConfiguration",
-            () => _b.DataAcquisitionClient.GetFhirQueryConfigurationAsync(_facilityId));
+            () => DataAcqClient.GetFhirQueryConfigurationAsync(_facilityId));
 
         var dischargePlanBody = BuildQueryPlanRequest(_facilityId, measureId, "Discharge");
         await RunAsync(results, "DataAcq.CreateQueryPlan.Discharge", async () =>
         {
-            await _b.DataAcquisitionClient.CreateQueryPlanAsync(_facilityId, dischargePlanBody);
+            await DataAcqClient.CreateQueryPlanAsync(_facilityId, dischargePlanBody);
             _dischargePlanCreated = true;
         });
 
         var monthlyPlanBody = BuildQueryPlanRequest(_facilityId, measureId, "Monthly");
         await RunAsync(results, "DataAcq.CreateQueryPlan.Monthly", async () =>
         {
-            await _b.DataAcquisitionClient.CreateQueryPlanAsync(_facilityId, monthlyPlanBody);
+            await DataAcqClient.CreateQueryPlanAsync(_facilityId, monthlyPlanBody);
             _monthlyPlanCreated = true;
         });
 
         await RunAsync(results, "DataAcq.GetQueryPlan.Discharge",
-            () => _b.DataAcquisitionClient.GetQueryPlanAsync(_facilityId, "Discharge"));
+            () => DataAcqClient.GetQueryPlanAsync(_facilityId, "Discharge"));
 
         await RunAsync(results, "DataAcq.GetQueryPlan.Monthly",
-            () => _b.DataAcquisitionClient.GetQueryPlanAsync(_facilityId, "Monthly"));
+            () => DataAcqClient.GetQueryPlanAsync(_facilityId, "Monthly"));
 
         var normalizationBody = new CreateNormalizationOperationRequestApiModel
         {
@@ -171,15 +189,15 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
 
         await RunAsync(results, "Normalization.CreateOperation", async () =>
         {
-            await _b.NormalizationClient.CreateOperationAsync(normalizationBody);
+            await NormalizationClient.CreateOperationAsync(normalizationBody);
             _normalizationCreated = true;
         });
 
         await RunAsync(results, "Normalization.SearchFacilityOperations",
-            () => _b.NormalizationClient.SearchFacilityOperationsAsync(_facilityId));
+            () => NormalizationClient.SearchFacilityOperationsAsync(_facilityId));
 
         await RunAsync(results, "Normalization.GetOperationSequences",
-            () => _b.NormalizationClient.GetOperationSequencesAsync(_facilityId));
+            () => NormalizationClient.GetOperationSequencesAsync(_facilityId));
 
         var censusConfig = new CensusConfigApiModel
         {
@@ -190,109 +208,113 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
 
         await RunAsync(results, "Census.CreateConfig", async () =>
         {
-            await _b.CensusClient.CreateCensusConfigAsync(censusConfig);
+            await CensusClient.CreateCensusConfigAsync(censusConfig);
             _censusConfigCreated = true;
         });
 
         await RunAsync(results, "Census.GetConfig",
-            () => _b.CensusClient.GetCensusConfigAsync(_facilityId));
+            () => CensusClient.GetCensusConfigAsync(_facilityId));
 
         await RunAsync(results, "Census.UpdateConfig",
-            () => _b.CensusClient.UpdateCensusConfigAsync(_facilityId, censusConfig));
+            () => CensusClient.UpdateCensusConfigAsync(_facilityId, censusConfig));
 
         var rangeStart = DateTime.SpecifyKind(DateTime.Parse(_config.StartDate), DateTimeKind.Utc);
         var rangeEnd = DateTime.SpecifyKind(DateTime.Parse(_config.EndDate), DateTimeKind.Utc);
 
         await RunAsync(results, "Census.GetAdmittedPatients",
-            () => _b.CensusClient.GetAdmittedPatientsAsync(_facilityId, rangeStart, rangeEnd));
+            () => CensusClient.GetAdmittedPatientsAsync(_facilityId, rangeStart, rangeEnd));
 
         await RunAsync(results, "Census.GetCurrentPatientEncounters",
-            () => _b.CensusClient.GetCurrentPatientEncountersAsync(_facilityId));
+            () => CensusClient.GetCurrentPatientEncountersAsync(_facilityId));
 
         await RunAsync(results, "Census.GetHistoricalPatientEncounters",
-            () => _b.CensusClient.GetHistoricalPatientEncountersAsync(_facilityId, DateTime.UtcNow));
+            () => CensusClient.GetHistoricalPatientEncountersAsync(_facilityId, DateTime.UtcNow));
 
         await RunAsync(results, "Census.RebuildPatientEncounters",
-            () => _b.CensusClient.RebuildPatientEncountersAsync(_facilityId));
+            () => CensusClient.RebuildPatientEncountersAsync(_facilityId));
 
         await RunAsync(results, "Census.GetPatientEvents",
-            () => _b.CensusClient.GetPatientEventsAsync(_facilityId));
+            () => CensusClient.GetPatientEventsAsync(_facilityId));
 
         await RunAsync(results, "Census.DeletePatientEvent",
-            () => _b.CensusClient.DeletePatientEventAsync(Guid.NewGuid().ToString()));
+            () => CensusClient.DeletePatientEventAsync(Guid.NewGuid().ToString()));
 
         await RunAsync(results, "Census.DeletePatientEventsByCorrelation",
-            () => _b.CensusClient.DeletePatientEventsByCorrelationAsync(Guid.NewGuid().ToString()));
+            () => CensusClient.DeletePatientEventsByCorrelationAsync(Guid.NewGuid().ToString()));
 
         await RunAsync(results, "Report.GetSchedule",
-            () => _b.ReportClient.GetScheduleAsync(Guid.NewGuid().ToString()));
+            () => ReportClient.GetScheduleAsync(Guid.NewGuid().ToString()));
 
         await RunAsync(results, "Report.SearchSchedules",
-            () => _b.ReportClient.SearchSchedulesAsync(Guid.NewGuid().ToString()));
+            () => ReportClient.SearchSchedulesAsync(Guid.NewGuid().ToString()));
 
         await RunAsync(results, "Report.GetEntriesBySchedule",
-            () => _b.ReportClient.GetEntriesByScheduleAsync(Guid.NewGuid().ToString()));
+            () => ReportClient.GetEntriesByScheduleAsync(Guid.NewGuid().ToString()));
 
         await RunAsync(results, "Report.SearchResources",
-            () => _b.ReportClient.SearchResourcesAsync(_facilityId, Guid.NewGuid().ToString()));
+            () => ReportClient.SearchResourcesAsync(_facilityId, Guid.NewGuid().ToString()));
 
         await RunAsync(results, "Report.GetPopulationsBySchedule",
-            () => _b.ReportClient.GetPopulationsByScheduleAsync(Guid.NewGuid().ToString()));
+            () => ReportClient.GetPopulationsByScheduleAsync(Guid.NewGuid().ToString()));
+
+        // Submission service – non-existent report returns 404; that proves the service is reachable
+        await RunExpecting404Async(results, "Submission.DownloadSubmission",
+            () => SubmissionClient.DownloadSubmissionAsync(_facilityId, Guid.NewGuid().ToString()));
 
         await RunAsync(results, "DataAcq.SearchAcquisitionLogs",
-            () => _b.DataAcquisitionClient.SearchAcquisitionLogsAsync(_facilityId, Guid.NewGuid().ToString()));
+            () => DataAcqClient.SearchAcquisitionLogsAsync(_facilityId, Guid.NewGuid().ToString()));
 
         await RunAsync(results, "DataAcq.SearchDetailedAcquisitionLogs",
-            () => _b.DataAcquisitionClient.SearchDetailedAcquisitionLogsAsync(_facilityId, Guid.NewGuid().ToString()));
+            () => DataAcqClient.SearchDetailedAcquisitionLogsAsync(_facilityId, Guid.NewGuid().ToString()));
 
         await RunAsync(results, "DataAcq.GetReportStatusCounts",
-            () => _b.DataAcquisitionClient.GetReportStatusCountsAsync(Guid.NewGuid().ToString()));
+            () => DataAcqClient.GetReportStatusCountsAsync(Guid.NewGuid().ToString()));
 
         await RunAsync(results, "DataAcq.GetAcquiredResourceIdsForReport",
-            () => _b.DataAcquisitionClient.GetAcquiredResourceIdsForReportAsync(_facilityId, Guid.NewGuid().ToString()));
+            () => DataAcqClient.GetAcquiredResourceIdsForReportAsync(_facilityId, Guid.NewGuid().ToString()));
 
         await RunAsync(results, "Validation.GetValidationResults",
-            () => _b.SdkValidationClient.GetValidationResultsAsync(_facilityId, Guid.NewGuid().ToString()));
+            () => ValidationClient.GetValidationResultsAsync(_facilityId, Guid.NewGuid().ToString()));
 
         if (_monthlyPlanCreated)
         {
             await RunAsync(results, "DataAcq.DeleteQueryPlan.Monthly",
-                () => _b.DataAcquisitionClient.DeleteQueryPlanAsync(_facilityId, "Monthly"));
+                () => DataAcqClient.DeleteQueryPlanAsync(_facilityId, "Monthly"));
             _monthlyPlanCreated = false;
         }
 
         if (_dischargePlanCreated)
         {
             await RunAsync(results, "DataAcq.DeleteQueryPlan.Discharge",
-                () => _b.DataAcquisitionClient.DeleteQueryPlanAsync(_facilityId, "Discharge"));
+                () => DataAcqClient.DeleteQueryPlanAsync(_facilityId, "Discharge"));
             _dischargePlanCreated = false;
         }
 
         if (_queryConfigCreated)
         {
             await RunAsync(results, "DataAcq.DeleteFhirQueryConfiguration",
-                () => _b.DataAcquisitionClient.DeleteFhirQueryConfigurationAsync(_facilityId));
+                () => DataAcqClient.DeleteFhirQueryConfigurationAsync(_facilityId));
             _queryConfigCreated = false;
         }
 
         if (_normalizationCreated)
         {
             await RunAsync(results, "Normalization.DeleteFacilityOperations",
-                () => _b.NormalizationClient.DeleteFacilityOperationsAsync(_facilityId));
+                () => NormalizationClient.DeleteFacilityOperationsAsync(_facilityId));
             _normalizationCreated = false;
         }
 
         if (_censusConfigCreated)
         {
             await RunAsync(results, "Census.DeleteConfig",
-                () => _b.CensusClient.DeleteCensusConfigAsync(_facilityId));
+                () => CensusClient.DeleteCensusConfigAsync(_facilityId));
             _censusConfigCreated = false;
         }
 
         if (_facilityCreated)
         {
             await RunAsync(results, "Facility.Delete",
-                () => _b.FacilityClient.DeleteAsync(_facilityId));
+                () => FacilityClient.DeleteAsync(_facilityId));
             _facilityCreated = false;
         }
 
@@ -320,6 +342,27 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
         {
             await action();
             results.AddSuccess(name);
+        }
+        catch (Exception ex)
+        {
+            results.AddError(name, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Runs an action where a 404 response is the expected healthy outcome
+    /// (e.g., querying a non-existent resource to prove the service is reachable).
+    /// </summary>
+    private async Task RunExpecting404Async(ApiRunResults results, string name, Func<Task> action)
+    {
+        try
+        {
+            await action();
+            results.AddSuccess(name);
+        }
+        catch (FlurlHttpException ex) when (ex.StatusCode == 404)
+        {
+            results.AddSuccess(name, "404 (expected for non-existent resource)");
         }
         catch (Exception ex)
         {

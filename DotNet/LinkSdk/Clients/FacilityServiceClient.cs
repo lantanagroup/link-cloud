@@ -56,6 +56,14 @@ public class FacilityServiceClient : LinkApiClientBase, IFacilityServiceClient
         DeleteOrIgnoreAsync(() => Request($"/Facility/{facilityId}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
+    public Task<GenerateAdhocReportResponseApiModel> GenerateAdhocReportAsync(
+        string facilityId,
+        AdHocReportRequest request,
+        CancellationToken cancellationToken = default) =>
+        Request($"/Facility/{facilityId}/AdHocReport")
+            .PostJsonAsync(request, cancellationToken: cancellationToken)
+            .ReceiveJson<GenerateAdhocReportResponseApiModel>();
+
     public Task<GenerateAdhocReportResponseApiModel> RegenerateReportAsync(
         string facilityId,
         RegenerateReportRequest request,

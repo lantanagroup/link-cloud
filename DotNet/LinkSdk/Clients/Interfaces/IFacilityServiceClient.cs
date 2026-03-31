@@ -9,5 +9,6 @@ public interface IFacilityServiceClient
     Task<FacilityModel?> GetAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<bool> CheckFacilityExistsAsync(string facilityId, CancellationToken cancellationToken = default);
     Task DeleteAsync(string facilityId, CancellationToken cancellationToken = default);
+    Task<GenerateAdhocReportResponseApiModel> GenerateAdhocReportAsync(string facilityId, AdHocReportRequest request, CancellationToken cancellationToken = default);
     Task<GenerateAdhocReportResponseApiModel> RegenerateReportAsync(string facilityId, RegenerateReportRequest request, CancellationToken cancellationToken = default);
 }

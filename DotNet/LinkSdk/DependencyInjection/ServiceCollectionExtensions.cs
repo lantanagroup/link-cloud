@@ -20,6 +20,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IReportServiceClient, ReportServiceClient>();
         services.AddSingleton<IMeasureEvalServiceClient, MeasureEvalServiceClient>();
         services.AddSingleton<IValidationServiceClient, ValidationServiceClient>();
+        services.AddSingleton<ISubmissionServiceClient, SubmissionServiceClient>();
 
         return services;
     }

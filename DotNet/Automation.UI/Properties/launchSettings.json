@@ -1,33 +1,7 @@
 ﻿{
   "$schema": "http://json.schemastore.org/launchsettings.json",
-  "iisSettings": {
-    "windowsAuthentication": false,
-    "anonymousAuthentication": true,
-    "iisExpress": {
-      "applicationUrl": "http://localhost:60105",
-      "sslPort": 44316
-    }
-  },
   "profiles": {
     "http": {
-      "commandName": "Project",
-      "dotnetRunMessages": true,
-      "launchBrowser": true,
-      "applicationUrl": "http://localhost:5255",
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
-    },
-    "https": {
-      "commandName": "Project",
-      "dotnetRunMessages": true,
-      "launchBrowser": true,
-      "applicationUrl": "https://localhost:7022;http://localhost:5255",
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
-    },
-    "docker": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,
@@ -36,11 +10,36 @@
         "ASPNETCORE_ENVIRONMENT": "Docker"
       }
     },
-    "IIS Express": {
-      "commandName": "IISExpress",
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
       "launchBrowser": true,
+      "applicationUrl": "https://localhost:7022;http://localhost:5255",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Docker"
+      }
+    },
+    "docker": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:5255",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Docker",
+        "ServiceRegistry__TenantService__TenantServiceUrl": "http://localhost:8074",
+        "ServiceRegistry__CensusServiceUrl": "http://localhost:8064",
+        "ServiceRegistry__DataAcquisitionServiceUrl": "http://localhost:8065",
+        "ServiceRegistry__NormalizationServiceUrl": "http://localhost:8068",
+        "ServiceRegistry__ReportServiceUrl": "http://localhost:8072",
+        "ServiceRegistry__MeasureServiceUrl": "http://localhost:8067",
+        "ServiceRegistry__ValidationServiceUrl": "http://localhost:8075",
+        "ServiceRegistry__SubmissionServiceUrl": "http://localhost:8073",
+        "Automation__ExternalFhirServerBase": "http://localhost:6157/fhir",
+        "Automation__AdminBffBase": "http://localhost:8063/api",
+        "Automation__LokiBaseUrl": "http://localhost:3100",
+        "Automation__Database__Server": "localhost,1433",
+        "Automation__Kafka__BootstrapServers": "localhost:9094",
+        "Automation__Kafka__RestProxyBaseUrl": "http://localhost:8082"
       }
     }
   }

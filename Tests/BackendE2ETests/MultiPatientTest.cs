@@ -3,6 +3,9 @@ using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.Automation.Generation;
 using LantanaGroup.Link.Automation.Helpers;
 using LantanaGroup.Link.Automation.Services;
+using LantanaGroup.Link.Automation.Validation;
+using LantanaGroup.Link.Sdk.Clients;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using Task = System.Threading.Tasks.Task;
 
@@ -23,27 +26,23 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
         "MULTI_PATIENT_TEST",
         defaultPatientIds: []);
 
-    private readonly TestServices _tesetServices;
+    private readonly IServiceProvider _sp;
     private List<(string Name, string Json)> _generatedBundles = [];
 
-    private AutomationConfig AutomationCfg => _tesetServices.AutomationCfg;
-    private DualOutputHelper _output => _tesetServices.Output;
-    private FhirDataLoader FhirDataLoader => _tesetServices.FhirDataLoader;
-
-    private ReportApiHelper ReportApi => _tesetServices.CreateReportHelper();
-
-    private ValidationApiHelper ValidationApi => _tesetServices.CreateValidationHelper();
+    private AutomationConfig AutomationCfg => _sp.GetRequiredService<AutomationConfig>();
+    private DualOutputHelper Output => _sp.GetRequiredService<DualOutputHelper>();
+    private FhirDataLoader FhirDataLoader => _sp.GetRequiredService<FhirDataLoader>();
 
     public MultiPatientTest(BackendE2ETestFixture fixture)
     {
-        _tesetServices = fixture.GetTestServices();
+        _sp = fixture.ServiceProvider;
     }
 
     public async Task InitializeAsync()
     {
-        _output.WriteLine($"Using deterministic generation seed: {GenerationSeed}");
+        Output.WriteLine($"Using deterministic generation seed: {GenerationSeed}");
         // Generate 1000 synthetic patients, each with ~100 resources
-        var (patientIds, bundles) = FhirBundleGenerator.Generate(_output, 1000, 100, "MultiPatient", GenerationSeed);
+        var (patientIds, bundles) = FhirBundleGenerator.Generate(Output, 1000, 100, "MultiPatient", GenerationSeed);
         _generatedBundles = bundles;
 
         // If config has no patient IDs set (the default), use generated ones
@@ -53,37 +52,42 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
         }
 
         await GeneratedFhirDataSnapshotWriter.WriteIfChangedAsync(
-            _output,
+            Output,
             nameof(MultiPatientTest),
             GenerationSeed,
             Config.PatientIds,
             bundles);
 
-        _output.WriteLine($"Patient IDs for test: [{string.Join(", ", Config.PatientIds.Take(10))}...]");
+        Output.WriteLine($"Patient IDs for test: [{string.Join(", ", Config.PatientIds.Take(10))}...]");
 
         // Wait for FHIR server before uploading large volume of bundles
-        await FhirDataLoader.WaitForServerAsync(_output);
+        await FhirDataLoader.WaitForServerAsync(Output);
 
         // Load the generated bundles
-        await FhirDataLoader.LoadTransactionBundlesFromJsonAsync(_output, bundles);
+        await FhirDataLoader.LoadTransactionBundlesFromJsonAsync(Output, bundles);
 
+        var validationApi = _sp.GetRequiredService<ValidationApiHelper>();
         // Initialize validation artifacts and categories (with retry)
-        await ValidationApi.InitializeArtifactsAsync();
-        await ValidationApi.InitializeCategoriesAsync();
+        await validationApi.InitializeArtifactsAsync();
+        await validationApi.InitializeCategoriesAsync();
     }
 
     public async Task DisposeAsync()
     {
-        _output.WriteLine("Cleaning up...\n");
+        Output.WriteLine("Cleaning up...\n");
 
         if (Config.RemoveFacilityConfig)
         {
-            await SdkSetupHelper.CleanupFacilityAsync(_tesetServices, FacilityId);
+            await FacilitySetupHelper.CleanupFacilityAsync(
+                _sp.GetRequiredService<IFacilityServiceClient>(),
+                _sp.GetRequiredService<INormalizationServiceClient>(),
+                _sp.GetRequiredService<IDataAcquisitionServiceClient>(),
+                Output, FacilityId);
         }
 
         if (AutomationCfg.CleanupTestData)
         {
-            FhirDataLoader.ExpungeEverything(_output);
+            FhirDataLoader.ExpungeEverything(Output);
         }
     }
 
@@ -92,75 +96,81 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
     public async Task ExecuteMultiPatientTest()
     {
         // Step 1: Load measure definition into measureeval and validation
-        var measureLoader = new MeasureLoader(_tesetServices.MeasureEvalClient, _tesetServices.SdkValidationClient, _output, Config);
+        var measureLoader = new MeasureLoader(
+            _sp.GetRequiredService<IMeasureEvalServiceClient>(),
+            _sp.GetRequiredService<IValidationServiceClient>(),
+            Output, Config);
         await measureLoader.LoadAsync();
 
         var measureId = measureLoader.MeasureId
             ?? throw new InvalidOperationException("MeasureLoader did not produce a MeasureId");
 
-        _output.WriteLine($"MeasureId: {measureId}");
-        _output.WriteLine($"Patients : {Config.PatientIds.Count}");
-        _output.WriteLine(
+        Output.WriteLine($"MeasureId: {measureId}");
+        Output.WriteLine($"Patients : {Config.PatientIds.Count}");
+        Output.WriteLine(
             $"Submission polling timeout: up to {Config.MaxPollingDuration.TotalMinutes:F1} minutes " +
             $"({Config.MaxRetryCount} checks every {Config.PollingIntervalSeconds} seconds).");
 
         // Step 2: Create facility
-        await SdkSetupHelper.EnsureFacilityAsync(_tesetServices, FacilityId, measureId);
+        await FacilitySetupHelper.EnsureFacilityAsync(
+            _sp.GetRequiredService<IFacilityServiceClient>(), Output, FacilityId, measureId);
 
         // Step 3: Create normalization config
-        await SdkSetupHelper.EnsureNormalizationConfigAsync(_tesetServices, FacilityId);
+        await FacilitySetupHelper.EnsureNormalizationConfigAsync(
+            _sp.GetRequiredService<INormalizationServiceClient>(), Output, FacilityId);
 
         // Step 4: Create query plans (Discharge + Monthly)
-        await SdkSetupHelper.EnsureQueryPlansAsync(_tesetServices, FacilityId, measureId, "Epic");
+        await FacilitySetupHelper.EnsureQueryPlansAsync(
+            _sp.GetRequiredService<IDataAcquisitionServiceClient>(), Output, FacilityId, measureId, "Epic");
 
         // Step 5: Create FHIR query config
-        await SdkSetupHelper.EnsureQueryConfigAsync(_tesetServices, FacilityId);
+        await FacilitySetupHelper.EnsureQueryConfigAsync(
+            _sp.GetRequiredService<IDataAcquisitionServiceClient>(), AutomationCfg, Output, FacilityId);
 
         // Step 6: Generate the ad-hoc report
-        var reportId = await ReportApi.GenerateReportAsync(FacilityId, measureId, Config);
+        var reportApi = _sp.GetRequiredService<ReportApiHelper>();
+        var reportId = await reportApi.GenerateReportAsync(FacilityId, measureId, Config);
 
         // Step 7: Start background diagnostics and poll until the report is submitted
+        var lokiScraper = _sp.GetRequiredService<LokiScraper>();
+        var dataReader = _sp.GetRequiredService<PipelineDataReader>();
+
         await using var diagnostics = new BackgroundDiagnosticsMonitor(
-            _output,
-            _tesetServices.LokiScraper,
-            AutomationCfg,
+            Output, lokiScraper, AutomationCfg,
             Config.PatientIds.Count,
             forwardInternalLogsToOutput: false,
-            pipelineReader: _tesetServices.DataReader);
-        await using var watcher = DiagnosticsEventWatcher.Start(diagnostics, _output);
+            pipelineReader: dataReader);
+        await using var watcher = DiagnosticsEventWatcher.Start(diagnostics, Output);
         await diagnostics.StartAsync(FacilityId, reportId);
 
-        var reportSubmitted = await ReportApi.CheckSubmissionStatusAsync(reportId, Config, diagnostics);
+        var reportSubmitted = await reportApi.CheckSubmissionStatusAsync(reportId, Config, diagnostics);
 
         await diagnostics.StopAsync();
         await watcher.StopAsync();
 
-        // Keep diagnostics output concise: rely on live background monitoring above,
-        // and capture a single DB snapshot before assertions.
-        // Always write a snapshot before any assertions can kill the test.
-        var pipelineSnapshot = _tesetServices.CreatePipelineSnapshot();
-        await pipelineSnapshot.WriteFullSnapshotAsync(_output, FacilityId, reportId);
+        var pipelineSnapshot = _sp.GetRequiredService<PipelineSnapshot>();
+        await pipelineSnapshot.WriteFullSnapshotAsync(Output, FacilityId, reportId);
 
         Assert.True(reportSubmitted,
             $"Expected report with id {reportId} to be submitted but it was not. " +
             $"Check [DIAG] and [Snapshot] output above for root cause details.");
 
         // Step 8: Download and validate the report contents
-        var downloadedResources = await ReportApi.DownloadReportAsync(FacilityId, reportId, Config);
-        var internalAbsResources = await ReportApi.DownloadReportAsync(FacilityId, reportId, Config, external: false);
+        var downloadedResources = await reportApi.DownloadReportAsync(FacilityId, reportId, Config);
+        var internalAbsResources = await reportApi.DownloadReportAsync(FacilityId, reportId, Config, external: false);
 
         Assert.True(downloadedResources.ContainsKey("manifest.ndjson"),
             "Expected report to include manifest.ndjson but it was not");
 
-        foreach (var patientId in Config.PatientIds.Take(10)) // Only check first 10 for sanity
+        foreach (var patientId in Config.PatientIds.Take(10))
         {
             Assert.True(downloadedResources.ContainsKey($"patient-{patientId}.ndjson"),
                 $"Expected report to include patient-{patientId}.ndjson but it was not");
         }
 
-        _output.WriteLine("Done generating and validating report.");
+        Output.WriteLine("Done generating and validating report.");
 
-        await _tesetServices.CreateReportAbsManifestValidator().ValidateAllAsync(
+        await _sp.GetRequiredService<ReportAbsManifestValidator>().ValidateAllAsync(
             internalAbsResources,
             Config.PatientIds,
             measureId,
@@ -171,8 +181,7 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
             GeneratedFhirDataSnapshotWriter.GetSnapshotDirectory(nameof(MultiPatientTest)));
 
         await ValidationBaselineManager.ValidateOrCreateAsync(
-            _output,
-            _tesetServices.DataReader,
+            Output, dataReader,
             nameof(MultiPatientTest),
             FacilityId,
             reportId,

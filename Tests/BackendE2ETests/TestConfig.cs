@@ -11,9 +11,24 @@ namespace LantanaGroup.Link.Tests.E2ETests;
 /// </summary>
 public static class TestConfig
 {
+    // FHIR server
     public static string ExternalFhirServerBase => Environment.GetEnvironmentVariable("EXTERNAL_FHIR_SERVER_BASE_URL") ?? "http://localhost:6157/fhir";
     public static string InternalFhirServerBase => Environment.GetEnvironmentVariable("INTERNAL_FHIR_SERVER_BASE_URL") ?? "http://fhir-server:8080/fhir";
+
+    // Service URLs — direct to each service (not through BFF)
+    public static string TenantServiceBase => Environment.GetEnvironmentVariable("TENANT_SERVICE_BASE_URL") ?? "http://localhost:8074";
+    public static string CensusServiceBase => Environment.GetEnvironmentVariable("CENSUS_SERVICE_BASE_URL") ?? "http://localhost:8064";
+    public static string DataAcquisitionServiceBase => Environment.GetEnvironmentVariable("DATAACQUISITION_SERVICE_BASE_URL") ?? "http://localhost:8065";
+    public static string NormalizationServiceBase => Environment.GetEnvironmentVariable("NORMALIZATION_SERVICE_BASE_URL") ?? "http://localhost:8068";
+    public static string ReportServiceBase => Environment.GetEnvironmentVariable("REPORT_SERVICE_BASE_URL") ?? "http://localhost:8072";
+    public static string MeasureServiceBase => Environment.GetEnvironmentVariable("MEASURE_SERVICE_BASE_URL") ?? "http://localhost:8067";
+    public static string ValidationServiceBase => Environment.GetEnvironmentVariable("VALIDATION_SERVICE_BASE_URL") ?? "http://localhost:8075";
+    public static string SubmissionServiceBase => Environment.GetEnvironmentVariable("SUBMISSION_SERVICE_BASE_URL") ?? "http://localhost:8073";
+
+    // AdminBFF — only for operations that have no direct service endpoint
     public static string AdminBffBase => Environment.GetEnvironmentVariable("ADMIN_BFF_BASE_URL") ?? "http://localhost:8063/api";
+
+    // Infrastructure
     public static string LokiBaseUrl => Environment.GetEnvironmentVariable("LOKI_BASE_URL") ?? "http://localhost:3100";
     public static string? SmokeTestDownloadPath =>
     Environment.GetEnvironmentVariable("SMOKE_TEST_DOWNLOAD_PATH");

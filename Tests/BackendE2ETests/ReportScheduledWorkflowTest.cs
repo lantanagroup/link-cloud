@@ -1,5 +1,4 @@
-﻿using System.Net;
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
 using System.Globalization;
 using Confluent.Kafka;
@@ -8,9 +7,12 @@ using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.Automation.Generation;
 using LantanaGroup.Link.Automation.Helpers;
 using LantanaGroup.Link.Automation.Services;
+using LantanaGroup.Link.Automation.Validation;
+using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using Task = System.Threading.Tasks.Task;
 
@@ -32,19 +34,17 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
         defaultMaxRetryCount: 140,
         defaultLokiScrapeWindowMinutes: 10);
 
-    private readonly TestServices _b;
+    private readonly IServiceProvider _sp;
     private readonly string _facilityId = $"ScheduledTest-{Guid.NewGuid():N}";
     private List<(string Name, string Json)> _generatedBundles = [];
 
-    private AutomationConfig AutomationCfg => _b.AutomationCfg;
-    private DualOutputHelper Output => _b.Output;
-    private FhirDataLoader FhirDataLoader => _b.FhirDataLoader;
-
-    private ValidationApiHelper ValidationApi => _b.CreateValidationHelper();
+    private AutomationConfig AutomationCfg => _sp.GetRequiredService<AutomationConfig>();
+    private DualOutputHelper Output => _sp.GetRequiredService<DualOutputHelper>();
+    private FhirDataLoader FhirDataLoader => _sp.GetRequiredService<FhirDataLoader>();
 
     public ReportScheduledWorkflowTest(BackendE2ETestFixture fixture)
     {
-        _b = fixture.GetTestServices();
+        _sp = fixture.ServiceProvider;
         _config.RemoveFacilityConfig = true;
     }
 
@@ -67,8 +67,9 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
         await FhirDataLoader.WaitForServerAsync(Output);
         await FhirDataLoader.LoadTransactionBundlesFromJsonAsync(Output, bundles);
 
-        await ValidationApi.InitializeArtifactsAsync();
-        await ValidationApi.InitializeCategoriesAsync();
+        var validationApi = _sp.GetRequiredService<ValidationApiHelper>();
+        await validationApi.InitializeArtifactsAsync();
+        await validationApi.InitializeCategoriesAsync();
     }
 
     public async Task DisposeAsync()
@@ -76,7 +77,13 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
         Output.WriteLine("Cleaning up...\n");
 
         if (_config.RemoveFacilityConfig)
-            await SdkSetupHelper.CleanupFacilityAsync(_b, _facilityId);
+        {
+            await FacilitySetupHelper.CleanupFacilityAsync(
+                _sp.GetRequiredService<IFacilityServiceClient>(),
+                _sp.GetRequiredService<INormalizationServiceClient>(),
+                _sp.GetRequiredService<IDataAcquisitionServiceClient>(),
+                Output, _facilityId);
+        }
 
         if (AutomationCfg.CleanupTestData)
             FhirDataLoader.ExpungeEverything(Output);
@@ -86,32 +93,41 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
     [Trait("Category", "ReportScheduledWorkflowTest")]
     public async Task ExecuteReportScheduledWorkflowTest()
     {
-        var measureLoader = new MeasureLoader(_b.MeasureEvalClient, _b.SdkValidationClient, Output, _config);
+        var measureLoader = new MeasureLoader(
+            _sp.GetRequiredService<IMeasureEvalServiceClient>(),
+            _sp.GetRequiredService<IValidationServiceClient>(),
+            Output, _config);
         await measureLoader.LoadAsync();
 
         var measureId = measureLoader.MeasureId
             ?? throw new InvalidOperationException("MeasureLoader did not produce a MeasureId");
 
-        await SdkSetupHelper.EnsureFacilityAsync(_b, _facilityId, measureId);
-        await SdkSetupHelper.EnsureNormalizationConfigAsync(_b, _facilityId);
-        await SdkSetupHelper.EnsureQueryPlansAsync(_b, _facilityId, measureId, "Epic");
-        await SdkSetupHelper.EnsureQueryConfigAsync(_b, _facilityId);
+        await FacilitySetupHelper.EnsureFacilityAsync(
+            _sp.GetRequiredService<IFacilityServiceClient>(), Output, _facilityId, measureId);
+        await FacilitySetupHelper.EnsureNormalizationConfigAsync(
+            _sp.GetRequiredService<INormalizationServiceClient>(), Output, _facilityId);
+        await FacilitySetupHelper.EnsureQueryPlansAsync(
+            _sp.GetRequiredService<IDataAcquisitionServiceClient>(), Output, _facilityId, measureId, "Epic");
+        await FacilitySetupHelper.EnsureQueryConfigAsync(
+            _sp.GetRequiredService<IDataAcquisitionServiceClient>(), AutomationCfg, Output, _facilityId);
 
         var reportId = await ProduceReportScheduledEventAsync(_facilityId, measureId, TimeSpan.FromMinutes(1));
         await WaitForScheduleCreationAsync(reportId);
         await ProduceAdmitPatientEventAsync(_facilityId, _config.PatientIds[0]);
 
+        var lokiScraper = _sp.GetRequiredService<LokiScraper>();
+        var dataReader = _sp.GetRequiredService<PipelineDataReader>();
+        var reportApi = _sp.GetRequiredService<ReportApiHelper>();
+
         await using var diagnostics = new BackgroundDiagnosticsMonitor(
-            Output,
-            _b.LokiScraper,
-            AutomationCfg,
+            Output, lokiScraper, AutomationCfg,
             _config.PatientIds.Count,
             forwardInternalLogsToOutput: false,
-            pipelineReader: _b.DataReader);
+            pipelineReader: dataReader);
         await using var watcher = DiagnosticsEventWatcher.Start(diagnostics, Output);
 
         await diagnostics.StartAsync(_facilityId, reportId);
-        var submitted = await _b.CreateReportHelper().CheckSubmissionStatusAsync(reportId, _config, diagnostics);
+        var submitted = await reportApi.CheckSubmissionStatusAsync(reportId, _config, diagnostics);
         await diagnostics.StopAsync();
         await watcher.StopAsync();
 
@@ -120,21 +136,17 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
             DumpKafkaTopicDiagnostics(diagnostics.KafkaErrors, "ResourceNormalized-Error", maxLines: 8);
         }
 
-        var pipelineSnapshot = _b.CreatePipelineSnapshot();
+        var pipelineSnapshot = _sp.GetRequiredService<PipelineSnapshot>();
         await pipelineSnapshot.WriteFullSnapshotAsync(Output, _facilityId, reportId);
 
         Assert.True(submitted,
             $"Expected scheduled workflow report {reportId} to be submitted but it was not.");
 
-        // Fetch the actual schedule dates — the scheduled path uses wall-clock end date
-        // and the start date may be timezone-adjusted, so we must validate against what
-        // the pipeline actually stored rather than the static config dates.
-        var schedule = await _b.ReportClient.GetScheduleAsync(reportId)
+        var schedule = await _sp.GetRequiredService<IReportServiceClient>().GetScheduleAsync(reportId)
             ?? throw new InvalidOperationException($"Schedule {reportId} not found after submission.");
         var actualStartDate = schedule.ReportStartDate.ToUniversalTime().ToString("o");
         var actualEndDate = schedule.ReportEndDate.ToUniversalTime().ToString("o");
 
-        var reportApi = _b.CreateReportHelper();
         var downloadedResources = await reportApi.DownloadReportAsync(_facilityId, reportId, _config);
         var internalAbsResources = await reportApi.DownloadReportAsync(_facilityId, reportId, _config, external: false);
 
@@ -149,7 +161,7 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
                 $"Expected scheduled workflow report to include patient-{patientId}.ndjson but it was not");
         }
 
-        await _b.CreateReportAbsManifestValidator().ValidateAllAsync(
+        await _sp.GetRequiredService<ReportAbsManifestValidator>().ValidateAllAsync(
             internalAbsResources,
             _config.PatientIds,
             measureId,
@@ -160,8 +172,7 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
             GeneratedFhirDataSnapshotWriter.GetSnapshotDirectory(nameof(ReportScheduledWorkflowTest)));
 
         await ValidationBaselineManager.ValidateOrCreateAsync(
-            Output,
-            _b.DataReader,
+            Output, dataReader,
             nameof(ReportScheduledWorkflowTest),
             _facilityId,
             reportId,
@@ -170,17 +181,14 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
             _generatedBundles,
             internalAbsResources);
 
-        await _b.CreateReportValidator().ValidateAllAsync(
-            _facilityId,
-            reportId,
-            measureId,
-            _config.PatientIds,
+        await _sp.GetRequiredService<ReportDatabaseValidator>().ValidateAllAsync(
+            _facilityId, reportId, measureId, _config.PatientIds,
             expectedFrequency: Frequency.Monthly,
             expectedAdHocType: null);
-        await _b.CreateDataAcqValidator().ValidateAllAsync(_facilityId, reportId, measureId, _config.PatientIds);
-        await _b.CreateNormalizationValidator().ValidateAllAsync(_facilityId);
-        await _b.CreateTenantValidator().ValidateAllAsync(_facilityId, measureId);
-        await _b.CreateValidationResultsValidator().ValidateAllAsync(_facilityId, reportId, _config.PatientIds, _config.LokiScrapeWindow);
+        await _sp.GetRequiredService<DataAcquisitionDatabaseValidator>().ValidateAllAsync(_facilityId, reportId, measureId, _config.PatientIds);
+        await _sp.GetRequiredService<NormalizationDatabaseValidator>().ValidateAllAsync(_facilityId);
+        await _sp.GetRequiredService<TenantDatabaseValidator>().ValidateAllAsync(_facilityId, measureId);
+        await _sp.GetRequiredService<ValidationResultsValidator>().ValidateAllAsync(_facilityId, reportId, _config.PatientIds, _config.LokiScrapeWindow);
     }
 
     private async Task<string> ProduceReportScheduledEventAsync(string facilityId, string measureId, TimeSpan delay)
@@ -254,7 +262,7 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
 
         while (DateTime.UtcNow - started < timeout)
         {
-            var schedule = await _b.ReportClient.GetScheduleAsync(reportId);
+            var schedule = await _sp.GetRequiredService<IReportServiceClient>().GetScheduleAsync(reportId);
             if (schedule != null)
             {
                 Output.WriteLine($"Report schedule detected before patient-event publish (status={schedule.Status}).");

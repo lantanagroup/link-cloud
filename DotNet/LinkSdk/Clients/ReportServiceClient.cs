@@ -4,7 +4,6 @@ using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
-using LantanaGroup.Link.Shared.Application.Models.Integration.Tenant;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using Microsoft.Extensions.Options;
@@ -24,17 +23,8 @@ public class ReportServiceClient : LinkApiClientBase, IReportServiceClient
             bearerOptions, tokenServiceSettings, tokenService)
     { }
 
-    public Task<GenerateAdhocReportResponseApiModel> GenerateAdhocReportAsync(string facilityId, AdHocReportRequest request, CancellationToken cancellationToken = default) =>
-        Request($"facility/{facilityId}/AdhocReport").PostJsonAsync(request, cancellationToken: cancellationToken).ReceiveJson<GenerateAdhocReportResponseApiModel>();
-
     public Task<ReportScheduleApiModel?> GetScheduleAsync(string reportId, CancellationToken cancellationToken = default) =>
         GetOrDefaultAsync(() => Request($"/schedules/{reportId}").GetJsonAsync<ReportScheduleApiModel>(cancellationToken: cancellationToken));
-
-    public async Task<(byte[] Bytes, string? ContentType)> DownloadSubmissionAsync(string facilityId, string reportId, bool external = true, CancellationToken cancellationToken = default)
-    {
-        var response = await Request($"submission/{facilityId}/{reportId}").SetQueryParam("external", external.ToString().ToLowerInvariant()).GetAsync(cancellationToken: cancellationToken);
-        return (await response.GetBytesAsync(), response.ResponseMessage.Content.Headers.ContentType?.MediaType);
-    }
 
     public Task<PagedConfigModel<ReportScheduleApiModel>> SearchSchedulesAsync(string reportId, CancellationToken cancellationToken = default) =>
         Request("/schedules/search").SetQueryParam("id", reportId).SetQueryParam("pageSize", 10).SetQueryParam("pageNumber", 1).GetJsonAsync<PagedConfigModel<ReportScheduleApiModel>>(cancellationToken: cancellationToken);
