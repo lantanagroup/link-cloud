@@ -105,7 +105,7 @@ public class BlobStorageService {
         }
 
         // Produce MeasureReportGenerated event
-        this.measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(status, report, measureReport, patientPayloadUri, blobName);
+        this.measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(status, report, measureReport.getIdPart(), patientPayloadUri, blobName);
     }
 
     private List<Resource> normalize(MeasureReport measureReport) {
