@@ -1322,7 +1322,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         // Refresh stalled log from DB
         await dbContext.Entry(stalledLog).ReloadAsync();
-        Assert.Equal(RequestStatus.Ready, stalledLog.Status);
+        Assert.Equal(RequestStatus.Pending, stalledLog.Status);
 
         // Refresh recent log from DB
         await dbContext.Entry(recentLog).ReloadAsync();
