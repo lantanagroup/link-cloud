@@ -205,11 +205,6 @@
         </div>
 
         <div class="btn-group" role="group" aria-label="Filtering">
-          <button class="link-button success" (click)="applyFilters()">
-            <fa-icon [icon]="faPlus"></fa-icon>
-            Apply Filters
-          </button>
-
           <button class="link-button secondary"
                   aria-label="Clear filters"
                   (click)="clearFilters()"
@@ -223,7 +218,7 @@
             Refresh
           </button>
 
-          <mat-checkbox [(ngModel)]="includeDeleted" (change)="applyFilters()">
+          <mat-checkbox [(ngModel)]="includeDeleted" (change)="onIncludeDeletedChange()">
             Show Deleted
           </mat-checkbox>
         </div>
@@ -279,8 +274,9 @@
               Patient Id
               <fa-icon [icon]="getSortIcon('patientId')"></fa-icon>
             </th>
-            <th scope="col" class="header-column">
+            <th scope="col" class="header-column sortable" (click)="onSort('reportTrackingId')">
               Report Id
+              <fa-icon [icon]="getSortIcon('reportTrackingId')"></fa-icon>
             </th>
             <th scope="col" class="header-column sortable" (click)="onSort('facilityId')">
               Facility

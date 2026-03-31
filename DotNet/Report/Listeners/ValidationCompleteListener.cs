@@ -13,6 +13,7 @@ using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Settings;
@@ -92,29 +93,29 @@ namespace LantanaGroup.Link.Report.Listeners
                             try
                             {
                                 await ProcessMessageAsync(result, consumeCancellationToken);
-                                consumer.Commit(result);
+                                consumer.SafeCommit(result, _logger);
                             }
                             catch (DeadLetterException ex)
                             {
                                 _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
-                                consumer.Commit(result);
+                                consumer.SafeCommit(result, _logger);
                             }
                             catch (TransientException ex)
                             {
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
-                                consumer.Commit(result);
+                                consumer.SafeCommit(result, _logger);
                             }
                             catch (TimeoutException ex)
                             {
                                 var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [{string.Join(", ", consumer.Subscription)}] at offset: {result.TopicPartitionOffset}";
                                 var transientException = new TransientException(exceptionMessage, ex);
                                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
-                                consumer.Commit(result);
+                                consumer.SafeCommit(result, _logger);
                             }
                             catch (Exception ex)
                             {
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
-                                consumer.Commit(result);
+                                consumer.SafeCommit(result, _logger);
                             }
                         }, cancellationToken);
                     }
@@ -129,12 +130,11 @@ namespace LantanaGroup.Link.Report.Listeners
                         _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 
                         var offset = ex.ConsumerRecord?.TopicPartitionOffset;
-                        consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
+                        consumer.SafeCommit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset }, _logger);
                     }
                     catch (Exception ex)
                     {
                         _exceptionLogger.Handle(ex, "Error encountered in ValidationCompleteListener", LogLevel.Error);
-                        consumer.Commit();
                     }
                 }
             }
@@ -174,7 +174,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             if (reportEntry == null)
             {
-                throw new DeadLetterException($"No patient report entry records were found (ReportId = {schedule.Id}, FacilityId = {facilityId}");
+                throw new DeadLetterException($"No patient report entry records were found (ReportId = {schedule.Id}, FacilityId = {facilityId})");
             }
 
             if (!value.IsValid)
@@ -189,6 +189,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             reportEntry.ReportingStatus = value.IsValid ? ReportingStatus.PassedValidation : ReportingStatus.FailedValidation;
             reportEntry.SubmissionStatus = SubmissionStatus.Submitting;
+
             await reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
 
             await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, correlationIdStr, reportEntry.AggregateReportUri);

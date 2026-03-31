@@ -1,16 +1,15 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Report.Application.Core;
-using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using System.Diagnostics;
 using System.Text;
 using Task = System.Threading.Tasks.Task;
 
@@ -43,7 +42,6 @@ namespace LantanaGroup.Link.Report.Listeners
             ReadyForValidationProducer readyForValidationProducer,
             IExceptionLogger<MeasureReportGeneratedListener> exceptionLogger)
         {
-
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
 
@@ -106,7 +104,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             finally
                             {
-                                consumer.Commit(result);
+                                consumer.SafeCommit(result, _logger);
                             }
                         }, cancellationToken);
                     }
@@ -122,12 +120,11 @@ namespace LantanaGroup.Link.Report.Listeners
                         _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 
                         var offset = ex.ConsumerRecord?.TopicPartitionOffset;
-                        consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
+                        consumer.SafeCommit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset }, _logger);
                     }
                     catch (Exception ex)
                     {
                         _exceptionLogger.Handle(ex, "Error encountered in MeasureReportGeneratedListener", LogLevel.Error);
-                        consumer.Commit();
                     }
                 }
             }
@@ -142,19 +139,15 @@ namespace LantanaGroup.Link.Report.Listeners
         public async Task ProcessMessageAsync(ConsumeResult<Null, MeasureReportGeneratedValue> result, string facilityId, CancellationToken cancellationToken)
         {
             if (result.Message.Value == null)
-            {
                 throw new DeadLetterException($"{Name}: MeasureReportGenerated event value segment missing");
-            }
 
             if (!result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
-            {
                 throw new DeadLetterException($"{Name}: Received message without correlation ID (ReportId = {result.Message.Value.ReportTrackingId}, FacilityId = {result.Message.Value.FacilityId}).");
-            }
 
             var messageValue = result.Message.Value;
+            var correlationId = Encoding.UTF8.GetString(headerValue);
 
             using var scope = _serviceScopeFactory.CreateScope();
-            var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
             var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
             var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
             var reportResourceManager = scope.ServiceProvider.GetRequiredService<IReportResourceManager>();
@@ -162,15 +155,11 @@ namespace LantanaGroup.Link.Report.Listeners
             var patientAggregator = scope.ServiceProvider.GetRequiredService<PatientAggregator>();
             var reportManifestProducer = scope.ServiceProvider.GetRequiredService<ReportManifestProducer>();
 
-            var correlationId = Encoding.UTF8.GetString(headerValue);
-
             var reportTrackingId = Guid.Parse(messageValue.ReportTrackingId);
             var schedule = await reportScheduledManager.GetReportSchedule(messageValue.FacilityId, reportTrackingId, cancellationToken);
 
             if (schedule == null)
-            {
-                throw new DeadLetterException($"{Name}: No scheduled report record was found (ReportId = {messageValue.ReportTrackingId}, FacilityId = {result.Message.Value.FacilityId}).");
-            }
+                throw new DeadLetterException($"{Name}: No scheduled report record was found (ReportId = {messageValue.ReportTrackingId}, FacilityId = {facilityId}).");
 
             var reportEntry = await reportEntryManager.UpdateAsyncWithConsumerResult(messageValue);
 
@@ -192,7 +181,6 @@ namespace LantanaGroup.Link.Report.Listeners
             }
 
             AggregateResult aggregateResult;
-
             try
             {
                 aggregateResult = await patientAggregator.AggregateToABS(messageValue.PatientId, schedule);
@@ -205,17 +193,21 @@ namespace LantanaGroup.Link.Report.Listeners
             await reportEntryManager.UpdateAsyncWithAggregateResult(reportEntry, aggregateResult);
             await reportResourceManager.AddAsyncWithAggregateResult(facilityId, reportTrackingId, messageValue.PatientId, aggregateResult, cancellationToken);
 
-            foreach (var aggregateMeasureReport in aggregateResult.MeasureReportResults)
+            foreach (var agg in aggregateResult.MeasureReportResults)
             {
-                var populationModel = await reportPopulationManager.SingleOrDefaultAsync(x => x.ReportScheduleId == reportTrackingId && x.ReportType == aggregateMeasureReport.ReportType);
+                var existing = (await reportPopulationManager.FindAsync(
+                    x => x.ReportScheduleId == reportTrackingId && x.ReportType == agg.ReportType, cancellationToken))
+                    .FirstOrDefault();
 
-                if (populationModel == null)
+                if (existing != null)
                 {
-                    await reportPopulationManager.AddAsyncWithAggregateResult(messageValue.FacilityId, reportTrackingId, aggregateMeasureReport, cancellationToken);
-                    continue;
+                    await reportPopulationManager.UpdateAsyncWithAggregateResult(existing, agg, cancellationToken);
                 }
-
-                await reportPopulationManager.UpdateAsyncWithAggregateResult(populationModel, aggregateMeasureReport, cancellationToken);
+                else
+                {
+                    await reportPopulationManager.AddAsyncWithAggregateResult(
+                        facilityId, reportTrackingId, agg, cancellationToken);
+                }
             }
 
             if (reportEntry.MeasureReports.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable))
@@ -233,7 +225,6 @@ namespace LantanaGroup.Link.Report.Listeners
                 _exceptionLogger.Handle(ex, "An error was encountered producing a ReadyForValidation", LogLevel.Error, facilityId, new { ReportId = schedule.Id });
                 throw new DeadLetterException(ex.Message, ex);
             }
-
         }
     }
 }

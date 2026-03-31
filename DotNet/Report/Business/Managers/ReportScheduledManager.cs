@@ -25,17 +25,21 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         Task<ReportScheduleModel?> SingleOrDefaultAsync(Expression<Func<ReportSchedule, bool>> predicate, CancellationToken cancellationToken = default);
 
+        Task<ReportScheduleModel> SingleAsync(Expression<Func<ReportSchedule, bool>> predicate, CancellationToken cancellationToken = default);
+
         Task<PagedConfigModel<ReportScheduleModel>> SearchAsync(
             string? facilityId, Frequency? frequency, string? reportType,
             DateTime? reportStartDate, DateTime? reportEndDate,
-            ScheduleStatus? status, bool? endOfReportPeriodJobHasRun,
+            ScheduleStatus[]? statuses, bool? endOfReportPeriodJobHasRun,
             bool includeDeleted, string? sortBy, SortOrder? sortOrder,
-            int pageSize, int pageNumber, CancellationToken cancellationToken = default);
+            int pageSize, int pageNumber, CancellationToken cancellationToken = default,
+            DateOnly? createDate = null, Guid? id = null);
 
         Task UpdateReportsDeletedStatusForFacility(
             string facilityId, bool deleted, CancellationToken cancellationToken = default);
 
         Task SoftDeleteByReportTrackingIdAsync(Guid reportTrackingId, CancellationToken cancellationToken = default);
+        Task RestoreByReportTrackingIdAsync(Guid reportTrackingId, CancellationToken cancellationToken = default);
     }
 
     public class ReportScheduledManager : IReportScheduledManager
@@ -45,15 +49,18 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         private readonly ReportDbContext _context;
         private readonly ILogger<ReportScheduledManager> _logger;
         private readonly IQuartzJobHelper _quartzJobHelper;
+        private readonly IReportPopulationManager _reportPopulationManager;
 
         public ReportScheduledManager(
             ReportDbContext context,
             ILogger<ReportScheduledManager> logger,
-            IQuartzJobHelper quartzJobHelper)
+            IQuartzJobHelper quartzJobHelper,
+            IReportPopulationManager reportPopulationManager)
         {
             _context = context;
             _logger = logger;
             _quartzJobHelper = quartzJobHelper;
+            _reportPopulationManager = reportPopulationManager;
         }
 
         public async Task<ReportScheduleModel?> GetReportSchedule(string facilityid, Guid reportId, CancellationToken cancellationToken = default)
@@ -104,6 +111,12 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     ReportTypes = r.ReportTypes.Select(rt => rt.ReportType).ToList()
                 })
                 .ToListAsync(cancellationToken);
+        }
+
+        public async Task<ReportScheduleModel> SingleAsync(Expression<Func<ReportSchedule, bool>> predicate, CancellationToken cancellationToken = default)
+        {
+            return await SingleOrDefaultAsync(predicate, cancellationToken)
+                ?? throw new InvalidOperationException("No ReportSchedule found matching the specified criteria.");
         }
 
         public async Task<ReportScheduleModel?> SingleOrDefaultAsync(Expression<Func<ReportSchedule, bool>> predicate, CancellationToken cancellationToken = default)
@@ -175,43 +188,61 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task<ReportScheduleModel> AddAsync(ReportScheduleModel model, CancellationToken cancellationToken)
         {
-            var entity = new ReportSchedule
-            {
-                Id = model.Id == Guid.Empty ? Guid.NewGuid() : model.Id,
-                CreateDate = DateTime.UtcNow,
-                FacilityId = model.FacilityId,
-                ReportStartDate = model.ReportStartDate,
-                ReportEndDate = model.ReportEndDate,
-                SubmitReportDateTime = model.SubmitReportDateTime,
-                EnableSubmission = model.EnableSubmission,
-                EndOfReportPeriodJobHasRun = model.EndOfReportPeriodJobHasRun,
-                AdHocType = model.AdHocType,
-                Frequency = model.Frequency,
-                PayloadRootUri = model.PayloadRootUri,
-                Status = model.Status,
-                IsDeleted = model.IsDeleted
-            };
+            using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
-            foreach (var type in model.ReportTypes)
+            try
             {
-                entity.ReportTypes.Add(new ScheduleReportType { ReportType = type });
+                var entity = new ReportSchedule
+                {
+                    Id = model.Id == Guid.Empty ? Guid.NewGuid() : model.Id,
+                    CreateDate = DateTime.UtcNow,
+                    FacilityId = model.FacilityId,
+                    ReportStartDate = model.ReportStartDate,
+                    ReportEndDate = model.ReportEndDate,
+                    SubmitReportDateTime = model.SubmitReportDateTime,
+                    EnableSubmission = model.EnableSubmission,
+                    EndOfReportPeriodJobHasRun = model.EndOfReportPeriodJobHasRun,
+                    AdHocType = model.AdHocType,
+                    Frequency = model.Frequency,
+                    PayloadRootUri = model.PayloadRootUri,
+                    Status = model.Status,
+                    IsDeleted = model.IsDeleted
+                };
+
+                foreach (var type in model.ReportTypes)
+                {
+                    entity.ReportTypes.Add(new ScheduleReportType { ReportType = type });
+                }
+
+                await _context.AddAsync(entity, cancellationToken);
+                await _context.SaveChangesAsync(cancellationToken);
+
+                await _reportPopulationManager.AddWithReportScheduleAsync(model, cancellationToken);
+
+                await transaction.CommitAsync();
+
+                return await SingleAsync(r => r.Id == entity.Id);
             }
-
-            await _context.AddAsync(entity, cancellationToken);
-            await _context.SaveChangesAsync(cancellationToken);
-
-            model.Id = entity.Id;
-            return model;
+            catch(Exception ex)
+            {
+                _logger.LogError(ex, "Error adding new ReportSchedule");
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
 
         public async Task<PagedConfigModel<ReportScheduleModel>> SearchAsync(
             string? facilityId, Frequency? frequency, string? reportType,
             DateTime? reportStartDate, DateTime? reportEndDate,
-            ScheduleStatus? status, bool? endOfReportPeriodJobHasRun,
+            ScheduleStatus[]? statuses, bool? endOfReportPeriodJobHasRun,
             bool includeDeleted, string? sortBy, SortOrder? sortOrder,
-            int pageSize, int pageNumber, CancellationToken cancellationToken = default)
+            int pageSize, int pageNumber, CancellationToken cancellationToken = default,
+            DateOnly? createDate = null, Guid? id = null)
         {
             Expression<Func<ReportSchedule, bool>> predicate = x => true;
+
+            if (id.HasValue)
+                predicate = predicate.And(q => q.Id == id.Value);
 
             if (!string.IsNullOrWhiteSpace(facilityId))
                 predicate = predicate.And(q => q.FacilityId == facilityId);
@@ -228,8 +259,15 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             if (reportEndDate.HasValue)
                 predicate = predicate.And(q => q.ReportEndDate <= reportEndDate.Value);
 
-            if (status.HasValue)
-                predicate = predicate.And(q => q.Status == status.Value);
+            if (createDate.HasValue)
+            { 
+                var dayStart = createDate.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+                var dayEnd = dayStart.AddDays(1);
+                predicate = predicate.And(q => q.CreateDate >= dayStart && q.CreateDate < dayEnd);
+            }
+
+            if (statuses != null && statuses.Length > 0)
+                predicate = predicate.And(q => statuses.Contains(q.Status));
 
             if (endOfReportPeriodJobHasRun.HasValue)
                 predicate = predicate.And(q => q.EndOfReportPeriodJobHasRun == endOfReportPeriodJobHasRun.Value);
@@ -411,6 +449,50 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             }
 
             entity.IsDeleted = true;
+            entity.ModifyDate = DateTime.UtcNow;
+            _context.ReportSchedule.Update(entity);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task RestoreByReportTrackingIdAsync(Guid reportTrackingId, CancellationToken cancellationToken = default)
+        {
+            var entity = await _context.ReportSchedule
+                .FirstOrDefaultAsync(r => r.Id == reportTrackingId && r.IsDeleted == true, cancellationToken);
+
+            if (entity == null)
+                throw new InvalidOperationException($"Soft-deleted report schedule with ID '{reportTrackingId}' not found.");
+
+            if (entity.Status == ScheduleStatus.Scheduled)
+            {
+                if (entity.ReportEndDate > DateTime.UtcNow)
+                {
+                    try
+                    {
+                        await _quartzJobHelper.ScheduleJob<EndOfReportPeriodJob>(
+                            new Dictionary<string, object>
+                            {
+                                { "ReportScheduleId", entity.Id },
+                                { "FacilityId", entity.FacilityId }
+                            },
+                            entity.ReportEndDate,
+                            entity.Id.ToString(),
+                            ReportConstants.MeasureReportSubmissionScheduler.Group,
+                            $"{entity.Id}-{entity.ReportEndDate}",
+                            cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to re-schedule Quartz job for report schedule {ReportScheduleId}", entity.Id);
+                        throw new InvalidOperationException($"Failed to re-schedule job for report schedule '{reportTrackingId}'.");
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("Skipping Quartz job re-schedule for report schedule {ReportScheduleId}: ReportEndDate {ReportEndDate} is in the past", entity.Id, entity.ReportEndDate);
+                }
+            }
+
+            entity.IsDeleted = false;
             entity.ModifyDate = DateTime.UtcNow;
             _context.ReportSchedule.Update(entity);
             await _context.SaveChangesAsync(cancellationToken);

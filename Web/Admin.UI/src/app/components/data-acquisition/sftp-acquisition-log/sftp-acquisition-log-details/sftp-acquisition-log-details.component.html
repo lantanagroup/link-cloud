@@ -1,0 +1,243 @@
+<div class="link-dialog-header">
+  <div class="link-dialog-title">
+    {{title}}
+  </div>
+  <div class="link-dialog-button">
+    <button class="link-button light" (click)="onClose()">
+      <fa-icon [icon]="faXmark"></fa-icon>
+    </button>
+  </div>
+</div>
+<div class="link-dialog-content">
+
+  <div class="link-card" style="margin-top: none; border-radius: .375em;">
+    <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          External ID:
+          <span class="data-value selectable-value" style="display: inline;">{{log.externalId}}</span>
+        </div>
+      </div>
+      <div style="flex: 1;">
+      </div>
+      <div style="flex: 1;">
+      </div>
+    </div>
+    <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Facility:
+          <span class="data-value selectable-value" style="display: inline;">{{log.facilityId}}</span>
+        </div>
+      </div>
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Acquisition Type:
+          <span class="data-value" style="display: inline;">{{log.acquisitionType}}</span>
+        </div>
+      </div>
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Sub Type:
+          <span class="data-value" style="display: inline;">{{log.subType}}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Status:
+          <span class="data-value" style="display: inline;">{{log.status}}</span>
+        </div>
+      </div>
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Scheduled Date:
+          <span class="data-value" style="display: inline;">{{log.scheduledDate ? (log.scheduledDate | date:'short') : 'Immediate'}}</span>
+        </div>
+      </div>
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Process Date:
+          <span class="data-value" style="display: inline;">{{log.processDate ? (log.processDate | date:'short') : 'Not processed'}}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Retry Attempts:
+          <span class="data-value" style="display: inline;">{{log.retryAttempts || 0}}</span>
+        </div>
+      </div>
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
+          Files Processed:
+          <span class="data-value" style="display: inline;">{{log.fileNames?.length || 0}}</span>
+        </div>
+      </div>
+      <div style="flex: 1;">
+      </div>
+    </div>
+
+    @if (log.status === 'ConfigurationRequired') {
+      <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
+        <div style="flex: 1;">
+          <div class="config-warning">
+            <fa-icon [icon]="faExclamationTriangle"></fa-icon>
+            <span>This log requires configuration to be added before it can be processed. Once configuration is in place, use the Reset button to retry.</span>
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (isResettable()) {
+      <div class="link-card-row" style="justify-content: flex-end; margin-bottom: 2em;">
+        <button class="link-button primary" (click)="resetLog()" [disabled]="isResetting">
+          <fa-icon [icon]="faRefresh"></fa-icon>
+          {{ isResetting ? 'Resetting...' : 'Reset for Retry' }}
+        </button>
+      </div>
+    }
+
+  </div>
+
+  <!-- Files Section -->
+  <div class="link-card" style="border-radius: .375em; margin-top: 2em;">
+    <div class="link-dialog-section-header">
+      Files Processed
+    </div>
+    <div>
+      @if (log.fileNames && log.fileNames.length > 0) {
+        <ul>
+          @for (fileName of log.fileNames; track fileName) {
+            <li>
+              <span class="data-value selectable-value">{{fileName}}</span>
+            </li>
+          }
+        </ul>
+      } @else {
+        <div class="no-results">
+          <p class="no-results-subtext">No files processed yet.</p>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- Benchmarks Section -->
+  @if (log.benchmarks && log.benchmarks.length > 0) {
+    <div class="link-card" style="border-radius: .375em; margin-top: 2em;">
+      <div class="link-dialog-section-header">
+        Performance Benchmarks
+      </div>
+      <mat-accordion>
+        @for (benchmark of log.benchmarks; track benchmark.attemptNumber) {
+          <mat-expansion-panel>
+            <mat-expansion-panel-header>
+              <mat-panel-title>
+                Attempt #{{ benchmark.attemptNumber + 1 }}
+                @if (benchmark.isSuccessful) {
+                  <fa-icon [icon]="faCheck" class="success-icon"></fa-icon>
+                } @else {
+                  <fa-icon [icon]="faExclamationTriangle" class="failure-icon"></fa-icon>
+                }
+              </mat-panel-title>
+              <mat-panel-description>
+                Total: {{ formatDuration(benchmark.totalDurationMs) }}
+              </mat-panel-description>
+            </mat-expansion-panel-header>
+
+            <div class="benchmark-details">
+              <div class="benchmark-summary">
+                <div class="benchmark-summary-item">
+                  <span class="data-label">Started At</span>
+                  <span class="data-value">{{ benchmark.attemptStartedAt | date:'medium' }}</span>
+                </div>
+                <div class="benchmark-summary-item">
+                  <span class="data-label">Items Processed</span>
+                  <span class="data-value">{{ benchmark.itemsProcessed }}</span>
+                </div>
+              </div>
+
+              <div class="phase-timing-section">
+                <div class="phase-timing-header">
+                  <fa-icon [icon]="faClock"></fa-icon>
+                  <span>Phase Timing Breakdown</span>
+                </div>
+                <div class="phase-timing-container">
+                  @for (phase of getPhases(benchmark); track phase.name) {
+                    <div class="phase-item">
+                      <div class="phase-info">
+                        <span class="phase-name">{{ phase.name }}</span>
+                        <span class="phase-duration">{{ formatDuration(phase.duration) }}</span>
+                      </div>
+                      <div class="phase-bar-background">
+                        <div
+                          class="phase-bar"
+                          [class]="phase.colorClass"
+                          [style.width.%]="getPhasePercentage(benchmark, phase.duration)"
+                        ></div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              </div>
+            </div>
+          </mat-expansion-panel>
+        }
+      </mat-accordion>
+    </div>
+  }
+
+  <!-- Notes Section -->
+  <div class="link-card" style="border-radius: .375em; margin-top: 2em;">
+    <div class="link-dialog-section-header">
+      Notes
+    </div>
+    <div>
+      @if (log.notes && log.notes.length > 0) {
+        <ul>
+          @for (note of log.notes; track note) {
+            <li>
+              <span class="data-value">{{note}}</span>
+            </li>
+          }
+        </ul>
+      } @else {
+        <div class="no-results">
+          <p class="no-results-subtext">No notes recorded.</p>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- Tracing Section -->
+  @if (log.originatingTraceId || log.originatingSpanId) {
+    <div class="link-card" style="border-radius: .375em; margin-top: 2em;">
+      <div class="link-dialog-section-header">
+        Tracing
+      </div>
+      <div class="link-card-row" style="justify-content: flex-start;">
+        @if (log.originatingTraceId) {
+          <div style="flex: 1;">
+            <div class="data-label inline-label">
+              Trace ID:
+              <span class="data-value selectable-value" style="display: inline; font-family: monospace;">{{log.originatingTraceId}}</span>
+            </div>
+          </div>
+        }
+        @if (log.originatingSpanId) {
+          <div style="flex: 1;">
+            <div class="data-label inline-label">
+              Span ID:
+              <span class="data-value selectable-value" style="display: inline; font-family: monospace;">{{log.originatingSpanId}}</span>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+</div>

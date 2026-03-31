@@ -31,5 +31,12 @@ export class AggregationService {
     );
   }
 
+  restoreReport(reportScheduleId: string): Observable<void> {
+    return this.http.patch<void>(
+      `${this.appConfigService.config?.baseApiUrl}/aggregate/reports/${encodeURIComponent(reportScheduleId)}/restore`,
+      null
+    );
+  }
+
 
 }

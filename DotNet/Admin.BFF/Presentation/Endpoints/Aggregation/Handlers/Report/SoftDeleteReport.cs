@@ -91,17 +91,33 @@ public static class SoftDeleteReport
         catch (Exception ex)
         {
             logger.LogError(ex, "Exception soft-deleting acquisition logs for report {ReportScheduleId} — rolling back step 1", reportScheduleId);
+            await RollbackReportScheduleAsync(reportService, context, reportScheduleId, logger);
             return ProblemDetailsExtension.UserFacingProblem("Failed to soft-delete acquisition logs. Report soft-delete has been rolled back.", StatusCodes.Status500InternalServerError);
         }
 
         if (!daResponse.IsSuccessStatusCode)
         {
             logger.LogWarning("Acquisition log soft-delete failed for report {ReportScheduleId} with status {StatusCode} — rolling back step 1", reportScheduleId, daResponse.StatusCode);
+            await RollbackReportScheduleAsync(reportService, context, reportScheduleId, logger);
             return ProblemDetailsExtension.UserFacingProblem("Failed to soft-delete acquisition logs. Report soft-delete has been rolled back.", StatusCodes.Status500InternalServerError);
         }
 
         logger.LogInformation("Report schedule {ReportScheduleId} and its acquisition logs were successfully soft deleted", reportScheduleId);
         return Results.NoContent();
+    }
+
+    private static async Task RollbackReportScheduleAsync(ReportService reportService, HttpContext context, string reportScheduleId, ILogger logger)
+    {
+        try
+        {
+            var response = await reportService.RestoreReportScheduleAsync(context.User, reportScheduleId, context.RequestAborted);
+            if (!response.IsSuccessStatusCode)
+                logger.LogError("Rollback failed: could not restore report schedule {ReportScheduleId} (status {StatusCode})", reportScheduleId, response.StatusCode);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Rollback failed: exception restoring report schedule {ReportScheduleId}", reportScheduleId);
+        }
     }
 
     private static async Task<string?> ReadDetailAsync(HttpResponseMessage response)

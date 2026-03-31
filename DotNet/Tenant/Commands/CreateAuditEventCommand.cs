@@ -26,7 +26,7 @@ namespace LantanaGroup.Link.Tenant.Commands
 
                 try
                 {
-                    // send the Audit Event
+                    // send the Audit Event to Auditing Kafka Topic
                     Headers headers = new Headers();
                     headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(auditEvent.CorrelationId ?? Guid.NewGuid().ToString()));
 

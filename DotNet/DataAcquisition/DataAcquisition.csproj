@@ -50,13 +50,14 @@
 		<PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="8.*" />
 		<PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="7.4.*" />
 		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />		
-		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />	
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />		
+		<PackageReference Include="System.Text.Json" Version="10.0.1" />
+		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
 	</ItemGroup>
 
 	<ItemGroup>
 	  <ProjectReference Include="..\DataAcquisition.Domain\DataAcquisition.Domain.csproj" />
 	  <ProjectReference Include="..\Link.Authorization\Link.Authorization.csproj" />
-	  <ProjectReference Include="..\Shared\Shared.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

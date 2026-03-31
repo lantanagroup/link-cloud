@@ -9,8 +9,8 @@ import {MatTableDataSource, MatTableModule} from '@angular/material/table';
 import {MatPaginator, MatPaginatorModule, PageEvent} from '@angular/material/paginator';
 import {MatSort, MatSortModule, Sort} from '@angular/material/sort';
 import {MatTooltipModule} from '@angular/material/tooltip';
-import {Subscription} from 'rxjs';
-import {take} from 'rxjs/operators';
+import {BehaviorSubject, combineLatest, Observable, of, Subject, Subscription} from 'rxjs';
+import {debounceTime, distinctUntilChanged, map, startWith, switchMap, take, tap} from 'rxjs/operators';
 import {TenantService} from '../../../services/gateway/tenant/tenant.service';
 import {LoadingService} from '../../../services/loading.service';
 import {AggregationService} from '../../../services/gateway/aggregation/aggregation.service';
@@ -23,8 +23,13 @@ import {FontAwesomeModule} from '@fortawesome/angular-fontawesome';
 import {faRotate} from '@fortawesome/free-solid-svg-icons';
 import {IReportSchedule} from '../../../interfaces/report/report-schedule.interface';
 import {ReportService} from '../../../services/gateway/report/report.service';
-import {FormsModule} from "@angular/forms";
+import {FormControl, FormsModule, ReactiveFormsModule} from "@angular/forms";
 import {MatCheckbox} from "@angular/material/checkbox";
+import {MatFormFieldModule} from '@angular/material/form-field';
+import {MatInputModule} from '@angular/material/input';
+import {MatSelectModule} from '@angular/material/select';
+import {MatDatepickerModule} from '@angular/material/datepicker';
+import {MatAutocompleteModule} from '@angular/material/autocomplete';
 
 @Component({
   selector: 'app-reports-dashboard',
@@ -41,9 +46,15 @@ import {MatCheckbox} from "@angular/material/checkbox";
     RouterLink,
     FontAwesomeModule,
     FormsModule,
+    ReactiveFormsModule,
     MatCheckbox,
     MatSnackBarModule,
-    MatDialogModule
+    MatDialogModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+    MatDatepickerModule,
+    MatAutocompleteModule
   ],
   templateUrl: './reports-dashboard.component.html',
   styleUrls: ['./reports-dashboard.component.scss']
@@ -53,6 +64,8 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
   @ViewChild(MatSort, { static: false }) sort!: MatSort;
 
   private subscription: Subscription | undefined;
+  private reportIdSubscription: Subscription | undefined;
+  private reportIdSubject = new Subject<string>();
   private readonly PAGE_SIZE_KEY = 'reportsDashboardPageSize';
   private refreshTimeoutId: ReturnType<typeof setTimeout> | null = null;
   defaultPageNumber: number = 0;
@@ -68,6 +81,21 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
 
   currentSortBy: string = 'CreateDate';
   currentSortOrder: number = 1; // 1 = Descending, 0 = Ascending
+
+  // Filters
+  facilityInputControl = new FormControl<string>('');
+  selectedFacilityId: string | null = null;
+  filteredFacilities: Observable<{ facilityId: string; facilityName: string }[]> = of([]);
+  private showDeletedSubject = new BehaviorSubject<boolean>(false);
+  reportIdFilter: string = '';
+  statusFilters: string[] = [];
+  frequencyFilter: string = '';
+  reportStartDateFilter: Date | null = null;
+  reportEndDateFilter: Date | null = null;
+  createDateFilter: Date | null = null;
+
+  readonly statusOptions = ['New', 'Scheduled', 'EndOfPeriod', 'Submitted'];
+  readonly frequencyOptions = ['Monthly', 'Weekly', 'Daily', 'Adhoc'];
 
   constructor(
     private route: ActivatedRoute,
@@ -91,10 +119,39 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
     this.paginationMetadata.pageSize = this.defaultPageSize;
     this.paginationMetadata.totalCount = 0;
     this.paginationMetadata.totalPages = 0;
+
+    this.filteredFacilities = combineLatest([
+      this.facilityInputControl.valueChanges.pipe(
+        startWith(''),
+        debounceTime(300),
+        distinctUntilChanged(),
+        // Clear the selected ID whenever the user edits the text. emitEvent:false
+        // (used in onFacilitySelected) bypasses valueChanges, so the tap only
+        // fires on real keystrokes, not on programmatic selection.
+        tap(() => { this.selectedFacilityId = null; })
+      ),
+      this.showDeletedSubject
+    ]).pipe(
+      switchMap(([term, includeDeleted]) => {
+        const search = typeof term === 'string' ? term : '';
+        return this.tenantService.autocompleteFacilities(search, includeDeleted);
+      }),
+      map(results => Object.entries(results || {}).map(([facilityId, facilityName]) => ({ facilityId, facilityName: facilityName as string })))
+    );
+
+    this.reportIdSubscription = this.reportIdSubject.pipe(
+      debounceTime(300),
+      distinctUntilChanged()
+    ).subscribe(() => {
+      this.paginationMetadata.pageNumber = 0;
+      this.loadReportSchedules();
+    });
+
     this.loadReportSchedules();
   }
 
   ngOnDestroy(): void {
+    this.reportIdSubscription?.unsubscribe();
     if (this.subscription) {
       this.subscription.unsubscribe();
     }
@@ -114,23 +171,29 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
       this.highlightedRowIds = new Set();
     }
     this.loadingService.isLoading.next(true);
+    const reportEndDateNormalized = this.reportEndDateFilter
+      ? new Date(this.reportEndDateFilter.getFullYear(), this.reportEndDateFilter.getMonth(), this.reportEndDateFilter.getDate(), 23, 59, 59, 999)
+      : undefined;
     this.reportService.searchReportSchedules(
+      this.selectedFacilityId || this.facilityInputControl.value || undefined,
+      this.frequencyFilter || undefined,
       undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
+      this.reportStartDateFilter ?? undefined,
+      reportEndDateNormalized,
+      this.statusFilters.length > 0 ? this.statusFilters : undefined,
       undefined,
       this.showDeleted,
       this.currentSortBy,
       this.currentSortOrder,
       Math.max(1, this.paginationMetadata.pageSize || this.defaultPageSize),
-      this.paginationMetadata.pageNumber + 1 // API expects 1-based indexing
+      this.paginationMetadata.pageNumber + 1, // API expects 1-based indexing
+      this.createDateFilter ?? undefined,
+      this.reportIdFilter || undefined
     ).subscribe({
       next: (data) => {
         this.reportSchedules = data.records;
         this.dataSource.data = this.reportSchedules;
+        this.paginationMetadata = data.metadata;
         this.paginationMetadata.pageNumber = data.metadata.pageNumber - 1; // Convert back to 0-based
         this.loadingService.isLoading.next(false);
         if (this.pendingHighlight && data.records.length > 0) {
@@ -145,7 +208,55 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  onReportIdInput(value: string): void {
+    this.reportIdFilter = value;
+    this.reportIdSubject.next(value);
+  }
+
+  applyFilters(): void {
+    this.paginationMetadata.pageNumber = 0;
+    this.loadReportSchedules();
+  }
+
+  clearFilters(): void {
+    this.facilityInputControl.setValue('', { emitEvent: false });
+    this.selectedFacilityId = null;
+    this.reportIdFilter = '';
+    this.statusFilters = [];
+    this.frequencyFilter = '';
+    this.reportStartDateFilter = null;
+    this.reportEndDateFilter = null;
+    this.createDateFilter = null;
+    this.paginationMetadata.pageNumber = 0;
+    this.loadReportSchedules();
+  }
+
+  onFacilitySelected(fac: { facilityId: string; facilityName: string }): void {
+    this.selectedFacilityId = fac.facilityId;
+    this.facilityInputControl.setValue(fac.facilityName || fac.facilityId, { emitEvent: false });
+    this.applyFilters();
+  }
+
+  clearFacilityFilter(): void {
+    this.selectedFacilityId = null;
+    this.facilityInputControl.setValue('', { emitEvent: false });
+    this.applyFilters();
+  }
+
+  displayFacility(fac: { facilityId: string; facilityName: string } | string | null): string {
+    if (!fac) return '';
+    if (typeof fac === 'string') return fac;
+    return fac.facilityName || fac.facilityId;
+  }
+
+  hasActiveFilters(): boolean {
+    return !!(this.selectedFacilityId || this.facilityInputControl.value ||
+              this.reportIdFilter || this.statusFilters.length > 0 || this.frequencyFilter ||
+              this.reportStartDateFilter || this.reportEndDateFilter || this.createDateFilter);
+  }
+
   onShowDeletedChange(): void {
+    this.showDeletedSubject.next(this.showDeleted);
     this.paginationMetadata.pageNumber = 0;
     this.loadReportSchedules();
   }
@@ -275,6 +386,47 @@ export class ReportsDashboardComponent implements OnInit, OnDestroy {
                 ? 'This report cannot be deleted because it is currently in progress. Please wait for it to complete.'
                 : 'Failed to soft delete the report. Please try again.'),
               icon: is409 ? 'running_with_errors' : 'error',
+              iconColor: 'warn'
+            }
+          });
+        }
+      });
+    });
+  }
+
+  onRestoreReport(reportScheduleId: string): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        title: 'Restore Report',
+        message: 'Are you sure you want to restore this report and all its associated acquisition logs?',
+        icon: 'restore',
+        iconColor: 'primary',
+        confirmButtonText: 'Restore'
+      }
+    });
+
+    dialogRef.afterClosed().pipe(take(1)).subscribe(confirmed => {
+      if (!confirmed) return;
+
+      const progressSnackBar = this.snackBar.open('Restoring report, please wait...', 'Close');
+
+      this.aggregationService.restoreReport(reportScheduleId).subscribe({
+        next: () => {
+          progressSnackBar.dismiss();
+          this.snackBar.open('Report restored successfully', 'Close', { duration: 3000, panelClass: 'success-snackbar' });
+          this.paginationMetadata.pageNumber = 0;
+          this.loadReportSchedules();
+        },
+        error: (err) => {
+          progressSnackBar.dismiss();
+          const detail = this.extractDetail(err);
+          this.dialog.open(AlertDialogComponent, {
+            width: '420px',
+            data: {
+              title: 'Restore Failed',
+              message: detail || 'Failed to restore the report. Please try again.',
+              icon: 'error',
               iconColor: 'warn'
             }
           });

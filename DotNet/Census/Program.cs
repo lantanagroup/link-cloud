@@ -122,8 +122,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Kafka Consumers and Producers
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientListMessage>, KafkaConsumerFactory<string, PatientListMessage>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, CernerPatientsAcquired>, KafkaConsumerFactory<string, CernerPatientsAcquired>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, PatientListMessage>, KafkaProducerFactory<string, PatientListMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, CernerPatientsAcquired>, KafkaProducerFactory<string, CernerPatientsAcquired>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, LantanaGroup.Link.Census.Application.Models.Messages.PatientEvent>, KafkaProducerFactory<string, LantanaGroup.Link.Census.Application.Models.Messages.PatientEvent>>();
@@ -151,6 +153,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Application Services
     builder.Services.AddScoped<IPatientListService, PatientListService>();
+    builder.Services.AddScoped<ICernerListService, CernerListService>();
     builder.Services.AddTransient<IEventProducerService<LantanaGroup.Link.Census.Application.Models.Messages.PatientEvent>, EventProducerService<LantanaGroup.Link.Census.Application.Models.Messages.PatientEvent>>();
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
@@ -166,6 +169,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     if (consumerSettings == null || !consumerSettings.DisableConsumer)
     {
         builder.Services.AddHostedService<PatientListsAcquiredListener>();
+        builder.Services.AddHostedService<CernerPatientsAcquiredListener>();
     }
     if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
     {
