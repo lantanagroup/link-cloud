@@ -60,7 +60,7 @@ namespace QueryDispatch.Domain.Managers
                 {
                     Value = auditMessage,
                     Headers = new Headers()
-            });
+                });
 
                 _producer.Flush();
 
@@ -137,7 +137,7 @@ namespace QueryDispatch.Domain.Managers
                 {
                     Value = auditMessage,
                     Headers = new Headers()
-            });
+                });
 
                 _producer.Flush();
 

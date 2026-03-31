@@ -18,7 +18,7 @@ namespace LantanaGroup.Link.Account.Application.Factories.Role
                     .Where(x => x.ClaimValue is not null && x.ClaimType == LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions)
                     .Select(x => x.ClaimValue ?? string.Empty).ToList()
             };
-            
+
         }
 
         public LinkRoleModel Create(string name, string description, IEnumerable<string> claims)

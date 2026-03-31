@@ -7,7 +7,7 @@
         public static class AppSettingsSectionNames
         {
             public const string ServiceInformation = "ServiceInformation";
-            public const string DatabaseProvider = "DatabaseProvider";      
+            public const string DatabaseProvider = "DatabaseProvider";
             public const string Serilog = "Serilog";
         }
 
@@ -16,14 +16,14 @@
             public const string NotFound = "https://datatracker.ietf.org/doc/html/rfc9110#section-15.5.5";
         }
 
-        public static class AuditLoggingIds 
+        public static class AuditLoggingIds
         {
             public const int GenerateItems = 1000;
             public const int SearchPerformed = 1001;
             public const int GetItem = 1002;
             public const int InsertItem = 1003;
             public const int UpdateItem = 1004;
-            public const int DeleteItem = 1005;      
+            public const int DeleteItem = 1005;
             public const int GetItemNotFound = 1006;
             public const int UpdateItemNotFound = 1007;
             public const int SearchException = 1008;

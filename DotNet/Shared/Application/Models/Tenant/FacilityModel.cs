@@ -20,7 +20,7 @@ namespace LantanaGroup.Link.Shared.Application.Models.Tenant
 
         [JsonPropertyName("timeZone")]
         public string TimeZone { get; set; } = string.Empty;
-        
+
         [JsonPropertyName("isDeleted")]
         public bool? IsDeleted { get; set; }
 

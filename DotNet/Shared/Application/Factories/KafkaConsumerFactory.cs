@@ -16,7 +16,7 @@ public class KafkaConsumerFactory<TConsumerKey, TConsumerValue> : IKafkaConsumer
         _kafkaConnection = kafkaConnection ?? throw new ArgumentNullException(nameof(kafkaConnection));
     }
 
-    public IConsumer<TConsumerKey, TConsumerValue> CreateConsumer(ConsumerConfig config, IDeserializer<TConsumerKey>? keyDeserializer = null, IDeserializer<TConsumerValue>? valueDeserializer = null) 
+    public IConsumer<TConsumerKey, TConsumerValue> CreateConsumer(ConsumerConfig config, IDeserializer<TConsumerKey>? keyDeserializer = null, IDeserializer<TConsumerValue>? valueDeserializer = null)
     {
         try
         {

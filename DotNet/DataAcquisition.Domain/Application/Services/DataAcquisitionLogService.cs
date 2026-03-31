@@ -75,7 +75,7 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
         }
         catch (Exception ex)
         {
-            if(transaction != null && ex is ProduceException<string, ReadyToAcquire>)
+            if (transaction != null && ex is ProduceException<string, ReadyToAcquire>)
             {
                 //ensure that db update is rolled back
                 request.Status = RequestStatus.Failed;

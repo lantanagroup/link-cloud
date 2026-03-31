@@ -11,7 +11,7 @@ public class ConditionalEndpoint(RequestDelegate next, IConfiguration configurat
         context.Response.StatusCode = StatusCodes.Status404NotFound;
         await context.Response.WriteAsync("This feature is disabled.");
     }
-    
+
     public async Task InvokeAsync(HttpContext context)
     {
         // Access the matched endpoint after routing

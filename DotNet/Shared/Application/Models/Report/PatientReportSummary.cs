@@ -7,7 +7,8 @@ using System.Threading.Tasks;
 
 namespace LantanaGroup.Link.Shared.Application.Models.Report
 {
-    public class PatientReportSummary { 
+    public class PatientReportSummary
+    {
         public int total { get; set; }
         public List<PatientSummary> Patients { get; set; } = new();
     }

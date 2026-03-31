@@ -31,7 +31,7 @@ public class FhirQueryManager : IFhirQueryManager
         using var activity = ServiceActivitySource.Instance.StartActivity("FhirQueryManager.CreateAsync");
         activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
 
-        if(string.IsNullOrEmpty(model.FacilityId))
+        if (string.IsNullOrEmpty(model.FacilityId))
         {
             throw new ArgumentNullException("FacilityId cannot be null");
         }
@@ -96,7 +96,7 @@ public class FhirQueryManager : IFhirQueryManager
         if (model.IsReference.HasValue)
             query.IsReference = model.IsReference.Value;
 
-       query.QueryType = model.QueryType;
+        query.QueryType = model.QueryType;
 
         if (model.Paged.HasValue)
             query.Paged = model.Paged.Value;

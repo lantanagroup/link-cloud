@@ -30,7 +30,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
 
             return response;
         }
-        
+
         public async Task<LinkServiceHealthReport> LinkServiceHealthCheck(CancellationToken cancellationToken)
         {
             // HTTP GET

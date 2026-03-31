@@ -32,10 +32,10 @@ public class VariableParameterFactory : IVariableParameterFactory
             || (string.IsNullOrWhiteSpace(parameterFactoryResult.value)
             || (parameterFactoryResult.paged && parameterFactoryResult.values?.Count == 0)))
         {
-            _logger.LogWarning("VariableParameter validation failed: Key is null/whitespace, Value is null/whitespace, or Paged with empty values. Key: {Key}, Value: {Value}, Paged: {Paged}, ValuesCount: {ValuesCount}", 
-                parameterFactoryResult.key, 
-                parameterFactoryResult.value, 
-                parameterFactoryResult.paged, 
+            _logger.LogWarning("VariableParameter validation failed: Key is null/whitespace, Value is null/whitespace, or Paged with empty values. Key: {Key}, Value: {Value}, Paged: {Paged}, ValuesCount: {ValuesCount}",
+                parameterFactoryResult.key,
+                parameterFactoryResult.value,
+                parameterFactoryResult.paged,
                 parameterFactoryResult.values?.Count);
             return null;
         }
@@ -66,10 +66,10 @@ public class VariableParameterFactory : IVariableParameterFactory
         }
         var dateOnly = date.Date.ToString("yyyy-MM-dd");
 
-        if(parameter.Variable == Variable.PeriodStart)
+        if (parameter.Variable == Variable.PeriodStart)
             dateOnly = $"{dateOnly}T00:00:00Z";
 
-        if(parameter.Variable == Variable.PeriodEnd)
+        if (parameter.Variable == Variable.PeriodEnd)
             dateOnly = $"{dateOnly}T23:59:59Z";
 
         return string.Format(parameter.Format, dateOnly);
