@@ -6,7 +6,6 @@ import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.internals.RecordHeaders;
-import org.hl7.fhir.r4.model.MeasureReport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -26,11 +25,11 @@ public class MeasureReportGeneratedProducer {
     public void produceMeasureReportGeneratedRecord (
             PatientReportingEvaluationStatus patientStatus,
             PatientReportingEvaluationStatus.Report report,
-            MeasureReport measureReport,
+            String measureReportId,
             String payloadUri,
             String blobName) {
 
-        if (patientStatus == null || report == null || report.getReportTrackingId() == null || measureReport == null) {
+        if (patientStatus == null || report == null || report.getReportTrackingId() == null || measureReportId == null) {
             throw new IllegalArgumentException("All parameters are required");
         }
 
@@ -52,7 +51,7 @@ public class MeasureReportGeneratedProducer {
         }
 
         MeasureReportGenerated value = new MeasureReportGenerated(
-                measureReport.getIdPart(),
+                measureReportId,
                 patientStatus.getFacilityId(),
                 report.getReportTrackingId(),
                 patientStatus.getPatientId(),

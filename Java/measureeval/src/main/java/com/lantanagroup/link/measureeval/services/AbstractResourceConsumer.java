@@ -223,18 +223,27 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                 continue;
             }
 
-            MeasureReport measureReport = evaluateMeasureService.evaluateMeasure(value.getQueryType().toString(), patientStatus, report, bundle);
-
-            if (measureReport.getIdPart() == null) {
-                measureReport.setId(UUID.randomUUID().toString());
+            MeasureReport measureReport;
+            if (bundle.hasEntry()) {
+                measureReport = evaluateMeasureService.evaluateMeasure(value.getQueryType().toString(), patientStatus, report, bundle);
+                if (measureReport.getIdPart() == null) {
+                    measureReport.setId(UUID.randomUUID().toString());
+                }
+            } else {
+                if (value.getQueryType() != QueryType.INITIAL) {
+                    throw new IllegalArgumentException("Unexpected empty bundle during non-initial evaluation");
+                }
+                measureReport = null;
             }
 
             switch (value.getQueryType()) {
                 case INITIAL -> {
-                    updateReportability(patientStatus, report, measureReport);
+                    boolean reportable = measureReport != null && reportabilityPredicate.test(measureReport);
+                    updateReportability(patientStatus, report, reportable);
 
-                    if (!report.getReportable()) {
-                        measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(patientStatus, report, measureReport, null, null);
+                    if (!reportable) {
+                        String measureReportId = measureReport == null ? UUID.randomUUID().toString() : measureReport.getIdPart();
+                        measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(patientStatus, report, measureReportId, null, null);
                     }
                 }
                 case SUPPLEMENTAL -> blobStorageService.storePatientInBlobStorage(patientStatus, report, measureReport);
@@ -269,8 +278,8 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     private void updateReportability (
             PatientReportingEvaluationStatus patientStatus,
             PatientReportingEvaluationStatus.Report report,
-            MeasureReport measureReport) {
-        report.setReportable(reportabilityPredicate.test(measureReport));
+            boolean reportable) {
+        report.setReportable(reportable);
         patientStatusRepository.save(patientStatus);
     }
 
