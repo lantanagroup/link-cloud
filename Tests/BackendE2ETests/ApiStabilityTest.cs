@@ -3,6 +3,7 @@ using LantanaGroup.Link.Automation;
 using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.Automation.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Census;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
@@ -114,6 +115,7 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
             FacilityId = _facilityId,
             FacilityName = _facilityId,
             TimeZone = "America/Chicago",
+            Vendor = Vendor.Epic,
             ScheduledReports = new TenantScheduledReportConfig
             {
                 Monthly = [measureId],

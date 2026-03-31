@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
@@ -26,6 +27,7 @@ public static class FacilitySetupHelper
             FacilityId = facilityId,
             FacilityName = facilityId,
             TimeZone = "America/Chicago",
+            Vendor = Vendor.Epic,
             ScheduledReports = new TenantScheduledReportConfig
             {
                 Monthly = measureId != null ? [measureId] : [],
