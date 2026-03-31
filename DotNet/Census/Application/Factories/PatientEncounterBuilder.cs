@@ -7,11 +7,14 @@ public class PatientEncounterBuilder
 {
     private PatientEncounter _patientEncounter = new PatientEncounter();
 
-    public PatientEncounterBuilder(string facilityId, string MRN, DateTime admitDate, DateTime? dischargeDate, string correlationId)
+    public PatientEncounterBuilder(string facilityId, string MRN, DateTime admitDate, DateTime? dischargeDate, string correlationId, string encounterType = null, string encounterStatus = null, string encounterClass = null)
     {
         _patientEncounter.FacilityId = facilityId;
         _patientEncounter.MedicalRecordNumber = MRN;
         _patientEncounter.AdmitDate = admitDate;
+        _patientEncounter.EncounterType = encounterType;
+        _patientEncounter.EncounterStatus = encounterStatus;
+        _patientEncounter.EncounterClass = encounterClass;
 
         if (dischargeDate != default)
         {

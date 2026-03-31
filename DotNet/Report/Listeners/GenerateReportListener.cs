@@ -9,6 +9,7 @@ using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
@@ -115,7 +116,7 @@ namespace LantanaGroup.Link.Report.Listeners
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
                             await ProcessMessageAsync(result, consumeCancellationToken);
-                            consumer.Commit(result);
+                            consumer.SafeCommit(result, _logger);
                         }, cancellationToken);
 
                     }
@@ -133,12 +134,11 @@ namespace LantanaGroup.Link.Report.Listeners
                         _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 
                         var offset = ex.ConsumerRecord?.TopicPartitionOffset;
-                        consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
+                        consumer.SafeCommit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset }, _logger);
                     }
                     catch (Exception ex)
                     {
                         _exceptionLogger.Handle(ex, "Error encountered in GenerateReportListener", LogLevel.Error);
-                        consumer.Commit();
                     }
                 }
             }
@@ -160,8 +160,10 @@ namespace LantanaGroup.Link.Report.Listeners
                     return;
                 }
 
-                var reportScheduledManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportScheduledManager>();
-                var reportEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportEntryManager>();
+                using var scope = _serviceScopeFactory.CreateScope();
+                var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+                var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+                var reportPopulationManager = scope.ServiceProvider.GetRequiredService<IReportPopulationManager>();
 
                 var key = result.Message.Key;
                 var value = result.Message.Value;
@@ -231,6 +233,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 await reportScheduledManager.AddAsync(reportSchedule, cancellationToken);
 
+                var newEntries = new List<ReportEntryModel>();
+
                 if (value.Regenerate)
                 {
                     var scheduledReports = await reportEntryManager.FindAsync(p => p.ReportScheduleId == reportId, cancellationToken);
@@ -244,7 +248,8 @@ namespace LantanaGroup.Link.Report.Listeners
                             ReportingStatus = ReportingStatus.PatientIdentified,
                             ReportScheduleId = reportSchedule.Id,
                             FacilityId = facilityId,
-                            CreateDate = DateTime.UtcNow
+                            CreateDate = DateTime.UtcNow,
+                            MeasureReports = new List<EntryMeasureReportModel>()
                         };
 
                         foreach (var reportType in reportTypes)
@@ -256,29 +261,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             });
                         }
 
-                        await reportEntryManager.AddAsync(newEntry, cancellationToken);
-
-                        try
-                        {
-                            await _evaluationProducer.ProduceAsync(nameof(KafkaTopic.EvaluationRequested), new Message<string, EvaluationRequestedValue>
-                            {
-                                Key = facilityId,
-                                Value = new EvaluationRequestedValue
-                                {
-                                    PreviousReportId = value.ReportId?.ToString(),
-                                    PatientId = p,
-                                    ReportTrackingId = reportSchedule.Id.ToString(),
-                                },
-                                Headers = new Headers
-                                            {
-                                                { "X-Correlation-Id", Encoding.ASCII.GetBytes(Guid.NewGuid().ToString()) }
-                                            }
-                            });
-                        }
-                        catch (ProduceException<string, EvaluationRequestedValue> ex)
-                        {
-                            _exceptionLogger.Handle(ex, "An error was encountered generating an Evaluation Requested event", LogLevel.Error, facilityId, new { ReportTrackingId = reportSchedule.Id });
-                        }
+                        newEntries.Add(newEntry);
                     }
                 }
                 else
@@ -305,7 +288,8 @@ namespace LantanaGroup.Link.Report.Listeners
                             ReportingStatus = ReportingStatus.PatientIdentified,
                             ReportScheduleId = reportSchedule.Id,
                             FacilityId = facilityId,
-                            CreateDate = DateTime.UtcNow
+                            CreateDate = DateTime.UtcNow,
+                            MeasureReports = new List<EntryMeasureReportModel>()
                         };
 
                         foreach (var reportType in reportTypes)
@@ -317,10 +301,45 @@ namespace LantanaGroup.Link.Report.Listeners
                             });
                         }
 
-                        await reportEntryManager.AddAsync(newEntry, cancellationToken);
+                        newEntries.Add(newEntry);
                     }
+                }
 
-                    await _dataAcqProducer.Produce(reportSchedule, patientIds);
+                if (newEntries.Count > 0)
+                {
+                    await reportEntryManager.AddRangeAsync(newEntries, cancellationToken);
+                }
+
+                if (value.Regenerate)
+                {
+                    foreach (var entry in newEntries)
+                    {
+                        try
+                        {
+                            await _evaluationProducer.ProduceAsync(nameof(KafkaTopic.EvaluationRequested), new Message<string, EvaluationRequestedValue>
+                            {
+                                Key = facilityId,
+                                Value = new EvaluationRequestedValue
+                                {
+                                    PreviousReportId = value.ReportId?.ToString(),
+                                    PatientId = entry.PatientId,
+                                    ReportTrackingId = reportSchedule.Id.ToString(),
+                                },
+                                Headers = new Headers
+                                            {
+                                                { "X-Correlation-Id", Encoding.ASCII.GetBytes(Guid.NewGuid().ToString()) }
+                                            }
+                            });
+                        }
+                        catch (ProduceException<string, EvaluationRequestedValue> ex)
+                        {
+                            _exceptionLogger.Handle(ex, "An error was encountered generating an Evaluation Requested event", LogLevel.Error, facilityId, new { ReportTrackingId = reportSchedule.Id });
+                        }
+                    }
+                }
+                else
+                {
+                    await _dataAcqProducer.Produce(reportSchedule, newEntries.Select(e => e.PatientId).ToList());
                 }
             }
             catch (DeadLetterException ex)

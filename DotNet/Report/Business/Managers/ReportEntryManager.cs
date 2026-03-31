@@ -19,6 +19,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         Task<ReportEntryModel> AddAsync(ReportEntryModel model, CancellationToken cancellationToken);
 
+        Task AddRangeAsync(IEnumerable<ReportEntryModel> models, CancellationToken cancellationToken);
+
         Task<List<ReportEntryModel>> FindAsync(Expression<Func<ReportEntry, bool>> predicate,
             CancellationToken cancellationToken = default);
 
@@ -293,48 +295,68 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task<ReportEntryModel> AddAsync(ReportEntryModel model, CancellationToken cancellationToken)
         {
-            var entity = new ReportEntry
-            {
-                Id = model.Id == Guid.Empty ? Guid.NewGuid() : model.Id,
-                CreateDate = DateTime.UtcNow,
-                FacilityId = model.FacilityId,
-                ReportScheduleId = model.ReportScheduleId,
-                PatientId = model.PatientId,
-                ReportingStatus = model.ReportingStatus,
-                SubmissionStatus = model.SubmissionStatus,
-                SubmitReportDateTime = model.SubmitReportDateTime,
-                AggregateReportUri = model.AggregateReportUri,
-                AggregateReportBlobName = model.AggregateReportBlobName
-            };
+            await AddRangeAsync(new[] { model }, cancellationToken);
+            return model;
+        }
 
-            foreach (var measureModel in model.MeasureReports)
+        public async Task AddRangeAsync(IEnumerable<ReportEntryModel> models, CancellationToken cancellationToken)
+        {
+            if (models == null || !models.Any())
+                return;
+
+            var entities = new List<ReportEntry>();
+
+            foreach (var model in models)
             {
-                var measureEntry = new EntryMeasureReport
+                var entity = new ReportEntry
                 {
-                    ReportType = measureModel.ReportType,
-                    Status = measureModel.Status,
-                    MeasureReportId = measureModel.MeasureReportId,
-                    MeasureReportUri = measureModel.MeasureReportUri,
-                    MeasureReportFileName = measureModel.MeasureReportFileName
+                    Id = model.Id == Guid.Empty ? Guid.NewGuid() : model.Id,
+                    CreateDate = DateTime.UtcNow,
+                    FacilityId = model.FacilityId,
+                    ReportScheduleId = model.ReportScheduleId,
+                    PatientId = model.PatientId,
+                    ReportingStatus = model.ReportingStatus,
+                    SubmissionStatus = model.SubmissionStatus,
+                    SubmitReportDateTime = model.SubmitReportDateTime,
+                    AggregateReportUri = model.AggregateReportUri,
+                    AggregateReportBlobName = model.AggregateReportBlobName
                 };
 
-                foreach (var rc in measureModel.ResourceCount)
+                foreach (var measureModel in model.MeasureReports)
                 {
-                    measureEntry.ResourceCounts.Add(new ResourceCounts
+                    var measureEntry = new EntryMeasureReport
                     {
-                        ResourceType = rc.Key,
-                        ResourceCount = rc.Value
-                    });
+                        ReportType = measureModel.ReportType,
+                        Status = measureModel.Status,
+                        MeasureReportId = measureModel.MeasureReportId,
+                        MeasureReportUri = measureModel.MeasureReportUri,
+                        MeasureReportFileName = measureModel.MeasureReportFileName
+                    };
+
+                    foreach (var rc in measureModel.ResourceCount)
+                    {
+                        measureEntry.ResourceCounts.Add(new ResourceCounts
+                        {
+                            ResourceType = rc.Key,
+                            ResourceCount = rc.Value
+                        });
+                    }
+
+                    entity.MeasureReports.Add(measureEntry);
                 }
 
-                entity.MeasureReports.Add(measureEntry);
+                entities.Add(entity);
             }
 
-            await _dbContext.AddAsync(entity, cancellationToken);
+            await _dbContext.ReportEntry.AddRangeAsync(entities, cancellationToken);
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            model.Id = entity.Id;
-            return model;
+            var entityArray = entities.ToArray();
+            int index = 0;
+            foreach (var model in models)
+            {
+                model.Id = entityArray[index++].Id;
+            }
         }
 
         public async Task<ReportEntryModel> UpdateAsyncWithConsumerResult(MeasureReportGeneratedValue consumerValue)
@@ -464,7 +486,6 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 predicate = predicate.And(q => q.MeasureReports.Any(a => a.ReportType == reportType));
             }
 
-
             IQueryable<ReportEntry> entityQuery = _dbContext.ReportEntry.Where(predicate);
 
             if (!string.IsNullOrWhiteSpace(sortBy))
@@ -557,7 +578,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             {
                 var reportingStatusKey = entry.ReportingStatus.ToString();
                 if (summary.ReportingStatusCounts.ContainsKey(reportingStatusKey))
-                    summary.ReportingStatusCounts[reportingStatusKey]++;
+                    summary.ReportingStatusCounts[reportingStatusKey] = summary.ReportingStatusCounts.GetValueOrDefault(reportingStatusKey) + 1;
                 else
                     summary.ReportingStatusCounts[reportingStatusKey] = 1;
 
@@ -566,7 +587,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     : "Pending";
 
                 if (summary.SubmissionStatusCounts.ContainsKey(submissionStatusKey))
-                    summary.SubmissionStatusCounts[submissionStatusKey]++;
+                    summary.SubmissionStatusCounts[submissionStatusKey] = summary.SubmissionStatusCounts.GetValueOrDefault(submissionStatusKey) + 1;
                 else
                     summary.SubmissionStatusCounts[submissionStatusKey] = 1;
 
@@ -575,7 +596,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     foreach (var measureReport in entry.MeasureReports)
                     {
                         if (summary.ReportTypeCounts.ContainsKey(measureReport.ReportType))
-                            summary.ReportTypeCounts[measureReport.ReportType]++;
+                            summary.ReportTypeCounts[measureReport.ReportType] = summary.ReportTypeCounts.GetValueOrDefault(measureReport.ReportType) + 1;
                         else
                             summary.ReportTypeCounts[measureReport.ReportType] = 1;
                     }

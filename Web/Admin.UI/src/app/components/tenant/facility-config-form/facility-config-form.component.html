@@ -2,7 +2,7 @@
   <form [formGroup]="facilityConfigForm" class="dialog-form">
     <div class="form-input">
       <mat-form-field appearance="outline" class="subject-input form-input ">
-        <mat-label>Facility Id</mat-label>
+        <mat-label>Facility ID</mat-label>
         <input matInput formControlName="facilityId" [disabled]="viewOnly">
         @if (facilityIdControl.value && !viewOnly) {
           <button matSuffix mat-icon-button aria-label="Clear" (click)="clearFacilityId()">

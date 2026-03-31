@@ -80,24 +80,40 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task AddAsyncWithAggregateResult(string facilityId, Guid reportId, string patientId, AggregateResult aggregateResult, CancellationToken cancellationToken)
         {
+            if (aggregateResult?.MeasureReportResults == null || !aggregateResult.MeasureReportResults.Any())
+                return;
+
+            var entities = new List<ReportResource>();
+
             foreach (var measureReport in aggregateResult.MeasureReportResults)
             {
+                if (measureReport.ResourceReferences == null) continue;
+
                 foreach (var resource in measureReport.ResourceReferences)
                 {
-                    var resModel = new ReportResourceModel
+                    if (resource == null || resource.Length < 2)
+                        continue;
+
+                    var entity = new ReportResource
                     {
                         Id = Guid.NewGuid(),
-                        ReportScheduleId = reportId,
+                        CreateDate = DateTime.UtcNow,
                         FacilityId = facilityId,
+                        ReportScheduleId = reportId,
                         PatientId = patientId,
                         MeasureReportId = measureReport.MeasureReportId,
                         ResourceType = resource[0],
-                        ResourceId = resource[1],
-                        CreateDate = DateTime.UtcNow
+                        ResourceId = resource[1]
                     };
 
-                    await AddAsync(resModel, cancellationToken);
+                    entities.Add(entity);
                 }
+            }
+
+            if (entities.Count > 0)
+            {
+                await _context.ReportResource.AddRangeAsync(entities, cancellationToken);
+                await _context.SaveChangesAsync(cancellationToken);
             }
         }
 
