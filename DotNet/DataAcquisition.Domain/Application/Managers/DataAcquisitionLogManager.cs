@@ -136,6 +136,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     private const int SoftDeleteBatchSize = 1000;
 
+    // Soft deletes all logs for a facility in batches to avoid large update locks
     public async Task<int> SoftDeleteByFacilityAsync(string facilityId, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.SoftDeleteByFacilityAsync");

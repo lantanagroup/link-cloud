@@ -100,6 +100,7 @@ export class TenantDashboardComponent implements OnInit {
       'facilityId',
       'facilityName',
       'timeZone',
+      'vendor',
       'action'
     ];
 
