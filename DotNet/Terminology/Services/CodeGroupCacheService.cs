@@ -69,7 +69,7 @@ public class CodeGroupCacheService(
 
         if (key == null)
             return null;
-        
+
         cache.TryGetValue(key.Key, out CodeGroup? codeGroup);
         return codeGroup;
     }
@@ -104,7 +104,7 @@ public class CodeGroupCacheService(
         }
         else
         {
-            
+
             var keys = _cacheKeys
                 .Where(k => k.Type == type)
                 .Where(k => string.Equals(k.Version, version, StringComparison.CurrentCultureIgnoreCase))
@@ -118,10 +118,10 @@ public class CodeGroupCacheService(
                     k.Identifiers.Any(i =>
                         string.Equals(i.Value, identifier, StringComparison.CurrentCultureIgnoreCase)));
         }
-        
+
         if (key == null)
             return null;
-        
+
         cache.TryGetValue(key.Key, out CodeGroup? codeGroup);
         return codeGroup;
     }
@@ -140,7 +140,7 @@ public class CodeGroupCacheService(
             .Where(cg => cg != null)
             .OrderByDescending(cg => cg!.Version)
             .ToList()!;
-        
+
         // Remove all but the first duplicate by id (returning only the HEAD/latest version)
         codeGroups = codeGroups.GroupBy(cg => cg.Id)
             .Select(g => g.First())
@@ -163,9 +163,9 @@ public class CodeGroupCacheService(
 
     protected internal virtual void SetCodeGroup(CodeGroup codeGroup)
     {
-        CacheKey urlKey = new CacheKey((CodeGroup.CodeGroupTypes) codeGroup.Type!, codeGroup.Url!, codeGroup.Version!, codeGroup.Id!, codeGroup.Identifiers);
+        CacheKey urlKey = new CacheKey((CodeGroup.CodeGroupTypes)codeGroup.Type!, codeGroup.Url!, codeGroup.Version!, codeGroup.Id!, codeGroup.Identifiers);
         cache.Set(urlKey.Key, codeGroup, _cacheOptions);
-        
+
         if (!_cacheKeys.Contains(urlKey))
             _cacheKeys.Add(urlKey);
     }
@@ -173,7 +173,7 @@ public class CodeGroupCacheService(
     private async Task<CodeGroup> GetCodeGroup(string jsonFilePath)
     {
         CodeGroup codeGroup = new CodeGroup();
-            
+
         // Read the JSON file and parse it as a FHIR resource
         var jsonContent = await ReadAllTextAsync(jsonFilePath);
         codeGroup.Resource = new Hl7.Fhir.Serialization.FhirJsonParser().Parse<Resource>(jsonContent);
@@ -194,7 +194,7 @@ public class CodeGroupCacheService(
             codeGroup.Version = valueSet.Version;
             codeGroup.Identifiers = valueSet.Identifier;
         }
-        else 
+        else
         {
             logger.LogWarning("Resource type {Type} is not supported", codeGroup.Resource.TypeName);
             throw new InvalidOperationException($"Resource type {codeGroup.Resource.TypeName} is not supported");
@@ -217,17 +217,17 @@ public class CodeGroupCacheService(
         var records = csv.GetRecords<CsvValueSetRecord>();
         string? system = null;
         List<Code>? systemCodes = null;
-                
+
         foreach (var record in records)
         {
             string code = record.Code;
             string display = record.Display;
-                    
+
             if (system == null || (!string.IsNullOrEmpty(record.System) && system != record.System))
             {
                 if (string.IsNullOrEmpty(record.System))
                     continue;
-                
+
                 system = record.System;
                 if (!codeGroup.Codes.ContainsKey(system))
                 {
@@ -245,14 +245,14 @@ public class CodeGroupCacheService(
                 logger.LogWarning("System codes list is null for code {Code}", code);
                 continue;
             }
-                    
+
             systemCodes.Add(new Code
             {
                 Value = code,
                 Display = display
             });
         }
-                    
+
         SetCodeGroup(codeGroup);
         logger.LogDebug("Value set {ValueSet} loaded with {Count} codes", codeGroup.Id, codeGroup.Codes.Values.SelectMany(c => c).Count());
     }
@@ -261,10 +261,10 @@ public class CodeGroupCacheService(
     {
         if (codeGroup == null)
             throw new ArgumentNullException(nameof(codeGroup));
-        
+
         if (string.IsNullOrEmpty(codeGroup.Url))
             throw new ArgumentException("Code system URL is required", nameof(codeGroup));
-        
+
         // Validate column count
         csv.Read();
         csv.ReadHeader();
@@ -276,22 +276,22 @@ public class CodeGroupCacheService(
 
         var records = csv.GetRecords<CsvCodeSystemRecord>();
         string system = codeGroup.Url;
-        
+
         foreach (var record in records)
         {
             string code = record.Code;
             string display = record.Display;
-            
+
             if (!codeGroup.Codes.ContainsKey(system))
                 codeGroup.Codes.Add(system, new List<Code>());
-            
+
             codeGroup.Codes[system].Add(new Code
             {
                 Value = code,
                 Display = display
             });
         }
-            
+
         SetCodeGroup(codeGroup);
         logger.LogDebug("Code system {CodeSystem} loaded with {Count} codes", codeGroup.Id, codeGroup.Codes[system].Count);
     }
@@ -311,7 +311,7 @@ public class CodeGroupCacheService(
             logger.LogWarning("Terminology path {Path} does not exist. Cannot populate cache.", _terminologyConfig.Path);
             return;
         }
-        
+
         var directories = GetDirectories(_terminologyConfig.Path);
         int loadedValueSets = 0;
         int loadedCodeSystems = 0;
@@ -366,9 +366,9 @@ public class CodeGroupCacheService(
                 logger.LogError(ex, "Error loading code group from {csvFilePath}", csvFilePath);
             }
         }
-        
+
         logger.LogInformation("Loaded {LoadedValueSetsCount} value sets and {LoadedCodeSystemsCount} code systems for a total of {AllCodeGroupsCount} code groups.", loadedValueSets, loadedCodeSystems, loadedValueSets + loadedCodeSystems);
-        
+
         if (notLoadedDirectories.Count > 0)
             logger.LogWarning("{NotLoadedCount} code groups were not loaded from the directory:\n- {NotLoadedList}", notLoadedDirectories.Count, String.Join("\n- ", notLoadedDirectories));
     }

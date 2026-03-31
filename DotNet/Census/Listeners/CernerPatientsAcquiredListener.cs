@@ -132,7 +132,7 @@ namespace LantanaGroup.Link.Census.Listeners
 
             var dischargeEvents = await cernerListService.ProcessDischarges(result.Message.Key, result.Message.Value, cancellationToken);
 
-            if (dischargeEvents != null) 
+            if (dischargeEvents != null)
             {
                 await _eventProducerService.ProduceEventsAsync(result.Message.Key, dischargeEvents, cancellationToken);
             }

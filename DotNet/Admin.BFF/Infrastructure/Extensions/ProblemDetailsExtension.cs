@@ -21,7 +21,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
             var problemDetailsOptions = new ProblemDetailsOptions();
             options?.Invoke(problemDetailsOptions);
 
-            services.AddProblemDetails(options => {
+            services.AddProblemDetails(options =>
+            {
                 options.CustomizeProblemDetails = ctx =>
                 {
                     // Remove the userFacing marker — it must not appear in the response body

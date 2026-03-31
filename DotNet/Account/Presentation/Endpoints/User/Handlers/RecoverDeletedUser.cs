@@ -43,7 +43,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
                 Activity.Current?.AddException(ex);
                 logger.LogUserRecoveryException(id.ToString(), ex.Message);
                 throw;
-            }            
+            }
         }
     }
 }

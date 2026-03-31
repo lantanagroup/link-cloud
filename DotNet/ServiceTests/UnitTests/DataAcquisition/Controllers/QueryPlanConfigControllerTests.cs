@@ -19,7 +19,7 @@ namespace UnitTests.DataAcquisition.Controllers
     public class QueryPlanConfigControllerTests
     {
         [Fact]
-        public async Task  GetQueryPlanNegativeTest_NullResult()
+        public async Task GetQueryPlanNegativeTest_NullResult()
         {
             var facilityId = "test-facility-id";
             var _mocker = new AutoMocker();
@@ -31,11 +31,11 @@ namespace UnitTests.DataAcquisition.Controllers
             var result = await _controller.GetQueryPlan(facilityId, new GetQueryPlanParameters { Type = Frequency.Monthly }, CancellationToken.None);
 
             var problem = (ObjectResult)result;
-            Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.NotFound);
+            Assert.Equal((int)HttpStatusCode.NotFound, problem.StatusCode.Value);
         }
 
         [Fact]
-        public async Task  GetQueryPlanNegativeTest_InvalidFacilityId()
+        public async Task GetQueryPlanNegativeTest_InvalidFacilityId()
         {
             var facilityId = "test-facility-id";
             var _mocker = new AutoMocker();
@@ -44,11 +44,11 @@ namespace UnitTests.DataAcquisition.Controllers
             var result = await _controller.GetQueryPlan("", new GetQueryPlanParameters { Type = Frequency.Monthly }, CancellationToken.None);
 
             var problem = (ObjectResult)result;
-            Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.BadRequest);
+            Assert.Equal((int)HttpStatusCode.BadRequest, problem.StatusCode.Value);
         }
 
         [Fact]
-        public async Task  CreateQueryPlanTest()
+        public async Task CreateQueryPlanTest()
         {
             var facilityId = "test-facility-id";
             var _mocker = new AutoMocker();
@@ -57,7 +57,7 @@ namespace UnitTests.DataAcquisition.Controllers
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.CreateQueryPlan(facilityId, 
+            var result = await _controller.CreateQueryPlan(facilityId,
                 new QueryPlanApiModel
                 {
                     FacilityId = facilityId,
@@ -70,7 +70,7 @@ namespace UnitTests.DataAcquisition.Controllers
         }
 
         [Fact]
-        public async Task  CreateQueryPlanNegativeTest_NullContent()
+        public async Task CreateQueryPlanNegativeTest_NullContent()
         {
             var facilityId = "test-facility-id";
             var _mocker = new AutoMocker();
@@ -79,11 +79,11 @@ namespace UnitTests.DataAcquisition.Controllers
             var result = await _controller.CreateQueryPlan(facilityId, null, CancellationToken.None);
 
             var problem = (ObjectResult)result;
-            Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.BadRequest);
+            Assert.Equal((int)HttpStatusCode.BadRequest, problem.StatusCode.Value);
         }
 
         [Fact]
-        public async Task  UpdateQueryPlanTest()
+        public async Task UpdateQueryPlanTest()
         {
             var facilityId = "test-facility-id";
             var _mocker = new AutoMocker();
@@ -96,10 +96,10 @@ namespace UnitTests.DataAcquisition.Controllers
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.UpdateQueryPlan(facilityId, 
+            var result = await _controller.UpdateQueryPlan(facilityId,
                 new QueryPlanApiModel
-                { 
-                    FacilityId = facilityId, 
+                {
+                    FacilityId = facilityId,
                     Type = Frequency.Monthly,
                     PlanName = "Test",
                     InitialQueries = new Dictionary<string, IQueryConfig> { { "1", new ParameterQueryConfig { Parameters = new List<IParameter> { } } } },
@@ -110,7 +110,7 @@ namespace UnitTests.DataAcquisition.Controllers
         }
 
         [Fact]
-        public async Task  UpdateQueryPlanNegativeTest_NullBody()
+        public async Task UpdateQueryPlanNegativeTest_NullBody()
         {
             var facilityId = "test-facility-id";
             var _mocker = new AutoMocker();
@@ -124,7 +124,7 @@ namespace UnitTests.DataAcquisition.Controllers
             var result = await _controller.UpdateQueryPlan(facilityId, null, CancellationToken.None);
 
             var problem = (ObjectResult)result;
-            Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.BadRequest);
+            Assert.Equal((int)HttpStatusCode.BadRequest, problem.StatusCode.Value);
         }
 
         [Fact]
@@ -142,9 +142,9 @@ namespace UnitTests.DataAcquisition.Controllers
 
             var _createController = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            await _createController.CreateQueryPlan(facilityId, new QueryPlanApiModel 
+            await _createController.CreateQueryPlan(facilityId, new QueryPlanApiModel
             {
-                FacilityId = facilityId, 
+                FacilityId = facilityId,
                 Type = Frequency.Monthly,
                 PlanName = "Test",
                 InitialQueries = new Dictionary<string, IQueryConfig> { { "1", new ParameterQueryConfig { Parameters = new List<IParameter> { } } } },
@@ -162,7 +162,7 @@ namespace UnitTests.DataAcquisition.Controllers
         }
 
         [Fact]
-        public async Task  DeleteQueryPlanNegativeTest_InvalidFacilityId()
+        public async Task DeleteQueryPlanNegativeTest_InvalidFacilityId()
         {
             var facilityId = "test-facility-id";
             var _mocker = new AutoMocker();
@@ -171,11 +171,11 @@ namespace UnitTests.DataAcquisition.Controllers
             var result = await _controller.DeleteQueryPlan("", new DeleteQueryPlanParameters { Type = Frequency.Monthly }, CancellationToken.None);
 
             var problem = (ObjectResult)result;
-            Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.BadRequest);
+            Assert.Equal((int)HttpStatusCode.BadRequest, problem.StatusCode.Value);
         }
 
         [Fact]
-        public async Task  DeleteQueryPlanNegativeTest_NullResult()
+        public async Task DeleteQueryPlanNegativeTest_NullResult()
         {
             var facilityId = "test-facility-id";
             var _mocker = new AutoMocker();
@@ -187,7 +187,7 @@ namespace UnitTests.DataAcquisition.Controllers
             var result = await _controller.DeleteQueryPlan(facilityId, new DeleteQueryPlanParameters { Type = Frequency.Monthly }, CancellationToken.None);
 
             var problem = (ObjectResult)result;
-            Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.NotFound);
+            Assert.Equal((int)HttpStatusCode.NotFound, problem.StatusCode.Value);
         }
     }
 }

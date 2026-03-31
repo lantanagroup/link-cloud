@@ -3,7 +3,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Caching.Distributed;
 using System.Text.Json;
 
- namespace LantanaGroup.Link.Shared.Application.Extensions.Caching
+namespace LantanaGroup.Link.Shared.Application.Extensions.Caching
 {
     public class RedisCacheService : ICacheService
     {

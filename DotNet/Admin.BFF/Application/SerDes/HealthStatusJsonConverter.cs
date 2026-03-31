@@ -13,7 +13,7 @@ public class HealthStatusJsonConverter : JsonConverter<HealthStatus>
         {
             return (HealthStatus)type;
         }
-        
+
         throw new JsonException("Invalid value for Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions.HealthStatus");
     }
 

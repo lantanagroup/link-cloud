@@ -18,10 +18,10 @@ namespace Link.Authorization.Policies
 
         public static AuthorizationPolicy PermissiveAccess()
         {
-            return new AuthorizationPolicyBuilder()                
+            return new AuthorizationPolicyBuilder()
                 .AddRequirements(new PermissiveAccessRequirement())
                 .Build();
-        }       
+        }
 
         public static AuthorizationPolicy FacilityAccess()
         {
@@ -109,8 +109,8 @@ namespace Link.Authorization.Policies
                 .RequireAuthenticatedUser()
                 .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkSystemPermissions.CanGenerateReports)])
                 .Build();
-        }     
-        
+        }
+
         public static AuthorizationPolicy CanGenerateEvents()
         {
             return new AuthorizationPolicyBuilder()
@@ -153,6 +153,6 @@ namespace Link.Authorization.Policies
                 .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkSystemPermissions.CanEditTenantConfigurations)])
                 .Build();
         }
-        
+
     }
 }
