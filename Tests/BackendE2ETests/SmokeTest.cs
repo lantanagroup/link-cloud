@@ -1,5 +1,4 @@
-﻿using System.Net;
-using LantanaGroup.Link.Automation;
+﻿using LantanaGroup.Link.Automation;
 using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.Automation.Generation;
 using LantanaGroup.Link.Automation.Helpers;
@@ -150,7 +149,7 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
             Config.EndDate,
             FacilityId,
             reportId,
-            null);
+            GeneratedFhirDataSnapshotWriter.GetSnapshotDirectory(nameof(SmokeTest)));
 
         await ValidationBaselineManager.ValidateOrCreateAsync(
             _output,
@@ -159,8 +158,6 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
             FacilityId,
             reportId,
             measureId,
-            Config.StartDate,
-            Config.EndDate,
             Config.PatientIds,
             _generatedBundles,
             internalAbsResources);

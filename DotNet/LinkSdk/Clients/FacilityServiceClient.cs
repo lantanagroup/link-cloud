@@ -3,6 +3,7 @@ using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Tenant;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using Microsoft.Extensions.Options;
 
@@ -54,4 +55,12 @@ public class FacilityServiceClient : LinkApiClientBase, IFacilityServiceClient
         CancellationToken cancellationToken = default) =>
         DeleteOrIgnoreAsync(() => Request($"/Facility/{facilityId}")
             .DeleteAsync(cancellationToken: cancellationToken));
+
+    public Task<GenerateAdhocReportResponseApiModel> RegenerateReportAsync(
+        string facilityId,
+        RegenerateReportRequest request,
+        CancellationToken cancellationToken = default) =>
+        Request($"/Facility/{facilityId}/RegenerateReport")
+            .PostJsonAsync(request, cancellationToken: cancellationToken)
+            .ReceiveJson<GenerateAdhocReportResponseApiModel>();
 }

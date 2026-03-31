@@ -182,7 +182,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             return device;
         }
 
-        private List CreatePatientList(List<string> patientIds, DateTime startDate, DateTime endDate)
+        private List CreatePatientList(List<string> patientIds, DateTimeOffset startDate, DateTimeOffset endDate)
         {
             var admittedPatients = new List();
             admittedPatients.Status = List.ListStatus.Current;
@@ -192,8 +192,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 Url = "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-patient-list-applicable-period-extension",
                 Value = new Period()
                 {
-                    StartElement = new FhirDateTime(new DateTimeOffset(startDate)),
-                    EndElement = new FhirDateTime(new DateTimeOffset(endDate))
+                    StartElement = new FhirDateTime(startDate),
+                    EndElement = new FhirDateTime(endDate)
                 }
             });
 

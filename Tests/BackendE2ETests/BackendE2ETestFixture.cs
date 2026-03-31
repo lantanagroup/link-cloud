@@ -9,7 +9,6 @@ using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using RestSharp;
 
 namespace LantanaGroup.Link.Tests.E2ETests;
 
@@ -39,7 +38,6 @@ public sealed class BackendE2ETestFixture : IDisposable
 
         // Infrastructure
         builder.Services.AddSingleton(sp => new DatabaseConnectionFactory(sp.GetRequiredService<AutomationConfig>().Database));
-        builder.Services.AddSingleton(sp => AdminBffClientFactory.Create(sp.GetRequiredService<AutomationConfig>()));
 
         // ServiceRegistry — point all services at AdminBFF base for E2E tests
         // The AdminBFF YARP proxy routes api/census/*, api/data/*, etc. to the real services.
@@ -59,7 +57,7 @@ public sealed class BackendE2ETestFixture : IDisposable
             opts.SubmissionServiceUrl = bffBase;
         });
 
-        // Auth — E2E tests use anonymous or OAuth token via AdminBFF
+        // Auth — E2E tests use anonymous
         builder.Services.Configure<BackendAuthenticationServiceExtension.LinkBearerServiceOptions>(opts =>
         {
             opts.AllowAnonymous = true;

@@ -34,8 +34,8 @@ public class MeasureReportGeneratedListenerTests : IClassFixture<ReportIntegrati
         {
             Id = reportId,
             FacilityId = facilityId,
-            ReportStartDate = DateTime.UtcNow.AddDays(-30),
-            ReportEndDate = DateTime.UtcNow.AddDays(30),
+            ReportStartDate = DateTimeOffset.UtcNow.AddDays(-30),
+            ReportEndDate = DateTimeOffset.UtcNow.AddDays(30),
             Frequency = Frequency.Monthly,
             ReportTypes = { "DE-111" },
             Status = ScheduleStatus.Scheduled,

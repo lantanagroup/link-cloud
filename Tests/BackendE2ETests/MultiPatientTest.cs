@@ -177,8 +177,6 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
             FacilityId,
             reportId,
             measureId,
-            Config.StartDate,
-            Config.EndDate,
             Config.PatientIds,
             _generatedBundles,
             internalAbsResources);

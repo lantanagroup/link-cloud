@@ -28,9 +28,9 @@ public partial class ReportSchedule
     [StringLength(100)]
     public string FacilityId { get; set; }
 
-    public DateTime ReportStartDate { get; set; }
+    public DateTimeOffset ReportStartDate { get; set; }
 
-    public DateTime ReportEndDate { get; set; }
+    public DateTimeOffset ReportEndDate { get; set; }
 
     public DateTime? SubmitReportDateTime { get; set; }
 

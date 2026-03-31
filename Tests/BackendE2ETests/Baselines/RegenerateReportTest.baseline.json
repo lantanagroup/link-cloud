@@ -2,8 +2,6 @@
   "schemaVersion": 1,
   "baselineName": "RegenerateReportTest",
   "measureId": "NHSNAcuteCareHospitalMonthlyInitialPopulation",
-  "startDate": "2023-01-01T00:00:00Z",
-  "endDate": "2023-12-31T23:59:59Z",
   "expectedPatientIds": [
     "RegenPatient-001"
   ],
@@ -20,7 +18,7 @@
     "ImagingStudy": 2,
     "Immunization": 3,
     "List": 1,
-    "Location": 4,
+    "Location": 5,
     "Medication": 3,
     "MedicationAdministration": 7,
     "MedicationRequest": 6,

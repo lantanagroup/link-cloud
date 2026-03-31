@@ -282,8 +282,8 @@ public class GenerateReportListenerTests : IClassFixture<ReportIntegrationTestFi
         {
             Id = originalReportId,
             FacilityId = facilityId,
-            ReportStartDate = DateTime.UtcNow.AddDays(-60),
-            ReportEndDate = DateTime.UtcNow.AddDays(-30),
+            ReportStartDate = DateTimeOffset.UtcNow.AddDays(-60),
+            ReportEndDate = DateTimeOffset.UtcNow.AddDays(-30),
             Frequency = Frequency.Monthly,
             ReportTypes = { "DE-111" },
             Status = ScheduleStatus.Scheduled,

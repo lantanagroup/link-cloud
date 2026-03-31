@@ -1,5 +1,4 @@
-﻿using System.Net;
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
 using System.Globalization;
 using Confluent.Kafka;
@@ -9,11 +8,9 @@ using LantanaGroup.Link.Automation.Generation;
 using LantanaGroup.Link.Automation.Helpers;
 using LantanaGroup.Link.Automation.Services;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Integration.Tenant;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.SerDes;
-using RestSharp;
 using Xunit;
 using Task = System.Threading.Tasks.Task;
 
@@ -154,6 +151,13 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
         Assert.True(regeneratedSubmitted,
             $"Expected regenerated report {regeneratedReportId} to be submitted but it was not.");
 
+        // Fetch the actual schedule dates — the regenerated report inherits dates from the
+        // source scheduled report, which uses wall-clock end date and timezone-adjusted start.
+        var regenSchedule = await _b.ReportClient.GetScheduleAsync(regeneratedReportId)
+            ?? throw new InvalidOperationException($"Schedule {regeneratedReportId} not found after submission.");
+        var actualStartDate = regenSchedule.ReportStartDate.ToUniversalTime().ToString("o");
+        var actualEndDate = regenSchedule.ReportEndDate.ToUniversalTime().ToString("o");
+
         // Step 4: Validate regenerated report artifacts.
         var reportApi = _b.CreateReportHelper();
         var downloadedResources = await reportApi.DownloadReportAsync(_facilityId, regeneratedReportId, _config);
@@ -168,6 +172,17 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
                 $"Expected regenerated report to include patient-{patientId}.ndjson but it was not");
         }
 
+        await _b.CreateReportAbsManifestValidator().ValidateAllAsync(
+            internalAbsResources,
+            _config.PatientIds,
+            measureId,
+            actualStartDate,
+            actualEndDate,
+            _facilityId,
+            regeneratedReportId,
+            GeneratedFhirDataSnapshotWriter.GetSnapshotDirectory(nameof(RegenerateReportTest)),
+            expectDataAcquisitionData: false);
+
         await ValidationBaselineManager.ValidateOrCreateAsync(
             Output,
             _b.DataReader,
@@ -175,8 +190,6 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
             _facilityId,
             regeneratedReportId,
             measureId,
-            _config.StartDate,
-            _config.EndDate,
             _config.PatientIds,
             _generatedBundles,
             internalAbsResources);
@@ -347,23 +360,14 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
     {
         Output.WriteLine($"Regenerating report from source reportId={sourceReportId}…");
 
-        var request = new RestRequest($"facility/{facilityId}/RegenerateReport", Method.Post)
-            .AddJsonBody(new RegenerateReportRequest
-            {
-                ReportId = sourceReportId,
-                BypassSubmission = false
-            });
-
-        var response = await _b.AdminBffClient.ExecuteAsync(request);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.False(string.IsNullOrWhiteSpace(response.Content));
-
-        var payload = JsonSerializer.Deserialize<GenerateAdhocReportResponseApiModel>(
-            response.Content!,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        var payload = await _b.FacilityClient.RegenerateReportAsync(facilityId, new RegenerateReportRequest
+        {
+            ReportId = sourceReportId,
+            BypassSubmission = false
+        });
 
         Assert.NotNull(payload);
-        Assert.NotEqual(Guid.Empty, payload!.ReportId);
+        Assert.NotEqual(Guid.Empty, payload.ReportId);
 
         return payload.ReportId.ToString();
     }

@@ -35,8 +35,8 @@ namespace IntegrationTests.Report.Core
             {
                 Id = Guid.NewGuid(),
                 FacilityId = facilityId,
-                ReportStartDate = DateTime.UtcNow.AddDays(-30),
-                ReportEndDate = DateTime.UtcNow,
+                ReportStartDate = DateTimeOffset.UtcNow.AddDays(-30),
+                ReportEndDate = DateTimeOffset.UtcNow,
                 Frequency = Frequency.Monthly,
                 ReportTypes = { "DE-111" },
                 Status = ScheduleStatus.Scheduled,

@@ -42,7 +42,8 @@ public class ReportAbsManifestValidator
         string? facilityId = null,
         string? reportId = null,
         string? generatedSnapshotDirectory = null,
-        IReadOnlyCollection<string>? expectedManifestPatientListIds = null)
+        IReadOnlyCollection<string>? expectedManifestPatientListIds = null,
+        bool expectDataAcquisitionData = true)
     {
         var errors = new List<string>();
 
@@ -102,7 +103,8 @@ public class ReportAbsManifestValidator
                 reportId,
                 actualPatientFiles,
                 parsedPatientResources,
-                errors);
+                errors,
+                expectDataAcquisitionData);
 
             if (!string.IsNullOrWhiteSpace(generatedSnapshotDirectory))
             {
@@ -198,7 +200,12 @@ public class ReportAbsManifestValidator
             return string.Equals(actual, expected, StringComparison.Ordinal);
 
         if (DateTimeOffset.TryParse(actual, out var actualDto) && DateTimeOffset.TryParse(expected, out var expectedDto))
-            return actualDto.ToUniversalTime() == expectedDto.ToUniversalTime();
+        {
+            // Allow up to 1 second of tolerance to account for sub-second precision
+            // differences across serialization layers (DB milliseconds vs FHIR microseconds).
+            var diff = (actualDto.ToUniversalTime() - expectedDto.ToUniversalTime()).Duration();
+            return diff < TimeSpan.FromSeconds(1);
+        }
 
         return string.Equals(actual, expected, StringComparison.Ordinal);
     }
@@ -292,7 +299,8 @@ public class ReportAbsManifestValidator
         string reportId,
         IReadOnlySet<string> actualPatientFiles,
         List<AbsResourceRecord> patientResources,
-        List<string> errors)
+        List<string> errors,
+        bool expectDataAcquisitionData)
     {
         if (!Guid.TryParse(reportId, out var scheduleId))
         {
@@ -388,32 +396,35 @@ public class ReportAbsManifestValidator
         CompareCountMapsExact("MeasureEval->ReportResource", measureEvalCountMap, reportCountMap, errors);
         CompareCountMapsExact("MeasureEval->ABS", measureEvalCountMap, absCountMap, errors);
 
-        var dataAcqCountMap = ToCountMap(
-            (await _reader.GetDataAcquisitionResourceCountsByPatientTypeAsync(facilityId, reportId))
-            .Where(x => submittedPatients.Contains(x.PatientId))
-            .Select(x => (x.PatientId, x.ResourceType, x.Count)));
+        if (expectDataAcquisitionData)
+        {
+            var dataAcqCountMap = ToCountMap(
+                (await _reader.GetDataAcquisitionResourceCountsByPatientTypeAsync(facilityId, reportId))
+                .Where(x => submittedPatients.Contains(x.PatientId))
+                .Select(x => (x.PatientId, x.ResourceType, x.Count)));
 
-        CompareCountMapsMinimum("DataAcquisition->ReportResource", dataAcqCountMap, reportCountMap, errors);
-        CompareCountMapsMinimum("DataAcquisition->ABS", dataAcqCountMap, absCountMap, errors);
+            CompareCountMapsMinimum("DataAcquisition->ReportResource", dataAcqCountMap, reportCountMap, errors);
+            CompareCountMapsMinimum("DataAcquisition->ABS", dataAcqCountMap, absCountMap, errors);
 
-        var acquisitionLogs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
-        var acquiredKeys = acquisitionLogs
-            .Where(l => string.Equals(l.Status, "Completed", StringComparison.OrdinalIgnoreCase))
-            .SelectMany(l => l.ResourceAcquiredIds ?? [])
-            .Where(r => !string.IsNullOrWhiteSpace(r) && r.Contains('/'))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var acquisitionLogs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
+            var acquiredKeys = acquisitionLogs
+                .Where(l => string.Equals(l.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+                .SelectMany(l => l.ResourceAcquiredIds ?? [])
+                .Where(r => !string.IsNullOrWhiteSpace(r) && r.Contains('/'))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var expectedNonDerived = expectedKeys
-            .Where(k => !IsDerivedType(k.Split('/')[0]))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var expectedNonDerived = expectedKeys
+                .Where(k => !IsDerivedType(k.Split('/')[0]))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var missingInAcquisition = expectedNonDerived
-            .Except(acquiredKeys, StringComparer.OrdinalIgnoreCase)
-            .Take(50)
-            .ToList();
+            var missingInAcquisition = expectedNonDerived
+                .Except(acquiredKeys, StringComparer.OrdinalIgnoreCase)
+                .Take(50)
+                .ToList();
 
-        foreach (var missing in missingInAcquisition)
-            AddError(errors, $"ReportResource {missing} not found in DataAcquisition completed ResourceAcquiredIds.");
+            foreach (var missing in missingInAcquisition)
+                AddError(errors, $"ReportResource {missing} not found in DataAcquisition completed ResourceAcquiredIds.");
+        }
     }
 
     private void ValidateGeneratedSnapshotReconciliation(

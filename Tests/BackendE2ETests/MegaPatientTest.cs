@@ -163,8 +163,6 @@ public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETe
             FacilityId,
             reportId,
             measureId,
-            Config.StartDate,
-            Config.EndDate,
             Config.PatientIds,
             _generatedBundles,
             internalAbsResources);

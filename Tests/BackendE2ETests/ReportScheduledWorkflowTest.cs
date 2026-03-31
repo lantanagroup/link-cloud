@@ -9,7 +9,8 @@ using LantanaGroup.Link.Automation.Generation;
 using LantanaGroup.Link.Automation.Helpers;
 using LantanaGroup.Link.Automation.Services;
 using LantanaGroup.Link.Shared.Application.Models;
-using RestSharp;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using Xunit;
 using Task = System.Threading.Tasks.Task;
 
@@ -125,6 +126,14 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
         Assert.True(submitted,
             $"Expected scheduled workflow report {reportId} to be submitted but it was not.");
 
+        // Fetch the actual schedule dates — the scheduled path uses wall-clock end date
+        // and the start date may be timezone-adjusted, so we must validate against what
+        // the pipeline actually stored rather than the static config dates.
+        var schedule = await _b.ReportClient.GetScheduleAsync(reportId)
+            ?? throw new InvalidOperationException($"Schedule {reportId} not found after submission.");
+        var actualStartDate = schedule.ReportStartDate.ToUniversalTime().ToString("o");
+        var actualEndDate = schedule.ReportEndDate.ToUniversalTime().ToString("o");
+
         var reportApi = _b.CreateReportHelper();
         var downloadedResources = await reportApi.DownloadReportAsync(_facilityId, reportId, _config);
         var internalAbsResources = await reportApi.DownloadReportAsync(_facilityId, reportId, _config, external: false);
@@ -140,6 +149,16 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
                 $"Expected scheduled workflow report to include patient-{patientId}.ndjson but it was not");
         }
 
+        await _b.CreateReportAbsManifestValidator().ValidateAllAsync(
+            internalAbsResources,
+            _config.PatientIds,
+            measureId,
+            actualStartDate,
+            actualEndDate,
+            _facilityId,
+            reportId,
+            GeneratedFhirDataSnapshotWriter.GetSnapshotDirectory(nameof(ReportScheduledWorkflowTest)));
+
         await ValidationBaselineManager.ValidateOrCreateAsync(
             Output,
             _b.DataReader,
@@ -147,8 +166,6 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
             _facilityId,
             reportId,
             measureId,
-            _config.StartDate,
-            _config.EndDate,
             _config.PatientIds,
             _generatedBundles,
             internalAbsResources);
@@ -168,26 +185,65 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
 
     private async Task<string> ProduceReportScheduledEventAsync(string facilityId, string measureId, TimeSpan delay)
     {
-        var reportId = Guid.NewGuid().ToString();
-        var startDate = DateTime.SpecifyKind(DateTime.Parse(_config.StartDate, CultureInfo.InvariantCulture), DateTimeKind.Utc);
+        var reportId = Guid.NewGuid();
+        var startDateUtc = DateTime.SpecifyKind(DateTime.Parse(_config.StartDate, CultureInfo.InvariantCulture), DateTimeKind.Utc);
+        var endDateUtc = DateTime.UtcNow.Add(delay);
 
-        Output.WriteLine($"Producing integration report-scheduled event (facility={facilityId}, reportId={reportId}, delay={delay.TotalMinutes:F1}m)...");
+        var candidates = new[]
+        {
+            AutomationCfg.Kafka.BootstrapServers,
+            "localhost:9092",
+            "localhost:9094"
+        }
+        .Where(x => !string.IsNullOrWhiteSpace(x))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToList();
 
-        var request = new RestRequest("integration/report-scheduled", Method.Post)
-            .AddJsonBody(new
+        Exception? last = null;
+
+        foreach (var bootstrapServers in candidates)
+        {
+            foreach (var config in BuildProducerConfigs(bootstrapServers))
             {
-                facilityId,
-                frequency = Frequency.Monthly,
-                reportTypes = new[] { measureId },
-                startDate,
-                delay = delay.TotalMinutes.ToString(CultureInfo.InvariantCulture),
-                reportTrackingId = reportId
-            });
+                try
+                {
+                    Output.WriteLine($"Producing ReportScheduled directly to Kafka (facility={facilityId}, reportId={reportId}, delay={delay.TotalMinutes:F1}m, bootstrap={bootstrapServers}, mode={config.mode})...");
 
-        var response = await _b.AdminBffClient.ExecuteAsync(request);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+                    using var producer = new ProducerBuilder<string, ReportScheduledValue>(config.producerConfig)
+                        .SetValueSerializer(new JsonWithFhirMessageSerializer<ReportScheduledValue>())
+                        .Build();
 
-        return reportId;
+                    await producer.ProduceAsync(nameof(KafkaTopic.ReportScheduled), new Message<string, ReportScheduledValue>
+                    {
+                        Key = facilityId,
+                        Value = new ReportScheduledValue
+                        {
+                            ReportTypes = [measureId],
+                            Frequency = Frequency.Monthly,
+                            StartDate = new DateTimeOffset(startDateUtc),
+                            EndDate = new DateTimeOffset(endDateUtc),
+                            ReportTrackingId = reportId
+                        },
+                        Headers = new Headers
+                        {
+                            { "X-Correlation-Id", Encoding.UTF8.GetBytes(reportId.ToString()) }
+                        }
+                    });
+
+                    producer.Flush(TimeSpan.FromSeconds(5));
+                    return reportId.ToString();
+                }
+                catch (Exception ex)
+                {
+                    last = ex;
+                    Output.WriteLine($"Kafka produce attempt failed for bootstrap '{bootstrapServers}' ({config.mode}): {ex.Message}");
+                }
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"Unable to produce ReportScheduled to Kafka using any bootstrap server candidate: {string.Join(", ", candidates)}",
+            last);
     }
 
     private async Task WaitForScheduleCreationAsync(string reportId)

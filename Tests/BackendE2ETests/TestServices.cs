@@ -5,7 +5,6 @@ using LantanaGroup.Link.Automation.Services;
 using LantanaGroup.Link.Automation.Validation;
 using LantanaGroup.Link.Sdk.Clients;
 using Microsoft.Extensions.DependencyInjection;
-using RestSharp;
 
 namespace LantanaGroup.Link.Tests.E2ETests;
 
@@ -24,7 +23,6 @@ public sealed class TestServices
 
     public AutomationConfig AutomationCfg => _services.GetRequiredService<AutomationConfig>();
     public DualOutputHelper Output => _services.GetRequiredService<DualOutputHelper>();
-    public RestClient AdminBffClient => _services.GetRequiredService<RestClient>();
     public LokiScraper LokiScraper => _services.GetRequiredService<LokiScraper>();
     public FhirDataLoader FhirDataLoader => _services.GetRequiredService<FhirDataLoader>();
     public DatabaseConnectionFactory DbFactory => _services.GetRequiredService<DatabaseConnectionFactory>();

@@ -5,6 +5,7 @@ using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
@@ -40,7 +41,7 @@ namespace LantanaGroup.Link.Report.Controllers
         /// Defaults to <c>false</c>.
         /// </param>
         [HttpGet("{id}")]
-        public async Task<ActionResult<ReportSchedule>> GetById(
+        public async Task<ActionResult<ReportScheduleApiModel>> GetById(
             string id,
             [FromQuery] bool includeDeleted = false)
         {
@@ -60,7 +61,7 @@ namespace LantanaGroup.Link.Report.Controllers
                 if (reportSchedule == null)
                     return NotFound();
 
-                return Ok(reportSchedule);
+                return Ok(reportSchedule.ToApiModel());
             }
             catch (Exception ex)
             {
@@ -88,10 +89,10 @@ namespace LantanaGroup.Link.Report.Controllers
         /// Defaults to <c>false</c>.
         /// </param>
         [HttpGet("facilities/{facilityId}")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<ReportSchedule>))]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<ReportScheduleApiModel>))]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<List<ReportSchedule>>> GetByFacilityId(
+        public async Task<ActionResult<List<ReportScheduleApiModel>>> GetByFacilityId(
             string facilityId,
             [FromQuery] bool? active = null,
             [FromQuery] bool blocking = false,
@@ -131,7 +132,7 @@ namespace LantanaGroup.Link.Report.Controllers
                 if (reportSchedules == null)
                     return NotFound();
 
-                return Ok(reportSchedules);
+                return Ok(reportSchedules.Select(s => s.ToApiModel()).ToList());
             }
             catch (Exception ex)
             {
@@ -251,9 +252,9 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="pageSize">Number of records per page (default: 10)</param>
         /// <param name="pageNumber">Page number (default: 1)</param>
         [HttpGet("search")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<ReportSchedule>))]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<ReportScheduleApiModel>))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<PagedConfigModel<ReportSchedule>>> Search(
+        public async Task<ActionResult<PagedConfigModel<ReportScheduleApiModel>>> Search(
             string? facilityId = null,
             Frequency? frequency = null,
             string? reportType = null,
@@ -304,7 +305,11 @@ namespace LantanaGroup.Link.Report.Controllers
 
                 Response.Headers.Append("X-Pagination", JsonSerializer.Serialize(result.Metadata));
 
-                return Ok(result);
+                var apiResult = new PagedConfigModel<ReportScheduleApiModel>(
+                    result.Records.Select(s => s.ToApiModel()).ToList(),
+                    result.Metadata);
+
+                return Ok(apiResult);
             }
             catch (Exception ex)
             {

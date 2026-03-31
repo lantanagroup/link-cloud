@@ -1,4 +1,4 @@
-﻿using Azure.Storage.Blobs;
+using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
 using Confluent.Kafka;
 using LantanaGroup.Link.Report.Domain.Managers;
@@ -53,8 +53,8 @@ public class ValidationCompleteListenerTests : IClassFixture<ReportIntegrationTe
         {
             Id = reportId,
             FacilityId = facilityId,
-            ReportStartDate = DateTime.UtcNow.AddDays(-30),
-            ReportEndDate = DateTime.UtcNow.AddDays(30),
+            ReportStartDate = DateTimeOffset.UtcNow.AddDays(-30),
+            ReportEndDate = DateTimeOffset.UtcNow.AddDays(30),
             Frequency = Frequency.Monthly,
             ReportTypes = { "DE-111" },
             Status = ScheduleStatus.Scheduled,
@@ -135,8 +135,8 @@ public class ValidationCompleteListenerTests : IClassFixture<ReportIntegrationTe
         {
             Id = reportId,
             FacilityId = facilityId,
-            ReportStartDate = DateTime.UtcNow.AddDays(-30),
-            ReportEndDate = DateTime.UtcNow.AddDays(30),
+            ReportStartDate = DateTimeOffset.UtcNow.AddDays(-30),
+            ReportEndDate = DateTimeOffset.UtcNow.AddDays(30),
             Frequency = Frequency.Monthly,
             ReportTypes = { "DE-111" },
             Status = ScheduleStatus.Scheduled,
@@ -187,8 +187,8 @@ public class ValidationCompleteListenerTests : IClassFixture<ReportIntegrationTe
         {
             Id = reportId,
             FacilityId = facilityId,
-            ReportStartDate = DateTime.UtcNow.AddDays(-30),
-            ReportEndDate = DateTime.UtcNow.AddDays(30),
+            ReportStartDate = DateTimeOffset.UtcNow.AddDays(-30),
+            ReportEndDate = DateTimeOffset.UtcNow.AddDays(30),
             Frequency = Frequency.Monthly,
             ReportTypes = { "DE-111" },
             Status = ScheduleStatus.Scheduled,
@@ -265,8 +265,8 @@ public class ValidationCompleteListenerTests : IClassFixture<ReportIntegrationTe
         {
             Id = reportId,
             FacilityId = facilityId,
-            ReportStartDate = DateTime.UtcNow.AddDays(-30),
-            ReportEndDate = DateTime.UtcNow.AddDays(30),
+            ReportStartDate = DateTimeOffset.UtcNow.AddDays(-30),
+            ReportEndDate = DateTimeOffset.UtcNow.AddDays(30),
             Frequency = Frequency.Monthly,
             ReportTypes = { "DE-111" },
             Status = ScheduleStatus.Scheduled,

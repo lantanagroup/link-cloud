@@ -14,8 +14,6 @@ public static class ValidationBaselineManager
         public int SchemaVersion { get; set; } = 1;
         public string BaselineName { get; set; } = string.Empty;
         public string MeasureId { get; set; } = string.Empty;
-        public string StartDate { get; set; } = string.Empty;
-        public string EndDate { get; set; } = string.Empty;
         public List<string> ExpectedPatientIds { get; set; } = [];
         public SortedDictionary<string, int> GeneratedInputCountsByType { get; set; } = new(StringComparer.Ordinal);
         public SortedDictionary<string, SortedDictionary<string, int>> DataAcquisitionCountsByPatientType { get; set; } = new(StringComparer.Ordinal);
@@ -31,8 +29,6 @@ public static class ValidationBaselineManager
         string facilityId,
         string reportId,
         string measureId,
-        string startDate,
-        string endDate,
         IReadOnlyCollection<string> expectedPatientIds,
         IReadOnlyList<(string Name, string Json)> generatedBundles,
         IDictionary<string, object> internalAbsResources)
@@ -47,8 +43,6 @@ public static class ValidationBaselineManager
             facilityId,
             reportId,
             measureId,
-            startDate,
-            endDate,
             expectedPatientIds,
             generatedBundles,
             internalAbsResources);
@@ -73,9 +67,6 @@ public static class ValidationBaselineManager
             return;
         }
 
-        var actualPath = Path.Combine(Path.GetDirectoryName(baselinePath)!, $"{baselineName}.actual.json");
-        await WriteBaselineAsync(actualPath, current);
-
         output.WriteLine($"[BASELINE] Baseline mismatch for {baselineName}: {diffs.Count} difference(s)");
         foreach (var diff in diffs.Take(100))
             output.WriteLine($"  - {diff}");
@@ -83,8 +74,14 @@ public static class ValidationBaselineManager
         if (diffs.Count > 100)
             output.WriteLine($"  - Additional differences omitted: {diffs.Count - 100}");
 
+        var diffSummary = string.Join(Environment.NewLine, diffs.Take(20).Select(d => $"  - {d}"));
+        if (diffs.Count > 20)
+            diffSummary += $"{Environment.NewLine}  ... and {diffs.Count - 20} more difference(s)";
+
         throw new InvalidOperationException(
-            $"Baseline validation failed for {baselineName}. See '{actualPath}' and committed baseline '{baselinePath}'.");
+            $"Baseline validation failed for {baselineName}.{Environment.NewLine}" +
+            $"Differences:{Environment.NewLine}{diffSummary}{Environment.NewLine}" +
+            $"Committed baseline: '{baselinePath}'.");
     }
 
     private static async Task<ValidationBaselineDocument> BuildCurrentAsync(
@@ -94,8 +91,6 @@ public static class ValidationBaselineManager
         string facilityId,
         string reportId,
         string measureId,
-        string startDate,
-        string endDate,
         IReadOnlyCollection<string> expectedPatientIds,
         IReadOnlyList<(string Name, string Json)> generatedBundles,
         IDictionary<string, object> internalAbsResources)
@@ -108,8 +103,6 @@ public static class ValidationBaselineManager
         {
             BaselineName = baselineName,
             MeasureId = measureId,
-            StartDate = startDate,
-            EndDate = endDate,
             ExpectedPatientIds = expectedPatientIds.OrderBy(x => x, StringComparer.Ordinal).ToList(),
             GeneratedInputCountsByType = GetGeneratedInputCounts(generatedBundles),
             DataAcquisitionCountsByPatientType = ToNestedMap(dataAcqCounts.Select(x => (x.PatientId, x.ResourceType, x.Count))),
@@ -209,10 +202,6 @@ public static class ValidationBaselineManager
 
         if (!string.Equals(expected.MeasureId, actual.MeasureId, StringComparison.Ordinal))
             diffs.Add($"MeasureId mismatch: expected={expected.MeasureId}, actual={actual.MeasureId}");
-
-        if (!string.Equals(expected.StartDate, actual.StartDate, StringComparison.Ordinal) ||
-            !string.Equals(expected.EndDate, actual.EndDate, StringComparison.Ordinal))
-            diffs.Add($"Date range mismatch: expected={expected.StartDate}..{expected.EndDate}, actual={actual.StartDate}..{actual.EndDate}");
 
         if (!expected.ExpectedPatientIds.SequenceEqual(actual.ExpectedPatientIds, StringComparer.Ordinal))
             diffs.Add("ExpectedPatientIds mismatch.");

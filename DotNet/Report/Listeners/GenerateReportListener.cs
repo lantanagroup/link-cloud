@@ -148,8 +148,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 var key = result.Message.Key;
                 var value = result.Message.Value;
-                var startDate = value.StartDate;
-                var endDate = value.EndDate;
+                DateTimeOffset? startDate = value.StartDate.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(value.StartDate.Value, DateTimeKind.Utc)) : null;
+                DateTimeOffset? endDate = value.EndDate.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(value.EndDate.Value, DateTimeKind.Utc)) : null;
                 var reportTypes = value.ReportTypes;
                 var reportId = value.ReportId;
 
@@ -190,8 +190,11 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                 }
 
-                startDate = new DateTime(startDate.Value.Year, startDate.Value.Month, startDate.Value.Day, startDate.Value.Hour, startDate.Value.Minute, startDate.Value.Second, DateTimeKind.Utc);
-                endDate = new DateTime(endDate.Value.Year, endDate.Value.Month, endDate.Value.Day, endDate.Value.Hour, endDate.Value.Minute, endDate.Value.Second, DateTimeKind.Utc);
+                // Truncate to second precision for consistency
+                var truncatedStart = new DateTimeOffset(startDate!.Value.Year, startDate.Value.Month, startDate.Value.Day,
+                    startDate.Value.Hour, startDate.Value.Minute, startDate.Value.Second, startDate.Value.Offset);
+                var truncatedEnd = new DateTimeOffset(endDate!.Value.Year, endDate.Value.Month, endDate.Value.Day,
+                    endDate.Value.Hour, endDate.Value.Minute, endDate.Value.Second, endDate.Value.Offset);
 
                 bool isCensus = !value.Regenerate && (value.PatientIds == null || value.PatientIds.Count == 0);
 
@@ -199,8 +202,8 @@ namespace LantanaGroup.Link.Report.Listeners
                 {
                     Id = value.AdhocReportId,
                     FacilityId = facilityId,
-                    ReportStartDate = startDate.Value,
-                    ReportEndDate = endDate.Value,
+                    ReportStartDate = truncatedStart,
+                    ReportEndDate = truncatedEnd,
                     Frequency = Frequency.Adhoc,
                     AdHocType = isCensus ? AdHocType.Census : AdHocType.Manual,
                     ReportTypes = reportTypes,
@@ -256,7 +259,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             Name, reportSchedule.Id);
 
                         value.PatientIds =
-                            await GetPatientList(facilityId, startDate.Value, endDate.Value);
+                            await GetPatientList(facilityId, truncatedStart.UtcDateTime, truncatedEnd.UtcDateTime);
                     }
 
                     var patientIds = value.PatientIds.Distinct().ToList();

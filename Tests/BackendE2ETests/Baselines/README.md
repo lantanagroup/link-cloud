@@ -6,7 +6,8 @@ Expected baseline files:
 
 - `SmokeTest.baseline.json`
 - `MegaPatientTest.baseline.json`
-- `MultiPatientTest.baseline.json`
+- `ReportScheduledWorkflowTest.baseline.json`
+- `RegenerateReportTest.baseline.json`
 
 ## Behavior
 

@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Report.Data;
+﻿using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Models;
@@ -526,8 +526,8 @@ public class ReportResourceManagerTests : IClassFixture<ReportIntegrationTestFix
             Id = scheduleId,
             FacilityId = facilityId,
             CreateDate = DateTime.UtcNow,
-            ReportStartDate = DateTime.UtcNow.AddDays(-30),
-            ReportEndDate = DateTime.UtcNow.AddDays(30),
+            ReportStartDate = DateTimeOffset.UtcNow.AddDays(-30),
+            ReportEndDate = DateTimeOffset.UtcNow.AddDays(30),
             EnableSubmission = true,
             EndOfReportPeriodJobHasRun = false,
             Frequency = 0,

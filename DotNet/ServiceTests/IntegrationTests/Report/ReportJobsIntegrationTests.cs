@@ -37,8 +37,8 @@ public class EndOfReportPeriodJobTests
         {
             Id = scheduleId,
             FacilityId = facilityId,
-            ReportStartDate = DateTime.UtcNow.AddDays(-30),
-            ReportEndDate = DateTime.UtcNow.AddDays(-1),
+            ReportStartDate = DateTimeOffset.UtcNow.AddDays(-30),
+            ReportEndDate = DateTimeOffset.UtcNow.AddDays(-1),
             Status = ScheduleStatus.Scheduled,
             EndOfReportPeriodJobHasRun = false
         };
@@ -130,8 +130,8 @@ public class EndOfReportPeriodJobTests
         {
             Id = scheduleId,
             FacilityId = "test-facility-error",
-            ReportStartDate = DateTime.UtcNow.AddDays(-30),
-            ReportEndDate = DateTime.UtcNow.AddDays(-1),
+            ReportStartDate = DateTimeOffset.UtcNow.AddDays(-30),
+            ReportEndDate = DateTimeOffset.UtcNow.AddDays(-1),
             Status = ScheduleStatus.Scheduled
         };
         await database.ReportScheduledRepository.AddAsync(schedule);
