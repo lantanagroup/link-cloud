@@ -14,7 +14,6 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
-using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
@@ -796,6 +795,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             "priority" => descending ? query.OrderByDescending(log => log.Priority) : query.OrderBy(log => log.Priority),
             "retryattempts" => descending ? query.OrderByDescending(log => log.RetryAttempts) : query.OrderBy(log => log.RetryAttempts),
             "isdeleted" => descending ? query.OrderByDescending(log => log.IsDeleted) : query.OrderBy(log => log.IsDeleted),
+            "reporttrackingid" => descending ? query.OrderByDescending(log => log.ReportTrackingId) : query.OrderBy(log => log.ReportTrackingId),
             _ => descending ? query.OrderByDescending(log => log.Id) : query.OrderBy(log => log.Id)
         };
     }

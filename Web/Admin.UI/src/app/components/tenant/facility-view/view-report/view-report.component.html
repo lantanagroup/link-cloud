@@ -96,8 +96,8 @@
             @case ('Submitted') { <span class="status-submitted">Submitted</span> }
           }
         </span>
-        <div style="margin-top:5px" *ngIf="reportSummary">
-          {{(reportSummary.submitDate || reportSummary.createDate) | date:'M/d/yy HH:mm'}}
+        <div style="margin-top:5px" *ngIf="reportSummary?.submitReportDateTime">
+          {{reportSummary.submitReportDateTime | date:'M/d/yy h:mm a'}}
         </div>
 
       </div>
@@ -206,7 +206,7 @@
           <ng-container matColumnDef="measure">
             <th mat-header-cell *matHeaderCellDef>Measure</th>
             <td mat-cell *matCellDef="let element">
-              <span *ngFor="let report of element.measureReportList; let last = last">
+              <span *ngFor="let report of element.measureReports; let last = last">
                 {{report.reportType}}<span *ngIf="!last">, </span>
               </span>
             </td>
@@ -216,10 +216,10 @@
           <ng-container matColumnDef="resourceCount">
             <th mat-header-cell *matHeaderCellDef>Number of Resources</th>
             <td mat-cell *matCellDef="let element">
-              <span *ngIf="element.measureReportList && element.measureReportList.length > 0">
-                {{getTotalResourceCount(element.measureReportList)}}
+              <span *ngIf="element.measureReports && element.measureReports.length > 0">
+                {{getTotalResourceCount(element.measureReports)}}
               </span>
-              <span *ngIf="!element.measureReportList || element.measureReportList.length === 0">0</span>
+              <span *ngIf="!element.measureReports || element.measureReports.length === 0">0</span>
             </td>
           </ng-container>
 
@@ -248,7 +248,7 @@
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Submitted</th>
             <td mat-cell *matCellDef="let element">
               <span *ngIf="element.submitReportDateTime" [matTooltip]="element.submitReportDateTime | date:'M/d/yy h:mm:ss a'">
-                {{element.submitReportDateTime | date:'M/d/yy HH:mm'}}
+                {{element.submitReportDateTime | date:'M/d/yy h:mm a'}}
               </span>
               <span *ngIf="!element.submitReportDateTime">-</span>
             </td>

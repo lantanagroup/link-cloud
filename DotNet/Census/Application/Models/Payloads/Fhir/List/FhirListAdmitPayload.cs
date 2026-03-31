@@ -12,6 +12,7 @@ namespace LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 public class FHIRListAdmitPayload : IPayload
 {
     public string PayloadType { get; } = EventType.FHIRListAdmit.ToString();
+    //TODO: Daniel - Do we need to add Json property names to each property? Look at CernerListAdmitPayload.
     
     [JsonPropertyName("patientId")]
     public string PatientId;

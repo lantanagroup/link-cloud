@@ -7,6 +7,7 @@ import {
   IScheduledReportModel,
   PagedFacilityConfigModel
 } from 'src/app/interfaces/tenant/facility-config-model.interface';
+import {Vendor} from 'src/app/interfaces/tenant/vendor.enum';
 import {Observable, catchError, map, tap, of} from 'rxjs';
 import {IEntityCreatedResponse} from 'src/app/interfaces/entity-created-response.model';
 import {AppConfigService} from '../../app-config.service';
@@ -20,11 +21,12 @@ export class TenantService {
   }
 
 
-  createFacility(facilityId: string, facilityName: string, timeZone: string, scheduledReports: IScheduledReportModel): Observable<IEntityCreatedResponse> {
+  createFacility(facilityId: string, facilityName: string, timeZone: string, scheduledReports: IScheduledReportModel, vendor?: Vendor): Observable<IEntityCreatedResponse> {
     let facility: IFacilityConfigModel = {
       facilityId: facilityId,
       facilityName: facilityName,
       timeZone: timeZone,
+      vendor: vendor,
       scheduledReports: scheduledReports
     };
 
@@ -38,12 +40,13 @@ export class TenantService {
       )
   }
 
-  updateFacility(id: string, facilityId: string, facilityName: string, timeZone: string, scheduledReports: IScheduledReportModel): Observable<IEntityCreatedResponse> {
+  updateFacility(id: string, facilityId: string, facilityName: string, timeZone: string, scheduledReports: IScheduledReportModel, vendor?: Vendor): Observable<IEntityCreatedResponse> {
     let facility: IFacilityConfigModel = {
       id: id,
       facilityId: facilityId,
       facilityName: facilityName,
       timeZone: timeZone,
+      vendor: vendor,
       scheduledReports: scheduledReports
     };
 
@@ -103,16 +106,17 @@ export class TenantService {
       );
   }
 
-  getAllFacilities(): Observable<Record<string, string>> {
-    return this.http.get<Record<string, string>>(`${this.appConfigService.config?.baseApiUrl}/facility/list`)
+  getAllFacilities(includeDeleted = false): Observable<Record<string, string>> {
+    const params = new HttpParams().set('includeDeleted', includeDeleted.toString());
+    return this.http.get<Record<string, string>>(`${this.appConfigService.config?.baseApiUrl}/facility/list`, { params })
       .pipe(
         catchError((error) => this.errorHandler.handleError(error))
       )
   }
 
-  autocompleteFacilities(search: string | null): Observable<Record<string, string>> {
+  autocompleteFacilities(search: string | null, includeDeleted = false): Observable<Record<string, string>> {
     const headers = new HttpHeaders({'X-Skip-Loading': 'true'});
-    const params = new HttpParams().set('search', search || '');
+    const params = new HttpParams().set('search', search || '').set('includeDeleted', includeDeleted.toString());
     return this.http.get<Record<string, string>>(`${this.appConfigService.config?.baseApiUrl}/facility/list`, {
       headers,
       params

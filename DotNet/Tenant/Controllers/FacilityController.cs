@@ -161,7 +161,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                     }
                 }
 
-                var facilities = await _facilityQueries.SearchAsync(searchModel, HttpContext.RequestAborted);
+                var facilities = await _facilityQueries.SearchAsync(searchModel, HttpContext.RequestAborted, includeDeleted);
 
                 if ((facilities?.Count ?? 0) == 0)
                 {
@@ -210,6 +210,11 @@ namespace LantanaGroup.Link.Tenant.Controllers
             if (facilityEntity.FacilityId == null)
             {
                 return BadRequest();
+            }
+
+            if (newFacility.Vendor == null)
+            {
+                return BadRequest("Vendor must be provided.");
             }
 
             try
@@ -310,6 +315,11 @@ namespace LantanaGroup.Link.Tenant.Controllers
             if (existingModel == null)
             {
                 return NotFound();
+            }
+
+            if (facilityConfig.Vendor == null)
+            {
+                return BadRequest("Vendor must be provided.");
             }
 
             var oldFacility = _mapperDtoToModel.Map<FacilityModel, Facility>(existingModel);

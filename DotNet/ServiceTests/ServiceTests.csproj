@@ -10,6 +10,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="IntegrationTests\Report\Aggregators\**" />
+    <EmbeddedResource Remove="IntegrationTests\Report\Aggregators\**" />
+    <None Remove="IntegrationTests\Report\Aggregators\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Remove="Resources\indMeasureReport.json" />
   </ItemGroup>
 

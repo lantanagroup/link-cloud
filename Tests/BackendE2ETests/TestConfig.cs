@@ -15,22 +15,11 @@ public static class TestConfig
     public static OAuthConfig FhirServerOAuth => new("FHIRSERVER");
     public static BasicAuthConfig FhirServerBasicAuth => new("FHIRSERVER");
     public static SmokeTestConfig AdhocReportingSmokeTestConfig => new("ADHOC_REPORTING_SMOKE_TEST");
-    public const string AdHocSmokeTestFile = "Stu3-AdHocSmokeTest";
-    public const string SingleMeasureAdHocFacility = "SingleMeasureAdHocFacility";
-    public const string SingleMeasureAdHocAchDqmVersion = "1.0.0-dev";
-    public const string MeasureAch = "NHSNAcuteCareHospitalMonthlyInitialPopulation";
-    public const string CronValue = "0 0 */4 * * ?";
-
-    public const string singleMeasureAdHocTestPatient_One = "patient-CYUcGIlSrpJxCBMeEml30YSmE0Ea7loNBPVZfhCUkv7A3.ndjson";
-    public const string singleMeasureAdHocTestPatient_Two = "patient-6tZ8Wt8maJdDFLvEsDcKmAaCAcSOxjr0mB8RjEi5Szw7H.ndjson";
-    public const string singleMeasureAdHocTestPatient_Three = "patient-jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg.ndjson";
-    public const string singleMeasureAdHocTestPatient_Four = "patient-MVLkMLWErl3gQGRCuA2mygtVuix7PMBFBh9WVayaCL7xM.ndjson";
-    public const string singleMeasureAdHocTestPatient_Five = "patient-VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA.ndjson";
-    public const string singleMeasureAdHocTestPatient_Six = "patient-x25sJU80vVa51mxJ6vSDcjbNC3BcdCQujJbXQwqdppFOO.ndjson";
-    public const string singleMeasureAdHocTestPatient_Seven = "patient-jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494.ndjson";
-    public const string singleMeasureAdHocTestPatient_Eight = "patient-DJxsHpmWuBezhV9hJNgEHT4szaKW3uP5vUNzXUCkltpXj.ndjson";
-    public const string singleMeasureAdHocTestPatient_Nine = "patient-9i6Xi6uG2WjuGxHTmpbin4ct2ZwevRwTWhIkJkRjVFZ4C.ndjson";
-    public const string singleMeasureAdHocTestPatient_Ten = "patient-5ieWogP3EGV24Kus8QsGh6rpmUaJBP5Hl0nCSJJXmh6TI.ndjson";
+    public static SmokeTestConfig MegaPatientTestConfig => new("MEGA_PATIENT_TEST",
+        defaultPatientIds: [],
+        defaultPollingIntervalSeconds: 5,
+        defaultMaxRetryCount: 300,
+        defaultLokiScrapeWindowMinutes: 20);
 
     public static class FhirQueryConfig
     {
@@ -39,23 +28,6 @@ public static class TestConfig
         public static readonly TimeSpan MaxAcquisitionPullTime = TimeSpan.FromHours(24);
         public static readonly string TimeZone = "America/New_York";
     }
-
-    public static readonly string[] SingleMeasureExpectedFiles =
-    {
-        "manifest.ndjson",
-        "patient-x25sJU80vVa51mxJ6vSDcjbNC3BcdCQujJbXQwqdppFOO.ndjson",
-        "patient-MVLkMLWErl3gQGRCuA2mygtVuix7PMBFBh9WVayaCL7xM.ndjson",
-        "patient-CYUcGIlSrpJxCBMeEml30YSmE0Ea7loNBPVZfhCUkv7A3.ndjson",
-        "patient-VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA.ndjson",
-        "patient-jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg.ndjson",
-        "patient-6tZ8Wt8maJdDFLvEsDcKmAaCAcSOxjr0mB8RjEi5Szw7H.ndjson"
-    };
-
-    public static readonly string[] SingleMeasureExpectedPatientIds =
-        SingleMeasureExpectedFiles
-            .Where(f => f.StartsWith("patient-", StringComparison.OrdinalIgnoreCase))
-            .Select(f => f.Substring("patient-".Length, f.Length - "patient-".Length - ".ndjson".Length))
-            .ToArray();
 
     public static string GetEmbeddedResourceContent(string resourceName)
     {
@@ -69,21 +41,61 @@ public static class TestConfig
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
     }
-    public class SmokeTestConfig(string prefix)
+
+    public class SmokeTestConfig
     {
-        public string MeasureBundleLocation => Environment.GetEnvironmentVariable($"{prefix}_MEASURE_BUNDLE_PATH") ?? "resource://LantanaGroup.Link.Tests.BackendE2ETests.measures.NHSNAcuteCareHospitalMonthlyInitialPopulation.json";
-        public string StartDate => Environment.GetEnvironmentVariable($"{prefix}_START_DATE") ?? "2023-01-01T00:00:00Z";
-        public string EndDate => Environment.GetEnvironmentVariable($"{prefix}_END_DATE") ?? "2023-12-31T23:59:59Z";
-        public List<string> PatientIds = Environment.GetEnvironmentVariable($"{prefix}_PATIENT_IDS")?.Split(',')?.ToList() ?? ["207727"];
-        public bool RemoveFacilityConfig = bool.Parse(Environment.GetEnvironmentVariable($"{prefix}_REMOVE_FACILITY_CONFIG") ?? "true");
-        public bool RemoveReport = Environment.GetEnvironmentVariable($"{prefix}_REMOVE_REPORT")?.ToLower() == "true";
+        private readonly string _prefix;
+
+        public SmokeTestConfig(
+            string prefix,
+            List<string>? defaultPatientIds = null,
+            int defaultPollingIntervalSeconds = 3,
+            int defaultMaxRetryCount = 60,
+            int defaultLokiScrapeWindowMinutes = 5)
+        {
+            _prefix = prefix;
+            MeasureBundleLocation = Environment.GetEnvironmentVariable($"{prefix}_MEASURE_BUNDLE_PATH") ?? "resource://LantanaGroup.Link.Tests.BackendE2ETests.measures.NHSNAcuteCareHospitalMonthlyInitialPopulation.json";
+            StartDate = Environment.GetEnvironmentVariable($"{prefix}_START_DATE") ?? "2023-01-01T00:00:00Z";
+            EndDate = Environment.GetEnvironmentVariable($"{prefix}_END_DATE") ?? "2023-12-31T23:59:59Z";
+            PatientIds = Environment.GetEnvironmentVariable($"{prefix}_PATIENT_IDS")?.Split(',')?.ToList() ?? defaultPatientIds ?? ["207727"];
+            RemoveFacilityConfig = bool.Parse(Environment.GetEnvironmentVariable($"{prefix}_REMOVE_FACILITY_CONFIG") ?? "true");
+            RemoveReport = Environment.GetEnvironmentVariable($"{prefix}_REMOVE_REPORT")?.ToLower() == "true";
+            PollingIntervalSeconds = int.Parse(Environment.GetEnvironmentVariable($"{prefix}_POLLING_INTERVAL_SECONDS") ?? defaultPollingIntervalSeconds.ToString());
+            MaxRetryCount = int.Parse(Environment.GetEnvironmentVariable($"{prefix}_MAX_RETRY_COUNT") ?? defaultMaxRetryCount.ToString());
+            DownloadFileName = Environment.GetEnvironmentVariable($"{prefix}_DOWNLOAD_FILENAME") ?? $"{prefix.ToLower().Replace('_', '-')}-submission.zip";
+            LokiScrapeWindowMinutes = int.Parse(Environment.GetEnvironmentVariable($"{prefix}_LOKI_SCRAPE_WINDOW_MINUTES") ?? defaultLokiScrapeWindowMinutes.ToString());
+        }
+
+        public string MeasureBundleLocation { get; }
+        public string StartDate { get; }
+        public string EndDate { get; }
+        public List<string> PatientIds { get; set; }
+        public bool RemoveFacilityConfig { get; }
+        public bool RemoveReport { get; }
+        public int PollingIntervalSeconds { get; }
+        public int MaxRetryCount { get; }
+        public string DownloadFileName { get; }
+        public int LokiScrapeWindowMinutes { get; }
+
+        /// <summary>
+        /// The maximum wall-clock time the polling loop will run,
+        /// computed from <see cref="MaxRetryCount"/> × <see cref="PollingIntervalSeconds"/>.
+        /// </summary>
+        public TimeSpan MaxPollingDuration => TimeSpan.FromSeconds(MaxRetryCount * PollingIntervalSeconds);
+
+        /// <summary>
+        /// The Loki scrape window as a <see cref="TimeSpan"/>.
+        /// </summary>
+        public TimeSpan LokiScrapeWindow => TimeSpan.FromMinutes(LokiScrapeWindowMinutes);
     }
+
     public class BasicAuthConfig(string prefix)
     {
         public bool ShouldAuthenticate { get; } = bool.Parse(Environment.GetEnvironmentVariable($"{prefix}_BASICAUTH_SHOULD_AUTHENTICATE") ?? "false");
         public string? Username { get; } = Environment.GetEnvironmentVariable($"{prefix}_BASICAUTH_USERNAME");
         public string? Password { get; } = Environment.GetEnvironmentVariable($"{prefix}_BASICAUTH_PASSWORD");
     }
+
     public class OAuthConfig(string prefix)
     {
         public bool ShouldAuthenticate { get; } = bool.Parse(Environment.GetEnvironmentVariable($"{prefix}_OAUTH_SHOULD_AUTHENTICATE") ?? "false");
@@ -93,103 +105,5 @@ public static class TestConfig
         public string Scope { get; } = Environment.GetEnvironmentVariable($"{prefix}_OAUTH_SCOPE") ?? "openid profile email";
         public string? Username { get; } = Environment.GetEnvironmentVariable($"{prefix}_OAUTH_USERNAME");
         public string? Password { get; } = Environment.GetEnvironmentVariable($"{prefix}_OAUTH_PASSWORD");
-    }
-    public static class TestContextStore
-    {
-        private static readonly AsyncLocal<string?> _reportTrackingIdGuid = new();
-        private static readonly AsyncLocal<string?> _adHocReportTrackingIdGuid = new();
-
-        public static string? ReportTrackingIdGuid
-        {
-            get => _reportTrackingIdGuid.Value;
-            set => _reportTrackingIdGuid.Value = value;
-        }
-
-        public static string? AdHocReportTrackingIdGuid
-        {
-            get => _adHocReportTrackingIdGuid.Value;
-            set => _adHocReportTrackingIdGuid.Value = value;
-        }
-    }
-    public static class ValidationHelper
-    {
-        /// <summary>
-        /// Attempts to run a validation method. Captures and logs, does not stop test. 
-        /// </summary>
-        //public static void TryRunValidation(Action validationMethod, List<string> failures)
-        //{
-        //    try
-        //    {
-        //        validationMethod();
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        string methodName = validationMethod.Method.Name;
-        //        Console.WriteLine($"[FAIL] {methodName} - {ex.Message}");
-        //        failures.Add($"{methodName}: {ex.Message}");
-        //    }
-        //}
-
-        /// <summary>
-        /// Async version for use with asynchronous validations.
-        /// </summary>
-        //public static async Task TryRunValidationAsync(Func<Task> validationMethod, List<string> failures)
-        //{
-        //    try
-        //    {
-        //        await validationMethod();
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        string methodName = validationMethod.Method.Name;
-        //        Console.WriteLine($"[FAIL] {methodName} - {ex.Message}");
-        //        failures.Add($"{methodName}: {ex.Message}");
-        //    }
-        //}
-
-        public enum ValidationSeverity
-        {
-            Info,
-            Warning,
-            Error
-        }
-
-        public enum ValidationIssueType
-        {
-            MissingResourceTypeInBundle,
-            BundleCountMismatch,
-            EvaluatedCountMismatch,
-            UnexpectedEvaluatedType,
-            ExcludedTypeMissingFromBundle,
-            ExcludedTypePresentInEvaluated,
-            OperationOutcomePresentInEvaluated,
-            BundleVsEvaluatedCountMismatch,
-            BundleVsEvaluatedIdMismatch,
-            CrossTypeReference,
-            ObservedResourceTypeCount
-        }
-
-        public sealed class ValidationIssue
-        {
-            public string FileName { get; }
-            public ValidationIssueType IssueType { get; }
-            public ValidationSeverity Severity { get; }
-            public string ResourceType { get; }
-            public string Message { get; }
-
-            public ValidationIssue(
-                string fileName,
-                ValidationIssueType issueType,
-                ValidationSeverity severity,
-                string resourceType,
-                string message)
-            {
-                FileName = fileName;
-                IssueType = issueType;
-                Severity = severity;
-                ResourceType = resourceType;
-                Message = message;
-            }
-        }
     }
 }

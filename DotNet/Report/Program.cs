@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Core;
@@ -128,7 +128,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaConsumerFactory<string, ReportScheduledValue>, KafkaConsumerFactory<string, ReportScheduledValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, DataAcquisitionRequestedValue>, KafkaConsumerFactory<string, DataAcquisitionRequestedValue>>();
-    builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientListMessage>, KafkaConsumerFactory<string, PatientListMessage>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientEventValue>, KafkaConsumerFactory<string, PatientEventValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, ValidationCompleteValue>, KafkaConsumerFactory<string, ValidationCompleteValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<Null, MeasureReportGeneratedValue>, KafkaConsumerFactory<Null, MeasureReportGeneratedValue>>();
@@ -138,7 +138,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.RegisterKafkaProducers(kafkaConnection);
 
     builder.Services.AddTransient<IKafkaProducerFactory<string, ReportScheduledValue>, KafkaProducerFactory<string, ReportScheduledValue>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, PatientListMessage>, KafkaProducerFactory<string, PatientListMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, PatientEventValue>, KafkaProducerFactory<string, PatientEventValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, KafkaProducerFactory<string, GenerateReportValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, ValidationCompleteValue>, KafkaProducerFactory<string, ValidationCompleteValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
@@ -149,6 +149,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IEntityRepository<ReportEntry>, EntityRepository<ReportEntry, ReportDbContext>>();
     builder.Services.AddTransient<IEntityRepository<ReportPopulation>, EntityRepository<ReportPopulation, ReportDbContext>>();
     builder.Services.AddTransient<IEntityRepository<ReportResource>, EntityRepository<ReportResource, ReportDbContext>>();
+    builder.Services.AddTransient<IEntityRepository<GroupPopulation>, EntityRepository<GroupPopulation, ReportDbContext>>();
+    builder.Services.AddTransient<IEntityRepository<MeasureReportPopulation>, EntityRepository<MeasureReportPopulation, ReportDbContext>>();
     builder.Services.AddTransient<IDatabase, Database>();
 
     builder.Services.AddTransient<IReportScheduledManager, ReportScheduledManager>();
@@ -218,18 +220,19 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 
     builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceConfigName, [
-        KafkaTopic.ReportScheduledRetry.GetStringValue(),
-        KafkaTopic.MeasureReportGeneratedRetry.GetStringValue(),
-        KafkaTopic.PatientListsAcquiredRetry.GetStringValue(),
-        KafkaTopic.GenerateReportRequestedRetry.GetStringValue(),
-        KafkaTopic.PayloadSubmittedRetry.GetStringValue(),
-        KafkaTopic.ValidationCompleteRetry.GetStringValue(),
-    ]));
+            KafkaTopic.ReportScheduledRetry.GetStringValue(),
+            KafkaTopic.MeasureReportGeneratedRetry.GetStringValue(),
+            KafkaTopic.PatientEventRetry.GetStringValue(),
+            KafkaTopic.GenerateReportRequestedRetry.GetStringValue(),
+            KafkaTopic.PayloadSubmittedRetry.GetStringValue(),
+            KafkaTopic.ValidationCompleteRetry.GetStringValue(),
+        ]));
 
+    builder.Services.AddHostedService<RetryScheduleService>();
     builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<GenerateReportListener>();
     builder.Services.AddHostedService<ReportScheduledListener>();
-    builder.Services.AddHostedService<PatientListsAcquiredListener>();
+    builder.Services.AddHostedService<PatientEventListener>();
     builder.Services.AddHostedService<ValidationCompleteListener>();
     builder.Services.AddHostedService<PayloadSubmittedListener>();
     builder.Services.AddHostedService<MeasureReportGeneratedListener>();
