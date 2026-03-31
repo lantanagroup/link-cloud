@@ -230,6 +230,9 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                     measureReport.setId(UUID.randomUUID().toString());
                 }
             } else {
+                if (value.getQueryType() != QueryType.INITIAL) {
+                    throw new IllegalArgumentException("Unexpected empty bundle during non-initial evaluation");
+                }
                 measureReport = null;
             }
 
