@@ -82,7 +82,7 @@ public class AcquisitionProcessingJob : IJob
 
             if (resetCount > 0)
             {
-                _logger.LogInformation("Successfully reset {count} stalled processing logs to Ready.", resetCount);
+                _logger.LogInformation("Successfully reset {count} stalled processing logs to Pending.", resetCount);
             }
         }
         catch (Exception ex)

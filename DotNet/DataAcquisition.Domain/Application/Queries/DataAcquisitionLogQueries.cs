@@ -444,7 +444,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             return await _dbContext.DataAcquisitionLogs
                 .Where(l => l.Status == RequestStatus.Processing && l.ModifyDate <= stallThreshold)
                 .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(l => l.Status, RequestStatus.Ready)
+                    .SetProperty(l => l.Status, RequestStatus.Pending)
                     .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
                     cancellationToken);
         });
