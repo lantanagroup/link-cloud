@@ -1,4 +1,4 @@
-﻿name: "Auto-format"
+name: "Auto-format"
 
 on:
   pull_request:
@@ -47,10 +47,66 @@ jobs:
         if: steps.changed.outputs.files != ''
         run: dotnet format link-cloud.sln --include ${{ steps.changed.outputs.files }}
 
-      - name: Commit and push formatting changes
+      - name: Push formatting changes via GitHub API
         if: steps.changed.outputs.files != ''
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: actions/github-script@v7
         with:
-          commit_message: "style: auto-format changed files"
-          commit_user_name: "github-actions[bot]"
-          commit_user_email: "41898282+github-actions[bot]@users.noreply.github.com"
+          script: |
+            const { execSync } = require('child_process');
+            const fs = require('fs');
+
+            const status = execSync('git status --porcelain').toString().trim();
+            if (!status) {
+              console.log('No formatting changes needed.');
+              return;
+            }
+
+            console.log('Files changed by dotnet format:');
+            console.log(status);
+
+            const branch = process.env.GITHUB_HEAD_REF;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Current HEAD
+            const headSha = execSync('git rev-parse HEAD').toString().trim();
+            const { data: headCommit } = await github.rest.git.getCommit({
+              owner, repo, commit_sha: headSha
+            });
+
+            // Create blobs for each changed file
+            const changedFiles = status.split('\n').map(line => line.substring(3));
+            const treeEntries = [];
+
+            for (const filePath of changedFiles) {
+              const content = fs.readFileSync(filePath, 'utf8');
+              const { data: blob } = await github.rest.git.createBlob({
+                owner, repo, content, encoding: 'utf-8'
+              });
+              treeEntries.push({
+                path: filePath, mode: '100644', type: 'blob', sha: blob.sha
+              });
+            }
+
+            // Create tree and commit via the API (GitHub signs these automatically)
+            const { data: newTree } = await github.rest.git.createTree({
+              owner, repo, base_tree: headCommit.tree.sha, tree: treeEntries
+            });
+
+            const { data: newCommit } = await github.rest.git.createCommit({
+              owner, repo,
+              message: 'style: auto-format changed files',
+              tree: newTree.sha,
+              parents: [headSha]
+            });
+
+            console.log(`Created verified commit: ${newCommit.sha}`);
+
+            // Update the branch to point to the new signed commit
+            await github.rest.git.updateRef({
+              owner, repo,
+              ref: `heads/${branch}`,
+              sha: newCommit.sha
+            });
+
+            console.log(`Branch ${branch} updated to ${newCommit.sha}`);
