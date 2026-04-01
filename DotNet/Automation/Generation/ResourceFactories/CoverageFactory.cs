@@ -30,16 +30,16 @@ public static class CoverageFactory
         string typeDisplay,
         string payorName,
         int seed) => new()
-    {
-        Id           = id,
-        Status       = FinancialResourceStatusCodes.Active,
-        Type         = CC("http://terminology.hl7.org/CodeSystem/v3-ActCode", typeCode, typeDisplay),
-        SubscriberId = $"SUB-{id.GetStableHash32() & 0xFFFFFF:X6}",
-        Beneficiary  = Ref($"Patient/{patientId}"),
-        Relationship = CC("http://terminology.hl7.org/CodeSystem/subscriber-relationship", "self", "Self"),
-        Period       = new Period { Start = start.ToString("yyyy-MM-dd"), End = end.AddYears(1).ToString("yyyy-MM-dd") },
-        Payor        = [Ref($"Patient/{patientId}")],
-        Class        =
+        {
+            Id = id,
+            Status = FinancialResourceStatusCodes.Active,
+            Type = CC("http://terminology.hl7.org/CodeSystem/v3-ActCode", typeCode, typeDisplay),
+            SubscriberId = $"SUB-{id.GetStableHash32() & 0xFFFFFF:X6}",
+            Beneficiary = Ref($"Patient/{patientId}"),
+            Relationship = CC("http://terminology.hl7.org/CodeSystem/subscriber-relationship", "self", "Self"),
+            Period = new Period { Start = start.ToString("yyyy-MM-dd"), End = end.AddYears(1).ToString("yyyy-MM-dd") },
+            Payor = [Ref($"Patient/{patientId}")],
+            Class =
         [
             new Coverage.ClassComponent
             {
@@ -48,5 +48,5 @@ public static class CoverageFactory
                 Name  = $"{payorName} Plan {seed % 5 + 1}"
             }
         ]
-    };
+        };
 }

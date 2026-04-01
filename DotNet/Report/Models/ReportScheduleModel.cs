@@ -4,6 +4,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 
 namespace LantanaGroup.Link.Report.Models;
+
 public class ReportScheduleModel
 {
     public Guid Id { get; set; }

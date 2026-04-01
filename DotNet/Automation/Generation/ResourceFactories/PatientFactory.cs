@@ -39,16 +39,16 @@ public static class PatientFactory
         string? gpPractitionerId = null)
     {
         var stableHash = id.GetStableHash32();
-        var mrn      = $"MRN-{stableHash:D10}";
-        var epi      = $"E{stableHash & 0xFFFFFF:X6}";
+        var mrn = $"MRN-{stableHash:D10}";
+        var epi = $"E{stableHash & 0xFFFFFF:X6}";
         var areaCode = 500 + (int)(stableHash % 500);
-        var lineNum  = (int)((stableHash >> 8) % 10000);
-        var phone    = $"+1 {areaCode:D3}-555-{lineNum:D4}";
+        var lineNum = (int)((stableHash >> 8) % 10000);
+        var phone = $"+1 {areaCode:D3}-555-{lineNum:D4}";
 
         var patient = new Patient
         {
-            Id     = id,
-            Meta   = new Meta { Profile = ["http://hl7.org/fhir/us/core/StructureDefinition/us-core-patient"] },
+            Id = id,
+            Meta = new Meta { Profile = ["http://hl7.org/fhir/us/core/StructureDefinition/us-core-patient"] },
             Active = true,
             Extension =
             [
@@ -117,9 +117,9 @@ public static class PatientFactory
                 new ContactPoint { System = ContactPoint.ContactPointSystem.Phone, Value = phone,                    Use = ContactPoint.ContactPointUse.Home },
                 new ContactPoint { System = ContactPoint.ContactPointSystem.Email, Value = $"{id}@patient.example.com", Use = ContactPoint.ContactPointUse.Home }
             ],
-            Gender    = gender switch { "male" => AdministrativeGender.Male, "female" => AdministrativeGender.Female, _ => AdministrativeGender.Other },
+            Gender = gender switch { "male" => AdministrativeGender.Male, "female" => AdministrativeGender.Female, _ => AdministrativeGender.Other },
             BirthDate = birthDate,
-            Deceased  = new FhirBoolean(false),
+            Deceased = new FhirBoolean(false),
             Address =
             [
                 new Address

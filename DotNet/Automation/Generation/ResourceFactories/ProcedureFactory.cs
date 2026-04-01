@@ -12,7 +12,7 @@ public static class ProcedureFactory
         string locationId, string orgId,
         List<string> conditionIds)
     {
-        var v       = FhirGenerationCodes.Procedures[seed % FhirGenerationCodes.Procedures.Length];
+        var v = FhirGenerationCodes.Procedures[seed % FhirGenerationCodes.Procedures.Length];
         return Create(id, patientId, encounterId, performed, seed, practId, locationId, orgId,
                       v.Code, v.Display, v.BodySiteCode, v.BodySiteDisplay,
                       v.OutcomeCode, v.OutcomeDisplay,
@@ -41,15 +41,15 @@ public static class ProcedureFactory
 
         var procedure = new Procedure
         {
-            Id        = id,
-            Status    = EventStatus.Completed,
-            Code      = Snomed(snomedCode, display),
-            Subject   = Ref($"Patient/{patientId}"),
+            Id = id,
+            Status = EventStatus.Completed,
+            Code = Snomed(snomedCode, display),
+            Subject = Ref($"Patient/{patientId}"),
             Encounter = Ref($"Encounter/{encounterId}"),
             Performed = new Period
             {
                 StartElement = new FhirDateTime(performed),
-                EndElement   = new FhirDateTime(performed.Add(duration))
+                EndElement = new FhirDateTime(performed.Add(duration))
             },
             Performer =
             [
@@ -60,9 +60,9 @@ public static class ProcedureFactory
                     OnBehalfOf = Ref($"Organization/{orgId}")
                 }
             ],
-            Location  = Ref($"Location/{locationId}"),
-            BodySite  = [Snomed(bodySiteCode, bodySiteDisplay)],
-            Outcome   = Snomed(outcomeCode, outcomeDisplay),
+            Location = Ref($"Location/{locationId}"),
+            BodySite = [Snomed(bodySiteCode, bodySiteDisplay)],
+            Outcome = Snomed(outcomeCode, outcomeDisplay),
         };
 
         if (reasonConditionId != null)

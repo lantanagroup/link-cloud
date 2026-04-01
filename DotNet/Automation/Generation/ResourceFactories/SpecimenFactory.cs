@@ -39,24 +39,24 @@ public static class SpecimenFactory
 
         return new Specimen
         {
-            Id         = id,
-            Status     = Specimen.SpecimenStatus.Available,
-            Type       = new CodeableConcept { Coding = [new Coding(typeSystem, typeCode, typeDisplay)], Text = typeDisplay },
-            Subject    = Ref($"Patient/{patientId}"),
+            Id = id,
+            Status = Specimen.SpecimenStatus.Available,
+            Type = new CodeableConcept { Coding = [new Coding(typeSystem, typeCode, typeDisplay)], Text = typeDisplay },
+            Subject = Ref($"Patient/{patientId}"),
             ReceivedTimeElement = new FhirDateTime(collected.AddMinutes(30 + seed % 60)),
             Collection = new Specimen.CollectionComponent
             {
                 // FHIR R4: Specimen.collection.collector is Reference(Practitioner|PractitionerRole) only
                 Collector = Ref($"Practitioner/{collectorPractitionerId}", "Collecting Practitioner"),
                 Collected = new FhirDateTime(collected),
-                Quantity  = new Quantity
+                Quantity = new Quantity
                 {
-                    Value  = (decimal)volumeMl,
-                    Unit   = "mL",
+                    Value = (decimal)volumeMl,
+                    Unit = "mL",
                     System = "http://unitsofmeasure.org",
-                    Code   = "mL"
+                    Code = "mL"
                 },
-                Method   = CC("http://snomed.info/sct",
+                Method = CC("http://snomed.info/sct",
                               seed % 3 == 0 ? "28520004" : seed % 3 == 1 ? "73904009" : "82078001",
                               collectionMethod),
                 BodySite = Snomed(bodySiteCode, bodySiteDisplay)

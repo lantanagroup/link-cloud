@@ -499,7 +499,7 @@ public class FhirBundleGeneratorTests
                     break;
 
                 default:
-                    Assert.True(false, $"Unexpected generated resource type: {resource.TypeName}");
+                    Assert.Fail($"Unexpected generated resource type: {resource.TypeName}");
                     break;
             }
         }

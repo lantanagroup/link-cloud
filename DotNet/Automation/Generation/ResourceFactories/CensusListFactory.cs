@@ -11,17 +11,17 @@ public static class CensusListFactory
     /// <summary>Create a census List with caller-supplied values.</summary>
     public static List Create(string id, string patientId, string listPrefix, DateTime date) => new()
     {
-        Id     = id,
+        Id = id,
         Status = List.ListStatus.Current,
-        Mode   = ListMode.Working,
-        Title  = $"Synthetic Census List - {listPrefix} - {patientId}",
-        Code   = new CodeableConcept
+        Mode = ListMode.Working,
+        Title = $"Synthetic Census List - {listPrefix} - {patientId}",
+        Code = new CodeableConcept
         {
             Coding = [new Coding("http://hl7.org/fhir/list-example-use-codes", "patients", "Patient List")],
-            Text   = "Patient List"
+            Text = "Patient List"
         },
         DateElement = new FhirDateTime(date),
-        Entry       =
+        Entry =
         [
             new List.EntryComponent
             {

@@ -17,30 +17,30 @@ public static class ConditionFactory
         string snomedCode,
         string display,
         string icdCode) => new()
-    {
-        Id                 = id,
-        ClinicalStatus     = CC("http://terminology.hl7.org/CodeSystem/condition-clinical",   "active", "Active"),
-        VerificationStatus = CC("http://terminology.hl7.org/CodeSystem/condition-ver-status", "confirmed", "Confirmed"),
-        Category           =
+        {
+            Id = id,
+            ClinicalStatus = CC("http://terminology.hl7.org/CodeSystem/condition-clinical", "active", "Active"),
+            VerificationStatus = CC("http://terminology.hl7.org/CodeSystem/condition-ver-status", "confirmed", "Confirmed"),
+            Category =
         [
             CC("http://terminology.hl7.org/CodeSystem/condition-category",  "problem-list-item", "Problem List Item"),
             CC("http://terminology.hl7.org/CodeSystem/condition-category",  "encounter-diagnosis", "Encounter Diagnosis")
         ],
-        Severity           = CC("http://snomed.info/sct", "24484000", "Severe"),
-        Code               = new CodeableConcept
-        {
-            Coding =
+            Severity = CC("http://snomed.info/sct", "24484000", "Severe"),
+            Code = new CodeableConcept
+            {
+                Coding =
             [
                 new Coding("http://snomed.info/sct",            snomedCode, display),
                 new Coding("http://hl7.org/fhir/sid/icd-10-cm", icdCode,    display)
             ],
-            Text = display
-        },
-        Subject      = Ref($"Patient/{patientId}"),
-        Encounter    = Ref($"Encounter/{encounterId}"),
-        Onset        = new FhirDateTime(onset),
-        RecordedDate = onset.ToString("yyyy-MM-dd")
-    };
+                Text = display
+            },
+            Subject = Ref($"Patient/{patientId}"),
+            Encounter = Ref($"Encounter/{encounterId}"),
+            Onset = new FhirDateTime(onset),
+            RecordedDate = onset.ToString("yyyy-MM-dd")
+        };
 
     /// <summary>Generate a secondary/comorbid Condition from the pool using a seed index.</summary>
     public static Condition Generate(
@@ -70,8 +70,8 @@ public static class ConditionFactory
         string icdCode,
         string categoryCode)
     {
-        var isActive       = seed % 5 != 0;
-        var severityCodes  = new[] { ("24484000","Severe"), ("6736007","Moderate"), ("255604002","Mild") };
+        var isActive = seed % 5 != 0;
+        var severityCodes = new[] { ("24484000", "Severe"), ("6736007", "Moderate"), ("255604002", "Mild") };
         var (sevCode, sevDisplay) = severityCodes[seed % severityCodes.Length];
 
         var categories = new List<CodeableConcept>
@@ -84,12 +84,12 @@ public static class ConditionFactory
 
         var condition = new Condition
         {
-            Id                 = id,
-            ClinicalStatus     = CC("http://terminology.hl7.org/CodeSystem/condition-clinical",   isActive ? "active" : "resolved", isActive ? "Active" : "Resolved"),
+            Id = id,
+            ClinicalStatus = CC("http://terminology.hl7.org/CodeSystem/condition-clinical", isActive ? "active" : "resolved", isActive ? "Active" : "Resolved"),
             VerificationStatus = CC("http://terminology.hl7.org/CodeSystem/condition-ver-status", "confirmed", "Confirmed"),
-            Category           = categories,
-            Severity           = CC("http://snomed.info/sct", sevCode, sevDisplay),
-            Code               = new CodeableConcept
+            Category = categories,
+            Severity = CC("http://snomed.info/sct", sevCode, sevDisplay),
+            Code = new CodeableConcept
             {
                 Coding =
                 [
@@ -98,9 +98,9 @@ public static class ConditionFactory
                 ],
                 Text = display
             },
-            Subject      = Ref($"Patient/{patientId}"),
-            Encounter    = Ref($"Encounter/{encounterId}"),
-            Onset        = new FhirDateTime(onset),
+            Subject = Ref($"Patient/{patientId}"),
+            Encounter = Ref($"Encounter/{encounterId}"),
+            Onset = new FhirDateTime(onset),
             RecordedDate = onset.ToString("yyyy-MM-dd")
         };
 
