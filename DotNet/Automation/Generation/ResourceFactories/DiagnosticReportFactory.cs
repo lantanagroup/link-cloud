@@ -42,12 +42,12 @@ public static class DiagnosticReportFactory
         string display,
         string categoryCode,
         string categoryDisplay,
-        List<ResourceReference>? resultRefs = null,
+        List<ResourceReference>? resultRefs  = null,
         List<ResourceReference>? specimenRefs = null) => new()
-        {
-            Id = id,
-            Status = DiagnosticReport.DiagnosticReportStatus.Final,
-            Category =
+    {
+        Id        = id,
+        Status    = DiagnosticReport.DiagnosticReportStatus.Final,
+        Category  =
         [
             new CodeableConcept
             {
@@ -55,15 +55,15 @@ public static class DiagnosticReportFactory
                 Text   = categoryDisplay
             }
         ],
-            Code = Loinc(loincCode, display),
-            Subject = Ref($"Patient/{patientId}"),
-            Encounter = Ref($"Encounter/{encounterId}"),
-            Effective = new FhirDateTime(effective),
-            IssuedElement = new Instant(new DateTimeOffset(effective.AddHours(2))),
-            Performer = [Ref($"Practitioner/{practId}", "Interpreting Physician")],
-            ResultsInterpreter = [Ref($"Practitioner/{practId}", "Interpreting Physician")],
-            Specimen = specimenRefs ?? [],
-            Result = resultRefs ?? [],
-            Conclusion = $"Results reviewed and interpreted. See individual observation values for findings."
-        };
+        Code      = Loinc(loincCode, display),
+        Subject   = Ref($"Patient/{patientId}"),
+        Encounter = Ref($"Encounter/{encounterId}"),
+        Effective = new FhirDateTime(effective),
+        IssuedElement = new Instant(new DateTimeOffset(effective.AddHours(2))),
+        Performer    = [Ref($"Practitioner/{practId}", "Interpreting Physician")],
+        ResultsInterpreter = [Ref($"Practitioner/{practId}", "Interpreting Physician")],
+        Specimen  = specimenRefs ?? [],
+        Result    = resultRefs   ?? [],
+        Conclusion = $"Results reviewed and interpreted. See individual observation values for findings."
+    };
 }

@@ -28,21 +28,21 @@ public static class DocumentReferenceFactory
         string classCode,
         string classDisplay)
     {
-        var contentText = BuildNoteText(patientId, display, created);
+        var contentText  = BuildNoteText(patientId, display, created);
         var contentBytes = System.Text.Encoding.UTF8.GetBytes(contentText);
 
         return new DocumentReference
         {
-            Id = id,
+            Id         = id,
             MasterIdentifier = new Identifier
             {
                 System = "urn:ietf:rfc:3986",
-                Value = $"urn:uuid:{id}"
+                Value  = $"urn:uuid:{id}"
             },
-            Status = DocumentReferenceStatus.Current,
-            DocStatus = CompositionStatus.Final,
-            Type = Loinc(loincCode, display),
-            Category =
+            Status     = DocumentReferenceStatus.Current,
+            DocStatus  = CompositionStatus.Final,
+            Type       = Loinc(loincCode, display),
+            Category   =
             [
                 new CodeableConcept
                 {
@@ -50,17 +50,17 @@ public static class DocumentReferenceFactory
                     Text   = classDisplay
                 }
             ],
-            Subject = Ref($"Patient/{patientId}"),
+            Subject    = Ref($"Patient/{patientId}"),
             DateElement = new Instant(new DateTimeOffset(created)),
-            Author = [Ref($"Practitioner/{authorPractId}", "Authoring Clinician")],
+            Author     = [Ref($"Practitioner/{authorPractId}", "Authoring Clinician")],
             Authenticator = Ref($"Organization/{orgId}", "General Test Hospital"),
-            Custodian = Ref($"Organization/{orgId}", "General Test Hospital"),
+            Custodian  = Ref($"Organization/{orgId}", "General Test Hospital"),
             Description = $"{display} - {created:yyyy-MM-dd}",
             SecurityLabel =
             [
                 CC("http://terminology.hl7.org/CodeSystem/v3-Confidentiality", "N", "Normal")
             ],
-            Content =
+            Content    =
             [
                 new DocumentReference.ContentComponent
                 {
@@ -81,12 +81,12 @@ public static class DocumentReferenceFactory
             Context = new DocumentReference.ContextComponent
             {
                 Encounter = [Ref($"Encounter/{encounterId}")],
-                Period = new Period
+                Period    = new Period
                 {
                     StartElement = new FhirDateTime(created),
-                    EndElement = new FhirDateTime(created.AddHours(1))
+                    EndElement   = new FhirDateTime(created.AddHours(1))
                 },
-                FacilityType = CC("http://terminology.hl7.org/CodeSystem/v3-RoleCode", "HOSP", "Hospital"),
+                FacilityType    = CC("http://terminology.hl7.org/CodeSystem/v3-RoleCode", "HOSP", "Hospital"),
                 PracticeSetting = CC("http://snomed.info/sct", "394802001", "General medicine")
             }
         };
@@ -94,9 +94,9 @@ public static class DocumentReferenceFactory
 
     private static string BuildNoteText(string patientId, string noteType, DateTime date) => noteType switch
     {
-        "Discharge summary" => $"DISCHARGE SUMMARY\nPatient: {patientId}\nDate: {date:yyyy-MM-dd}\nDiagnosis: See problem list.\nCondition at discharge: Stable.\nFollow-up: Outpatient clinic in 2 weeks.",
+        "Discharge summary"       => $"DISCHARGE SUMMARY\nPatient: {patientId}\nDate: {date:yyyy-MM-dd}\nDiagnosis: See problem list.\nCondition at discharge: Stable.\nFollow-up: Outpatient clinic in 2 weeks.",
         "History and physical note" => $"HISTORY & PHYSICAL\nPatient: {patientId}\nDate: {date:yyyy-MM-dd}\nCC: Presenting complaint documented.\nPMH: Hypertension, Diabetes.\nExam: Within normal limits except as noted.",
-        "Progress note" => $"PROGRESS NOTE\nPatient: {patientId}\nDate: {date:yyyy-MM-dd}\nS: Patient reports improvement.\nO: Vitals stable. Labs reviewed.\nA/P: Continue current management.",
-        _ => $"{noteType.ToUpper()}\nPatient: {patientId}\nDate: {date:yyyy-MM-dd}\nClinical documentation for inpatient encounter."
+        "Progress note"           => $"PROGRESS NOTE\nPatient: {patientId}\nDate: {date:yyyy-MM-dd}\nS: Patient reports improvement.\nO: Vitals stable. Labs reviewed.\nA/P: Continue current management.",
+        _                         => $"{noteType.ToUpper()}\nPatient: {patientId}\nDate: {date:yyyy-MM-dd}\nClinical documentation for inpatient encounter."
     };
 }

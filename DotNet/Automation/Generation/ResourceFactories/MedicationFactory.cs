@@ -19,16 +19,16 @@ public static class MedicationFactory
         double doseValue, string doseUnit,
         string routeCode, string routeDisplay)
     {
-        var isTablet = doseUnit == "mg" && routeCode == "26643006";
-        var formCode = isTablet ? "385055001" : doseUnit == "[iU]" ? "385218009" : "385219001";
+        var isTablet  = doseUnit == "mg" && routeCode == "26643006";
+        var formCode  = isTablet ? "385055001" : doseUnit == "[iU]" ? "385218009" : "385219001";
         var formDisplay = isTablet ? "Tablet" : doseUnit == "[iU]" ? "Injection solution" : "Injectable solution";
 
         return new Medication
         {
-            Id = id,
-            Code = RxNorm(rxCode, display),
+            Id     = id,
+            Code   = RxNorm(rxCode, display),
             Status = Medication.MedicationStatusCodes.Active,
-            Form = CC("http://snomed.info/sct", formCode, formDisplay),
+            Form   = CC("http://snomed.info/sct", formCode, formDisplay),
             Ingredient =
             [
                 new Medication.IngredientComponent

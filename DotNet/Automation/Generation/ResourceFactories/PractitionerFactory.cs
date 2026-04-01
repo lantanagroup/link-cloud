@@ -16,11 +16,11 @@ public static class PractitionerFactory
     public static Practitioner Create(
         string id, string family, string given, string gender,
         string npi, string email, string specialty) => new()
-        {
-            Id = id,
-            Meta = new Meta { Profile = ["http://hl7.org/fhir/us/core/StructureDefinition/us-core-practitioner"] },
-            Active = true,
-            Identifier =
+    {
+        Id     = id,
+        Meta   = new Meta { Profile = ["http://hl7.org/fhir/us/core/StructureDefinition/us-core-practitioner"] },
+        Active = true,
+        Identifier =
         [
             new Identifier
             {
@@ -29,7 +29,7 @@ public static class PractitionerFactory
                 Type   = new CodeableConcept { Coding = [new Coding("http://terminology.hl7.org/CodeSystem/v2-0203", "NPI", "National provider identifier")] }
             }
         ],
-            Name =
+        Name =
         [
             new HumanName
             {
@@ -40,7 +40,7 @@ public static class PractitionerFactory
                 Text   = $"Dr. {given} {family}"
             }
         ],
-            Telecom =
+        Telecom =
         [
             new ContactPoint
             {
@@ -53,7 +53,7 @@ public static class PractitionerFactory
                 ]
             }
         ],
-            Address =
+        Address =
         [
             new Address
             {
@@ -65,8 +65,8 @@ public static class PractitionerFactory
                 Country    = "US"
             }
         ],
-            Gender = gender switch { "male" => AdministrativeGender.Male, "female" => AdministrativeGender.Female, _ => AdministrativeGender.Other },
-            Qualification =
+        Gender = gender switch { "male" => AdministrativeGender.Male, "female" => AdministrativeGender.Female, _ => AdministrativeGender.Other },
+        Qualification =
         [
             new Practitioner.QualificationComponent
             {
@@ -74,5 +74,5 @@ public static class PractitionerFactory
                 Identifier = [new Identifier { System = "http://hl7.org/fhir/sid/us-npi", Value = npi }]
             }
         ]
-        };
+    };
 }

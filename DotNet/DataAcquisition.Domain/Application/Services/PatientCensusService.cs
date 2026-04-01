@@ -23,7 +23,6 @@ using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
-
 public interface IPatientCensusService
 {
     Task CreateLog(string facilityId, CancellationToken cancellationToken);

@@ -19,10 +19,10 @@ using Task = System.Threading.Tasks.Task;
 namespace LantanaGroup.Link.Tests.E2ETests;
 
 /// <summary>
-/// End-to-end test for ReportScheduledListener path:
-/// produce ReportScheduled integration event, create patient entry via PatientEvent,
-/// and validate full pipeline completion after Quartz executes EndOfReportPeriodJob.
-/// </summary>
+    /// End-to-end test for ReportScheduledListener path:
+    /// produce ReportScheduled integration event, create patient entry via PatientEvent,
+    /// and validate full pipeline completion after Quartz executes EndOfReportPeriodJob.
+    /// </summary>
 public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixture>
 {
     private const int GenerationSeed = 20260326;

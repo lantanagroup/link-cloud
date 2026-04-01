@@ -21,28 +21,28 @@ public static class CarePlanFactory
         string careTeamId, DateTime period,
         string activityCode, string activityDisplay,
         string goalCode, string goalDisplay) => new()
-        {
-            Id = id,
-            Status = RequestStatus.Active,
-            Intent = CarePlan.CarePlanIntent.Order,
-            Title = $"Inpatient Care Plan",
-            Description = $"Inpatient care plan for {activityDisplay.ToLower()} and recovery.",
-            Category =
+    {
+        Id        = id,
+        Status    = RequestStatus.Active,
+        Intent    = CarePlan.CarePlanIntent.Order,
+        Title     = $"Inpatient Care Plan",
+        Description = $"Inpatient care plan for {activityDisplay.ToLower()} and recovery.",
+        Category  =
         [
             CC("http://hl7.org/fhir/us/core/CodeSystem/careplan-category", "assess-plan", "Assessment and Plan of Treatment")
         ],
-            Subject = Ref($"Patient/{patientId}"),
-            Encounter = Ref($"Encounter/{encounterId}"),
-            Period = new Period { StartElement = new FhirDateTime(period) },
-            CareTeam = [Ref($"CareTeam/{careTeamId}")],
-            Goal =
+        Subject   = Ref($"Patient/{patientId}"),
+        Encounter = Ref($"Encounter/{encounterId}"),
+        Period    = new Period { StartElement = new FhirDateTime(period) },
+        CareTeam  = [Ref($"CareTeam/{careTeamId}")],
+        Goal      =
         [
             new ResourceReference
             {
                 Display = goalDisplay
             }
         ],
-            Activity =
+        Activity  =
         [
             new CarePlan.ActivityComponent
             {
@@ -63,5 +63,5 @@ public static class CarePlanFactory
                 }
             }
         ]
-        };
+    };
 }

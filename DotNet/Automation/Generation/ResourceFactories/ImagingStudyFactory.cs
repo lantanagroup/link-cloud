@@ -33,14 +33,14 @@ public static class ImagingStudyFactory
         string reasonCode,
         string reasonDisplay)
     {
-        var stableHash = id.GetStableHash32();
-        var studyUid = $"1.2.840.99999.{stableHash}.1";
-        var seriesUid = $"{studyUid}.1";
+        var stableHash  = id.GetStableHash32();
+        var studyUid    = $"1.2.840.99999.{stableHash}.1";
+        var seriesUid   = $"{studyUid}.1";
         var instanceUid = $"{seriesUid}.1";
 
         return new ImagingStudy
         {
-            Id = id,
+            Id         = id,
             Identifier =
             [
                 new Identifier
@@ -50,18 +50,18 @@ public static class ImagingStudyFactory
                     Value  = $"urn:oid:{studyUid}"
                 }
             ],
-            Status = ImagingStudy.ImagingStudyStatus.Available,
-            Modality = [new Coding("http://dicom.nema.org/resources/ontology/DCM", modality, modality)],
-            Subject = Ref($"Patient/{patientId}"),
-            Encounter = Ref($"Encounter/{encounterId}"),
-            StartedElement = new FhirDateTime(started),
-            NumberOfSeries = 1,
+            Status            = ImagingStudy.ImagingStudyStatus.Available,
+            Modality          = [new Coding("http://dicom.nema.org/resources/ontology/DCM", modality, modality)],
+            Subject           = Ref($"Patient/{patientId}"),
+            Encounter         = Ref($"Encounter/{encounterId}"),
+            StartedElement    = new FhirDateTime(started),
+            NumberOfSeries    = 1,
             NumberOfInstances = 1,
-            ProcedureCode = [Snomed(snomedCode, display)],
-            ReasonCode = [Snomed(reasonCode, reasonDisplay)],
-            Location = Ref($"Location/{locationId}"),
-            Interpreter = [Ref($"Practitioner/{interpreterPractitionerId}", "Radiologist")],
-            Note = [new Annotation { Text = new Markdown($"Study performed for: {reasonDisplay}. Interpreted by radiology.") }],
+            ProcedureCode     = [Snomed(snomedCode, display)],
+            ReasonCode        = [Snomed(reasonCode, reasonDisplay)],
+            Location          = Ref($"Location/{locationId}"),
+            Interpreter       = [Ref($"Practitioner/{interpreterPractitionerId}", "Radiologist")],
+            Note              = [new Annotation { Text = new Markdown($"Study performed for: {reasonDisplay}. Interpreted by radiology.") }],
             Series =
             [
                 new ImagingStudy.SeriesComponent

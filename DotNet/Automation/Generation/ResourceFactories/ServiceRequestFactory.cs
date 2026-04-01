@@ -35,10 +35,10 @@ public static class ServiceRequestFactory
     {
         var request = new ServiceRequest
         {
-            Id = id,
-            Status = seed % 4 == 0 ? RequestStatus.Completed : RequestStatus.Active,
-            Intent = RequestIntent.Order,
-            Category =
+            Id        = id,
+            Status    = seed % 4 == 0 ? RequestStatus.Completed : RequestStatus.Active,
+            Intent    = RequestIntent.Order,
+            Category  =
             [
                 new CodeableConcept
                 {
@@ -48,14 +48,14 @@ public static class ServiceRequestFactory
                     Text = isLab ? "Laboratory" : "Education"
                 }
             ],
-            Priority = seed % 5 == 0 ? RequestPriority.Urgent : RequestPriority.Routine,
-            Code = new CodeableConcept { Coding = [new Coding(codeSystem, code, display)], Text = display },
-            Subject = Ref($"Patient/{patientId}"),
-            Encounter = Ref($"Encounter/{encounterId}"),
+            Priority   = seed % 5 == 0 ? RequestPriority.Urgent : RequestPriority.Routine,
+            Code       = new CodeableConcept { Coding = [new Coding(codeSystem, code, display)], Text = display },
+            Subject    = Ref($"Patient/{patientId}"),
+            Encounter  = Ref($"Encounter/{encounterId}"),
             Occurrence = new FhirDateTime(authored.AddHours(1)),
             AuthoredOn = authored.ToString("yyyy-MM-ddTHH:mm:ssZ"),
-            Requester = Ref($"Practitioner/{practId}", "Ordering Physician"),
-            Performer = [Ref($"Organization/{FhirBundleGenerator.HospitalOrgId}", "General Test Hospital")]
+            Requester  = Ref($"Practitioner/{practId}", "Ordering Physician"),
+            Performer  = [Ref($"Organization/{FhirBundleGenerator.HospitalOrgId}", "General Test Hospital")]
         };
 
         if (reasonConditionId != null)

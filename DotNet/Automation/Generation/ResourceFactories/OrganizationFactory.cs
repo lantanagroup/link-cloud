@@ -12,16 +12,16 @@ public static class OrganizationFactory
     /// <summary>Create an Organization with caller-supplied values.</summary>
     public static Organization Create(string id, string name, string alias) => new()
     {
-        Id = id,
-        Meta = new Meta { Profile = ["http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization"] },
+        Id     = id,
+        Meta   = new Meta { Profile = ["http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization"] },
         Active = true,
         Identifier =
         [
             new Identifier { System = "https://github.com/synthetichealth/synthea", Value = id }
         ],
-        Type = [CC("http://terminology.hl7.org/CodeSystem/organization-type", "prov", "Healthcare Provider")],
-        Name = name,
-        Alias = [alias],
+        Type    = [CC("http://terminology.hl7.org/CodeSystem/organization-type", "prov", "Healthcare Provider")],
+        Name    = name,
+        Alias   = [alias],
         Telecom = [new ContactPoint { System = ContactPoint.ContactPointSystem.Phone, Value = "555-867-5309" }],
         Address =
         [

@@ -10,10 +10,10 @@ public static class MedicationAdministrationFactory
         string id, string patientId, string encounterId,
         DateTime effective, int seed, List<string> medicationIds, string practId)
     {
-        var v = FhirGenerationCodes.Medications[seed % FhirGenerationCodes.Medications.Length];
+        var v        = FhirGenerationCodes.Medications[seed % FhirGenerationCodes.Medications.Length];
         var medRefId = medicationIds.Count > 0 ? medicationIds[seed % medicationIds.Count] : null;
         // IV infusions get an effective period; oral/subcut get a point-in-time
-        var isIv = v.RouteCode == "47625008";
+        var isIv     = v.RouteCode == "47625008";
         return Create(id, patientId, encounterId, effective, seed, practId,
                       v.RxCode, v.Display, v.RouteCode, v.RouteDisplay,
                       v.DoseValue, v.DoseUnit, v.IndicationSnomed, v.IndicationDisplay,
@@ -57,20 +57,20 @@ public static class MedicationAdministrationFactory
             ? new Period
             {
                 StartElement = new FhirDateTime(effective),
-                EndElement = new FhirDateTime(effective.AddHours(1 + seed % 3))
+                EndElement   = new FhirDateTime(effective.AddHours(1 + seed % 3))
             }
             : new FhirDateTime(effective);
 
         return new MedicationAdministration
         {
-            Id = id,
-            Status = MedicationAdministration.MedicationAdministrationStatusCodes.Completed,
-            Category = CC("http://terminology.hl7.org/CodeSystem/medication-admin-location", "inpatient", "Inpatient"),
+            Id         = id,
+            Status     = MedicationAdministration.MedicationAdministrationStatusCodes.Completed,
+            Category   = CC("http://terminology.hl7.org/CodeSystem/medication-admin-location", "inpatient", "Inpatient"),
             Medication = medChoice,
-            Subject = Ref($"Patient/{patientId}"),
-            Context = Ref($"Encounter/{encounterId}"),
-            Effective = effectiveElement,
-            Performer =
+            Subject    = Ref($"Patient/{patientId}"),
+            Context    = Ref($"Encounter/{encounterId}"),
+            Effective  = effectiveElement,
+            Performer  =
             [
                 new MedicationAdministration.PerformerComponent
                 {
@@ -79,11 +79,11 @@ public static class MedicationAdministrationFactory
                 }
             ],
             ReasonCode = [Snomed(indicationCode, indicationDisplay)],
-            Dosage = new MedicationAdministration.DosageComponent
+            Dosage     = new MedicationAdministration.DosageComponent
             {
-                Text = $"{doseValue} {doseUnit} {routeDisplay}",
+                Text  = $"{doseValue} {doseUnit} {routeDisplay}",
                 Route = Snomed(routeCode, routeDisplay),
-                Dose = Qty(doseValue, doseUnit)
+                Dose  = Qty(doseValue, doseUnit)
             }
         };
     }

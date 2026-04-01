@@ -15,21 +15,21 @@ public static class ProvenanceFactory
     public static Provenance Create(
         string id, string patientId, string encounterId,
         DateTime recorded, string practId, string orgId) => new()
-        {
-            Id = id,
-            Target =
+    {
+        Id      = id,
+        Target  =
         [
             Ref($"Encounter/{encounterId}"),
             Ref($"Patient/{patientId}")
         ],
-            RecordedElement = new Instant(new DateTimeOffset(recorded)),
-            Occurred = new Period
-            {
-                StartElement = new FhirDateTime(recorded),
-                EndElement = new FhirDateTime(recorded.AddMinutes(5))
-            },
-            Activity = CC("http://terminology.hl7.org/CodeSystem/v3-DataOperation", "CREATE", "create"),
-            Agent =
+        RecordedElement = new Instant(new DateTimeOffset(recorded)),
+        Occurred        = new Period
+        {
+            StartElement = new FhirDateTime(recorded),
+            EndElement   = new FhirDateTime(recorded.AddMinutes(5))
+        },
+        Activity        = CC("http://terminology.hl7.org/CodeSystem/v3-DataOperation", "CREATE", "create"),
+        Agent   =
         [
             new Provenance.AgentComponent
             {
@@ -44,6 +44,6 @@ public static class ProvenanceFactory
                 Who        = Ref($"Organization/{orgId}", "General Test Hospital")
             }
         ],
-            Signature = []
-        };
+        Signature = []
+    };
 }
