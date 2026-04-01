@@ -25,26 +25,26 @@ public static class ImmunizationFactory
         string cvxCode,
         string display,
         double doseMl) => new()
-    {
-        Id            = id,
-        Status        = Immunization.ImmunizationStatusCodes.Completed,
-        VaccineCode   = new CodeableConcept
         {
-            Coding =
+            Id = id,
+            Status = Immunization.ImmunizationStatusCodes.Completed,
+            VaccineCode = new CodeableConcept
+            {
+                Coding =
             [
                 new Coding("http://hl7.org/fhir/sid/cvx",      cvxCode, display),
                 new Coding("http://hl7.org/fhir/sid/ndc",      $"NDC-{cvxCode}", display)
             ],
-            Text = display
-        },
-        Patient       = Ref($"Patient/{patientId}"),
-        Encounter     = Ref($"Encounter/{encounterId}"),
-        Occurrence    = new FhirDateTime(occurrence),
-        PrimarySource = true,
-        LotNumber     = $"LOT{seed * 7 + 1001:D5}",
-        ExpirationDate = occurrence.AddYears(1).ToString("yyyy-MM-dd"),
-        Location      = Ref($"Location/{locationId}"),
-        Performer     =
+                Text = display
+            },
+            Patient = Ref($"Patient/{patientId}"),
+            Encounter = Ref($"Encounter/{encounterId}"),
+            Occurrence = new FhirDateTime(occurrence),
+            PrimarySource = true,
+            LotNumber = $"LOT{seed * 7 + 1001:D5}",
+            ExpirationDate = occurrence.AddYears(1).ToString("yyyy-MM-dd"),
+            Location = Ref($"Location/{locationId}"),
+            Performer =
         [
             new Immunization.PerformerComponent
             {
@@ -52,12 +52,12 @@ public static class ImmunizationFactory
                 Actor    = Ref($"Organization/{FhirBundleGenerator.HospitalOrgId}", "General Test Hospital")
             }
         ],
-        DoseQuantity  = new Quantity { Value = (decimal)doseMl, Unit = "mL", System = "http://unitsofmeasure.org", Code = "mL" },
-        Site          = CC("http://terminology.hl7.org/CodeSystem/v3-ActSite",
+            DoseQuantity = new Quantity { Value = (decimal)doseMl, Unit = "mL", System = "http://unitsofmeasure.org", Code = "mL" },
+            Site = CC("http://terminology.hl7.org/CodeSystem/v3-ActSite",
                            seed % 2 == 0 ? "LA" : "RA",
                            seed % 2 == 0 ? "Left arm" : "Right arm"),
-        Route         = CC("http://terminology.hl7.org/CodeSystem/v3-RouteOfAdministration", "IM", "Injection, intramuscular"),
-        ProtocolApplied =
+            Route = CC("http://terminology.hl7.org/CodeSystem/v3-RouteOfAdministration", "IM", "Injection, intramuscular"),
+            ProtocolApplied =
         [
             new Immunization.ProtocolAppliedComponent
             {
@@ -66,5 +66,5 @@ public static class ImmunizationFactory
                 SeriesDoses = new FhirString("2")
             }
         ]
-    };
+        };
 }

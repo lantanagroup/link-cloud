@@ -13,14 +13,14 @@ public static class CareTeamFactory
     /// <summary>Create a CareTeam with caller-supplied values.</summary>
     public static CareTeam Create(string id, string patientId, string encounterId,
         string attendingPractId, DateTime period, string orgId) => new()
-    {
-        Id        = id,
-        Status    = CareTeam.CareTeamStatus.Active,
-        Name      = $"Inpatient Care Team",
-        Subject   = Ref($"Patient/{patientId}"),
-        Encounter = Ref($"Encounter/{encounterId}"),
-        Period    = new Period { StartElement = new FhirDateTime(period) },
-        Participant =
+        {
+            Id = id,
+            Status = CareTeam.CareTeamStatus.Active,
+            Name = $"Inpatient Care Team",
+            Subject = Ref($"Patient/{patientId}"),
+            Encounter = Ref($"Encounter/{encounterId}"),
+            Period = new Period { StartElement = new FhirDateTime(period) },
+            Participant =
         [
             new CareTeam.ParticipantComponent
             {
@@ -29,8 +29,8 @@ public static class CareTeamFactory
                 Period = new Period { StartElement = new FhirDateTime(period) }
             }
         ],
-        ReasonCode           = [CC("http://snomed.info/sct", "305906004", "Admission to ward")],
-        ManagingOrganization = [Ref($"Organization/{orgId}", "General Test Hospital")],
-        Note                 = [new Annotation { Text = new Markdown("Multidisciplinary inpatient care team coordinating admission management.") }]
-    };
+            ReasonCode = [CC("http://snomed.info/sct", "305906004", "Admission to ward")],
+            ManagingOrganization = [Ref($"Organization/{orgId}", "General Test Hospital")],
+            Note = [new Annotation { Text = new Markdown("Multidisciplinary inpatient care team coordinating admission management.") }]
+        };
 }

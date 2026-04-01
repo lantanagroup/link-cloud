@@ -23,10 +23,10 @@ public static class DeviceFactory
     {
         var device = new Device
         {
-            Id           = id,
-            Status       = Device.FHIRDeviceStatus.Active,
-            Type         = Snomed(snomedCode, display),
-            DeviceName   =
+            Id = id,
+            Status = Device.FHIRDeviceStatus.Active,
+            Type = Snomed(snomedCode, display),
+            DeviceName =
             [
                 new Device.DeviceNameComponent { Name = display, Type = DeviceNameType.UserFriendlyName }
             ],

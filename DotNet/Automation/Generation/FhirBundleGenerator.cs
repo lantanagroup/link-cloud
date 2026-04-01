@@ -18,17 +18,17 @@ namespace LantanaGroup.Link.Automation.Generation;
 /// </summary>
 public static class FhirBundleGenerator
 {
-    public const int DefaultPatientCount          = 1;
-    public const int DefaultResourcesPerPatient   = 10_200;
-    private const int MaxEntriesPerBundle         = 500;
+    public const int DefaultPatientCount = 1;
+    public const int DefaultResourcesPerPatient = 10_200;
+    private const int MaxEntriesPerBundle = 500;
 
     // Shared infrastructure IDs
-    public const string HospitalLocationId  = "Gen-Location-Hospital";
-    public const string IcuLocationId       = "Gen-Location-ICU";
-    public const string EdLocationId        = "Gen-Location-ED";
-    public const string StepDownLocationId  = "Gen-Location-StepDown";
+    public const string HospitalLocationId = "Gen-Location-Hospital";
+    public const string IcuLocationId = "Gen-Location-ICU";
+    public const string EdLocationId = "Gen-Location-ED";
+    public const string StepDownLocationId = "Gen-Location-StepDown";
     public const string OutpatientLocationId = "Gen-Location-Outpatient";
-    public const string HospitalOrgId       = "Gen-Org-Hospital";
+    public const string HospitalOrgId = "Gen-Org-Hospital";
 
     private static readonly (string ResourceType, double Fraction)[] ResourceDistribution =
     [
@@ -94,19 +94,19 @@ public static class FhirBundleGenerator
         // ------------------------------------------------------------------
         for (var p = 0; p < patientCount; p++)
         {
-            var patientSeed      = baseSeed + p;
-            var patientId        = $"{patientIdPrefix}-{p + 1:D3}";
-            var scenario         = FhirGenerationCodes.ClinicalScenarios[Mod(patientSeed, FhirGenerationCodes.ClinicalScenarios.Length)];
+            var patientSeed = baseSeed + p;
+            var patientId = $"{patientIdPrefix}-{p + 1:D3}";
+            var scenario = FhirGenerationCodes.ClinicalScenarios[Mod(patientSeed, FhirGenerationCodes.ClinicalScenarios.Length)];
             var attendingPractId = sharedPractitionerIds[Mod(patientSeed, sharedPractitionerIds.Count)];
             var admittingPractId = sharedPractitionerIds[Mod(patientSeed + 1, sharedPractitionerIds.Count)];
-            var gpPractId        = sharedPractitionerIds[Mod(patientSeed + 2, sharedPractitionerIds.Count)];
-            var encStart         = EncounterStart(patientSeed);
-            var encEnd           = EncounterEnd(patientSeed);
-            var encounterId      = $"{patientId}-Enc-001";
-            var careTeamId       = $"{patientId}-CareTeam-001";
-            var carePlanId       = $"{patientId}-CarePlan-001";
-            var patientDeviceId  = $"{patientId}-Device-001";
-            var primaryDxId      = $"{patientId}-Condition-primary";
+            var gpPractId = sharedPractitionerIds[Mod(patientSeed + 2, sharedPractitionerIds.Count)];
+            var encStart = EncounterStart(patientSeed);
+            var encEnd = EncounterEnd(patientSeed);
+            var encounterId = $"{patientId}-Enc-001";
+            var careTeamId = $"{patientId}-CareTeam-001";
+            var carePlanId = $"{patientId}-CarePlan-001";
+            var patientDeviceId = $"{patientId}-Device-001";
+            var primaryDxId = $"{patientId}-Condition-primary";
             patientIds.Add(patientId);
 
             var entries = new List<Bundle.EntryComponent>();
@@ -137,11 +137,11 @@ public static class FhirBundleGenerator
             entries.Add(Entry($"CarePlan/{carePlanId}",
                 CarePlanFactory.Generate(carePlanId, patientId, encounterId, careTeamId, encStart, patientSeed)));
 
-            var medicationIds  = new List<string>();
-            var specimenIds    = new List<string>();
+            var medicationIds = new List<string>();
+            var specimenIds = new List<string>();
             var observationIds = new List<string>();
-            var conditionIds   = new List<string> { primaryDxId };
-            var resourceIndex  = 0;
+            var conditionIds = new List<string> { primaryDxId };
+            var resourceIndex = 0;
 
             foreach (var (resourceType, fraction) in ResourceDistribution)
             {
@@ -152,31 +152,31 @@ public static class FhirBundleGenerator
                     resourceIndex++;
                     // Combine patient seed (p) with loop counter (i) so every patient
                     // gets a distinct clinical variation even for the same resource index.
-                    var seed          = baseSeed + (p * 31 + i);
-                    var resourceId    = $"{patientId}-{resourceType}-{resourceIndex:D5}";
-                    var offset        = TimeSpan.FromMinutes((double)i / Math.Max(count, 1) * (encEnd - encStart).TotalMinutes);
+                    var seed = baseSeed + (p * 31 + i);
+                    var resourceId = $"{patientId}-{resourceType}-{resourceIndex:D5}";
+                    var offset = TimeSpan.FromMinutes((double)i / Math.Max(count, 1) * (encEnd - encStart).TotalMinutes);
                     var effectiveDate = encStart.Add(offset);
-                    var practId       = sharedPractitionerIds[Mod(seed, sharedPractitionerIds.Count)];
+                    var practId = sharedPractitionerIds[Mod(seed, sharedPractitionerIds.Count)];
 
                     Resource resource = resourceType switch
                     {
-                        "Observation"              => ObservationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, specimenIds, observationIds),
-                        "Condition"                => ConditionFactory.Generate(resourceId, patientId, encounterId, effectiveDate, encEnd, seed, conditionIds),
-                        "Procedure"                => ProcedureFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, HospitalLocationId, HospitalOrgId, conditionIds),
-                        "MedicationRequest"        => MedicationRequestFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, conditionIds),
+                        "Observation" => ObservationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, specimenIds, observationIds),
+                        "Condition" => ConditionFactory.Generate(resourceId, patientId, encounterId, effectiveDate, encEnd, seed, conditionIds),
+                        "Procedure" => ProcedureFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, HospitalLocationId, HospitalOrgId, conditionIds),
+                        "MedicationRequest" => MedicationRequestFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, conditionIds),
                         "MedicationAdministration" => MedicationAdministrationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, medicationIds, practId),
-                        "DiagnosticReport"         => DiagnosticReportFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, observationIds, specimenIds, practId),
-                        "ServiceRequest"           => ServiceRequestFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, conditionIds),
-                        "Coverage"                 => CoverageFactory.Generate(resourceId, patientId, encStart, encEnd, seed),
-                        "Specimen"                 => SpecimenFactory.Generate(resourceId, patientId, effectiveDate, seed, specimenIds, practId),
-                        "Medication"               => MedicationFactory.Generate(resourceId, seed, medicationIds),
-                        "AllergyIntolerance"       => AllergyIntoleranceFactory.Generate(resourceId, patientId, encStart, seed, practId),
-                        "Immunization"             => ImmunizationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalLocationId),
-                        "ImagingStudy"             => ImagingStudyFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalLocationId, practId),
-                        "CareTeam"                 => CareTeamFactory.Generate(resourceId, patientId, encounterId, attendingPractId, effectiveDate, HospitalOrgId),
-                        "CarePlan"                 => CarePlanFactory.Generate(resourceId, patientId, encounterId, careTeamId, effectiveDate, seed),
-                        "DocumentReference"        => DocumentReferenceFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalOrgId, attendingPractId),
-                        "Provenance"               => ProvenanceFactory.Generate(resourceId, patientId, encounterId, effectiveDate, practId, HospitalOrgId),
+                        "DiagnosticReport" => DiagnosticReportFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, observationIds, specimenIds, practId),
+                        "ServiceRequest" => ServiceRequestFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, conditionIds),
+                        "Coverage" => CoverageFactory.Generate(resourceId, patientId, encStart, encEnd, seed),
+                        "Specimen" => SpecimenFactory.Generate(resourceId, patientId, effectiveDate, seed, specimenIds, practId),
+                        "Medication" => MedicationFactory.Generate(resourceId, seed, medicationIds),
+                        "AllergyIntolerance" => AllergyIntoleranceFactory.Generate(resourceId, patientId, encStart, seed, practId),
+                        "Immunization" => ImmunizationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalLocationId),
+                        "ImagingStudy" => ImagingStudyFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalLocationId, practId),
+                        "CareTeam" => CareTeamFactory.Generate(resourceId, patientId, encounterId, attendingPractId, effectiveDate, HospitalOrgId),
+                        "CarePlan" => CarePlanFactory.Generate(resourceId, patientId, encounterId, careTeamId, effectiveDate, seed),
+                        "DocumentReference" => DocumentReferenceFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalOrgId, attendingPractId),
+                        "Provenance" => ProvenanceFactory.Generate(resourceId, patientId, encounterId, effectiveDate, practId, HospitalOrgId),
                         _ => throw new InvalidOperationException($"Unknown resource type: {resourceType}")
                     };
 
@@ -198,10 +198,10 @@ public static class FhirBundleGenerator
         // ------------------------------------------------------------------
         // Chunk into transaction bundles
         // ------------------------------------------------------------------
-        var bundles          = new List<(string Name, string Json)>();
-        var currentChunk     = new List<Bundle.EntryComponent>(sharedEntries);
+        var bundles = new List<(string Name, string Json)>();
+        var currentChunk = new List<Bundle.EntryComponent>(sharedEntries);
         var currentPatientId = "shared";
-        var chunkIndex       = 0;
+        var chunkIndex = 0;
 
         foreach (var (patientId, entries) in allEntries)
         {
@@ -329,18 +329,18 @@ public static class FhirBundleGenerator
         // ------------------------------------------------------------------
         for (var p = 0; p < profiles.Count; p++)
         {
-            var profile          = profiles[p];
-            var patientSeed      = baseSeed + (profile.SeedOffset ?? p);
-            var patientId        = $"{patientIdPrefix}-{p + 1:D3}";
-            var scenario         = FhirGenerationCodes.ClinicalScenarios[Mod(patientSeed, FhirGenerationCodes.ClinicalScenarios.Length)];
+            var profile = profiles[p];
+            var patientSeed = baseSeed + (profile.SeedOffset ?? p);
+            var patientId = $"{patientIdPrefix}-{p + 1:D3}";
+            var scenario = FhirGenerationCodes.ClinicalScenarios[Mod(patientSeed, FhirGenerationCodes.ClinicalScenarios.Length)];
             var attendingPractId = sharedPractitionerIds[Mod(patientSeed, sharedPractitionerIds.Count)];
             var admittingPractId = sharedPractitionerIds[Mod(patientSeed + 1, sharedPractitionerIds.Count)];
-            var gpPractId        = sharedPractitionerIds[Mod(patientSeed + 2, sharedPractitionerIds.Count)];
-            var encounterId      = $"{patientId}-Enc-001";
-            var careTeamId       = $"{patientId}-CareTeam-001";
-            var carePlanId       = $"{patientId}-CarePlan-001";
-            var patientDeviceId  = $"{patientId}-Device-001";
-            var primaryDxId      = $"{patientId}-Condition-primary";
+            var gpPractId = sharedPractitionerIds[Mod(patientSeed + 2, sharedPractitionerIds.Count)];
+            var encounterId = $"{patientId}-Enc-001";
+            var careTeamId = $"{patientId}-CareTeam-001";
+            var carePlanId = $"{patientId}-CarePlan-001";
+            var patientDeviceId = $"{patientId}-Device-001";
+            var primaryDxId = $"{patientId}-Condition-primary";
             patientIds.Add(patientId);
 
             // Encounter dates: qualifying patients use measurement-period dates,
@@ -349,7 +349,7 @@ public static class FhirBundleGenerator
             if (profile.Eligibility == MeasureEligibility.Qualifying)
             {
                 encStart = EncounterStart(patientSeed);
-                encEnd   = EncounterEnd(patientSeed);
+                encEnd = EncounterEnd(patientSeed);
             }
             else
             {
@@ -357,7 +357,7 @@ public static class FhirBundleGenerator
                 // structurally cannot overlap. Vary by seed for realism.
                 encStart = new DateTime(2020, 1 + (Mod(patientSeed, 6)), 1 + (Mod(patientSeed * 3, 28)),
                                         8 + Mod(patientSeed, 4), 0, 0, DateTimeKind.Utc);
-                encEnd   = encStart.AddHours(2 + Mod(patientSeed, 4));
+                encEnd = encStart.AddHours(2 + Mod(patientSeed, 4));
             }
 
             var entries = new List<Bundle.EntryComponent>();
@@ -401,11 +401,11 @@ public static class FhirBundleGenerator
                 CarePlanFactory.Generate(carePlanId, patientId, encounterId, careTeamId, encStart, patientSeed)));
 
             // Bulk resources — identical seed-driven loop as Generate()
-            var medicationIds  = new List<string>();
-            var specimenIds    = new List<string>();
+            var medicationIds = new List<string>();
+            var specimenIds = new List<string>();
             var observationIds = new List<string>();
-            var conditionIds   = new List<string> { primaryDxId };
-            var resourceIndex  = 0;
+            var conditionIds = new List<string> { primaryDxId };
+            var resourceIndex = 0;
 
             foreach (var (resourceType, fraction) in ResourceDistribution)
             {
@@ -414,31 +414,31 @@ public static class FhirBundleGenerator
                 for (var i = 0; i < count; i++)
                 {
                     resourceIndex++;
-                    var seed          = baseSeed + (p * 31 + i);
-                    var resourceId    = $"{patientId}-{resourceType}-{resourceIndex:D5}";
-                    var offset        = TimeSpan.FromMinutes((double)i / Math.Max(count, 1) * (encEnd - encStart).TotalMinutes);
+                    var seed = baseSeed + (p * 31 + i);
+                    var resourceId = $"{patientId}-{resourceType}-{resourceIndex:D5}";
+                    var offset = TimeSpan.FromMinutes((double)i / Math.Max(count, 1) * (encEnd - encStart).TotalMinutes);
                     var effectiveDate = encStart.Add(offset);
-                    var practId       = sharedPractitionerIds[Mod(seed, sharedPractitionerIds.Count)];
+                    var practId = sharedPractitionerIds[Mod(seed, sharedPractitionerIds.Count)];
 
                     Resource resource = resourceType switch
                     {
-                        "Observation"              => ObservationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, specimenIds, observationIds),
-                        "Condition"                => ConditionFactory.Generate(resourceId, patientId, encounterId, effectiveDate, encEnd, seed, conditionIds),
-                        "Procedure"                => ProcedureFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, HospitalLocationId, HospitalOrgId, conditionIds),
-                        "MedicationRequest"        => MedicationRequestFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, conditionIds),
+                        "Observation" => ObservationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, specimenIds, observationIds),
+                        "Condition" => ConditionFactory.Generate(resourceId, patientId, encounterId, effectiveDate, encEnd, seed, conditionIds),
+                        "Procedure" => ProcedureFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, HospitalLocationId, HospitalOrgId, conditionIds),
+                        "MedicationRequest" => MedicationRequestFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, conditionIds),
                         "MedicationAdministration" => MedicationAdministrationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, medicationIds, practId),
-                        "DiagnosticReport"         => DiagnosticReportFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, observationIds, specimenIds, practId),
-                        "ServiceRequest"           => ServiceRequestFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, conditionIds),
-                        "Coverage"                 => CoverageFactory.Generate(resourceId, patientId, encStart, encEnd, seed),
-                        "Specimen"                 => SpecimenFactory.Generate(resourceId, patientId, effectiveDate, seed, specimenIds, practId),
-                        "Medication"               => MedicationFactory.Generate(resourceId, seed, medicationIds),
-                        "AllergyIntolerance"       => AllergyIntoleranceFactory.Generate(resourceId, patientId, encStart, seed, practId),
-                        "Immunization"             => ImmunizationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalLocationId),
-                        "ImagingStudy"             => ImagingStudyFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalLocationId, practId),
-                        "CareTeam"                 => CareTeamFactory.Generate(resourceId, patientId, encounterId, attendingPractId, effectiveDate, HospitalOrgId),
-                        "CarePlan"                 => CarePlanFactory.Generate(resourceId, patientId, encounterId, careTeamId, effectiveDate, seed),
-                        "DocumentReference"        => DocumentReferenceFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalOrgId, attendingPractId),
-                        "Provenance"               => ProvenanceFactory.Generate(resourceId, patientId, encounterId, effectiveDate, practId, HospitalOrgId),
+                        "DiagnosticReport" => DiagnosticReportFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, observationIds, specimenIds, practId),
+                        "ServiceRequest" => ServiceRequestFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, conditionIds),
+                        "Coverage" => CoverageFactory.Generate(resourceId, patientId, encStart, encEnd, seed),
+                        "Specimen" => SpecimenFactory.Generate(resourceId, patientId, effectiveDate, seed, specimenIds, practId),
+                        "Medication" => MedicationFactory.Generate(resourceId, seed, medicationIds),
+                        "AllergyIntolerance" => AllergyIntoleranceFactory.Generate(resourceId, patientId, encStart, seed, practId),
+                        "Immunization" => ImmunizationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalLocationId),
+                        "ImagingStudy" => ImagingStudyFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalLocationId, practId),
+                        "CareTeam" => CareTeamFactory.Generate(resourceId, patientId, encounterId, attendingPractId, effectiveDate, HospitalOrgId),
+                        "CarePlan" => CarePlanFactory.Generate(resourceId, patientId, encounterId, careTeamId, effectiveDate, seed),
+                        "DocumentReference" => DocumentReferenceFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalOrgId, attendingPractId),
+                        "Provenance" => ProvenanceFactory.Generate(resourceId, patientId, encounterId, effectiveDate, practId, HospitalOrgId),
                         _ => throw new InvalidOperationException($"Unknown resource type: {resourceType}")
                     };
 
@@ -460,10 +460,10 @@ public static class FhirBundleGenerator
         // ------------------------------------------------------------------
         // Chunk into transaction bundles — same as Generate()
         // ------------------------------------------------------------------
-        var bundles          = new List<(string Name, string Json)>();
-        var currentChunk     = new List<Bundle.EntryComponent>(sharedEntries);
+        var bundles = new List<(string Name, string Json)>();
+        var currentChunk = new List<Bundle.EntryComponent>(sharedEntries);
         var currentPatientId = "shared";
-        var chunkIndex       = 0;
+        var chunkIndex = 0;
 
         foreach (var (patientId, entries) in allEntries)
         {
@@ -496,9 +496,9 @@ public static class FhirBundleGenerator
 
     private static Bundle.EntryComponent Entry(string resourceUrl, Resource resource) => new()
     {
-        FullUrl  = $"http://localhost:8080/fhir/{resourceUrl}",
+        FullUrl = $"http://localhost:8080/fhir/{resourceUrl}",
         Resource = resource,
-        Request  = new Bundle.RequestComponent { Method = Bundle.HTTPVerb.PUT, Url = resourceUrl }
+        Request = new Bundle.RequestComponent { Method = Bundle.HTTPVerb.PUT, Url = resourceUrl }
     };
 
     private static string Serialize(List<Bundle.EntryComponent> entries)
@@ -509,12 +509,12 @@ public static class FhirBundleGenerator
 
     private static DateTime EncounterStart(int index)
     {
-        const int baseYear  = 2023;
+        const int baseYear = 2023;
         const int baseMonth = 1;
         var monthOffset = index % 12;
-        var dayOffset   = (index * 3) % 28;
+        var dayOffset = (index * 3) % 28;
         var month = ((baseMonth - 1 + monthOffset) % 12) + 1;
-        var year  = baseYear + (baseMonth - 1 + monthOffset) / 12;
+        var year = baseYear + (baseMonth - 1 + monthOffset) / 12;
         return new DateTime(year, month, 1 + dayOffset, 6 + (index % 6), 0, 0, DateTimeKind.Utc);
     }
 

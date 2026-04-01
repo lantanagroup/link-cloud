@@ -44,17 +44,17 @@ public static class MedicationRequestFactory
     {
         var request = new MedicationRequest
         {
-            Id         = id,
-            Status     = seed % 5 == 0 ? MedicationRequest.MedicationrequestStatus.Completed
+            Id = id,
+            Status = seed % 5 == 0 ? MedicationRequest.MedicationrequestStatus.Completed
                                         : MedicationRequest.MedicationrequestStatus.Active,
-            Intent     = MedicationRequest.MedicationRequestIntent.Order,
+            Intent = MedicationRequest.MedicationRequestIntent.Order,
             Medication = RxNorm(rxCode, display),
-            Subject    = Ref($"Patient/{patientId}"),
-            Encounter  = Ref($"Encounter/{encounterId}"),
+            Subject = Ref($"Patient/{patientId}"),
+            Encounter = Ref($"Encounter/{encounterId}"),
             AuthoredOn = authored.ToString("yyyy-MM-ddTHH:mm:ssZ"),
-            Requester  = Ref($"Practitioner/{practId}", "Ordering Physician"),
+            Requester = Ref($"Practitioner/{practId}", "Ordering Physician"),
             ReasonCode = [Snomed(indicationCode, indicationDisplay)],
-            Note       = [new Annotation { Text = new Markdown($"Ordered for {indicationDisplay}. Monitor response.") }],
+            Note = [new Annotation { Text = new Markdown($"Ordered for {indicationDisplay}. Monitor response.") }],
             DosageInstruction =
             [
                 new Dosage
