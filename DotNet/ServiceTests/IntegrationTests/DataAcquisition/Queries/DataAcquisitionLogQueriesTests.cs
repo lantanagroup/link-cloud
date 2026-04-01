@@ -1277,4 +1277,55 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         Assert.Equal(RequestStatus.Queued, recentLog.Status);
         Assert.Single(recentLog.Notes);
     }
+
+    [Fact]
+    public async Task ResetStalledProcessingLogsAsync_ResetsStalledLogs()
+    {
+        // Arrange
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        // Reset database for this test
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var stallMinutes = 240;
+        var stalledDate = DateTime.UtcNow.AddMinutes(-(stallMinutes + 1));
+        var recentDate = DateTime.UtcNow;
+
+        var stalledLog = new DataAcquisitionLog
+        {
+            FacilityId = "TestFacility",
+            Status = RequestStatus.Processing,
+            ModifyDate = stalledDate,
+            Notes = new List<string> { "Processing started" }
+        };
+
+        var recentLog = new DataAcquisitionLog
+        {
+            FacilityId = "TestFacility",
+            Status = RequestStatus.Processing,
+            ModifyDate = recentDate,
+            Notes = new List<string> { "Processing started" }
+        };
+
+        dbContext.DataAcquisitionLogs.AddRange(stalledLog, recentLog);
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        // Act
+        int rowsAffected = await queries.ResetStalledProcessingLogsAsync(stallMinutes);
+
+        // Assert
+        Assert.Equal(1, rowsAffected);
+
+        // Refresh stalled log from DB
+        await dbContext.Entry(stalledLog).ReloadAsync();
+        Assert.Equal(RequestStatus.Pending, stalledLog.Status);
+
+        // Refresh recent log from DB
+        await dbContext.Entry(recentLog).ReloadAsync();
+        Assert.Equal(RequestStatus.Processing, recentLog.Status);
+    }
 }
