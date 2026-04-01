@@ -13,111 +13,17 @@ on:
       - test/**
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
 
-  auto-format:
-    name: Auto-format Changed Files
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    # Only run on actual PR branches, not forks (forks can't push back)
-    if: github.event.pull_request.head.repo.full_name == github.repository
-
-    steps:
-      - name: Checkout PR branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-          fetch-depth: 0
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-
-      - name: Get changed C# files
-        id: changed
-        shell: bash
-        run: |
-          files=$(git diff --name-only --diff-filter=ACM origin/${{ github.base_ref }}...HEAD -- '*.cs' | tr '\n' ' ')
-          echo "files=$files" >> "$GITHUB_OUTPUT"
-          if [ -z "$files" ]; then
-            echo "No C# files changed."
-          else
-            echo "Changed files: $files"
-          fi
-
-      - name: Apply dotnet format
-        if: steps.changed.outputs.files != ''
-        run: dotnet format link-cloud.sln --include ${{ steps.changed.outputs.files }}
-
-      - name: Push formatting changes via GitHub API
-        if: steps.changed.outputs.files != ''
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { execSync } = require('child_process');
-            const fs = require('fs');
-
-            const diff = execSync('git diff --name-only').toString().trim();
-            if (!diff) {
-              console.log('No formatting changes needed.');
-              return;
-            }
-
-            const changedFiles = diff.split('\n');
-            console.log(`Files changed by dotnet format (${changedFiles.length}):`);
-            changedFiles.forEach(f => console.log(`  ${f}`));
-
-            const branch = process.env.GITHUB_HEAD_REF;
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-
-            const headSha = execSync('git rev-parse HEAD').toString().trim();
-            const { data: headCommit } = await github.rest.git.getCommit({
-              owner, repo, commit_sha: headSha
-            });
-
-            const treeEntries = [];
-            for (const filePath of changedFiles) {
-              const content = fs.readFileSync(filePath, 'utf8');
-              const { data: blob } = await github.rest.git.createBlob({
-                owner, repo, content, encoding: 'utf-8'
-              });
-              treeEntries.push({
-                path: filePath, mode: '100644', type: 'blob', sha: blob.sha
-              });
-            }
-
-            const { data: newTree } = await github.rest.git.createTree({
-              owner, repo, base_tree: headCommit.tree.sha, tree: treeEntries
-            });
-
-            const { data: newCommit } = await github.rest.git.createCommit({
-              owner, repo,
-              message: 'style: auto-format changed files',
-              tree: newTree.sha,
-              parents: [headSha]
-            });
-
-            console.log(`Created verified commit: ${newCommit.sha}`);
-
-            await github.rest.git.updateRef({
-              owner, repo,
-              ref: `heads/${branch}`,
-              sha: newCommit.sha
-            });
-
-            console.log(`Branch ${branch} updated to ${newCommit.sha}`);
-
   changes:
-    needs: auto-format
     runs-on: ubuntu-latest
     outputs: 
       run_job: ${{ steps.should.outputs.run_job }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref }}
           fetch-depth: 0
 
       - name: Compute whether to run smoke tests
@@ -148,8 +54,6 @@ jobs:
     steps:          
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -213,8 +117,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -270,8 +172,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -327,8 +227,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -379,8 +277,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -437,8 +333,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -493,8 +387,6 @@ jobs:
     steps:
       - name: Checkout source repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
 
       - name: Set up JDK
         uses: actions/setup-java@v3
@@ -541,7 +433,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref }}
           fetch-depth: 0
 
       - name: Download DotNet Coverage
