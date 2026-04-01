@@ -1,4 +1,4 @@
-name: "Auto-format"
+﻿name: "Auto-format"
 
 on:
   pull_request:
@@ -55,14 +55,16 @@ jobs:
             const { execSync } = require('child_process');
             const fs = require('fs');
 
-            const status = execSync('git status --porcelain').toString().trim();
-            if (!status) {
+            // Use git diff to get clean file paths (no status prefix parsing needed)
+            const diff = execSync('git diff --name-only').toString().trim();
+            if (!diff) {
               console.log('No formatting changes needed.');
               return;
             }
 
-            console.log('Files changed by dotnet format:');
-            console.log(status);
+            const changedFiles = diff.split('\n');
+            console.log(`Files changed by dotnet format (${changedFiles.length}):`);
+            changedFiles.forEach(f => console.log(`  ${f}`));
 
             const branch = process.env.GITHUB_HEAD_REF;
             const owner = context.repo.owner;
@@ -75,7 +77,6 @@ jobs:
             });
 
             // Create blobs for each changed file
-            const changedFiles = status.split('\n').map(line => line.substring(3));
             const treeEntries = [];
 
             for (const filePath of changedFiles) {
