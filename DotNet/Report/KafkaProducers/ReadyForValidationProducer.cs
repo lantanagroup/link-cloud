@@ -46,8 +46,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 {
                     Key = new ReadyForValidationKey()
                     {
-                        FacilityId = facilityId
-
+                        FacilityId = facilityId,
+                        CorrelationId = correlationId
                     },
                     Value = new ReadyForValidationValue
                     {
