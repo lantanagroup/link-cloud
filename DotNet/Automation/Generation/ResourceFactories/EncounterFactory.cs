@@ -27,12 +27,12 @@ public static class EncounterFactory
             attendingPractId, admittingPractId,
             edLocationId, icuLocationId, stepDownLocationId, orgId,
             primaryDiagnosisConditionId,
-            scenario.AdmitTypeCode,    scenario.AdmitTypeDisplay,
-            scenario.PrimaryDxSnomed,  scenario.PrimaryDxDisplay, scenario.PrimaryDxIcd,
-            scenario.AdmitSourceCode,  scenario.AdmitSourceDisplay,
+            scenario.AdmitTypeCode, scenario.AdmitTypeDisplay,
+            scenario.PrimaryDxSnomed, scenario.PrimaryDxDisplay, scenario.PrimaryDxIcd,
+            scenario.AdmitSourceCode, scenario.AdmitSourceDisplay,
             scenario.DischargeDispositionCode, scenario.DischargeDispositionDisplay,
-            scenario.ServiceTypeCode,  scenario.ServiceTypeDisplay,
-            scenario.PriorityCode,     scenario.PriorityDisplay);
+            scenario.ServiceTypeCode, scenario.ServiceTypeDisplay,
+            scenario.PriorityCode, scenario.PriorityDisplay);
     }
 
     /// <summary>Create an Encounter with fully caller-supplied values.</summary>
@@ -61,10 +61,10 @@ public static class EncounterFactory
         string serviceTypeDisplay,
         string priorityCode,
         string priorityDisplay) => new()
-    {
-        Id     = id,
-        Status = Encounter.EncounterStatus.Finished,
-        Identifier =
+        {
+            Id = id,
+            Status = Encounter.EncounterStatus.Finished,
+            Identifier =
         [
             new Identifier
             {
@@ -73,8 +73,8 @@ public static class EncounterFactory
                 Value = id
             }
         ],
-        Class  = new Coding("http://terminology.hl7.org/CodeSystem/v3-ActCode", "IMP", "inpatient encounter"),
-        Type   =
+            Class = new Coding("http://terminology.hl7.org/CodeSystem/v3-ActCode", "IMP", "inpatient encounter"),
+            Type =
         [
             new CodeableConcept
             {
@@ -82,14 +82,14 @@ public static class EncounterFactory
                 Text   = encTypeDisplay
             }
         ],
-        ServiceType = new CodeableConcept
-        {
-            Coding = [new Coding("http://terminology.hl7.org/CodeSystem/service-type", serviceTypeCode, serviceTypeDisplay)],
-            Text   = serviceTypeDisplay
-        },
-        Priority = CC("http://terminology.hl7.org/CodeSystem/v3-ActPriority", priorityCode, priorityDisplay),
-        Subject  = Ref($"Patient/{patientId}", $"Patient {patientId}"),
-        Participant =
+            ServiceType = new CodeableConcept
+            {
+                Coding = [new Coding("http://terminology.hl7.org/CodeSystem/service-type", serviceTypeCode, serviceTypeDisplay)],
+                Text = serviceTypeDisplay
+            },
+            Priority = CC("http://terminology.hl7.org/CodeSystem/v3-ActPriority", priorityCode, priorityDisplay),
+            Subject = Ref($"Patient/{patientId}", $"Patient {patientId}"),
+            Participant =
         [
             new Encounter.ParticipantComponent
             {
@@ -118,10 +118,10 @@ public static class EncounterFactory
                 Individual = Ref($"Practitioner/{admittingPractId}", "Admitting Physician")
             }
         ],
-        Period = new Period { StartElement = new FhirDateTime(start), EndElement = new FhirDateTime(end) },
-        Length = new Duration { Value = (decimal)(end - start).TotalDays, Unit = "days", System = "http://unitsofmeasure.org", Code = "d" },
-        // Reason code carries the ICD-10 for claim-level coding
-        ReasonCode =
+            Period = new Period { StartElement = new FhirDateTime(start), EndElement = new FhirDateTime(end) },
+            Length = new Duration { Value = (decimal)(end - start).TotalDays, Unit = "days", System = "http://unitsofmeasure.org", Code = "d" },
+            // Reason code carries the ICD-10 for claim-level coding
+            ReasonCode =
         [
             new CodeableConcept
             {
@@ -133,8 +133,8 @@ public static class EncounterFactory
                 Text = reasonDisplay
             }
         ],
-        // diagnosis.use = AD (Admission Diagnosis) with rank 1, linking to the Condition resource
-        Diagnosis =
+            // diagnosis.use = AD (Admission Diagnosis) with rank 1, linking to the Condition resource
+            Diagnosis =
         [
             new Encounter.DiagnosisComponent
             {
@@ -143,12 +143,12 @@ public static class EncounterFactory
                 Rank      = 1
             }
         ],
-        Hospitalization = new Encounter.HospitalizationComponent
-        {
-            AdmitSource          = CC("http://terminology.hl7.org/CodeSystem/admit-source",          admitSourceCode,          admitSourceDisplay),
-            DischargeDisposition = CC("http://terminology.hl7.org/CodeSystem/discharge-disposition", dischargeDispositionCode, dischargeDispositionDisplay)
-        },
-        Location =
+            Hospitalization = new Encounter.HospitalizationComponent
+            {
+                AdmitSource = CC("http://terminology.hl7.org/CodeSystem/admit-source", admitSourceCode, admitSourceDisplay),
+                DischargeDisposition = CC("http://terminology.hl7.org/CodeSystem/discharge-disposition", dischargeDispositionCode, dischargeDispositionDisplay)
+            },
+            Location =
         [
             new Encounter.LocationComponent
             {
@@ -169,8 +169,8 @@ public static class EncounterFactory
                 Period   = new Period { StartElement = new FhirDateTime(end.AddDays(-1)), EndElement = new FhirDateTime(end) }
             }
         ],
-        ServiceProvider = Ref($"Organization/{orgId}", "General Test Hospital")
-    };
+            ServiceProvider = Ref($"Organization/{orgId}", "General Test Hospital")
+        };
 
     /// <summary>
     /// Create an ambulatory (outpatient) Encounter that will NOT qualify for
@@ -189,10 +189,10 @@ public static class EncounterFactory
         string reasonSnomedCode,
         string reasonDisplay,
         string reasonIcdCode) => new()
-    {
-        Id     = id,
-        Status = Encounter.EncounterStatus.Finished,
-        Identifier =
+        {
+            Id = id,
+            Status = Encounter.EncounterStatus.Finished,
+            Identifier =
         [
             new Identifier
             {
@@ -201,8 +201,8 @@ public static class EncounterFactory
                 Value = id
             }
         ],
-        Class  = new Coding("http://terminology.hl7.org/CodeSystem/v3-ActCode", "AMB", "ambulatory"),
-        Type   =
+            Class = new Coding("http://terminology.hl7.org/CodeSystem/v3-ActCode", "AMB", "ambulatory"),
+            Type =
         [
             new CodeableConcept
             {
@@ -210,14 +210,14 @@ public static class EncounterFactory
                 Text   = "Outpatient consultation"
             }
         ],
-        ServiceType = new CodeableConcept
-        {
-            Coding = [new Coding("http://terminology.hl7.org/CodeSystem/service-type", "305", "General Medicine")],
-            Text   = "General Medicine"
-        },
-        Priority = CC("http://terminology.hl7.org/CodeSystem/v3-ActPriority", "R", "routine"),
-        Subject  = Ref($"Patient/{patientId}", $"Patient {patientId}"),
-        Participant =
+            ServiceType = new CodeableConcept
+            {
+                Coding = [new Coding("http://terminology.hl7.org/CodeSystem/service-type", "305", "General Medicine")],
+                Text = "General Medicine"
+            },
+            Priority = CC("http://terminology.hl7.org/CodeSystem/v3-ActPriority", "R", "routine"),
+            Subject = Ref($"Patient/{patientId}", $"Patient {patientId}"),
+            Participant =
         [
             new Encounter.ParticipantComponent
             {
@@ -233,9 +233,9 @@ public static class EncounterFactory
                 Individual = Ref($"Practitioner/{attendingPractId}", "Attending Physician")
             }
         ],
-        Period = new Period { StartElement = new FhirDateTime(start), EndElement = new FhirDateTime(end) },
-        Length = new Duration { Value = (decimal)(end - start).TotalHours, Unit = "hours", System = "http://unitsofmeasure.org", Code = "h" },
-        ReasonCode =
+            Period = new Period { StartElement = new FhirDateTime(start), EndElement = new FhirDateTime(end) },
+            Length = new Duration { Value = (decimal)(end - start).TotalHours, Unit = "hours", System = "http://unitsofmeasure.org", Code = "h" },
+            ReasonCode =
         [
             new CodeableConcept
             {
@@ -247,7 +247,7 @@ public static class EncounterFactory
                 Text = reasonDisplay
             }
         ],
-        Diagnosis =
+            Diagnosis =
         [
             new Encounter.DiagnosisComponent
             {
@@ -256,7 +256,7 @@ public static class EncounterFactory
                 Rank      = 1
             }
         ],
-        Location =
+            Location =
         [
             new Encounter.LocationComponent
             {
@@ -265,6 +265,6 @@ public static class EncounterFactory
                 Period   = new Period { StartElement = new FhirDateTime(start), EndElement = new FhirDateTime(end) }
             }
         ],
-        ServiceProvider = Ref($"Organization/{orgId}", "General Test Hospital")
-    };
+            ServiceProvider = Ref($"Organization/{orgId}", "General Test Hospital")
+        };
 }

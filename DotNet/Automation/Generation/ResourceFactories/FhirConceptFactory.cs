@@ -16,16 +16,16 @@ public static class FhirConceptFactory
 
     public static Quantity Qty(double value, string unit) => new()
     {
-        Value  = (decimal)value,
-        Unit   = unit,
+        Value = (decimal)value,
+        Unit = unit,
         System = "http://unitsofmeasure.org",
-        Code   = unit
+        Code = unit
     };
 
     public static CodeableConcept CC(string system, string code, string? display = null) => new()
     {
         Coding = [new Coding(system, code, display)],
-        Text   = display
+        Text = display
     };
 
     public static CodeableConcept Loinc(string code, string display) =>

@@ -12,9 +12,9 @@ public static class LocationFactory
     /// <summary>Create a Location with caller-supplied values.</summary>
     public static Location Create(string id, string typeCode, string name, string managingOrgId) => new()
     {
-        Id     = id,
+        Id = id,
         Status = Location.LocationStatus.Active,
-        Name   = name,
+        Name = name,
         Identifier =
         [
             new Identifier { System = "http://example.org/fhir/sid/location", Value = id }

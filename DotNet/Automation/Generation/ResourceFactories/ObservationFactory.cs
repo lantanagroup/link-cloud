@@ -43,13 +43,13 @@ public static class ObservationFactory
         int seed,
         List<string>? specimenIds = null)
     {
-        var isLab     = category == "laboratory";
+        var isLab = category == "laboratory";
         var periodEnd = effective.AddHours(1 + seed % 4);
 
         var obs = new Observation
         {
-            Id       = id,
-            Status   = ObservationStatus.Final,
+            Id = id,
+            Status = ObservationStatus.Final,
             Category =
             [
                 new CodeableConcept
@@ -59,8 +59,8 @@ public static class ObservationFactory
                                          isLab ? "Laboratory" : "Vital Signs")]
                 }
             ],
-            Code      = Loinc(loincCode, display),
-            Subject   = Ref($"Patient/{patientId}"),
+            Code = Loinc(loincCode, display),
+            Subject = Ref($"Patient/{patientId}"),
             Encounter = Ref($"Encounter/{encounterId}"),
             Performer = [Ref($"Organization/{FhirBundleGenerator.HospitalOrgId}", "General Test Hospital")]
         };
@@ -70,7 +70,7 @@ public static class ObservationFactory
             obs.Effective = new Period
             {
                 StartElement = new FhirDateTime(effective),
-                EndElement   = new FhirDateTime(periodEnd)
+                EndElement = new FhirDateTime(periodEnd)
             };
             if (specimenIds?.Count > 0)
                 obs.Specimen = Ref($"Specimen/{specimenIds[seed % specimenIds.Count]}");
@@ -98,8 +98,8 @@ public static class ObservationFactory
         // ---------------------------------------------------------------
         if (loincCode == "55284-4")
         {
-            var systolic  = 100 + seed % 80;  // 100–179
-            var diastolic = 60  + seed % 40;  // 60–99
+            var systolic = 100 + seed % 80;  // 100–179
+            var diastolic = 60 + seed % 40;  // 60–99
             obs.Component =
             [
                 new Observation.ComponentComponent
@@ -126,7 +126,7 @@ public static class ObservationFactory
         if (normHigh > 0 && normHigh < 999)
         {
             // Oscillate around midpoint; ~80% of values will be in-range
-            var mid   = (normLow + normHigh) / 2.0;
+            var mid = (normLow + normHigh) / 2.0;
             var range = (normHigh - normLow) * 0.7;
             var phase = seed % 100 / 100.0 * 2 * Math.PI;
             value = Math.Round(mid + Math.Sin(phase) * range, 2);
@@ -170,9 +170,9 @@ public static class ObservationFactory
     {
         const string sys = "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation";
         if (critHigh < 999 && value > critHigh) return CC(sys, "HH", "Critical high");
-        if (critLow  > 0   && value < critLow)  return CC(sys, "LL", "Critical low");
-        if (normHigh < 999 && value > normHigh)  return CC(sys, "H",  "High");
-        if (normLow  > 0   && value < normLow)   return CC(sys, "L",  "Low");
+        if (critLow > 0 && value < critLow) return CC(sys, "LL", "Critical low");
+        if (normHigh < 999 && value > normHigh) return CC(sys, "H", "High");
+        if (normLow > 0 && value < normLow) return CC(sys, "L", "Low");
         return CC(sys, "N", "Normal");
     }
 }

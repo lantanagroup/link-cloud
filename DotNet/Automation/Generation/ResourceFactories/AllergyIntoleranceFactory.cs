@@ -30,27 +30,27 @@ public static class AllergyIntoleranceFactory
         string exposureRouteCode,
         string recorderPractitionerId)
     {
-        var categories    = new[] { AllergyIntolerance.AllergyIntoleranceCategory.Medication, AllergyIntolerance.AllergyIntoleranceCategory.Food, AllergyIntolerance.AllergyIntoleranceCategory.Environment, AllergyIntolerance.AllergyIntoleranceCategory.Biologic };
+        var categories = new[] { AllergyIntolerance.AllergyIntoleranceCategory.Medication, AllergyIntolerance.AllergyIntoleranceCategory.Food, AllergyIntolerance.AllergyIntoleranceCategory.Environment, AllergyIntolerance.AllergyIntoleranceCategory.Biologic };
         var criticalities = new[] { AllergyIntolerance.AllergyIntoleranceCriticality.Low, AllergyIntolerance.AllergyIntoleranceCriticality.High, AllergyIntolerance.AllergyIntoleranceCriticality.UnableToAssess };
-        var severity      = severityStr switch
+        var severity = severityStr switch
         {
-            "severe"   => AllergyIntolerance.AllergyIntoleranceSeverity.Severe,
+            "severe" => AllergyIntolerance.AllergyIntoleranceSeverity.Severe,
             "moderate" => AllergyIntolerance.AllergyIntoleranceSeverity.Moderate,
-            _          => AllergyIntolerance.AllergyIntoleranceSeverity.Mild
+            _ => AllergyIntolerance.AllergyIntoleranceSeverity.Mild
         };
 
         return new AllergyIntolerance
         {
-            Id                  = id,
-            ClinicalStatus      = CC("http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical",    "active",    "Active"),
-            VerificationStatus  = CC("http://terminology.hl7.org/CodeSystem/allergyintolerance-verification", "confirmed", "Confirmed"),
-            Type                = seed % 2 == 0 ? AllergyIntolerance.AllergyIntoleranceType.Allergy : AllergyIntolerance.AllergyIntoleranceType.Intolerance,
-            Category            = [categories[seed % categories.Length]],
-            Criticality         = criticalities[seed % criticalities.Length],
-            Code                = new CodeableConcept { Coding = [new Coding("http://snomed.info/sct", snomedCode, display)], Text = display },
-            Patient             = Ref($"Patient/{patientId}"),
+            Id = id,
+            ClinicalStatus = CC("http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical", "active", "Active"),
+            VerificationStatus = CC("http://terminology.hl7.org/CodeSystem/allergyintolerance-verification", "confirmed", "Confirmed"),
+            Type = seed % 2 == 0 ? AllergyIntolerance.AllergyIntoleranceType.Allergy : AllergyIntolerance.AllergyIntoleranceType.Intolerance,
+            Category = [categories[seed % categories.Length]],
+            Criticality = criticalities[seed % criticalities.Length],
+            Code = new CodeableConcept { Coding = [new Coding("http://snomed.info/sct", snomedCode, display)], Text = display },
+            Patient = Ref($"Patient/{patientId}"),
             RecordedDateElement = new FhirDateTime(recorded),
-            Recorder            = Ref($"Practitioner/{recorderPractitionerId}", "Documenting Practitioner"),
+            Recorder = Ref($"Practitioner/{recorderPractitionerId}", "Documenting Practitioner"),
             Reaction =
             [
                 new AllergyIntolerance.ReactionComponent
