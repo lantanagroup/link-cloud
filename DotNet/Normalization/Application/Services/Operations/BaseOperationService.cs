@@ -6,10 +6,10 @@ using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 {
-    public abstract class BaseOperationService<TOperation> : BackgroundService
+    public abstract class BaseOperationService<TOperation>
         where TOperation : class
     {
-        private readonly ConcurrentQueue<(TOperation Operation, DomainResource Resource, TaskCompletionSource<OperationResult> Result)> _operationQueue = new();
+        //private readonly ConcurrentQueue<(TOperation Operation, DomainResource Resource, TaskCompletionSource<OperationResult> Result)> _operationQueue = new();
         private readonly TimeSpan _operationTimeout;
         protected readonly ILogger Logger;
 
@@ -27,40 +27,44 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             if (resource == null)
                 return OperationResult.Failure("Resource cannot be null.");
 
-            var tcs = new TaskCompletionSource<OperationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-            _operationQueue.Enqueue((operation, resource, tcs));
+            //var tcs = new TaskCompletionSource<OperationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            //_operationQueue.Enqueue((operation, resource, tcs));
 
-            try
-            {
-                return await tcs.Task.WaitAsync(_operationTimeout, CancellationToken.None);
-            }
-            catch (TimeoutException tex)
-            {
-                Logger.LogError(tex, "{OperationType} operation timed out after {Timeout}.", typeof(TOperation).Name, _operationTimeout);
-                return OperationResult.Failure($"{typeof(TOperation).Name} operation timed out after {_operationTimeout}.");
-            }
+            var result = await ProcessOperation(operation, resource);
+
+
+            return result;
+            //try
+            //{
+            //    //return await tcs.Task.WaitAsync(_operationTimeout, CancellationToken.None);
+            //}
+            //catch (TimeoutException tex)
+            //{
+            //    Logger.LogError(tex, "{OperationType} operation timed out after {Timeout}.", typeof(TOperation).Name, _operationTimeout);
+            //    return OperationResult.Failure($"{typeof(TOperation).Name} operation timed out after {_operationTimeout}.");
+            //}
         }
 
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-        {
-            while (!stoppingToken.IsCancellationRequested)
-            {
-                var batch = new List<(TOperation Operation, DomainResource Resource, TaskCompletionSource<OperationResult> Result)>();
-                while (_operationQueue.TryDequeue(out var item) && batch.Count < 10)
-                    batch.Add(item);
+        //protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        //{
+        //    while (!stoppingToken.IsCancellationRequested)
+        //    {
+        //        //var batch = new List<(TOperation Operation, DomainResource Resource, TaskCompletionSource<OperationResult> Result)>();
+        //        //while (_operationQueue.TryDequeue(out var item) && batch.Count < 10)
+        //        //    batch.Add(item);
 
-                foreach (var item in batch)
-                {
-                    var result = await ProcessOperation(item.Operation, item.Resource);
-                    item.Result.SetResult(result);
-                    if (result.SuccessCode != OperationStatus.Success)
-                        Logger.LogError("Failed {OperationType} operation: {ErrorMessage}", typeof(TOperation).Name, result.ErrorMessage);
-                }
+        //        //foreach (var item in batch)
+        //        //{
+        //        //    var result = await ProcessOperation(item.Operation, item.Resource);
+        //        //    item.Result.SetResult(result);
+        //        //    if (result.SuccessCode != OperationStatus.Success)
+        //        //        Logger.LogError("Failed {OperationType} operation: {ErrorMessage}", typeof(TOperation).Name, result.ErrorMessage);
+        //        //}
 
-                if (batch.Count == 0)
-                    await Task.Delay(100, stoppingToken);
-            }
-        }
+        //        //if (batch.Count == 0)
+        //        //    await Task.Delay(100, stoppingToken);
+        //    }
+        //}
 
         protected virtual async Task<OperationResult> ProcessOperation(TOperation operation, DomainResource resource)
         {

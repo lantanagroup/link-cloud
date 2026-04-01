@@ -51,6 +51,7 @@ public class BundleResourceAcquiredEventService : IBundleEventService<ResourceKe
                         Value = new ResourceAcquired
                         {
                             Resource = resource,
+                            ResourceType = resource.TypeName,
                             ScheduledReports = request.scheduledReports,
                             PatientId = RemovePatientId(e.Resource) ? string.Empty : request.patientId,
                             QueryType = request.queryType,
