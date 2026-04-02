@@ -213,9 +213,9 @@ public class ResourceAcquiredListener : BackgroundService
                                     {
                                         _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", messageMetaData.facilityId, messageMetaData.correlationId, operation.OperationType, operationResult?.ErrorMessage ?? "No Operation Result Error Message");
                                     }
-
-                                    await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId, resource);
                                 }
+
+                                await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId, resource);
                             }
                             else
                             {
