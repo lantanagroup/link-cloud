@@ -46,10 +46,13 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             })).Single();
         }
 
+        private static (string? FacilityId, string? ResourceType, Guid? ResourceTypeId) BuildCacheKey(OperationSequenceSearchModel model) => (model.FacilityId, model.ResourceType, model.ResourceTypeId);
+
         public async Task<List<OperationSequenceModel>> Search(OperationSequenceSearchModel model)
         {
             //Daniel - 4/2026: Temporarily adding queried configs into memory cache to reduce the amount of queries made to the database.
-            var cacheResult = _cache.GetOrCreate(model.FacilityId + model.ResourceType, entry =>
+            var cacheKey = BuildCacheKey(model);
+            var cacheResult = _cache.GetOrCreate(cacheKey, entry =>
             {
                 entry.AbsoluteExpirationRelativeToNow = _cacheTtl;
 
@@ -136,10 +139,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 return query.ToList();
             });
 
-
             return cacheResult;
-
-           
         }
 
         public void ClearCache(OperationSequenceSearchModel model) {

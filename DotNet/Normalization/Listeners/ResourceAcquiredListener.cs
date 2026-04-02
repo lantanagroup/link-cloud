@@ -319,14 +319,7 @@ public class ResourceAcquiredListener : BackgroundService
         }
         catch (ProduceException<ResourceKey, ResourceNormalizedMessage> ex)
         {
-            DomainResource? deserializedResource = null;
-
-            if (resource != null)
-            {
-                deserializedResource = DeserializeResource(resource);
-            }
-
-            _logger.LogError(ex, "Failed to produce ResourceNormalized message. FacilityId: {FacilityId}, CorrelationId: {CorrelationId}, FhirResourceType: {fhirResourceType}, ResourceId: {resourceId}", facilityId, correlationId, deserializedResource?.TypeName, deserializedResource?.Id);
+            _logger.LogError(ex, "Failed to produce ResourceNormalized message. FacilityId: {FacilityId}, CorrelationId: {CorrelationId}, ResourceAcquired Partition: {Partition}, ResourceAcquired Offset: {Offset}", facilityId, correlationId, message.Partition.Value, message.Offset.Value);
             throw new TransientException($"Failed to produce ResourceNormalized message: {ex.Message}", ex);
         }
     }
