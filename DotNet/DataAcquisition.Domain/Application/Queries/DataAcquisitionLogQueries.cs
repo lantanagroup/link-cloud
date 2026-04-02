@@ -91,6 +91,8 @@ public interface IDataAcquisitionLogQueries
 
     Task<int> FailStalledQueuedLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default);
 
+    Task<int> ResetStalledProcessingLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default);
+    
     Task<DataAcquisitionLogModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog,
         CancellationToken cancellationToken = default);
 
@@ -428,18 +430,79 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     public async Task<int> FailStalledQueuedLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default)
     {
         var stallThreshold = DateTime.UtcNow.AddMinutes(-stallMinutes);
+        int totalUpdated = 0;
+        int batchesProcessed = 0;
+        const int BatchSize = 100;
 
-        // High-speed bulk update without fetching entities or using transactions.
-        // This avoids LINQ translation errors with JSON collections and minimizes lock duration.
-        return await _deadlockRetryPolicy.ExecuteAsync(async () =>
+        while (batchesProcessed < maxBatches)
         {
-            return await _dbContext.DataAcquisitionLogs
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var batchIds = await _dbContext.DataAcquisitionLogs
                 .Where(l => l.Status == RequestStatus.Queued && l.ModifyDate <= stallThreshold)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(l => l.Status, RequestStatus.Failed)
-                    .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
-                    cancellationToken);
-        });
+                .OrderBy(l => l.Id)
+                .Select(l => l.Id)
+                .Take(BatchSize)
+                .ToListAsync(cancellationToken);
+
+            if (batchIds.Count == 0)
+                break;
+
+            totalUpdated += await _deadlockRetryPolicy.ExecuteAsync(async () =>
+            {
+                return await _dbContext.DataAcquisitionLogs
+                    .Where(l => batchIds.Contains(l.Id))
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(l => l.Status, RequestStatus.Failed)
+                        .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                        cancellationToken);
+            });
+
+            batchesProcessed++;
+            if (batchIds.Count < BatchSize)
+                break;
+        }
+
+        return totalUpdated;
+    }
+    
+    public async Task<int> ResetStalledProcessingLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default)
+    {
+        var stallThreshold = DateTime.UtcNow.AddMinutes(-stallMinutes);
+        int totalUpdated = 0;
+        int batchesProcessed = 0;
+        const int BatchSize = 100;
+
+        while (batchesProcessed < maxBatches)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var batchIds = await _dbContext.DataAcquisitionLogs
+                .Where(l => l.Status == RequestStatus.Processing && l.ModifyDate <= stallThreshold)
+                .OrderBy(l => l.Id)
+                .Select(l => l.Id)
+                .Take(BatchSize)
+                .ToListAsync(cancellationToken);
+
+            if (batchIds.Count == 0)
+                break;
+
+            totalUpdated += await _deadlockRetryPolicy.ExecuteAsync(async () =>
+            {
+                return await _dbContext.DataAcquisitionLogs
+                    .Where(l => batchIds.Contains(l.Id))
+                    .ExecuteUpdateAsync(setters => setters
+                            .SetProperty(l => l.Status, RequestStatus.Pending)
+                            .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                        cancellationToken);
+            });
+
+            batchesProcessed++;
+            if (batchIds.Count < BatchSize)
+                break;
+        }
+
+        return totalUpdated;
     }
 
     public async Task<PagedConfigModel<DataAcquisitionLogModel>> SearchAsync(SearchDataAcquisitionLogRequest model,
