@@ -161,7 +161,7 @@ public class ResourceAcquiredListener : BackgroundService
 
                             if (sequences != null && sequences.Count > 0)
                             {
-                                Console.WriteLine("Sequence found (" + sequences.Count() + " for " + message.Message.Value.ResourceType);
+                                Console.WriteLine("Sequence found (" + sequences.Count() + ") for " + message.Message.Value.ResourceType);
 
                                 DomainResource resource;
                                 try
@@ -217,7 +217,6 @@ public class ResourceAcquiredListener : BackgroundService
                                         _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", messageMetaData.facilityId, messageMetaData.correlationId, operation.OperationType, operationResult?.ErrorMessage ?? "No Operation Result Error Message");
                                     }
                                 }
-
                             }
                             
                             await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId);    
@@ -317,7 +316,7 @@ public class ResourceAcquiredListener : BackgroundService
 
         try
         {
-            await _producer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
+            _producer.Produce(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
         }
         catch (ProduceException<ResourceKey, ResourceNormalizedMessage> ex)
         {

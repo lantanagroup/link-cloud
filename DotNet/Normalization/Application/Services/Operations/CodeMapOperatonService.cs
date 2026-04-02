@@ -15,10 +15,11 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
         protected override async Task<OperationResult> ExecuteOperation(CodeMapOperation operation, DomainResource resource)
         {
-            var result = await FhirPathValidator.IsFhirPathValidForResourceType(operation.FhirPath, resource.TypeName);
+            //Daniel - Don't think we need this per execution. Should be in config API
+            //var result = await FhirPathValidator.IsFhirPathValidForResourceType(operation.FhirPath, resource.TypeName);
 
-            if (!result.IsValid)
-                return OperationResult.Failure($"Invalid target FHIRPath expression: {operation.FhirPath}. {result.ErrorMessage}", resource);
+            //if (!result.IsValid)
+            //    return OperationResult.Failure($"Invalid target FHIRPath expression: {operation.FhirPath}. {result.ErrorMessage}", resource);
 
             var sources = resource.Select(operation.FhirPath);
 
