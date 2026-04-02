@@ -46,6 +46,7 @@ public class AcquisitionProcessingJob : IJob
     {
         var stopwatch = Stopwatch.StartNew();
         await FailStalledQueuedLogs(context.CancellationToken);
+        await ResetStalledProcessingLogs(context.CancellationToken);
         await ProcessPendingLogs(stopwatch, context.CancellationToken);
         await ProcessPendingTailingMessages(context.CancellationToken);
     }
@@ -57,16 +58,45 @@ public class AcquisitionProcessingJob : IJob
             using var scope = _serviceScopeFactory.CreateScope();
             var dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
-            int failedCount = await dataAcquisitionLogQueries.FailStalledQueuedLogsAsync(15, _settings.MaxBatchesFailStalledPerRun, cancellationToken);
-
+            int failedCount = await dataAcquisitionLogQueries.FailStalledQueuedLogsAsync(_settings.StalledQueuedThresholdMinutes, _settings.MaxBatchesFailStalledPerRun, cancellationToken);
             if (failedCount > 0)
             {
                 _logger.LogInformation("Successfully failed {count} stalled queued logs.", failedCount);
             }
         }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Failing stalled queued logs operation was cancelled.");
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error occurred while failing stalled queued logs.");
+        }
+    }
+    
+    private async Task ResetStalledProcessingLogs(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var scope = _serviceScopeFactory.CreateScope();
+            var dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+            int resetCount = await dataAcquisitionLogQueries.ResetStalledProcessingLogsAsync(_settings.StalledProcessingThresholdMinutes, _settings.MaxBatchesFailStalledPerRun, cancellationToken);
+
+            if (resetCount > 0)
+            {
+                _logger.LogInformation("Successfully reset {count} stalled processing logs to Pending.", resetCount);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Resetting stalled processing logs operation was cancelled.");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while resetting stalled processing logs.");
         }
     }
 
@@ -84,6 +114,11 @@ public class AcquisitionProcessingJob : IJob
             {
                 await ProcessFacilityPendingLogs(facilityId, stopwatch, cancellationToken);
             });
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Processing pending logs operation was cancelled.");
+            throw;
         }
         catch (Exception ex)
         {
@@ -346,6 +381,11 @@ public class AcquisitionProcessingJob : IJob
                         message.CorrelationId,
                         message.ResourceAcquired.ScheduledReports.FirstOrDefault()?.ReportTrackingId?.ToString() ?? "",
                         cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger.LogInformation("Processing tailing message for facility {facilityId} was cancelled.", message.FacilityId?.SanitizeUntrustedString());
+                    throw;
                 }
                 catch (Exception ex)
                 {
