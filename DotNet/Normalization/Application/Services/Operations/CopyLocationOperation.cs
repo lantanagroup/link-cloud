@@ -26,7 +26,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 return OperationResult.Failure($"Resource must be a Location");
             }
 
-            _logger.LogInformation("Applying Copy Location Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName, resource.Id);
+            _logger.LogDebug("Applying Copy Location Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName, resource.Id);
 
             Location location = (Location)resource;
 

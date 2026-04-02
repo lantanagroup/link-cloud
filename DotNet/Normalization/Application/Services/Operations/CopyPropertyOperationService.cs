@@ -23,7 +23,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             var result = await CopyFhirPathValue(resource, operation.SourceFhirPath, operation.TargetFhirPath);
 
             if (result.SuccessCode == OperationStatus.Success) {
-                _logger.LogInformation("Copy Property Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName, resource.Id);
+                _logger.LogDebug("Copy Property Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName, resource.Id);
             }
 
             return result;

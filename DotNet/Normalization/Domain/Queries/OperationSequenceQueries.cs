@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
+﻿using AngleSharp;
+using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -18,6 +19,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
         private readonly IDatabase _database;
         private readonly NormalizationDbContext _dbContext;
         private readonly IMemoryCache _cache;
+        private readonly TimeSpan _cacheTtl = TimeSpan.FromSeconds(60);
+
         public OperationSequenceQueries(IDatabase database, NormalizationDbContext dbContext, IMemoryCache cache) 
         {
             _database = database;
@@ -48,6 +51,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             //Daniel - 4/2026: Temporarily adding queried configs into memory cache to reduce the amount of queries made to the database.
             var cacheResult = _cache.GetOrCreate(model.FacilityId + model.ResourceType, entry =>
             {
+                entry.AbsoluteExpirationRelativeToNow = _cacheTtl;
+
                 IQueryable<OperationSequenceModel> query = 
                     from o in _dbContext.OperationSequences
                     where o.FacilityId == model.FacilityId

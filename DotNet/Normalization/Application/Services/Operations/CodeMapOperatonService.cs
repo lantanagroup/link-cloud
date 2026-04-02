@@ -60,7 +60,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
             if (anyUpdated)
             {
-                _logger.LogInformation("Applying Code Map Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName, resource.Id);
+                _logger.LogDebug("Applying Code Map Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName, resource.Id);
                 return OperationResult.Success(resource);
             }
             else
