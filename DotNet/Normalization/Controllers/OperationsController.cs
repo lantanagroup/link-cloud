@@ -360,10 +360,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 var result = model.Operation.OperationType switch
                 {
-                    OperationType.CopyProperty => await _copyPropertyOperationService.EnqueueOperationAsync((CopyPropertyOperation)operationImplementation, domainResource),
-                    OperationType.CodeMap => await _codeMapOperationService.EnqueueOperationAsync((CodeMapOperation)operationImplementation, domainResource),
-                    OperationType.ConditionalTransform => await _conditionalTransformOperationService.EnqueueOperationAsync((ConditionalTransformOperation)operationImplementation, domainResource),
-                    OperationType.CopyLocation => await _copyLocationOperationService.EnqueueOperationAsync((CopyLocationOperation)operationImplementation, domainResource),
+                    OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operationImplementation, domainResource),
+                    OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operationImplementation, domainResource),
+                    OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operationImplementation, domainResource),
+                    OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operationImplementation, domainResource),
                     _ => null
                 };
 
@@ -407,10 +407,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 var result = operation.OperationType switch
                 {
-                    OperationType.CopyProperty => await _copyPropertyOperationService.EnqueueOperationAsync((CopyPropertyOperation)operation, domainResource),
-                    OperationType.CodeMap => await _codeMapOperationService.EnqueueOperationAsync((CodeMapOperation)operation, domainResource),
-                    OperationType.ConditionalTransform => await _conditionalTransformOperationService.EnqueueOperationAsync((ConditionalTransformOperation)operation, domainResource),
-                    OperationType.CopyLocation => await _copyLocationOperationService.EnqueueOperationAsync((CopyLocationOperation)operation, domainResource),
+                    OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operation, domainResource),
+                    OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operation, domainResource),
+                    OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operation, domainResource),
+                    OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operation, domainResource),
                     _ => null
                 };
 
