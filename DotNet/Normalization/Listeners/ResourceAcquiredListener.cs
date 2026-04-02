@@ -148,7 +148,6 @@ public class ResourceAcquiredListener : BackgroundService
                             return;
                         }
 
-
                         using (var scope = _scopeFactory.CreateScope())
                         {
                             var operationSequenceQueries = scope.ServiceProvider.GetRequiredService<IOperationSequenceQueries>();
@@ -161,8 +160,6 @@ public class ResourceAcquiredListener : BackgroundService
 
                             if (sequences != null && sequences.Count > 0)
                             {
-                                Console.WriteLine("Sequence found (" + sequences.Count() + ") for " + message.Message.Value.ResourceType);
-
                                 DomainResource resource;
                                 try
                                 {

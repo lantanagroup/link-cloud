@@ -8,9 +8,12 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 {
     public class CodeMapOperationService : BaseOperationService<CodeMapOperation>
     {
+        ILogger<CodeMapOperationService> _logger;
+
         public CodeMapOperationService(ILogger<CodeMapOperationService> logger, TimeSpan? operationTimeout = null)
             : base(logger, operationTimeout)
         {
+            _logger = logger;
         }
 
         protected override async Task<OperationResult> ExecuteOperation(CodeMapOperation operation, DomainResource resource)
@@ -27,6 +30,8 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             {
                 return OperationResult.NoAction($"Nothing found at {operation.FhirPath}", resource);
             }
+
+            _logger.LogInformation("Applying Code Map Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName, resource.Id);
 
             var anyUpdated = false;
 

@@ -11,13 +11,18 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 {
     public class ConditionalTransformOperationService : BaseOperationService<ConditionalTransformOperation>
     {
+        ILogger<ConditionalTransformOperationService> _logger;
+
         public ConditionalTransformOperationService(ILogger<ConditionalTransformOperationService> logger, TimeSpan? operationTimeout = null)
             : base(logger, operationTimeout)
         {
+            _logger = logger;
         }
 
         protected override async Task<OperationResult> ExecuteOperation(ConditionalTransformOperation operation, DomainResource resource)
         {
+            _logger.LogInformation("Applying Conditional Transform Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName, resource.Id);
+
             foreach (var condition in operation.Conditions)
             {
                 var conditionResult = await IsConditionPassed(condition, resource);
