@@ -446,8 +446,8 @@ namespace IntegrationTests.Normalization
             var result = await operationManager.DeleteOperationSequence(deleteModel);
 
             Assert.True(result);
-            operationSequenceQueries.ClearCache(new OperationSequenceSearchModel { FacilityId = facilityId, ResourceType = "Patient" });
-            var searched = await operationSequenceQueries.Search(new OperationSequenceSearchModel { FacilityId = facilityId, ResourceType = "Patient" });
+            operationSequenceQueries.ClearCache(new OperationSequenceSearchModel { ResourceTypeId = opId, FacilityId = facilityId, ResourceType = "Patient" });
+            var searched = await operationSequenceQueries.Search(new OperationSequenceSearchModel { ResourceTypeId = opId, FacilityId = facilityId, ResourceType = "Patient" });
             Assert.Empty(searched);
         }
 
