@@ -21,8 +21,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
         protected override async Task<OperationResult> ExecuteOperation(ConditionalTransformOperation operation, DomainResource resource)
         {
-            _logger.LogInformation("Applying Conditional Transform Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName, resource.Id);
-
             foreach (var condition in operation.Conditions)
             {
                 var conditionResult = await IsConditionPassed(condition, resource);
@@ -39,6 +37,11 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             }
 
             var result = await SetTransformValue(resource, operation.TargetFhirPath, operation.TargetValue);
+
+            if (result.SuccessCode == OperationStatus.Success) {
+                _logger.LogInformation("Applying Conditional Transform Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName, resource.Id);
+            }
+
             return result;
         }
 

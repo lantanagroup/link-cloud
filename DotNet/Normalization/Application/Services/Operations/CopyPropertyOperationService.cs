@@ -20,8 +20,13 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
         protected override async Task<OperationResult> ExecuteOperation(CopyPropertyOperation operation, DomainResource resource)
         {
-            _logger.LogInformation("Copy Property Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName, resource.Id);
-            return await CopyFhirPathValue(resource, operation.SourceFhirPath, operation.TargetFhirPath);
+            var result = await CopyFhirPathValue(resource, operation.SourceFhirPath, operation.TargetFhirPath);
+
+            if (result.SuccessCode == OperationStatus.Success) {
+                _logger.LogInformation("Copy Property Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName, resource.Id);
+            }
+
+            return result;
         }
 
         private async Task<OperationResult> CopyFhirPathValue(DomainResource resource, string sourceFhirPath, string targetFhirPath)

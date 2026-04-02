@@ -31,8 +31,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 return OperationResult.NoAction($"Nothing found at {operation.FhirPath}", resource);
             }
 
-            _logger.LogInformation("Applying Code Map Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName, resource.Id);
-
             var anyUpdated = false;
 
             foreach (var source in sources)
@@ -60,8 +58,11 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 }
             }
 
-            if(anyUpdated)
+            if (anyUpdated)
+            {
+                _logger.LogInformation("Applying Code Map Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName, resource.Id);
                 return OperationResult.Success(resource);
+            }
             else
                 return OperationResult.NoAction("No code maps applied.", resource);
         }
