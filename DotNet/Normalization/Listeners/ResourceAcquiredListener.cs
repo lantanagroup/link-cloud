@@ -109,7 +109,7 @@ public class ResourceAcquiredListener : BackgroundService
                     {
                         message = result;
 
-                        if (message.Key == null || string.IsNullOrWhiteSpace(message.Key.FacilityId))
+                        if (message.Message.Key == null || string.IsNullOrWhiteSpace(message.Message.Key.FacilityId))
                         {
                             throw new DeadLetterException("Message Key (FacilityId) is null or empty.");
                         }
@@ -144,7 +144,7 @@ public class ResourceAcquiredListener : BackgroundService
                         {
                             _logger.LogInformation("Acquisition Complete tail message received. Producing message for measure eval.");
 
-                            await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId);
+                            await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId, message.Message.Value.Resource);
                             return;
                         }
 
@@ -193,10 +193,10 @@ public class ResourceAcquiredListener : BackgroundService
 
                                     var operationResult = operation.OperationType switch
                                     {
-                                        OperationType.CopyProperty => await _copyPropertyOperationService.EnqueueOperationAsync((CopyPropertyOperation)operation, resource),
-                                        OperationType.CodeMap => await _codeMapOperationService.EnqueueOperationAsync((CodeMapOperation)operation, resource),
-                                        OperationType.ConditionalTransform => await _conditionalTransformOperationService.EnqueueOperationAsync((ConditionalTransformOperation)operation, resource),
-                                        OperationType.CopyLocation => await _copyLocationOperationService.EnqueueOperationAsync((CopyLocationOperation)operation, resource),
+                                        OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operation, resource),
+                                        OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operation, resource),
+                                        OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operation, resource),
+                                        OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operation, resource),
                                         _ => null
                                     };
 
@@ -216,10 +216,14 @@ public class ResourceAcquiredListener : BackgroundService
                                     {
                                         _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", messageMetaData.facilityId, messageMetaData.correlationId, operation.OperationType, operationResult?.ErrorMessage ?? "No Operation Result Error Message");
                                     }
+
+                                    await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId, resource);
                                 }
                             }
-                            
-                            await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId);    
+                            else
+                            {
+                                await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId, message.Message.Value.Resource);
+                            }
                         }
                     }
                     catch (DeadLetterException ex)
@@ -285,7 +289,7 @@ public class ResourceAcquiredListener : BackgroundService
     }
 
 
-    private async Task ProduceResourceNormalizedMessage(ConsumeResult<ResourceKey, ResourceAcquiredMessage>? message, string facilityId, string correlationId)
+    private async Task ProduceResourceNormalizedMessage(ConsumeResult<ResourceKey, ResourceAcquiredMessage>? message, string facilityId, string correlationId, object? resource)
     {
         //var serializedResource = JsonSerializer.SerializeToElement(resource, LinkFhirSerializerOptions.ForFhirLenientSerialization);
 
@@ -298,7 +302,7 @@ public class ResourceAcquiredListener : BackgroundService
         {
             AcquisitionComplete = message.Message.Value.AcquisitionComplete,
             PatientId = message.Message.Value.PatientId ?? "",
-            Resource = message.Message.Value.Resource, //serializedResource,
+            Resource = resource,// message.Message.Value.Resource, //serializedResource,
             QueryType = message.Message.Value.QueryType,
             ScheduledReports = message.Message.Value.ScheduledReports,
             ReportableEvent = message.Message.Value.ReportableEvent

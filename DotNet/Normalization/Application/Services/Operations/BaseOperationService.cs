@@ -10,7 +10,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
     public abstract class BaseOperationService<TOperation>
         where TOperation : class
     {
-        //private readonly ConcurrentQueue<(TOperation Operation, DomainResource Resource, TaskCompletionSource<OperationResult> Result)> _operationQueue = new();
         private readonly TimeSpan _operationTimeout;
         protected readonly ILogger Logger;
 
@@ -20,7 +19,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             _operationTimeout = operationTimeout ?? TimeSpan.FromSeconds(120);
         }
 
-        public async Task<OperationResult> EnqueueOperationAsync(TOperation operation, DomainResource resource)
+        public async Task<OperationResult> ProcessOperationAsync(TOperation operation, DomainResource resource)
         {
             if (operation == null)
                 return OperationResult.Failure("Operation cannot be null.");
@@ -28,48 +27,14 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             if (resource == null)
                 return OperationResult.Failure("Resource cannot be null.");
 
-            //var tcs = new TaskCompletionSource<OperationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-            //_operationQueue.Enqueue((operation, resource, tcs));
-
             var result = await ProcessOperation(operation, resource);
 
-
             return result;
-            //try
-            //{
-            //    //return await tcs.Task.WaitAsync(_operationTimeout, CancellationToken.None);
-            //}
-            //catch (TimeoutException tex)
-            //{
-            //    Logger.LogError(tex, "{OperationType} operation timed out after {Timeout}.", typeof(TOperation).Name, _operationTimeout);
-            //    return OperationResult.Failure($"{typeof(TOperation).Name} operation timed out after {_operationTimeout}.");
-            //}
         }
-
-        //protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-        //{
-        //    while (!stoppingToken.IsCancellationRequested)
-        //    {
-        //        //var batch = new List<(TOperation Operation, DomainResource Resource, TaskCompletionSource<OperationResult> Result)>();
-        //        //while (_operationQueue.TryDequeue(out var item) && batch.Count < 10)
-        //        //    batch.Add(item);
-
-        //        //foreach (var item in batch)
-        //        //{
-        //        //    var result = await ProcessOperation(item.Operation, item.Resource);
-        //        //    item.Result.SetResult(result);
-        //        //    if (result.SuccessCode != OperationStatus.Success)
-        //        //        Logger.LogError("Failed {OperationType} operation: {ErrorMessage}", typeof(TOperation).Name, result.ErrorMessage);
-        //        //}
-
-        //        //if (batch.Count == 0)
-        //        //    await Task.Delay(100, stoppingToken);
-        //    }
-        //}
 
         protected virtual async Task<OperationResult> ProcessOperation(TOperation operation, DomainResource resource)
         {
-            //Daniel - Do we need to perform a deep copy?
+            //Daniel - 4/2026: Do we need to perform a deep copy? Commented this out for now as it looks like the operations are being applied without it. 
             //var resourceCopy = resource.DeepCopy() as DomainResource;
             //if (resourceCopy == null)
             //    return OperationResult.Failure($"Failed to create a deep copy of the resource of type {resource.GetType().Name}.");
