@@ -121,12 +121,12 @@ public class MilestoneValidationOrchestrator
         if (_completed.Contains(Milestone.AcquisitionStarted))
             return;
 
-        var logs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
-        if (logs.Count == 0)
+        var summary = await _reader.GetDataAcquisitionReportSummaryAsync(reportId);
+        if (summary == null || summary.TotalLogs == 0)
             return;
 
         _completed.Add(Milestone.AcquisitionStarted);
-        _output.WriteLine($"[DIAG][Milestone] Reached: AcquisitionStarted ({logs.Count} log rows)");
+        _output.WriteLine($"[DIAG][Milestone] Reached: AcquisitionStarted ({summary.TotalLogs} log rows)");
     }
 
     private async Task CheckAcquisitionCompleted(string facilityId, string reportId)
@@ -134,11 +134,11 @@ public class MilestoneValidationOrchestrator
         if (_completed.Contains(Milestone.AcquisitionCompleted))
             return;
 
-        var logs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
-        if (logs.Count == 0)
+        var summary = await _reader.GetDataAcquisitionReportSummaryAsync(reportId);
+        if (summary == null || summary.TotalLogs == 0)
             return;
 
-        var maxRetries = logs.Count(l => string.Equals(l.Status, "MaxRetriesReached", StringComparison.OrdinalIgnoreCase));
+        var maxRetries = summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "MaxRetriesReached", StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
         if (maxRetries > 0)
         {
             RecordIssue($"Data acquisition terminal failures detected: {maxRetries} max-retry log(s).", critical: true);
@@ -146,18 +146,14 @@ public class MilestoneValidationOrchestrator
             return;
         }
 
-        var failed = logs.Count(l => string.Equals(l.Status, "Failed", StringComparison.OrdinalIgnoreCase));
+        var failed = summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "Failed", StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
         if (failed > 0)
             RecordIssue($"Data acquisition has {failed} retriable failed log(s); waiting for retry recovery.", critical: false);
 
         if (_expectedPatientCount <= 0)
             return;
 
-        var completedPatients = logs
-            .Where(l => string.Equals(l.Status, "Completed", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(l.PatientId))
-            .Select(l => l.PatientId!)
-            .Distinct(StringComparer.Ordinal)
-            .Count();
+        var completedPatients = summary.TotalPatients;
 
         // Must satisfy basic completion criteria first.
         if (completedPatients < _expectedPatientCount)
@@ -167,9 +163,8 @@ public class MilestoneValidationOrchestrator
         }
 
         // Guardrail: if any in-flight statuses exist, do not complete.
-        var inFlight = logs.Count(l =>
-            string.Equals(l.Status, "Pending", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(l.Status, "Processing", StringComparison.OrdinalIgnoreCase));
+        var inFlight = (summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "Pending", StringComparison.OrdinalIgnoreCase))?.Count ?? 0)
+                     + (summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "Processing", StringComparison.OrdinalIgnoreCase))?.Count ?? 0);
 
         if (inFlight > 0)
         {
@@ -180,11 +175,11 @@ public class MilestoneValidationOrchestrator
         // Debounce: require stable log-count and completed-patient count across a short window.
         var nowUtc = DateTime.UtcNow;
         if (_acquisitionCompletionCandidateSinceUtc == null ||
-            _acquisitionCompletionCandidateLogCount != logs.Count ||
+            _acquisitionCompletionCandidateLogCount != summary.TotalLogs ||
             _acquisitionCompletionCandidateCompletedPatients != completedPatients)
         {
             _acquisitionCompletionCandidateSinceUtc = nowUtc;
-            _acquisitionCompletionCandidateLogCount = logs.Count;
+            _acquisitionCompletionCandidateLogCount = summary.TotalLogs;
             _acquisitionCompletionCandidateCompletedPatients = completedPatients;
             return;
         }
@@ -193,7 +188,7 @@ public class MilestoneValidationOrchestrator
             return;
 
         _completed.Add(Milestone.AcquisitionCompleted);
-        _output.WriteLine($"[DIAG][Milestone] Reached: AcquisitionCompleted ({completedPatients}/{_expectedPatientCount} patients, stable logs={logs.Count})");
+        _output.WriteLine($"[DIAG][Milestone] Reached: AcquisitionCompleted ({completedPatients}/{_expectedPatientCount} patients, stable logs={summary.TotalLogs})");
     }
 
     private void ResetAcquisitionCompletionCandidate()

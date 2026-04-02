@@ -5,13 +5,18 @@
 
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3>Run <code>@Model.RunId</code></h3>
+        <h3><span id="runName">@Model.RunName</span> <code>@Model.RunId</code></h3>
         <a asp-action="Index" class="btn btn-outline-secondary">Back</a>
     </div>
 
     <div class="card mb-3">
         <div class="card-body">
+            <div><strong>Run Name:</strong> <span id="runNameDetails">@Model.RunName</span></div>
             <div><strong>Scenario:</strong> <span id="scenario">@Model.Scenario</span></div>
+            <div><strong>Measure:</strong> <span id="selectedMeasure">@Model.SelectedMeasure</span></div>
+            <div><strong>Patients:</strong> <span id="patientCount">@Model.PatientCount</span></div>
+            <div><strong>Resources / Patient:</strong> <span id="resourcesPerPatient">@Model.ResourcesPerPatient</span></div>
+            <div><strong>Generation Seed:</strong> <span id="seed">@Model.Seed</span></div>
             <div><strong>Status:</strong> <span id="status">@Model.Status</span></div>
             <div><strong>Error:</strong> <span id="error">@(Model.Error ?? "-")</span></div>
             <div><strong>Started:</strong> <span id="started">@(Model.StartedAt?.ToString("u") ?? "-")</span></div>
@@ -19,19 +24,278 @@
         </div>
     </div>
 
-    <div class="card">
-        <div class="card-header">Live Logs</div>
-        <div class="card-body">
-            <pre id="logBox" style="height: 500px; overflow:auto; background:#111; color:#ddd; padding:12px;">@string.Join("\n", Model.Logs)</pre>
+    <ul class="nav nav-tabs mb-3" id="runDetailsTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab" aria-controls="overview-pane" aria-selected="true">Overview</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="logs-tab" data-bs-toggle="tab" data-bs-target="#logs-pane" type="button" role="tab" aria-controls="logs-pane" aria-selected="false">Logs</button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="runDetailsTabContent">
+        <div class="tab-pane fade show active" id="overview-pane" role="tabpanel" aria-labelledby="overview-tab" tabindex="0">
+            <div class="card mb-3">
+                <div class="card-header"><strong>Report</strong></div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="small text-muted mb-1">Milestones</div>
+                        <div id="reportMilestones" class="d-flex flex-wrap justify-content-center gap-2" style="min-height: 42px;"></div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <div class="border rounded p-3 h-100">
+                                <div class="small text-muted mb-2">Report Schedule</div>
+                                <div class="row g-2">
+                                    <div class="col-md-6"><strong>Test:</strong> <span id="scheduleReportName">-</span></div>
+                                    <div class="col-md-6"><strong>Frequency:</strong> <span id="scheduleFrequency">-</span></div>
+                                    <div class="col-md-6"><strong>Start:</strong> <span id="scheduleStart">-</span></div>
+                                    <div class="col-md-6"><strong>End:</strong> <span id="scheduleEnd">-</span></div>
+                                    <div class="col-md-6"><strong>Adhoc Type:</strong> <span id="scheduleAdhoc">-</span></div>
+                                    <div class="col-md-6"><strong>Status:</strong> <span id="scheduleStatusPill" class="badge bg-secondary">-</span></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-3 h-100">
+                                <div class="small text-muted mb-2">Report Entries by Submission Status</div>
+                                    <canvas id="entriesDonut" height="150" style="height:150px;max-height:150px;"></canvas>
+                                <div id="entriesLegend" class="small mt-2"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="border rounded p-3 mt-3">
+                        <div class="small text-muted mb-1">Report Populations</div>
+                        <div id="populationSummary">No population data yet.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3" id="validatorResultsCard" style="display:none;">
+                <div class="card-header"><strong>Automation Validator Results</strong></div>
+                <div class="card-body">
+                    <div id="validatorResultsSummary" class="small text-muted mb-2"></div>
+                    <div class="row g-2" id="validatorResultsGrid"></div>
+                </div>
+            </div>
+
+            <div class="card mb-3" id="serviceErrorSummaryCard">
+                <div class="card-header"><strong>Service Error Summary</strong></div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <div class="border rounded p-2 h-100">
+                                <div class="small text-muted mb-1">Data Acquisition</div>
+                                <button type="button" id="serviceErrorBtnDataAcq" class="btn w-100 text-center service-error-btn" data-service="Data Acquisition" disabled>
+                                    <div id="serviceErrorCountDataAcq" class="display-5 fw-semibold text-muted">0</div>
+                                    <div class="small text-muted">exceptions</div>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border rounded p-2 h-100">
+                                <div class="small text-muted mb-1">Measure Eval</div>
+                                <button type="button" id="serviceErrorBtnMeasureEval" class="btn w-100 text-center service-error-btn" data-service="Measure Eval" disabled>
+                                    <div id="serviceErrorCountMeasureEval" class="display-5 fw-semibold text-muted">0</div>
+                                    <div class="small text-muted">exceptions</div>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border rounded p-2 h-100">
+                                <div class="small text-muted mb-1">Validation</div>
+                                <button type="button" id="serviceErrorBtnValidation" class="btn w-100 text-center service-error-btn" data-service="Validation" disabled>
+                                    <div id="serviceErrorCountValidation" class="display-5 fw-semibold text-muted">0</div>
+                                    <div class="small text-muted">exceptions</div>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border rounded p-2 h-100">
+                                <div class="small text-muted mb-1">Report</div>
+                                <button type="button" id="serviceErrorBtnReport" class="btn w-100 text-center service-error-btn" data-service="Report" disabled>
+                                    <div id="serviceErrorCountReport" class="display-5 fw-semibold text-muted">0</div>
+                                    <div class="small text-muted">exceptions</div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header" role="button" data-bs-toggle="modal" data-bs-target="#dataAcqLogModal" style="cursor:pointer;">
+                    <strong>Data Acquisition</strong>
+                    <span class="badge bg-secondary ms-2" id="dataAcqTotalLogs">0</span>
+                    <span class="small text-muted ms-1">logs (click to drill down)</span>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Resource Count</div><div class="fs-4 fw-semibold" id="dataAcqResourceCount">0</div></div></div>
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Avg Resources/sec</div><div class="fs-4 fw-semibold" id="dataAcqResPerSec">0.00</div></div></div>
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Events/sec</div><div class="fs-4 fw-semibold" id="dataAcqRate">0.00</div></div></div>
+                        <div class="col-md-3 d-flex align-items-end justify-content-end">
+                            <button type="button" id="dataAcqErrorsBtn" class="btn btn-sm btn-outline-danger" style="display:none;">Errors Encountered</button>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="small text-muted mb-1">Logs by Status</div>
+                            <canvas id="dataAcqDonut" height="160" style="height:160px;max-height:160px;max-width: 220px;"></canvas>
+                            <div id="dataAcqLegend" class="small mt-2"></div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-muted mb-1">Throughput Timeline (10s buckets)</div>
+                            <canvas id="dataAcqTimeline" height="90" style="height:90px;max-height:90px;"></canvas>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-muted mb-1">Top Resource Types</div>
+                            <canvas id="dataAcqResourceMixChart" height="170" style="height:170px;max-height:170px;"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header"><strong>Measure Eval</strong></div>
+                <div class="card-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Resource Count</div><div class="fs-4 fw-semibold" id="measureResourceCount">0</div></div></div>
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Avg Resources/sec</div><div class="fs-4 fw-semibold" id="measureResPerSec">0.00</div></div></div>
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Events/sec</div><div class="fs-4 fw-semibold" id="measureRate">0.00</div></div></div>
+                        <div class="col-md-3 d-flex align-items-end justify-content-end">
+                            <button type="button" id="measureErrorsBtn" class="btn btn-sm btn-outline-danger" style="display:none;">Errors Encountered</button>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="small text-muted mb-1">Measure Report Patient States</div>
+                            <canvas id="measureStageChart" height="170" style="height:170px;max-height:170px;"></canvas>
+                            <div id="measureStageLegend" class="small mt-2"></div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-muted mb-1">Throughput Timeline (10s buckets)</div>
+                            <canvas id="measureTimeline" height="90" style="height:90px;max-height:90px;"></canvas>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-muted mb-1">Top Resource Types</div>
+                            <canvas id="measureResourceMixChart" height="170" style="height:170px;max-height:170px;"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header"><strong>Validation</strong></div>
+                <div class="card-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Resource Count</div><div class="fs-4 fw-semibold" id="validationResourceCount">0</div></div></div>
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Avg Resources/sec</div><div class="fs-4 fw-semibold" id="validationResPerSec">0.00</div></div></div>
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Events/sec</div><div class="fs-4 fw-semibold" id="validationRate">0.00</div></div></div>
+                        <div class="col-md-3 d-flex align-items-end justify-content-end">
+                            <button type="button" id="validationErrorsBtn" class="btn btn-sm btn-outline-danger" style="display:none;">Errors Encountered</button>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="small text-muted mb-1">Validation Patient States</div>
+                            <canvas id="validationStageChart" height="170" style="height:170px;max-height:170px;"></canvas>
+                            <div id="validationStageLegend" class="small mt-2"></div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-muted mb-1">Throughput Timeline (10s buckets)</div>
+                            <canvas id="validationTimeline" height="90" style="height:90px;max-height:90px;"></canvas>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-muted mb-1">Top Resource Types</div>
+                            <canvas id="validationResourceMixChart" height="170" style="height:170px;max-height:170px;"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="logs-pane" role="tabpanel" aria-labelledby="logs-tab" tabindex="0">
+            <div class="card">
+                <div class="card-header">Console</div>
+                <div class="card-body">
+                    <pre id="logBox" style="height: 500px; overflow:auto; background:#111; color:#ddd; padding:12px;">@string.Join("\n", Model.Logs)</pre>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
+<div id="errorFlyout" style="position:fixed; top:0; right:-480px; width:460px; height:100%; background:#fff; box-shadow:-4px 0 20px rgba(0,0,0,.2); z-index:1055; transition:right .2s ease;">
+    <div class="d-flex justify-content-between align-items-center border-bottom p-3">
+        <h6 class="mb-0" id="errorFlyoutTitle">Errors</h6>
+        <button class="btn btn-sm btn-outline-secondary" id="closeFlyout">Close</button>
+    </div>
+    <div class="p-3" id="errorFlyoutBody" style="overflow:auto; height: calc(100% - 60px);"></div>
+</div>
+
+<div class="modal fade" id="dataAcqLogModal" tabindex="-1" aria-labelledby="dataAcqLogModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="dataAcqLogModalLabel">Data Acquisition Logs</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped" id="dataAcqLogTable">
+                        <thead>
+                            <tr>
+                                <th>Id</th>
+                                <th>Patient</th>
+                                <th>Status</th>
+                                <th>Phase</th>
+                                <th>Resources</th>
+                                <th>Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dataAcqLogTableBody">
+                        </tbody>
+                    </table>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <span class="small text-muted" id="dataAcqLogPaginationInfo"></span>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-secondary" id="dataAcqLogPrev" disabled>Previous</button>
+                        <button class="btn btn-outline-secondary" id="dataAcqLogNext" disabled>Next</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
 <script>
     (function () {
         const runId = '@Model.RunId';
+        const snapshotUrl = '@Url.Action("PipelineSnapshot", "Runs")';
         const logBox = document.getElementById('logBox');
+        let dataAcqErrors = [];
+        let measureErrors = [];
+        let validationErrors = [];
+        let lastDataAcqSnapshot = null;
+        const serviceErrorLines = {
+            'Data Acquisition': [],
+            'Measure Eval': [],
+            'Validation': [],
+            'Report': []
+        };
+        const charts = {};
+        let currentRunStatus = '@Model.Status';
+        let currentFinishedAt = '@(Model.FinishedAt?.ToString("O") ?? string.Empty)';
+        let snapshotTimer = null;
 
         const connection = new signalR.HubConnectionBuilder()
             .withUrl('/hubs/runs')
@@ -44,16 +308,544 @@
             logBox.scrollTop = logBox.scrollHeight;
         }
 
+        function formatNumber(value) {
+            return Number(value || 0).toFixed(2);
+        }
+
+        function escapeHtml(value) {
+            const s = String(value || '');
+            return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+        }
+
+        function upsertChart(canvasId, config) {
+            if (charts[canvasId]) {
+                charts[canvasId].data = config.data;
+                charts[canvasId].options = config.options;
+                charts[canvasId].update('none');
+                return;
+            }
+
+            charts[canvasId] = new Chart(document.getElementById(canvasId), config);
+        }
+
+        function renderStageChart(canvasId, legendId, counts, colorMap) {
+            renderDoughnut(canvasId, legendId, counts, colorMap);
+        }
+
+        function renderResourceMix(canvasId, counts) {
+            const items = counts || [];
+            if (!items.length) {
+                return;
+            }
+
+            upsertChart(canvasId, {
+                type: 'bar',
+                data: {
+                    labels: items.map(x => x.status || 'Unknown'),
+                    datasets: [{
+                        data: items.map(x => x.count || 0),
+                        backgroundColor: ['#0d6efd', '#198754', '#6f42c1', '#20c997', '#fd7e14', '#6c757d'],
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: 2.2,
+                    animation: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { beginAtZero: true, ticks: { precision: 0 } },
+                        y: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        function renderTimeline(canvasId, buckets, color) {
+            const items = buckets || [];
+            if (!items.length) {
+                return;
+            }
+
+            upsertChart(canvasId, {
+                type: 'line',
+                data: {
+                    labels: items.map(x => x.label || ''),
+                    datasets: [{
+                        data: items.map(x => x.count || 0),
+                        borderColor: color,
+                        backgroundColor: `${color}33`,
+                        fill: true,
+                        pointRadius: 2,
+                        tension: 0.25
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: 2.6,
+                    animation: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { maxTicksLimit: 6 } },
+                        y: { beginAtZero: true, ticks: { precision: 0 } }
+                    }
+                }
+            });
+        }
+
+        function renderDoughnut(canvasId, legendId, items, colorMap, preserveOnEmpty = false) {
+            const total = (items || []).reduce((sum, x) => sum + (x.count || 0), 0);
+            const legend = document.getElementById(legendId);
+
+            if (!items || items.length === 0 || total === 0) {
+                if (preserveOnEmpty && charts[canvasId]) {
+                    return;
+                }
+                if (charts[canvasId]) {
+                    charts[canvasId].destroy();
+                    delete charts[canvasId];
+                }
+                legend.innerHTML = '<span class="text-muted small">No data yet.</span>';
+                return;
+            }
+
+            const labels = [];
+            const values = [];
+            const colors = [];
+            const fallbackPalette = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#ef4444', '#10b981', '#64748b'];
+            let legendHtml = '';
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                const value = item.count || 0;
+                const color = colorMap[(item.status || '').toLowerCase()] || fallbackPalette[i % fallbackPalette.length];
+                labels.push(item.status || 'Unknown');
+                values.push(value);
+                colors.push(color);
+                legendHtml += `<div class="small"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:6px;"></span>${item.status}: ${value}</div>`;
+            }
+
+            upsertChart(canvasId, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{ data: values, backgroundColor: colors, borderWidth: 0 }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: 1.2,
+                    animation: false,
+                    cutout: '65%',
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            legend.innerHTML = legendHtml;
+        }
+
+        function getScheduleStatusClass(status) {
+            const s = (status || '').toLowerCase();
+            if (s === 'submitted') return 'bg-success';
+            if (s === 'endofperiod') return 'bg-success-subtle text-success-emphasis';
+            if (s === 'scheduled') return 'bg-warning text-dark';
+            if (s === 'new') return 'bg-secondary';
+            return 'bg-secondary';
+        }
+
+        function isRunComplete(status) {
+            const value = String(status || '').toLowerCase();
+            return value === 'succeeded' || value === 'failed' || value === '2' || value === '3';
+        }
+
+        function stopSnapshotPolling() {
+            if (snapshotTimer) {
+                clearInterval(snapshotTimer);
+                snapshotTimer = null;
+            }
+        }
+
+        function renderValidatorResults(results) {
+            const card = document.getElementById('validatorResultsCard');
+            const grid = document.getElementById('validatorResultsGrid');
+            const summary = document.getElementById('validatorResultsSummary');
+
+            if (!isRunComplete(currentRunStatus) && !currentFinishedAt) {
+                card.style.display = 'none';
+                return;
+            }
+
+            card.style.display = '';
+            const items = (results || []).filter(x => !(x.name || '').startsWith('[Snapshot]'));
+            if (!items.length) {
+                summary.textContent = 'No validator output was captured for this run.';
+                grid.innerHTML = '<div class="col-12 text-muted small">No validator results available.</div>';
+                return;
+            }
+
+            const passed = items.filter(x => (x.outcome || '').toLowerCase() === 'passed').length;
+            const advisory = items.filter(x =>
+                (x.outcome || '').toLowerCase() === 'failed'
+                && (x.name || '').toUpperCase() === 'VALIDATION RESULTS (API)').length;
+            const failed = items.length - passed - advisory;
+            summary.textContent = `${passed} passed, ${advisory} advisory, ${failed} failed.`;
+
+            grid.innerHTML = items.map(item => {
+                const outcome = (item.outcome || 'Unknown');
+                const isPass = outcome.toLowerCase() === 'passed';
+                const isAdvisory = !isPass && (item.name || '').toUpperCase() === 'VALIDATION RESULTS (API)';
+                const badge = isPass
+                    ? 'bg-success-subtle text-success-emphasis'
+                    : isAdvisory
+                        ? 'bg-warning-subtle text-warning-emphasis'
+                        : 'bg-danger-subtle text-danger-emphasis';
+                const badgeText = isPass ? 'Passed' : isAdvisory ? 'Advisory' : outcome;
+                const issueText = isPass ? 'No issues' : `${item.issueCount || 0} issue(s)`;
+
+                return `<div class="col-md-4">
+                    <div class="border rounded p-2 h-100">
+                        <div class="fw-semibold small">${escapeHtml(item.name)}</div>
+                        <div class="mt-1"><span class="badge ${badge}">${escapeHtml(badgeText)}</span></div>
+                        <div class="small text-muted mt-1">${issueText}</div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function getServiceError(summaryItems, serviceName) {
+            return (summaryItems || []).find(x =>
+                String(x.serviceName || x.ServiceName || '').toLowerCase() === serviceName.toLowerCase());
+        }
+
+        function toCountItems(groupItems) {
+            return (groupItems || []).map(x => ({
+                status: x.status || x.Status,
+                count: x.count ?? x.Count ?? 0
+            }));
+        }
+
+        function animateCounter(elementId, targetValue) {
+            const el = document.getElementById(elementId);
+            const startValue = Number(el.dataset.current || 0);
+            const endValue = Number(targetValue || 0);
+
+            if (startValue === endValue) {
+                el.textContent = String(endValue);
+                return;
+            }
+
+            const durationMs = 350;
+            const startTs = performance.now();
+
+            function step(ts) {
+                const progress = Math.min(1, (ts - startTs) / durationMs);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                const value = Math.round(startValue + ((endValue - startValue) * eased));
+                el.textContent = String(value);
+                if (progress < 1) {
+                    requestAnimationFrame(step);
+                } else {
+                    el.textContent = String(endValue);
+                    el.dataset.current = String(endValue);
+                }
+            }
+
+            requestAnimationFrame(step);
+        }
+
+        function renderServiceErrorSummary(summaryItems) {
+            const targets = [
+                { name: 'Data Acquisition', countId: 'serviceErrorCountDataAcq', buttonId: 'serviceErrorBtnDataAcq' },
+                { name: 'Measure Eval', countId: 'serviceErrorCountMeasureEval', buttonId: 'serviceErrorBtnMeasureEval' },
+                { name: 'Validation', countId: 'serviceErrorCountValidation', buttonId: 'serviceErrorBtnValidation' },
+                { name: 'Report', countId: 'serviceErrorCountReport', buttonId: 'serviceErrorBtnReport' }
+            ];
+
+            for (const target of targets) {
+                const service = getServiceError(summaryItems, target.name);
+                const total = Number(service?.totalErrors ?? service?.TotalErrors ?? 0);
+                const errorLines = service?.errorLines || service?.ErrorLines || [];
+                serviceErrorLines[target.name] = errorLines;
+
+                animateCounter(target.countId, total);
+
+                const btn = document.getElementById(target.buttonId);
+                btn.disabled = total <= 0;
+                btn.classList.toggle('text-danger', total > 0);
+            }
+        }
+
+        function renderMilestones(milestones) {
+            const host = document.getElementById('reportMilestones');
+            const orderedMilestones = [
+                'Report Scheduled',
+                'Data Acquired',
+                'Measure Evaluated',
+                'Validation',
+                'Submitted',
+                'Test Validation'
+            ];
+            const normalized = new Map();
+            for (const m of (milestones || [])) {
+                const name = m.name || m.Name;
+                if (!name) continue;
+                normalized.set(name, {
+                    name,
+                    completed: m.completed === true || m.Completed === true,
+                    failed: m.failed === true || m.Failed === true
+                });
+            }
+
+            host.innerHTML = '';
+            for (const stepName of orderedMilestones) {
+                const m = normalized.get(stepName) || { name: stepName, completed: false, failed: false };
+                const div = document.createElement('span');
+                const failed = m.failed === true;
+                const completed = m.completed === true;
+                div.className = `rounded-pill d-inline-flex align-items-center justify-content-center ${failed ? 'bg-danger text-white' : completed ? 'bg-success text-white' : 'bg-light border text-dark'}`;
+                div.style.width = '136px';
+                div.style.height = '30px';
+                div.style.fontSize = '0.8rem';
+                div.style.fontWeight = '600';
+                div.style.lineHeight = '1';
+                div.style.whiteSpace = 'nowrap';
+                div.textContent = m.name;
+                host.appendChild(div);
+            }
+        }
+
+        function setFlyout(title, errors) {
+            const flyout = document.getElementById('errorFlyout');
+            document.getElementById('errorFlyoutTitle').textContent = title;
+            const body = document.getElementById('errorFlyoutBody');
+            if (!errors || errors.length === 0) {
+                body.innerHTML = '<div class="text-muted">No errors.</div>';
+            } else {
+                body.innerHTML = errors.map(x => `<div class="border-bottom py-2 small">${x.replaceAll('<', '&lt;').replaceAll('>', '&gt;')}</div>`).join('');
+            }
+            flyout.style.right = '0';
+        }
+
+        async function refreshSnapshot() {
+            try {
+                const response = await fetch(`${snapshotUrl}?id=${encodeURIComponent(runId)}`);
+                if (response.status === 204) {
+                    appendLog('[snapshot] no snapshot content yet (204).');
+                    return;
+                }
+                if (response.status === 404) {
+                    appendLog('[snapshot] snapshot endpoint returned 404.');
+                    return;
+                }
+                if (!response.ok) {
+                    appendLog(`[snapshot] HTTP error ${response.status}.`);
+                    throw new Error(`Snapshot HTTP ${response.status}`);
+                }
+                const snapshot = await response.json();
+                if (!snapshot) {
+                    appendLog('[snapshot] empty snapshot payload.');
+                    return;
+                }
+
+                const snapshotIsFinal = snapshot.isFinal === true || snapshot.IsFinal === true;
+
+                renderMilestones(snapshot.report?.milestones || []);
+                renderValidatorResults(snapshot.validatorResults || []);
+
+                const schedule = snapshot.report?.schedule;
+                document.getElementById('scheduleReportName').textContent = schedule?.reportName || '-';
+                document.getElementById('scheduleFrequency').textContent = schedule?.frequency || '-';
+                document.getElementById('scheduleStart').textContent = schedule?.startDate || '-';
+                document.getElementById('scheduleEnd').textContent = schedule?.endDate || '-';
+                document.getElementById('scheduleAdhoc').textContent = schedule?.adHocType || '-';
+
+                const statusPill = document.getElementById('scheduleStatusPill');
+                statusPill.className = `badge ${getScheduleStatusClass(schedule?.scheduleStatus)}`;
+                statusPill.textContent = schedule?.scheduleStatus || '-';
+
+                renderDoughnut('entriesDonut', 'entriesLegend', snapshot.report?.entrySubmissionStatuses || [], {
+                    submitted: '#198754',
+                    submitting: '#06b6d4',
+                    noteligable: '#f59e0b',
+                    failedsubmission: '#ef4444',
+                    pendingvalidation: '#94a3b8',
+                    unknown: '#cbd5e1'
+                });
+
+                document.getElementById('populationSummary').textContent = snapshot.report?.populationSummary || 'No population data yet.';
+
+                const dataAcqCandidate = snapshot.dataAcquisition || {};
+                const dataAcqHasData = (dataAcqCandidate.statusCounts || []).length > 0
+                    || (dataAcqCandidate.resourceTypeCounts || []).length > 0
+                    || (dataAcqCandidate.throughputBuckets || []).length > 0
+                    || Number(dataAcqCandidate.resourceCount || 0) > 0;
+
+                if (dataAcqHasData) {
+                    lastDataAcqSnapshot = dataAcqCandidate;
+                }
+
+                const dataAcq = lastDataAcqSnapshot || dataAcqCandidate;
+
+                renderDoughnut('dataAcqDonut', 'dataAcqLegend', dataAcq.statusCounts || [], {
+                    completed: '#198754',
+                    processing: '#06b6d4',
+                    failed: '#ef4444',
+                    pending: '#f59e0b',
+                    unknown: '#94a3b8'
+                }, true);
+
+                document.getElementById('dataAcqRate').textContent = formatNumber(dataAcq.completionRatePerSecond);
+                document.getElementById('dataAcqResourceCount').textContent = dataAcq.resourceCount || 0;
+                document.getElementById('dataAcqResPerSec').textContent = formatNumber(dataAcq.averageResourcesPerSecond);
+                renderTimeline('dataAcqTimeline', dataAcq.throughputBuckets || [], '#06b6d4');
+                renderResourceMix('dataAcqResourceMixChart', dataAcq.resourceTypeCounts || []);
+                dataAcqErrors = dataAcq.errors || [];
+                document.getElementById('dataAcqErrorsBtn').style.display = dataAcqErrors.length > 0 ? '' : 'none';
+
+                const totalLogCount = (dataAcq.statusCounts || []).reduce((sum, x) => sum + (x.count || 0), 0);
+                document.getElementById('dataAcqTotalLogs').textContent = totalLogCount;
+
+                renderServiceErrorSummary(snapshot.serviceErrorSummary || snapshot.ServiceErrorSummary || []);
+
+                document.getElementById('measureRate').textContent = formatNumber(snapshot.measureEval?.completionRatePerSecond);
+                document.getElementById('measureResourceCount').textContent = snapshot.measureEval?.resourceCount || 0;
+                document.getElementById('measureResPerSec').textContent = formatNumber(snapshot.measureEval?.averageResourcesPerSecond);
+                renderStageChart('measureStageChart', 'measureStageLegend', snapshot.measureEval?.funnelCounts || [], {
+                    'no measure report': '#94a3b8',
+                    notreportable: '#f59e0b',
+                    readyforvalidation: '#198754'
+                });
+                renderResourceMix('measureResourceMixChart', snapshot.measureEval?.resourceTypeCounts || []);
+                renderTimeline('measureTimeline', snapshot.measureEval?.throughputBuckets || [], '#0d6efd');
+
+                measureErrors = snapshot.measureEval?.errors || [];
+                document.getElementById('measureErrorsBtn').style.display = measureErrors.length > 0 ? '' : 'none';
+
+                document.getElementById('validationRate').textContent = formatNumber(snapshot.validation?.completionRatePerSecond);
+                document.getElementById('validationResourceCount').textContent = snapshot.validation?.resourceCount || 0;
+                document.getElementById('validationResPerSec').textContent = formatNumber(snapshot.validation?.averageResourcesPerSecond);
+                renderStageChart('validationStageChart', 'validationStageLegend', snapshot.validation?.funnelCounts || [], {
+                    notvalidated: '#94a3b8',
+                    failedvalidation: '#ef4444',
+                    passedvalidation: '#198754'
+                });
+                renderResourceMix('validationResourceMixChart', snapshot.validation?.resourceTypeCounts || []);
+                renderTimeline('validationTimeline', snapshot.validation?.throughputBuckets || [], '#198754');
+
+                validationErrors = snapshot.validation?.errors || [];
+                document.getElementById('validationErrorsBtn').style.display = validationErrors.length > 0 ? '' : 'none';
+
+                if (snapshotIsFinal || isRunComplete(currentRunStatus) || currentFinishedAt) {
+                    stopSnapshotPolling();
+                }
+            } catch (err) {
+                const message = err && err.message ? err.message : String(err || 'Unknown snapshot error');
+                appendLog(`[snapshot] ERROR: ${message}`);
+                console.error('refreshSnapshot failed', err);
+            }
+        }
+
         connection.on('log', appendLog);
         connection.on('status', (run) => {
+            currentRunStatus = run.status || currentRunStatus;
+            document.getElementById('runName').textContent = run.runName;
+            document.getElementById('runNameDetails').textContent = run.runName;
+            document.getElementById('selectedMeasure').textContent = run.selectedMeasure;
+            document.getElementById('patientCount').textContent = run.patientCount;
+            document.getElementById('resourcesPerPatient').textContent = run.resourcesPerPatient;
+            document.getElementById('seed').textContent = run.seed;
             document.getElementById('status').textContent = run.status;
             document.getElementById('error').textContent = run.error || '-';
             document.getElementById('started').textContent = run.startedAt || '-';
             document.getElementById('finished').textContent = run.finishedAt || '-';
+            currentFinishedAt = run.finishedAt || currentFinishedAt;
+            refreshSnapshot();
+        });
+
+        document.getElementById('measureErrorsBtn').addEventListener('click', () => setFlyout('Measure Eval Errors', measureErrors));
+        document.getElementById('validationErrorsBtn').addEventListener('click', () => setFlyout('Validation Errors', validationErrors));
+        document.getElementById('dataAcqErrorsBtn').addEventListener('click', () => setFlyout('Data Acquisition Errors', dataAcqErrors));
+        for (const btn of document.querySelectorAll('.service-error-btn')) {
+            btn.addEventListener('click', () => {
+                const service = btn.getAttribute('data-service');
+                const lines = serviceErrorLines[service] || [];
+                if (!lines.length) return;
+                setFlyout(`${service} Exceptions`, lines);
+            });
+        }
+        document.getElementById('closeFlyout').addEventListener('click', () => {
+            document.getElementById('errorFlyout').style.right = '-480px';
         });
 
         connection.start()
             .then(() => connection.invoke('SubscribeRun', runId))
             .catch(err => appendLog('[signalr] ' + err));
+
+        refreshSnapshot();
+        if (!isRunComplete(currentRunStatus) && !currentFinishedAt)
+            snapshotTimer = setInterval(refreshSnapshot, 2000);
+
+        // --- DA Log Drill-Down Modal ---
+        const dataAcqLogsUrl = '@Url.Action("DataAcquisitionLogs", "Runs")';
+        let daLogPage = 1;
+        const daLogPageSize = 50;
+
+        async function loadDataAcqLogs(page) {
+            daLogPage = page;
+            const tbody = document.getElementById('dataAcqLogTableBody');
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Loading...</td></tr>';
+
+            try {
+                const res = await fetch(`${dataAcqLogsUrl}?id=${encodeURIComponent(runId)}&pageNumber=${page}&pageSize=${daLogPageSize}`);
+                if (!res.ok) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Failed to load logs.</td></tr>';
+                    return;
+                }
+
+                const data = await res.json();
+                const records = data.records || data.Records || [];
+                const totalCount = data.metadata?.totalCount || data.Metadata?.TotalCount || 0;
+                const totalPages = Math.max(1, Math.ceil(totalCount / daLogPageSize));
+
+                document.getElementById('dataAcqLogPaginationInfo').textContent =
+                    `Page ${page} of ${totalPages} (${totalCount} total)`;
+
+                document.getElementById('dataAcqLogPrev').disabled = page <= 1;
+                document.getElementById('dataAcqLogNext').disabled = page >= totalPages;
+
+                if (!records.length) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No logs found.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = records.map(r => {
+                    const status = r.status ?? r.Status ?? '-';
+                    const phase = r.queryPhase ?? r.QueryPhase ?? '-';
+                    const patient = r.patientId ?? r.PatientId ?? '-';
+                    const resCount = (r.resourceAcquiredIds || r.ResourceAcquiredIds || []).length;
+                    const notes = (r.notes || r.Notes || []).slice(0, 2).join('; ') || '-';
+                    const statusClass = status.toLowerCase() === 'completed' ? 'text-success'
+                        : status.toLowerCase() === 'failed' ? 'text-danger'
+                        : status.toLowerCase() === 'processing' ? 'text-info'
+                        : '';
+                    return `<tr>
+                        <td class="small">${r.id ?? r.Id ?? '-'}</td>
+                        <td class="small">${escapeHtml(patient)}</td>
+                        <td class="small ${statusClass}">${escapeHtml(status)}</td>
+                        <td class="small">${escapeHtml(phase)}</td>
+                        <td class="small">${resCount}</td>
+                        <td class="small" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(notes)}">${escapeHtml(notes)}</td>
+                    </tr>`;
+                }).join('');
+            } catch {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading logs.</td></tr>';
+            }
+        }
+
+        document.getElementById('dataAcqLogModal').addEventListener('show.bs.modal', () => loadDataAcqLogs(1));
+        document.getElementById('dataAcqLogPrev').addEventListener('click', () => { if (daLogPage > 1) loadDataAcqLogs(daLogPage - 1); });
+        document.getElementById('dataAcqLogNext').addEventListener('click', () => loadDataAcqLogs(daLogPage + 1));
     })();
 </script>

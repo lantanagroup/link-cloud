@@ -45,10 +45,11 @@ public class LokiScraper
 
     private const string HarmlessPatterns = "healthcheck|health-check|actuator|AppInfoParser|InstanceAlreadyExistsException";
 
-    public async Task ScrapeErrorsAsync()
+    public async Task ScrapeErrorsAsync(string? facilityId = null, string? reportId = null)
     {
+        var correlationFilter = BuildCorrelationFilter(facilityId, reportId);
         await ScrapeQueryAsync(
-            $"{{app=\"link-cloud\"}} |~ \"(?i)(error|exception)\" !~ \"(?i)({HarmlessPatterns})\"",
+            $"{{app=\"link-cloud\"}} |~ \"(?i)(error|exception)\" !~ \"(?i)({HarmlessPatterns})\"{correlationFilter}",
             "LOKI ERROR");
     }
 
@@ -57,7 +58,7 @@ public class LokiScraper
     /// a concise summary grouped by service. Services with no issues are listed on
     /// one line. Services with issues get their most recent error lines shown.
     /// </summary>
-    public async Task ScrapeAllServicesErrorSummaryAsync(TimeSpan lookback)
+    public async Task ScrapeAllServicesErrorSummaryAsync(TimeSpan lookback, string? facilityId = null, string? reportId = null)
     {
         var end = DateTime.UtcNow;
         var start = end - lookback;
@@ -72,7 +73,8 @@ public class LokiScraper
         {
             try
             {
-                var query = $"{{app=\"link-cloud\", component=\"{component}\"}} |~ \"(?i)(error|exception|fail|timeout|disconnect)\" !~ \"(?i)({HarmlessPatterns})\"";
+                var correlationFilter = BuildCorrelationFilter(facilityId, reportId);
+                var query = $"{{app=\"link-cloud\", component=\"{component}\"}} |~ \"(?i)(error|exception|fail|timeout|disconnect)\" !~ \"(?i)({HarmlessPatterns})\"{correlationFilter}";
                 var request = new RestRequest("/loki/api/v1/query_range");
                 request.AddParameter("query", query);
                 request.AddParameter("start", startUnix.ToString());
@@ -396,14 +398,15 @@ public class LokiScraper
         }
     }
 
-    public async Task<List<string>> GetServiceExceptionLinesAsync(string componentName, TimeSpan lookback, int limit = 20)
+    public async Task<List<string>> GetServiceExceptionLinesAsync(string componentName, TimeSpan lookback, int limit = 20, string? facilityId = null, string? reportId = null)
     {
         var end = DateTime.UtcNow;
         var start = end - lookback;
         var startUnix = ((DateTimeOffset)start).ToUnixTimeMilliseconds() * 1000000;
         var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
 
-        var query = $"{{app=\"link-cloud\", component=\"{componentName}\"}} |~ \"(?i)(exception|fatal|unhandled|stack\\s*trace|critical)\" !~ \"(?i)({HarmlessPatterns}|Unknown message ID)\"";
+        var correlationFilter = BuildCorrelationFilter(facilityId, reportId);
+        var query = $"{{app=\"link-cloud\", component=\"{componentName}\"}} |~ \"(?i)(exception|fatal|unhandled|stack\\s*trace|critical)\" !~ \"(?i)({HarmlessPatterns}|Unknown message ID)\"{correlationFilter}";
 
         var request = new RestRequest("/loki/api/v1/query_range");
         request.AddParameter("query", query);
@@ -446,6 +449,19 @@ public class LokiScraper
         }
 
         return lines;
+    }
+
+    private static string BuildCorrelationFilter(string? facilityId, string? reportId)
+    {
+        var filters = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(facilityId))
+            filters.Add($" |= \"{facilityId}\"");
+
+        if (!string.IsNullOrWhiteSpace(reportId))
+            filters.Add($" |= \"{reportId}\"");
+
+        return string.Concat(filters);
     }
 
     public async Task<string?> GetValidationActivitySummaryAsync(TimeSpan lookback)

@@ -93,6 +93,13 @@ public interface IDataAcquisitionLogQueries
 
     Task<DataAcquisitionLogModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns a lightweight aggregate summary for a report: totals, status counts
+    /// and resource-type counts. Runs entirely as DB aggregates — no entity loading.
+    /// </summary>
+    Task<DataAcquisitionReportSummary> GetReportSummaryAsync(string reportId,
+        CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
@@ -683,6 +690,89 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             ReportId = reportId,
             PatientId = string.IsNullOrWhiteSpace(patientId) ? null : patientId,
             Statuses = statuses
+        };
+    }
+
+    public async Task<DataAcquisitionReportSummary> GetReportSummaryAsync(string reportId,
+        CancellationToken cancellationToken = default)
+    {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetReportSummaryAsync");
+        activity?.SetTag(DiagnosticNames.ReportId, reportId);
+
+        if (string.IsNullOrWhiteSpace(reportId))
+            throw new ArgumentNullException(nameof(reportId));
+
+        var baseQuery = _dbContext.DataAcquisitionLogs
+            .AsNoTracking()
+            .Where(l => l.ReportTrackingId == reportId && !l.IsDeleted);
+
+        // Single aggregate pass for scalar totals.
+        var totals = await baseQuery
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                TotalLogs = g.Count(),
+                TotalPatients = g.Select(l => l.PatientId).Distinct().Count(),
+                TotalRetryAttempts = g.Sum(l => (int?)l.RetryAttempts ?? 0),
+                TotalCompletionTimeMs = g.Sum(l => (long?)l.CompletionTimeMilliseconds ?? 0L)
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // Status counts — lightweight grouped count.
+        var statusCounts = await baseQuery
+            .Where(l => l.Status != null)
+            .GroupBy(l => l.Status!.Value)
+            .OrderBy(g => g.Key)
+            .Select(g => new DataAcquisitionReportSummary.StatusCount
+            {
+                Status = g.Key.ToString(),
+                Count = g.Count()
+            })
+            .ToListAsync(cancellationToken);
+
+        // Resource-type counts from ResourceAcquiredIds JSON column.
+        // EF translates OPENJSON / json_each depending on provider; if that fails
+        // we fall back to a lightweight paged scan (still far cheaper than full entity load).
+        List<DataAcquisitionReportSummary.ResourceTypeCount> resourceTypeCounts;
+        int totalResourcesAcquired;
+        try
+        {
+            var rawIds = await baseQuery
+                .Where(l => l.Status == RequestStatus.Completed && l.ResourceAcquiredIds != null)
+                .SelectMany(l => l.ResourceAcquiredIds!)
+                .ToListAsync(cancellationToken);
+
+            var grouped = rawIds
+                .Where(id => !string.IsNullOrWhiteSpace(id) && id.Contains('/'))
+                .GroupBy(id => id.Split('/')[0], StringComparer.OrdinalIgnoreCase)
+                .Select(g => new DataAcquisitionReportSummary.ResourceTypeCount
+                {
+                    ResourceType = g.Key,
+                    Count = g.Count()
+                })
+                .OrderByDescending(x => x.Count)
+                .ToList();
+
+            totalResourcesAcquired = grouped.Sum(x => x.Count);
+            resourceTypeCounts = grouped;
+        }
+        catch
+        {
+            // Fallback if JSON column expansion is not supported by provider.
+            totalResourcesAcquired = 0;
+            resourceTypeCounts = [];
+        }
+
+        return new DataAcquisitionReportSummary
+        {
+            ReportId = reportId,
+            TotalLogs = totals?.TotalLogs ?? 0,
+            TotalPatients = totals?.TotalPatients ?? 0,
+            TotalRetryAttempts = totals?.TotalRetryAttempts ?? 0,
+            TotalCompletionTimeMs = totals?.TotalCompletionTimeMs ?? 0,
+            TotalResourcesAcquired = totalResourcesAcquired,
+            StatusCounts = statusCounts,
+            ResourceTypeCounts = resourceTypeCounts
         };
     }
 

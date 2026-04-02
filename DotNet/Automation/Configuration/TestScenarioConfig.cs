@@ -20,8 +20,11 @@ public class TestScenarioConfig
     /// <summary>
     /// The maximum wall-clock time the polling loop will run,
     /// computed from <see cref="MaxRetryCount"/> × <see cref="PollingIntervalSeconds"/>.
+    /// Non-positive <see cref="MaxRetryCount"/> indicates unlimited polling.
     /// </summary>
-    public TimeSpan MaxPollingDuration => TimeSpan.FromSeconds(MaxRetryCount * PollingIntervalSeconds);
+    public TimeSpan MaxPollingDuration => MaxRetryCount <= 0
+        ? TimeSpan.MaxValue
+        : TimeSpan.FromSeconds(MaxRetryCount * PollingIntervalSeconds);
 
     /// <summary>
     /// The Loki scrape window as a <see cref="TimeSpan"/>.

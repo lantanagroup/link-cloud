@@ -6,12 +6,12 @@
 public enum MeasureEligibility
 {
     /// <summary>
-    /// Inpatient encounter within the measurement period — will be included in the Initial Population.
+    /// Generated to satisfy the selected measure's Initial Population criteria.
     /// </summary>
     Qualifying,
 
     /// <summary>
-    /// Ambulatory/outpatient encounter — will NOT be included in the Initial Population.
+    /// Generated to avoid the selected measure's Initial Population criteria.
     /// </summary>
     NonQualifying
 }

@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
+using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 
@@ -50,7 +51,16 @@ public class EntryMeasureReportApiModel
 {
     public string? MeasureReportId { get; set; }
     public string ReportType { get; set; } = string.Empty;
+    public EntryMeasureReportStatus? Status { get; set; }
     public Dictionary<string, int> ResourceCount { get; set; } = [];
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum EntryMeasureReportStatus
+{
+    EntryCreated = 0,
+    NotReportable = 1,
+    ReadyForValidation = 2
 }
 
 public class ReportResourceApiModel

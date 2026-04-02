@@ -17,7 +17,7 @@ public sealed class LokiErrorProbe : IBackgroundMonitorProbe
 
     public async Task<MonitorProbeResult> ExecuteAsync(TestMonitorState state, CancellationToken cancellationToken)
     {
-        await _lokiScraper.ScrapeErrorsAsync();
+        await _lokiScraper.ScrapeErrorsAsync(state.FacilityId, state.ReportId);
         return MonitorProbeResult.Empty;
     }
 }

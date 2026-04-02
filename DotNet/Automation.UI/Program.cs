@@ -1,11 +1,14 @@
 ﻿using Automation.UI.Services;
+using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Automation.Configuration;
+using LantanaGroup.Link.Automation.Helpers;
 using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services.Security.Token;
+using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,9 +45,49 @@ builder.Services.AddSingleton<ICreateSystemToken, CreateSystemToken>();
 // ── LinkSdk service clients (all resolve URLs from ServiceRegistry) ──
 builder.Services.AddLinkSdk();
 
+// ── MongoDB persistence ──
+// Keys match Azure App Configuration: MongoDB:ConnectionString (shared, no label)
+// and MongoDB:DatabaseName (per-service via label "Link Automation UI").
+// In deployed environments these come from Key Vault references via App Config.
+var mongoConnectionString = builder.Configuration.GetValue<string>("MongoDB:ConnectionString");
+var mongoDatabaseName = builder.Configuration.GetValue<string>("MongoDB:DatabaseName");
+
+// For local host access to Docker Mongo replica-set (rs0), ensure required query params exist.
+if (!string.IsNullOrWhiteSpace(mongoConnectionString)
+    && (mongoConnectionString.Contains("localhost:17017", StringComparison.OrdinalIgnoreCase)
+        || mongoConnectionString.Contains("127.0.0.1:17017", StringComparison.OrdinalIgnoreCase)))
+{
+    var hasReplicaSet = mongoConnectionString.Contains("replicaSet=", StringComparison.OrdinalIgnoreCase);
+    var hasDirectConnection = mongoConnectionString.Contains("directConnection=", StringComparison.OrdinalIgnoreCase);
+    if (!hasReplicaSet || !hasDirectConnection)
+    {
+        var separator = mongoConnectionString.Contains('?') ? "&" : "?";
+        if (!hasReplicaSet)
+        {
+            mongoConnectionString += $"{separator}replicaSet=rs0";
+            separator = "&";
+        }
+
+        if (!hasDirectConnection)
+            mongoConnectionString += $"{separator}directConnection=true";
+    }
+}
+
+var mongoUrl = new MongoUrl(mongoConnectionString);
+var mongoClientSettings = MongoClientSettings.FromUrl(mongoUrl);
+
+builder.Services.AddSingleton<IMongoClient>(_ => new MongoClient(mongoClientSettings));
+builder.Services.AddSingleton(sp => sp.GetRequiredService<IMongoClient>().GetDatabase(mongoDatabaseName));
+builder.Services.AddSingleton<ISnapshotStore, MongoSnapshotStore>();
+
+// ── Pipeline data reader (scoped so each poller gets its own) ──
+builder.Services.AddScoped<PipelineDataReader>();
+
 // ── MVC + SignalR ──
 builder.Services.AddControllersWithViews();
 builder.Services.AddSignalR();
+builder.Services.AddSingleton<RunSnapshotOrchestrator>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<RunSnapshotOrchestrator>());
 builder.Services.AddSingleton<IAutomationRunManager, AutomationRunManager>();
 
 var app = builder.Build();

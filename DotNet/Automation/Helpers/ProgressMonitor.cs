@@ -164,14 +164,15 @@ public class ProgressMonitor
     {
         try
         {
-            var logs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
+            var summary = await _reader.GetDataAcquisitionReportSummaryAsync(reportId);
+            if (summary == null) return false;
 
-            var total = logs.Count;
-            var completed = logs.Count(l => string.Equals(l.Status, "Completed", StringComparison.OrdinalIgnoreCase));
-            var failed = logs.Count(l => string.Equals(l.Status, "Failed", StringComparison.OrdinalIgnoreCase));
-            var maxRetries = logs.Count(l => string.Equals(l.Status, "MaxRetriesReached", StringComparison.OrdinalIgnoreCase));
-            var processing = logs.Count(l => string.Equals(l.Status, "Processing", StringComparison.OrdinalIgnoreCase));
-            var pending = logs.Count(l => string.Equals(l.Status, "Pending", StringComparison.OrdinalIgnoreCase));
+            var total = summary.TotalLogs;
+            var completed = summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "Completed", StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
+            var failed = summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "Failed", StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
+            var maxRetries = summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "MaxRetriesReached", StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
+            var processing = summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "Processing", StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
+            var pending = summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "Pending", StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
 
             var breakdown = $"completed={completed}, processing={processing}, " +
                             $"pending={pending}, failed={failed}, maxRetries={maxRetries}";
@@ -186,18 +187,7 @@ public class ProgressMonitor
 
             if (maxRetries > 0)
             {
-                var terminalLogs = logs
-                    .Where(l => string.Equals(l.Status, "MaxRetriesReached", StringComparison.OrdinalIgnoreCase))
-                    .Take(5)
-                    .ToList();
-
-                foreach (var log in terminalLogs)
-                {
-                    var notes = log.Notes.Count > 0 ? string.Join(" | ", log.Notes.Take(3)) : "(no notes)";
-                    _output.WriteLine($"[DIAG][DataAcq] CRITICAL: TERMINAL Log Id={log.Id}, Patient={log.PatientId}, " +
-                                     $"Status={log.Status}, Phase={log.QueryPhase}, Notes={notes}");
-                }
-
+                _output.WriteLine($"[DIAG][DataAcq] CRITICAL: {maxRetries} terminal MaxRetriesReached log(s) detected.");
                 return true;
             }
 

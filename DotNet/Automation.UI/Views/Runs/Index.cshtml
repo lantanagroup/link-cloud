@@ -1,4 +1,4 @@
-﻿@model IReadOnlyList<Automation.UI.Models.AutomationRunSummary>
+﻿@model Automation.UI.Models.AutomationRunIndexViewModel
 @{
     ViewData["Title"] = "Automation Runs";
     var qualifyingValue = (int)MeasureEligibility.Qualifying;
@@ -35,6 +35,10 @@
                         <select class="form-select" id="SelectedMeasure" name="SelectedMeasure">
                             <option value="@ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation">@ProfiledMeasureCatalog.GetDisplayName(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
                             </option>
+                            <option value="@ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation">@ProfiledMeasureCatalog.GetDisplayName(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation)
+                            </option>
+                            <option value="@ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation">@ProfiledMeasureCatalog.GetDisplayName(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation)
+                            </option>
                         </select>
                         <div class="form-text">Both measure loading and profile generation run in this selected
                             measure context.</div>
@@ -56,19 +60,6 @@
                     <div class="col-md-3">
                         <label class="form-label" for="Seed">Seed</label>
                         <input class="form-control" type="number" min="1" id="Seed" name="Seed" value="20260329" />
-                    </div>
-
-                    <div class="col-md-3">
-                        <label class="form-label" for="PollingIntervalSeconds">Polling Interval (sec)</label>
-                        <input class="form-control" type="number" min="1" max="120" id="PollingIntervalSeconds" name="PollingIntervalSeconds" value="3" />
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label" for="MaxRetryCount">Max Retry Count</label>
-                        <input class="form-control" type="number" min="1" max="5000" id="MaxRetryCount" name="MaxRetryCount" value="120" />
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label" for="LokiScrapeWindowMinutes">Loki Window (min)</label>
-                        <input class="form-control" type="number" min="1" max="240" id="LokiScrapeWindowMinutes" name="LokiScrapeWindowMinutes" value="10" />
                     </div>
 
                     <div class="col-md-3 d-flex align-items-end">
@@ -147,7 +138,11 @@
                 <thead>
                     <tr>
                         <th>Run Id</th>
+                        <th>Run</th>
                         <th>Scenario</th>
+                        <th>Patients</th>
+                        <th>Resources/Patient</th>
+                        <th>Seed</th>
                         <th>Status</th>
                         <th>Created</th>
                         <th>Finished</th>
@@ -155,21 +150,52 @@
                     </tr>
                 </thead>
                 <tbody>
-                @foreach (var run in Model)
+                @foreach (var run in Model.Runs)
                 {
                     <tr>
                         <td><code>@run.RunId</code></td>
+                        <td>@run.RunName</td>
                         <td>@run.Scenario</td>
+                        <td>@run.PatientCount</td>
+                        <td>@run.ResourcesPerPatient</td>
+                        <td>@run.Seed</td>
                         <td>
                             <span class="badge @(run.Status == AutomationRunStatus.Succeeded ? "bg-success" : run.Status == AutomationRunStatus.Failed ? "bg-danger" : "bg-secondary")">@run.Status</span>
                         </td>
                         <td>@run.CreatedAt.LocalDateTime</td>
                         <td>@(run.FinishedAt?.LocalDateTime.ToString() ?? "-")</td>
-                        <td><a asp-action="Details" asp-route-id="@run.RunId" class="btn btn-sm btn-outline-primary">Open</a></td>
+                        <td class="text-nowrap">
+                            <div class="d-inline-flex gap-1 align-items-center">
+                                <a asp-action="Details" asp-route-id="@run.RunId" class="btn btn-sm btn-outline-primary">Open</a>
+                                @if (run.Status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed)
+                                {
+                                    <form asp-action="Delete" method="post" class="d-inline m-0">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@run.RunId" />
+                                        <input type="hidden" name="pageNumber" value="@Model.PageNumber" />
+                                        <input type="hidden" name="pageSize" value="@Model.PageSize" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this final run and all persisted data?');">Delete</button>
+                                    </form>
+                                }
+                            </div>
+                        </td>
                     </tr>
                 }
                 </tbody>
             </table>
+        </div>
+        <div class="card-footer d-flex justify-content-between align-items-center">
+            <span class="small text-muted">Showing page @Model.PageNumber of @Model.TotalPages (@Model.TotalCount total run(s))</span>
+            <div class="btn-group btn-group-sm" role="group" aria-label="Pagination">
+                <a class="btn btn-outline-secondary @(Model.PageNumber <= 1 ? "disabled" : "")"
+                   asp-action="Index"
+                   asp-route-pageNumber="@(Math.Max(1, Model.PageNumber - 1))"
+                   asp-route-pageSize="@Model.PageSize">Previous</a>
+                <a class="btn btn-outline-secondary @((Model.PageNumber >= Model.TotalPages) ? "disabled" : "")"
+                   asp-action="Index"
+                   asp-route-pageNumber="@(Math.Min(Model.TotalPages, Model.PageNumber + 1))"
+                   asp-route-pageSize="@Model.PageSize">Next</a>
+            </div>
         </div>
     </div>
 </div>

@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 
 namespace LantanaGroup.Link.Sdk.Clients;
@@ -14,7 +15,8 @@ public interface IDataAcquisitionServiceClient
     Task<bool> CreateQueryPlanAsync(string facilityId, CreateQueryPlanRequestApiModel request, CancellationToken cancellationToken = default);
     Task DeleteQueryPlanAsync(string facilityId, string type, CancellationToken cancellationToken = default);
     Task<PagedConfigModel<DataAcquisitionLogApiModel>> SearchAcquisitionLogsAsync(string facilityId, string reportId, int pageSize = 100, int pageNumber = 1, CancellationToken cancellationToken = default);
+    Task<DataAcquisitionLogApiModel?> GetAcquisitionLogByIdAsync(long id, CancellationToken cancellationToken = default);
     Task<DataAcquisitionLogStatusStatisticsApiModel?> GetReportStatusCountsAsync(string reportId, CancellationToken cancellationToken = default);
-    Task<PagedConfigModel<DataAcquisitionLogApiModel>> SearchDetailedAcquisitionLogsAsync(string facilityId, string reportId, int pageSize = 100, int pageNumber = 1, CancellationToken cancellationToken = default);
+    Task<DataAcquisitionReportSummaryApiModel?> GetReportSummaryAsync(string reportId, CancellationToken cancellationToken = default);
     Task<List<string>> GetAcquiredResourceIdsForReportAsync(string facilityId, string reportId, CancellationToken cancellationToken = default);
 }

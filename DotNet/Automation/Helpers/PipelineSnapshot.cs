@@ -112,32 +112,17 @@ public class PipelineSnapshot
     {
         try
         {
-            var logs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
-            if (logs.Count == 0)
+            var summary = await _reader.GetDataAcquisitionReportSummaryAsync(reportId);
+            if (summary == null || summary.TotalLogs == 0)
             {
                 output.WriteLine("[Snapshot][DataAcqLog]          0 rows");
             }
             else
             {
-                var byStatus = logs.GroupBy(l => l.Status)
-                    .Select(g => $"{g.Key}={g.Count()}");
-                var patientCount = logs.Where(l => l.PatientId != null)
-                    .Select(l => l.PatientId).Distinct().Count();
-
-                output.WriteLine($"[Snapshot][DataAcqLog]          {logs.Count} row(s) for {patientCount} patient(s) | " +
-                                 $"{string.Join(", ", byStatus)}");
-
-                var failedLogs = logs
-                    .Where(l => string.Equals(l.Status, "Failed", StringComparison.OrdinalIgnoreCase) || string.Equals(l.Status, "MaxRetriesReached", StringComparison.OrdinalIgnoreCase))
-                    .Take(5)
-                    .ToList();
-
-                foreach (var log in failedLogs)
-                {
-                    var notes = log.Notes.Count > 0 ? string.Join(" | ", log.Notes.Take(3)) : "(no notes)";
-                    output.WriteLine($"[Snapshot][DataAcqLog]          FAILED Id={log.Id}, Patient={log.PatientId}, " +
-                                     $"Status={log.Status}, Phase={log.QueryPhase}, Notes={notes}");
-                }
+                var byStatus = string.Join(", ", summary.StatusCounts.Select(s => $"{s.Status}={s.Count}"));
+                output.WriteLine($"[Snapshot][DataAcqLog]          {summary.TotalLogs} row(s) for {summary.TotalPatients} patient(s) | {byStatus}");
+                output.WriteLine($"[Snapshot][DataAcqLog]          Resources acquired: {summary.TotalResourcesAcquired}, " +
+                                 $"Avg completion: {summary.AverageCompletionTimeMs}ms, Retries: {summary.TotalRetryAttempts}");
             }
 
             var hasConfig = await _reader.HasFhirQueryConfigurationAsync(facilityId);

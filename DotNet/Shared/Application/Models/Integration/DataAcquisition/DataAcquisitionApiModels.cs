@@ -12,7 +12,19 @@ public class DataAcquisitionLogApiModel
     public QueryPhase? QueryPhase { get; set; }
     public List<FhirQueryApiModel> FhirQuery { get; set; } = [];
     public List<string>? ResourceAcquiredIds { get; set; } = [];
+    public List<ReferenceResourceApiModel> ReferenceResources { get; set; } = [];
     public List<string>? Notes { get; set; } = [];
+}
+
+public class ReferenceResourceApiModel
+{
+    public Guid Id { get; set; }
+    public string FacilityId { get; set; } = string.Empty;
+    public string ResourceId { get; set; } = string.Empty;
+    public string ResourceType { get; set; } = string.Empty;
+    public string? ReferenceResource { get; set; }
+    public QueryPhase? QueryPhase { get; set; }
+    public long DataAcquisitionLogId { get; set; }
 }
 
 public class FhirQueryApiModel

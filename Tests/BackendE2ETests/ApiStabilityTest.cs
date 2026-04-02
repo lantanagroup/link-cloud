@@ -266,11 +266,11 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
         await RunAsync(results, "DataAcq.SearchAcquisitionLogs",
             () => DataAcqClient.SearchAcquisitionLogsAsync(_facilityId, Guid.NewGuid().ToString()));
 
-        await RunAsync(results, "DataAcq.SearchDetailedAcquisitionLogs",
-            () => DataAcqClient.SearchDetailedAcquisitionLogsAsync(_facilityId, Guid.NewGuid().ToString()));
-
         await RunAsync(results, "DataAcq.GetReportStatusCounts",
             () => DataAcqClient.GetReportStatusCountsAsync(Guid.NewGuid().ToString()));
+
+        await RunAsync(results, "DataAcq.GetReportSummary",
+            () => DataAcqClient.GetReportSummaryAsync(Guid.NewGuid().ToString()));
 
         await RunAsync(results, "DataAcq.GetAcquiredResourceIdsForReport",
             () => DataAcqClient.GetAcquiredResourceIdsForReportAsync(_facilityId, Guid.NewGuid().ToString()));

@@ -51,12 +51,15 @@ public class ReportApiHelper
     {
         var pollingIntervalSeconds = config.PollingIntervalSeconds;
         var maxRetryCount = config.MaxRetryCount;
+        var unlimited = maxRetryCount <= 0;
 
-        _output.WriteLine($"Polling for report submission (reportId={reportId}, max {maxRetryCount * pollingIntervalSeconds}s)...");
+        _output.WriteLine(unlimited
+            ? $"Polling for report submission (reportId={reportId}, no timeout)..."
+            : $"Polling for report submission (reportId={reportId}, max {maxRetryCount * pollingIntervalSeconds}s)...");
 
         string? lastStatus = null;
 
-        for (var retry = 0; retry < maxRetryCount; retry++)
+        for (var retry = 0; unlimited || retry < maxRetryCount; retry++)
         {
             if (diagnostics?.HasCriticalFailure == true)
             {

@@ -95,26 +95,23 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
             .SetQueryParam("sortOrder", "Ascending")
             .GetJsonAsync<PagedConfigModel<DataAcquisitionLogApiModel>>(cancellationToken: cancellationToken);
 
+    public Task<DataAcquisitionLogApiModel?> GetAcquisitionLogByIdAsync(
+        long id,
+        CancellationToken cancellationToken = default) =>
+        GetOrDefaultAsync(() => Request($"data/acquisition-logs/{id}")
+            .GetJsonAsync<DataAcquisitionLogApiModel>(cancellationToken: cancellationToken));
+
     public Task<DataAcquisitionLogStatusStatisticsApiModel?> GetReportStatusCountsAsync(
         string reportId,
         CancellationToken cancellationToken = default) =>
         GetOrDefaultAsync(() => Request($"data/acquisition-logs/report/{reportId}/status-counts")
             .GetJsonAsync<DataAcquisitionLogStatusStatisticsApiModel>(cancellationToken: cancellationToken));
 
-    public Task<PagedConfigModel<DataAcquisitionLogApiModel>> SearchDetailedAcquisitionLogsAsync(
-        string facilityId,
+    public Task<DataAcquisitionReportSummaryApiModel?> GetReportSummaryAsync(
         string reportId,
-        int pageSize = 100,
-        int pageNumber = 1,
         CancellationToken cancellationToken = default) =>
-        Request("data/acquisition-logs/detailed")
-            .SetQueryParam("facilityId", facilityId)
-            .SetQueryParam("reportId", reportId)
-            .SetQueryParam("pageSize", pageSize)
-            .SetQueryParam("pageNumber", pageNumber)
-            .SetQueryParam("sortBy", "Id")
-            .SetQueryParam("sortOrder", "Ascending")
-            .GetJsonAsync<PagedConfigModel<DataAcquisitionLogApiModel>>(cancellationToken: cancellationToken);
+        GetOrDefaultAsync(() => Request($"data/acquisition-logs/report/{reportId}/summary")
+            .GetJsonAsync<DataAcquisitionReportSummaryApiModel>(cancellationToken: cancellationToken));
 
     public Task<List<string>> GetAcquiredResourceIdsForReportAsync(
         string facilityId,

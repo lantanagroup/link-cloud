@@ -250,12 +250,16 @@ public class KafkaErrorMonitor : IAsyncDisposable
         try
         {
             var json = JObject.Parse(rawValue);
-            var patientId = json["PatientId"]?.ToString();
-            var queryType = json["QueryType"]?.ToString();
-            var reportableEvent = json["ReportableEvent"]?.ToString();
-            var resourceType = json["Resource"]?["resourceType"]?.ToString();
-            var resourceId = json["Resource"]?["id"]?.ToString();
-            var scheduledCount = json["ScheduledReports"] is JArray reports ? reports.Count : 0;
+            var patientId = json["PatientId"]?.ToString() ?? json["patientId"]?.ToString();
+            var queryType = json["QueryType"]?.ToString() ?? json["queryType"]?.ToString();
+            var reportableEvent = json["ReportableEvent"]?.ToString() ?? json["reportableEvent"]?.ToString();
+
+            var resourceToken = json["Resource"] ?? json["resource"];
+            var resourceType = resourceToken?["resourceType"]?.ToString();
+            var resourceId = resourceToken?["id"]?.ToString();
+
+            var scheduledReports = json["ScheduledReports"] ?? json["scheduledReports"];
+            var scheduledCount = scheduledReports is JArray reports ? reports.Count : 0;
 
             return $"patientId={patientId ?? "(null)"}, queryType={queryType ?? "(null)"}, reportableEvent={reportableEvent ?? "(null)"}, resourceType={resourceType ?? "(null)"}, resourceId={resourceId ?? "(null)"}, scheduledReports={scheduledCount}";
         }

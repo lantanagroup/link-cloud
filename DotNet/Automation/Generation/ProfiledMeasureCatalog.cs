@@ -9,6 +9,8 @@ public static class ProfiledMeasureCatalog
     public static string GetDisplayName(ProfiledMeasureType measure) => measure switch
     {
         ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation => "NHSN Acute Care Hospital Monthly Initial Population",
+        ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation => "NHSN Acute Care Hospital Daily Initial Population",
+        ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation => "NHSN Glycemic Control Hypoglycemic Initial Population",
         _ => throw new ArgumentOutOfRangeException(nameof(measure), measure, null)
     };
 
@@ -16,6 +18,10 @@ public static class ProfiledMeasureCatalog
     {
         ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation
             => "resource://LantanaGroup.Link.Automation.measures.NHSNAcuteCareHospitalMonthlyInitialPopulation.json",
+        ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation
+            => "resource://LantanaGroup.Link.Automation.measures.NHSNAcuteCareHospitalDailyInitialPopulation.json",
+        ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation
+            => "resource://LantanaGroup.Link.Automation.measures.NHSNGlycemicControlHypoglycemicInitialPopulation.json",
         _ => throw new ArgumentOutOfRangeException(nameof(measure), measure, null)
     };
 }

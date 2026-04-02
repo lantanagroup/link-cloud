@@ -46,7 +46,9 @@ public class ValidationResultsValidator
             var exceptionLines = await _lokiScraper.GetServiceExceptionLinesAsync(
                 LokiScraper.Components.Validation,
                 window,
-                20);
+                20,
+                facilityId,
+                reportId);
 
             if (exceptionLines.Count > 0)
             {

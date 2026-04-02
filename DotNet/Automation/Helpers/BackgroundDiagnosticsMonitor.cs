@@ -235,7 +235,10 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
                 ["stallSeconds"] = ((int)stallDuration.TotalSeconds).ToString()
             });
 
-        await _lokiScraper.ScrapeAllServicesErrorSummaryAsync(TimeSpan.FromMinutes(5));
+        await _lokiScraper.ScrapeAllServicesErrorSummaryAsync(
+            TimeSpan.FromMinutes(5),
+            _monitor.State.FacilityId,
+            _monitor.State.ReportId);
     }
 
     private Task OnMonitorEventAsync(AutomationMonitorEvent evt)

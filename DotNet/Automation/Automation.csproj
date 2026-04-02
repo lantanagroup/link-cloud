@@ -12,8 +12,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Remove="measures\NHSNAcuteCareHospitalMonthlyInitialPopulation.json" />
-    <EmbeddedResource Include="measures\NHSNAcuteCareHospitalMonthlyInitialPopulation.json" />
+    <None Remove="measures\*.json" />
+    <EmbeddedResource Include="measures\*.json" />
   </ItemGroup>
 
   <ItemGroup>

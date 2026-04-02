@@ -138,31 +138,65 @@ public class DataAcquisitionDatabaseValidator
 
     private async Task ValidateFhirQueries(string facilityId, string reportId, List<string> errors, bool expectDataAcquisitionData)
     {
-        var queries = await _reader.GetFhirQueriesForReportAsync(facilityId, reportId);
+        var hasFhirQueries = await _reader.HasAnyFhirQueryRowsForReportAsync(facilityId, reportId);
 
         if (!expectDataAcquisitionData)
         {
-            if (queries.Count > 0)
-                AddError(errors, $"Expected no FhirQuery rows for report {reportId} but found {queries.Count}.");
+            if (hasFhirQueries)
+                AddError(errors, $"Expected no FhirQuery rows for report {reportId} but found at least one.");
             return;
         }
 
-        if (queries.Count == 0)
+        if (!hasFhirQueries)
             AddError(errors, "Expected FhirQuery rows for this report but found none.");
     }
 
     private async Task ValidateReferenceResources(string facilityId, string reportId, List<string> errors, bool expectDataAcquisitionData)
     {
-        var groupCount = await _reader.GetReferenceResourceGroupCountAsync(facilityId, reportId);
+        var logs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
+        var hasReferenceResources = await _reader.HasAnyReferenceResourcesForReportAsync(facilityId, reportId);
 
         if (!expectDataAcquisitionData)
         {
-            if (groupCount > 0)
-                AddError(errors, $"Expected no ReferenceResources rows for report {reportId} but found {groupCount} groups.");
+            if (hasReferenceResources)
+                AddError(errors, $"Expected no ReferenceResources rows for report {reportId} but found at least one.");
             return;
         }
 
-        if (groupCount == 0)
-            AddError(errors, "Expected ReferenceResources rows for the facility but found none.");
+        if (hasReferenceResources)
+            return;
+
+        var referentialLogs = logs
+            .Where(l => string.Equals(l.QueryPhase, "Referential", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var referentialCompleted = referentialLogs.Count(l =>
+            string.Equals(l.Status, "Completed", StringComparison.OrdinalIgnoreCase));
+
+        // If no referential work completed, reference-resource rows are not expected.
+        if (referentialCompleted == 0)
+            return;
+
+        // Small consistency wait if referential work is already marked completed.
+        if (referentialCompleted > 0)
+        {
+            for (var i = 0; i < 10; i++)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(2));
+                hasReferenceResources = await _reader.HasAnyReferenceResourcesForReportAsync(facilityId, reportId);
+                if (hasReferenceResources)
+                    return;
+            }
+        }
+
+        var statusSummary = referentialLogs
+            .GroupBy(l => l.Status ?? "(null)", StringComparer.OrdinalIgnoreCase)
+            .Select(g => $"{g.Key}={g.Count()}")
+            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase);
+
+        AddError(
+            errors,
+            $"Expected ReferenceResources rows for the facility but found none. " +
+            $"Diagnostics: totalLogs={logs.Count}, referentialLogs={referentialLogs.Count}, referentialCompleted={referentialCompleted}, " +
+            $"referentialStatuses=[{string.Join(", ", statusSummary)}].");
     }
 }

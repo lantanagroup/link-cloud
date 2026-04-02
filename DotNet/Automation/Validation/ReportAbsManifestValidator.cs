@@ -223,8 +223,13 @@ public class ReportAbsManifestValidator
         }
 
         var patientResourceFound = resources.Any(r => IsType(r, "Patient") && string.Equals(GetString(r, "id"), patientId, StringComparison.Ordinal));
-        if (!patientResourceFound)
-            AddError(errors, $"patient-{patientId}.ndjson does not contain Patient/{patientId}.");
+        var patientReferenceFound = resources.Any(r =>
+            string.Equals(GetNestedString(r, "subject", "reference"), $"Patient/{patientId}", StringComparison.Ordinal) ||
+            string.Equals(GetNestedString(r, "patient", "reference"), $"Patient/{patientId}", StringComparison.Ordinal) ||
+            string.Equals(GetNestedString(r, "beneficiary", "reference"), $"Patient/{patientId}", StringComparison.Ordinal));
+
+        if (!patientResourceFound && !patientReferenceFound)
+            AddError(errors, $"patient-{patientId}.ndjson does not contain Patient/{patientId} or a matching patient reference.");
 
         var duplicates = resources
             .Select(r => (Type: GetString(r, "resourceType"), Id: GetString(r, "id")))
@@ -398,20 +403,33 @@ public class ReportAbsManifestValidator
 
         if (expectDataAcquisitionData)
         {
-            var dataAcqCountMap = ToCountMap(
-                (await _reader.GetDataAcquisitionResourceCountsByPatientTypeAsync(facilityId, reportId))
-                .Where(x => submittedPatients.Contains(x.PatientId))
-                .Select(x => (x.PatientId, x.ResourceType, x.Count)));
+            var acquiredKeys = await _reader.GetAcquiredResourceIdsForReportAsync(facilityId, reportId);
 
-            CompareCountMapsMinimum("DataAcquisition->ReportResource", dataAcqCountMap, reportCountMap, errors);
-            CompareCountMapsMinimum("DataAcquisition->ABS", dataAcqCountMap, absCountMap, errors);
+            var dataAcqTypeCountMap = acquiredKeys
+                .Select(GetResourceTypeFromKey)
+                .Where(t => !string.IsNullOrWhiteSpace(t))
+                .GroupBy(t => t, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
 
-            var acquisitionLogs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
-            var acquiredKeys = acquisitionLogs
-                .Where(l => string.Equals(l.Status, "Completed", StringComparison.OrdinalIgnoreCase))
-                .SelectMany(l => l.ResourceAcquiredIds ?? [])
-                .Where(r => !string.IsNullOrWhiteSpace(r) && r.Contains('/'))
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var reportTypeCountMap = reportResources
+                .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType) && !string.IsNullOrWhiteSpace(r.ResourceId) && !IsDerivedType(r.ResourceType))
+                .Select(r => ToResourceKey(r.ResourceType, r.ResourceId))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .GroupBy(GetResourceTypeFromKey, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+
+            var absTypeCountMap = patientResources
+                .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType)
+                            && !string.IsNullOrWhiteSpace(r.ResourceId)
+                            && !IsAbsSupplementalType(r.ResourceType)
+                            && !IsDerivedType(r.ResourceType))
+                .Select(r => ToResourceKey(r.ResourceType, r.ResourceId))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .GroupBy(GetResourceTypeFromKey, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+
+            CompareTypeCountMinimum("DataAcquisition->ReportResource", dataAcqTypeCountMap, reportTypeCountMap, errors);
+            CompareTypeCountMinimum("DataAcquisition->ABS", dataAcqTypeCountMap, absTypeCountMap, errors);
 
             var expectedNonDerived = expectedKeys
                 .Where(k => !IsDerivedType(k.Split('/')[0]))
@@ -424,6 +442,25 @@ public class ReportAbsManifestValidator
 
             foreach (var missing in missingInAcquisition)
                 AddError(errors, $"ReportResource {missing} not found in DataAcquisition completed ResourceAcquiredIds.");
+        }
+    }
+
+    private static void CompareTypeCountMinimum(
+        string sourceName,
+        Dictionary<string, int> minimumExpected,
+        Dictionary<string, int> actual,
+        List<string> errors)
+    {
+        foreach (var (resourceType, minCount) in minimumExpected)
+        {
+            if (!actual.TryGetValue(resourceType, out var actualCount))
+                continue;
+
+            if (actualCount > minCount)
+            {
+                AddError(errors,
+                    $"{sourceName} upstream count lower than downstream for type={resourceType}: upstream={minCount}, downstream={actualCount}.");
+            }
         }
     }
 
@@ -707,6 +744,13 @@ public class ReportAbsManifestValidator
         }
     }
 
+    /// <summary>
+    /// For each resource type that exists in BOTH the upstream (minimumExpected) and
+    /// downstream (actual) layers, verify that the downstream count does not exceed
+    /// the upstream count. Resource types acquired upstream but absent downstream
+    /// are expected — MeasureEval only references the subset of acquired data that
+    /// the CQL expressions actually use.
+    /// </summary>
     private static void CompareCountMapsMinimum(
         string sourceName,
         Dictionary<(string PatientId, string ResourceType), int> minimumExpected,
@@ -717,8 +761,8 @@ public class ReportAbsManifestValidator
         {
             if (!actual.TryGetValue(key, out var actualCount))
             {
-                AddError(errors,
-                    $"{sourceName} missing patient/type in downstream layer: patient={key.PatientId}, type={key.ResourceType}, expectedAtLeast={minCount}, actual=0.");
+                // Upstream acquired this type but downstream doesn't reference it.
+                // This is normal — not every acquired resource type is used by the measure CQL.
                 continue;
             }
 

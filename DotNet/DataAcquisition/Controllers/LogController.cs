@@ -9,12 +9,14 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using LantanaGroup.Link.Shared.Settings;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using LantanaGroup.Link.Shared.Application.Enums;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -311,6 +313,58 @@ public class LogController : Controller
         {
             _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetReportStatistics"), ex, "An exception occurred while attempting to get report statistics with a report id of {id}", reportId.Sanitize());
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Get a lightweight aggregate summary of data acquisition for a report.
+    /// Returns totals, status counts and resource-type counts computed via DB aggregates.
+    /// Intended for dashboard polling and run monitoring.
+    /// </summary>
+    [HttpGet("report/{reportId}/summary")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DataAcquisitionReportSummaryApiModel))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<DataAcquisitionReportSummaryApiModel>> GetReportSummary(
+        [FromRoute] string reportId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(reportId))
+            return BadRequest($"{nameof(reportId)} cannot be null or empty.");
+
+        reportId = HtmlInputSanitizer.Sanitize(reportId).SanitizeAndRemove();
+
+        try
+        {
+            var summary = await _logQueries.GetReportSummaryAsync(reportId, cancellationToken);
+
+            return Ok(new DataAcquisitionReportSummaryApiModel
+            {
+                ReportId = summary.ReportId,
+                TotalLogs = summary.TotalLogs,
+                TotalPatients = summary.TotalPatients,
+                TotalResourcesAcquired = summary.TotalResourcesAcquired,
+                TotalRetryAttempts = summary.TotalRetryAttempts,
+                TotalCompletionTimeMs = summary.TotalCompletionTimeMs,
+                StatusCounts = summary.StatusCounts.Select(s => new DataAcquisitionReportSummaryApiModel.StatusCountEntry
+                {
+                    Status = s.Status,
+                    Count = s.Count
+                }).ToList(),
+                ResourceTypeCounts = summary.ResourceTypeCounts.Select(r => new DataAcquisitionReportSummaryApiModel.ResourceTypeCountEntry
+                {
+                    ResourceType = r.ResourceType,
+                    Count = r.Count
+                }).ToList()
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetReportSummary"), ex,
+                "An exception occurred while attempting to get report summary for report {reportId}",
+                reportId.Sanitize());
+            return Problem(title: "Internal Server Error", detail: ex.Message,
+                statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
 
@@ -741,52 +795,6 @@ public class LogController : Controller
         catch (Exception ex)
         {
             _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "ProcessByFilter"), ex, "An Exception occurred while attempting to process logs by filter.");
-            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
-        }
-    }
-
-    /// <summary>
-    /// Get paged detailed data acquisition logs with full log payload.
-    /// Intended for diagnostics and automation validation scenarios.
-    /// </summary>
-    [HttpGet("detailed")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<DataAcquisitionLogModel>))]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<PagedConfigModel<DataAcquisitionLogModel>>> SearchDetailed(
-        [FromQuery] string? facilityId = null,
-        [FromQuery] string? reportId = null,
-        [FromQuery] string? patientId = null,
-        [FromQuery] int pageSize = 100,
-        [FromQuery] int pageNumber = 1,
-        [FromQuery] string? sortBy = "Id",
-        [FromQuery] LantanaGroup.Link.Shared.Application.Enums.SortOrder sortOrder = LantanaGroup.Link.Shared.Application.Enums.SortOrder.Ascending,
-        CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            if (pageSize < 1 || pageSize > 5000)
-                pageSize = 100;
-            if (pageNumber < 1)
-                pageNumber = 1;
-
-            var result = await _logQueries.SearchAsync(new SearchDataAcquisitionLogRequest
-            {
-                FacilityId = facilityId?.SanitizeAndRemove(),
-                ReportTrackingId = reportId?.SanitizeAndRemove(),
-                PatientId = patientId?.SanitizeAndRemove(),
-                PageSize = pageSize,
-                PageNumber = pageNumber,
-                SortBy = string.IsNullOrWhiteSpace(sortBy) ? "Id" : sortBy,
-                SortOrder = sortOrder
-            }, cancellationToken);
-
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(new EventId(LoggingIds.ListItems, "SearchDetailed"), ex,
-                "An exception occurred while searching detailed data acquisition logs.");
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }

@@ -9,5 +9,15 @@ public enum ProfiledMeasureType
     /// <summary>
     /// NHSN Acute Care Hospital Monthly Initial Population.
     /// </summary>
-    NhsnAcuteCareHospitalMonthlyInitialPopulation
+    NhsnAcuteCareHospitalMonthlyInitialPopulation,
+
+    /// <summary>
+    /// NHSN Acute Care Hospital Daily Initial Population.
+    /// </summary>
+    NhsnAcuteCareHospitalDailyInitialPopulation,
+
+    /// <summary>
+    /// NHSN Glycemic Control Hypoglycemic Initial Population.
+    /// </summary>
+    NhsnGlycemicControlHypoglycemicInitialPopulation
 }

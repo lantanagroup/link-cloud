@@ -1,5 +1,5 @@
-﻿using LantanaGroup.Link.Sdk.ApiClient;
-using LantanaGroup.Link.Sdk.Clients;
+﻿using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 
 namespace LantanaGroup.Link.Automation.Helpers;
 
@@ -47,6 +47,18 @@ public class PipelineDataReader
     public record MeasureReportPopulationInfo(string? MeasureReportId);
 
     public record AcquisitionLogInfo(long Id, string? PatientId, string? Status, string? QueryPhase, List<string> Notes, List<string> ResourceAcquiredIds, List<FhirQueryInfo> FhirQueries);
+    public record StatusCountInfo(string Status, int Count);
+    public record ResourceTypeCountInfo(string ResourceType, int Count);
+    public record AcquisitionSummaryInfo(
+        string ReportId,
+        int TotalLogs,
+        int TotalPatients,
+        int TotalResourcesAcquired,
+        int TotalRetryAttempts,
+        long TotalCompletionTimeMs,
+        long AverageCompletionTimeMs,
+        List<StatusCountInfo> StatusCounts,
+        List<ResourceTypeCountInfo> ResourceTypeCounts);
     public record QueryPlanInfo(string Type, string? PlanName, int InitialQueriesCount, int SupplementalQueriesCount);
     public record FhirQueryInfo(List<string> ResourceTypes);
 
@@ -88,7 +100,7 @@ public class PipelineDataReader
         {
             var mrs = e.MeasureReports.Select(mr => new MeasureReportInfo(
                 mr.MeasureReportId,
-                null,
+                mr.Status?.ToString(),
                 mr.ReportType,
                 mr.ResourceCount.Select(rc => new ResourceCountInfo(rc.Key, rc.Value)).ToList())).ToList();
 
@@ -181,17 +193,66 @@ public class PipelineDataReader
 
     public async Task<List<AcquisitionLogInfo>> GetAcquisitionLogsAsync(string facilityId, string reportId)
     {
+        var results = await GetAcquisitionLogsCoreAsync(facilityId, reportId);
+        if (results.Count > 0 || string.IsNullOrWhiteSpace(facilityId))
+            return results;
+
+        // Facility can occasionally drift from report context; retry report-only for deterministic validation.
+        return await GetAcquisitionLogsCoreAsync(string.Empty, reportId);
+    }
+
+    public Task<DataAcquisitionLogApiModel?> GetAcquisitionLogByIdAsync(long id)
+        => _dataAcqClient.GetAcquisitionLogByIdAsync(id);
+
+    public async Task<bool> HasAnyFhirQueryRowsForReportAsync(string facilityId, string reportId)
+    {
+        var result = await HasAnyDetailedRowsForReportCoreAsync(
+            facilityId,
+            reportId,
+            detailed => (detailed?.FhirQuery?.Count ?? 0) > 0);
+
+        if (result || string.IsNullOrWhiteSpace(facilityId))
+            return result;
+
+        return await HasAnyDetailedRowsForReportCoreAsync(
+            string.Empty,
+            reportId,
+            detailed => (detailed?.FhirQuery?.Count ?? 0) > 0);
+    }
+
+    public async Task<bool> HasAnyReferenceResourcesForReportAsync(string facilityId, string reportId)
+    {
+        var result = await HasAnyDetailedRowsForReportCoreAsync(
+            facilityId,
+            reportId,
+            detailed => (detailed?.ReferenceResources?.Count ?? 0) > 0);
+
+        if (result || string.IsNullOrWhiteSpace(facilityId))
+            return result;
+
+        return await HasAnyDetailedRowsForReportCoreAsync(
+            string.Empty,
+            reportId,
+            detailed => (detailed?.ReferenceResources?.Count ?? 0) > 0);
+    }
+
+    private async Task<List<AcquisitionLogInfo>> GetAcquisitionLogsCoreAsync(string facilityId, string reportId)
+    {
         var pageNumber = 1;
         const int pageSize = 100;
         var results = new List<AcquisitionLogInfo>();
+        long? totalCount = null;
 
         while (true)
         {
-            var page = await _dataAcqClient.SearchDetailedAcquisitionLogsAsync(facilityId, reportId, pageSize: pageSize, pageNumber: pageNumber);
-            if (page?.Records == null || page.Records.Count == 0)
+            var page = await _dataAcqClient.SearchAcquisitionLogsAsync(facilityId, reportId, pageSize: pageSize, pageNumber: pageNumber);
+            var records = page?.Records ?? [];
+            if (records.Count == 0)
                 break;
 
-            results.AddRange(page.Records.Select(log => new AcquisitionLogInfo(
+            totalCount ??= page?.Metadata?.TotalCount;
+
+            results.AddRange(records.Select(log => new AcquisitionLogInfo(
                 log.Id,
                 log.PatientId,
                 log.Status?.ToString(),
@@ -200,13 +261,54 @@ public class PipelineDataReader
                 log.ResourceAcquiredIds?.ToList() ?? [],
                 log.FhirQuery.Select(fq => new FhirQueryInfo(fq.ResourceTypes.Where(r => !string.IsNullOrWhiteSpace(r)).ToList())).ToList())));
 
-            if (page.Records.Count < pageSize)
+            if (records.Count < pageSize)
+                break;
+
+            if (totalCount.HasValue && results.Count >= totalCount.Value)
                 break;
 
             pageNumber++;
         }
 
         return results;
+    }
+
+    private async Task<bool> HasAnyDetailedRowsForReportCoreAsync(
+        string facilityId,
+        string reportId,
+        Func<DataAcquisitionLogApiModel?, bool> predicate)
+    {
+        var pageNumber = 1;
+        const int pageSize = 100;
+        long scanned = 0;
+        long? totalCount = null;
+
+        while (true)
+        {
+            var page = await _dataAcqClient.SearchAcquisitionLogsAsync(facilityId, reportId, pageSize: pageSize, pageNumber: pageNumber);
+            var records = page?.Records ?? [];
+            if (records.Count == 0)
+                break;
+
+            totalCount ??= page?.Metadata?.TotalCount;
+            scanned += records.Count;
+
+            foreach (var record in records)
+            {
+                var detailed = await _dataAcqClient.GetAcquisitionLogByIdAsync(record.Id);
+                if (predicate(detailed))
+                    return true;
+            }
+
+            if (records.Count < pageSize)
+                break;
+
+            if (totalCount.HasValue && scanned >= totalCount.Value)
+                break;
+
+            pageNumber++;
+        }
+        return false;
     }
 
     public Task<bool> HasFhirQueryConfigurationAsync(string facilityId) =>
@@ -337,15 +439,66 @@ public class PipelineDataReader
 
     public async Task<List<PatientResourceTypeCount>> GetDataAcquisitionResourceCountsByPatientTypeAsync(string facilityId, string reportId)
     {
-        var logs = await GetAcquisitionLogsAsync(facilityId, reportId);
-        return logs
-            .Where(l => !string.IsNullOrWhiteSpace(l.PatientId) && string.Equals(l.Status, "Completed", StringComparison.OrdinalIgnoreCase))
-            .SelectMany(l => l.ResourceAcquiredIds
-                .Where(id => !string.IsNullOrWhiteSpace(id) && id.Contains('/'))
-                .Select(id => new { PatientId = l.PatientId!, ResourceType = id.Split('/')[0] }))
-            .GroupBy(x => new { x.PatientId, x.ResourceType })
-            .Select(g => new PatientResourceTypeCount(g.Key.PatientId, g.Key.ResourceType, g.Count()))
+        var counts = new Dictionary<(string PatientId, string ResourceType), int>();
+
+        var pageNumber = 1;
+        const int pageSize = 100;
+        long scanned = 0;
+        long? totalCount = null;
+
+        while (true)
+        {
+            var page = await _dataAcqClient.SearchAcquisitionLogsAsync(facilityId, reportId, pageSize: pageSize, pageNumber: pageNumber);
+            var records = page?.Records ?? [];
+            if (records.Count == 0)
+                break;
+
+            totalCount ??= page?.Metadata?.TotalCount;
+            scanned += records.Count;
+
+            foreach (var record in records)
+            {
+                var detailed = await _dataAcqClient.GetAcquisitionLogByIdAsync(record.Id);
+                if (string.IsNullOrWhiteSpace(detailed?.PatientId))
+                    continue;
+
+                foreach (var resourceId in detailed.ResourceAcquiredIds ?? [])
+                {
+                    if (string.IsNullOrWhiteSpace(resourceId) || !resourceId.Contains('/'))
+                        continue;
+
+                    var resourceType = resourceId.Split('/')[0];
+                    if (string.IsNullOrWhiteSpace(resourceType))
+                        continue;
+
+                    var key = (detailed.PatientId!, resourceType);
+                    counts[key] = counts.TryGetValue(key, out var current)
+                        ? current + 1
+                        : 1;
+                }
+            }
+
+            if (records.Count < pageSize)
+                break;
+
+            if (totalCount.HasValue && scanned >= totalCount.Value)
+                break;
+
+            pageNumber++;
+        }
+
+        return counts
+            .Select(kvp => new PatientResourceTypeCount(kvp.Key.PatientId, kvp.Key.ResourceType, kvp.Value))
             .ToList();
+    }
+
+    public async Task<List<StatusCountInfo>> GetDataAcquisitionStatusCountsAsync(string reportId)
+    {
+        var stats = await _dataAcqClient.GetReportStatusCountsAsync(reportId);
+        return stats?.Statuses?
+            .Where(s => !string.IsNullOrWhiteSpace(s.Name))
+            .Select(s => new StatusCountInfo(s.Name, s.Count))
+            .ToList() ?? [];
     }
 
     public async Task<HashSet<string>> GetAcquiredResourceIdsForReportAsync(string facilityId, string reportId)
@@ -354,5 +507,28 @@ public class PipelineDataReader
         return ids?
             .Where(x => !string.IsNullOrWhiteSpace(x) && x.Contains('/'))
             .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    public async Task<AcquisitionSummaryInfo?> GetDataAcquisitionReportSummaryAsync(string reportId)
+    {
+        var summary = await _dataAcqClient.GetReportSummaryAsync(reportId);
+        if (summary == null) return null;
+
+        return new AcquisitionSummaryInfo(
+            summary.ReportId,
+            summary.TotalLogs,
+            summary.TotalPatients,
+            summary.TotalResourcesAcquired,
+            summary.TotalRetryAttempts,
+            summary.TotalCompletionTimeMs,
+            summary.AverageCompletionTimeMs,
+            summary.StatusCounts
+                .Where(s => !string.IsNullOrWhiteSpace(s.Status))
+                .Select(s => new StatusCountInfo(s.Status, s.Count))
+                .ToList(),
+            summary.ResourceTypeCounts
+                .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType))
+                .Select(r => new ResourceTypeCountInfo(r.ResourceType, r.Count))
+                .ToList());
     }
 }

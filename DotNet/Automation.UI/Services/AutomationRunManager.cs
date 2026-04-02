@@ -1,5 +1,6 @@
-﻿using Automation.UI.Models;
-using Automation.UI.Services;
+﻿using Automation.UI.Services;
+using Automation.UI.Services.Persistence;
+using Automation.UI.Models;
 using LantanaGroup.Link.Automation;
 using LantanaGroup.Link.Automation.Configuration;
 using LantanaGroup.Link.Automation.Generation;
@@ -23,18 +24,24 @@ public class AutomationRunManager : IAutomationRunManager
     private readonly AutomationConfig _automationConfig;
     private readonly ILogger<AutomationRunManager> _logger;
     private readonly IServiceProvider _hostServices;
+    private readonly RunSnapshotOrchestrator _orchestrator;
+    private readonly ISnapshotStore _snapshotStore;
     private readonly ConcurrentDictionary<Guid, MutableRunState> _runs = new();
 
     public AutomationRunManager(
         IHubContext<RunHub> hub,
         IOptions<AutomationConfig> automationConfig,
         ILogger<AutomationRunManager> logger,
-        IServiceProvider hostServices)
+        IServiceProvider hostServices,
+        RunSnapshotOrchestrator orchestrator,
+        ISnapshotStore snapshotStore)
     {
         _hub = hub;
         _automationConfig = automationConfig.Value;
         _logger = logger;
         _hostServices = hostServices;
+        _orchestrator = orchestrator;
+        _snapshotStore = snapshotStore;
     }
 
     public Task<Guid> StartAsync(StartScenarioRequest request, CancellationToken cancellationToken = default)
@@ -44,17 +51,159 @@ public class AutomationRunManager : IAutomationRunManager
         var state = new MutableRunState(runId, request.Scenario, options);
         _runs[runId] = state;
 
+        _ = PersistRunSummaryAsync(state);
+
         _ = Task.Run(() => ExecuteAsync(state, cancellationToken), CancellationToken.None);
         return Task.FromResult(runId);
     }
 
-    public IReadOnlyList<AutomationRunSummary> GetRuns() => _runs.Values
-        .OrderByDescending(x => x.CreatedAt)
-        .Select(ToSummary)
-        .ToList();
+    public async Task<AutomationRunIndexViewModel> GetRunsPageAsync(int pageNumber = 1, int pageSize = 20, CancellationToken cancellationToken = default)
+    {
+        var page = await _snapshotStore.GetRunsPageAsync(pageNumber, pageSize, cancellationToken);
+        return new AutomationRunIndexViewModel
+        {
+            Runs = page.Items,
+            PageNumber = page.PageNumber,
+            PageSize = page.PageSize,
+            TotalCount = page.TotalCount
+        };
+    }
 
-    public AutomationRunSummary? GetRun(Guid runId)
-        => _runs.TryGetValue(runId, out var state) ? ToSummary(state) : null;
+    public async Task<AutomationRunSummary?> GetRunAsync(Guid runId, CancellationToken cancellationToken = default)
+    {
+        if (_runs.TryGetValue(runId, out var state))
+            return ToSummary(state);
+
+        var summary = await _snapshotStore.GetRunSummaryAsync(runId, cancellationToken);
+        if (summary == null)
+            return null;
+
+        summary.Logs = await _snapshotStore.GetLogsAsync(runId, cancellationToken);
+        return summary;
+    }
+
+    public async Task<bool> DeleteRunAsync(Guid runId, CancellationToken cancellationToken = default)
+    {
+        AutomationRunSummary? summary;
+
+        if (_runs.TryGetValue(runId, out var state))
+        {
+            summary = ToSummary(state);
+            if (summary.Status is not AutomationRunStatus.Succeeded and not AutomationRunStatus.Failed)
+                return false;
+
+            _runs.TryRemove(runId, out _);
+        }
+        else
+        {
+            summary = await _snapshotStore.GetRunSummaryAsync(runId, cancellationToken);
+            if (summary == null)
+                return false;
+            if (summary.Status is not AutomationRunStatus.Succeeded and not AutomationRunStatus.Failed)
+                return false;
+        }
+
+        await _snapshotStore.DeleteRunAsync(runId, cancellationToken);
+        return true;
+    }
+
+    public async Task<PipelineSummarySnapshotBuilder.PipelineSummarySnapshot?> GetPipelineSnapshotAsync(Guid runId, CancellationToken cancellationToken = default)
+    {
+        // Always read from Mongo — the poller writes domain data there,
+        // and logs are persisted as they're written. One data flow, no branching.
+        var summary = await _snapshotStore.GetRunSummaryAsync(runId, cancellationToken);
+
+        // For a live run that hasn't been persisted yet, fall back to in-memory for basic fields.
+        string? facilityId;
+        string? reportId;
+        List<string> logs;
+        AutomationRunStatus status;
+
+        if (_runs.TryGetValue(runId, out var state))
+        {
+            lock (state.Sync)
+            {
+                facilityId = state.FacilityId;
+                reportId = state.ReportId;
+                logs = state.Logs.ToList();
+            }
+            status = state.Status;
+        }
+        else if (summary != null)
+        {
+            facilityId = summary.FacilityId;
+            reportId = summary.ReportId;
+            logs = await _snapshotStore.GetLogsAsync(runId, cancellationToken);
+            status = summary.Status;
+        }
+        else
+        {
+            return null;
+        }
+
+        var isFinal = status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed;
+
+        try
+        {
+            // Build snapshot from store-cached domain data (zero API calls).
+            var builder = new PipelineSummarySnapshotBuilder(async (scheduleId, fId) =>
+            {
+                var schedule = await SafeGetDomainAsync<PipelineDataReader.ReportScheduleInfo>(runId, "schedule", cancellationToken);
+                var entries = await SafeGetDomainAsync<List<PipelineDataReader.ReportEntryInfo>>(runId, "entries", cancellationToken) ?? [];
+                var populations = await SafeGetDomainAsync<List<PipelineDataReader.ReportPopulationInfo>>(runId, "populations", cancellationToken) ?? [];
+                var acquisitionSummary = await SafeGetDomainAsync<PipelineDataReader.AcquisitionSummaryInfo>(runId, "acquisitionSummary", cancellationToken);
+                var measureResources = await SafeGetDomainAsync<List<PipelineDataReader.PatientResourceTypeCount>>(runId, "measureResources", cancellationToken) ?? [];
+                var validationResources = await SafeGetDomainAsync<List<PipelineDataReader.PatientResourceTypeCount>>(runId, "validationResources", cancellationToken) ?? [];
+
+                _logger.LogDebug(
+                    "[Snapshot][{RunId}] Domain data: schedule={HasSchedule}, entries={EntryCount}, populations={PopCount}, acqSummary={HasAcqSummary} (logs={AcqLogs}), measureRes={MeasureCount}, valRes={ValCount}",
+                    runId,
+                    schedule != null,
+                    entries.Count,
+                    populations.Count,
+                    acquisitionSummary != null,
+                    acquisitionSummary?.TotalLogs ?? 0,
+                    measureResources.Count,
+                    validationResources.Count);
+
+                return new PipelineSummarySnapshotBuilder.ResolvedDomainData
+                {
+                    Schedule = schedule,
+                    Entries = entries,
+                    Populations = populations,
+                    AcquisitionSummary = acquisitionSummary,
+                    MeasureEvalResourceCounts = measureResources,
+                    ReportResourceCounts = validationResources
+                };
+            });
+
+            var snapshot = await builder.BuildAsync(facilityId, reportId, logs, cancellationToken);
+            snapshot.IsFinal = isFinal;
+            return snapshot;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Pipeline snapshot build failed for run {RunId} (facility={FacilityId}, report={ReportId})", runId, facilityId, reportId);
+
+            try
+            {
+                var line = $"[{DateTimeOffset.Now:HH:mm:ss}] [Snapshot] ERROR: {ex.GetType().Name}: {ex.Message}";
+                await _snapshotStore.AppendLogsAsync(runId, [line], CancellationToken.None);
+            }
+            catch
+            {
+                // best effort only
+            }
+
+            return new PipelineSummarySnapshotBuilder.PipelineSummarySnapshot
+            {
+                GeneratedAt = DateTimeOffset.UtcNow,
+                FacilityId = facilityId,
+                ReportId = reportId,
+                IsFinal = isFinal
+            };
+        }
+    }
 
     private async Task ExecuteAsync(MutableRunState state, CancellationToken cancellationToken)
     {
@@ -124,6 +273,13 @@ public class AutomationRunManager : IAutomationRunManager
             var expectedAllPatientIds = scenarioConfig.PatientIds;
 
             await fhirDataLoader.WaitForServerAsync(output);
+
+            if (state.Options.CleanupTestData)
+            {
+                output.WriteLine("Cleanup is enabled; expunging existing FHIR test data before loading generated bundles...");
+                fhirDataLoader.ExpungeEverything(output);
+            }
+
             await fhirDataLoader.LoadTransactionBundlesFromJsonAsync(output, bundles);
 
             await validationHelper.InitializeArtifactsAsync();
@@ -134,6 +290,10 @@ public class AutomationRunManager : IAutomationRunManager
             var measureId = measureLoader.MeasureId ?? throw new InvalidOperationException("MeasureLoader did not produce a MeasureId");
 
             var facilityId = $"{state.Scenario}-{state.RunId:N}".Substring(0, Math.Min(48, $"{state.Scenario}-{state.RunId:N}".Length));
+            lock (state.Sync)
+            {
+                state.FacilityId = facilityId;
+            }
 
             await FacilitySetupHelper.EnsureFacilityAsync(
                 services.GetRequiredService<IFacilityServiceClient>(),
@@ -150,6 +310,13 @@ public class AutomationRunManager : IAutomationRunManager
                 output, facilityId);
 
             var reportId = await reportHelper.GenerateReportAsync(facilityId, measureId, scenarioConfig);
+            lock (state.Sync)
+            {
+                state.ReportId = reportId;
+            }
+
+            // Register with orchestrator so store-backed pollers start automatically.
+            await _orchestrator.RegisterRunAsync(state.RunId, facilityId, reportId);
 
             await using (var diagnostics = new BackgroundDiagnosticsMonitor(output, lokiScraper, _automationConfig, scenarioConfig.PatientIds.Count, forwardInternalLogsToOutput: true, pipelineReader: services.GetRequiredService<PipelineDataReader>()))
             {
@@ -211,6 +378,7 @@ public class AutomationRunManager : IAutomationRunManager
 
             state.Status = AutomationRunStatus.Succeeded;
             state.FinishedAt = DateTimeOffset.UtcNow;
+            await _orchestrator.CompleteRunAsync(state.RunId);
             await BroadcastStatus(state);
             WriteLog(state, "Run completed successfully.");
         }
@@ -220,6 +388,7 @@ public class AutomationRunManager : IAutomationRunManager
             state.Status = AutomationRunStatus.Failed;
             state.Error = ex.Message;
             state.FinishedAt = DateTimeOffset.UtcNow;
+            await _orchestrator.CompleteRunAsync(state.RunId);
             await BroadcastStatus(state);
             WriteLog(state, $"Run failed: {ex.Message}");
         }
@@ -287,10 +456,10 @@ public class AutomationRunManager : IAutomationRunManager
     {
         var defaults = request.Scenario switch
         {
-            AutomationScenarioKind.SmokeTest => new ResolvedRunOptions(1, 1000, "SmokePatient", 20260326, 3, 60, 5, true, _automationConfig.CleanupTestData, ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation, []),
-            AutomationScenarioKind.MultiPatientTest => new ResolvedRunOptions(1000, 100, "MultiPatient", 20260328, 3, 60, 5, true, _automationConfig.CleanupTestData, ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation, []),
-            AutomationScenarioKind.MegaPatientTest => new ResolvedRunOptions(FhirBundleGenerator.DefaultPatientCount, FhirBundleGenerator.DefaultResourcesPerPatient, "MegaPatient", 20260327, 5, 300, 20, true, _automationConfig.CleanupTestData, ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation, []),
-            AutomationScenarioKind.Custom => new ResolvedRunOptions(10, 250, "CustomPatient", 20260329, 3, 120, 10, true, _automationConfig.CleanupTestData, ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation, []),
+            AutomationScenarioKind.SmokeTest => new ResolvedRunOptions(1, 1000, "SmokePatient", 20260326, 3, 0, 30, true, _automationConfig.CleanupTestData, ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation, []),
+            AutomationScenarioKind.MultiPatientTest => new ResolvedRunOptions(1000, 100, "MultiPatient", 20260328, 3, 0, 30, true, _automationConfig.CleanupTestData, ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation, []),
+            AutomationScenarioKind.MegaPatientTest => new ResolvedRunOptions(FhirBundleGenerator.DefaultPatientCount, FhirBundleGenerator.DefaultResourcesPerPatient, "MegaPatient", 20260327, 3, 0, 30, true, _automationConfig.CleanupTestData, ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation, []),
+            AutomationScenarioKind.Custom => new ResolvedRunOptions(10, 250, "CustomPatient", 20260329, 3, 0, 30, true, _automationConfig.CleanupTestData, ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation, []),
             _ => throw new ArgumentOutOfRangeException(nameof(request.Scenario), request.Scenario, null)
         };
 
@@ -311,9 +480,9 @@ public class AutomationRunManager : IAutomationRunManager
             ResourcesPerPatient = request.ResourcesPerPatient ?? defaults.ResourcesPerPatient,
             Prefix = prefix,
             Seed = request.Seed ?? defaults.Seed,
-            PollingIntervalSeconds = request.PollingIntervalSeconds ?? defaults.PollingIntervalSeconds,
-            MaxRetryCount = request.MaxRetryCount ?? defaults.MaxRetryCount,
-            LokiScrapeWindowMinutes = request.LokiScrapeWindowMinutes ?? defaults.LokiScrapeWindowMinutes,
+            PollingIntervalSeconds = 3,
+            MaxRetryCount = 0,
+            LokiScrapeWindowMinutes = 30,
             RemoveFacilityConfig = request.RemoveFacilityConfig ?? defaults.RemoveFacilityConfig,
             CleanupTestData = request.CleanupTestData ?? defaults.CleanupTestData,
             SelectedMeasure = request.SelectedMeasure ?? defaults.SelectedMeasure,
@@ -348,10 +517,71 @@ public class AutomationRunManager : IAutomationRunManager
         }
 
         _ = _hub.Clients.Group(state.RunId.ToString()).SendAsync("log", line);
+
+        // Persist to store (fire-and-forget, best effort)
+        _ = Task.Run(async () =>
+        {
+            try { await _snapshotStore.AppendLogsAsync(state.RunId, [line]); }
+            catch { /* log persistence is best-effort */ }
+        });
     }
 
-    private Task BroadcastStatus(MutableRunState state)
-        => _hub.Clients.Group(state.RunId.ToString()).SendAsync("status", ToSummary(state));
+    private async Task BroadcastStatus(MutableRunState state)
+    {
+        await _hub.Clients.Group(state.RunId.ToString()).SendAsync("status", ToSummary(state));
+        await PersistRunSummaryAsync(state);
+    }
+
+    private async Task PersistRunSummaryAsync(MutableRunState state)
+    {
+        try
+        {
+            AutomationRunSummary summary;
+            string? facilityId;
+            string? reportId;
+
+            lock (state.Sync)
+            {
+                summary = ToSummary(state);
+                facilityId = state.FacilityId;
+                reportId = state.ReportId;
+            }
+
+            await _snapshotStore.UpsertRunSummaryAsync(summary, facilityId, reportId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Unable to persist run summary for {RunId}", state.RunId);
+        }
+    }
+
+    /// <summary>
+    /// Reads a single domain snapshot from the store, returning null on any failure
+    /// so one broken domain doesn't take down the entire snapshot.
+    /// </summary>
+    private async Task<T?> SafeGetDomainAsync<T>(Guid runId, string domain, CancellationToken ct) where T : class
+    {
+        try
+        {
+            return (await _snapshotStore.GetDomainAsync<T>(runId, domain, ct))?.Data;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[Snapshot][{RunId}] Failed to read domain '{Domain}' (type={Type})", runId, domain, typeof(T).Name);
+
+            try
+            {
+                var line = $"[{DateTimeOffset.Now:HH:mm:ss}] [Snapshot][{domain}] ERROR: {ex.GetType().Name}: {ex.Message}";
+                await _snapshotStore.AppendLogsAsync(runId, [line], CancellationToken.None);
+            }
+            catch
+            {
+                // best effort only
+            }
+
+            return null;
+        }
+    }
 
     private static AutomationRunSummary ToSummary(MutableRunState state)
     {
@@ -360,15 +590,38 @@ public class AutomationRunManager : IAutomationRunManager
             return new AutomationRunSummary
             {
                 RunId = state.RunId,
+                RunName = GetRunName(state.Scenario, state.Options.SelectedMeasure),
                 Scenario = state.Scenario,
+                SelectedMeasure = ProfiledMeasureCatalog.GetDisplayName(state.Options.SelectedMeasure),
+                PatientCount = state.Options.PatientProfiles is { Count: > 0 }
+                    ? state.Options.PatientProfiles.Count
+                    : state.Options.PatientCount,
+                ResourcesPerPatient = state.Options.ResourcesPerPatient,
+                Seed = state.Options.Seed,
                 Status = state.Status,
                 CreatedAt = state.CreatedAt,
                 StartedAt = state.StartedAt,
                 FinishedAt = state.FinishedAt,
                 Error = state.Error,
+                FacilityId = state.FacilityId,
+                ReportId = state.ReportId,
                 Logs = state.Logs.ToList()
             };
         }
+    }
+
+    private static string GetRunName(AutomationScenarioKind scenario, ProfiledMeasureType selectedMeasure)
+    {
+        if (scenario != AutomationScenarioKind.Custom)
+            return scenario.ToString();
+
+        return selectedMeasure switch
+        {
+            ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation => "Custom-HYPO",
+            ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation => "Custom-Daily-ACH",
+            ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation => "Custom-Monthly-ACH",
+            _ => "Custom"
+        };
     }
 
     private sealed class MutableRunState(Guid runId, AutomationScenarioKind scenario, ResolvedRunOptions options)
@@ -380,9 +633,22 @@ public class AutomationRunManager : IAutomationRunManager
         public DateTimeOffset CreatedAt { get; } = DateTimeOffset.UtcNow;
         public DateTimeOffset? StartedAt { get; set; }
         public DateTimeOffset? FinishedAt { get; set; }
+        public string? FacilityId { get; set; }
+        public string? ReportId { get; set; }
         public AutomationRunStatus Status { get; set; } = AutomationRunStatus.Queued;
         public string? Error { get; set; }
         public List<string> Logs { get; } = [];
+    }
+
+    private sealed class NullAutomationOutput : IAutomationOutput
+    {
+        public void WriteLine(string message)
+        {
+        }
+
+        public void WriteLine(string format, params object[] args)
+        {
+        }
     }
 
     private record ResolvedRunOptions(

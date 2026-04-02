@@ -273,22 +273,40 @@ public static class FhirBundleGenerator
         return measure switch
         {
             ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation =>
-                GenerateWithProfilesForNhsn(
+                GenerateWithProfilesForNhsnAcuteCareHospital(
                     output,
                     profiles,
                     totalResourcesPerPatient,
                     patientIdPrefix,
-                    generationSeed),
+                    generationSeed,
+                    requireDiabeticMedicationForQualifying: false),
+            ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation =>
+                GenerateWithProfilesForNhsnAcuteCareHospital(
+                    output,
+                    profiles,
+                    totalResourcesPerPatient,
+                    patientIdPrefix,
+                    generationSeed,
+                    requireDiabeticMedicationForQualifying: false),
+            ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation =>
+                GenerateWithProfilesForNhsnAcuteCareHospital(
+                    output,
+                    profiles,
+                    totalResourcesPerPatient,
+                    patientIdPrefix,
+                    generationSeed,
+                    requireDiabeticMedicationForQualifying: true),
             _ => throw new ArgumentOutOfRangeException(nameof(measure), measure, null)
         };
     }
 
-    private static (List<string> PatientIds, List<(string Name, string Json)> Bundles) GenerateWithProfilesForNhsn(
+    private static (List<string> PatientIds, List<(string Name, string Json)> Bundles) GenerateWithProfilesForNhsnAcuteCareHospital(
         IAutomationOutput output,
         IReadOnlyList<PatientProfile> profiles,
         int totalResourcesPerPatient = DefaultResourcesPerPatient,
         string patientIdPrefix = "ProfilePatient",
-        int? generationSeed = null)
+        int? generationSeed = null,
+        bool requireDiabeticMedicationForQualifying = false)
     {
         var patientIds = new List<string>();
         var allEntries = new List<(string PatientId, List<Bundle.EntryComponent> Entries)>();
@@ -376,12 +394,44 @@ public static class FhirBundleGenerator
             if (profile.Eligibility == MeasureEligibility.Qualifying)
             {
                 // Inpatient encounter — qualifies via class, type, and location
-                entries.Add(Entry($"Encounter/{encounterId}",
-                    EncounterFactory.Generate(
-                        encounterId, patientId, encStart, encEnd,
-                        attendingPractId, admittingPractId,
-                        EdLocationId, IcuLocationId, StepDownLocationId, HospitalOrgId,
-                        primaryDxId, patientSeed)));
+                if (requireDiabeticMedicationForQualifying)
+                {
+                    entries.Add(Entry($"Encounter/{encounterId}",
+                        EncounterFactory.Create(
+                            encounterId,
+                            patientId,
+                            encStart,
+                            encEnd,
+                            attendingPractId,
+                            admittingPractId,
+                            EdLocationId,
+                            IcuLocationId,
+                            StepDownLocationId,
+                            HospitalOrgId,
+                            primaryDxId,
+                            "32485007",
+                            "Hospital admission (procedure)",
+                            scenario.PrimaryDxSnomed,
+                            scenario.PrimaryDxDisplay,
+                            scenario.PrimaryDxIcd,
+                            scenario.AdmitSourceCode,
+                            scenario.AdmitSourceDisplay,
+                            scenario.DischargeDispositionCode,
+                            scenario.DischargeDispositionDisplay,
+                            scenario.ServiceTypeCode,
+                            scenario.ServiceTypeDisplay,
+                            "EM",
+                            "emergency")));
+                }
+                else
+                {
+                    entries.Add(Entry($"Encounter/{encounterId}",
+                        EncounterFactory.Generate(
+                            encounterId, patientId, encStart, encEnd,
+                            attendingPractId, admittingPractId,
+                            EdLocationId, IcuLocationId, StepDownLocationId, HospitalOrgId,
+                            primaryDxId, patientSeed)));
+                }
             }
             else
             {
@@ -399,6 +449,11 @@ public static class FhirBundleGenerator
 
             entries.Add(Entry($"CarePlan/{carePlanId}",
                 CarePlanFactory.Generate(carePlanId, patientId, encounterId, careTeamId, encStart, patientSeed)));
+
+            if (requireDiabeticMedicationForQualifying && profile.Eligibility == MeasureEligibility.Qualifying)
+            {
+                AddHypoglycemicQualifyingMedicationEntries(entries, patientId, encounterId, attendingPractId, patientSeed, encStart);
+            }
 
             // Bulk resources — identical seed-driven loop as Generate()
             var medicationIds = new List<string>();
@@ -488,6 +543,76 @@ public static class FhirBundleGenerator
 
         output.WriteLine($"Generated {bundles.Count} transaction bundles for {profiles.Count} profiled patients.");
         return (patientIds, bundles);
+    }
+
+    private static void AddHypoglycemicQualifyingMedicationEntries(
+        List<Bundle.EntryComponent> entries,
+        string patientId,
+        string encounterId,
+        string practitionerId,
+        int seed,
+        DateTime encounterStart)
+    {
+        // Use a Diabetes Medications value-set member from the uploaded Hypoglycemic measure bundle.
+        const string insulinRxNorm = "274783";
+        const string insulinDisplay = "insulin glargine";
+        const string subcutaneousRouteCode = "34206005";
+        const string subcutaneousRouteDisplay = "Subcutaneous route";
+        const string diabetesIndicationCode = "44054006";
+        const string diabetesIndicationDisplay = "Diabetes mellitus type 2";
+
+        var medicationId = $"{patientId}-Medication-ADD-001";
+        var medicationRequestId = $"{patientId}-MedicationRequest-ADD-001";
+        var medicationAdministrationId = $"{patientId}-MedicationAdministration-ADD-001";
+        var medicationTime = encounterStart.AddHours(1);
+
+        entries.Add(Entry($"Medication/{medicationId}",
+            MedicationFactory.Create(
+                medicationId,
+                insulinRxNorm,
+                insulinDisplay,
+                20,
+                "[iU]",
+                subcutaneousRouteCode,
+                subcutaneousRouteDisplay)));
+
+        entries.Add(Entry($"MedicationRequest/{medicationRequestId}",
+            MedicationRequestFactory.Create(
+                medicationRequestId,
+                patientId,
+                encounterId,
+                medicationTime,
+                seed,
+                practitionerId,
+                insulinRxNorm,
+                insulinDisplay,
+                subcutaneousRouteCode,
+                subcutaneousRouteDisplay,
+                20,
+                "[iU]",
+                1,
+                false,
+                diabetesIndicationCode,
+                diabetesIndicationDisplay)));
+
+        entries.Add(Entry($"MedicationAdministration/{medicationAdministrationId}",
+            MedicationAdministrationFactory.Create(
+                medicationAdministrationId,
+                patientId,
+                encounterId,
+                medicationTime,
+                seed,
+                practitionerId,
+                insulinRxNorm,
+                insulinDisplay,
+                subcutaneousRouteCode,
+                subcutaneousRouteDisplay,
+                20,
+                "[iU]",
+                diabetesIndicationCode,
+                diabetesIndicationDisplay,
+                infusionPeriod: false,
+                medicationRefId: null)));
     }
 
     // ------------------------------------------------------------------
