@@ -104,7 +104,7 @@ class BlobStorageServiceTest {
         String expectedBlobName = "root/patient-patient1-type1.mr";
         verify(containerClient).getBlobClient(expectedBlobName);
         verify(blobClient).upload(any(BinaryData.class), eq(true));
-        verify(measureReportGeneratedProducer).produceMeasureReportGeneratedRecord(eq(status), eq(report), eq(measureReport), anyString(), eq(expectedBlobName));
+        verify(measureReportGeneratedProducer).produceMeasureReportGeneratedRecord(eq(status), eq(report), eq(measureReport.getIdPart()), anyString(), eq(expectedBlobName));
     }
 
     @Test
