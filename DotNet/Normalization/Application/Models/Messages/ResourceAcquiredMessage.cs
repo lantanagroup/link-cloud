@@ -10,7 +10,6 @@ public class ResourceAcquiredMessage
     public string QueryType { get; set; }
     public string? ResourceType { get; set; }
     public object Resource { get; set; }
-    //public string Resource { get; set; }
     public string ReportableEvent { get; set; }
     public List<ScheduledReport> ScheduledReports { get; set; }
 }

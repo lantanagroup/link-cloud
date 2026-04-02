@@ -288,8 +288,6 @@ public class ResourceAcquiredListener : BackgroundService
 
     private async Task ProduceResourceNormalizedMessage(ConsumeResult<ResourceKey, ResourceAcquiredMessage>? message, string facilityId, string correlationId, object? resource)
     {
-        //var serializedResource = JsonSerializer.SerializeToElement(resource, LinkFhirSerializerOptions.ForFhirLenientSerialization);
-
         var headers = new Headers
         {
             new Header(NormalizationConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(correlationId))
@@ -299,7 +297,7 @@ public class ResourceAcquiredListener : BackgroundService
         {
             AcquisitionComplete = message.Message.Value.AcquisitionComplete,
             PatientId = message.Message.Value.PatientId ?? "",
-            Resource = resource,// message.Message.Value.Resource, //serializedResource,
+            Resource = resource,
             QueryType = message.Message.Value.QueryType,
             ScheduledReports = message.Message.Value.ScheduledReports,
             ReportableEvent = message.Message.Value.ReportableEvent
@@ -321,8 +319,14 @@ public class ResourceAcquiredListener : BackgroundService
         }
         catch (ProduceException<ResourceKey, ResourceNormalizedMessage> ex)
         {
-            //TODO: Daniel: Include resource id in the event to help with this print
-            //_logger.LogError(ex, "Failed to produce ResourceNormalized message. FacilityId: {FacilityId}, CorrelationId: {CorrelationId}, FhirResourceType: {fhirResourceType}, ResourceId: {resourceId}", facilityId, correlationId, resource?.TypeName, resource?.Id);
+            DomainResource? deserializedResource = null;
+
+            if (resource != null)
+            {
+                deserializedResource = DeserializeResource(resource);
+            }
+
+            _logger.LogError(ex, "Failed to produce ResourceNormalized message. FacilityId: {FacilityId}, CorrelationId: {CorrelationId}, FhirResourceType: {fhirResourceType}, ResourceId: {resourceId}", facilityId, correlationId, deserializedResource?.TypeName, deserializedResource?.Id);
             throw new TransientException($"Failed to produce ResourceNormalized message: {ex.Message}", ex);
         }
     }
