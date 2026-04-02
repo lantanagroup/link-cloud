@@ -140,7 +140,16 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
         if (correlationId != null) {
             headers.add(Headers.CORRELATION_ID, Headers.getBytes(correlationId));
         }
-        validationCompleteTemplate.send(new ProducerRecord<>(Topics.VALIDATION_COMPLETE, null, facilityId, value, headers));
+        try {
+            // Use .get() to make the send synchronous and wait for broker confirmation
+            validationCompleteTemplate.send(new ProducerRecord<>(Topics.VALIDATION_COMPLETE, null, facilityId, value, headers)).get();
+        } catch (Exception e) {
+            _logger.error("Failed to send ValidationComplete record for patient {} in report {}: {}",
+                    patientId, reportId, e.getMessage(), e);
+            // Throwing the exception ensures AsyncListener's catch block handles it
+            // (e.g., sending the source record to the Error topic)
+            throw new RuntimeException("Failed to produce ValidationComplete message", e);
+        }
     }
 
     private void produceMetrics(
