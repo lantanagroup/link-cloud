@@ -1,4 +1,3 @@
-keith321:3:1:max.message.bytes=1111111
 AuditableEventOccurred:3:1
 AuditableEventOccurred-Error:3:1
 AuditableEventOccurred-Retry:3:1

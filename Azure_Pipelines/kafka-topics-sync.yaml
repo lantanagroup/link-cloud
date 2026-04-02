@@ -22,7 +22,7 @@ variables:
 
   # GitHub Topics File
 - name: TOPICS_URL
-  value: "https://raw.githubusercontent.com/lantanagroup/link-cloud/lnk-4949/topics.txt"
+  value: "https://raw.githubusercontent.com/lantanagroup/link-cloud/dev/topics.txt"
 
 # REST URL
 - name: restUrl
