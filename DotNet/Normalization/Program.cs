@@ -196,17 +196,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<RetryJob>();
 
     builder.Services.AddSingleton<CopyPropertyOperationService>();
-    //builder.Services.AddHostedService(provider => provider.GetRequiredService<CopyPropertyOperationService>());
-
     builder.Services.AddSingleton<CodeMapOperationService>();
-    //builder.Services.AddHostedService(provider => provider.GetRequiredService<CodeMapOperationService>());
-
     builder.Services.AddSingleton<ConditionalTransformOperationService>();
-    //builder.Services.AddHostedService(provider => provider.GetRequiredService<ConditionalTransformOperationService>());
-
     builder.Services.AddSingleton<CopyLocationOperationService>();
-    //builder.Services.AddHostedService(provider => provider.GetRequiredService<CopyLocationOperationService>());
-
+    
     if (consumerSettings != null && !consumerSettings.DisableConsumer)
     {
          builder.Services.AddHostedService<ResourceAcquiredListener>();
