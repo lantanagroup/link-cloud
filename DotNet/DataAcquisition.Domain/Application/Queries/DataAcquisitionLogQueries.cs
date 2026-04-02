@@ -498,6 +498,21 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         return totalUpdated;
     }
 
+    public async Task<int> ResetStalledProcessingLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default)
+    {
+        var stallThreshold = DateTime.UtcNow.AddMinutes(-stallMinutes);
+
+        return await _deadlockRetryPolicy.ExecuteAsync(async () =>
+        {
+            return await _dbContext.DataAcquisitionLogs
+                .Where(l => l.Status == RequestStatus.Processing && l.ModifyDate <= stallThreshold)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(l => l.Status, RequestStatus.Pending)
+                    .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                    cancellationToken);
+        });
+    }
+
     public async Task<PagedConfigModel<DataAcquisitionLogModel>> SearchAsync(SearchDataAcquisitionLogRequest model,
         CancellationToken cancellationToken = default)
     {
