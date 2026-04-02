@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.ResourceType;
 using Task = System.Threading.Tasks.Task;
+using Microsoft.EntityFrameworkCore;
 
 namespace IntegrationTests.DataAcquisition.Queries;
 
@@ -1327,5 +1328,79 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         // Refresh recent log from DB
         await dbContext.Entry(recentLog).ReloadAsync();
         Assert.Equal(RequestStatus.Processing, recentLog.Status);
+    }
+
+    [Fact]
+    public async Task FailStalledQueuedLogsAsync_RespectsMaxBatches()
+    {
+        // Arrange
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        // Reset database for this test
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var stallMinutes = 15;
+        var stalledDate = DateTime.UtcNow.AddMinutes(-(stallMinutes + 1));
+
+        // Create 250 stalled logs (BatchSize is 100)
+        var stalledLogs = Enumerable.Range(1, 250).Select(i => new DataAcquisitionLog
+        {
+            FacilityId = "TestFacility",
+            Status = RequestStatus.Queued,
+            ModifyDate = stalledDate
+        }).ToList();
+
+        dbContext.DataAcquisitionLogs.AddRange(stalledLogs);
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        // Act - request only 1 batch (should update exactly 100)
+        int rowsAffected = await queries.FailStalledQueuedLogsAsync(stallMinutes, maxBatches: 1);
+
+        // Assert
+        Assert.Equal(100, rowsAffected);
+        
+        var failedCount = await dbContext.DataAcquisitionLogs.CountAsync(l => l.Status == RequestStatus.Failed);
+        Assert.Equal(100, failedCount);
+    }
+
+    [Fact]
+    public async Task ResetStalledProcessingLogsAsync_RespectsMaxBatches()
+    {
+        // Arrange
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        // Reset database for this test
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var stallMinutes = 240;
+        var stalledDate = DateTime.UtcNow.AddMinutes(-(stallMinutes + 1));
+
+        // Create 250 stalled logs (BatchSize is 100)
+        var stalledLogs = Enumerable.Range(1, 250).Select(i => new DataAcquisitionLog
+        {
+            FacilityId = "TestFacility",
+            Status = RequestStatus.Processing,
+            ModifyDate = stalledDate
+        }).ToList();
+
+        dbContext.DataAcquisitionLogs.AddRange(stalledLogs);
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        // Act - request only 2 batches (should update exactly 200)
+        int rowsAffected = await queries.ResetStalledProcessingLogsAsync(stallMinutes, maxBatches: 2);
+
+        // Assert
+        Assert.Equal(200, rowsAffected);
+
+        var pendingCount = await dbContext.DataAcquisitionLogs.CountAsync(l => l.Status == RequestStatus.Pending);
+        Assert.Equal(200, pendingCount);
     }
 }
