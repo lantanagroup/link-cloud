@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Shared.Application.Enums;
+﻿using LantanaGroup.Link.Shared.Application.Enums;
 
 namespace LantanaGroup.Link.Automation.Helpers;
 
@@ -59,6 +59,13 @@ public class PipelineProgressTracker
                 {
                     completedUnits++;
                     stageDetails.Add("report=finalized");
+                }
+                else if (string.Equals(schedule.Status, ScheduleStatus.EndOfPeriod.ToString(), StringComparison.OrdinalIgnoreCase))
+                {
+                    // EndOfPeriod means the period ended and the manifest is being submitted;
+                    // count it as partial progress so stall detection doesn't fire.
+                    completedUnits++;
+                    stageDetails.Add("report=endOfPeriod");
                 }
                 else
                 {
@@ -182,7 +189,7 @@ public class PipelineProgressTracker
                     return key;
                 }
             }
-            else if (key == "report" && value != "finalized")
+            else if (key == "report" && value != "finalized" && value != "endOfPeriod")
             {
                 return $"report (status={value})";
             }
