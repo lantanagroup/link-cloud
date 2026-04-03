@@ -315,7 +315,7 @@ public class ResourceAcquiredListener : BackgroundService
 
         try
         {
-            _producer.Produce(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
+            await _producer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
         }
         catch (ProduceException<ResourceKey, ResourceNormalizedMessage> ex)
         {
