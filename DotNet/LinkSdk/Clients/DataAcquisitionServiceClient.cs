@@ -80,6 +80,12 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
             .SetQueryParam("type", type)
             .DeleteAsync(cancellationToken: cancellationToken));
 
+    public Task SoftDeleteLogsByFacilityAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        DeleteOrIgnoreAsync(() => Request($"data/acquisition-logs/facility/{facilityId}")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
     public Task<PagedConfigModel<DataAcquisitionLogApiModel>> SearchAcquisitionLogsAsync(
         string facilityId,
         string reportId,

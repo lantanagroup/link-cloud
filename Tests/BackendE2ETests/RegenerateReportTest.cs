@@ -81,7 +81,16 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
                 _sp.GetRequiredService<IFacilityServiceClient>(),
                 _sp.GetRequiredService<INormalizationServiceClient>(),
                 _sp.GetRequiredService<IDataAcquisitionServiceClient>(),
+                _sp.GetRequiredService<IQueryDispatchServiceClient>(),
                 Output, _facilityId);
+        }
+
+        if (AutomationCfg.CleanupTestData)
+        {
+            await FacilitySetupHelper.CleanupQueryDispatchConfigAsync(
+                _sp.GetRequiredService<IQueryDispatchServiceClient>(),
+                Output,
+                _facilityId);
         }
 
         if (AutomationCfg.CleanupTestData)
@@ -110,6 +119,10 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
             _sp.GetRequiredService<IDataAcquisitionServiceClient>(), Output, _facilityId, measureId, "Epic");
         await FacilitySetupHelper.EnsureQueryConfigAsync(
             _sp.GetRequiredService<IDataAcquisitionServiceClient>(), AutomationCfg, Output, _facilityId);
+        await FacilitySetupHelper.EnsureQueryDispatchConfigAsync(
+            _sp.GetRequiredService<IQueryDispatchServiceClient>(),
+            Output,
+            _facilityId);
 
         // Step 2: Create source report via the scheduled-report production path.
         //   a) Produce ReportScheduled → creates the report schedule.

@@ -29,6 +29,9 @@ public class ReportServiceClient : LinkApiClientBase, IReportServiceClient
     public Task<PagedConfigModel<ReportScheduleApiModel>> SearchSchedulesAsync(string reportId, CancellationToken cancellationToken = default) =>
         Request("/schedules/search").SetQueryParam("id", reportId).SetQueryParam("pageSize", 10).SetQueryParam("pageNumber", 1).GetJsonAsync<PagedConfigModel<ReportScheduleApiModel>>(cancellationToken: cancellationToken);
 
+    public Task SoftDeleteScheduleAsync(string reportId, CancellationToken cancellationToken = default) =>
+        DeleteOrIgnoreAsync(() => Request($"/schedules/{reportId}").DeleteAsync(cancellationToken: cancellationToken));
+
     public async Task<List<ReportEntryApiModel>> GetEntriesByScheduleAsync(string reportId, CancellationToken cancellationToken = default) =>
         await GetOrDefaultAsync(() => Request($"/entries/schedules/{reportId}").GetJsonAsync<List<ReportEntryApiModel>>(cancellationToken: cancellationToken)) ?? [];
 

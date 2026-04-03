@@ -45,6 +45,7 @@ public sealed class BackendE2ETestFixture : IDisposable
             opts.CensusServiceUrl = TestConfig.CensusServiceBase;
             opts.DataAcquisitionServiceUrl = TestConfig.DataAcquisitionServiceBase;
             opts.NormalizationServiceUrl = TestConfig.NormalizationServiceBase;
+            opts.QueryDispatchServiceUrl = TestConfig.QueryDispatchServiceBase;
             opts.ReportServiceUrl = TestConfig.ReportServiceBase;
             opts.MeasureServiceUrl = TestConfig.MeasureServiceBase;
             opts.ValidationServiceUrl = TestConfig.ValidationServiceBase;

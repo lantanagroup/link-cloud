@@ -17,6 +17,7 @@
             <div><strong>Patients:</strong> <span id="patientCount">@Model.PatientCount</span></div>
             <div><strong>Resources / Patient:</strong> <span id="resourcesPerPatient">@Model.ResourcesPerPatient</span></div>
             <div><strong>Generation Seed:</strong> <span id="seed">@Model.Seed</span></div>
+            <div><strong>Facility ID:</strong> <code id="facilityId">@(Model.FacilityId ?? "-")</code></div>
             <div><strong>Status:</strong> <span id="status">@Model.Status</span></div>
             <div><strong>Error:</strong> <span id="error">@(Model.Error ?? "-")</span></div>
             <div><strong>Started:</strong> <span id="started">@(Model.StartedAt?.ToString("u") ?? "-")</span></div>
@@ -48,6 +49,7 @@
                             <div class="border rounded p-3 h-100">
                                 <div class="small text-muted mb-2">Report Schedule</div>
                                 <div class="row g-2">
+                                    <div class="col-md-12"><strong>Facility ID:</strong> <code id="scheduleFacilityId">@(Model.FacilityId ?? "-")</code></div>
                                     <div class="col-md-6"><strong>Test:</strong> <span id="scheduleReportName">-</span></div>
                                     <div class="col-md-6"><strong>Frequency:</strong> <span id="scheduleFrequency">-</span></div>
                                     <div class="col-md-6"><strong>Start:</strong> <span id="scheduleStart">-</span></div>
@@ -655,6 +657,8 @@
                 renderValidatorResults(snapshot.validatorResults || []);
 
                 const schedule = snapshot.report?.schedule;
+                const effectiveFacilityId = snapshot.facilityId || snapshot.FacilityId || schedule?.reportName || '-';
+                document.getElementById('scheduleFacilityId').textContent = effectiveFacilityId;
                 document.getElementById('scheduleReportName').textContent = schedule?.reportName || '-';
                 document.getElementById('scheduleFrequency').textContent = schedule?.frequency || '-';
                 document.getElementById('scheduleStart').textContent = schedule?.startDate || '-';
@@ -756,6 +760,8 @@
             document.getElementById('patientCount').textContent = run.patientCount;
             document.getElementById('resourcesPerPatient').textContent = run.resourcesPerPatient;
             document.getElementById('seed').textContent = run.seed;
+            document.getElementById('facilityId').textContent = run.facilityId || '-';
+            document.getElementById('scheduleFacilityId').textContent = run.facilityId || '-';
             document.getElementById('status').textContent = run.status;
             document.getElementById('error').textContent = run.error || '-';
             document.getElementById('started').textContent = run.startedAt || '-';

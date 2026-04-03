@@ -20,6 +20,7 @@ public static class TestConfig
     public static string CensusServiceBase => Environment.GetEnvironmentVariable("CENSUS_SERVICE_BASE_URL") ?? "http://localhost:8064";
     public static string DataAcquisitionServiceBase => Environment.GetEnvironmentVariable("DATAACQUISITION_SERVICE_BASE_URL") ?? "http://localhost:8065";
     public static string NormalizationServiceBase => Environment.GetEnvironmentVariable("NORMALIZATION_SERVICE_BASE_URL") ?? "http://localhost:8068";
+    public static string QueryDispatchServiceBase => Environment.GetEnvironmentVariable("QUERYDISPATCH_SERVICE_BASE_URL") ?? "http://localhost:8071";
     public static string ReportServiceBase => Environment.GetEnvironmentVariable("REPORT_SERVICE_BASE_URL") ?? "http://localhost:8072";
     public static string MeasureServiceBase => Environment.GetEnvironmentVariable("MEASURE_SERVICE_BASE_URL") ?? "http://localhost:8067";
     public static string ValidationServiceBase => Environment.GetEnvironmentVariable("VALIDATION_SERVICE_BASE_URL") ?? "http://localhost:8075";
@@ -32,7 +33,7 @@ public static class TestConfig
     public static string LokiBaseUrl => Environment.GetEnvironmentVariable("LOKI_BASE_URL") ?? "http://localhost:3100";
     public static string? SmokeTestDownloadPath =>
     Environment.GetEnvironmentVariable("SMOKE_TEST_DOWNLOAD_PATH");
-    public static bool CleanupSmokeTestData => bool.Parse(Environment.GetEnvironmentVariable("CLEANUP_SMOKE_TEST_DATA") ?? "false");
+    public static bool CleanupSmokeTestData => bool.Parse(Environment.GetEnvironmentVariable("CLEANUP_SMOKE_TEST_DATA") ?? "true");
 
     /// <summary>
     /// Builds an <see cref="AutomationConfig"/> from environment variables.

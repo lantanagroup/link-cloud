@@ -95,19 +95,71 @@ public static class FacilitySetupHelper
             output.WriteLine($"Query config for facility '{facilityId}' already exists. Skipping create.");
     }
 
+    public static async Task EnsureQueryDispatchConfigAsync(
+        IQueryDispatchServiceClient queryDispatchClient,
+        IAutomationOutput output,
+        string facilityId)
+    {
+        await queryDispatchClient.UpsertQueryDispatchConfigurationAsync(
+            facilityId,
+            new LantanaGroup.Link.Shared.Application.Models.Integration.QueryDispatch.QueryDispatchConfigurationApiModel
+            {
+                FacilityId = facilityId,
+                DispatchSchedules =
+                [
+                    new LantanaGroup.Link.Shared.Application.Models.Integration.QueryDispatch.DispatchScheduleApiModel
+                    {
+                        Event = "Discharge",
+                        Duration = "PT0S"
+                    }
+                ]
+            });
+
+        output.WriteLine($"Ensured query dispatch config for facility '{facilityId}'.");
+    }
+
+    public static async Task CleanupQueryDispatchConfigAsync(
+        IQueryDispatchServiceClient queryDispatchClient,
+        IAutomationOutput output,
+        string facilityId)
+    {
+        await queryDispatchClient.DeleteQueryDispatchConfigurationAsync(facilityId);
+        output.WriteLine($"Query dispatch config cleanup complete for facility '{facilityId}'.");
+    }
+
     public static async Task CleanupFacilityAsync(
         IFacilityServiceClient facilityClient,
         INormalizationServiceClient normalizationClient,
         IDataAcquisitionServiceClient dataAcqClient,
+        IQueryDispatchServiceClient queryDispatchClient,
         IAutomationOutput output,
         string facilityId)
     {
+        await queryDispatchClient.DeleteQueryDispatchConfigurationAsync(facilityId);
         await normalizationClient.DeleteFacilityOperationsAsync(facilityId);
         await dataAcqClient.DeleteQueryPlanAsync(facilityId, "Discharge");
         await dataAcqClient.DeleteQueryPlanAsync(facilityId, "Monthly");
         await dataAcqClient.DeleteFhirQueryConfigurationAsync(facilityId);
         await facilityClient.DeleteAsync(facilityId);
         output.WriteLine("Facility cleanup complete.");
+    }
+
+    public static async Task SoftDeleteRunDataAsync(
+        IReportServiceClient reportClient,
+        IDataAcquisitionServiceClient dataAcqClient,
+        IQueryDispatchServiceClient queryDispatchClient,
+        IAutomationOutput output,
+        string facilityId,
+        string reportId)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId) || string.IsNullOrWhiteSpace(reportId))
+            return;
+
+        await reportClient.SoftDeleteScheduleAsync(reportId);
+        await dataAcqClient.SoftDeleteLogsByFacilityAsync(facilityId);
+        await queryDispatchClient.DeleteQueryDispatchConfigurationAsync(facilityId);
+
+        output.WriteLine($"Soft-deleted report '{reportId}', DA logs, and query dispatch config for facility '{facilityId}'.");
     }
 
     private static async Task EnsureQueryPlanAsync(

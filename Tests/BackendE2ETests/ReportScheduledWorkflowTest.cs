@@ -82,11 +82,19 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
                 _sp.GetRequiredService<IFacilityServiceClient>(),
                 _sp.GetRequiredService<INormalizationServiceClient>(),
                 _sp.GetRequiredService<IDataAcquisitionServiceClient>(),
+                _sp.GetRequiredService<IQueryDispatchServiceClient>(),
                 Output, _facilityId);
         }
 
         if (AutomationCfg.CleanupTestData)
+        {
+            await FacilitySetupHelper.CleanupQueryDispatchConfigAsync(
+                _sp.GetRequiredService<IQueryDispatchServiceClient>(),
+                Output,
+                _facilityId);
+
             FhirDataLoader.ExpungeEverything(Output);
+        }
     }
 
     [Fact]
@@ -110,10 +118,16 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
             _sp.GetRequiredService<IDataAcquisitionServiceClient>(), Output, _facilityId, measureId, "Epic");
         await FacilitySetupHelper.EnsureQueryConfigAsync(
             _sp.GetRequiredService<IDataAcquisitionServiceClient>(), AutomationCfg, Output, _facilityId);
+        await FacilitySetupHelper.EnsureQueryDispatchConfigAsync(
+            _sp.GetRequiredService<IQueryDispatchServiceClient>(),
+            Output,
+            _facilityId);
 
-        var reportId = await ProduceReportScheduledEventAsync(_facilityId, measureId, TimeSpan.FromMinutes(1));
+        var reportId = await ProduceReportScheduledEventAsync(_facilityId, measureId, TimeSpan.FromMinutes(3));
         await WaitForScheduleCreationAsync(reportId);
         await ProduceAdmitPatientEventAsync(_facilityId, _config.PatientIds[0]);
+        await Task.Delay(TimeSpan.FromMinutes(1));
+        await ProduceDischargePatientEventAsync(_facilityId, _config.PatientIds[0]);
 
         var lokiScraper = _sp.GetRequiredService<LokiScraper>();
         var dataReader = _sp.GetRequiredService<PipelineDataReader>();
@@ -275,7 +289,13 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
         throw new TimeoutException($"Timed out waiting for report schedule {reportId} to be created.");
     }
 
-    private async Task ProduceAdmitPatientEventAsync(string facilityId, string patientId)
+    private Task ProduceAdmitPatientEventAsync(string facilityId, string patientId)
+        => ProducePatientEventAsync(facilityId, patientId, "Admit");
+
+    private async Task ProduceDischargePatientEventAsync(string facilityId, string patientId)
+        => await ProducePatientEventAsync(facilityId, patientId, "Discharge");
+
+    private async Task ProducePatientEventAsync(string facilityId, string patientId, string eventType)
     {
         var candidates = new[]
         {
@@ -295,14 +315,14 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
             {
                 try
                 {
-                    Output.WriteLine($"Producing PatientEvent directly to Kafka (facility={facilityId}, patient={patientId}, event=Admit, bootstrap={bootstrapServers}, mode={config.mode})...");
+                    Output.WriteLine($"Producing PatientEvent directly to Kafka (facility={facilityId}, patient={patientId}, event={eventType}, bootstrap={bootstrapServers}, mode={config.mode})...");
 
                     using var producer = new ProducerBuilder<string, string>(config.producerConfig).Build();
 
                     var payload = JsonSerializer.Serialize(new
                     {
                         PatientId = patientId,
-                        EventType = "Admit"
+                        EventType = eventType
                     });
 
                     await producer.ProduceAsync(nameof(KafkaTopic.PatientEvent), new Message<string, string>

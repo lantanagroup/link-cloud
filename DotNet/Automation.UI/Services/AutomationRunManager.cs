@@ -308,6 +308,10 @@ public class AutomationRunManager : IAutomationRunManager
                 services.GetRequiredService<IDataAcquisitionServiceClient>(),
                 services.GetRequiredService<AutomationConfig>(),
                 output, facilityId);
+            await FacilitySetupHelper.EnsureQueryDispatchConfigAsync(
+                services.GetRequiredService<IQueryDispatchServiceClient>(),
+                output,
+                facilityId);
 
             var reportId = await reportHelper.GenerateReportAsync(facilityId, measureId, scenarioConfig);
             lock (state.Sync)
@@ -371,10 +375,21 @@ public class AutomationRunManager : IAutomationRunManager
                     services.GetRequiredService<IFacilityServiceClient>(),
                     services.GetRequiredService<INormalizationServiceClient>(),
                     services.GetRequiredService<IDataAcquisitionServiceClient>(),
+                    services.GetRequiredService<IQueryDispatchServiceClient>(),
                     output, facilityId);
 
             if (state.Options.CleanupTestData)
+            {
+                await FacilitySetupHelper.SoftDeleteRunDataAsync(
+                    services.GetRequiredService<IReportServiceClient>(),
+                    services.GetRequiredService<IDataAcquisitionServiceClient>(),
+                    services.GetRequiredService<IQueryDispatchServiceClient>(),
+                    output,
+                    facilityId,
+                    reportId);
+
                 fhirDataLoader.ExpungeEverything(output);
+            }
 
             state.Status = AutomationRunStatus.Succeeded;
             state.FinishedAt = DateTimeOffset.UtcNow;
@@ -456,10 +471,10 @@ public class AutomationRunManager : IAutomationRunManager
     {
         var defaults = request.Scenario switch
         {
-            AutomationScenarioKind.SmokeTest => new ResolvedRunOptions(1, 1000, "SmokePatient", 20260326, 3, 0, 30, true, _automationConfig.CleanupTestData, ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation, []),
-            AutomationScenarioKind.MultiPatientTest => new ResolvedRunOptions(1000, 100, "MultiPatient", 20260328, 3, 0, 30, true, _automationConfig.CleanupTestData, ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation, []),
-            AutomationScenarioKind.MegaPatientTest => new ResolvedRunOptions(FhirBundleGenerator.DefaultPatientCount, FhirBundleGenerator.DefaultResourcesPerPatient, "MegaPatient", 20260327, 3, 0, 30, true, _automationConfig.CleanupTestData, ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation, []),
-            AutomationScenarioKind.Custom => new ResolvedRunOptions(10, 250, "CustomPatient", 20260329, 3, 0, 30, true, _automationConfig.CleanupTestData, ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation, []),
+            AutomationScenarioKind.SmokeTest => new ResolvedRunOptions(1, 1000, "SmokePatient", 20260326, 3, 0, 30, true, false, ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation, []),
+            AutomationScenarioKind.MultiPatientTest => new ResolvedRunOptions(1000, 100, "MultiPatient", 20260328, 3, 0, 30, true, false, ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation, []),
+            AutomationScenarioKind.MegaPatientTest => new ResolvedRunOptions(FhirBundleGenerator.DefaultPatientCount, FhirBundleGenerator.DefaultResourcesPerPatient, "MegaPatient", 20260327, 3, 0, 30, true, false, ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation, []),
+            AutomationScenarioKind.Custom => new ResolvedRunOptions(10, 250, "CustomPatient", 20260329, 3, 0, 30, true, false, ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation, []),
             _ => throw new ArgumentOutOfRangeException(nameof(request.Scenario), request.Scenario, null)
         };
 

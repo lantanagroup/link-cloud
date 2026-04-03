@@ -17,13 +17,14 @@ namespace LantanaGroup.Link.Tests.E2ETests;
 /// </summary>
 public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixture>
 {
-    private const string FacilityId = "SmokeTestFacility";
     private const int GenerationSeed = 20260326;
 
     private static readonly TestScenarioConfig Config = TestConfig.AdhocReportingSmokeTestConfig;
 
     private readonly IServiceProvider _sp;
+    private readonly string _facilityId = $"SmokeTest-{Guid.NewGuid():N}";
     private List<(string Name, string Json)> _generatedBundles = [];
+    private string? _reportId;
 
     private AutomationConfig AutomationCfg => _sp.GetRequiredService<AutomationConfig>();
     private DualOutputHelper Output => _sp.GetRequiredService<DualOutputHelper>();
@@ -72,12 +73,29 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
                 _sp.GetRequiredService<IFacilityServiceClient>(),
                 _sp.GetRequiredService<INormalizationServiceClient>(),
                 _sp.GetRequiredService<IDataAcquisitionServiceClient>(),
+                _sp.GetRequiredService<IQueryDispatchServiceClient>(),
                 Output,
-                FacilityId);
+                _facilityId);
         }
 
         if (AutomationCfg.CleanupTestData)
         {
+            await FacilitySetupHelper.CleanupQueryDispatchConfigAsync(
+                _sp.GetRequiredService<IQueryDispatchServiceClient>(),
+                Output,
+                _facilityId);
+
+            if (!string.IsNullOrWhiteSpace(_reportId))
+            {
+                await FacilitySetupHelper.SoftDeleteRunDataAsync(
+                    _sp.GetRequiredService<IReportServiceClient>(),
+                    _sp.GetRequiredService<IDataAcquisitionServiceClient>(),
+                    _sp.GetRequiredService<IQueryDispatchServiceClient>(),
+                    Output,
+                    _facilityId,
+                    _reportId);
+            }
+
             FhirDataLoader.ExpungeEverything(Output);
         }
     }
@@ -98,23 +116,28 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
 
         // Step 2: Create facility.
         await FacilitySetupHelper.EnsureFacilityAsync(
-            _sp.GetRequiredService<IFacilityServiceClient>(), Output, FacilityId, measureId);
+            _sp.GetRequiredService<IFacilityServiceClient>(), Output, _facilityId, measureId);
 
         // Step 3: Create normalization config.
         await FacilitySetupHelper.EnsureNormalizationConfigAsync(
-            _sp.GetRequiredService<INormalizationServiceClient>(), Output, FacilityId);
+            _sp.GetRequiredService<INormalizationServiceClient>(), Output, _facilityId);
 
         // Step 4: Create query plans (Discharge + Monthly).
         await FacilitySetupHelper.EnsureQueryPlansAsync(
-            _sp.GetRequiredService<IDataAcquisitionServiceClient>(), Output, FacilityId, measureId, "Epic");
+            _sp.GetRequiredService<IDataAcquisitionServiceClient>(), Output, _facilityId, measureId, "Epic");
 
         // Step 5: Create FHIR query config.
         await FacilitySetupHelper.EnsureQueryConfigAsync(
-            _sp.GetRequiredService<IDataAcquisitionServiceClient>(), AutomationCfg, Output, FacilityId);
+            _sp.GetRequiredService<IDataAcquisitionServiceClient>(), AutomationCfg, Output, _facilityId);
+        await FacilitySetupHelper.EnsureQueryDispatchConfigAsync(
+            _sp.GetRequiredService<IQueryDispatchServiceClient>(),
+            Output,
+            _facilityId);
 
         // Step 6: Generate the ad-hoc report.
         var reportApi = _sp.GetRequiredService<ReportApiHelper>();
-        var reportId = await reportApi.GenerateReportAsync(FacilityId, measureId, Config);
+        var reportId = await reportApi.GenerateReportAsync(_facilityId, measureId, Config);
+        _reportId = reportId;
 
         // Step 7: Start background diagnostics and poll until submitted.
         var lokiScraper = _sp.GetRequiredService<LokiScraper>();
@@ -127,7 +150,7 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
             pipelineReader: dataReader);
         await using var watcher = DiagnosticsEventWatcher.Start(diagnostics, Output);
 
-        await diagnostics.StartAsync(FacilityId, reportId);
+        await diagnostics.StartAsync(_facilityId, reportId);
 
         var reportSubmitted = await reportApi.CheckSubmissionStatusAsync(reportId, Config, diagnostics);
         await diagnostics.StopAsync();
@@ -135,15 +158,15 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
 
         // Always capture a non-asserting snapshot before assertions.
         var pipelineSnapshot = _sp.GetRequiredService<PipelineSnapshot>();
-        await pipelineSnapshot.WriteFullSnapshotAsync(Output, FacilityId, reportId);
+        await pipelineSnapshot.WriteFullSnapshotAsync(Output, _facilityId, reportId);
 
         Assert.True(reportSubmitted,
             $"Expected report with id {reportId} to be submitted but it was not. " +
             $"Check [DIAG] and [Snapshot] output above for root cause details.");
 
         // Step 8: Download and validate report artifacts.
-        var downloadedResources = await reportApi.DownloadReportAsync(FacilityId, reportId, Config);
-        var internalAbsResources = await reportApi.DownloadReportAsync(FacilityId, reportId, Config, external: false);
+        var downloadedResources = await reportApi.DownloadReportAsync(_facilityId, reportId, Config);
+        var internalAbsResources = await reportApi.DownloadReportAsync(_facilityId, reportId, Config, external: false);
 
         Assert.True(downloadedResources.ContainsKey("manifest.ndjson"),
             "Expected report to include manifest.ndjson but it was not");
@@ -162,7 +185,7 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
             measureId,
             Config.StartDate,
             Config.EndDate,
-            FacilityId,
+            _facilityId,
             reportId,
             GeneratedFhirDataSnapshotWriter.GetSnapshotDirectory(nameof(SmokeTest)));
 
@@ -170,7 +193,7 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
             Output,
             dataReader,
             nameof(SmokeTest),
-            FacilityId,
+            _facilityId,
             reportId,
             measureId,
             Config.PatientIds,
@@ -178,10 +201,10 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
             internalAbsResources);
 
         // Step 9-10: Strict database validation.
-        await _sp.GetRequiredService<ReportDatabaseValidator>().ValidateAllAsync(FacilityId, reportId, measureId, Config.PatientIds);
-        await _sp.GetRequiredService<DataAcquisitionDatabaseValidator>().ValidateAllAsync(FacilityId, reportId, measureId, Config.PatientIds);
-        await _sp.GetRequiredService<NormalizationDatabaseValidator>().ValidateAllAsync(FacilityId);
-        await _sp.GetRequiredService<TenantDatabaseValidator>().ValidateAllAsync(FacilityId, measureId);
-        await _sp.GetRequiredService<ValidationResultsValidator>().ValidateAllAsync(FacilityId, reportId, Config.PatientIds, Config.LokiScrapeWindow);
+        await _sp.GetRequiredService<ReportDatabaseValidator>().ValidateAllAsync(_facilityId, reportId, measureId, Config.PatientIds);
+        await _sp.GetRequiredService<DataAcquisitionDatabaseValidator>().ValidateAllAsync(_facilityId, reportId, measureId, Config.PatientIds);
+        await _sp.GetRequiredService<NormalizationDatabaseValidator>().ValidateAllAsync(_facilityId);
+        await _sp.GetRequiredService<TenantDatabaseValidator>().ValidateAllAsync(_facilityId, measureId);
+        await _sp.GetRequiredService<ValidationResultsValidator>().ValidateAllAsync(_facilityId, reportId, Config.PatientIds, Config.LokiScrapeWindow);
     }
 }

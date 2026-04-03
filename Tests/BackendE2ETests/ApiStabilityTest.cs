@@ -7,6 +7,7 @@ using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Census;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
+using LantanaGroup.Link.Shared.Application.Models.Integration.QueryDispatch;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -29,6 +30,7 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
     private bool _monthlyPlanCreated;
     private bool _normalizationCreated;
     private bool _censusConfigCreated;
+    private bool _queryDispatchConfigCreated;
 
     // Resolve clients once for readability
     private IAutomationOutput Output => _sp.GetRequiredService<DualOutputHelper>();
@@ -41,6 +43,7 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
     private ISubmissionServiceClient SubmissionClient => _sp.GetRequiredService<ISubmissionServiceClient>();
     private IMeasureEvalServiceClient MeasureEvalClient => _sp.GetRequiredService<IMeasureEvalServiceClient>();
     private IValidationServiceClient ValidationClient => _sp.GetRequiredService<IValidationServiceClient>();
+    private IQueryDispatchServiceClient QueryDispatchClient => _sp.GetRequiredService<IQueryDispatchServiceClient>();
 
     public ApiStabilityTest(BackendE2ETestFixture fixture)
     {
@@ -65,6 +68,8 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
             await Try(() => NormalizationClient.DeleteFacilityOperationsAsync(_facilityId));
         if (_censusConfigCreated)
             await Try(() => CensusClient.DeleteCensusConfigAsync(_facilityId));
+        if (_queryDispatchConfigCreated)
+            await Try(() => QueryDispatchClient.DeleteQueryDispatchConfigurationAsync(_facilityId));
         if (_facilityCreated)
             await Try(() => FacilityClient.DeleteAsync(_facilityId));
     }
@@ -135,6 +140,25 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
 
         await RunAsync(results, "Facility.CheckFacilityExists",
             () => FacilityClient.CheckFacilityExistsAsync(_facilityId));
+
+        var queryDispatchConfig = new QueryDispatchConfigurationApiModel
+        {
+            FacilityId = _facilityId,
+            DispatchSchedules =
+            [
+                new DispatchScheduleApiModel
+                {
+                    Event = "Discharge",
+                    Duration = "PT0S"
+                }
+            ]
+        };
+
+        await RunAsync(results, "QueryDispatch.UpsertConfiguration", async () =>
+        {
+            await QueryDispatchClient.UpsertQueryDispatchConfigurationAsync(_facilityId, queryDispatchConfig);
+            _queryDispatchConfigCreated = true;
+        });
 
         var queryConfigRequest = new CreateFhirQueryConfigurationRequestApiModel
         {
@@ -250,6 +274,9 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
         await RunAsync(results, "Report.SearchSchedules",
             () => ReportClient.SearchSchedulesAsync(Guid.NewGuid().ToString()));
 
+        await RunExpecting404Async(results, "Report.SoftDeleteSchedule",
+            () => ReportClient.SoftDeleteScheduleAsync(Guid.NewGuid().ToString()));
+
         await RunAsync(results, "Report.GetEntriesBySchedule",
             () => ReportClient.GetEntriesByScheduleAsync(Guid.NewGuid().ToString()));
 
@@ -274,6 +301,9 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
 
         await RunAsync(results, "DataAcq.GetAcquiredResourceIdsForReport",
             () => DataAcqClient.GetAcquiredResourceIdsForReportAsync(_facilityId, Guid.NewGuid().ToString()));
+
+        await RunAsync(results, "DataAcq.SoftDeleteLogsByFacility",
+            () => DataAcqClient.SoftDeleteLogsByFacilityAsync(_facilityId));
 
         await RunAsync(results, "Validation.GetValidationResults",
             () => ValidationClient.GetValidationResultsAsync(_facilityId, Guid.NewGuid().ToString()));
@@ -311,6 +341,13 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
             await RunAsync(results, "Census.DeleteConfig",
                 () => CensusClient.DeleteCensusConfigAsync(_facilityId));
             _censusConfigCreated = false;
+        }
+
+        if (_queryDispatchConfigCreated)
+        {
+            await RunAsync(results, "QueryDispatch.DeleteConfiguration",
+                () => QueryDispatchClient.DeleteQueryDispatchConfigurationAsync(_facilityId));
+            _queryDispatchConfigCreated = false;
         }
 
         if (_facilityCreated)
