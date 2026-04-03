@@ -1,4 +1,4 @@
-ï»¿namespace LantanaGroup.Link.Automation.Generation;
+namespace LantanaGroup.Automation.Generation;
 
 /// <summary>
 /// Shared clinical code tables used across all resource factories.
@@ -7,7 +7,7 @@
 ///
 /// Clinical design principle: each "scenario" row ties together a primary
 /// diagnosis, a set of plausible medications, a set of plausible procedures,
-/// and an appropriate set of observations â€” so the resources for a single
+/// and an appropriate set of observations — so the resources for a single
 /// patient form a coherent clinical story.
 /// </summary>
 public static class FhirGenerationCodes
@@ -48,7 +48,7 @@ public static class FhirGenerationCodes
     ];
 
     // -----------------------------------------------------------------------
-    //  Clinical scenarios â€” each row is a coherent admission story
+    //  Clinical scenarios — each row is a coherent admission story
     //  Scenario drives: primary diagnosis, admit reason, medications, procedures
     // -----------------------------------------------------------------------
 
@@ -60,27 +60,27 @@ public static class FhirGenerationCodes
         string ServiceTypeCode, string ServiceTypeDisplay,
         string PriorityCode, string PriorityDisplay)[] ClinicalScenarios =
     [
-        // 0 â€” Community-acquired pneumonia, emergency admission
+        // 0 — Community-acquired pneumonia, emergency admission
         ("233604007", "Pneumonia (disorder)",                               "J18.9",  "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "305",  "General Medicine",  "EM", "emergency"),
-        // 1 â€” Acute decompensated heart failure, urgent admission
+        // 1 — Acute decompensated heart failure, urgent admission
         ("84114007",  "Heart failure (disorder)",                           "I50.9",  "32485007",  "Hospital admission (procedure)", "hosp-trans", "Transferred from other hospital",     "snf",     "Skilled nursing facility", "303", "Cardiology",   "R",  "routine"),
-        // 2 â€” Acute myocardial infarction, emergency admission
+        // 2 — Acute myocardial infarction, emergency admission
         ("57054005",  "Acute myocardial infarction (disorder)",             "I21.9",  "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "306",  "Cardiothoracic Surgery", "EM", "emergency"),
-        // 3 â€” COPD exacerbation, emergency admission
+        // 3 — COPD exacerbation, emergency admission
         ("195951007", "Acute exacerbation of chronic obstructive airways disease (disorder)", "J44.1", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "305", "Pulmonology", "EM", "emergency"),
-        // 4 â€” Sepsis from urinary source, emergency admission
+        // 4 — Sepsis from urinary source, emergency admission
         ("10001005",  "Septicemia (disorder)",                              "A41.9",  "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "305",  "General Medicine",  "EM", "emergency"),
-        // 5 â€” Hip fracture, elective surgical admission
+        // 5 — Hip fracture, elective surgical admission
         ("700097003", "Fracture of bone of hip region (disorder)",          "S72.001A","32485007", "Hospital admission (procedure)", "gp",   "General practitioner referral",       "home",    "Home",              "308",  "Orthopaedics",      "R",  "routine"),
-        // 6 â€” Acute renal failure, urgent admission
+        // 6 — Acute renal failure, urgent admission
         ("14669001",  "Acute renal failure syndrome (disorder)",            "N17.9",  "32485007",  "Hospital admission (procedure)", "hosp-trans", "Transferred from other hospital",     "home",    "Home",              "310",  "Nephrology",        "R",  "routine"),
-        // 7 â€” Ischaemic stroke, emergency admission
+        // 7 — Ischaemic stroke, emergency admission
         ("422504002", "Ischemic stroke (disorder)",                         "I63.9",  "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "rehab",   "Inpatient rehabilitation", "320", "Neurology",    "EM", "emergency"),
     ];
 
     // -----------------------------------------------------------------------
     //  Observations with interpretation thresholds (criticalLow, normalLow,
-    //  normalHigh, criticalHigh) â€” used to populate interpretation codes
+    //  normalHigh, criticalHigh) — used to populate interpretation codes
     // -----------------------------------------------------------------------
 
     public static readonly (
@@ -96,12 +96,12 @@ public static class FhirGenerationCodes
         ("55284-4", "Blood pressure systolic and diastolic",                   "vital-signs", "mm[Hg]",           0,   90,   140, 220),
         ("9279-1",  "Respiratory rate",                                        "vital-signs", "{breaths}/min",    4,   12,   20,  40),
         ("59576-9", "Body mass index (BMI) [Ratio]",                           "vital-signs", "kg/m2",            0,   18.5, 29.9, 60),
-        // Laboratory â€” haematology
+        // Laboratory — haematology
         ("718-7",   "Hemoglobin [Mass/volume] in Blood",                       "laboratory",  "g/dL",             5,   12.0, 17.5, 20),
         ("4544-3",  "Hematocrit [Volume Fraction] of Blood",                   "laboratory",  "%",                15,  36,   52,  65),
         ("6690-2",  "Leukocytes [#/volume] in Blood",                          "laboratory",  "10*3/uL",          1,   4.5,  11,  30),
         ("777-3",   "Platelets [#/volume] in Blood",                           "laboratory",  "10*3/uL",          20,  150,  400, 1000),
-        // Laboratory â€” chemistry
+        // Laboratory — chemistry
         ("2160-0",  "Creatinine [Mass/volume] in Serum or Plasma",             "laboratory",  "mg/dL",            0,   0.6,  1.2, 10),
         ("2345-7",  "Glucose [Mass/volume] in Serum or Plasma",                "laboratory",  "mg/dL",            40,  70,   99,  500),
         ("2951-2",  "Sodium [Moles/volume] in Serum or Plasma",                "laboratory",  "mmol/L",           120, 136,  145, 160),
@@ -116,18 +116,18 @@ public static class FhirGenerationCodes
         ("2571-8",  "Triglycerides [Mass/volume] in Serum or Plasma",          "laboratory",  "mg/dL",            0,   0,    150, 1000),
         ("48643-1", "Glomerular filtration rate/1.73 sq M.predicted [Volume Rate/Area] in Serum, Plasma or Blood by Creatinine-based formula (MDRD)", "laboratory", "mL/min/{1.73_m2}", 0, 60, 999, 999),
         ("2532-0",  "Lactate dehydrogenase [Enzymatic activity/volume]",       "laboratory",  "U/L",              0,   122,  222, 1000),
-        // Laboratory â€” microbiology / culture
+        // Laboratory — microbiology / culture
         ("600-7",   "Bacteria identified in Blood by Culture",                 "laboratory",  "",                 0,   0,    0,   0),
-        // Laboratory â€” coagulation
+        // Laboratory — coagulation
         ("5902-2",  "Prothrombin time (PT)",                                   "laboratory",  "s",                0,   11,   13,  30),
         ("6301-6",  "INR in Platelet poor plasma by Coagulation assay",        "laboratory",  "{INR}",            0,   0.9,  1.1, 5),
-        // Laboratory â€” cardiac
+        // Laboratory — cardiac
         ("33762-6", "NT-proBNP [Mass/volume] in Serum or Plasma",              "laboratory",  "pg/mL",            0,   0,    125, 35000),
         ("10839-9", "Troponin I.cardiac [Mass/volume] in Serum or Plasma",     "laboratory",  "ng/mL",            0,   0,    0.04, 50),
     ];
 
     // -----------------------------------------------------------------------
-    //  Conditions (secondary / comorbidities â€” primary dx comes from scenario)
+    //  Conditions (secondary / comorbidities — primary dx comes from scenario)
     // -----------------------------------------------------------------------
 
     public static readonly (string Code, string Display, string IcdCode, string Category)[] Conditions =
@@ -151,7 +151,7 @@ public static class FhirGenerationCodes
     ];
 
     // -----------------------------------------------------------------------
-    //  Procedures â€” with associated condition reason for clinical coherence
+    //  Procedures — with associated condition reason for clinical coherence
     // -----------------------------------------------------------------------
 
     public static readonly (string Code, string Display, string ReasonCode, string ReasonDisplay, string BodySiteCode, string BodySiteDisplay, string OutcomeCode, string OutcomeDisplay)[] Procedures =
@@ -172,7 +172,7 @@ public static class FhirGenerationCodes
     ];
 
     // -----------------------------------------------------------------------
-    //  Medications â€” with explicit frequency, PRN flag, and indication
+    //  Medications — with explicit frequency, PRN flag, and indication
     // -----------------------------------------------------------------------
 
     public static readonly (
@@ -218,7 +218,7 @@ public static class FhirGenerationCodes
     ];
 
     // -----------------------------------------------------------------------
-    //  Specimens â€” with container and handling
+    //  Specimens — with container and handling
     // -----------------------------------------------------------------------
 
     public static readonly (
@@ -236,7 +236,7 @@ public static class FhirGenerationCodes
     ];
 
     // -----------------------------------------------------------------------
-    //  Allergies â€” with substance, reaction, and route of exposure
+    //  Allergies — with substance, reaction, and route of exposure
     // -----------------------------------------------------------------------
 
     public static readonly (
@@ -273,7 +273,7 @@ public static class FhirGenerationCodes
     ];
 
     // -----------------------------------------------------------------------
-    //  Imaging studies â€” with interpreter and reason
+    //  Imaging studies — with interpreter and reason
     // -----------------------------------------------------------------------
 
     public static readonly (
@@ -291,7 +291,7 @@ public static class FhirGenerationCodes
     ];
 
     // -----------------------------------------------------------------------
-    //  Diagnostic report panels â€” all genuine lab/radiology panels.
+    //  Diagnostic report panels — all genuine lab/radiology panels.
     //  category uses v2-0074 codes only (HM, CH, UA, MB, RAD, PT).
     //  Clinical notes (H&P, discharge summary) live in DocumentTypes only.
     // -----------------------------------------------------------------------

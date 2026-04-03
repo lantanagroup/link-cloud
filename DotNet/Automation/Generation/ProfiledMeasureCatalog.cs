@@ -1,4 +1,4 @@
-﻿namespace LantanaGroup.Link.Automation.Generation;
+namespace LantanaGroup.Automation.Generation;
 
 /// <summary>
 /// Central catalog for measure metadata used by automation (bundle location,
@@ -17,11 +17,11 @@ public static class ProfiledMeasureCatalog
     public static string GetBundleLocation(ProfiledMeasureType measure) => measure switch
     {
         ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation
-            => "resource://LantanaGroup.Link.Automation.measures.NHSNAcuteCareHospitalMonthlyInitialPopulation.json",
+            => "resource://LantanaGroup.Automation.measures.NHSNAcuteCareHospitalMonthlyInitialPopulation.json",
         ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation
-            => "resource://LantanaGroup.Link.Automation.measures.NHSNAcuteCareHospitalDailyInitialPopulation.json",
+            => "resource://LantanaGroup.Automation.measures.NHSNAcuteCareHospitalDailyInitialPopulation.json",
         ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation
-            => "resource://LantanaGroup.Link.Automation.measures.NHSNGlycemicControlHypoglycemicInitialPopulation.json",
+            => "resource://LantanaGroup.Automation.measures.NHSNGlycemicControlHypoglycemicInitialPopulation.json",
         _ => throw new ArgumentOutOfRangeException(nameof(measure), measure, null)
     };
 }

@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>LantanaGroup.Link.Automation</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Hl7.Fhir.R4" Version="5.*" />
+    <PackageReference Include="RestSharp" Version="112.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="measures\*.json" />
+    <EmbeddedResource Include="measures\*.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LinkSdk\LinkSdk.csproj" />
+    <ProjectReference Include="..\Shared\Shared.csproj" />
+  </ItemGroup>
+</Project>

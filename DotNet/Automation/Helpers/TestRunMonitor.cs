@@ -1,5 +1,10 @@
-ï»¿namespace LantanaGroup.Link.Automation.Helpers;
+namespace LantanaGroup.Automation.Helpers;
 
+/// <summary>
+/// Generic test run monitor that orchestrates pluggable probes, detects stalls,
+/// and emits events. Platform-agnostic — the probes themselves carry the
+/// domain-specific logic.
+/// </summary>
 public sealed class TestRunMonitor
 {
     private readonly IAutomationOutput _output;
@@ -29,9 +34,9 @@ public sealed class TestRunMonitor
         _onEvent = onEvent;
     }
 
-    public void Start(string facilityId, string reportId, int expectedPatientCount)
+    public void Start(string correlationId1, string correlationId2, int expectedItemCount)
     {
-        State.Start(facilityId, reportId, expectedPatientCount);
+        State.Start(correlationId1, correlationId2, expectedItemCount);
         _lastProbeRunUtc.Clear();
         _emittedIssueKeys.Clear();
         _stallDiagnosticsDumped = false;
@@ -52,7 +57,7 @@ public sealed class TestRunMonitor
             new Dictionary<string, string>
             {
                 ["cycle"] = State.CycleCount.ToString(),
-                ["runId"] = State.ReportId
+                ["runId"] = State.CorrelationId2
             });
 
         foreach (var probe in _probes)
@@ -127,8 +132,8 @@ public sealed class TestRunMonitor
         if (result.StalledStage != null)
             State.StalledStage = result.StalledStage;
 
-        if (result.KafkaErrorCount.HasValue)
-            State.KafkaErrorCount = result.KafkaErrorCount.Value;
+        if (result.MessageBusErrorCount.HasValue)
+            State.MessageBusErrorCount = result.MessageBusErrorCount.Value;
 
         if (result.CompletedMilestones != null)
         {
@@ -142,7 +147,7 @@ public sealed class TestRunMonitor
                     MonitorIssueSeverity.Info,
                     "Milestones",
                     $"Reached milestone {milestone}",
-                    new Dictionary<string, string> { ["milestone"] = milestone.ToString() });
+                    new Dictionary<string, string> { ["milestone"] = milestone });
             }
         }
 
@@ -189,7 +194,7 @@ public sealed class TestRunMonitor
         var evt = new AutomationMonitorEvent(
             Sequence: 0,
             TimestampUtc: DateTime.UtcNow,
-            RunId: State.ReportId,
+            RunId: State.CorrelationId2,
             Type: type,
             Severity: severity,
             Source: source,

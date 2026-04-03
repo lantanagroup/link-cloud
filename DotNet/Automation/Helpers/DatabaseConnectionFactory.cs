@@ -1,17 +1,13 @@
-﻿using LantanaGroup.Link.Automation.Configuration;
-
-namespace LantanaGroup.Link.Automation.Helpers;
+namespace LantanaGroup.Automation.Helpers;
 
 /// <summary>
-/// Provides connection strings and EF DbContext instances for direct database
-/// validation during E2E tests. Connection parameters are sourced from
-/// <see cref="AutomationConfig.DatabaseConfig"/>.
+/// Provides connection strings for direct database validation during automation.
 /// </summary>
 public class DatabaseConnectionFactory
 {
-    private readonly AutomationConfig.DatabaseConfig _dbConfig;
+    private readonly Configuration.AutomationConfigBase.DatabaseConfigBase _dbConfig;
 
-    public DatabaseConnectionFactory(AutomationConfig.DatabaseConfig dbConfig)
+    public DatabaseConnectionFactory(Configuration.AutomationConfigBase.DatabaseConfigBase dbConfig)
     {
         _dbConfig = dbConfig;
     }
@@ -20,10 +16,5 @@ public class DatabaseConnectionFactory
     {
         return $"Server=tcp:{_dbConfig.Server};Initial Catalog={database};User ID={_dbConfig.UserId};Password={_dbConfig.Password};" +
                "TrustServerCertificate=True;Encrypt=True;Connection Timeout=30;";
-    }
-
-    public static class Databases
-    {
-        public const string Validation = "link-validation";
     }
 }

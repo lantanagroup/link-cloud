@@ -1,43 +1,49 @@
-﻿using LantanaGroup.Link.Automation.Configuration;
-using LantanaGroup.Link.Automation.Helpers;
+using LantanaGroup.Automation.Configuration;
+using LantanaGroup.Automation.Helpers;
 
-namespace LantanaGroup.Link.Automation;
+namespace LantanaGroup.Automation;
 
 using System.Reflection;
 using System.Text.Json.Nodes;
 using RestSharp;
 
+/// <summary>
+/// Generic FHIR data loader that interacts with a FHIR server via REST.
+/// Does not depend on any Link SDK types.
+/// </summary>
 public class FhirDataLoader
 {
     private readonly List<string> _createdResources = new List<string>();
     private string? _authorization;
     private readonly RestClient _restClient;
-    private readonly AutomationConfig _config;
+    private readonly OAuthConfig? _oauthConfig;
+    private readonly BasicAuthConfig? _basicAuthConfig;
 
     private const int MaxRetries = 3;
     private static readonly TimeSpan InitialRetryDelay = TimeSpan.FromSeconds(2);
 
-    public FhirDataLoader(string fhirServerBaseUrl, AutomationConfig config)
+    public FhirDataLoader(string fhirServerBaseUrl, OAuthConfig? oauthConfig = null, BasicAuthConfig? basicAuthConfig = null)
     {
-        _config = config;
-        this._restClient = new RestClient(fhirServerBaseUrl.TrimEnd('/'));
-        this.GetAuthorization();
+        _oauthConfig = oauthConfig;
+        _basicAuthConfig = basicAuthConfig;
+        _restClient = new RestClient(fhirServerBaseUrl.TrimEnd('/'));
+        GetAuthorization();
     }
 
     private void GetAuthorization()
     {
-        if (!_config.FhirServerOAuth.ShouldAuthenticate &&
-            !_config.FhirServerBasicAuth.ShouldAuthenticate) return;
+        if (_oauthConfig?.ShouldAuthenticate != true &&
+            _basicAuthConfig?.ShouldAuthenticate != true) return;
 
         Console.WriteLine("Authenticating to load data on FHIR server...");
 
-        if (_config.FhirServerOAuth.ShouldAuthenticate)
+        if (_oauthConfig?.ShouldAuthenticate == true)
         {
-            this._authorization = "Bearer " + AuthHelper.GetBearerToken(_config.FhirServerOAuth);
+            _authorization = "Bearer " + AuthHelper.GetBearerToken(_oauthConfig);
         }
-        else if (_config.FhirServerBasicAuth.ShouldAuthenticate)
+        else if (_basicAuthConfig?.ShouldAuthenticate == true)
         {
-            this._authorization = "Basic " + AuthHelper.GetBasicAuthorization(_config.FhirServerBasicAuth);
+            _authorization = "Basic " + AuthHelper.GetBasicAuthorization(_basicAuthConfig);
         }
     }
 
@@ -58,7 +64,7 @@ public class FhirDataLoader
             try
             {
                 var request = new RestRequest("metadata", Method.Get);
-                var response = await this._restClient.ExecuteAsync(request);
+                var response = await _restClient.ExecuteAsync(request);
 
                 if (response.IsSuccessful)
                 {
@@ -138,8 +144,8 @@ public class FhirDataLoader
                         {
                             var resourcePath = location.Split("/_history")[0];
 
-                            if (!this._createdResources.Contains(resourcePath))
-                                this._createdResources.Add(resourcePath);
+                            if (!_createdResources.Contains(resourcePath))
+                                _createdResources.Add(resourcePath);
                         }
                     }
                 }
@@ -155,17 +161,17 @@ public class FhirDataLoader
     {
         output.WriteLine("Removing data from FHIR server...");
 
-        foreach (var resource in this._createdResources)
+        foreach (var resource in _createdResources)
         {
             var request = new RestRequest($"{resource}", Method.Delete);
             request.AddHeader("Content-Type", "application/fhir+json");
 
-            if (!string.IsNullOrEmpty(this._authorization))
-                request.AddHeader("Authorization", this._authorization);
+            if (!string.IsNullOrEmpty(_authorization))
+                request.AddHeader("Authorization", _authorization);
 
             request.AddQueryParameter("_expunge", "true");
 
-            var response = this._restClient.Execute(request);
+            var response = _restClient.Execute(request);
 
             output.WriteLine($"Expunging {resource} => Status: {response.StatusCode}");
 
@@ -183,8 +189,8 @@ public class FhirDataLoader
         var request = new RestRequest("$expunge", Method.Post);
         request.AddHeader("Content-Type", "application/fhir+json");
 
-        if (!string.IsNullOrEmpty(this._authorization))
-            request.AddHeader("Authorization", this._authorization);
+        if (!string.IsNullOrEmpty(_authorization))
+            request.AddHeader("Authorization", _authorization);
 
         string body = """
             {
@@ -196,7 +202,7 @@ public class FhirDataLoader
             """;
         request.AddStringBody(body, DataFormat.Json);
 
-        var response = this._restClient.Execute(request);
+        var response = _restClient.Execute(request);
 
         output.WriteLine($"Expunging everything => Status: {response.StatusCode}");
         if (!response.IsSuccessful)
@@ -248,35 +254,33 @@ public class FhirDataLoader
 
                         if (status == null || !status.StartsWith("20"))
                         {
-                            output.WriteLine("Failed response for index " + entries.IndexOf(entry) + ": " + responseNode);
+                            output.WriteLine($"  {progress} Entry error in {name}: {responseNode}");
                         }
 
                         if (!string.IsNullOrEmpty(location))
                         {
                             var resourcePath = location.Split("/_history")[0];
-
-                            if (!this._createdResources.Contains(resourcePath))
-                                this._createdResources.Add(resourcePath);
+                            if (!_createdResources.Contains(resourcePath))
+                                _createdResources.Add(resourcePath);
                         }
                     }
                 }
             }
             catch (Exception ex)
             {
-                output.WriteLine("Error parsing response for " + name + ": " + ex.Message);
+                output.WriteLine($"  {progress} Error parsing response for {name}: {ex.Message}");
             }
         }
 
-        output.WriteLine($"Upload complete: {successCount} succeeded, {failCount} failed out of {bundles.Count} bundles.");
+        output.WriteLine($"Bundle loading complete: {successCount} succeeded, {failCount} failed.");
     }
 
     private async Task<RestResponse> PostBundleWithRetryAsync(
         string bundleJson,
-        string bundleName,
-        string requestPath,
+        string name,
+        string progress,
         IAutomationOutput output)
     {
-        var delay = InitialRetryDelay;
         RestResponse? lastResponse = null;
 
         for (var attempt = 1; attempt <= MaxRetries; attempt++)
@@ -284,38 +288,25 @@ public class FhirDataLoader
             var request = new RestRequest("", Method.Post);
             request.AddHeader("Content-Type", "application/fhir+json");
 
-            if (!string.IsNullOrEmpty(this._authorization))
-                request.AddHeader("Authorization", this._authorization);
+            if (!string.IsNullOrEmpty(_authorization))
+                request.AddHeader("Authorization", _authorization);
 
             request.AddStringBody(bundleJson, DataFormat.Json);
 
-            lastResponse = await this._restClient.ExecuteAsync(request);
+            lastResponse = await _restClient.ExecuteAsync(request);
 
             if (lastResponse.IsSuccessful)
             {
                 if (attempt > 1)
-                    output.WriteLine($"  {requestPath} Posted {bundleName} => {lastResponse.StatusCode} (succeeded on attempt {attempt})");
-                else
-                    output.WriteLine($"  {requestPath} Posted {bundleName} => {lastResponse.StatusCode}");
-                return lastResponse;
-            }
-
-            var statusCode = (int)lastResponse.StatusCode;
-            if (statusCode != 0 && statusCode < 500)
-            {
-                output.WriteLine($"  {requestPath} Posted {bundleName} => {lastResponse.StatusCode} (non-retryable)");
+                    output.WriteLine($"  {progress} Retry succeeded for {name} on attempt {attempt}");
                 return lastResponse;
             }
 
             if (attempt < MaxRetries)
             {
-                output.WriteLine($"  {requestPath} Posted {bundleName} => {lastResponse.StatusCode} (attempt {attempt}/{MaxRetries}, retrying in {delay.TotalSeconds:F0}s...)");
+                var delay = InitialRetryDelay * Math.Pow(2, attempt - 1);
+                output.WriteLine($"  {progress} Attempt {attempt} failed for {name}: {lastResponse.StatusCode}. Retrying in {delay.TotalSeconds:F0}s...");
                 await Task.Delay(delay);
-                delay *= 2;
-            }
-            else
-            {
-                output.WriteLine($"  {requestPath} Posted {bundleName} => {lastResponse.StatusCode} (attempt {attempt}/{MaxRetries}, giving up)");
             }
         }
 

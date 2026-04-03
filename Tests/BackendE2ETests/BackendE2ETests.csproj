@@ -42,8 +42,8 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\..\DotNet\Automation.Link\Automation.Link.csproj" />
       <ProjectReference Include="..\..\DotNet\LinkSdk\LinkSdk.csproj" />
-      <ProjectReference Include="..\..\DotNet\Automation\Automation.csproj" />
       <ProjectReference Include="..\..\DotNet\DataAcquisition.Domain\DataAcquisition.Domain.csproj" />
       <ProjectReference Include="..\..\DotNet\Normalization\Normalization.csproj" />
       <ProjectReference Include="..\..\DotNet\Report\Report.csproj" />

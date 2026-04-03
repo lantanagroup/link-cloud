@@ -1,4 +1,4 @@
-﻿namespace LantanaGroup.Link.Automation.Generation;
+namespace LantanaGroup.Automation.Generation;
 
 /// <summary>
 /// Per-patient profile that drives measure-aware generation.

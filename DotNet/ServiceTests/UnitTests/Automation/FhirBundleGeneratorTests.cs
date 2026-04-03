@@ -1,9 +1,7 @@
-﻿using System.Text.Json;
-using Hl7.Fhir.Model;
-using LantanaGroup.Link.Automation.Generation;
+﻿using LantanaGroup.Link.Automation.Generation;
 using LantanaGroup.Link.Automation.Helpers;
 using LantanaGroup.Link.Shared.Application.SerDes;
-using Xunit.Abstractions;
+using System.Text.Json;
 
 namespace UnitTests.Automation;
 

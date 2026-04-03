@@ -1,7 +1,7 @@
-﻿using Hl7.Fhir.Model;
-using static LantanaGroup.Link.Automation.Generation.ResourceFactories.FhirConceptFactory;
+using Hl7.Fhir.Model;
+using static LantanaGroup.Automation.Generation.ResourceFactories.FhirConceptFactory;
 
-namespace LantanaGroup.Link.Automation.Generation.ResourceFactories;
+namespace LantanaGroup.Automation.Generation.ResourceFactories;
 
 public static class CareTeamFactory
 {

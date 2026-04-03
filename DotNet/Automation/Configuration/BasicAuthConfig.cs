@@ -1,5 +1,8 @@
-﻿namespace LantanaGroup.Link.Automation.Configuration;
+namespace LantanaGroup.Automation.Configuration;
 
+/// <summary>
+/// Basic authentication configuration (username/password).
+/// </summary>
 public class BasicAuthConfig
 {
     public bool ShouldAuthenticate { get; set; }

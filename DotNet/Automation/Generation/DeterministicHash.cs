@@ -1,4 +1,4 @@
-﻿namespace LantanaGroup.Link.Automation.Generation;
+namespace LantanaGroup.Automation.Generation;
 
 public static class DeterministicHash
 {

@@ -1,6 +1,6 @@
-﻿using Hl7.Fhir.Model;
+using Hl7.Fhir.Model;
 
-namespace LantanaGroup.Link.Automation.Generation.ResourceFactories;
+namespace LantanaGroup.Automation.Generation.ResourceFactories;
 
 /// <summary>
 /// Lightweight factory for FHIR POCO concept helpers shared by all resource factories.

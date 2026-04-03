@@ -71,6 +71,15 @@ namespace LantanaGroup.Link.Report.Jobs
 
                 _logger.LogInformation("Executing EndOfReportPeriodJob for ScheduleId {ScheduleId}", schedule.Id);
 
+                // Mark the end-of-period flag BEFORE attempting to produce the manifest.
+                // ReportManifestProducer.Produce gates on EndOfReportPeriodJobHasRun — if
+                // all patient entries already reached a terminal state (e.g., discharge
+                // processing completed before the period ended), the flag must be true
+                // for the manifest to be generated on this call.
+                schedule.Status = ScheduleStatus.EndOfPeriod;
+                schedule.EndOfReportPeriodJobHasRun = true;
+                await reportScheduledManager.UpdateAsync(schedule, CancellationToken.None);
+
                 var manifestProduced = await reportManifestProducer.Produce(schedule);
 
                 if (!manifestProduced)
@@ -93,10 +102,6 @@ namespace LantanaGroup.Link.Report.Jobs
                         }
                     }
                 }
-
-                schedule.Status = ScheduleStatus.EndOfPeriod;
-                schedule.EndOfReportPeriodJobHasRun = true;
-                await reportScheduledManager.UpdateAsync(schedule, CancellationToken.None);
 
                 await _quartz.DeleteJob(
                     identity: context.JobDetail.Key.Name,

@@ -1,4 +1,4 @@
-﻿namespace LantanaGroup.Link.Automation.Helpers;
+namespace LantanaGroup.Automation.Helpers;
 
 public enum AutomationMonitorEventType
 {

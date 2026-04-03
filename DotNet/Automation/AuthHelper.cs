@@ -1,10 +1,13 @@
-﻿using LantanaGroup.Link.Automation.Configuration;
+using LantanaGroup.Automation.Configuration;
 using RestSharp;
 using System.Text;
 using System.Text.Json;
 
-namespace LantanaGroup.Link.Automation;
+namespace LantanaGroup.Automation;
 
+/// <summary>
+/// Generic authentication helpers for OAuth and Basic auth flows.
+/// </summary>
 public static class AuthHelper
 {
     public static string GetBasicAuthorization(BasicAuthConfig config)
@@ -51,9 +54,9 @@ public static class AuthHelper
 
         var responseModel = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(response.Content!);
 
-        if (!responseModel.ContainsKey("access_token"))
+        if (!responseModel!.ContainsKey("access_token"))
             throw new InvalidOperationException("OAuth token response does not contain access token");
 
-        return responseModel["access_token"].GetString();
+        return responseModel["access_token"].GetString()!;
     }
 }

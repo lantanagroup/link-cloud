@@ -1,10 +1,9 @@
 ﻿using Hl7.Fhir.Model;
-using LantanaGroup.Link.Automation.Generation.ResourceFactories;
-using LantanaGroup.Link.Automation.Helpers;
-using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Automation.Generation.ResourceFactories;
+using LantanaGroup.Automation.Helpers;
 using System.Text.Json;
 
-namespace LantanaGroup.Link.Automation.Generation;
+namespace LantanaGroup.Automation.Generation;
 
 /// <summary>
 /// Orchestrates synthetic FHIR R4 transaction bundle generation for E2E / stress / volume tests.
@@ -111,7 +110,7 @@ public static class FhirBundleGenerator
 
             var entries = new List<Bundle.EntryComponent>();
 
-            // Core anchors — order matters: Patient → Device → Encounter → Diagnoses → Care
+            // Core anchors — order matters: Patient ? Device ? Encounter ? Diagnoses ? Care
             entries.Add(Entry($"Patient/{patientId}",
                 PatientFactory.Generate(patientId, patientSeed, gpPractId)));
 
@@ -190,7 +189,7 @@ public static class FhirBundleGenerator
 
             output.WriteLine($"  Patient {patientId}: {entries.Count} entries | scenario={scenario.PrimaryDxDisplay} | " +
                              $"encounter={encounterId} LOS={(encEnd - encStart).TotalDays:F1}d " +
-                             $"({encStart:yyyy-MM-dd} → {encEnd:yyyy-MM-dd})");
+                             $"({encStart:yyyy-MM-dd} ? {encEnd:yyyy-MM-dd})");
 
             allEntries.Add((patientId, entries));
         }
@@ -507,7 +506,7 @@ public static class FhirBundleGenerator
 
             var tag = profile.Eligibility == MeasureEligibility.Qualifying ? "QUALIFYING" : "NON-QUALIFYING";
             output.WriteLine($"  Patient {patientId}: {entries.Count} entries [{tag}] | scenario={scenario.PrimaryDxDisplay} | " +
-                             $"encounter={encounterId} ({encStart:yyyy-MM-dd} → {encEnd:yyyy-MM-dd})");
+                             $"encounter={encounterId} ({encStart:yyyy-MM-dd} ? {encEnd:yyyy-MM-dd})");
 
             allEntries.Add((patientId, entries));
         }
@@ -629,7 +628,7 @@ public static class FhirBundleGenerator
     private static string Serialize(List<Bundle.EntryComponent> entries)
     {
         var bundle = new Bundle { Type = Bundle.BundleType.Transaction, Entry = entries };
-        return JsonSerializer.Serialize(bundle, LinkFhirSerializerOptions.ForFhirWithoutValidation());
+        return JsonSerializer.Serialize(bundle, FhirSerializerOptions.ForFhirWithoutValidation());
     }
 
     private static DateTime EncounterStart(int index)

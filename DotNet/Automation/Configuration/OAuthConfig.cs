@@ -1,5 +1,8 @@
-﻿namespace LantanaGroup.Link.Automation.Configuration;
+namespace LantanaGroup.Automation.Configuration;
 
+/// <summary>
+/// OAuth configuration for token-based authentication.
+/// </summary>
 public class OAuthConfig
 {
     public bool ShouldAuthenticate { get; set; }

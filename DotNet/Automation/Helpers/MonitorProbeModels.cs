@@ -1,6 +1,4 @@
-﻿using LantanaGroup.Link.Automation.Validation;
-
-namespace LantanaGroup.Link.Automation.Helpers;
+namespace LantanaGroup.Automation.Helpers;
 
 public enum MonitorIssueSeverity
 {
@@ -23,48 +21,48 @@ public sealed class MonitorProbeResult
     public bool? HasCriticalFailure { get; init; }
     public TimeSpan? StallDuration { get; init; }
     public string? StalledStage { get; init; }
-    public int? KafkaErrorCount { get; init; }
-    public IReadOnlyCollection<MilestoneValidationOrchestrator.Milestone>? CompletedMilestones { get; init; }
+    public int? MessageBusErrorCount { get; init; }
+    public IReadOnlyCollection<string>? CompletedMilestones { get; init; }
     public List<MonitorIssue> Issues { get; init; } = [];
 }
 
 public sealed class TestMonitorState
 {
-    private readonly HashSet<MilestoneValidationOrchestrator.Milestone> _completedMilestones = [];
+    private readonly HashSet<string> _completedMilestones = [];
     private readonly List<MonitorIssue> _issues = [];
 
-    public string FacilityId { get; private set; } = string.Empty;
-    public string ReportId { get; private set; } = string.Empty;
-    public int ExpectedPatientCount { get; private set; }
+    public string CorrelationId1 { get; private set; } = string.Empty;
+    public string CorrelationId2 { get; private set; } = string.Empty;
+    public int ExpectedItemCount { get; private set; }
     public DateTime StartUtc { get; private set; }
     public int CycleCount { get; private set; }
 
     public bool HasCriticalFailure { get; set; }
     public TimeSpan StallDuration { get; set; }
     public string? StalledStage { get; set; }
-    public int KafkaErrorCount { get; set; }
+    public int MessageBusErrorCount { get; set; }
 
-    public IReadOnlyCollection<MilestoneValidationOrchestrator.Milestone> CompletedMilestones => _completedMilestones;
+    public IReadOnlyCollection<string> CompletedMilestones => _completedMilestones;
     public IReadOnlyList<MonitorIssue> Issues => _issues;
 
-    public void Start(string facilityId, string reportId, int expectedPatientCount)
+    public void Start(string correlationId1, string correlationId2, int expectedItemCount)
     {
-        FacilityId = facilityId;
-        ReportId = reportId;
-        ExpectedPatientCount = expectedPatientCount;
+        CorrelationId1 = correlationId1;
+        CorrelationId2 = correlationId2;
+        ExpectedItemCount = expectedItemCount;
         StartUtc = DateTime.UtcNow;
         CycleCount = 0;
         HasCriticalFailure = false;
         StallDuration = TimeSpan.Zero;
         StalledStage = null;
-        KafkaErrorCount = 0;
+        MessageBusErrorCount = 0;
         _completedMilestones.Clear();
         _issues.Clear();
     }
 
     public void IncrementCycle() => CycleCount++;
 
-    public void MergeMilestones(IReadOnlyCollection<MilestoneValidationOrchestrator.Milestone> milestones)
+    public void MergeMilestones(IReadOnlyCollection<string> milestones)
     {
         foreach (var milestone in milestones)
             _completedMilestones.Add(milestone);

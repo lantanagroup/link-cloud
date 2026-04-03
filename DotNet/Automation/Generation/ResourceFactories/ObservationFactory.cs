@@ -1,7 +1,7 @@
-ï»¿using Hl7.Fhir.Model;
-using static LantanaGroup.Link.Automation.Generation.ResourceFactories.FhirConceptFactory;
+using Hl7.Fhir.Model;
+using static LantanaGroup.Automation.Generation.ResourceFactories.FhirConceptFactory;
 
-namespace LantanaGroup.Link.Automation.Generation.ResourceFactories;
+namespace LantanaGroup.Automation.Generation.ResourceFactories;
 
 public static class ObservationFactory
 {
@@ -81,7 +81,7 @@ public static class ObservationFactory
         }
 
         // ---------------------------------------------------------------
-        // Culture / bacteriology â€” valueString
+        // Culture / bacteriology — valueString
         // ---------------------------------------------------------------
         if (loincCode == "600-7")
         {
@@ -94,12 +94,12 @@ public static class ObservationFactory
         }
 
         // ---------------------------------------------------------------
-        // Blood pressure â€” component-based
+        // Blood pressure — component-based
         // ---------------------------------------------------------------
         if (loincCode == "55284-4")
         {
-            var systolic = 100 + seed % 80;  // 100â€“179
-            var diastolic = 60 + seed % 40;  // 60â€“99
+            var systolic = 100 + seed % 80;  // 100–179
+            var diastolic = 60 + seed % 40;  // 60–99
             obs.Component =
             [
                 new Observation.ComponentComponent
@@ -119,7 +119,7 @@ public static class ObservationFactory
         }
 
         // ---------------------------------------------------------------
-        // Standard numeric value â€” vary within a clinically plausible range
+        // Standard numeric value — vary within a clinically plausible range
         // using a sine-like distribution so values cluster around normal
         // ---------------------------------------------------------------
         double value;
@@ -134,7 +134,7 @@ public static class ObservationFactory
         }
         else
         {
-            // Unbounded high (e.g. height, weight) â€” just use low + fraction of large range
+            // Unbounded high (e.g. height, weight) — just use low + fraction of large range
             value = Math.Round(normLow + seed % 100 / 100.0 * (normLow * 0.5), 1);
         }
 
@@ -150,8 +150,8 @@ public static class ObservationFactory
                     Low  = normLow > 0    ? Qty(normLow,  unit) : null,
                     High = normHigh < 999 ? Qty(normHigh, unit) : null,
                     Text = normHigh < 999
-                        ? $"{normLow} â€“ {normHigh} {unit}"
-                        : $"â‰¥ {normLow} {unit}"
+                        ? $"{normLow} – {normHigh} {unit}"
+                        : $"= {normLow} {unit}"
                 }
             ];
         }
