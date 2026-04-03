@@ -3,5 +3,6 @@
     public class ReadyForValidationKey
     {
         public string FacilityId { get; set; }
+        public string CorrelationId { get; set; }
     }
 }
