@@ -3,6 +3,7 @@ using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
+using LantanaGroup.Link.Shared.Application.Models.Integration.QueryDispatch;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 
 namespace LantanaGroup.Link.Automation.Helpers;
@@ -102,12 +103,12 @@ public static class FacilitySetupHelper
     {
         await queryDispatchClient.UpsertQueryDispatchConfigurationAsync(
             facilityId,
-            new LantanaGroup.Link.Shared.Application.Models.Integration.QueryDispatch.QueryDispatchConfigurationApiModel
+            new QueryDispatchConfigurationApiModel
             {
                 FacilityId = facilityId,
                 DispatchSchedules =
                 [
-                    new LantanaGroup.Link.Shared.Application.Models.Integration.QueryDispatch.DispatchScheduleApiModel
+                    new DispatchScheduleApiModel
                     {
                         Event = "Discharge",
                         Duration = "PT0S"

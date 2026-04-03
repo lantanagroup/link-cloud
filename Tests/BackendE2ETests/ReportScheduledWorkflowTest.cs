@@ -123,10 +123,10 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
             Output,
             _facilityId);
 
-        var reportId = await ProduceReportScheduledEventAsync(_facilityId, measureId, TimeSpan.FromMinutes(3));
+        var reportId = await ProduceReportScheduledEventAsync(_facilityId, measureId, TimeSpan.FromMinutes(2));
         await WaitForScheduleCreationAsync(reportId);
         await ProduceAdmitPatientEventAsync(_facilityId, _config.PatientIds[0]);
-        await Task.Delay(TimeSpan.FromMinutes(1));
+        await Task.Delay(TimeSpan.FromSeconds(30));
         await ProduceDischargePatientEventAsync(_facilityId, _config.PatientIds[0]);
 
         var lokiScraper = _sp.GetRequiredService<LokiScraper>();
