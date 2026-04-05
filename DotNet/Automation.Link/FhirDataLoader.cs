@@ -1,7 +1,7 @@
-﻿using LantanaGroup.Link.Automation.Configuration;
-using LantanaGroup.Link.Automation.Helpers;
+using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Link.Automation.Link.Helpers;
 
-namespace LantanaGroup.Link.Automation;
+namespace LantanaGroup.Link.Automation.Link;
 
 using System.Reflection;
 using System.Text.Json.Nodes;

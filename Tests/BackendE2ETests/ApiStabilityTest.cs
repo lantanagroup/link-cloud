@@ -1,7 +1,7 @@
-﻿using Flurl.Http;
-using LantanaGroup.Link.Automation;
-using LantanaGroup.Link.Automation.Configuration;
-using LantanaGroup.Link.Automation.Helpers;
+using Flurl.Http;
+using LantanaGroup.Link.Automation.Link;
+using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Census;
@@ -286,7 +286,7 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
         await RunAsync(results, "Report.GetPopulationsBySchedule",
             () => ReportClient.GetPopulationsByScheduleAsync(Guid.NewGuid().ToString()));
 
-        // Submission service – non-existent report returns 404; that proves the service is reachable
+        // Submission service � non-existent report returns 404; that proves the service is reachable
         await RunExpecting404Async(results, "Submission.DownloadSubmission",
             () => SubmissionClient.DownloadSubmissionAsync(_facilityId, Guid.NewGuid().ToString()));
 

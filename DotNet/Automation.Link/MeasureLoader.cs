@@ -1,7 +1,8 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.Automation.Configuration;
-using LantanaGroup.Link.Automation.Helpers;
+using LantanaGroup.Automation.Generation;
+using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using System.Reflection;
@@ -9,7 +10,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Task = System.Threading.Tasks.Task;
 
-namespace LantanaGroup.Link.Automation;
+namespace LantanaGroup.Link.Automation.Link;
 
 public class MeasureLoader
 {
@@ -21,6 +22,12 @@ public class MeasureLoader
     private readonly FhirJsonParser _parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
 
     public string? MeasureId { get; private set; }
+
+    /// <summary>
+    /// After <see cref="LoadAllAsync"/> completes, contains the measure IDs
+    /// for every loaded measure bundle (in order).
+    /// </summary>
+    public List<string> MeasureIds { get; } = [];
 
     private Bundle? _evaluationBundle;
     private Bundle? _validationBundle;
@@ -50,7 +57,11 @@ public class MeasureLoader
         {
             var resourceName = _config.MeasureBundleLocation
                 .Replace("resource://", "", StringComparison.OrdinalIgnoreCase);
-            var assembly = _resourceAssembly ?? Assembly.GetExecutingAssembly();
+
+            // Resolve the assembly that contains the embedded resource.
+            // The Automation project owns the measure bundles; use its assembly
+            // (via ProfiledMeasureCatalog as an anchor type) by default.
+            var assembly = _resourceAssembly ?? typeof(ProfiledMeasureCatalog).Assembly;
             await using var stream = assembly.GetManifestResourceStream(resourceName);
 
             if (stream == null)
@@ -199,5 +210,44 @@ public class MeasureLoader
         }
 
         _output.WriteLine($"  Removed {orphaned.Count} orphaned supplementalData entries ({measure.SupplementalData.Count} remaining).");
+    }
+
+    /// <summary>
+    /// Loads all measure bundles referenced by the scenario config.
+    /// Populates <see cref="MeasureId"/> with the first and <see cref="MeasureIds"/>
+    /// with every loaded measure ID.
+    /// </summary>
+    public async Task LoadAllAsync()
+    {
+        var locations = _config.AllMeasureBundleLocations;
+        if (locations.Count == 0)
+            throw new InvalidOperationException("No measure bundle locations configured.");
+
+        // Load the primary bundle via existing flow
+        await LoadAsync();
+        if (MeasureId != null && !MeasureIds.Contains(MeasureId))
+            MeasureIds.Add(MeasureId);
+
+        // Load additional bundles (skip the first since LoadAsync already handled it)
+        for (var i = 1; i < locations.Count; i++)
+        {
+            var originalLocation = _config.MeasureBundleLocation;
+            try
+            {
+                _config.MeasureBundleLocation = locations[i];
+                _output.WriteLine($"Loading additional measure bundle [{i + 1}/{locations.Count}]: {locations[i]}");
+                await LoadAsync();
+                if (MeasureId != null && !MeasureIds.Contains(MeasureId))
+                    MeasureIds.Add(MeasureId);
+            }
+            finally
+            {
+                _config.MeasureBundleLocation = originalLocation;
+            }
+        }
+
+        // Restore MeasureId to the first
+        MeasureId = MeasureIds.Count > 0 ? MeasureIds[0] : null;
+        _output.WriteLine($"Loaded {MeasureIds.Count} measure(s): [{string.Join(", ", MeasureIds)}]");
     }
 }

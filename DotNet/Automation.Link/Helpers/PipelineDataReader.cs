@@ -1,7 +1,7 @@
-﻿using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 
-namespace LantanaGroup.Link.Automation.Helpers;
+namespace LantanaGroup.Link.Automation.Link.Helpers;
 
 public class PipelineDataReader
 {

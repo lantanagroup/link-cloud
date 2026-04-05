@@ -1,8 +1,8 @@
-﻿using LantanaGroup.Link.Automation.Helpers;
+﻿using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 
-namespace LantanaGroup.Link.Automation.Validation;
+namespace LantanaGroup.Link.Automation.Link.Validation;
 
 public class ReportDatabaseValidator
 {
@@ -16,10 +16,27 @@ public class ReportDatabaseValidator
         _reader = reader;
     }
 
-    public async Task ValidateAllAsync(
+    /// <summary>
+    /// Backward-compatible overload that accepts a single expected measure ID.
+    /// </summary>
+    public Task ValidateAllAsync(
         string facilityId,
         string reportId,
         string expectedMeasureId,
+        List<string> expectedPatientIds,
+        Frequency expectedFrequency = Frequency.Adhoc,
+        string? expectedAdHocType = "Manual",
+        List<string>? expectedSubmittedPatientIds = null)
+    {
+        return ValidateAllAsync(
+            facilityId, reportId, (IReadOnlyList<string>)[expectedMeasureId],
+            expectedPatientIds, expectedFrequency, expectedAdHocType, expectedSubmittedPatientIds);
+    }
+
+    public async Task ValidateAllAsync(
+        string facilityId,
+        string reportId,
+        IReadOnlyList<string> expectedMeasureIds,
         List<string> expectedPatientIds,
         Frequency expectedFrequency = Frequency.Adhoc,
         string? expectedAdHocType = "Manual",
@@ -33,11 +50,11 @@ public class ReportDatabaseValidator
             var expectedSubmitted = expectedSubmittedPatientIds ?? expectedPatientIds;
 
             await ValidateReportSchedule(scheduleId, facilityId, expectedFrequency, expectedAdHocType, errors);
-            await ValidateScheduleReportTypes(scheduleId, expectedMeasureId, errors);
+            await ValidateScheduleReportTypes(scheduleId, expectedMeasureIds, errors);
             await ValidateReportEntries(scheduleId, facilityId, expectedPatientIds, expectedSubmitted, errors);
-            await ValidateEntryMeasureReports(scheduleId, expectedMeasureId, expectedPatientIds.Count, errors);
+            await ValidateEntryMeasureReports(scheduleId, expectedMeasureIds, expectedPatientIds.Count, errors);
             await ValidateReportResources(scheduleId, facilityId, expectedSubmitted, errors);
-            await ValidateReportPopulations(scheduleId, facilityId, expectedMeasureId, errors);
+            await ValidateReportPopulations(scheduleId, facilityId, expectedMeasureIds, errors);
         }
         catch (Exception ex)
         {
@@ -94,17 +111,21 @@ public class ReportDatabaseValidator
         if (schedule.ReportStartDate >= schedule.ReportEndDate) AddError(errors, "ReportSchedule.ReportStartDate must be before ReportEndDate.");
     }
 
-    private async Task ValidateScheduleReportTypes(Guid scheduleId, string expectedMeasureId, List<string> errors)
+    private async Task ValidateScheduleReportTypes(Guid scheduleId, IReadOnlyList<string> expectedMeasureIds, List<string> errors)
     {
         var reportTypes = await _reader.GetScheduleReportTypesAsync(scheduleId);
-        if (reportTypes.Count != 1)
+        if (reportTypes.Count != expectedMeasureIds.Count)
         {
-            AddError(errors, $"Expected exactly 1 ScheduleReportType row, found {reportTypes.Count}.");
+            AddError(errors, $"Expected {expectedMeasureIds.Count} ScheduleReportType row(s), found {reportTypes.Count}.");
             return;
         }
 
-        if (reportTypes[0].ReportType != expectedMeasureId)
-            AddError(errors, $"ScheduleReportType.ReportType mismatch: expected {expectedMeasureId}, actual {reportTypes[0].ReportType}");
+        var actualSet = reportTypes.Select(r => r.ReportType).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var expected in expectedMeasureIds)
+        {
+            if (!actualSet.Contains(expected))
+                AddError(errors, $"ScheduleReportType missing expected measure: {expected}");
+        }
     }
 
     private async Task ValidateReportEntries(
@@ -148,17 +169,19 @@ public class ReportDatabaseValidator
         }
     }
 
-    private async Task ValidateEntryMeasureReports(Guid scheduleId, string expectedMeasureId, int expectedPatientCount, List<string> errors)
+    private async Task ValidateEntryMeasureReports(Guid scheduleId, IReadOnlyList<string> expectedMeasureIds, int expectedPatientCount, List<string> errors)
     {
         var reports = await _reader.GetEntryMeasureReportsAsync(scheduleId);
+        var expectedTotal = expectedPatientCount * expectedMeasureIds.Count;
 
-        if (reports.Count != expectedPatientCount)
-            AddError(errors, $"EntryMeasureReport count mismatch: expected {expectedPatientCount}, actual {reports.Count}");
+        if (reports.Count != expectedTotal)
+            AddError(errors, $"EntryMeasureReport count mismatch: expected {expectedTotal} ({expectedPatientCount} patients × {expectedMeasureIds.Count} measures), actual {reports.Count}");
 
+        var expectedSet = expectedMeasureIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var report in reports)
         {
-            if (report.ReportType != expectedMeasureId)
-                AddError(errors, $"EntryMeasureReport {report.Id} ReportType mismatch: expected {expectedMeasureId}, actual {report.ReportType}");
+            if (!string.IsNullOrWhiteSpace(report.ReportType) && !expectedSet.Contains(report.ReportType))
+                AddError(errors, $"EntryMeasureReport {report.Id} ReportType '{report.ReportType}' does not match any expected measure [{string.Join(", ", expectedMeasureIds)}]");
 
             if (string.IsNullOrWhiteSpace(report.MeasureReportId))
                 AddError(errors, $"EntryMeasureReport {report.Id} MeasureReportId should be populated.");
@@ -177,7 +200,7 @@ public class ReportDatabaseValidator
         }
     }
 
-    private async Task ValidateReportPopulations(Guid scheduleId, string facilityId, string expectedMeasureId, List<string> errors)
+    private async Task ValidateReportPopulations(Guid scheduleId, string facilityId, IReadOnlyList<string> expectedMeasureIds, List<string> errors)
     {
         var populations = await _reader.GetReportPopulationsAsync(scheduleId, facilityId);
 
@@ -187,10 +210,11 @@ public class ReportDatabaseValidator
             return;
         }
 
+        var expectedSet = expectedMeasureIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var pop in populations)
         {
-            if (pop.ReportType != expectedMeasureId)
-                AddError(errors, $"ReportPopulation ReportType mismatch: expected {expectedMeasureId}, actual {pop.ReportType}");
+            if (!string.IsNullOrWhiteSpace(pop.ReportType) && !expectedSet.Contains(pop.ReportType))
+                AddError(errors, $"ReportPopulation ReportType '{pop.ReportType}' does not match any expected measure [{string.Join(", ", expectedMeasureIds)}]");
 
             if (pop.GroupPopulations.Count == 0)
             {

@@ -1,14 +1,14 @@
-﻿using System.IO.Compression;
+using System.IO.Compression;
 using LantanaGroup.Link.Sdk.ApiClient;
 using Hl7.Fhir.Model;
-using LantanaGroup.Link.Automation.Configuration;
-using LantanaGroup.Link.Automation.Helpers;
+using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Sdk.Clients;
 using Task = System.Threading.Tasks.Task;
 
-namespace LantanaGroup.Link.Automation.Services;
+namespace LantanaGroup.Link.Automation.Link.Services;
 
 public class ReportApiHelper
 {
@@ -29,13 +29,18 @@ public class ReportApiHelper
 
     public async Task<string> GenerateReportAsync(string facilityId, string measureId, TestScenarioConfig config)
     {
-        _output.WriteLine("Generating report...");
+        return await GenerateReportAsync(facilityId, [measureId], config);
+    }
+
+    public async Task<string> GenerateReportAsync(string facilityId, List<string> measureIds, TestScenarioConfig config)
+    {
+        _output.WriteLine($"Generating report with {measureIds.Count} measure(s): [{string.Join(", ", measureIds)}]...");
         var body = new AdHocReportRequest
         {
             BypassSubmission = false,
             StartDate = DateTime.Parse(config.StartDate),
             EndDate = DateTime.Parse(config.EndDate),
-            ReportTypes = [measureId],
+            ReportTypes = measureIds,
             PatientIds = config.PatientIds
         };
 
@@ -63,7 +68,7 @@ public class ReportApiHelper
         {
             if (diagnostics?.HasCriticalFailure == true)
             {
-                _output.WriteLine("[EARLY EXIT] Background diagnostics detected a critical failure — aborting poll loop.");
+                _output.WriteLine("[EARLY EXIT] Background diagnostics detected a critical failure � aborting poll loop.");
                 _output.WriteLine("Review the [DIAG] entries above for details on the root cause.");
                 return false;
             }

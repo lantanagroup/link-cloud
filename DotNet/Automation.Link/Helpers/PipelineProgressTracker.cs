@@ -1,6 +1,6 @@
-﻿using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Enums;
 
-namespace LantanaGroup.Link.Automation.Helpers;
+namespace LantanaGroup.Link.Automation.Link.Helpers;
 
 /// <summary>
 /// Computes a coarse pipeline progress percentage by querying service APIs through LinkSdk,

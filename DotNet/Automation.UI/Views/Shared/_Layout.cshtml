@@ -22,6 +22,20 @@
                             <a class="nav-link text-dark" asp-area="" asp-controller="Runs" asp-action="Index">Runs</a>
                         </li>
                     </ul>
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <ul class="navbar-nav">
+                            <li class="nav-item d-flex align-items-center">
+                                <span class="navbar-text me-3">@(User.Identity.Name ?? User.FindFirst("email")?.Value ?? "User")</span>
+                            </li>
+                            <li class="nav-item">
+                                <form asp-controller="Account" asp-action="Logout" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-outline-secondary btn-sm">Logout</button>
+                                </form>
+                            </li>
+                        </ul>
+                    }
                 </div>
             </div>
         </nav>

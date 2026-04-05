@@ -1,7 +1,7 @@
-﻿using LantanaGroup.Link.Automation.Configuration;
-using LantanaGroup.Link.Automation.Helpers;
+﻿using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Link.Automation.Link.Helpers;
 
-namespace LantanaGroup.Link.Automation.Validation;
+namespace LantanaGroup.Link.Automation.Link.Validation;
 
 /// <summary>
 /// Runs lightweight, idempotent milestone validations as the pipeline progresses.
@@ -203,24 +203,45 @@ public class MilestoneValidationOrchestrator
         if (_completed.Contains(Milestone.MeasureReportsGenerated))
             return;
 
+        // Cannot mark this milestone until acquisition is fully complete —
+        // MeasureEval may have processed early patients while later ones
+        // are still failing/retrying in data acquisition.
+        if (!_completed.Contains(Milestone.AcquisitionCompleted))
+            return;
+
         var reports = await _reader.GetEntryMeasureReportsAsync(scheduleId);
         if (reports.Count == 0)
             return;
 
         var withIds = reports.Count(r => !string.IsNullOrWhiteSpace(r.MeasureReportId));
-        if (_expectedPatientCount > 0 && withIds < _expectedPatientCount)
+
+        // With multi-measure, there are patients × measures rows.
+        // Derive the measure count from the distinct ReportType values observed so far.
+        var distinctMeasures = reports
+            .Where(r => !string.IsNullOrWhiteSpace(r.ReportType))
+            .Select(r => r.ReportType!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+        var measureMultiplier = Math.Max(1, distinctMeasures);
+        var expectedTotal = _expectedPatientCount > 0
+            ? _expectedPatientCount * measureMultiplier
+            : reports.Count;
+
+        // Wait until all expected rows have a MeasureReportId before completing this milestone.
+        if (withIds < expectedTotal)
             return;
 
-        if (withIds < reports.Count)
-            RecordIssue($"Some EntryMeasureReport rows are missing MeasureReportId ({withIds}/{reports.Count}).", critical: true);
-
         _completed.Add(Milestone.MeasureReportsGenerated);
-        _output.WriteLine($"[DIAG][Milestone] Reached: MeasureReportsGenerated ({withIds} measure reports)");
+        _output.WriteLine($"[DIAG][Milestone] Reached: MeasureReportsGenerated ({withIds} measure reports across {distinctMeasures} measure(s))");
     }
 
     private async Task CheckSubmissionCompleted(Guid scheduleId)
     {
         if (_completed.Contains(Milestone.SubmissionCompleted))
+            return;
+
+        // Cannot mark submission complete until measure reports are generated.
+        if (!_completed.Contains(Milestone.MeasureReportsGenerated))
             return;
 
         var entries = await _reader.GetReportEntriesAsync(scheduleId);

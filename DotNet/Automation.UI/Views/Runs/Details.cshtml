@@ -87,7 +87,7 @@
                 <div class="card-header"><strong>Service Error Summary</strong></div>
                 <div class="card-body">
                     <div class="row g-3">
-                        <div class="col-md-3">
+                        <div class="col">
                             <div class="border rounded p-2 h-100">
                                 <div class="small text-muted mb-1">Data Acquisition</div>
                                 <button type="button" id="serviceErrorBtnDataAcq" class="btn w-100 text-center service-error-btn" data-service="Data Acquisition" disabled>
@@ -96,7 +96,16 @@
                                 </button>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col">
+                            <div class="border rounded p-2 h-100">
+                                <div class="small text-muted mb-1">Normalization</div>
+                                <button type="button" id="serviceErrorBtnNormalization" class="btn w-100 text-center service-error-btn" data-service="Normalization" disabled>
+                                    <div id="serviceErrorCountNormalization" class="display-5 fw-semibold text-muted">0</div>
+                                    <div class="small text-muted">exceptions</div>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col">
                             <div class="border rounded p-2 h-100">
                                 <div class="small text-muted mb-1">Measure Eval</div>
                                 <button type="button" id="serviceErrorBtnMeasureEval" class="btn w-100 text-center service-error-btn" data-service="Measure Eval" disabled>
@@ -105,7 +114,7 @@
                                 </button>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col">
                             <div class="border rounded p-2 h-100">
                                 <div class="small text-muted mb-1">Validation</div>
                                 <button type="button" id="serviceErrorBtnValidation" class="btn w-100 text-center service-error-btn" data-service="Validation" disabled>
@@ -114,7 +123,7 @@
                                 </button>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col">
                             <div class="border rounded p-2 h-100">
                                 <div class="small text-muted mb-1">Report</div>
                                 <button type="button" id="serviceErrorBtnReport" class="btn w-100 text-center service-error-btn" data-service="Report" disabled>
@@ -156,6 +165,31 @@
                         <div class="col-md-4">
                             <div class="small text-muted mb-1">Top Resource Types</div>
                             <canvas id="dataAcqResourceMixChart" height="170" style="height:170px;max-height:170px;"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header"><strong>Normalization</strong></div>
+                <div class="card-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Resource Count</div><div class="fs-4 fw-semibold" id="normalizationResourceCount">0</div></div></div>
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Avg Resources/sec</div><div class="fs-4 fw-semibold" id="normalizationResPerSec">0.00</div></div></div>
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Events/sec</div><div class="fs-4 fw-semibold" id="normalizationRate">0.00</div></div></div>
+                        <div class="col-md-3 d-flex align-items-end justify-content-end">
+                            <button type="button" id="normalizationErrorsBtn" class="btn btn-sm btn-outline-danger" style="display:none;">Errors Encountered</button>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="small text-muted mb-1">Throughput Timeline (10s buckets)</div>
+                            <canvas id="normalizationTimeline" height="90" style="height:90px;max-height:90px;"></canvas>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small text-muted mb-1">Top Resource Types</div>
+                            <canvas id="normalizationResourceMixChart" height="170" style="height:170px;max-height:170px;"></canvas>
                         </div>
                     </div>
                 </div>
@@ -241,6 +275,36 @@
     <div class="p-3" id="errorFlyoutBody" style="overflow:auto; height: calc(100% - 60px);"></div>
 </div>
 
+<div class="modal fade" id="serviceExceptionModal" tabindex="-1" aria-labelledby="serviceExceptionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable" style="max-width:900px;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title mb-0" id="serviceExceptionModalLabel">Service Exceptions</h5>
+                    <small class="text-muted" id="serviceExceptionSubtitle"></small>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="sticky-top bg-white border-bottom px-3 py-2" style="z-index:2;">
+                    <div class="row g-2 align-items-center">
+                        <div class="col">
+                            <input type="text" class="form-control form-control-sm" id="exModalSearch" placeholder="Search exceptions…">
+                        </div>
+                        <div class="col-auto">
+                            <span class="badge bg-secondary" id="exModalVisibleCount">0</span>
+                            <span class="small text-muted">shown</span>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-1 mt-2" id="exModalGroupChips"></div>
+                </div>
+                <div id="exModalAccordion" class="accordion accordion-flush" style="min-height:200px;"></div>
+                <div id="exModalEmpty" class="text-center text-muted p-4" style="display:none;">No exceptions match the current filter.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="dataAcqLogModal" tabindex="-1" aria-labelledby="dataAcqLogModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
@@ -287,9 +351,11 @@
         let dataAcqErrors = [];
         let measureErrors = [];
         let validationErrors = [];
+        let normalizationErrors = [];
         let lastDataAcqSnapshot = null;
         const serviceErrorLines = {
             'Data Acquisition': [],
+            'Normalization': [],
             'Measure Eval': [],
             'Validation': [],
             'Report': []
@@ -558,8 +624,11 @@
         }
 
         function renderServiceErrorSummary(summaryItems) {
+            if (!serviceErrorLines._summaries) serviceErrorLines._summaries = {};
+
             const targets = [
                 { name: 'Data Acquisition', countId: 'serviceErrorCountDataAcq', buttonId: 'serviceErrorBtnDataAcq' },
+                { name: 'Normalization', countId: 'serviceErrorCountNormalization', buttonId: 'serviceErrorBtnNormalization' },
                 { name: 'Measure Eval', countId: 'serviceErrorCountMeasureEval', buttonId: 'serviceErrorBtnMeasureEval' },
                 { name: 'Validation', countId: 'serviceErrorCountValidation', buttonId: 'serviceErrorBtnValidation' },
                 { name: 'Report', countId: 'serviceErrorCountReport', buttonId: 'serviceErrorBtnReport' }
@@ -570,6 +639,7 @@
                 const total = Number(service?.totalErrors ?? service?.TotalErrors ?? 0);
                 const errorLines = service?.errorLines || service?.ErrorLines || [];
                 serviceErrorLines[target.name] = errorLines;
+                serviceErrorLines._summaries[target.name] = service || { errorLines: [], errorGroups: [], totalErrors: 0 };
 
                 animateCounter(target.countId, total);
 
@@ -629,6 +699,162 @@
             }
             flyout.style.right = '0';
         }
+
+        // ── Service Exception Modal ──
+        let _exModalAllItems = [];
+        let _exModalGroups = [];
+        let _exModalActiveGroup = null;
+
+        function openServiceExceptionModal(serviceName) {
+            const summary = (serviceErrorLines._summaries || {})[serviceName];
+            if (!summary) return;
+
+            const lines = summary.errorLines || summary.ErrorLines || [];
+            const groups = (summary.errorGroups || summary.ErrorGroups || []).map(g => ({
+                label: g.status || g.Status || 'Unknown',
+                count: g.count ?? g.Count ?? 0
+            })).sort((a, b) => b.count - a.count);
+            const totalErrors = summary.totalErrors ?? summary.TotalErrors ?? lines.length;
+
+            document.getElementById('serviceExceptionModalLabel').textContent = `${serviceName} Exceptions`;
+            document.getElementById('serviceExceptionSubtitle').textContent = `${totalErrors} total exception(s) captured`;
+
+            _exModalAllItems = lines.map((line, i) => {
+                const parsed = parseExceptionLine(line);
+                return { id: i, raw: line, ...parsed };
+            });
+            _exModalGroups = groups;
+            _exModalActiveGroup = null;
+
+            renderExModalGroupChips();
+            applyExModalFilter();
+
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('serviceExceptionModal'));
+            modal.show();
+        }
+
+        function parseExceptionLine(line) {
+            let cleaned = line;
+            const componentMatch = cleaned.match(/^\[([^\]]+)\]\s*/);
+            const component = componentMatch ? componentMatch[1] : '';
+            if (componentMatch) cleaned = cleaned.slice(componentMatch[0].length);
+
+            let level = 'ERROR';
+            const levelMatch = cleaned.match(/^(ERROR|WARN|WARNING|FATAL|INFO)\b\s*\|?\s*/i);
+            if (levelMatch) {
+                level = levelMatch[1].toUpperCase();
+                cleaned = cleaned.slice(levelMatch[0].length);
+            }
+
+            // Split on ||| delimiter — left side is summary, right side is full detail
+            let summary = cleaned;
+            let detail = '';
+            const tripleIdx = cleaned.indexOf('|||');
+            if (tripleIdx >= 0) {
+                summary = cleaned.slice(0, tripleIdx).trim();
+                detail = cleaned.slice(tripleIdx + 3).trim();
+            }
+
+            let headline = summary;
+            if (!detail) {
+                // No triple-pipe detail — try splitting on first pipe for headline/detail
+                const pipeIdx = summary.indexOf(' | ');
+                if (pipeIdx > 0) {
+                    headline = summary.slice(0, pipeIdx).trim();
+                    detail = summary.slice(pipeIdx + 3).trim();
+                } else if (summary.length > 120) {
+                    headline = summary.slice(0, 120).trim() + '…';
+                    detail = summary;
+                }
+            } else {
+                // Shorten the summary for the collapsed header
+                if (summary.length > 160) {
+                    headline = summary.slice(0, 160).trim() + '…';
+                }
+            }
+
+            return { component, level, headline, detail, full: line };
+        }
+
+        function renderExModalGroupChips() {
+            const host = document.getElementById('exModalGroupChips');
+            if (!_exModalGroups.length) { host.innerHTML = ''; return; }
+
+            const allActive = _exModalActiveGroup === null;
+            let html = `<button class="btn btn-sm ${allActive ? 'btn-dark' : 'btn-outline-secondary'} ex-group-chip" data-group="">All</button>`;
+            for (const g of _exModalGroups) {
+                const active = _exModalActiveGroup === g.label;
+                html += `<button class="btn btn-sm ${active ? 'btn-dark' : 'btn-outline-secondary'} ex-group-chip" data-group="${escapeHtml(g.label)}" title="${escapeHtml(g.label)}">${truncate(g.label, 50)} <span class="badge bg-light text-dark ms-1">${g.count}</span></button>`;
+            }
+            host.innerHTML = html;
+
+            for (const btn of host.querySelectorAll('.ex-group-chip')) {
+                btn.addEventListener('click', () => {
+                    _exModalActiveGroup = btn.dataset.group || null;
+                    renderExModalGroupChips();
+                    applyExModalFilter();
+                });
+            }
+        }
+
+        function applyExModalFilter() {
+            const searchTerm = (document.getElementById('exModalSearch').value || '').toLowerCase();
+            const accordion = document.getElementById('exModalAccordion');
+            const emptyMsg = document.getElementById('exModalEmpty');
+
+            let filtered = _exModalAllItems;
+            if (_exModalActiveGroup) {
+                const groupLower = _exModalActiveGroup.toLowerCase();
+                filtered = filtered.filter(item => item.raw.toLowerCase().includes(groupLower));
+            }
+            if (searchTerm) {
+                filtered = filtered.filter(item => item.raw.toLowerCase().includes(searchTerm));
+            }
+
+            document.getElementById('exModalVisibleCount').textContent = String(filtered.length);
+
+            if (!filtered.length) {
+                accordion.innerHTML = '';
+                emptyMsg.style.display = '';
+                return;
+            }
+            emptyMsg.style.display = 'none';
+
+            const maxRender = 200;
+            const items = filtered.slice(0, maxRender);
+
+            accordion.innerHTML = items.map(item => {
+                const levelBadge = item.level === 'FATAL' || item.level === 'ERROR'
+                    ? 'bg-danger' : item.level === 'WARN' || item.level === 'WARNING'
+                    ? 'bg-warning text-dark' : 'bg-secondary';
+                const collapseId = `exCollapse${item.id}`;
+                const headerId = `exHeader${item.id}`;
+                const hasDetail = !!item.detail;
+
+                return `<div class="accordion-item">
+                    <h2 class="accordion-header" id="${headerId}">
+                        <button class="accordion-button collapsed py-2 px-3" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}" style="font-size:.82rem;">
+                            <span class="badge ${levelBadge} me-2" style="font-size:.65rem;">${item.level}</span>
+                            <span class="text-muted me-2" style="flex-shrink:0;font-size:.72rem;">${escapeHtml(item.component)}</span>
+                            <span class="text-truncate">${escapeHtml(item.headline)}</span>
+                        </button>
+                    </h2>
+                    <div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headerId}">
+                        <div class="accordion-body p-3" style="background:#f8f9fa;">
+                            ${hasDetail
+                                ? `<pre class="mb-0 small" style="white-space:pre-wrap;word-break:break-all;max-height:400px;overflow:auto;">${escapeHtml(item.detail)}</pre>`
+                                : `<pre class="mb-0 small" style="white-space:pre-wrap;word-break:break-all;max-height:400px;overflow:auto;">${escapeHtml(item.full)}</pre>`}
+                        </div>
+                    </div>
+                </div>`;
+            }).join('') + (filtered.length > maxRender ? `<div class="text-center text-muted small p-3">${filtered.length - maxRender} more items not shown. Use the search filter to narrow results.</div>` : '');
+        }
+
+        function truncate(str, len) {
+            return str.length > len ? str.slice(0, len) + '…' : str;
+        }
+
+        document.getElementById('exModalSearch').addEventListener('input', applyExModalFilter);
 
         async function refreshSnapshot() {
             try {
@@ -713,6 +939,15 @@
 
                 renderServiceErrorSummary(snapshot.serviceErrorSummary || snapshot.ServiceErrorSummary || []);
 
+                document.getElementById('normalizationRate').textContent = formatNumber(snapshot.normalization?.completionRatePerSecond);
+                document.getElementById('normalizationResourceCount').textContent = snapshot.normalization?.resourceCount || 0;
+                document.getElementById('normalizationResPerSec').textContent = formatNumber(snapshot.normalization?.averageResourcesPerSecond);
+                renderResourceMix('normalizationResourceMixChart', snapshot.normalization?.resourceTypeCounts || []);
+                renderTimeline('normalizationTimeline', snapshot.normalization?.throughputBuckets || [], '#6f42c1');
+
+                normalizationErrors = snapshot.normalization?.errors || [];
+                document.getElementById('normalizationErrorsBtn').style.display = normalizationErrors.length > 0 ? '' : 'none';
+
                 document.getElementById('measureRate').textContent = formatNumber(snapshot.measureEval?.completionRatePerSecond);
                 document.getElementById('measureResourceCount').textContent = snapshot.measureEval?.resourceCount || 0;
                 document.getElementById('measureResPerSec').textContent = formatNumber(snapshot.measureEval?.averageResourcesPerSecond);
@@ -770,15 +1005,14 @@
             refreshSnapshot();
         });
 
-        document.getElementById('measureErrorsBtn').addEventListener('click', () => setFlyout('Measure Eval Errors', measureErrors));
-        document.getElementById('validationErrorsBtn').addEventListener('click', () => setFlyout('Validation Errors', validationErrors));
-        document.getElementById('dataAcqErrorsBtn').addEventListener('click', () => setFlyout('Data Acquisition Errors', dataAcqErrors));
+        document.getElementById('measureErrorsBtn').addEventListener('click', () => openServiceExceptionModal('Measure Eval'));
+        document.getElementById('validationErrorsBtn').addEventListener('click', () => openServiceExceptionModal('Validation'));
+        document.getElementById('dataAcqErrorsBtn').addEventListener('click', () => openServiceExceptionModal('Data Acquisition'));
+        document.getElementById('normalizationErrorsBtn').addEventListener('click', () => openServiceExceptionModal('Normalization'));
         for (const btn of document.querySelectorAll('.service-error-btn')) {
             btn.addEventListener('click', () => {
                 const service = btn.getAttribute('data-service');
-                const lines = serviceErrorLines[service] || [];
-                if (!lines.length) return;
-                setFlyout(`${service} Exceptions`, lines);
+                openServiceExceptionModal(service);
             });
         }
         document.getElementById('closeFlyout').addEventListener('click', () => {

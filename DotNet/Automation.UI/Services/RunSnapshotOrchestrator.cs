@@ -1,6 +1,6 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using Automation.UI.Services.Persistence;
-using LantanaGroup.Link.Automation.Helpers;
+using LantanaGroup.Link.Automation.Link.Helpers;
 
 namespace Automation.UI.Services;
 
@@ -9,7 +9,7 @@ namespace Automation.UI.Services;
 /// Periodically checks for active runs and ensures each one has a poller.
 /// When a run completes, its poller is stopped and removed.
 ///
-/// This is the single place that does API polling — the UI controllers
+/// This is the single place that does API polling � the UI controllers
 /// only read from <see cref="ISnapshotStore"/>.
 /// </summary>
 public sealed class RunSnapshotOrchestrator : BackgroundService

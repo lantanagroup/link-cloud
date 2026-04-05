@@ -263,40 +263,51 @@ public static class FhirBundleGenerator
         string patientIdPrefix = "ProfilePatient",
         int? generationSeed = null)
     {
+        return GenerateWithProfiles(output, [measure], profiles, totalResourcesPerPatient, patientIdPrefix, generationSeed);
+    }
+
+    /// <summary>
+    /// Generate patients with explicit measure-eligibility profiles that must
+    /// qualify (or not qualify) for ALL specified measures simultaneously.
+    /// Qualifying patients satisfy the criteria of every measure; non-qualifying
+    /// patients miss at least one (typically all) measures.
+    /// </summary>
+    public static (List<string> PatientIds, List<(string Name, string Json)> Bundles) GenerateWithProfiles(
+        IAutomationOutput output,
+        IReadOnlyList<ProfiledMeasureType> measures,
+        IReadOnlyList<PatientProfile> profiles,
+        int totalResourcesPerPatient = DefaultResourcesPerPatient,
+        string patientIdPrefix = "ProfilePatient",
+        int? generationSeed = null)
+    {
+        if (measures == null || measures.Count == 0)
+            throw new ArgumentException("At least one measure is required.", nameof(measures));
+
         if (profiles == null)
             throw new ArgumentNullException(nameof(profiles));
 
         if (profiles.Count == 0)
             throw new ArgumentException("At least one patient profile is required.", nameof(profiles));
 
-        return measure switch
+        // For multi-measure: qualifying patients need to satisfy the most restrictive
+        // generation requirements. If any measure requires diabetic medication (Hypo),
+        // qualifying patients get it. This ensures they qualify for ALL measures.
+        var requireDiabeticMed = measures.Any(m =>
+            m == ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation);
+
+        if (measures.Count > 1)
         {
-            ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation =>
-                GenerateWithProfilesForNhsnAcuteCareHospital(
-                    output,
-                    profiles,
-                    totalResourcesPerPatient,
-                    patientIdPrefix,
-                    generationSeed,
-                    requireDiabeticMedicationForQualifying: false),
-            ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation =>
-                GenerateWithProfilesForNhsnAcuteCareHospital(
-                    output,
-                    profiles,
-                    totalResourcesPerPatient,
-                    patientIdPrefix,
-                    generationSeed,
-                    requireDiabeticMedicationForQualifying: false),
-            ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation =>
-                GenerateWithProfilesForNhsnAcuteCareHospital(
-                    output,
-                    profiles,
-                    totalResourcesPerPatient,
-                    patientIdPrefix,
-                    generationSeed,
-                    requireDiabeticMedicationForQualifying: true),
-            _ => throw new ArgumentOutOfRangeException(nameof(measure), measure, null)
-        };
+            output.WriteLine($"Multi-measure generation: [{string.Join(", ", measures)}] " +
+                             $"(requireDiabeticMedForQualifying={requireDiabeticMed})");
+        }
+
+        return GenerateWithProfilesForNhsnAcuteCareHospital(
+            output,
+            profiles,
+            totalResourcesPerPatient,
+            patientIdPrefix,
+            generationSeed,
+            requireDiabeticMedicationForQualifying: requireDiabeticMed);
     }
 
     private static (List<string> PatientIds, List<(string Name, string Json)> Bundles) GenerateWithProfilesForNhsnAcuteCareHospital(

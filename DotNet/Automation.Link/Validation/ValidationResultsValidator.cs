@@ -1,6 +1,6 @@
-﻿using LantanaGroup.Link.Automation.Helpers;
+using LantanaGroup.Link.Automation.Link.Helpers;
 
-namespace LantanaGroup.Link.Automation.Validation;
+namespace LantanaGroup.Link.Automation.Link.Validation;
 
 /// <summary>
 /// Validates that validation pipeline produced results for each expected patient and

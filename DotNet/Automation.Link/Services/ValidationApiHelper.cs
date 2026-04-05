@@ -1,7 +1,7 @@
-﻿using LantanaGroup.Link.Automation.Helpers;
+﻿using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
 
-namespace LantanaGroup.Link.Automation.Services;
+namespace LantanaGroup.Link.Automation.Link.Services;
 
 public class ValidationApiHelper(IValidationServiceClient validationClient, IAutomationOutput output, LokiScraper lokiScraper)
 {
@@ -11,7 +11,8 @@ public class ValidationApiHelper(IValidationServiceClient validationClient, IAut
         await RetryHelper.RetryUntilSuccess(async () =>
         {
             await validationClient.InitializeArtifactsAsync();
-        }, TimeSpan.FromMinutes(3), TimeSpan.FromSeconds(10), output, lokiScraper);
+        }, TimeSpan.FromMinutes(3), TimeSpan.FromSeconds(10), output,
+            onFinalFailureDiagnostics: () => lokiScraper.ScrapeErrorsAsync());
     }
 
     public async Task InitializeCategoriesAsync()
@@ -20,6 +21,7 @@ public class ValidationApiHelper(IValidationServiceClient validationClient, IAut
         await RetryHelper.RetryUntilSuccess(async () =>
         {
             await validationClient.InitializeCategoriesAsync();
-        }, TimeSpan.FromSeconds(90), TimeSpan.FromSeconds(10), output, lokiScraper);
+        }, TimeSpan.FromSeconds(90), TimeSpan.FromSeconds(10), output,
+            onFinalFailureDiagnostics: () => lokiScraper.ScrapeErrorsAsync());
     }
 }

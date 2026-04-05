@@ -1,5 +1,5 @@
 ﻿using Automation.UI.Services.Persistence;
-using LantanaGroup.Link.Automation.Helpers;
+using LantanaGroup.Link.Automation.Link.Helpers;
 
 namespace Automation.UI.Services;
 
@@ -88,6 +88,10 @@ public sealed class StoreBackedServicePoller
         try
         {
             await action();
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected during shutdown — not an error.
         }
         catch (Exception ex)
         {

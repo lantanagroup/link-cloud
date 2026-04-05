@@ -1,6 +1,6 @@
-﻿using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Linq;
 
-namespace LantanaGroup.Link.Automation.Helpers;
+namespace LantanaGroup.Link.Automation.Link.Helpers;
 
 public static class QueryPlanBuilder
 {

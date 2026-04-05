@@ -3,7 +3,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RootNamespace>LantanaGroup.Link.Automation</RootNamespace>
+    <RootNamespace>LantanaGroup.Link.Automation.Link</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
@@ -12,11 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Remove="measures\*.json" />
-    <EmbeddedResource Include="measures\*.json" />
-  </ItemGroup>
-
-  <ItemGroup>
+    <ProjectReference Include="..\Automation\Automation.csproj" />
     <ProjectReference Include="..\LinkSdk\LinkSdk.csproj" />
     <ProjectReference Include="..\Shared\Shared.csproj" />
   </ItemGroup>

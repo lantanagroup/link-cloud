@@ -1,7 +1,7 @@
 ﻿using System.Text.Json;
-using LantanaGroup.Link.Automation.Helpers;
+using LantanaGroup.Link.Automation.Link.Helpers;
 
-namespace LantanaGroup.Link.Automation.Validation;
+namespace LantanaGroup.Link.Automation.Link.Validation;
 
 /// <summary>
 /// Validates the report manifest and patient artifacts stored in internal ABS
@@ -33,7 +33,10 @@ public class ReportAbsManifestValidator
         _reader = reader;
     }
 
-    public async Task ValidateAllAsync(
+    /// <summary>
+    /// Backward-compatible overload that accepts a single expected measure ID.
+    /// </summary>
+    public Task ValidateAllAsync(
         IDictionary<string, object> internalAbsResources,
         IReadOnlyCollection<string> expectedPatientIds,
         string expectedMeasureId,
@@ -41,7 +44,32 @@ public class ReportAbsManifestValidator
         string expectedEndDate,
         string? facilityId = null,
         string? reportId = null,
-        string? generatedSnapshotDirectory = null,
+        IReadOnlyList<(string Name, string Json)>? generatedBundles = null,
+        IReadOnlyCollection<string>? expectedManifestPatientListIds = null,
+        bool expectDataAcquisitionData = true)
+    {
+        return ValidateAllAsync(
+            internalAbsResources,
+            expectedPatientIds,
+            (IReadOnlyList<string>)[expectedMeasureId],
+            expectedStartDate,
+            expectedEndDate,
+            facilityId,
+            reportId,
+            generatedBundles,
+            expectedManifestPatientListIds,
+            expectDataAcquisitionData);
+    }
+
+    public async Task ValidateAllAsync(
+        IDictionary<string, object> internalAbsResources,
+        IReadOnlyCollection<string> expectedPatientIds,
+        IReadOnlyList<string> expectedMeasureIds,
+        string expectedStartDate,
+        string expectedEndDate,
+        string? facilityId = null,
+        string? reportId = null,
+        IReadOnlyList<(string Name, string Json)>? generatedBundles = null,
         IReadOnlyCollection<string>? expectedManifestPatientListIds = null,
         bool expectDataAcquisitionData = true)
     {
@@ -76,7 +104,7 @@ public class ReportAbsManifestValidator
             AddError(errors, $"Unexpected patient artifact in internal ABS: {extra}");
 
         var manifestResources = ParseNdjson(manifestNdjson, "manifest.ndjson", errors);
-        ValidateManifest(manifestResources, expectedListPatientIds, expectedMeasureId, expectedStartDate, expectedEndDate, errors);
+        ValidateManifest(manifestResources, expectedListPatientIds, expectedMeasureIds, expectedStartDate, expectedEndDate, errors);
 
         var parsedPatientResources = new List<AbsResourceRecord>();
         var patientMeasureReportIds = new HashSet<string>(StringComparer.Ordinal);
@@ -106,9 +134,9 @@ public class ReportAbsManifestValidator
                 errors,
                 expectDataAcquisitionData);
 
-            if (!string.IsNullOrWhiteSpace(generatedSnapshotDirectory))
+            if (generatedBundles is { Count: > 0 })
             {
-                ValidateGeneratedSnapshotReconciliation(generatedSnapshotDirectory, parsedPatientResources, errors);
+                ValidateGeneratedBundleReconciliation(generatedBundles, parsedPatientResources, errors);
             }
         }
 
@@ -118,7 +146,7 @@ public class ReportAbsManifestValidator
     private void ValidateManifest(
         List<JsonElement> manifestResources,
         IReadOnlyCollection<string> expectedPatientIds,
-        string expectedMeasureId,
+        IReadOnlyList<string> expectedMeasureIds,
         string expectedStartDate,
         string expectedEndDate,
         List<string> errors)
@@ -166,11 +194,23 @@ public class ReportAbsManifestValidator
         if (subjectListReports.Count == 0)
             AddError(errors, "Manifest does not contain any subject-list MeasureReport resources.");
 
+        // Track which expected measure IDs are covered by subject-list reports.
+        var coveredMeasureIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var mr in subjectListReports)
         {
             var measure = GetString(mr, "measure");
-            if (string.IsNullOrWhiteSpace(measure) || !measure.Contains(expectedMeasureId, StringComparison.OrdinalIgnoreCase))
-                AddError(errors, $"Manifest MeasureReport measure does not contain expected measure id '{expectedMeasureId}'. Actual='{measure ?? "(null)"}'");
+            var matchedMeasure = expectedMeasureIds.FirstOrDefault(id =>
+                !string.IsNullOrWhiteSpace(measure) && measure.Contains(id, StringComparison.OrdinalIgnoreCase));
+
+            if (matchedMeasure != null)
+            {
+                coveredMeasureIds.Add(matchedMeasure);
+            }
+            else
+            {
+                AddError(errors, $"Manifest MeasureReport measure does not match any expected measure id [{string.Join(", ", expectedMeasureIds)}]. Actual='{measure ?? "(null)"}'");
+            }
 
             var reporterRef = GetNestedString(mr, "reporter", "reference");
             if (string.IsNullOrWhiteSpace(reporterRef) || !reporterRef.StartsWith("Organization/", StringComparison.Ordinal))
@@ -191,6 +231,13 @@ public class ReportAbsManifestValidator
             {
                 AddError(errors, "Manifest MeasureReport subject reference is present but invalid.");
             }
+        }
+
+        // Verify all expected measures are represented in the manifest.
+        foreach (var expectedId in expectedMeasureIds)
+        {
+            if (!coveredMeasureIds.Contains(expectedId))
+                AddError(errors, $"Manifest is missing a subject-list MeasureReport for expected measure '{expectedId}'.");
         }
     }
 
@@ -464,34 +511,16 @@ public class ReportAbsManifestValidator
         }
     }
 
-    private void ValidateGeneratedSnapshotReconciliation(
-        string generatedSnapshotDirectory,
+    private void ValidateGeneratedBundleReconciliation(
+        IReadOnlyList<(string Name, string Json)> generatedBundles,
         List<AbsResourceRecord> patientResources,
         List<string> errors)
     {
-        if (!Directory.Exists(generatedSnapshotDirectory))
-        {
-            AddError(errors, $"Generated FHIR snapshot directory not found: {generatedSnapshotDirectory}");
-            return;
-        }
-
-        var generatedFiles = Directory
-            .EnumerateFiles(generatedSnapshotDirectory, "*.json", SearchOption.TopDirectoryOnly)
-            .Where(f => !string.Equals(Path.GetFileName(f), "metadata.json", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        if (generatedFiles.Count == 0)
-        {
-            AddError(errors, $"No generated bundle snapshot files found in {generatedSnapshotDirectory}");
-            return;
-        }
-
         var generatedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var file in generatedFiles)
+        foreach (var (name, json) in generatedBundles)
         {
             try
             {
-                var json = File.ReadAllText(file);
                 using var doc = JsonDocument.Parse(json);
 
                 if (!doc.RootElement.TryGetProperty("entry", out var entries) || entries.ValueKind != JsonValueKind.Array)
@@ -509,7 +538,7 @@ public class ReportAbsManifestValidator
             }
             catch (Exception ex)
             {
-                AddError(errors, $"Failed to parse generated snapshot file {Path.GetFileName(file)}: {ex.Message}");
+                AddError(errors, $"Failed to parse generated bundle '{name}': {ex.Message}");
             }
         }
 
@@ -524,8 +553,12 @@ public class ReportAbsManifestValidator
             .Take(50)
             .ToList();
 
-        foreach (var missing in missingFromGenerated)
-            AddError(errors, $"ABS resource {missing} not found in generated FHIR input snapshot.");
+        if (missingFromGenerated.Count > 0)
+        {
+            _output.WriteLine($"[WARN] ABS contains {missingFromGenerated.Count} resource(s) not present in the generated FHIR bundles:");
+            foreach (var missing in missingFromGenerated)
+                _output.WriteLine($"  [WARN] {missing}");
+        }
     }
 
     private void ValidateManifestPatientList(

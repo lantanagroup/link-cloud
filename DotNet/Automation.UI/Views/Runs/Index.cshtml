@@ -31,17 +31,23 @@
                     </div>
 
                     <div class="col-md-6">
-                        <label class="form-label" for="SelectedMeasure">Measure</label>
-                        <select class="form-select" id="SelectedMeasure" name="SelectedMeasure">
-                            <option value="@ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation">@ProfiledMeasureCatalog.GetDisplayName(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
-                            </option>
-                            <option value="@ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation">@ProfiledMeasureCatalog.GetDisplayName(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation)
-                            </option>
-                            <option value="@ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation">@ProfiledMeasureCatalog.GetDisplayName(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation)
-                            </option>
-                        </select>
-                        <div class="form-text">Both measure loading and profile generation run in this selected
-                            measure context.</div>
+                        <label class="form-label">Measures</label>
+                        <div class="form-text mb-2">Select one or more measures. For multi-measure runs, qualifying patients must qualify for <strong>all</strong> selected measures.</div>
+                        <div class="form-check">
+                            <input class="form-check-input measure-checkbox" type="checkbox" id="measure_ach_monthly"
+                                   name="SelectedMeasures" value="@ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation" checked />
+                            <label class="form-check-label" for="measure_ach_monthly">@ProfiledMeasureCatalog.GetDisplayName(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input measure-checkbox" type="checkbox" id="measure_ach_daily"
+                                   name="SelectedMeasures" value="@ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation" />
+                            <label class="form-check-label" for="measure_ach_daily">@ProfiledMeasureCatalog.GetDisplayName(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation)</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input measure-checkbox" type="checkbox" id="measure_hypo"
+                                   name="SelectedMeasures" value="@ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation" />
+                            <label class="form-check-label" for="measure_hypo">@ProfiledMeasureCatalog.GetDisplayName(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation)</label>
+                        </div>
                     </div>
 
                     <div class="col-md-3" id="patientCountGroup">
@@ -96,7 +102,8 @@
                         <div class="card bg-light mt-2">
                             <div class="card-body py-2">
                                 <p class="text-muted small mb-2">
-                                    Each row defines one patient in the context of the selected measure above.
+                                    Each row defines one patient. For multi-measure runs, qualifying patients
+                                    must satisfy <strong>all</strong> selected measures simultaneously.
                                     <strong>Qualifying</strong> patients are generated to meet initial-population criteria.
                                     <strong>Non-Qualifying</strong> patients are generated to miss initial-population criteria.
                                     The patient count field above is ignored when profiles are defined &mdash; patient count
@@ -291,11 +298,21 @@
             addProfileRow(NON_QUALIFYING, null);
         });
 
-        document.getElementById('scenarioForm').addEventListener('submit', function () {
+        document.getElementById('scenarioForm').addEventListener('submit', function (e) {
             var checked = document.querySelector('input[name="generationMode"]:checked');
             var mode = checked ? checked.value : 'standard';
             if (mode !== 'measure') {
                 profileRows.innerHTML = '';
+            }
+
+            // Ensure at least one measure is checked for Custom scenarios
+            if (scenarioSelect.value === CUSTOM_VALUE) {
+                var checkedMeasures = document.querySelectorAll('.measure-checkbox:checked');
+                if (checkedMeasures.length === 0) {
+                    e.preventDefault();
+                    alert('Please select at least one measure.');
+                    return false;
+                }
             }
         });
 

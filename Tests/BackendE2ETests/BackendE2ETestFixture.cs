@@ -1,8 +1,8 @@
-﻿using LantanaGroup.Link.Automation;
-using LantanaGroup.Link.Automation.Configuration;
-using LantanaGroup.Link.Automation.Helpers;
-using LantanaGroup.Link.Automation.Services;
-using LantanaGroup.Link.Automation.Validation;
+﻿using LantanaGroup.Link.Automation.Link;
+using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Link.Automation.Link.Helpers;
+using LantanaGroup.Link.Automation.Link.Services;
+using LantanaGroup.Link.Automation.Link.Validation;
 using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
@@ -36,7 +36,7 @@ public sealed class BackendE2ETestFixture : IDisposable
         builder.Services.AddSingleton<IAutomationOutput>(sp => sp.GetRequiredService<DualOutputHelper>());
 
         // Infrastructure
-        builder.Services.AddSingleton(sp => new DatabaseConnectionFactory(sp.GetRequiredService<AutomationConfig>().Database));
+        builder.Services.AddSingleton(sp => new LantanaGroup.Link.Automation.Link.Helpers.DatabaseConnectionFactory(sp.GetRequiredService<AutomationConfig>().Database));
 
         // ServiceRegistry — point each service directly at its host
         builder.Services.Configure<ServiceRegistry>(opts =>

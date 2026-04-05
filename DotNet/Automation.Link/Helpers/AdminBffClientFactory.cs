@@ -1,7 +1,7 @@
-﻿using LantanaGroup.Link.Automation.Configuration;
+using LantanaGroup.Link.Automation.Link.Configuration;
 using RestSharp;
 
-namespace LantanaGroup.Link.Automation.Helpers;
+namespace LantanaGroup.Link.Automation.Link.Helpers;
 
 public static class AdminBffClientFactory
 {

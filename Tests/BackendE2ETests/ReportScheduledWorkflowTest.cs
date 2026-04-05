@@ -2,12 +2,12 @@
 using System.Text.Json;
 using System.Globalization;
 using Confluent.Kafka;
-using LantanaGroup.Link.Automation;
-using LantanaGroup.Link.Automation.Configuration;
-using LantanaGroup.Link.Automation.Generation;
-using LantanaGroup.Link.Automation.Helpers;
-using LantanaGroup.Link.Automation.Services;
-using LantanaGroup.Link.Automation.Validation;
+using LantanaGroup.Link.Automation.Link;
+using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Automation.Generation;
+using LantanaGroup.Link.Automation.Link.Helpers;
+using LantanaGroup.Link.Automation.Link.Services;
+using LantanaGroup.Link.Automation.Link.Validation;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -56,13 +56,6 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
 
         if (_config.PatientIds.Count == 0)
             _config.PatientIds = patientIds;
-
-        await GeneratedFhirDataSnapshotWriter.WriteIfChangedAsync(
-            Output,
-            nameof(ReportScheduledWorkflowTest),
-            GenerationSeed,
-            _config.PatientIds,
-            bundles);
 
         await FhirDataLoader.WaitForServerAsync(Output);
         await FhirDataLoader.LoadTransactionBundlesFromJsonAsync(Output, bundles);
@@ -183,7 +176,7 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
             actualEndDate,
             _facilityId,
             reportId,
-            GeneratedFhirDataSnapshotWriter.GetSnapshotDirectory(nameof(ReportScheduledWorkflowTest)));
+            _generatedBundles);
 
         await ValidationBaselineManager.ValidateOrCreateAsync(
             Output, dataReader,

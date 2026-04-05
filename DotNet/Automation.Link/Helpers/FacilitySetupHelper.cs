@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Automation.Configuration;
+using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
@@ -6,7 +6,7 @@ using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 using LantanaGroup.Link.Shared.Application.Models.Integration.QueryDispatch;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 
-namespace LantanaGroup.Link.Automation.Helpers;
+namespace LantanaGroup.Link.Automation.Link.Helpers;
 
 public static class FacilitySetupHelper
 {
@@ -15,6 +15,16 @@ public static class FacilitySetupHelper
         IAutomationOutput output,
         string facilityId,
         string? measureId)
+    {
+        await EnsureFacilityAsync(facilityClient, output, facilityId,
+            measureId != null ? [measureId] : []);
+    }
+
+    public static async Task EnsureFacilityAsync(
+        IFacilityServiceClient facilityClient,
+        IAutomationOutput output,
+        string facilityId,
+        List<string> measureIds)
     {
         var existing = await facilityClient.GetAsync(facilityId);
         if (existing != null)
@@ -31,7 +41,7 @@ public static class FacilitySetupHelper
             Vendor = Vendor.Epic,
             ScheduledReports = new TenantScheduledReportConfig
             {
-                Monthly = measureId != null ? [measureId] : [],
+                Monthly = measureIds.ToArray(),
                 Daily = [],
                 Weekly = []
             }
@@ -74,8 +84,22 @@ public static class FacilitySetupHelper
         string? measureId,
         string ehrDescription)
     {
-        await EnsureQueryPlanAsync(dataAcqClient, output, facilityId, measureId, ehrDescription, "Discharge");
-        await EnsureQueryPlanAsync(dataAcqClient, output, facilityId, measureId, ehrDescription, "Monthly");
+        await EnsureQueryPlansAsync(dataAcqClient, output, facilityId,
+            measureId != null ? [measureId] : [], ehrDescription);
+    }
+
+    public static async Task EnsureQueryPlansAsync(
+        IDataAcquisitionServiceClient dataAcqClient,
+        IAutomationOutput output,
+        string facilityId,
+        List<string> measureIds,
+        string ehrDescription)
+    {
+        foreach (var measureId in measureIds)
+        {
+            await EnsureQueryPlanAsync(dataAcqClient, output, facilityId, measureId, ehrDescription, "Discharge");
+            await EnsureQueryPlanAsync(dataAcqClient, output, facilityId, measureId, ehrDescription, "Monthly");
+        }
     }
 
     public static async Task EnsureQueryConfigAsync(

@@ -1,7 +1,7 @@
 ﻿using System.Globalization;
 using System.Text.RegularExpressions;
 
-namespace LantanaGroup.Link.Automation.Helpers;
+namespace LantanaGroup.Link.Automation.Link.Helpers;
 
 public class PipelineSummarySnapshotBuilder
 {
@@ -39,6 +39,7 @@ public class PipelineSummarySnapshotBuilder
         public List<ServiceErrorSnapshot> ServiceErrorSummary { get; set; } = [];
         public List<ValidatorResultSnapshot> ValidatorResults { get; set; } = [];
         public DataAcquisitionSnapshot DataAcquisition { get; set; } = new();
+        public ServiceSnapshot Normalization { get; set; } = new();
         public ServiceSnapshot MeasureEval { get; set; } = new();
         public ServiceSnapshot Validation { get; set; } = new();
     }
@@ -136,18 +137,22 @@ public class PipelineSummarySnapshotBuilder
         var measureLines = FilterLines(logs, "measure", "measureeval", "subject-list", "evaluate");
         var validationLines = FilterLines(logs, "validation", "operationoutcome", "failedvalidation", "report internal abs manifest validation");
         var dataAcquisitionLines = FilterLines(logs, "data acquisition", "dataacq", "query plan", "fhir query", "resourceacquired", "acquisition");
+        var normalizationLines = FilterLines(logs, "normalization", "resourcenormalized", "normalizing");
         var lokiErrors = ParseLokiErrorEntries(logs);
 
         snapshot.MeasureEval.CompletionRatePerSecond = ComputeEventRatePerSecond(measureLines);
         snapshot.Validation.CompletionRatePerSecond = ComputeEventRatePerSecond(validationLines);
         snapshot.DataAcquisition.CompletionRatePerSecond = ComputeEventRatePerSecond(dataAcquisitionLines);
+        snapshot.Normalization.CompletionRatePerSecond = ComputeEventRatePerSecond(normalizationLines);
         snapshot.MeasureEval.ThroughputBuckets = BuildThroughputBuckets(measureLines);
         snapshot.Validation.ThroughputBuckets = BuildThroughputBuckets(validationLines);
         snapshot.DataAcquisition.ThroughputBuckets = BuildThroughputBuckets(dataAcquisitionLines);
+        snapshot.Normalization.ThroughputBuckets = BuildThroughputBuckets(normalizationLines);
 
         snapshot.MeasureEval.Errors = GetServiceLokiErrors(lokiErrors, "Measure Eval");
         snapshot.Validation.Errors = GetServiceLokiErrors(lokiErrors, "Validation");
         snapshot.DataAcquisition.Errors = GetServiceLokiErrors(lokiErrors, "Data Acquisition");
+        snapshot.Normalization.Errors = GetServiceLokiErrors(lokiErrors, "Normalization");
         snapshot.ValidatorResults = ParseValidatorResults(logs);
 
         if (string.IsNullOrWhiteSpace(facilityId) ||
@@ -227,6 +232,13 @@ public class PipelineSummarySnapshotBuilder
 
         var measureResources = measureEvalResourceCounts.Sum(x => x.Count);
         var validationResources = reportResourceCounts.Sum(x => x.Count);
+
+        // Normalization processes every resource acquired by DataAcquisition, so its
+        // resource count mirrors DataAcquisition output. Resource type breakdown is the same.
+        var normalizationResources = acquisitionSummary?.TotalResourcesAcquired ?? 0;
+        snapshot.Normalization.ResourceCount = normalizationResources;
+        snapshot.Normalization.AverageResourcesPerSecond = ComputeResourcesPerSecond(normalizationResources, normalizationLines);
+        snapshot.Normalization.ResourceTypeCounts = snapshot.DataAcquisition.ResourceTypeCounts.ToList();
 
         snapshot.MeasureEval.ResourceCount = measureResources;
         snapshot.Validation.ResourceCount = validationResources;
@@ -359,6 +371,7 @@ public class PipelineSummarySnapshotBuilder
         snapshot.ServiceErrorSummary =
         [
             BuildServiceErrorSummary("Data Acquisition", GetServiceLokiErrors(lokiErrors, "Data Acquisition")),
+            BuildServiceErrorSummary("Normalization", GetServiceLokiErrors(lokiErrors, "Normalization")),
             BuildServiceErrorSummary("Measure Eval", GetServiceLokiErrors(lokiErrors, "Measure Eval")),
             BuildServiceErrorSummary("Validation", GetServiceLokiErrors(lokiErrors, "Validation")),
             BuildServiceErrorSummary("Report", GetServiceLokiErrors(lokiErrors, "Report"))
@@ -407,12 +420,16 @@ public class PipelineSummarySnapshotBuilder
 
     private static List<LokiErrorEntry> ParseLokiErrorEntries(IReadOnlyList<string> logs)
     {
-        var regex = new Regex(@"\]\s+\[LOKI ERROR\]\[(?<component>[^\]]+)\]\s+(?<message>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        var errorRegex = new Regex(@"\]\s+\[LOKI ERROR\]\[(?<component>[^\]]+)\]\s+(?<message>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        var detailRegex = new Regex(@"\]\s+\[LOKI ERROR DETAIL\]\[(?<component>[^\]]+)\]\s+(?<detail>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         var list = new List<LokiErrorEntry>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var line in logs)
+        for (var i = 0; i < logs.Count; i++)
         {
-            var m = regex.Match(line);
+            var line = logs[i];
+
+            var m = errorRegex.Match(line);
             if (!m.Success)
                 continue;
 
@@ -423,7 +440,25 @@ public class PipelineSummarySnapshotBuilder
             if (!IsErrorLike(message))
                 continue;
 
-            list.Add(new LokiErrorEntry(component, message));
+            // Peek ahead for a matching DETAIL line immediately following.
+            string? detail = null;
+            if (i + 1 < logs.Count)
+            {
+                var dm = detailRegex.Match(logs[i + 1]);
+                if (dm.Success && string.Equals(dm.Groups["component"].Value.Trim(), component, StringComparison.OrdinalIgnoreCase))
+                {
+                    detail = dm.Groups["detail"].Value.Trim();
+                    i++; // skip the detail line
+                }
+            }
+
+            // Deduplicate on the summary portion only.
+            if (!seen.Add($"{component}|{message}"))
+                continue;
+
+            // Rejoin with ||| so the UI modal can split summary vs detail.
+            var fullMessage = string.IsNullOrEmpty(detail) ? message : $"{message}|||{detail}";
+            list.Add(new LokiErrorEntry(component, fullMessage));
         }
 
         return list;
@@ -452,6 +487,18 @@ public class PipelineSummarySnapshotBuilder
 
         if (string.Equals(component, LokiScraper.Components.Report, StringComparison.OrdinalIgnoreCase))
             return "Report";
+
+        if (string.Equals(component, LokiScraper.Components.Normalization, StringComparison.OrdinalIgnoreCase))
+            return "Normalization";
+
+        if (string.Equals(component, LokiScraper.Components.Submission, StringComparison.OrdinalIgnoreCase))
+            return "Submission";
+
+        if (string.Equals(component, LokiScraper.Components.QueryDispatch, StringComparison.OrdinalIgnoreCase))
+            return "Query Dispatch";
+
+        if (string.Equals(component, LokiScraper.Components.Tenant, StringComparison.OrdinalIgnoreCase))
+            return "Tenant";
 
         return component;
     }

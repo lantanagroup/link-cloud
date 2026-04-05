@@ -1,7 +1,7 @@
-﻿using LantanaGroup.Link.Automation.Helpers;
+using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Shared.Application.Models;
 
-namespace LantanaGroup.Link.Automation.Validation;
+namespace LantanaGroup.Link.Automation.Link.Validation;
 
 public class DataAcquisitionDatabaseValidator
 {

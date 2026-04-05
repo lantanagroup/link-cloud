@@ -1,9 +1,9 @@
-﻿using LantanaGroup.Link.Automation;
-using LantanaGroup.Link.Automation.Configuration;
-using LantanaGroup.Link.Automation.Generation;
-using LantanaGroup.Link.Automation.Helpers;
-using LantanaGroup.Link.Automation.Services;
-using LantanaGroup.Link.Automation.Validation;
+﻿using LantanaGroup.Link.Automation.Link;
+using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Automation.Generation;
+using LantanaGroup.Link.Automation.Link.Helpers;
+using LantanaGroup.Link.Automation.Link.Services;
+using LantanaGroup.Link.Automation.Link.Validation;
 using LantanaGroup.Link.Sdk.Clients;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -45,13 +45,6 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
         {
             Config.PatientIds = patientIds;
         }
-
-        await GeneratedFhirDataSnapshotWriter.WriteIfChangedAsync(
-            Output,
-            nameof(SmokeTest),
-            GenerationSeed,
-            Config.PatientIds,
-            bundles);
 
         Output.WriteLine($"Patient IDs for test: [{string.Join(", ", Config.PatientIds)}]");
 
@@ -187,7 +180,7 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
             Config.EndDate,
             _facilityId,
             reportId,
-            GeneratedFhirDataSnapshotWriter.GetSnapshotDirectory(nameof(SmokeTest)));
+            _generatedBundles);
 
         await ValidationBaselineManager.ValidateOrCreateAsync(
             Output,

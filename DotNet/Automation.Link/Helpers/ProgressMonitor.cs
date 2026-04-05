@@ -1,6 +1,6 @@
-﻿using LantanaGroup.Link.Automation.Configuration;
+﻿using LantanaGroup.Link.Automation.Link.Configuration;
 
-namespace LantanaGroup.Link.Automation.Helpers;
+namespace LantanaGroup.Link.Automation.Link.Helpers;
 
 /// <summary>
 /// Central progress aggregation hub for test pipeline output.
@@ -25,6 +25,7 @@ public class ProgressMonitor
     private int _progressCheckCount;
     private string? _lastMeasureEvalActivity;
     private string? _lastValidationActivity;
+    private string? _lastNormalizationActivity;
 
     /// <summary>
     /// Returns the pipeline stage that appears stalled, or null if progress
@@ -83,6 +84,13 @@ public class ProgressMonitor
         {
             _output.WriteLine($"[DIAG][MeasureEval] Active: {measureEvalActivity}");
             _lastMeasureEvalActivity = measureEvalActivity;
+        }
+
+        var normalizationActivity = await _lokiScraper.GetNormalizationActivitySummaryAsync(TimeSpan.FromSeconds(60));
+        if (!string.IsNullOrWhiteSpace(normalizationActivity) && !string.Equals(normalizationActivity, _lastNormalizationActivity, StringComparison.Ordinal))
+        {
+            _output.WriteLine($"[DIAG][Normalization] Active: {normalizationActivity}");
+            _lastNormalizationActivity = normalizationActivity;
         }
 
         // Validation activity is meaningful only after acquisition has produced work for downstream services.

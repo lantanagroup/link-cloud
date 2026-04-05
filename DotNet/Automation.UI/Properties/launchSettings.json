@@ -1,5 +1,4 @@
 ﻿{
-{
   "$schema": "http://json.schemastore.org/launchsettings.json",
   "profiles": {
     "http": {
@@ -33,6 +32,7 @@
         "ServiceRegistry__CensusServiceUrl": "http://localhost:8064",
         "ServiceRegistry__DataAcquisitionServiceUrl": "http://localhost:8065",
         "ServiceRegistry__NormalizationServiceUrl": "http://localhost:8068",
+        "ServiceRegistry__QueryDispatchServiceUrl": "http://localhost:8071",
         "ServiceRegistry__ReportServiceUrl": "http://localhost:8072",
         "ServiceRegistry__MeasureServiceUrl": "http://localhost:8067",
         "ServiceRegistry__ValidationServiceUrl": "http://localhost:8075",

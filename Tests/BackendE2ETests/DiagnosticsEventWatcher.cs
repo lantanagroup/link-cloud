@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Automation.Helpers;
+﻿using LantanaGroup.Link.Automation.Link.Helpers;
 
 namespace LantanaGroup.Link.Tests.E2ETests;
 

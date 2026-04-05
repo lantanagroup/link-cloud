@@ -1,9 +1,9 @@
-﻿using LantanaGroup.Link.Automation;
-using LantanaGroup.Link.Automation.Configuration;
-using LantanaGroup.Link.Automation.Generation;
-using LantanaGroup.Link.Automation.Helpers;
-using LantanaGroup.Link.Automation.Services;
-using LantanaGroup.Link.Automation.Validation;
+﻿using LantanaGroup.Link.Automation.Link;
+using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Automation.Generation;
+using LantanaGroup.Link.Automation.Link.Helpers;
+using LantanaGroup.Link.Automation.Link.Services;
+using LantanaGroup.Link.Automation.Link.Validation;
 using LantanaGroup.Link.Sdk.Clients;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -45,13 +45,6 @@ public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETe
         {
             Config.PatientIds = patientIds;
         }
-
-        await GeneratedFhirDataSnapshotWriter.WriteIfChangedAsync(
-            Output,
-            nameof(MegaPatientTest),
-            GenerationSeed,
-            Config.PatientIds,
-            bundles);
 
         Output.WriteLine($"Patient IDs for test: [{string.Join(", ", Config.PatientIds)}]");
 
@@ -190,7 +183,7 @@ public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETe
             Config.EndDate,
             _facilityId,
             reportId,
-            GeneratedFhirDataSnapshotWriter.GetSnapshotDirectory(nameof(MegaPatientTest)));
+            _generatedBundles);
 
         await ValidationBaselineManager.ValidateOrCreateAsync(
             Output, dataReader,

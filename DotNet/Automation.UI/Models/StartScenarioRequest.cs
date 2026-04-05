@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Automation.Generation;
+﻿using LantanaGroup.Automation.Generation;
 using System.ComponentModel.DataAnnotations;
 
 namespace Automation.UI.Models;
@@ -25,10 +25,17 @@ public class StartScenarioRequest
     public bool? CleanupTestData { get; set; }
 
     /// <summary>
-    /// Measure selected for this run. Both measure loading and any profile-driven
-    /// generation run in this measure context.
+    /// Single measure for backward compatibility. When set and <see cref="SelectedMeasures"/>
+    /// is empty, this measure is used.
     /// </summary>
     public ProfiledMeasureType? SelectedMeasure { get; set; }
+
+    /// <summary>
+    /// Measures selected for this run. When multiple measures are selected, the report
+    /// is generated with all of them as report types, and qualifying patients must
+    /// qualify for every selected measure.
+    /// </summary>
+    public List<ProfiledMeasureType> SelectedMeasures { get; set; } = [];
 
     /// <summary>
     /// Per-patient eligibility profiles for measure-eligibility generation mode.

@@ -1,5 +1,5 @@
-﻿using LantanaGroup.Link.Automation.Generation;
-using LantanaGroup.Link.Automation.Helpers;
+﻿using LantanaGroup.Automation.Generation;
+using LantanaGroup.Automation.Helpers;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using System.Text.Json;
 

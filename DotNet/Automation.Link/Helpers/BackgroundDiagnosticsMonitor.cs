@@ -1,8 +1,8 @@
 ﻿using System.Threading.Channels;
-using LantanaGroup.Link.Automation.Configuration;
-using LantanaGroup.Link.Automation.Validation;
+using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Link.Automation.Link.Validation;
 
-namespace LantanaGroup.Link.Automation.Helpers;
+namespace LantanaGroup.Link.Automation.Link.Helpers;
 
 /// <summary>
 /// Orchestrates background diagnostics monitoring during the test pipeline.
@@ -17,7 +17,7 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
     private readonly MilestoneValidationOrchestrator _milestoneOrchestrator;
     private readonly TimeSpan _pollInterval;
     private readonly int _expectedPatientCount;
-    private readonly TestRunMonitor _monitor;
+    private readonly LantanaGroup.Automation.Helpers.TestRunMonitor _monitor;
     private readonly Channel<AutomationMonitorEvent> _events = Channel.CreateUnbounded<AutomationMonitorEvent>();
 
     private CancellationTokenSource? _cts;
@@ -36,7 +36,7 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
     /// All Kafka error messages captured during monitoring.
     /// </summary>
     public IReadOnlyList<string> KafkaErrors => _kafkaMonitor.CapturedErrors;
-    public IReadOnlyCollection<MilestoneValidationOrchestrator.Milestone> CompletedMilestones => _monitor.State.CompletedMilestones;
+    public IReadOnlyCollection<string> CompletedMilestones => _monitor.State.CompletedMilestones;
 
     public BackgroundDiagnosticsMonitor(
         IAutomationOutput output,
@@ -75,7 +75,7 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
             new MilestoneProbe(_milestoneOrchestrator, _pollInterval)
         };
 
-        _monitor = new TestRunMonitor(
+        _monitor = new LantanaGroup.Automation.Helpers.TestRunMonitor(
             eventingOutput,
             probes,
             StallDiagnosticsThreshold,
@@ -121,25 +121,8 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
     {
         if (_cts == null) return;
 
-        try
-        {
-            await _monitor.RunCycleAsync(CancellationToken.None, forceAllProbes: true);
-        }
-        catch (Exception ex)
-        {
-            await PublishEventAsync(
-                AutomationMonitorEventType.MonitorLoopError,
-                MonitorIssueSeverity.Warning,
-                "Monitor",
-                $"Final monitor cycle error before stop: {ex.Message}");
-        }
-
-        await PublishEventAsync(
-            AutomationMonitorEventType.RunStopping,
-            MonitorIssueSeverity.Info,
-            "Monitor",
-            "Stopping background diagnostics...");
-
+        // Cancel the background loop FIRST so it stops producing output
+        // while the final cycle and shutdown logic run.
         await _cts.CancelAsync();
 
         if (_monitorTask != null)
@@ -152,6 +135,19 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
             {
                 // Expected
             }
+        }
+
+        try
+        {
+            await _monitor.RunCycleAsync(CancellationToken.None, forceAllProbes: true);
+        }
+        catch (Exception ex)
+        {
+            await PublishEventAsync(
+                AutomationMonitorEventType.MonitorLoopError,
+                MonitorIssueSeverity.Warning,
+                "Monitor",
+                $"Final monitor cycle error before stop: {ex.Message}");
         }
 
         _milestoneOrchestrator.WriteSummary();
@@ -195,6 +191,12 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
 
         while (!ct.IsCancellationRequested)
         {
+            // Stop the loop when a critical failure has been detected — the
+            // polling caller (CheckSubmissionStatusAsync) will see
+            // HasCriticalFailure and exit on its own.
+            if (_monitor.State.HasCriticalFailure)
+                break;
+
             try
             {
                 await Task.Delay(_pollInterval, ct);
@@ -213,9 +215,6 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
                     $"Monitor loop error: {ex.Message}");
             }
         }
-
-        if (!ct.IsCancellationRequested)
-            await _monitor.RunCycleAsync(ct);
     }
 
     /// <summary>
@@ -237,8 +236,8 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
 
         await _lokiScraper.ScrapeAllServicesErrorSummaryAsync(
             TimeSpan.FromMinutes(5),
-            _monitor.State.FacilityId,
-            _monitor.State.ReportId);
+            _monitor.State.CorrelationId1,
+            _monitor.State.CorrelationId2);
     }
 
     private Task OnMonitorEventAsync(AutomationMonitorEvent evt)
@@ -253,7 +252,7 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
         string message,
         IReadOnlyDictionary<string, string>? data = null)
     {
-        var runId = _monitor.State.ReportId;
+        var runId = _monitor.State.CorrelationId2;
         var seq = Interlocked.Increment(ref _eventSequence);
 
         _events.Writer.TryWrite(new AutomationMonitorEvent(
@@ -281,7 +280,7 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
         _events.Writer.TryWrite(new AutomationMonitorEvent(
             Sequence: seq,
             TimestampUtc: timestampUtc ?? DateTime.UtcNow,
-            RunId: runId ?? _monitor.State.ReportId,
+            RunId: runId ?? _monitor.State.CorrelationId2,
             Type: type,
             Severity: severity,
             Source: source,

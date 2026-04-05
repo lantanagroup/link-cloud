@@ -1,6 +1,6 @@
-﻿using LantanaGroup.Link.Automation.Validation;
+﻿using LantanaGroup.Link.Automation.Link.Validation;
 
-namespace LantanaGroup.Link.Automation.Helpers;
+namespace LantanaGroup.Link.Automation.Link.Helpers;
 
 public sealed class LokiErrorProbe : IBackgroundMonitorProbe
 {
@@ -17,7 +17,7 @@ public sealed class LokiErrorProbe : IBackgroundMonitorProbe
 
     public async Task<MonitorProbeResult> ExecuteAsync(TestMonitorState state, CancellationToken cancellationToken)
     {
-        await _lokiScraper.ScrapeErrorsAsync(state.FacilityId, state.ReportId);
+        await _lokiScraper.ScrapeErrorsAsync(state.CorrelationId1, state.CorrelationId2);
         return MonitorProbeResult.Empty;
     }
 }
@@ -41,7 +41,7 @@ public sealed class KafkaErrorProbe : IBackgroundMonitorProbe
         var count = _kafkaMonitor.CapturedErrors.Count;
 
         if (count <= 0)
-            return Task.FromResult(new MonitorProbeResult { KafkaErrorCount = 0 });
+            return Task.FromResult(new MonitorProbeResult { MessageBusErrorCount = 0 });
 
         var issues = new List<MonitorIssue>();
         if (count > _lastObservedCount)
@@ -58,7 +58,7 @@ public sealed class KafkaErrorProbe : IBackgroundMonitorProbe
 
         return Task.FromResult(new MonitorProbeResult
         {
-            KafkaErrorCount = count,
+            MessageBusErrorCount = count,
             HasCriticalFailure = true,
             Issues = issues
         });
@@ -80,7 +80,7 @@ public sealed class ProgressProbe : IBackgroundMonitorProbe
 
     public async Task<MonitorProbeResult> ExecuteAsync(TestMonitorState state, CancellationToken cancellationToken)
     {
-        var critical = await _progressMonitor.CheckProgressAsync(state.FacilityId, state.ReportId);
+        var critical = await _progressMonitor.CheckProgressAsync(state.CorrelationId1, state.CorrelationId2);
 
         var issues = new List<MonitorIssue>();
         if (critical)
@@ -119,7 +119,7 @@ public sealed class MilestoneProbe : IBackgroundMonitorProbe
 
     public async Task<MonitorProbeResult> ExecuteAsync(TestMonitorState state, CancellationToken cancellationToken)
     {
-        await _milestones.CheckAsync(state.FacilityId, state.ReportId);
+        await _milestones.CheckAsync(state.CorrelationId1, state.CorrelationId2);
 
         var newIssues = new List<MonitorIssue>();
         foreach (var issue in _milestones.Issues)
@@ -138,7 +138,7 @@ public sealed class MilestoneProbe : IBackgroundMonitorProbe
         return new MonitorProbeResult
         {
             HasCriticalFailure = _milestones.HasCriticalFailure,
-            CompletedMilestones = _milestones.CompletedMilestones,
+            CompletedMilestones = _milestones.CompletedMilestones.Select(m => m.ToString()).ToList(),
             Issues = newIssues
         };
     }

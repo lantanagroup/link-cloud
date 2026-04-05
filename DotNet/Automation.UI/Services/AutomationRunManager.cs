@@ -1,12 +1,12 @@
 ﻿using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using Automation.UI.Models;
-using LantanaGroup.Link.Automation;
-using LantanaGroup.Link.Automation.Configuration;
-using LantanaGroup.Link.Automation.Generation;
-using LantanaGroup.Link.Automation.Helpers;
-using LantanaGroup.Link.Automation.Services;
-using LantanaGroup.Link.Automation.Validation;
+using LantanaGroup.Link.Automation.Link;
+using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Automation.Generation;
+using LantanaGroup.Link.Automation.Link.Helpers;
+using LantanaGroup.Link.Automation.Link.Services;
+using LantanaGroup.Link.Automation.Link.Validation;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
@@ -236,24 +236,43 @@ public class AutomationRunManager : IAutomationRunManager
             var pipelineSnapshot = services.GetRequiredService<PipelineSnapshot>();
 
             output.WriteLine($"Starting {state.Scenario} run: {state.RunId}");
-            output.WriteLine($"Measure context: {ProfiledMeasureCatalog.GetDisplayName(state.Options.SelectedMeasure)} ({state.Options.SelectedMeasure})");
+            output.WriteLine($"Measure context: {string.Join(", ", state.Options.SelectedMeasures.Select(m => $"{ProfiledMeasureCatalog.GetDisplayName(m)} ({m})"))}");
             output.WriteLine($"Generation config: patients={state.Options.PatientCount}, resourcesPerPatient={state.Options.ResourcesPerPatient}, prefix={state.Options.Prefix}, seed={state.Options.Seed}");
 
             List<string> patientIds;
             List<(string Name, string Json)> bundles;
             List<string> expectedSubmittedPatientIds;
 
+            // Use the first measure for generation context (profile-driven generation picks
+            // the most restrictive measure — patients qualifying for all measures must meet
+            // the criteria of each). For multi-measure, GenerateWithProfiles handles the union.
+            var primaryMeasure = state.Options.SelectedMeasures[0];
+
             if (state.Options.PatientProfiles is { Count: > 0 })
             {
                 var profiles = state.Options.PatientProfiles;
                 output.WriteLine($"Using measure-eligibility profiles: {profiles.Count(p => p.Eligibility == MeasureEligibility.Qualifying)} qualifying, {profiles.Count(p => p.Eligibility == MeasureEligibility.NonQualifying)} non-qualifying");
-                (patientIds, bundles) = FhirBundleGenerator.GenerateWithProfiles(
-                    output,
-                    state.Options.SelectedMeasure,
-                    profiles,
-                    state.Options.ResourcesPerPatient,
-                    state.Options.Prefix,
-                    state.Options.Seed);
+
+                if (state.Options.SelectedMeasures.Count > 1)
+                {
+                    (patientIds, bundles) = FhirBundleGenerator.GenerateWithProfiles(
+                        output,
+                        (IReadOnlyList<ProfiledMeasureType>)state.Options.SelectedMeasures,
+                        profiles,
+                        state.Options.ResourcesPerPatient,
+                        state.Options.Prefix,
+                        state.Options.Seed);
+                }
+                else
+                {
+                    (patientIds, bundles) = FhirBundleGenerator.GenerateWithProfiles(
+                        output,
+                        primaryMeasure,
+                        profiles,
+                        state.Options.ResourcesPerPatient,
+                        state.Options.Prefix,
+                        state.Options.Seed);
+                }
 
                 expectedSubmittedPatientIds = patientIds
                     .Where((_, idx) => idx < profiles.Count && profiles[idx].Eligibility == MeasureEligibility.Qualifying)
@@ -286,8 +305,11 @@ public class AutomationRunManager : IAutomationRunManager
             await validationHelper.InitializeCategoriesAsync();
 
             var measureLoader = new MeasureLoader(measureEvalClient, sdkValidationClient, output, scenarioConfig);
-            await measureLoader.LoadAsync();
-            var measureId = measureLoader.MeasureId ?? throw new InvalidOperationException("MeasureLoader did not produce a MeasureId");
+            await measureLoader.LoadAllAsync();
+            var measureIds = measureLoader.MeasureIds;
+            if (measureIds.Count == 0)
+                throw new InvalidOperationException("MeasureLoader did not produce any MeasureIds");
+            var measureId = measureIds[0];
 
             var facilityId = $"{state.Scenario}-{state.RunId:N}".Substring(0, Math.Min(48, $"{state.Scenario}-{state.RunId:N}".Length));
             lock (state.Sync)
@@ -297,13 +319,13 @@ public class AutomationRunManager : IAutomationRunManager
 
             await FacilitySetupHelper.EnsureFacilityAsync(
                 services.GetRequiredService<IFacilityServiceClient>(),
-                output, facilityId, measureId);
+                output, facilityId, measureIds);
             await FacilitySetupHelper.EnsureNormalizationConfigAsync(
                 services.GetRequiredService<INormalizationServiceClient>(),
                 output, facilityId);
             await FacilitySetupHelper.EnsureQueryPlansAsync(
                 services.GetRequiredService<IDataAcquisitionServiceClient>(),
-                output, facilityId, measureId, "Epic");
+                output, facilityId, measureIds, "Epic");
             await FacilitySetupHelper.EnsureQueryConfigAsync(
                 services.GetRequiredService<IDataAcquisitionServiceClient>(),
                 services.GetRequiredService<AutomationConfig>(),
@@ -313,7 +335,7 @@ public class AutomationRunManager : IAutomationRunManager
                 output,
                 facilityId);
 
-            var reportId = await reportHelper.GenerateReportAsync(facilityId, measureId, scenarioConfig);
+            var reportId = await reportHelper.GenerateReportAsync(facilityId, measureIds, scenarioConfig);
             lock (state.Sync)
             {
                 state.ReportId = reportId;
@@ -346,26 +368,24 @@ public class AutomationRunManager : IAutomationRunManager
                     throw new InvalidOperationException($"Expected report to include patient-{patientId}.ndjson but it was not");
             }
 
-            var snapshotDir = await WriteGeneratedSnapshotAsync(state, expectedAllPatientIds, bundles);
-
             await reportAbsValidator.ValidateAllAsync(
                 internalAbsResources,
                 expectedSubmittedPatientIds,
-                measureId,
+                measureIds,
                 scenarioConfig.StartDate,
                 scenarioConfig.EndDate,
                 facilityId,
                 reportId,
-                snapshotDir,
+                bundles,
                 expectedManifestPatientListIds: expectedAllPatientIds);
 
             await reportValidator.ValidateAllAsync(
                 facilityId,
                 reportId,
-                measureId,
+                measureIds,
                 expectedAllPatientIds,
                 expectedSubmittedPatientIds: expectedSubmittedPatientIds);
-            await dataAcqValidator.ValidateAllAsync(facilityId, reportId, measureId, expectedAllPatientIds);
+            await dataAcqValidator.ValidateAllAsync(facilityId, reportId, measureIds[0], expectedAllPatientIds);
             await normalizationValidator.ValidateAllAsync(facilityId);
             await tenantValidator.ValidateAllAsync(facilityId, measureId);
             await validationResultsValidator.ValidateAllAsync(facilityId, reportId, expectedAllPatientIds, scenarioConfig.LokiScrapeWindow);
@@ -426,7 +446,7 @@ public class AutomationRunManager : IAutomationRunManager
 
         services.AddSingleton(sp => new LokiScraper(sp.GetRequiredService<IAutomationOutput>(), sp.GetRequiredService<AutomationConfig>()))
             .AddSingleton(sp => new FhirDataLoader(sp.GetRequiredService<AutomationConfig>().ExternalFhirServerBase, sp.GetRequiredService<AutomationConfig>()))
-            .AddSingleton(sp => new DatabaseConnectionFactory(sp.GetRequiredService<AutomationConfig>().Database))
+            .AddSingleton(sp => new LantanaGroup.Link.Automation.Link.Helpers.DatabaseConnectionFactory(sp.GetRequiredService<AutomationConfig>().Database))
             .AddSingleton<PipelineDataReader>();
 
         services.AddTransient<ValidationApiHelper>();
@@ -453,9 +473,14 @@ public class AutomationRunManager : IAutomationRunManager
             _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null)
         };
 
+        var bundleLocations = options.SelectedMeasures
+            .Select(ProfiledMeasureCatalog.GetBundleLocation)
+            .ToList();
+
         return new TestScenarioConfig
         {
-            MeasureBundleLocation = ProfiledMeasureCatalog.GetBundleLocation(options.SelectedMeasure),
+            MeasureBundleLocation = bundleLocations.Count > 0 ? bundleLocations[0] : "",
+            AdditionalMeasureBundleLocations = bundleLocations.Count > 1 ? bundleLocations.Skip(1).ToList() : [],
             StartDate = "2023-01-01T00:00:00Z",
             EndDate = "2023-12-31T23:59:59Z",
             PatientIds = [],
@@ -469,12 +494,13 @@ public class AutomationRunManager : IAutomationRunManager
 
     private ResolvedRunOptions ResolveRunOptions(StartScenarioRequest request)
     {
+        var defaultMeasures = new List<ProfiledMeasureType> { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation };
         var defaults = request.Scenario switch
         {
-            AutomationScenarioKind.SmokeTest => new ResolvedRunOptions(1, 1000, "SmokePatient", 20260326, 3, 0, 30, true, false, ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation, []),
-            AutomationScenarioKind.MultiPatientTest => new ResolvedRunOptions(1000, 100, "MultiPatient", 20260328, 3, 0, 30, true, false, ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation, []),
-            AutomationScenarioKind.MegaPatientTest => new ResolvedRunOptions(FhirBundleGenerator.DefaultPatientCount, FhirBundleGenerator.DefaultResourcesPerPatient, "MegaPatient", 20260327, 3, 0, 30, true, false, ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation, []),
-            AutomationScenarioKind.Custom => new ResolvedRunOptions(10, 250, "CustomPatient", 20260329, 3, 0, 30, true, false, ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation, []),
+            AutomationScenarioKind.SmokeTest => new ResolvedRunOptions(1, 1000, "SmokePatient", 20260326, 3, 0, 30, true, false, defaultMeasures, []),
+            AutomationScenarioKind.MultiPatientTest => new ResolvedRunOptions(1000, 100, "MultiPatient", 20260328, 3, 0, 30, true, false, defaultMeasures, []),
+            AutomationScenarioKind.MegaPatientTest => new ResolvedRunOptions(FhirBundleGenerator.DefaultPatientCount, FhirBundleGenerator.DefaultResourcesPerPatient, "MegaPatient", 20260327, 3, 0, 30, true, false, defaultMeasures, []),
+            AutomationScenarioKind.Custom => new ResolvedRunOptions(10, 250, "CustomPatient", 20260329, 3, 0, 30, true, false, defaultMeasures, []),
             _ => throw new ArgumentOutOfRangeException(nameof(request.Scenario), request.Scenario, null)
         };
 
@@ -489,6 +515,13 @@ public class AutomationRunManager : IAutomationRunManager
             ? request.PatientProfiles
             : defaults.PatientProfiles;
 
+        // Resolve measures: prefer SelectedMeasures list, fall back to single SelectedMeasure, then defaults
+        var measures = request.SelectedMeasures is { Count: > 0 }
+            ? request.SelectedMeasures
+            : request.SelectedMeasure.HasValue
+                ? [request.SelectedMeasure.Value]
+                : defaults.SelectedMeasures;
+
         return defaults with
         {
             PatientCount = request.PatientCount ?? defaults.PatientCount,
@@ -500,25 +533,9 @@ public class AutomationRunManager : IAutomationRunManager
             LokiScrapeWindowMinutes = 30,
             RemoveFacilityConfig = request.RemoveFacilityConfig ?? defaults.RemoveFacilityConfig,
             CleanupTestData = request.CleanupTestData ?? defaults.CleanupTestData,
-            SelectedMeasure = request.SelectedMeasure ?? defaults.SelectedMeasure,
+            SelectedMeasures = measures,
             PatientProfiles = profiles
         };
-    }
-
-    private async Task<string> WriteGeneratedSnapshotAsync(MutableRunState state, IReadOnlyCollection<string> patientIds, List<(string Name, string Json)> bundles)
-    {
-        var snapshotDir = Path.Combine(Path.GetTempPath(), "automation-ui-snapshots", state.Scenario.ToString(), state.RunId.ToString("N"));
-        Directory.CreateDirectory(snapshotDir);
-
-        foreach (var (name, json) in bundles)
-        {
-            await File.WriteAllTextAsync(Path.Combine(snapshotDir, $"{name}.json"), json);
-        }
-
-        await File.WriteAllTextAsync(Path.Combine(snapshotDir, "metadata.txt"),
-            $"Seed={state.Options.Seed}{Environment.NewLine}Patients={string.Join(",", patientIds)}{Environment.NewLine}GeneratedAt={DateTimeOffset.UtcNow:O}");
-
-        return snapshotDir;
     }
 
     private void WriteLog(MutableRunState state, string message)
@@ -605,9 +622,9 @@ public class AutomationRunManager : IAutomationRunManager
             return new AutomationRunSummary
             {
                 RunId = state.RunId,
-                RunName = GetRunName(state.Scenario, state.Options.SelectedMeasure),
+                RunName = GetRunName(state.Scenario, state.Options.SelectedMeasures),
                 Scenario = state.Scenario,
-                SelectedMeasure = ProfiledMeasureCatalog.GetDisplayName(state.Options.SelectedMeasure),
+                SelectedMeasure = string.Join(", ", state.Options.SelectedMeasures.Select(ProfiledMeasureCatalog.GetDisplayName)),
                 PatientCount = state.Options.PatientProfiles is { Count: > 0 }
                     ? state.Options.PatientProfiles.Count
                     : state.Options.PatientCount,
@@ -625,12 +642,15 @@ public class AutomationRunManager : IAutomationRunManager
         }
     }
 
-    private static string GetRunName(AutomationScenarioKind scenario, ProfiledMeasureType selectedMeasure)
+    private static string GetRunName(AutomationScenarioKind scenario, List<ProfiledMeasureType> selectedMeasures)
     {
         if (scenario != AutomationScenarioKind.Custom)
             return scenario.ToString();
 
-        return selectedMeasure switch
+        if (selectedMeasures.Count > 1)
+            return "Custom-MultiMeasure";
+
+        return selectedMeasures.FirstOrDefault() switch
         {
             ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation => "Custom-HYPO",
             ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation => "Custom-Daily-ACH",
@@ -676,6 +696,6 @@ public class AutomationRunManager : IAutomationRunManager
         int LokiScrapeWindowMinutes,
         bool RemoveFacilityConfig,
         bool CleanupTestData,
-        ProfiledMeasureType SelectedMeasure,
+        List<ProfiledMeasureType> SelectedMeasures,
         List<PatientProfile> PatientProfiles);
 }

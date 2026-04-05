@@ -1,4 +1,4 @@
-﻿namespace LantanaGroup.Link.Automation.Configuration;
+namespace LantanaGroup.Link.Automation.Link.Configuration;
 
 /// <summary>
 /// Configuration for a specific test scenario (smoke test, mega-patient test, etc.).
@@ -7,6 +7,24 @@
 public class TestScenarioConfig
 {
     public string MeasureBundleLocation { get; set; } = "";
+
+    /// <summary>
+    /// Additional measure bundle locations for multi-measure scenarios.
+    /// When populated, <see cref="MeasureBundleLocation"/> is treated as the first entry
+    /// and these are loaded in addition to it.
+    /// </summary>
+    public List<string> AdditionalMeasureBundleLocations { get; set; } = [];
+
+    /// <summary>
+    /// Convenience accessor that returns all measure bundle locations.
+    /// Returns <see cref="MeasureBundleLocation"/> followed by
+    /// <see cref="AdditionalMeasureBundleLocations"/>.
+    /// </summary>
+    public List<string> AllMeasureBundleLocations =>
+        string.IsNullOrWhiteSpace(MeasureBundleLocation)
+            ? [.. AdditionalMeasureBundleLocations]
+            : [MeasureBundleLocation, .. AdditionalMeasureBundleLocations];
+
     public string StartDate { get; set; } = "2023-01-01T00:00:00Z";
     public string EndDate { get; set; } = "2023-12-31T23:59:59Z";
     public List<string> PatientIds { get; set; } = ["207727"];
@@ -19,7 +37,7 @@ public class TestScenarioConfig
 
     /// <summary>
     /// The maximum wall-clock time the polling loop will run,
-    /// computed from <see cref="MaxRetryCount"/> × <see cref="PollingIntervalSeconds"/>.
+    /// computed from <see cref="MaxRetryCount"/> � <see cref="PollingIntervalSeconds"/>.
     /// Non-positive <see cref="MaxRetryCount"/> indicates unlimited polling.
     /// </summary>
     public TimeSpan MaxPollingDuration => MaxRetryCount <= 0

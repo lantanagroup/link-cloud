@@ -1,18 +1,18 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Text;
 using Confluent.Kafka;
-using LantanaGroup.Link.Automation.Configuration;
+using LantanaGroup.Link.Automation.Link.Configuration;
 using Newtonsoft.Json.Linq;
 using RestSharp;
 
-namespace LantanaGroup.Link.Automation.Helpers;
+namespace LantanaGroup.Link.Automation.Link.Helpers;
 
 /// <summary>
 /// Monitors Kafka error and retry topics for dead-letter messages that indicate
 /// processing failures in the pipeline. Uses a background consumer loop identical
 /// to the service listeners (e.g., ReportScheduledListener).
 ///
-/// Topics are discovered directly from the broker — any topic ending in -Error or
+/// Topics are discovered directly from the broker � any topic ending in -Error or
 /// -Retry is automatically monitored.
 /// </summary>
 public class KafkaErrorMonitor : IAsyncDisposable

@@ -1,9 +1,9 @@
 ﻿using System.Net;
-using LantanaGroup.Link.Automation.Configuration;
+using LantanaGroup.Link.Automation.Link.Configuration;
 using Newtonsoft.Json.Linq;
 using RestSharp;
 
-namespace LantanaGroup.Link.Automation.Helpers;
+namespace LantanaGroup.Link.Automation.Link.Helpers;
 
 public class LokiScraper
 {
@@ -47,7 +47,12 @@ public class LokiScraper
 
     public async Task ScrapeErrorsAsync(string? facilityId = null, string? reportId = null)
     {
-        var correlationFilter = BuildCorrelationFilter(facilityId, reportId);
+        // Only filter by facilityId if provided. Requiring both facilityId AND
+        // reportId as literal substrings in the log line was too restrictive —
+        // most error/exception log lines do not contain the report GUID.
+        var correlationFilter = !string.IsNullOrWhiteSpace(facilityId)
+            ? $" |= \"{facilityId}\""
+            : "";
         await ScrapeQueryAsync(
             $"{{app=\"link-cloud\"}} |~ \"(?i)(error|exception)\" !~ \"(?i)({HarmlessPatterns})\"{correlationFilter}",
             "LOKI ERROR");
@@ -73,7 +78,9 @@ public class LokiScraper
         {
             try
             {
-                var correlationFilter = BuildCorrelationFilter(facilityId, reportId);
+                var correlationFilter = !string.IsNullOrWhiteSpace(facilityId)
+                    ? $" |= \"{facilityId}\""
+                    : "";
                 var query = $"{{app=\"link-cloud\", component=\"{component}\"}} |~ \"(?i)(error|exception|fail|timeout|disconnect)\" !~ \"(?i)({HarmlessPatterns})\"{correlationFilter}";
                 var request = new RestRequest("/loki/api/v1/query_range");
                 request.AddParameter("query", query);
@@ -104,8 +111,7 @@ public class LokiScraper
                                 var logLine = value[1]?.ToString();
                                 if (logLine != null)
                                 {
-                                    if (logLine.Length > 200) logLine = logLine[..200] + "...";
-                                    lines.Add(logLine);
+                                    lines.Add(FormatLogLine(logLine, 0));
                                 }
                             }
                         }
@@ -121,7 +127,17 @@ public class LokiScraper
                     _output.WriteLine($"[DIAG]   {component}: {lines.Count} issue(s)");
                     foreach (var line in lines)
                     {
-                        _output.WriteLine($"[DIAG]     -> {line}");
+                        // Split summary from detail for clean log output.
+                        var dIdx = line.IndexOf("|||", StringComparison.Ordinal);
+                        var summaryPart = dIdx >= 0 ? line[..dIdx].TrimEnd() : line;
+
+                        _output.WriteLine($"[LOKI ERROR][{component}] {summaryPart}");
+
+                        if (dIdx >= 0)
+                        {
+                            var detailPart = line[(dIdx + 3)..].TrimStart();
+                            _output.WriteLine($"[LOKI ERROR DETAIL][{component}] {detailPart}");
+                        }
                     }
                 }
             }
@@ -199,7 +215,9 @@ public class LokiScraper
 
     private async Task ScrapeQueryAsync(string query, string logPrefix, int? limit = null, int truncateLength = 0)
     {
-        var start = _lastQueryTime;
+        // Use a small overlap to compensate for Loki ingestion lag.
+        var overlapBuffer = TimeSpan.FromSeconds(5);
+        var start = _lastQueryTime - overlapBuffer;
         var end = DateTime.UtcNow;
         _lastQueryTime = end;
 
@@ -237,13 +255,27 @@ public class LokiScraper
                             var logLine = value[1]?.ToString();
                             if (logLine == null) continue;
 
-                            var summary = FormatLogLine(logLine, truncateLength);
-                            var dedupeKey = $"{component}|{summary}";
+                            var formatted = FormatLogLine(logLine, truncateLength);
+
+                            // Dedupe on the summary portion only (before |||)
+                            var delimIdx = formatted.IndexOf("|||", StringComparison.Ordinal);
+                            var summaryForDedupe = delimIdx >= 0 ? formatted[..delimIdx] : formatted;
+                            var dedupeKey = $"{component}|{summaryForDedupe}";
 
                             if (!seen.Add(dedupeKey))
                                 continue;
 
-                            _output.WriteLine($"[{logPrefix}][{component}] {summary}");
+                            // Write only the summary to the visible log output.
+                            var summaryForLog = delimIdx >= 0 ? formatted[..delimIdx].TrimEnd() : formatted;
+                            _output.WriteLine($"[{logPrefix}][{component}] {summaryForLog}");
+
+                            // If full detail exists, write a hidden detail line that
+                            // PipelineSummarySnapshotBuilder can parse for the modal.
+                            if (delimIdx >= 0)
+                            {
+                                var detail = formatted[(delimIdx + 3)..].TrimStart();
+                                _output.WriteLine($"[{logPrefix} DETAIL][{component}] {detail}");
+                            }
                         }
                     }
                 }
@@ -260,8 +292,11 @@ public class LokiScraper
     }
 
     /// <summary>
-    /// Attempts to parse a structured JSON log line and extract a concise summary.
-    /// Falls back to truncating the raw line if it's not JSON.
+    /// Attempts to parse a structured JSON log line and extract both a concise
+    /// summary and the full detail (including stack traces). The two parts are
+    /// separated by <c>|||</c> so downstream consumers can display the summary
+    /// as a header and the detail on expand.
+    /// Falls back to the raw line if it's not JSON.
     /// </summary>
     private static string FormatLogLine(string logLine, int truncateLength)
     {
@@ -276,20 +311,48 @@ public class LokiScraper
                 var message = obj["Message"]?.ToString() ?? obj["message"]?.ToString() ?? "";
 
                 // Extract exception info if present
-                var exType = obj["Exception"]?["Type"]?.ToString();
+                var exType = obj["Exception"]?["Type"]?.ToString()
+                    ?? obj["ExceptionDetail"]?["Type"]?.ToString();
                 var exMessage = obj["Exception"]?["Message"]?.ToString()
                     ?? obj["ExceptionDetail"]?["Message"]?.ToString();
+                var exStackTrace = obj["Exception"]?["StackTrace"]?.ToString()
+                    ?? obj["ExceptionDetail"]?["StackTrace"]?.ToString()
+                    ?? obj["Exception"]?["StackTraceString"]?.ToString();
+                var innerException = obj["Exception"]?["InnerException"]?.ToString()
+                    ?? obj["ExceptionDetail"]?["InnerException"]?.ToString();
 
-                var parts = new List<string>();
+                // Build short summary for log display and dedupe
+                var summaryParts = new List<string>();
                 if (!string.IsNullOrEmpty(level))
-                    parts.Add(level.ToUpper());
+                    summaryParts.Add(level.ToUpper());
                 if (!string.IsNullOrEmpty(message))
-                    parts.Add(message.Length > 120 ? message[..120] + "..." : message);
+                    summaryParts.Add(message.Length > 200 ? message[..200] + "..." : message);
                 if (!string.IsNullOrEmpty(exType))
-                    parts.Add($"{exType}: {(exMessage?.Length > 100 ? exMessage[..100] + "..." : exMessage)}");
+                    summaryParts.Add($"{exType}: {(exMessage?.Length > 150 ? exMessage[..150] + "..." : exMessage)}");
 
-                if (parts.Count > 0)
-                    return string.Join(" | ", parts);
+                var summary = summaryParts.Count > 0 ? string.Join(" | ", summaryParts) : "";
+
+                // Build full detail for expand view
+                var detailParts = new List<string>();
+                if (!string.IsNullOrEmpty(message))
+                    detailParts.Add($"Message: {message}");
+                if (!string.IsNullOrEmpty(exType))
+                    detailParts.Add($"Exception: {exType}");
+                if (!string.IsNullOrEmpty(exMessage))
+                    detailParts.Add($"Detail: {exMessage}");
+                if (!string.IsNullOrEmpty(exStackTrace))
+                    detailParts.Add($"Stack Trace:\n{exStackTrace}");
+                if (!string.IsNullOrEmpty(innerException))
+                    detailParts.Add($"Inner Exception:\n{innerException}");
+
+                var detail = detailParts.Count > 0 ? string.Join("\n\n", detailParts) : "";
+
+                if (!string.IsNullOrEmpty(summary))
+                {
+                    return string.IsNullOrEmpty(detail) || detail == summary
+                        ? summary
+                        : $"{summary}|||{detail}";
+                }
             }
             catch
             {
@@ -298,7 +361,7 @@ public class LokiScraper
         }
 
         // Non-JSON or parse failure: truncate raw line
-        var maxLen = truncateLength > 0 ? truncateLength : 200;
+        var maxLen = truncateLength > 0 ? truncateLength : 500;
         return logLine.Length > maxLen ? logLine[..maxLen] + "..." : logLine;
     }
 
@@ -405,7 +468,9 @@ public class LokiScraper
         var startUnix = ((DateTimeOffset)start).ToUnixTimeMilliseconds() * 1000000;
         var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
 
-        var correlationFilter = BuildCorrelationFilter(facilityId, reportId);
+        var correlationFilter = !string.IsNullOrWhiteSpace(facilityId)
+            ? $" |= \"{facilityId}\""
+            : "";
         var query = $"{{app=\"link-cloud\", component=\"{componentName}\"}} |~ \"(?i)(exception|fatal|unhandled|stack\\s*trace|critical)\" !~ \"(?i)({HarmlessPatterns}|Unknown message ID)\"{correlationFilter}";
 
         var request = new RestRequest("/loki/api/v1/query_range");
@@ -449,19 +514,6 @@ public class LokiScraper
         }
 
         return lines;
-    }
-
-    private static string BuildCorrelationFilter(string? facilityId, string? reportId)
-    {
-        var filters = new List<string>();
-
-        if (!string.IsNullOrWhiteSpace(facilityId))
-            filters.Add($" |= \"{facilityId}\"");
-
-        if (!string.IsNullOrWhiteSpace(reportId))
-            filters.Add($" |= \"{reportId}\"");
-
-        return string.Concat(filters);
     }
 
     public async Task<string?> GetValidationActivitySummaryAsync(TimeSpan lookback)
@@ -528,6 +580,89 @@ public class LokiScraper
             }
 
             return $"processing validation activity ({logCount} log lines/{lookback.TotalSeconds:F0}s)";
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<string?> GetNormalizationActivitySummaryAsync(TimeSpan lookback)
+    {
+        var end = DateTime.UtcNow;
+        var start = end - lookback;
+        var startUnix = ((DateTimeOffset)start).ToUnixTimeMilliseconds() * 1000000;
+        var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
+
+        var query = $"{{app=\"link-cloud\", component=\"{Components.Normalization}\"}} |~ \"(?i)(ResourceNormalized|Producing|Normalization Operation|Acquisition Complete)\" !~ \"(?i)({HarmlessPatterns})\"";
+        var request = new RestRequest("/loki/api/v1/query_range");
+        request.AddParameter("query", query);
+        request.AddParameter("start", startUnix.ToString());
+        request.AddParameter("end", endUnix.ToString());
+        request.AddParameter("limit", "200");
+
+        try
+        {
+            var response = await _lokiClient.ExecuteAsync(request);
+            if (response.StatusCode != HttpStatusCode.OK || response.Content == null)
+                return null;
+
+            var jsonResponse = JObject.Parse(response.Content);
+            var results = jsonResponse["data"]?["result"] as JArray;
+            if (results == null)
+                return null;
+
+            var logCount = 0;
+            var resourceTypes = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var failedOps = 0;
+
+            foreach (var result in results)
+            {
+                var values = result["values"] as JArray;
+                if (values == null) continue;
+
+                foreach (var value in values)
+                {
+                    var logLine = value[1]?.ToString();
+                    if (string.IsNullOrWhiteSpace(logLine)) continue;
+                    logCount++;
+
+                    if (logLine.Contains("Normalization Operation Failed", StringComparison.OrdinalIgnoreCase))
+                        failedOps++;
+
+                    // Extract FHIR resource type from "FhirResourceType: Observation" or similar patterns
+                    var typeMarker = "FhirResourceType:";
+                    var typeIdx = logLine.IndexOf(typeMarker, StringComparison.OrdinalIgnoreCase);
+                    if (typeIdx >= 0)
+                    {
+                        var tail = logLine[(typeIdx + typeMarker.Length)..].TrimStart();
+                        var endIdx = tail.IndexOfAny([',', ' ', ';', '"', ')']);
+                        var resourceType = endIdx > 0 ? tail[..endIdx] : tail;
+                        if (!string.IsNullOrWhiteSpace(resourceType) && resourceType.Length <= 40)
+                        {
+                            resourceTypes.TryGetValue(resourceType, out var count);
+                            resourceTypes[resourceType] = count + 1;
+                        }
+                    }
+                }
+            }
+
+            if (logCount == 0)
+                return null;
+
+            var parts = new List<string>();
+            if (resourceTypes.Count > 0)
+            {
+                var top3 = resourceTypes.OrderByDescending(kv => kv.Value).Take(3).Select(kv => $"{kv.Key}={kv.Value}");
+                parts.Add(string.Join(", ", top3));
+            }
+
+            parts.Add($"{logCount} log lines/{lookback.TotalSeconds:F0}s");
+
+            if (failedOps > 0)
+                parts.Add($"{failedOps} failed ops");
+
+            return $"normalizing resources ({string.Join(", ", parts)})";
         }
         catch
         {

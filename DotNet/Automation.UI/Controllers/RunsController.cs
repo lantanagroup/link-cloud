@@ -1,10 +1,12 @@
 ﻿using Automation.UI.Models;
 using Automation.UI.Services;
 using LantanaGroup.Link.Sdk.Clients;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Automation.UI.Controllers;
 
+[Authorize]
 public class RunsController(IAutomationRunManager runManager, IDataAcquisitionServiceClient dataAcqClient) : Controller
 {
     [HttpGet]

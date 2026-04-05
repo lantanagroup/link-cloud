@@ -2,12 +2,12 @@
 using System.Text.Json;
 using System.Globalization;
 using Confluent.Kafka;
-using LantanaGroup.Link.Automation;
-using LantanaGroup.Link.Automation.Configuration;
-using LantanaGroup.Link.Automation.Generation;
-using LantanaGroup.Link.Automation.Helpers;
-using LantanaGroup.Link.Automation.Services;
-using LantanaGroup.Link.Automation.Validation;
+using LantanaGroup.Link.Automation.Link;
+using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Automation.Generation;
+using LantanaGroup.Link.Automation.Link.Helpers;
+using LantanaGroup.Link.Automation.Link.Services;
+using LantanaGroup.Link.Automation.Link.Validation;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -55,13 +55,6 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
 
         if (_config.PatientIds.Count == 0)
             _config.PatientIds = patientIds;
-
-        await GeneratedFhirDataSnapshotWriter.WriteIfChangedAsync(
-            Output,
-            nameof(RegenerateReportTest),
-            GenerationSeed,
-            _config.PatientIds,
-            bundles);
 
         await FhirDataLoader.WaitForServerAsync(Output);
         await FhirDataLoader.LoadTransactionBundlesFromJsonAsync(Output, bundles);
@@ -125,9 +118,9 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
             _facilityId);
 
         // Step 2: Create source report via the scheduled-report production path.
-        //   a) Produce ReportScheduled → creates the report schedule.
+        //   a) Produce ReportScheduled ? creates the report schedule.
         //   b) Wait for the schedule to exist so PatientEventListener can find it.
-        //   c) Produce PatientEvent (Admit) → PatientEventListener adds entries → DataAcq → full pipeline.
+        //   c) Produce PatientEvent (Admit) ? PatientEventListener adds entries ? DataAcq ? full pipeline.
         var sourceReportId = await ProduceReportScheduledEventAsync(_facilityId, measureId, TimeSpan.FromMinutes(1));
         await WaitForScheduleCreationAsync(sourceReportId);
         await ProduceAdmitPatientEventAsync(_facilityId, _config.PatientIds[0]);
@@ -199,7 +192,7 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
             actualEndDate,
             _facilityId,
             regeneratedReportId,
-            GeneratedFhirDataSnapshotWriter.GetSnapshotDirectory(nameof(RegenerateReportTest)),
+            _generatedBundles,
             expectDataAcquisitionData: false);
 
         await ValidationBaselineManager.ValidateOrCreateAsync(
