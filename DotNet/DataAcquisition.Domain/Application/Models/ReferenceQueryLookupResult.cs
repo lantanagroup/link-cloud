@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 

@@ -1,15 +1,9 @@
 ﻿using System.Diagnostics;
-using Polly;
-using Polly.Retry;
-using Microsoft.Data.SqlClient;
-using LantanaGroup.Link.Shared.Application.Models.Telemetry;
-using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -20,14 +14,10 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
-using Microsoft.Data.SqlClient;
-using System.Diagnostics;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Polly;
-using Polly.Retry;
 using System.Diagnostics;
-using Polly.Retry;
-using System.Diagnostics;
+using DataAcquisition.Domain.Application.Models;
 using IDatabase = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
@@ -93,11 +83,10 @@ public interface IDataAcquisitionLogQueries
         GetFacilitiesWithPendingAndRetryableFailedRequests(CancellationToken cancellationToken = default);
 
     Task<List<DataAcquisitionLogModel>> GetNextEligibleBatchForFacility(string facilityId, long? lastId, int batchSize,
-    /// <summary>
-    /// Returns a lightweight aggregate summary for a report: totals, status counts
-    /// and resource-type counts. Runs entirely as DB aggregates � no entity loading.
-    /// </summary>
-    Task<DataAcquisitionReportSummary> GetReportSummaryAsync(string reportId,
+        List<RequestStatus> statuses, DateTime? designagtedExecutionTime = null,
+        CancellationToken cancellationToken = default);
+
+    Task<List<string>> GetResourceIdsForReportPatient(string correlationId, string facilityId, string resourceType,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -106,15 +95,6 @@ public interface IDataAcquisitionLogQueries
     /// processing to avoid loading the full entity graph.
     /// </summary>
     Task<ReferenceQueryLookupResult?> FindReferenceQueryAsync(
-        string facilityId, string reportTrackingId, string correlationId,
-        string resourceType, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Returns a lightweight aggregate summary for a report: totals, status counts
-    /// and resource-type counts. Runs entirely as DB aggregates � no entity loading.
-    /// </summary>
-    Task<DataAcquisitionReportSummary> GetReportSummaryAsync(string reportId,
-        CancellationToken cancellationToken = default);
         string facilityId, string reportTrackingId, string correlationId,
         string resourceType, CancellationToken cancellationToken = default);
 }
@@ -481,76 +461,15 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         IsDeleted = log.IsDeleted,
                         ReportTrackingId = log.ReportTrackingId
                     };
+                }).ToList();
+            }
 
-
-
-            var batchIds = await _dbContext.DataAcquisitionLogs
-                .Where(l => l.Status == RequestStatus.Queued && l.ModifyDate <= stallThreshold)
-                .OrderBy(l => l.Id)
-                .Select(l => l.Id)
-                .Take(BatchSize)
-                .ToListAsync(cancellationToken);
-
-            if (batchIds.Count == 0)
-                break;
-
-            totalUpdated += await _deadlockRetryPolicy.ExecuteAsync(async () =>
-            {
-                return await _dbContext.DataAcquisitionLogs
-                    .Where(l => batchIds.Contains(l.Id))
-                    .ExecuteUpdateAsync(setters => setters
-                        .SetProperty(l => l.Status, RequestStatus.Failed)
-                        .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
-                        cancellationToken);
-            });
-
-            batchesProcessed++;
-            if (batchIds.Count < BatchSize)
-                break;
-        }
-
-        return totalUpdated;
-    }
-    
-    public async Task<int> ResetStalledProcessingLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default)
-    {
-        var stallThreshold = DateTime.UtcNow.AddMinutes(-stallMinutes);
-        int totalUpdated = 0;
-        int batchesProcessed = 0;
-        const int BatchSize = 100;
-
-        while (batchesProcessed < maxBatches)
+        return new QueryLogSummaryModelResponse
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var batchIds = await _dbContext.DataAcquisitionLogs
-                .Where(l => l.Status == RequestStatus.Processing && l.ModifyDate <= stallThreshold)
-                .OrderBy(l => l.Id)
-                .Select(l => l.Id)
-                .Take(BatchSize)
-                .ToListAsync(cancellationToken);
-
-            if (batchIds.Count == 0)
-                break;
-
-            totalUpdated += await _deadlockRetryPolicy.ExecuteAsync(async () =>
-            {
-                return await _dbContext.DataAcquisitionLogs
-                    .Where(l => batchIds.Contains(l.Id))
-                    .ExecuteUpdateAsync(setters => setters
-                            .SetProperty(l => l.Status, RequestStatus.Pending)
-                            .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
-                        cancellationToken);
-            });
-
-            batchesProcessed++;
-            if (batchIds.Count < BatchSize)
-                break;
-        }
-
-        return totalUpdated;
+            Records = records,
+            Metadata = new PaginationMetadata(request.PageSize, request.PageNumber, total)
+        };
     }
-
 
 
     public async Task<PagedConfigModel<DataAcquisitionLogModel>> SearchAsync(SearchDataAcquisitionLogRequest model,
