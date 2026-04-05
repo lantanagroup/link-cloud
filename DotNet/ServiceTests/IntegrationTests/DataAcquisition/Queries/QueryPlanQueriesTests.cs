@@ -25,7 +25,6 @@ namespace IntegrationTests.DataAcquisition.Queries
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             await dbContext.Database.EnsureDeletedAsync();
             await dbContext.Database.EnsureCreatedAsync();
             dbContext.QueryPlans.AddRange(plans);

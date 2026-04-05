@@ -24,7 +24,6 @@ namespace IntegrationTests.DataAcquisition.Queries
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             await dbContext.Database.EnsureDeletedAsync();
             await dbContext.Database.EnsureCreatedAsync();
             dbContext.ReferenceResources.AddRange(resources);
@@ -258,7 +257,6 @@ namespace IntegrationTests.DataAcquisition.Queries
             // Arrange
             using var scopeSeed = _fixture.ServiceProvider.CreateScope();
             var dbContext = scopeSeed.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             await dbContext.Database.EnsureDeletedAsync();
             await dbContext.Database.EnsureCreatedAsync();
 
