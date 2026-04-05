@@ -284,60 +284,106 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
         try
         {
-            // Only consider logs that are themselves in a terminal state AND
-            // haven't had their tail sent. This avoids scanning the (much larger)
-            // set of in-progress logs that can never form a complete group yet.
-            var baseQuery = _dbContext.DataAcquisitionLogs.AsNoTracking()
+            // Two-phase approach to avoid a full-table GROUP BY:
+            //
+            // Phase 1: Find (FacilityId, CorrelationId, QueryPhase) groups that have
+            //          at least one completed, non-TailSent log. These are the only
+            //          groups that COULD be ready for tailing.
+            //
+            // Phase 2: For each candidate group, verify that it has zero
+            //          non-terminal logs (i.e. all logs are finished).
+
+            // Phase 1 — narrow candidate groups via terminal-status logs only.
+            var candidateGroups = await _dbContext.DataAcquisitionLogs.AsNoTracking()
                 .Where(log =>
                     !log.TailSent &&
                     log.Status != null && completedOrFailedStatuses.Contains(log.Status.Value) &&
                     log.ReportTrackingId != null &&
                     log.CorrelationId != null &&
                     log.ReportStartDate != null &&
-                    log.ReportEndDate != null);
-
-            var query = baseQuery
+                    log.ReportEndDate != null)
                 .GroupBy(log => new
                 {
                     log.FacilityId,
                     log.ReportTrackingId,
                     log.CorrelationId,
-                    log.ReportStartDate,
-                    log.ReportEndDate,
                     log.QueryPhase,
                 })
-                .Select(g => new
+                .Select(g => g.Key)
+                .Take(100)
+                .ToListAsync(cancellationToken);
+
+            if (candidateGroups.Count == 0)
+                return [];
+
+            // Phase 2 — for each candidate, check if ANY non-terminal log exists.
+            var results = new List<TailingMessageModel>();
+
+            foreach (var group in candidateGroups)
+            {
+                // Check for incomplete logs in this correlation group
+                var hasIncomplete = await _dbContext.DataAcquisitionLogs.AsNoTracking()
+                    .AnyAsync(log =>
+                        !log.TailSent &&
+                        log.FacilityId == group.FacilityId &&
+                        log.CorrelationId == group.CorrelationId &&
+                        log.ReportTrackingId == group.ReportTrackingId &&
+                        log.QueryPhase == group.QueryPhase &&
+                        (log.Status == null || !completedOrFailedStatuses.Contains(log.Status.Value)),
+                    cancellationToken);
+
+                if (hasIncomplete)
+                    continue;
+
+                // All logs are terminal — collect data for the tail message
+                var groupLogs = await _dbContext.DataAcquisitionLogs.AsNoTracking()
+                    .Where(log =>
+                        !log.TailSent &&
+                        log.FacilityId == group.FacilityId &&
+                        log.CorrelationId == group.CorrelationId &&
+                        log.ReportTrackingId == group.ReportTrackingId &&
+                        log.QueryPhase == group.QueryPhase)
+                    .Select(log => new
+                    {
+                        log.Id,
+                        log.TraceId,
+                        log.PatientId,
+                        log.ReportableEvent,
+                        log.ScheduledReport,
+                        log.ReportStartDate,
+                        log.ReportEndDate
+                    })
+                    .ToListAsync(cancellationToken);
+
+                if (groupLogs.Count == 0)
+                    continue;
+
+                var first = groupLogs.First();
+
+                results.Add(new TailingMessageModel
                 {
-                    g.Key,
-                    TotalCount = g.Count(),
-                    LogIds = g.Select(x => x.Id).ToList(),
-                    TraceParentId = g.Where(x => x.TraceId != null).OrderBy(x => x.Id).Select(x => x.TraceId).FirstOrDefault(),
-                    PatientId = g.Select(x => x.PatientId).FirstOrDefault(),
-                    ReportableEvent = g.Select(x => x.ReportableEvent).FirstOrDefault(),
-                    ScheduledReport = g.Select(x => x.ScheduledReport).FirstOrDefault()
-                })
-                .Select(x => new TailingMessageModel
-                {
-                    FacilityId = x.Key.FacilityId ?? string.Empty,
-                    CorrelationId = x.Key.CorrelationId ?? string.Empty,
-                    LogIds = x.LogIds,
-                    TraceParentId = x.TraceParentId ?? string.Empty,
+                    FacilityId = group.FacilityId ?? string.Empty,
+                    CorrelationId = group.CorrelationId ?? string.Empty,
+                    LogIds = groupLogs.Select(x => x.Id).ToList(),
+                    TraceParentId = groupLogs.FirstOrDefault(x => x.TraceId != null)?.TraceId ?? string.Empty,
                     ResourceAcquired = new ResourceAcquired
                     {
-                        PatientId = x.PatientId ?? string.Empty,
-                        QueryType = x.Key.QueryPhase.ToString() ?? string.Empty,
-                        ReportableEvent = x.ReportableEvent ?? default,
+                        PatientId = first.PatientId ?? string.Empty,
+                        QueryType = group.QueryPhase.ToString() ?? string.Empty,
+                        ReportableEvent = first.ReportableEvent ?? default,
                         AcquisitionComplete = true,
                         ScheduledReports = new List<ScheduledReport>
                         {
-                            x.ScheduledReport
+                            first.ScheduledReport
                         }
                     }
-                })
-                // Cap to a reasonable batch to avoid holding the job cycle for too long
-                .Take(50);
+                });
 
-            return await query.ToListAsync(cancellationToken);
+                if (results.Count >= 50)
+                    break;
+            }
+
+            return results;
         }
         catch (OperationCanceledException)
         {
