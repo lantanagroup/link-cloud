@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.ResourceType;
 using Task = System.Threading.Tasks.Task;
+using Microsoft.EntityFrameworkCore;
 
 namespace IntegrationTests.DataAcquisition.Queries;
 

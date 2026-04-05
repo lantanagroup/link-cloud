@@ -95,7 +95,7 @@ public interface IDataAcquisitionLogQueries
     Task<List<DataAcquisitionLogModel>> GetNextEligibleBatchForFacility(string facilityId, long? lastId, int batchSize,
     /// <summary>
     /// Returns a lightweight aggregate summary for a report: totals, status counts
-    /// and resource-type counts. Runs entirely as DB aggregates — no entity loading.
+    /// and resource-type counts. Runs entirely as DB aggregates � no entity loading.
     /// </summary>
     Task<DataAcquisitionReportSummary> GetReportSummaryAsync(string reportId,
         CancellationToken cancellationToken = default);
@@ -111,7 +111,7 @@ public interface IDataAcquisitionLogQueries
 
     /// <summary>
     /// Returns a lightweight aggregate summary for a report: totals, status counts
-    /// and resource-type counts. Runs entirely as DB aggregates — no entity loading.
+    /// and resource-type counts. Runs entirely as DB aggregates � no entity loading.
     /// </summary>
     Task<DataAcquisitionReportSummary> GetReportSummaryAsync(string reportId,
         CancellationToken cancellationToken = default);
@@ -379,10 +379,10 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
         ArgumentNullException.ThrowIfNull(request);
 
-        // Build the filtered (unsorted) query once — reused by both count and page.
+        // Build the filtered (unsorted) query once � reused by both count and page.
         var baseQuery = BuildSearchQuery(request);
 
-        // Count doesn't need a sort — avoid the expensive ORDER BY for the count scan.
+        // Count doesn't need a sort � avoid the expensive ORDER BY for the count scan.
         var total = await baseQuery.CountAsync(cancellationToken);
 
         // Only fetch the page if there are results to show
@@ -733,7 +733,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             statistics.TotalResourcesAcquired = 0;
         }
 
-        // Fastest / slowest completion times — lightweight projection, not full entity
+        // Fastest / slowest completion times � lightweight projection, not full entity
         var fastest = await baseQuery
             .Where(l => l.CompletionTimeMilliseconds != null)
             .OrderBy(l => l.CompletionTimeMilliseconds)
@@ -768,7 +768,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 slowest.CompletionTimeMilliseconds!.Value);
         }
 
-        // Per-resource-type completion time aggregation — lightweight projection
+        // Per-resource-type completion time aggregation � lightweight projection
         var completionTimes = await baseQuery
             .Where(l => l.CompletionTimeMilliseconds != null)
             .Select(l => new

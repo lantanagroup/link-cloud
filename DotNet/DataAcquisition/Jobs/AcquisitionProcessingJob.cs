@@ -67,6 +67,11 @@ public class AcquisitionProcessingJob : IJob
                 _logger.LogInformation("Successfully failed {count} stalled queued logs.", failedCount);
             }
         }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Failing stalled queued logs operation was cancelled.");
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error occurred while failing stalled queued logs.");
@@ -112,6 +117,11 @@ public class AcquisitionProcessingJob : IJob
             {
                 await ProcessFacilityPendingLogs(facilityId, stopwatch, cancellationToken);
             });
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Processing pending logs operation was cancelled.");
+            throw;
         }
         catch (Exception ex)
         {
@@ -382,6 +392,11 @@ public class AcquisitionProcessingJob : IJob
                         message.CorrelationId,
                         message.ResourceAcquired.ScheduledReports.FirstOrDefault()?.ReportTrackingId?.ToString() ?? "",
                         cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger.LogInformation("Processing tailing message for facility {facilityId} was cancelled.", message.FacilityId?.SanitizeUntrustedString());
+                    throw;
                 }
                 catch (Exception ex)
                 {

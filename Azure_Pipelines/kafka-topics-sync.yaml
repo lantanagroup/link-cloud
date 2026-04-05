@@ -41,11 +41,11 @@ stages:
       - checkout: none
 
       - task: Bash@3
-        displayName: "Sync_Kafka_Topics_${{ parameters.environment }}"
+        displayName: "Sync Kafka Topics - ${{ parameters.environment }}"
         inputs:
           targetType: 'inline'
           script: |
-            set -e
+            set -euo pipefail
 
             REST_PROXY_URL="$(restUrl)"
             USERNAME="$(kafka-username)"
@@ -60,32 +60,38 @@ stages:
             echo "Using REST Proxy: $REST_PROXY_URL"
 
             echo "Fetching topics from GitHub..."
-            TOPICS_CONTENT=$(curl -s "$(TOPICS_URL)")
+            TOPICS_CONTENT=$(curl -s -f "$(TOPICS_URL)" || true)
 
+            # --- Validate topics file ---
             if [[ -z "$TOPICS_CONTENT" ]]; then
-              echo "ERROR: Failed to download topics file from GitHub."
+              echo "ERROR: Failed to fetch topics file from GitHub or file is empty. Aborting pipeline to prevent deletion."
               exit 1
             fi
 
-            # === Get Kafka Cluster ID ===
-            echo "Fetching Kafka cluster ID..."
-            CLUSTER_ID=$(curl -s -u "$USERNAME:$PASSWORD" "$REST_PROXY_URL/v3/clusters" | \
-              sed -n 's/.*"cluster_id":"\([^"]*\)".*/\1/p')
+            # Only keep lines with at least 3 colon-separated fields (topic:partitions:replicas)
+            DESIRED_TOPICS=$(echo "$TOPICS_CONTENT" | awk -F: '/^[^#]/ && NF>=3')
+
+            if [[ -z "$DESIRED_TOPICS" ]]; then
+              echo "ERROR: Topics file is invalid or contains no valid topics. Aborting pipeline to prevent deletion."
+              exit 1
+            fi
+
+            echo "Validated topics file. Processing topics..."
+
+            # --- Get Kafka Cluster ID ---
+            CLUSTER_ID=$(curl -s -u "$USERNAME:$PASSWORD" "$REST_PROXY_URL/v3/clusters" \
+              | sed -n 's/.*"cluster_id":"\([^"]*\)".*/\1/p')
 
             if [[ -z "$CLUSTER_ID" || "$CLUSTER_ID" == "null" ]]; then
-              echo "ERROR: Failed to retrieve cluster ID."
+              echo "ERROR: Failed to retrieve Kafka cluster ID."
               exit 1
             fi
 
             echo "Detected Kafka Cluster ID: $CLUSTER_ID"
             echo
 
-            # === Extract desired topics ===
-            DESIRED_TOPICS=$(echo "$TOPICS_CONTENT" | awk -F: '/^[^#]/ && NF>=3 {print $1 ":" $2 ":" $3}')
-
-            # === Create missing topics ===
-            echo "Processing topics..."
-            while IFS=: read -r TOPIC PARTITIONS REPLICAS || [[ -n "$TOPIC" ]]; do
+            # --- Create or update topics ---
+            while IFS=: read -r TOPIC PARTITIONS REPLICAS CONFIGS || [[ -n "$TOPIC" ]]; do
               [[ -z "$TOPIC" ]] && continue
               [[ "$TOPIC" =~ ^# ]] && continue
 
@@ -93,30 +99,73 @@ stages:
               STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
                 -u "$USERNAME:$PASSWORD" \
                 "$REST_PROXY_URL/v3/clusters/$CLUSTER_ID/topics/$TOPIC")
-              if [[ "$STATUS_CODE" == "200" ]]; then
-                echo "Topic '$TOPIC' already exists."
-              elif [[ "$STATUS_CODE" == "404" ]]; then
+
+              # Build configs JSON for creation
+              CONFIG_JSON=""
+              if [[ -n "${CONFIGS:-}" ]]; then
+                IFS=',' read -ra CFG <<< "$CONFIGS"
+                CONFIG_JSON='"configs":['
+                FIRST=true
+                for kv in "${CFG[@]}"; do
+                  KEY=$(echo "$kv" | cut -d= -f1)
+                  VAL=$(echo "$kv" | cut -d= -f2)
+                  if [ "$FIRST" = true ]; then
+                    FIRST=false
+                  else
+                    CONFIG_JSON+=","
+                  fi
+                  CONFIG_JSON+="{\"name\":\"$KEY\",\"value\":\"$VAL\"}"
+                done
+                CONFIG_JSON+=']'
+              fi
+
+              # --- Create topic if missing ---
+              if [[ "$STATUS_CODE" == "404" ]]; then
                 if ! [[ "$PARTITIONS" =~ ^[0-9]+$ && "$REPLICAS" =~ ^[0-9]+$ ]]; then
-                  echo "ERROR: Invalid partitions/replicas for topic '$TOPIC': '$PARTITIONS'/'$REPLICAS'"
+                  echo "ERROR: Invalid partitions/replicas for topic '$TOPIC'"
                   exit 1
                 fi
                 echo "Creating topic '$TOPIC'..."
-                CREATE_CODE=$(curl -s -o /dev/null -w "%{http_code}" -u "$USERNAME:$PASSWORD" \
+                CREATE_PAYLOAD="{\"topic_name\":\"$TOPIC\",\"partitions_count\":$PARTITIONS,\"replication_factor\":$REPLICAS"
+                [[ -n "$CONFIG_JSON" ]] && CREATE_PAYLOAD="$CREATE_PAYLOAD, $CONFIG_JSON"
+                CREATE_PAYLOAD="$CREATE_PAYLOAD}"
+                CREATE_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+                  -u "$USERNAME:$PASSWORD" \
                   -X POST "$REST_PROXY_URL/v3/clusters/$CLUSTER_ID/topics" \
                   -H "Content-Type: application/json" \
-                  -d "{\"topic_name\": \"$TOPIC\", \"partitions_count\": $PARTITIONS, \"replication_factor\": $REPLICAS}")
+                  -d "$CREATE_PAYLOAD")
                 if [[ "$CREATE_CODE" != "200" && "$CREATE_CODE" != "201" ]]; then
                   echo "ERROR: Failed to create topic '$TOPIC' (HTTP $CREATE_CODE)."
                   exit 1
                 fi
+              elif [[ "$STATUS_CODE" == "200" ]]; then
+                echo "Topic '$TOPIC' exists. Updating configs if any..."
               else
                 echo "ERROR: Unexpected status $STATUS_CODE checking topic '$TOPIC'."
                 exit 1
               fi
+
+              # --- Update configs for existing topics ---
+              if [[ -n "${CONFIGS:-}" ]]; then
+                IFS=',' read -ra CFG <<< "$CONFIGS"
+                for kv in "${CFG[@]}"; do
+                  KEY=$(echo "$kv" | cut -d= -f1)
+                  VAL=$(echo "$kv" | cut -d= -f2)
+                  echo "Setting $KEY=$VAL for topic '$TOPIC'..."
+                  UPDATE_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+                    -u "$USERNAME:$PASSWORD" \
+                    -X PUT "$REST_PROXY_URL/v3/clusters/$CLUSTER_ID/topics/$TOPIC/configs/$KEY" \
+                    -H "Content-Type: application/json" \
+                    -d "{\"value\":\"$VAL\"}")
+                  if [[ "$UPDATE_CODE" != "200" && "$UPDATE_CODE" != "204" ]]; then
+                    echo "WARNING: Failed to update $KEY for '$TOPIC' (HTTP $UPDATE_CODE)"
+                  fi
+                done
+              fi
               echo
             done <<< "$DESIRED_TOPICS"
 
-            # === Delete extra topics ===
+            # --- Delete extra topics ---
             echo "Checking for extra topics..."
             ALL_TOPICS=$(curl -s -u "$USERNAME:$PASSWORD" "$REST_PROXY_URL/v3/clusters/$CLUSTER_ID/topics" \
               | grep -oP '"topic_name":"\K[^"]+')
@@ -124,19 +173,17 @@ stages:
             DESIRED_TOPIC_NAMES=$(echo "$DESIRED_TOPICS" | awk -F: '{print $1}')
 
             for TOPIC in $ALL_TOPICS; do
-              # Skip Kafka internal/system topics
               if [[ "$TOPIC" == _* ]]; then
                 echo "Skipping internal topic '$TOPIC'."
                 continue
               fi
 
-              if ! echo "$DESIRED_TOPIC_NAMES" | grep -qxF "$TOPIC"; then
+              # Only delete if we have a validated topics file
+              if [[ -n "$DESIRED_TOPIC_NAMES" ]] && ! echo "$DESIRED_TOPIC_NAMES" | grep -qxF "$TOPIC"; then
                 echo "Deleting topic '$TOPIC'..."
-
                 DEL_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
                   -u "$USERNAME:$PASSWORD" \
                   -X DELETE "$REST_PROXY_URL/v3/clusters/$CLUSTER_ID/topics/$TOPIC")
-
                 if [[ "$DEL_CODE" != "200" && "$DEL_CODE" != "204" ]]; then
                   echo "WARNING: Failed to delete topic '$TOPIC' (HTTP $DEL_CODE)."
                 fi
