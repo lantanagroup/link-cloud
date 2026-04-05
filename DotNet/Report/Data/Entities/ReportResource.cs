@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace LantanaGroup.Link.Report.Data.Entities;
 
 [Index("FacilityId", "PatientId", Name = "IX_ReportResources_Facility_Patient")]
+[Index("FacilityId", "ReportScheduleId", Name = "IX_ReportResources_Facility_Schedule")]
 [Index("FacilityId", "ResourceType", "ResourceId", Name = "IX_ReportResources_Facility_Resource")]
 [Index("ResourceType", Name = "IX_ReportResources_ResourceType")]
 public partial class ReportResource

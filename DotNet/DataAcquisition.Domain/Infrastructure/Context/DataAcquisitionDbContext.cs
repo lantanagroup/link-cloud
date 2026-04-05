@@ -36,6 +36,7 @@ public class DataAcquisitionDbContext : DbContext
     public DbSet<DataAcquisitionLog> DataAcquisitionLogs { get; set; }
     public DbSet<SftpAcquisitionLog> SftpAcquisitionLogs { get; set; }
     public DbSet<SftpConfiguration> SftpConfigurations { get; set; }
+    public DbSet<PendingReferenceId> PendingReferenceIds { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -237,6 +238,15 @@ public class DataAcquisitionDbContext : DbContext
         modelBuilder.Entity<ResourceReferenceType>()
             .Property(b => b.QueryPhase)
             .HasConversion(new EnumToStringConverter<QueryPhase>());
+
+        //-------------------PendingReferenceId-------------------
+        modelBuilder.Entity<PendingReferenceId>(entity =>
+        {
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
+
+            entity.HasIndex(e => e.FhirQueryId)
+                .HasDatabaseName("IX_PendingReferenceIds_FhirQueryId");
+        });
 
         //-------------------SftpAcquisitionLog-------------------
         modelBuilder.Entity<SftpAcquisitionLog>(entity =>

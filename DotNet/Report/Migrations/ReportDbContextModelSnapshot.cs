@@ -720,6 +720,8 @@ namespace LantanaGroup.Link.Report.Migrations
 
                     b.HasIndex(new[] { "ReportingStatus", "SubmissionStatus" }, "IX_ReportEntries_Reporting_Submission");
 
+                    b.HasIndex(new[] { "ReportScheduleId", "PatientId" }, "IX_ReportEntries_Schedule_Patient");
+
                     b.HasIndex(new[] { "ReportScheduleId", "ReportingStatus" }, "IX_ReportEntries_Schedule_Status");
 
                     b.ToTable("ReportEntry");
@@ -814,6 +816,8 @@ namespace LantanaGroup.Link.Report.Migrations
                     b.HasIndex(new[] { "FacilityId", "PatientId" }, "IX_ReportResources_Facility_Patient");
 
                     b.HasIndex(new[] { "FacilityId", "ResourceType", "ResourceId" }, "IX_ReportResources_Facility_Resource");
+
+                    b.HasIndex(new[] { "FacilityId", "ReportScheduleId" }, "IX_ReportResources_Facility_Schedule");
 
                     b.HasIndex(new[] { "ResourceType" }, "IX_ReportResources_ResourceType");
 

@@ -1,9 +1,10 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Polly;
 using Polly.Retry;
 using Microsoft.Data.SqlClient;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
@@ -17,9 +18,16 @@ using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
+using Polly;
+using Polly.Retry;
+using System.Diagnostics;
+using Polly.Retry;
+using System.Diagnostics;
 using IDatabase = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
@@ -37,6 +45,12 @@ public interface IDataAcquisitionLogQueries
     /// <exception cref="ArgumentNullException"></exception>
     /// <exception cref="KeyNotFoundException"></exception>
     Task<DataAcquisitionLogModel?> GetAsync(long id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Same as <see cref="GetAsync"/> but also includes the ReferenceResources collection.
+    /// Use only when reference resources are needed (e.g. API detail endpoints).
+    /// </summary>
+    Task<DataAcquisitionLogModel?> GetWithReferencesAsync(long id, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retrieves a list of TailingMessageModel objects that represent the tailing messages for data acquisition logs.
@@ -79,21 +93,30 @@ public interface IDataAcquisitionLogQueries
         GetFacilitiesWithPendingAndRetryableFailedRequests(CancellationToken cancellationToken = default);
 
     Task<List<DataAcquisitionLogModel>> GetNextEligibleBatchForFacility(string facilityId, long? lastId, int batchSize,
-        List<RequestStatus> statuses, DateTime? designagtedExecutionTime = null,
+    /// <summary>
+    /// Returns a lightweight aggregate summary for a report: totals, status counts
+    /// and resource-type counts. Runs entirely as DB aggregates — no entity loading.
+    /// </summary>
+    Task<DataAcquisitionReportSummary> GetReportSummaryAsync(string reportId,
         CancellationToken cancellationToken = default);
 
-    Task<List<string>> GetResourceIdsForReportPatient(string correlationId, string facilityId, string resourceType,
+    /// <summary>
+    /// Lightweight lookup that returns only the FhirQuery ID, facility, query type
+    /// and query parameters for a reference resource type. Used by reference
+    /// processing to avoid loading the full entity graph.
+    /// </summary>
+    Task<ReferenceQueryLookupResult?> FindReferenceQueryAsync(
+        string facilityId, string reportTrackingId, string correlationId,
+        string resourceType, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns a lightweight aggregate summary for a report: totals, status counts
+    /// and resource-type counts. Runs entirely as DB aggregates — no entity loading.
+    /// </summary>
+    Task<DataAcquisitionReportSummary> GetReportSummaryAsync(string reportId,
         CancellationToken cancellationToken = default);
-
-    Task<bool> TrySetLogToQueuedAsync(long logId, CancellationToken cancellationToken);
-
-    Task<bool> TrySetLogStatusAsync(long logId, List<RequestStatus> validCurrentStatuses, RequestStatus newStatus,
-        CancellationToken cancellationToken = default);
-
-    Task<int> FailStalledQueuedLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default);
-
-    Task<DataAcquisitionLogModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog,
-        CancellationToken cancellationToken = default);
+        string facilityId, string reportTrackingId, string correlationId,
+        string resourceType, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
@@ -101,7 +124,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     private readonly IDatabase _database;
     private readonly DataAcquisitionDbContext _dbContext;
     private readonly ILogger<DataAcquisitionLogQueries> _logger;
-    private readonly AsyncRetryPolicy _deadlockRetryPolicy;
 
     public DataAcquisitionLogQueries(IDatabase database, DataAcquisitionDbContext dbContext,
         ILogger<DataAcquisitionLogQueries> logger)
@@ -109,16 +131,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-
-        var random = new Random();
-        _deadlockRetryPolicy = Policy
-            .Handle<SqlException>(ex => ex.Number == 1205) // SQL Deadlock error number
-            .WaitAndRetryAsync(5, retryAttempt =>
-                TimeSpan.FromMilliseconds(Math.Pow(2, retryAttempt) * 100) + TimeSpan.FromMilliseconds(random.Next(0, 100)),
-                (exception, timeSpan, retryCount, context) =>
-                {
-                    _logger.LogWarning(exception, "Deadlock detected (retry {RetryCount}). Retrying in {SleepDuration}ms...", retryCount, timeSpan.TotalMilliseconds);
-                });
     }
 
     public async Task<List<string>> GetResourceIdsForReportPatient(string correlationId, string facilityId,
@@ -167,15 +179,94 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetAsync");
         activity?.SetTag(DiagnosticNames.ReportId, id);
 
-        var entity = await _dbContext.DataAcquisitionLogs
-            .Include(l => l.FhirQueries)
-            .ThenInclude(q => q.FhirQueryResourceTypes)
-            .Include(l => l.FhirQueries)
-            .ThenInclude(q => q.ResourceReferenceTypes)
-            .Include(l => l.ReferenceResources)
-            .SingleOrDefaultAsync(l => l.Id == id, cancellationToken);
+        return await ProjectLogById(id, includeReferenceResources: false)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
 
-        return entity == null ? null : DataAcquisitionLogModel.FromDomain(entity);
+    /// <summary>
+    /// Retrieves a data acquisition log by ID including its ReferenceResources
+    /// collection. Use this only when reference resources are actually needed
+    /// (e.g. API detail endpoints). For the worker hot path, use <see cref="GetAsync"/>.
+    /// </summary>
+    public async Task<DataAcquisitionLogModel?> GetWithReferencesAsync(long id, CancellationToken cancellationToken = default)
+    {
+        return await ProjectLogById(id, includeReferenceResources: true)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Builds a LINQ-to-SQL projection query for a single log by ID.
+    /// All columns are projected directly into <see cref="DataAcquisitionLogModel"/>
+    /// without materialising the entity first.
+    /// </summary>
+    private IQueryable<DataAcquisitionLogModel> ProjectLogById(long id, bool includeReferenceResources)
+    {
+        return _dbContext.DataAcquisitionLogs
+            .AsNoTracking()
+            .Where(l => l.Id == id)
+            .Select(l => new DataAcquisitionLogModel
+            {
+                Id = l.Id,
+                Priority = l.Priority,
+                FacilityId = l.FacilityId,
+                IsCensus = l.IsCensus,
+                PatientId = l.PatientId,
+                ReportableEvent = l.ReportableEvent,
+                ReportTrackingId = l.ReportTrackingId,
+                CorrelationId = l.CorrelationId,
+                FhirVersion = l.FhirVersion,
+                QueryType = l.QueryType,
+                QueryPhase = l.QueryPhase,
+                FhirQuery = l.FhirQueries.Select(q => new FhirQueryModel
+                {
+                    Id = q.Id,
+                    FacilityId = q.FacilityId,
+                    MeasureId = q.MeasureId,
+                    IsReference = q.IsReference,
+                    QueryType = q.QueryType,
+                    ResourceTypes = q.FhirQueryResourceTypes.Select(r => r.ResourceType).ToList(),
+                    QueryParameters = q.QueryParameters,
+                    IdQueryParameterValues = q.IdQueryParameterValues.ToList(),
+                    Paged = q.Paged,
+                    DataAcquisitionLogId = q.DataAcquisitionLogId,
+                    CensusListId = q.CensusListId,
+                    CensusPatientStatus = q.CensusPatientStatus,
+                    CensusTimeFrame = q.CensusTimeFrame,
+                    ResourceReferenceTypes = q.ResourceReferenceTypes.Select(rt => new ResourceReferenceTypeModel
+                    {
+                        Id = rt.Id,
+                        FacilityId = rt.FacilityId,
+                        QueryPhase = rt.QueryPhase,
+                        ResourceType = rt.ResourceType,
+                        FhirQueryId = rt.FhirQueryId,
+                        CreateDate = rt.CreateDate,
+                        ModifyDate = rt.ModifyDate,
+                    }).ToList()
+                }).ToList(),
+                Status = l.Status,
+                ExecutionDate = l.ExecutionDate,
+                CreateDate = l.CreateDate,
+                TraceId = l.TraceId,
+                RetryAttempts = l.RetryAttempts,
+                CompletionDate = l.CompletionDate,
+                CompletionTimeMilliseconds = l.CompletionTimeMilliseconds,
+                ResourceAcquiredIds = l.ResourceAcquiredIds,
+                ReferenceResources = includeReferenceResources
+                    ? l.ReferenceResources.Select(r => new ReferenceResourceModel
+                    {
+                        Id = r.Id,
+                        FacilityId = r.FacilityId,
+                        ResourceId = r.ResourceId,
+                        ResourceType = r.ResourceType,
+                        ReferenceResource = r.ReferenceResource,
+                        QueryPhase = r.QueryPhase,
+                        DataAcquisitionLogId = r.DataAcquisitionLogId
+                    }).ToList()
+                    : new List<ReferenceResourceModel>(),
+                Notes = l.Notes,
+                ScheduledReport = l.ScheduledReport,
+                IsDeleted = l.IsDeleted
+            });
     }
 
     public async Task<int> GetCountOfNonRefLogsIncompleteAsync(string facilityId, string reportTrackingId,
@@ -195,17 +286,14 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         if (string.IsNullOrWhiteSpace(correlationId))
             throw new ArgumentNullException(nameof(correlationId), "Correlation ID cannot be null or empty.");
 
-        return await _deadlockRetryPolicy.ExecuteAsync(async () =>
-        {
-            return await (from l in _dbContext.DataAcquisitionLogs.AsNoTracking()
-                          where l.FacilityId == facilityId
-                                && l.ReportTrackingId == reportTrackingId
-                                && l.CorrelationId == correlationId
-                                && !(l.Status == RequestStatus.Completed || l.Status == RequestStatus.MaxRetriesReached || l.Status == RequestStatus.Skipped)
-                                && !l.TailSent
-                                && l.FhirQueries.Any(fq => fq.IsReference == false)
-                          select l).CountAsync(cancellationToken);
-        });
+        return await (from l in _dbContext.DataAcquisitionLogs.AsNoTracking()
+                      where l.FacilityId == facilityId
+                            && l.ReportTrackingId == reportTrackingId
+                            && l.CorrelationId == correlationId
+                            && !(l.Status == RequestStatus.Completed || l.Status == RequestStatus.MaxRetriesReached || l.Status == RequestStatus.Skipped)
+                            && !l.TailSent
+                            && l.FhirQueries.Any(fq => fq.IsReference == false)
+                      select l).CountAsync(cancellationToken);
     }
 
     public async Task<IEnumerable<TailingMessageModel>> GetTailingMessages(
@@ -216,11 +304,13 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
         try
         {
-            // Optimization: Filter logs that definitely haven't had their tail sent yet
-            // and have the necessary identifiers for grouping.
+            // Only consider logs that are themselves in a terminal state AND
+            // haven't had their tail sent. This avoids scanning the (much larger)
+            // set of in-progress logs that can never form a complete group yet.
             var baseQuery = _dbContext.DataAcquisitionLogs.AsNoTracking()
                 .Where(log =>
                     !log.TailSent &&
+                    log.Status != null && completedOrFailedStatuses.Contains(log.Status.Value) &&
                     log.ReportTrackingId != null &&
                     log.CorrelationId != null &&
                     log.ReportStartDate != null &&
@@ -239,17 +329,13 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 .Select(g => new
                 {
                     g.Key,
-                    // Use Sum or Min/Max logic instead of g.All to avoid correlated subqueries
                     TotalCount = g.Count(),
-                    FinishedCount = g.Count(log => log.Status != null && completedOrFailedStatuses.Contains(log.Status.Value)),
                     LogIds = g.Select(x => x.Id).ToList(),
                     TraceParentId = g.Where(x => x.TraceId != null).OrderBy(x => x.Id).Select(x => x.TraceId).FirstOrDefault(),
                     PatientId = g.Select(x => x.PatientId).FirstOrDefault(),
                     ReportableEvent = g.Select(x => x.ReportableEvent).FirstOrDefault(),
                     ScheduledReport = g.Select(x => x.ScheduledReport).FirstOrDefault()
                 })
-                // Only groups where ALL logs are finished
-                .Where(x => x.TotalCount == x.FinishedCount)
                 .Select(x => new TailingMessageModel
                 {
                     FacilityId = x.Key.FacilityId ?? string.Empty,
@@ -267,19 +353,19 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                             x.ScheduledReport
                         }
                     }
-                });
+                })
+                // Cap to a reasonable batch to avoid holding the job cycle for too long
+                .Take(50);
 
             return await query.ToListAsync(cancellationToken);
         }
         catch (OperationCanceledException)
         {
-            // Log cancellation if needed
             _logger.LogWarning("GetTailingMessages operation was cancelled.");
             throw;
         }
         catch (Exception ex)
         {
-            // Log the error (replace with your logger if available)
             _logger.LogError(ex, "An error occurred while retrieving tailing messages.");
             throw new InvalidOperationException("An error occurred while retrieving tailing messages.", ex);
         }
@@ -293,148 +379,179 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
         ArgumentNullException.ThrowIfNull(request);
 
-        var query = BuildSearchQuery(request);
-        query = ApplySort(query, request.SortBy, request.SortOrder);
+        // Build the filtered (unsorted) query once — reused by both count and page.
+        var baseQuery = BuildSearchQuery(request);
 
-        var total = await query.CountAsync(cancellationToken);
-        var pageLogs = await query
-            .Skip((request.PageNumber - 1) * request.PageSize)
-            .Take(request.PageSize)
-            .Select(log => new
+        // Count doesn't need a sort — avoid the expensive ORDER BY for the count scan.
+        var total = await baseQuery.CountAsync(cancellationToken);
+
+        // Only fetch the page if there are results to show
+        if (total == 0 || (request.PageNumber - 1) * request.PageSize >= total)
+        {
+            return new QueryLogSummaryModelResponse
             {
-                log.Id,
-                log.Priority,
-                log.FacilityId,
-                log.PatientId,
-                log.ReportTrackingId,
-                log.FhirVersion,
-                log.QueryType,
-                log.QueryPhase,
-                log.ExecutionDate,
-                log.CreateDate,
-                log.RetryAttempts,
-                log.Status,
-                log.IsDeleted
-            })
-            .ToListAsync(cancellationToken);
-
-        List<QueryLogSummaryModel> records;
-
-        if (pageLogs.Count == 0)
-        {
-            records = new List<QueryLogSummaryModel>();
+                Records = new List<QueryLogSummaryModel>(),
+                Metadata = new PaginationMetadata(request.PageSize, request.PageNumber, total)
+            };
         }
-        else
-        {
-            var logIds = pageLogs.Select(log => log.Id).ToList();
-            var queryInfo = await _dbContext.FhirQueries
-                .AsNoTracking()
-                .Where(q => logIds.Contains(q.DataAcquisitionLogId))
-                .Select(q => new
+
+        var sortedQuery = ApplySort(baseQuery, request.SortBy, request.SortOrder);
+        var pageLogs = await sortedQuery
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .Select(log => new
                 {
-                    q.Id,
-                    q.DataAcquisitionLogId,
-                    q.QueryParameters,
-                    ResourceTypes = q.FhirQueryResourceTypes.Select(rt => rt.ResourceType).ToList()
+                    log.Id,
+                    log.Priority,
+                    log.FacilityId,
+                    log.PatientId,
+                    log.ReportTrackingId,
+                    log.FhirVersion,
+                    log.QueryType,
+                    log.QueryPhase,
+                    log.ExecutionDate,
+                    log.CreateDate,
+                    log.RetryAttempts,
+                    log.Status,
+                    log.IsDeleted
                 })
                 .ToListAsync(cancellationToken);
 
-            var firstQueryByLogId = queryInfo
-                .OrderBy(q => q.Id)
-                .GroupBy(q => q.DataAcquisitionLogId)
-                .ToDictionary(g => g.Key, g => g.First());
+            List<QueryLogSummaryModel> records;
 
-            records = pageLogs.Select(log =>
+            if (pageLogs.Count == 0)
             {
-                firstQueryByLogId.TryGetValue(log.Id, out var fhirQuery);
-                var resourceTypes = fhirQuery?.ResourceTypes?.Select(rt => rt.ToString()).ToList() ??
-                                    new List<string>();
-                string? resourceId;
+                records = new List<QueryLogSummaryModel>();
+            }
+            else
+            {
+                var logIds = pageLogs.Select(log => log.Id).ToList();
+                var queryInfo = await _dbContext.FhirQueries
+                    .AsNoTracking()
+                    .Where(q => logIds.Contains(q.DataAcquisitionLogId))
+                    .Select(q => new
+                    {
+                        q.Id,
+                        q.DataAcquisitionLogId,
+                        q.QueryParameters,
+                        ResourceTypes = q.FhirQueryResourceTypes.Select(rt => rt.ResourceType).ToList()
+                    })
+                    .ToListAsync(cancellationToken);
 
-                if (resourceTypes.Count > 0 && resourceTypes[0] == ResourceType.Patient.ToString())
-                {
-                    resourceId = log.PatientId;
-                }
-                else if (log.QueryType == FhirQueryType.Read)
-                {
-                    resourceId = fhirQuery?.QueryParameters?.FirstOrDefault();
-                }
-                else
-                {
-                    resourceId = string.Empty;
-                }
+                var firstQueryByLogId = queryInfo
+                    .OrderBy(q => q.Id)
+                    .GroupBy(q => q.DataAcquisitionLogId)
+                    .ToDictionary(g => g.Key, g => g.First());
 
-                return new QueryLogSummaryModel
+                records = pageLogs.Select(log =>
                 {
-                    Id = log.Id,
-                    Priority = log.Priority,
-                    FacilityId = log.FacilityId,
-                    PatientId = log.PatientId,
-                    ResourceTypes = resourceTypes,
-                    ResourceId = resourceId,
-                    FhirVersion = log.FhirVersion ?? string.Empty,
-                    QueryType = log.QueryType,
-                    QueryPhase = log.QueryPhase,
-                    ExecutionDate = log.ExecutionDate,
-                    CreateDate = log.CreateDate,
-                    RetryAttempts = log.RetryAttempts,
-                    Status = log.Status,
-                    IsDeleted = log.IsDeleted,
-                    ReportTrackingId = log.ReportTrackingId
-                };
-            }).ToList();
+                    firstQueryByLogId.TryGetValue(log.Id, out var fhirQuery);
+                    var resourceTypes = fhirQuery?.ResourceTypes?.Select(rt => rt.ToString()).ToList() ??
+                                        new List<string>();
+                    string? resourceId;
+
+                    if (resourceTypes.Count > 0 && resourceTypes[0] == ResourceType.Patient.ToString())
+                    {
+                        resourceId = log.PatientId;
+                    }
+                    else if (log.QueryType == FhirQueryType.Read)
+                    {
+                        resourceId = fhirQuery?.QueryParameters?.FirstOrDefault();
+                    }
+                    else
+                    {
+                        resourceId = string.Empty;
+                    }
+
+                    return new QueryLogSummaryModel
+                    {
+                        Id = log.Id,
+                        Priority = log.Priority,
+                        FacilityId = log.FacilityId,
+                        PatientId = log.PatientId,
+                        ResourceTypes = resourceTypes,
+                        ResourceId = resourceId,
+                        FhirVersion = log.FhirVersion ?? string.Empty,
+                        QueryType = log.QueryType,
+                        QueryPhase = log.QueryPhase,
+                        ExecutionDate = log.ExecutionDate,
+                        CreateDate = log.CreateDate,
+                        RetryAttempts = log.RetryAttempts,
+                        Status = log.Status,
+                        IsDeleted = log.IsDeleted,
+                        ReportTrackingId = log.ReportTrackingId
+                    };
+
+
+
+            var batchIds = await _dbContext.DataAcquisitionLogs
+                .Where(l => l.Status == RequestStatus.Queued && l.ModifyDate <= stallThreshold)
+                .OrderBy(l => l.Id)
+                .Select(l => l.Id)
+                .Take(BatchSize)
+                .ToListAsync(cancellationToken);
+
+            if (batchIds.Count == 0)
+                break;
+
+            totalUpdated += await _deadlockRetryPolicy.ExecuteAsync(async () =>
+            {
+                return await _dbContext.DataAcquisitionLogs
+                    .Where(l => batchIds.Contains(l.Id))
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(l => l.Status, RequestStatus.Failed)
+                        .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                        cancellationToken);
+            });
+
+            batchesProcessed++;
+            if (batchIds.Count < BatchSize)
+                break;
         }
 
-        return new QueryLogSummaryModelResponse
-        {
-            Records = records,
-            Metadata = new PaginationMetadata(request.PageSize, request.PageNumber, total)
-        };
+        return totalUpdated;
     }
-
-
-    public async Task<bool> TrySetLogStatusAsync(long logId, List<RequestStatus> validCurrentStatuses,
-        RequestStatus newStatus,
-        CancellationToken cancellationToken = default)
-    {
-        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.TrySetLogStatusAsync");
-        activity?.SetTag(DiagnosticNames.ReportId, logId);
-
-        return await _deadlockRetryPolicy.ExecuteAsync(async () =>
-        {
-            int rowsAffected = await _dbContext.DataAcquisitionLogs
-                .Where(l => l.Id == logId && l.Status != null && validCurrentStatuses.Contains(l.Status.Value))
-                .ExecuteUpdateAsync(setters => setters
-                        .SetProperty(l => l.Status, newStatus)
-                        .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
-                    cancellationToken);
-
-            return rowsAffected > 0;
-        });
-    }
-
-    public async Task<bool> TrySetLogToQueuedAsync(long logId, CancellationToken cancellationToken)
-    {
-        return await TrySetLogStatusAsync(logId, [RequestStatus.Ready, RequestStatus.Pending], RequestStatus.Queued,
-            cancellationToken);
-    }
-
-    public async Task<int> FailStalledQueuedLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default)
+    
+    public async Task<int> ResetStalledProcessingLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default)
     {
         var stallThreshold = DateTime.UtcNow.AddMinutes(-stallMinutes);
+        int totalUpdated = 0;
+        int batchesProcessed = 0;
+        const int BatchSize = 100;
 
-        // High-speed bulk update without fetching entities or using transactions.
-        // This avoids LINQ translation errors with JSON collections and minimizes lock duration.
-        return await _deadlockRetryPolicy.ExecuteAsync(async () =>
+        while (batchesProcessed < maxBatches)
         {
-            return await _dbContext.DataAcquisitionLogs
-                .Where(l => l.Status == RequestStatus.Queued && l.ModifyDate <= stallThreshold)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(l => l.Status, RequestStatus.Failed)
-                    .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
-                    cancellationToken);
-        });
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var batchIds = await _dbContext.DataAcquisitionLogs
+                .Where(l => l.Status == RequestStatus.Processing && l.ModifyDate <= stallThreshold)
+                .OrderBy(l => l.Id)
+                .Select(l => l.Id)
+                .Take(BatchSize)
+                .ToListAsync(cancellationToken);
+
+            if (batchIds.Count == 0)
+                break;
+
+            totalUpdated += await _deadlockRetryPolicy.ExecuteAsync(async () =>
+            {
+                return await _dbContext.DataAcquisitionLogs
+                    .Where(l => batchIds.Contains(l.Id))
+                    .ExecuteUpdateAsync(setters => setters
+                            .SetProperty(l => l.Status, RequestStatus.Pending)
+                            .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                        cancellationToken);
+            });
+
+            batchesProcessed++;
+            if (batchIds.Count < BatchSize)
+                break;
+        }
+
+        return totalUpdated;
     }
+
+
 
     public async Task<PagedConfigModel<DataAcquisitionLogModel>> SearchAsync(SearchDataAcquisitionLogRequest model,
         CancellationToken cancellationToken = default)
@@ -537,115 +654,135 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetDataAcquisitionLogStatisticsByReportAsync");
         activity?.SetTag(DiagnosticNames.ReportId, reportId);
 
-        var logs = (await SearchAsync(new SearchDataAcquisitionLogRequest
-        {
-            ReportTrackingId = reportId,
-            PageSize = int.MaxValue
-        })).Records;
+        var baseQuery = _dbContext.DataAcquisitionLogs.AsNoTracking()
+            .Where(l => l.ReportTrackingId == reportId && !l.IsDeleted);
+
+        // Scalar aggregates in a single DB pass
+        var totals = await baseQuery
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                TotalLogs = g.Count(),
+                TotalPatients = g.Select(l => l.PatientId).Where(p => p != null).Distinct().Count(),
+                TotalRetryAttempts = g.Sum(l => (int?)l.RetryAttempts ?? 0),
+                TotalCompletionTimeMs = g.Sum(l => (long?)l.CompletionTimeMilliseconds ?? 0L)
+            })
+            .FirstOrDefaultAsync(cancellationToken);
 
         var statistics = new DataAcquisitionLogStatistics
         {
-            TotalLogs = logs.Count,
-            TotalPatients = logs.DistinctBy(x => x.PatientId).Count(x => !string.IsNullOrEmpty(x.PatientId)),
-            TotalResourcesAcquired = logs.Sum(log => log.ResourceAcquiredIds?.Count ?? 0),
-            TotalRetryAttempts = logs.Sum(log => log.RetryAttempts ?? 0),
-            TotalCompletionTimeMilliseconds = logs.Sum(log => log.CompletionTimeMilliseconds ?? 0)
+            TotalLogs = totals?.TotalLogs ?? 0,
+            TotalPatients = totals?.TotalPatients ?? 0,
+            TotalRetryAttempts = totals?.TotalRetryAttempts ?? 0,
+            TotalCompletionTimeMilliseconds = totals?.TotalCompletionTimeMs ?? 0
         };
 
-        // Calculate fastest and slowest completion times
+        // Status counts via DB GroupBy
+        var statusCounts = await baseQuery
+            .Where(l => l.Status != null)
+            .GroupBy(l => l.Status!.Value)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
 
-        var fastestLog = logs.OrderBy(log => log.CompletionTimeMilliseconds).FirstOrDefault();
-        if (fastestLog is { CompletionTimeMilliseconds: not null })
+        foreach (var sc in statusCounts)
+            statistics.RequestStatusCounts[sc.Status] = sc.Count;
+
+        // QueryType counts via DB GroupBy
+        var queryTypeCounts = await baseQuery
+            .GroupBy(l => l.QueryType)
+            .Select(g => new { QueryType = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        foreach (var qt in queryTypeCounts)
+            statistics.QueryTypeCounts[(FhirQueryType)qt.QueryType] = qt.Count;
+
+        // QueryPhase counts via DB GroupBy
+        var queryPhaseCounts = await baseQuery
+            .Where(l => l.QueryPhase != null)
+            .GroupBy(l => l.QueryPhase!.Value)
+            .Select(g => new { Phase = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        foreach (var qp in queryPhaseCounts)
+            statistics.QueryPhaseCounts[qp.Phase] = qp.Count;
+
+        // Resource type counts + total from ResourceAcquiredIds JSON column
+        try
+        {
+            var rawIds = await baseQuery
+                .Where(l => l.Status == RequestStatus.Completed && l.ResourceAcquiredIds != null)
+                .SelectMany(l => l.ResourceAcquiredIds!)
+                .ToListAsync(cancellationToken);
+
+            foreach (var resource in rawIds)
+            {
+                if (string.IsNullOrWhiteSpace(resource)) continue;
+                var slashIdx = resource.IndexOf('/');
+                var resourceType = slashIdx > 0 ? resource[..slashIdx] : resource;
+                if (string.IsNullOrEmpty(resourceType)) continue;
+
+                statistics.ResourceTypeCounts.TryGetValue(resourceType, out var val);
+                statistics.ResourceTypeCounts[resourceType] = val + 1;
+            }
+
+            statistics.TotalResourcesAcquired = statistics.ResourceTypeCounts.Values.Sum();
+        }
+        catch
+        {
+            // Fallback if JSON column expansion is not supported
+            statistics.TotalResourcesAcquired = 0;
+        }
+
+        // Fastest / slowest completion times — lightweight projection, not full entity
+        var fastest = await baseQuery
+            .Where(l => l.CompletionTimeMilliseconds != null)
+            .OrderBy(l => l.CompletionTimeMilliseconds)
+            .Select(l => new
+            {
+                l.CompletionTimeMilliseconds,
+                ResourceTypes = l.FhirQueries.SelectMany(q => q.FhirQueryResourceTypes.Select(r => r.ResourceType)).ToList()
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (fastest != null)
         {
             statistics.FastestCompletionTimeMilliseconds = new ResourceCompletionTime(
-                string.Join(",", fastestLog.FhirQuery.SelectMany(x => x.ResourceTypes.Select(r => r.ToString()))),
-                fastestLog.CompletionTimeMilliseconds.Value);
+                string.Join(",", fastest.ResourceTypes),
+                fastest.CompletionTimeMilliseconds!.Value);
         }
 
-        var slowestLog = logs.OrderByDescending(log => log.CompletionTimeMilliseconds).FirstOrDefault();
-        if (slowestLog is { CompletionTimeMilliseconds: not null })
+        var slowest = await baseQuery
+            .Where(l => l.CompletionTimeMilliseconds != null)
+            .OrderByDescending(l => l.CompletionTimeMilliseconds)
+            .Select(l => new
+            {
+                l.CompletionTimeMilliseconds,
+                ResourceTypes = l.FhirQueries.SelectMany(q => q.FhirQueryResourceTypes.Select(r => r.ResourceType)).ToList()
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (slowest != null)
         {
             statistics.SlowestCompletionTimeMilliseconds = new ResourceCompletionTime(
-                string.Join(",", slowestLog.FhirQuery.SelectMany(x => x.ResourceTypes.Select(r => r.ToString()))),
-                slowestLog.CompletionTimeMilliseconds.Value);
+                string.Join(",", slowest.ResourceTypes),
+                slowest.CompletionTimeMilliseconds!.Value);
         }
 
+        // Per-resource-type completion time aggregation — lightweight projection
+        var completionTimes = await baseQuery
+            .Where(l => l.CompletionTimeMilliseconds != null)
+            .Select(l => new
+            {
+                l.CompletionTimeMilliseconds,
+                ResourceTypes = l.FhirQueries.SelectMany(q => q.FhirQueryResourceTypes.Select(r => r.ResourceType)).ToList()
+            })
+            .ToListAsync(cancellationToken);
 
-        // Populate counts
-        foreach (var log in logs)
+        foreach (var ct in completionTimes)
         {
-            // Process Query Type
-            var queryType = (FhirQueryType)log.QueryType;
-            if (!statistics.QueryTypeCounts.TryGetValue(queryType, out var value))
-            {
-                value = 0;
-                statistics.QueryTypeCounts[queryType] = value;
-            }
-
-            statistics.QueryTypeCounts[queryType] = ++value;
-
-            // Process Query Phase
-            if (!statistics.QueryPhaseCounts.TryGetValue(log.QueryPhase!.Value, out var qpValue))
-            {
-                qpValue = 0;
-                statistics.QueryPhaseCounts[log.QueryPhase.Value] = qpValue;
-            }
-
-            statistics.QueryPhaseCounts[log.QueryPhase.Value] = ++qpValue;
-
-            // Process Request Status
-            if (!statistics.RequestStatusCounts.TryGetValue(log.Status.Value, out var scValue))
-            {
-                scValue = 0;
-                statistics.RequestStatusCounts[log.Status.Value] = scValue;
-            }
-
-            statistics.RequestStatusCounts[log.Status.Value] = ++scValue;
-
-
-            // Process Resources Acquired
-
-            foreach (var resource in log.ResourceAcquiredIds ?? [])
-            {
-                if (string.IsNullOrEmpty(resource)) continue;
-
-                var resourceTypeParts = resource.Trim().Split("/");
-
-                if (resourceTypeParts.Length == 0) continue;
-
-                var resourceType = resourceTypeParts[0];
-
-                if (string.IsNullOrEmpty(resourceType))
-                {
-                    _logger.LogWarning("Invalid resource Id format: {Resource}", resource.Sanitize());
-                    continue;
-                }
-
-                // Increment resource type count
-                if (!statistics.ResourceTypeCounts.TryGetValue(resourceType, out var val))
-                {
-                    val = 0;
-                    statistics.ResourceTypeCounts[resourceType] = val;
-                }
-
-                statistics.ResourceTypeCounts[resourceType] = ++val;
-            }
-
-            // Add completion time for this resource types
-            if (!log.CompletionTimeMilliseconds.HasValue) continue;
-
-            var resourceTypes = log.FhirQuery.SelectMany(x => x.ResourceTypes.Select(r => r.ToString())).ToList();
-
-            var combinedResourceTypes = string.Join(",", resourceTypes);
-            if (!statistics.ResourceTypeCompletionTimeMilliseconds.TryGetValue(combinedResourceTypes,
-                    out var totalCompletionTime))
-            {
-                totalCompletionTime = 0;
-                statistics.ResourceTypeCompletionTimeMilliseconds[combinedResourceTypes] = totalCompletionTime;
-            }
-
-            statistics.ResourceTypeCompletionTimeMilliseconds[combinedResourceTypes] +=
-                log.CompletionTimeMilliseconds.Value;
+            var key = string.Join(",", ct.ResourceTypes);
+            statistics.ResourceTypeCompletionTimeMilliseconds.TryGetValue(key, out var existing);
+            statistics.ResourceTypeCompletionTimeMilliseconds[key] = existing + ct.CompletionTimeMilliseconds!.Value;
         }
 
         return statistics;
@@ -716,6 +853,31 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             .Select(l => l.FacilityId)
             .Distinct()
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<ReferenceQueryLookupResult?> FindReferenceQueryAsync(
+        string facilityId, string reportTrackingId, string correlationId,
+        string resourceType, CancellationToken cancellationToken = default)
+    {
+        var parsedResourceType = Enum.Parse<ResourceType>(resourceType, ignoreCase: true);
+
+        return await _dbContext.DataAcquisitionLogs
+            .AsNoTracking()
+            .Where(l => !l.IsDeleted
+                && l.FacilityId == facilityId
+                && l.ReportTrackingId == reportTrackingId
+                && l.CorrelationId == correlationId
+                && l.FhirQueries.Any(q => q.FhirQueryResourceTypes.Any(r => r.ResourceType == parsedResourceType)))
+            .SelectMany(l => l.FhirQueries
+                .Where(q => q.FhirQueryResourceTypes.Any(r => r.ResourceType == parsedResourceType))
+                .Select(q => new ReferenceQueryLookupResult
+                {
+                    FhirQueryId = q.Id,
+                    FacilityId = l.FacilityId,
+                    QueryType = q.QueryType,
+                    QueryParameters = q.QueryParameters
+                }))
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     private IQueryable<DataAcquisitionLog> BuildSearchQuery(SearchDataAcquisitionLogRequest model)
@@ -839,69 +1001,5 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         return await query
             .Take(batchSize)
             .ToListAsync(cancellationToken);
-    }
-
-    public Task<List<DataAcquisitionLogModel>> GetNextBatchForFacility(string facilityId, long? lastId, int batchSize,
-        CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException();
-    }
-
-    public async Task<DataAcquisitionLogModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog,
-        CancellationToken cancellationToken = default)
-    {
-        using var activity = Activity.Current?.Source.StartActivity();
-
-        if (updateLog.Id is null or 0)
-        {
-            activity?.SetStatus(ActivityStatusCode.Error, "Log ID cannot be zero or null");
-            throw new InvalidOperationException("Log ID cannot be zero or null");
-        }
-
-        return await _deadlockRetryPolicy.ExecuteAsync(async () =>
-        {
-            // 1. Fetch the existing entity
-            var existingLog = await _dbContext.DataAcquisitionLogs
-                .FirstOrDefaultAsync(l => l.Id == updateLog.Id, cancellationToken);
-
-            if (existingLog is null)
-            {
-                activity?.SetStatus(ActivityStatusCode.Error, "Data acquisition log not found");
-                throw new DataAcquisitionLogNotFoundException($"Data acquisition log with ID {updateLog.Id} not found.");
-            }
-
-            // 2. Apply updates
-            if (updateLog.RetryAttempts is not null)
-                existingLog.RetryAttempts = updateLog.RetryAttempts;
-
-            if (updateLog.ResourceAcquiredIds is not null && updateLog.ResourceAcquiredIds.Count > 0)
-                existingLog.ResourceAcquiredIds = updateLog.ResourceAcquiredIds;
-
-            if (updateLog.TraceId is not null)
-                existingLog.TraceId = updateLog.TraceId;
-
-            if (updateLog.ExecutionDate is not null)
-                existingLog.ExecutionDate = updateLog.ExecutionDate;
-
-            if (updateLog.CompletionDate is not null)
-                existingLog.CompletionDate = updateLog.CompletionDate;
-
-            if (updateLog.CompletionTimeMilliseconds is not null)
-                existingLog.CompletionTimeMilliseconds = updateLog.CompletionTimeMilliseconds;
-
-            if (updateLog.Notes is not null)
-                existingLog.Notes = updateLog.Notes;
-
-            if (updateLog.Status is not null)
-                existingLog.Status = updateLog.Status.Value;
-
-            existingLog.ModifyDate = DateTime.UtcNow;
-
-            // 3. Save changes
-            _dbContext.DataAcquisitionLogs.Update(existingLog);
-            await _dbContext.SaveChangesAsync(cancellationToken);
-
-            return await GetAsync(updateLog.Id.Value, cancellationToken);
-        });
     }
 }

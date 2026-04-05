@@ -26,7 +26,7 @@ public class AcquisitionProcessingJob : IJob
     private readonly IProducer<long, ReadyToAcquire> _readyToAcquireProducer;
     private readonly IProducer<ResourceKey, ResourceAcquired> _resourceAcquiredProducer;
     private readonly AcquisitionWorkerProcessorSettings _settings;
-    private const int BatchSize = 25;
+    private const int BatchSize = 100;
 
     public AcquisitionProcessingJob(
         ILogger<AcquisitionProcessingJob> logger,
@@ -44,10 +44,14 @@ public class AcquisitionProcessingJob : IJob
 
     public async Task Execute(IJobExecutionContext context)
     {
-        var stopwatch = Stopwatch.StartNew();
         await FailStalledQueuedLogs(context.CancellationToken);
+        await ResetStalledProcessingLogs(context.CancellationToken);
+
+        // Start the stopwatch AFTER housekeeping so the full time budget
+        // is available for the primary work of dispatching pending logs.
+        var stopwatch = Stopwatch.StartNew();
         await ProcessPendingLogs(stopwatch, context.CancellationToken);
-        await ProcessPendingTailingMessages(context.CancellationToken);
+        await ProcessPendingTailingMessages(stopwatch, context.CancellationToken);
     }
 
     private async Task FailStalledQueuedLogs(CancellationToken cancellationToken)
@@ -55,10 +59,9 @@ public class AcquisitionProcessingJob : IJob
         try
         {
             using var scope = _serviceScopeFactory.CreateScope();
-            var dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+            var dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
 
-            int failedCount = await dataAcquisitionLogQueries.FailStalledQueuedLogsAsync(15, _settings.MaxBatchesFailStalledPerRun, cancellationToken);
-
+            int failedCount = await dataAcquisitionLogManager.FailStalledQueuedLogsAsync(_settings.StalledQueuedThresholdMinutes, _settings.MaxBatchesFailStalledPerRun, cancellationToken);
             if (failedCount > 0)
             {
                 _logger.LogInformation("Successfully failed {count} stalled queued logs.", failedCount);
@@ -67,6 +70,31 @@ public class AcquisitionProcessingJob : IJob
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error occurred while failing stalled queued logs.");
+        }
+    }
+    
+    private async Task ResetStalledProcessingLogs(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var scope = _serviceScopeFactory.CreateScope();
+            var dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
+
+            int resetCount = await dataAcquisitionLogManager.ResetStalledProcessingLogsAsync(_settings.StalledProcessingThresholdMinutes, _settings.MaxBatchesFailStalledPerRun, cancellationToken);
+
+            if (resetCount > 0)
+            {
+                _logger.LogInformation("Successfully reset {count} stalled processing logs to Pending.", resetCount);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Resetting stalled processing logs operation was cancelled.");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while resetting stalled processing logs.");
         }
     }
 
@@ -264,8 +292,16 @@ public class AcquisitionProcessingJob : IJob
         return currentTime >= minAcquisitionPullTime || currentTime <= maxAcquisitionPullTime;
     }
 
-    public async Task ProcessPendingTailingMessages(CancellationToken cancellationToken)
+    public async Task ProcessPendingTailingMessages(Stopwatch stopwatch, CancellationToken cancellationToken)
     {
+        // Skip tailing entirely if the time budget is already exhausted —
+        // dispatching pending logs to workers is higher priority.
+        if (stopwatch.Elapsed.TotalSeconds >= _settings.TimeBudgetPerRunSeconds)
+        {
+            _logger.LogDebug("Skipping tailing messages — time budget exhausted after {elapsed:F1}s.", stopwatch.Elapsed.TotalSeconds);
+            return;
+        }
+
         using var scope = _serviceScopeFactory.CreateScope();
         var dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
         var dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();

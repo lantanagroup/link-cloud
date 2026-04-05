@@ -342,6 +342,9 @@ public class PatientDataService : IPatientDataService
         //1. get log
         var log = await _dataAcquisitionLogQueries.GetAsync(request.logId, cancellationToken);
 
+        // Read facility config once — reused by the happy path and all error handlers
+        FhirQueryConfigurationModel? fhirQueryConfiguration = null;
+
         try
         {
             //check if log is null
@@ -447,7 +450,7 @@ public class PatientDataService : IPatientDataService
                     log.Status = RequestStatus.Pending;
                     log.Notes.Add(
                         $"[{DateTime.UtcNow}] Deferring log with ID {log.Id} due to {nonReferenceLogsCnt} incomplete non-reference log(s).");
-                    await _dataAcquisitionLogQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
+                    await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                     {
                         Id = log.Id,
                         ResourceAcquiredIds = log.ResourceAcquiredIds,
@@ -470,34 +473,21 @@ public class PatientDataService : IPatientDataService
                     $"Log with ID {log.Id} is not in a queued state. Current status: {log.Status}");
             }
 
-            //2. atomically update to "Processing"
-            var successfullyUpdatedLog = await _dataAcquisitionLogQueries.TrySetLogStatusAsync(log.Id,
+            //2. atomically update to "Processing" — single DB write, no follow-up UpdateAsync needed
+            var successfullyUpdatedLog = await _dataAcquisitionLogManager.TrySetLogStatusAsync(log.Id,
                 new List<RequestStatus> { RequestStatus.Queued }, RequestStatus.Processing,
                 cancellationToken);
 
             if (successfullyUpdatedLog)
             {
-                //3. set to "Processing"
                 log.Status = RequestStatus.Processing;
-                await _dataAcquisitionLogQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
-                {
-                    Id = log.Id,
-                    ResourceAcquiredIds = log.ResourceAcquiredIds,
-                    RetryAttempts = log.RetryAttempts,
-                    CompletionDate = log.CompletionDate,
-                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
-                    TraceId = log.TraceId,
-                    ExecutionDate = log.ExecutionDate,
-                    Notes = log.Notes,
-                    Status = log.Status,
-                }, cancellationToken);
 
                 //3. start timer
                 Stopwatch stopwatch = new Stopwatch();
                 stopwatch.Start();
 
-                //4. get fhir query configuration
-                var fhirQueryConfiguration =
+                //4. get fhir query configuration (read once, reused by error handlers)
+                fhirQueryConfiguration =
                     await _fhirQueryQueries.GetByFacilityIdAsync(log.FacilityId, cancellationToken);
 
                 if (fhirQueryConfiguration == null)
@@ -512,6 +502,23 @@ public class PatientDataService : IPatientDataService
                 var resourceIds = new HashSet<string>();
 
                 bool skipFetch = false;
+
+                // If this is a reference log, collect all staged IDs from concurrent
+                // patient workers into the FhirQuery before executing.
+                var isReferenceLog = log.FhirQuery.Any(x => x.IsReference.HasValue && x.IsReference.Value);
+                if (isReferenceLog)
+                {
+                    foreach (var refQuery in log.FhirQuery.Where(q => q.IsReference == true && q.Id.HasValue))
+                    {
+                        await _dataAcquisitionLogManager.CollectPendingReferenceIdsAsync(
+                            refQuery.Id!.Value, cancellationToken);
+                    }
+
+                    // Re-fetch the log so the FhirQuery.QueryParameters reflect the merged IDs.
+                    log = await _dataAcquisitionLogQueries.GetAsync(log.Id, cancellationToken);
+                    if (log == null)
+                        throw new InvalidOperationException($"Reference log {request.logId} disappeared after collecting pending IDs.");
+                }
 
                 //4. call api
                 foreach (var fhirQuery in log.FhirQuery.ToList())
@@ -590,7 +597,7 @@ public class PatientDataService : IPatientDataService
                 log.Status = skipFetch ? RequestStatus.Skipped : RequestStatus.Completed;
                 log.ResourceAcquiredIds = resourceIds.ToList();
 
-                await _dataAcquisitionLogQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
+                await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {
                     Id = log.Id,
                     RetryAttempts = log.RetryAttempts,
@@ -602,6 +609,18 @@ public class PatientDataService : IPatientDataService
                     Notes = log.Notes,
                     Status = log.Status,
                 }, cancellationToken);
+
+                // Clean up staging rows only after the reference log succeeds.
+                // If the log failed, the rows are preserved for the next retry
+                // (the merge step is idempotent — uses DISTINCT).
+                if (isReferenceLog)
+                {
+                    foreach (var refQuery in log.FhirQuery.Where(q => q.IsReference == true && q.Id.HasValue))
+                    {
+                        await _dataAcquisitionLogManager.CleanupPendingReferenceIdsAsync(
+                            refQuery.Id!.Value, cancellationToken);
+                    }
+                }
             }
         }
         catch (OpOutcomeException ex)
@@ -617,7 +636,6 @@ public class PatientDataService : IPatientDataService
             }
             else
             {
-                var fhirQueryConfiguration = await _fhirQueryQueries.GetByFacilityIdAsync(log.FacilityId, cancellationToken);
                 var maxRetryAttempts = fhirQueryConfiguration?.MaxRetries ?? DataAcquisitionLog.MaxRetryAttempts;
 
                 log.RetryAttempts ??= 0;
@@ -635,7 +653,7 @@ public class PatientDataService : IPatientDataService
                 }
             }
 
-            await _dataAcquisitionLogQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
+            await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
             {
                 Id = log.Id,
                 RetryAttempts = log.RetryAttempts,
@@ -657,7 +675,7 @@ public class PatientDataService : IPatientDataService
             log.Status = RequestStatus.Pending;
             log.Notes.Add($"[{DateTime.UtcNow}] Processing delay encountered. Retrying at {log.ExecutionDate}. See application logs for details.");
 
-            await _dataAcquisitionLogQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
+            await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
             {
                 Id = log.Id,
                 RetryAttempts = log.RetryAttempts,
@@ -683,7 +701,7 @@ public class PatientDataService : IPatientDataService
             log.Notes.Add(
                 $"[{DateTime.UtcNow}] Throttled (429): Retrying after {ex.RetryAfter.TotalSeconds}s. Attempt {log.RetryAttempts}.");
 
-            await _dataAcquisitionLogQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
+            await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
             {
                 Id = log.Id,
                 RetryAttempts = log.RetryAttempts,
@@ -705,7 +723,6 @@ public class PatientDataService : IPatientDataService
 
             log.Notes ??= new List<string>();
 
-            var fhirQueryConfiguration = await _fhirQueryQueries.GetByFacilityIdAsync(log.FacilityId, cancellationToken);
             var maxRetryAttempts = fhirQueryConfiguration?.MaxRetries ?? DataAcquisitionLog.MaxRetryAttempts;
 
             log.RetryAttempts ??= 0;
@@ -724,7 +741,7 @@ public class PatientDataService : IPatientDataService
                     $"[{DateTime.UtcNow}] Error encountered. Retrying. Attempt {log.RetryAttempts}. See application logs for details.");
             }
 
-            await _dataAcquisitionLogQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
+            await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
             {
                 Id = log.Id,
                 ResourceAcquiredIds = log.ResourceAcquiredIds,

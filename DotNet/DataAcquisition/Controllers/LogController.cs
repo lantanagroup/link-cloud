@@ -157,7 +157,7 @@ public class LogController : Controller
 
         try
         {
-            var logEntry = await _logQueries.GetAsync(id, cancellationToken);
+            var logEntry = await _logQueries.GetWithReferencesAsync(id, cancellationToken);
             if (logEntry == null)
             {
                 return NotFound();

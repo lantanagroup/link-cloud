@@ -1,18 +1,15 @@
-﻿using Confluent.Kafka;
-using DataAcquisition.Domain.Application.Models;
+﻿using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ReferenceQuery;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
 using Task = System.Threading.Tasks.Task;
@@ -30,48 +27,37 @@ public interface IReferenceResourceService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Processes a collection of resource references and updates the specified data acquisition log accordingly.
+    /// Stages discovered reference resource IDs for later collection by the reference log.
+    /// Writes independent rows to PendingReferenceIds — no shared mutable state,
+    /// no contention between concurrent patient workers.
     /// </summary>
-    /// <remarks>This method processes the provided resource references and updates the log with relevant
-    /// information. Ensure that the <paramref name="refResources"/> list contains valid references before calling this
-    /// method.</remarks>
-    /// <param name="log">The data acquisition log to be updated. This parameter cannot be <see langword="null"/>.</param>
-    /// <param name="refResources">A list of resource references to process. This parameter can be <see langword="null"/> if no references were found.</param>
-    /// <param name="cancellationToken">An optional token to monitor for cancellation requests.</param>
-    /// <returns>A task that represents the asynchronous operation.</returns>
     Task ProcessReferences(DataAcquisitionLogModel log, List<ResourceReference> refResources, CancellationToken cancellationToken = default);
 }
 
 public class ReferenceResourceService : IReferenceResourceService
 {
     private readonly ILogger<ReferenceResourceService> _logger;
-    private readonly IReferenceResourcesManager _referenceResourcesManager;
     private readonly IReferenceResourcesQueries _referenceResourcesQueries;
-    private readonly IProducer<ResourceKey, ResourceAcquired> _kafkaProducer;
-    private readonly IDataAcquisitionServiceMetrics _metrics;
-    private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
     private readonly IDataAcquisitionLogQueries _dataAcquisitionLogQueries;
-    private readonly IFhirQueryManager _fhirQueryMananger;
+    private readonly DataAcquisitionDbContext _dbContext;
+
+    // Per-scope cache for FindReferenceQueryAsync results.
+    // The lookup is deterministic for the lifetime of a single log execution
+    // (same facility + reportTrackingId + correlationId + resourceType always returns
+    // the same FhirQueryId), so we avoid hitting the DB on every FHIR bundle page.
+    private readonly Dictionary<string, ReferenceQueryLookupResult?> _referenceQueryCache = new();
 
 
     public ReferenceResourceService(
         ILogger<ReferenceResourceService> logger,
-        IReferenceResourcesManager referenceResourcesManager,
         IReferenceResourcesQueries referenceResourcesQueries,
-        IProducer<ResourceKey, ResourceAcquired> kafkaProducer,
-        IDataAcquisitionServiceMetrics metrics,
-        IDataAcquisitionLogManager dataAcquisitionLogManager,
         IDataAcquisitionLogQueries dataAcquisitionLogQueries,
-        IFhirQueryManager fhirQueryMananger)
+        DataAcquisitionDbContext dbContext)
     {
         _logger = logger;
-        _referenceResourcesManager = referenceResourcesManager;
         _referenceResourcesQueries = referenceResourcesQueries;
-        _kafkaProducer = kafkaProducer;
-        _metrics = metrics;
-        _dataAcquisitionLogManager = dataAcquisitionLogManager;
         _dataAcquisitionLogQueries = dataAcquisitionLogQueries;
-        _fhirQueryMananger = fhirQueryMananger;
+        _dbContext = dbContext;
     }
 
     public async Task<List<Resource>> FetchReferenceResources(ReferenceQueryFactoryResult referenceQueryFactoryResult, GetPatientDataRequest request, FhirQueryConfigurationModel fhirQueryConfiguration, ReferenceQueryConfig referenceQueryConfig, string queryPlanType, CancellationToken cancellationToken = default)
@@ -136,52 +122,36 @@ public class ReferenceResourceService : IReferenceResourceService
                 continue;
             }
 
-            // Get just the IDs we need, not the full entities
-            var referenceLogResult = (await _dataAcquisitionLogQueries.SearchAsync(new SearchDataAcquisitionLogRequest
+            var cacheKey = $"{log.FacilityId}|{log.ReportTrackingId}|{log.CorrelationId}|{resourceType}";
+            if (!_referenceQueryCache.TryGetValue(cacheKey, out var lookup))
             {
-                FacilityId = log.FacilityId,
-                ReportTrackingId = log.ReportTrackingId,
-                CorrelationId = log.CorrelationId,
-                ResourceType = resourceType,
-                PageSize = int.MaxValue
-            }, cancellationToken)).Records.FirstOrDefault();
+                lookup = await _dataAcquisitionLogQueries.FindReferenceQueryAsync(
+                    log.FacilityId, log.ReportTrackingId, log.CorrelationId,
+                    resourceType, cancellationToken);
+                _referenceQueryCache[cacheKey] = lookup;
+            }
 
-            if (referenceLogResult == null)
+            if (lookup == null)
             {
                 throw new InvalidOperationException($"No data acquisition log for reference resource type: {resourceType}");
             }
-            if (referenceLogResult.FhirQuery == null || referenceLogResult.FhirQuery.Count == 0)
+
+            // Stage each discovered ID as an independent row — no shared mutable state.
+            var newIds = group.Select(i => i.Id).Distinct().ToList();
+            var entities = newIds.Select(id => new PendingReferenceId
             {
-                throw new InvalidOperationException($"No FHIR query for reference resource type: {resourceType}");
-            }
-            if (referenceLogResult.FhirQuery.Count > 1)
-            {
-                throw new InvalidOperationException($"Multiple FHIR queries for reference resource type: {resourceType}");
-            }
+                FhirQueryId = lookup.FhirQueryId,
+                ResourceId = id,
+                ResourceType = resourceType
+            });
 
-            // Get just the FhirQuery ID - don't use the tracked entity
-            var fhirQueryId = referenceLogResult.FhirQuery.First().Id;
-            var facilityId = referenceLogResult.FacilityId;
+            _dbContext.PendingReferenceIds.AddRange(entities);
+        }
 
-            // Combine existing IDs with new ones
-            var existingIds = referenceLogResult.FhirQuery.First().IdQueryParameterValues.ToList();
-            var updatedIds = existingIds
-                .Concat(group.Select(i => i.Id))
-                .Distinct()
-                .ToList();
-
-            // Create a completely fresh model with ONLY the data we need to update
-            // Don't copy navigation properties from the tracked entity
-            var updateModel = new FhirQueryModel
-            {
-                Id = fhirQueryId,
-                FacilityId = facilityId,
-                IdQueryParameterValues = updatedIds,
-                QueryType = referenceLogResult.FhirQuery.First().QueryType
-            };
-
-            // UpdateAsync will load the full entity fresh and update it
-            await _fhirQueryMananger.UpdateAsync(updateModel, cancellationToken);
+        // Single SaveChangesAsync for all resource type groups in this call
+        if (_dbContext.ChangeTracker.HasChanges())
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
         }
     }
 }

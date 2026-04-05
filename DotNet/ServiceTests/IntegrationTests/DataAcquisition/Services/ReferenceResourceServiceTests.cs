@@ -39,17 +39,13 @@ namespace IntegrationTests.DataAcquisition.Services
 
             var daLogMgr = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
             var daLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
-            var fhirQueryManager = scope.ServiceProvider.GetRequiredService<IFhirQueryManager>();
+            var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
             return new ReferenceResourceService(
                 logger,
-                refMgr,
                 refQueries,
-                kafkaProducer,
-                metrics.Object,
-                daLogMgr,
                 daLogQueries,
-                fhirQueryManager);
+                dbContext);
         }
 
         [Fact]

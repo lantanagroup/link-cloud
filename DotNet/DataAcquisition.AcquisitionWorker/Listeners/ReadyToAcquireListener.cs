@@ -1,10 +1,9 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Internal;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -52,36 +51,18 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
         }
 
         using var scope = _serviceScopeFactory.CreateScope();
-        var logQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+        var logManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
         var processor = scope.ServiceProvider.GetRequiredService<AcquisitionProcessorBackgroundService>();
 
-        // ATOMIC STEP: Attempt to "claim" the log
-        // This replaces the GetAsync -> Check Status -> UpdateAsync flow
+        // ATOMIC STEP: Attempt to "claim" the log — single DB write, no read needed
         var logId = value.LogId.Value;
-        bool claimed = await logQueries.TrySetLogToQueuedAsync(logId, cancellationToken);
+        bool claimed = await logManager.TrySetLogToQueuedAsync(logId, cancellationToken);
 
         if (!claimed)
         {
             _logger.LogInformation("LogId {LogId} was already claimed or is in a non-processable state. Skipping duplicate request.", logId);
             return;
         }
-
-        // getting the log in case the enqueue fails and we need to revert the status
-        var log = await logQueries.GetAsync(logId, cancellationToken);
-        log.Notes ??= new List<string>();
-        log.Notes.Add($"[{DateTime.UtcNow:O}] Queued for background acquisition processing");
-        await logQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
-        {
-            Id = log.Id,
-            Notes = log.Notes,
-            ResourceAcquiredIds = log.ResourceAcquiredIds,
-            RetryAttempts = log.RetryAttempts,
-            CompletionDate = log.CompletionDate,
-            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
-            ExecutionDate = log.ExecutionDate,
-            Status = log.Status,
-            TraceId = log.TraceId
-        });
 
         try
         {
@@ -94,11 +75,10 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to enqueue work item for LogId {LogId}. Attempting to revert status.", logId);
-            // Minimally invasive: set back to Pending so the next trigger can try again
-            log.Status = RequestStatus.Pending;
-            log.Notes.Add($"[{DateTime.UtcNow:O}] Enqueue failed, reverting to Pending.\n\t{ex.InnerException}");
-            await logQueries.UpdateAsync(new UpdateDataAcquisitionLogModel { Id = log.Id, Status = log.Status, Notes = log.Notes });
-            throw new DeadLetterException("Failed to enqueue work item", ex); // Re-throw to let Kafka handle the retry/DLQ logic
+            // Revert to Pending so the next trigger can try again — single atomic write, no read needed
+            await logManager.TrySetLogStatusAsync(logId,
+                new List<RequestStatus> { RequestStatus.Queued }, RequestStatus.Pending, cancellationToken);
+            throw new DeadLetterException("Failed to enqueue work item", ex);
         }
         // Method ends → offset committed quickly by base class
     }
