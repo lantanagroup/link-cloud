@@ -20,6 +20,8 @@ public interface IDataAcquisitionLogManager
     Task<DataAcquisitionLogModel> CreateAsync(CreateDataAcquisitionLogModel log, CancellationToken cancellationToken = default);
     Task<DataAcquisitionLogModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default);
     Task<int> UpdateStatusBatchAsync(IEnumerable<long> ids, RequestStatus newStatus, CancellationToken cancellationToken = default);
+    Task<int> IncrementRetriesAndSetStatusAsync(IEnumerable<long> ids, RequestStatus newStatus, CancellationToken cancellationToken = default);
+    Task<int> CancelBulkAsync(IEnumerable<long> ids, CancellationToken cancellationToken = default);
     Task<List<DataAcquisitionLog>> GetLogsByIdsAsync(List<long> ids, CancellationToken cancellationToken = default);
     Task DeleteAsync(long id, CancellationToken cancellationToken = default);
     Task<int> SoftDeleteByFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
@@ -338,6 +340,33 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             .Where(l => ids.Contains(l.Id))
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(l => l.Status, newStatus)
+                .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                cancellationToken);
+    }
+
+    public async Task<int> IncrementRetriesAndSetStatusAsync(IEnumerable<long> ids, RequestStatus newStatus, CancellationToken cancellationToken = default)
+    {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.IncrementRetriesAndSetStatusAsync");
+
+        return await _dbContext.DataAcquisitionLogs
+            .Where(l => ids.Contains(l.Id))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(l => l.Status, newStatus)
+                .SetProperty(l => l.RetryAttempts, l => (l.RetryAttempts ?? 0) + 1)
+                .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                cancellationToken);
+    }
+
+    public async Task<int> CancelBulkAsync(IEnumerable<long> ids, CancellationToken cancellationToken = default)
+    {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.CancelBulkAsync");
+
+        var cancellableStatuses = new[] { RequestStatus.Pending, RequestStatus.Ready, RequestStatus.Queued };
+
+        return await _dbContext.DataAcquisitionLogs
+            .Where(l => ids.Contains(l.Id) && l.Status != null && cancellableStatuses.Contains(l.Status.Value))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(l => l.Status, RequestStatus.Cancelled)
                 .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
                 cancellationToken);
     }

@@ -155,6 +155,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   selectedLogIds: Set<string> = new Set<string>();
   isAllSelected: boolean = false;
   includeDeleted: boolean = false;
+  isStuckLogsFilterActive: boolean = false;
   statusChartExpanded: boolean = false;
   statusChartData: Record<string, number> = {};
   statusChartLoading = false;
@@ -331,6 +332,7 @@ export class AcquisitionLogViewComponent implements OnInit {
         break;
       case 'status':
         this.selectedStatusFilter = [];
+        this.isStuckLogsFilterActive = false;
         break;
       case 'reportId':
         this.reportIdFilter = this.reportIdFromRoute;
@@ -422,6 +424,7 @@ export class AcquisitionLogViewComponent implements OnInit {
     this.selectedQueryPhaseFilter = 'Any';
     this.selectedQueryTypeFilter = 'Any';
     this.selectedStatusFilter = [];
+    this.isStuckLogsFilterActive = false;
     this.onFilterApplication();
     this.clearSelection();
     this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);
@@ -429,12 +432,16 @@ export class AcquisitionLogViewComponent implements OnInit {
   }
 
   toggleSelection(logId: string) {
+    if (this.isAllSelected) {
+      this.acquisitionLogs.forEach(log => this.selectedLogIds.add(log.id));
+      this.isAllSelected = false;
+    }
+
     if (this.selectedLogIds.has(logId)) {
       this.selectedLogIds.delete(logId);
     } else {
       this.selectedLogIds.add(logId);
     }
-    this.isAllSelected = false;
   }
 
   isLogSelected(logId: string): boolean {
@@ -449,6 +456,19 @@ export class AcquisitionLogViewComponent implements OnInit {
   clearSelection() {
     this.isAllSelected = false;
     this.selectedLogIds.clear();
+  }
+
+  applyStuckLogsFilter(): void {
+    this.selectedStatusFilter = ['Pending', 'Ready', 'Queued', 'Processing', 'Failed'];
+    this.isStuckLogsFilterActive = true;
+    this.applyFilters();
+  }
+
+  handleLogCancelled(logId: string): void {
+    const index = this.acquisitionLogs.findIndex(log => log.id === logId);
+    if (index !== -1) {
+      this.acquisitionLogs[index].status = 'Cancelled';
+    }
   }
 
   bulkExecute() {
@@ -506,6 +526,36 @@ export class AcquisitionLogViewComponent implements OnInit {
         console.error('Error triggering bulk execution:', error);
       }
     });
+  }
+
+  bulkCancel() {
+    let ids: string[];
+
+    if (this.isAllSelected) {
+      ids = this.acquisitionLogs.map(log => log.id);
+    } else {
+      if (this.selectedLogIds.size === 0) return;
+      ids = Array.from(this.selectedLogIds);
+    }
+
+    if (ids.length === 0) return;
+
+    this.loadingService.show();
+    this.acquisitionLogService.cancelBulkAcquisitionLogs(ids)
+      .pipe(
+        finalize(() => {
+          this.loadingService.hide();
+          this.clearSelection();
+          this.refreshLogs();
+        })
+      ).subscribe({
+        next: () => {
+          console.log('Bulk cancellation triggered successfully');
+        },
+        error: (error) => {
+          console.error('Error triggering bulk cancellation:', error);
+        }
+      });
   }
 
   disableLogsByFacility(): void {

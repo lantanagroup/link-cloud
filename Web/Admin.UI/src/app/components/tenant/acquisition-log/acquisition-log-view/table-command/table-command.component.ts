@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, OnDestroy, OnInit, Output } from '@angular/core';
 import { MatDialog, MatDialogConfig, MatDialogModule } from '@angular/material/dialog';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faEllipsisV, faInfoCircle, faPlay } from '@fortawesome/free-solid-svg-icons';
+import { faBan, faEllipsisV, faInfoCircle, faPlay } from '@fortawesome/free-solid-svg-icons';
 import { AcquisitionLogDetailsComponent } from '../../acquisition-log-details/acquisition-log-details.component';
 import { AcquisitionLog } from '../../models/acquisition-log';
 import { AcquisitionLogService } from '../../acquisition-log.service';
@@ -35,13 +35,24 @@ import { animate, style, transition, trigger } from '@angular/animations';
 export class TableCommandComponent implements OnInit, OnDestroy {
   @Input() acquisitionLogId!: string;
   @Input() priority: string | undefined;
+  @Input() status: string = '';
+  @Input() createDate: string | Date | undefined;
 
   @Output() queryLogAddedToQueue = new EventEmitter<string>();
+  @Output() queryLogCancelled = new EventEmitter<string>();
 
   faEllipsisV = faEllipsisV;
   faInfoCircle = faInfoCircle;
   faPlay = faPlay;
+  faBan = faBan;
   isOpen = false;
+
+  get isCancelEligible(): boolean {
+    if (['MaxRetriesReached', 'Completed', 'Cancelled', 'Skipped'].includes(this.status)) return false;
+    if (!this.createDate) return false;
+    const ageMs = Date.now() - new Date(this.createDate).getTime();
+    return ageMs > 24 * 60 * 60 * 1000;
+  }
 
   private subscription = new Subscription();
   
@@ -108,6 +119,14 @@ export class TableCommandComponent implements OnInit, OnDestroy {
       console.log(`Query log id is not set.`);
     }
     
+  }
+
+  cancelLog() {
+    this.isOpen = false;
+    this.acquisitionLogService.cancelBulkAcquisitionLogs([this.acquisitionLogId]).subscribe({
+      next: () => this.queryLogCancelled.emit(this.acquisitionLogId),
+      error: (error) => console.error('Error cancelling acquisition log:', error)
+    });
   }
 
   ngOnDestroy(): void {

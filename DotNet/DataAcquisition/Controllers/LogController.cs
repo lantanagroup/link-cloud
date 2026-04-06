@@ -675,6 +675,35 @@ public class LogController : Controller
     }
 
     /// <summary>
+    /// Cancel multiple data acquisition log entries.
+    /// </summary>
+    /// <returns>
+    /// A response indicating the result of the cancellation.
+    /// </returns>
+    [HttpPost("cancel-bulk")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> CancelBulk([FromBody] List<long> ids, CancellationToken cancellationToken = default)
+    {
+        if (ids == null || !ids.Any())
+        {
+            return BadRequest("IDs cannot be null or empty.");
+        }
+
+        try
+        {
+            await _logManager.CancelBulkAsync(ids, cancellationToken);
+            return Accepted();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "CancelBulk"), ex, "An Exception occurred while attempting to cancel logs in bulk.");
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
     /// Process data acquisition log entries based on search criteria.
     /// </summary>
     /// <returns>

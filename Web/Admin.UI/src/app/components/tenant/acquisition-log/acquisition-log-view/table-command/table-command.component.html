@@ -15,6 +15,9 @@
     <ul class="menu-dropdown" @dropdownAnimation>
       <li (click)="showLogDetails()"><fa-icon [icon]="faInfoCircle"></fa-icon> Details</li>
       <li (click)="executeLog()"><fa-icon [icon]="faPlay"></fa-icon> Execute</li>
+      @if (isCancelEligible) {
+        <li (click)="cancelLog()"><fa-icon [icon]="faBan"></fa-icon> Cancel</li>
+      }
     </ul>
   }
 </div>

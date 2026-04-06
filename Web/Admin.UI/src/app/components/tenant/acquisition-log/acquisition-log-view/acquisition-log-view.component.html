@@ -205,6 +205,12 @@
         </div>
 
         <div class="btn-group" role="group" aria-label="Filtering">
+          <mat-checkbox [(ngModel)]="includeDeleted" (change)="onIncludeDeletedChange()">
+            Show Deleted
+          </mat-checkbox>
+
+          <span style="flex: 1;"></span>
+
           <button class="link-button secondary"
                   aria-label="Clear filters"
                   (click)="clearFilters()"
@@ -217,10 +223,6 @@
             <fa-icon [icon]="faRotate"></fa-icon>
             Refresh
           </button>
-
-          <mat-checkbox [(ngModel)]="includeDeleted" (change)="onIncludeDeletedChange()">
-            Show Deleted
-          </mat-checkbox>
         </div>
 
         @if (selectedFacilityFilter !== 'Any') {
@@ -238,6 +240,12 @@
           </div>
         }
 
+        <button type="button" class="link-button error" (click)="applyStuckLogsFilter()"
+                matTooltip="Filter to Pending, Ready, Queued, Processing, and Failed logs. The Cancel option in each row's menu is only available for logs created more than 24 hours ago.">
+          <fa-icon [icon]="faBan" style="margin-right: 5px;"></fa-icon>
+          Stuck Logs
+        </button>
+
         @if (selectedLogIds.size > 0 || isAllSelected) {
           <div class="btn-group">
             <button type="button" class="link-button secondary" (click)="clearSelection()">
@@ -247,6 +255,12 @@
               <fa-icon [icon]="faPlus" style="margin-right: 5px;"></fa-icon>
               Execute Selected ({{ isAllSelected ? paginationMetadata.totalCount : selectedLogIds.size }})
             </button>
+            @if (selectedLogIds.size > 0 || (isAllSelected && isStuckLogsFilterActive)) {
+              <button type="button" class="link-button error" (click)="bulkCancel()" matTooltip="Only Pending, Ready, and Queued logs can be cancelled. When all rows are selected, cancels the current page only.">
+                <fa-icon [icon]="faBan" style="margin-right: 5px;"></fa-icon>
+                Cancel Selected ({{ isAllSelected ? acquisitionLogs.length : selectedLogIds.size }})
+              </button>
+            }
           </div>
         }
       </div>
@@ -413,7 +427,10 @@
                   <app-table-command
                     [acquisitionLogId]="log.id"
                     [priority]="log.priority"
-                    (queryLogAddedToQueue)="handleLogScheduled($event)">
+                    [status]="log.status"
+                    [createDate]="log.createDate"
+                    (queryLogAddedToQueue)="handleLogScheduled($event)"
+                    (queryLogCancelled)="handleLogCancelled($event)">
                   </app-table-command>
                 </td>
               </tr>
