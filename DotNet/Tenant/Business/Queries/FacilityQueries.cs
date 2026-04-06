@@ -71,12 +71,15 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
 
             if (!string.IsNullOrEmpty(model.FacilityId))
             {
-                query = query.Where(f => f.FacilityId.Contains(model.FacilityId));
+                query = query.Where(f => f.FacilityId == model.FacilityId);
             }
 
             if (!string.IsNullOrEmpty(model.FacilityName))
             {
-                query = query.Where(f => f.FacilityName.Contains(model.FacilityName));
+                if (model.FacilityNameContains == true)
+                    query = query.Where(f => f.FacilityName.Contains(model.FacilityName));
+                else
+                    query = query.Where(f => f.FacilityName == model.FacilityName);
             }
 
             if (!string.IsNullOrEmpty(model.TimeZone))
