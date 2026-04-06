@@ -9,6 +9,7 @@ public class ResourceAcquired
     public bool AcquisitionComplete { get; set; } = false;
     public string PatientId { get; set; }
     public string QueryType { get; set; }
+    public string? ResourceType { get; set; }
     public Resource Resource { get; set; }
     public List<ScheduledReport> ScheduledReports { get; set; } = new List<ScheduledReport>();
     public ReportableEvent ReportableEvent { get; set; }
