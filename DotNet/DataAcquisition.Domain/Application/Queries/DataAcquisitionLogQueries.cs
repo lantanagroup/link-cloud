@@ -672,14 +672,14 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             statistics.QueryPhaseCounts[qp.Phase] = qp.Count;
 
         // Resource type counts + total from ResourceAcquiredIds JSON column
-        try
-        {
-            var rawIds = await baseQuery
-                .Where(l => l.Status == RequestStatus.Completed && l.ResourceAcquiredIds != null)
-                .SelectMany(l => l.ResourceAcquiredIds!)
-                .ToListAsync(cancellationToken);
+        var completedLogs = await baseQuery
+            .Where(l => l.Status == RequestStatus.Completed && l.ResourceAcquiredIds != null)
+            .Select(l => l.ResourceAcquiredIds!)
+            .ToListAsync(cancellationToken);
 
-            foreach (var resource in rawIds)
+        foreach (var ids in completedLogs)
+        {
+            foreach (var resource in ids)
             {
                 if (string.IsNullOrWhiteSpace(resource)) continue;
                 var slashIdx = resource.IndexOf('/');
@@ -689,16 +689,11 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 statistics.ResourceTypeCounts.TryGetValue(resourceType, out var val);
                 statistics.ResourceTypeCounts[resourceType] = val + 1;
             }
-
-            statistics.TotalResourcesAcquired = statistics.ResourceTypeCounts.Values.Sum();
-        }
-        catch
-        {
-            // Fallback if JSON column expansion is not supported
-            statistics.TotalResourcesAcquired = 0;
         }
 
-        // Fastest / slowest completion times � lightweight projection, not full entity
+        statistics.TotalResourcesAcquired = statistics.ResourceTypeCounts.Values.Sum();
+
+        // Fastest / slowest completion times – lightweight projection, not full entity
         var fastest = await baseQuery
             .Where(l => l.CompletionTimeMilliseconds != null)
             .OrderBy(l => l.CompletionTimeMilliseconds)
@@ -733,7 +728,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 slowest.CompletionTimeMilliseconds!.Value);
         }
 
-        // Per-resource-type completion time aggregation � lightweight projection
+        // Per-resource-type completion time aggregation – lightweight projection
         var completionTimes = await baseQuery
             .Where(l => l.CompletionTimeMilliseconds != null)
             .Select(l => new
@@ -801,13 +796,16 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         if (string.IsNullOrWhiteSpace(correlationId))
             throw new ArgumentNullException(nameof(correlationId), "Correlation ID cannot be null or empty.");
 
-        return await _dbContext.DataAcquisitionLogs
+        var candidateIds = await _dbContext.DataAcquisitionLogs
             .Where(x =>
                 x.ReportTrackingId == reportTrackingId &&
                 x.FacilityId == facilityId &&
-                x.CorrelationId == correlationId)
-            .AnyAsync(x => x.ResourceAcquiredIds != null &&
-                           x.ResourceAcquiredIds.Contains(referenceId), cancellationToken);
+                x.CorrelationId == correlationId &&
+                x.ResourceAcquiredIds != null)
+            .Select(x => x.ResourceAcquiredIds!)
+            .ToListAsync(cancellationToken);
+
+        return candidateIds.Any(ids => ids.Contains(referenceId));
     }
 
     public async Task<List<string>> GetFacilitiesWithPendingAndRetryableFailedRequests(

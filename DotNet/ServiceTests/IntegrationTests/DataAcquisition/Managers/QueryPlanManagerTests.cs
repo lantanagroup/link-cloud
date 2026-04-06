@@ -45,8 +45,6 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var manager = CreateManager(scope);
         var model = CreateValidCreateQueryPlanModel();
@@ -194,8 +192,6 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
         var queries = scope.ServiceProvider.GetRequiredService<IQueryPlanQueries>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         // Seed existing
         var existing = new QueryPlan
@@ -281,11 +277,9 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = CreateManager(scope);
         var model = CreateValidUpdateQueryPlanModel();
+        model.FacilityId = $"NonExistent_{Guid.NewGuid():N}";
 
         // Act & Assert
         await Assert.ThrowsAsync<NotFoundException>(() => manager.UpdateAsync(model));
@@ -298,8 +292,6 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         // Seed existing
         var existing = new QueryPlan
@@ -334,8 +326,6 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         // Seed existing
         var existing = new QueryPlan
@@ -370,8 +360,6 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         // Seed existing
         var existing = new QueryPlan
@@ -403,8 +391,6 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         // Seed existing
         var existing = new QueryPlan
@@ -435,8 +421,6 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         // Seed existing
         var existing = new QueryPlan
@@ -467,8 +451,6 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         // Seed existing
         var existing = new QueryPlan
@@ -490,7 +472,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
 
         // Act & Assert
         var ex = await Assert.ThrowsAsync<DbUpdateException>(() => manager.UpdateAsync(model));
-        Assert.Contains("NOT NULL constraint failed: queryPlan.PlanName", ex.InnerException.Message);
+        Assert.Contains("Cannot insert the value NULL into column", ex.InnerException!.Message);
     }
 
     [Fact]
@@ -500,8 +482,6 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         // Seed existing
         var existing = new QueryPlan
@@ -523,7 +503,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
 
         // Act & Assert
         var ex = await Assert.ThrowsAsync<DbUpdateException>(() => manager.UpdateAsync(model));
-        Assert.Contains("NOT NULL constraint failed: queryPlan.EHRDescription", ex.InnerException.Message);
+        Assert.Contains("Cannot insert the value NULL into column", ex.InnerException!.Message);
     }
 
     [Fact]
@@ -533,8 +513,6 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         // Seed existing
         var existing = new QueryPlan
@@ -556,7 +534,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
 
         // Act & Assert
         var ex = await Assert.ThrowsAsync<DbUpdateException>(() => manager.UpdateAsync(model));
-        Assert.Contains("NOT NULL constraint failed: queryPlan.LookBack", ex.InnerException.Message);
+        Assert.Contains("Cannot insert the value NULL into column", ex.InnerException!.Message);
     }
 
     [Fact]
@@ -566,13 +544,14 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
+
+        // Use a unique facility for isolation
+        var facilityId = $"DeleteTest_{Guid.NewGuid():N}";
 
         // Seed query plan
         var queryPlan = new QueryPlan
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             Type = Frequency.Daily,
             PlanName = "TestPlan",
             EHRDescription = "TestEHR",
@@ -586,10 +565,10 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         var manager = CreateManager(scope);
 
         // Act
-        await manager.DeleteAsync("TestFacility", Frequency.Daily);
+        await manager.DeleteAsync(facilityId, Frequency.Daily);
 
         // Assert
-        var deletedPlan = await dbContext.QueryPlans.FirstOrDefaultAsync(q => q.FacilityId == "TestFacility" && q.Type == Frequency.Daily);
+        var deletedPlan = await dbContext.QueryPlans.FirstOrDefaultAsync(q => q.FacilityId == facilityId && q.Type == Frequency.Daily);
         Assert.Null(deletedPlan);
     }
 
@@ -600,8 +579,6 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var manager = CreateManager(scope);
 

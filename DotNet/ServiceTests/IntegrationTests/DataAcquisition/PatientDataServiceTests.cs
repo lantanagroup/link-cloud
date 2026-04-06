@@ -679,23 +679,13 @@ public class PatientDataServiceTests
             .Setup(q => q.GetAsync(logId, cancellationToken))
             .ReturnsAsync(logModel);
 
-        // Expect exactly ONE update to Processing, then ONE final update to Completed
-        var updateCallCount = 0;
+        // Capture updates and validate terminal state (processing transition is done via TrySetLogStatusAsync)
+        var updates = new List<UpdateDataAcquisitionLogModel>();
         _mockLogManager
             .Setup(m => m.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), cancellationToken))
             .Callback<UpdateDataAcquisitionLogModel, CancellationToken>((model, _) =>
             {
-                updateCallCount++;
-                if (updateCallCount == 1)
-                {
-                    Assert.Equal(RequestStatus.Processing, model.Status);
-                }
-                else if (updateCallCount == 2)
-                {
-                    Assert.Equal(RequestStatus.Skipped, model.Status);
-                    Assert.Contains(model.Notes, n =>
-                        n.Contains("No IDs found in _id query parameter for Search FHIR query. Marking log as Completed."));
-                }
+                updates.Add(model);
             })
             .ReturnsAsync(logModel);
 
@@ -705,7 +695,11 @@ public class PatientDataServiceTests
         // Assert
         _mockLogManager.Verify(
             m => m.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), cancellationToken),
-            Times.Exactly(2)); // Processing ? Completed
+            Times.AtLeastOnce());
+
+        Assert.Contains(updates, u =>
+            u.Status == RequestStatus.Skipped &&
+            (u.Notes?.Any(n => n.Contains("No IDs found in _id query parameter for Search FHIR query. Marking log as Completed.")) ?? false));
 
         // Most important: ExecuteSearch should NEVER be called when no valid IDs exist
         _mockFhirApiService.Verify(
@@ -829,7 +823,7 @@ public class PatientDataServiceTests
 
         _mockLogManager.Verify(
             m => m.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), cancellationToken),
-            Times.AtLeast(2)); // Processing + Completed (possibly more if other logic runs)
+            Times.AtLeastOnce()); // Final completion update is required; processing transition uses TrySetLogStatusAsync
 
         // Final confirmation: log completed successfully without the "no IDs" note
         _mockLogManager.Verify(

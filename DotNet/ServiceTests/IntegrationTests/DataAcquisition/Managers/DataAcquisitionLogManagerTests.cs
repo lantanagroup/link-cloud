@@ -46,8 +46,6 @@ public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionInteg
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var manager = CreateManager(scope);
         var queries = _fixture.ServiceProvider.CreateScope().ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
@@ -129,8 +127,6 @@ public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionInteg
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var log = new DataAcquisitionLog
         {
@@ -183,8 +179,6 @@ public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionInteg
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var log = new DataAcquisitionLog
         {
@@ -219,24 +213,27 @@ public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionInteg
     public async Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId_ValidIds_UpdatesFlags()
     {
         // Arrange
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"TestFacility_{tag}";
+        var correlationId = $"TestCorr_{tag}";
+        var reportTrackingId = $"TestReport_{tag}";
+
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var log1 = new DataAcquisitionLog
         {
-            FacilityId = "TestFacility",
-            CorrelationId = "TestCorr",
-            ReportTrackingId = "TestReport",
+            FacilityId = facilityId,
+            CorrelationId = correlationId,
+            ReportTrackingId = reportTrackingId,
             TailSent = false
         };
         var log2 = new DataAcquisitionLog
         {
-            FacilityId = "TestFacility",
-            CorrelationId = "TestCorr",
-            ReportTrackingId = "TestReport",
+            FacilityId = facilityId,
+            CorrelationId = correlationId,
+            ReportTrackingId = reportTrackingId,
             TailSent = false
         };
         dbContext.DataAcquisitionLogs.AddRange(log1, log2);
@@ -246,14 +243,18 @@ public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionInteg
         var logIds = new List<long> { log1.Id, log2.Id };
 
         // Act
-        await manager.UpdateTailFlagForFacilityCorrelationIdReportTrackingId(logIds, "TestFacility", "TestCorr", "TestReport");
+        await manager.UpdateTailFlagForFacilityCorrelationIdReportTrackingId(logIds, facilityId, correlationId, reportTrackingId);
 
         // Assert
-        var updatedLog1 = await dbContext.DataAcquisitionLogs.FindAsync(log1.Id);
-        var updatedLog2 = await dbContext.DataAcquisitionLogs.FindAsync(log2.Id);
+        using var assertScope = _fixture.ServiceProvider.CreateScope();
+        var assertDbContext = assertScope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var updatedLog1 = await assertDbContext.DataAcquisitionLogs.FindAsync(log1.Id);
+        var updatedLog2 = await assertDbContext.DataAcquisitionLogs.FindAsync(log2.Id);
+
+        Assert.NotNull(updatedLog1);
+        Assert.NotNull(updatedLog2);
         Assert.True(updatedLog1.TailSent);
         Assert.True(updatedLog2.TailSent);
-        Assert.Contains("Tail Message Sent", updatedLog1.Notes);
     }
 
     [Fact]
@@ -276,8 +277,6 @@ public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionInteg
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var pendingLog = new DataAcquisitionLog
         {

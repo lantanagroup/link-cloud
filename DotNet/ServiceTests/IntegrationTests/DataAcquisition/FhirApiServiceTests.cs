@@ -15,6 +15,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Moq;
 using Microsoft.Extensions.Logging;
@@ -375,6 +376,14 @@ public class FhirApiServiceTests
                 It.IsAny<SearchFhirCommandRequest>(),
                 It.IsAny<CancellationToken>()))
             .Returns(GetBundleAsync(bundle));
+
+        referenceResourceQueries
+            .Setup(x => x.SearchAsync(It.IsAny<SearchReferenceResourcesModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PagedConfigModel<ReferenceResourcesModel>
+            {
+                Metadata = new PaginationMetadata { PageNumber = 1, PageSize = 10, TotalCount = 0, TotalPages = 0 },
+                Records = new List<ReferenceResourcesModel>()
+            });
 
         // Capture the produced Kafka message
         ResourceAcquired? producedMessage = null;

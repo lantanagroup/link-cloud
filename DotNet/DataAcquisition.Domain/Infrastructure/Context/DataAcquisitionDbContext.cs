@@ -128,7 +128,8 @@ public class DataAcquisitionDbContext : DbContext
             entity.HasMany(d => d.FhirQueryResourceTypes).WithOne(p => p.FhirQuery)
                     .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasForeignKey(r => r.FhirQueryId)
-                    .HasPrincipalKey(q => q.Id);
+                    .HasPrincipalKey(q => q.Id)
+                    .HasConstraintName("FK_FhirQueryResourceType_FhirQuery");
         });
 
         modelBuilder.Entity<FhirQueryResourceType>(entity =>
@@ -136,10 +137,6 @@ public class DataAcquisitionDbContext : DbContext
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
 
             entity.Property(e => e.ResourceType).HasConversion(new EnumToStringConverter<ResourceType>());
-
-            entity.HasOne(d => d.FhirQuery).WithMany(p => p.FhirQueryResourceTypes)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_FhirQueryResourceType_FhirQuery");
         });
 
         //-------------------DataAcquisitionLog-------------------
@@ -229,6 +226,15 @@ public class DataAcquisitionDbContext : DbContext
             entity.HasIndex(e => new { e.TailSent, e.FacilityId, e.ReportTrackingId, e.CorrelationId, e.ReportStartDate, e.ReportEndDate, e.QueryPhase })
                 .HasDatabaseName("IX_DataAcquisitionLogs_Tailing_Optimization")
                 .HasFilter("[TailSent] = 0 AND [ReportTrackingId] IS NOT NULL AND [CorrelationId] IS NOT NULL AND [ReportStartDate] IS NOT NULL AND [ReportEndDate] IS NOT NULL");
+
+            entity.Property(e => e.ResourceAcquiredIds)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
+                    v => v != null ? JsonSerializer.Deserialize<List<string>>(v, new JsonSerializerOptions()) ?? new List<string>() : new List<string>())
+                .Metadata.SetValueComparer(new ValueComparer<List<string>?>(
+                    (c1, c2) => c1 != null && c2 != null && c1.SequenceEqual(c2),
+                    c => c != null ? c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())) : 0,
+                    c => c != null ? c.ToList() : new List<string>()));
         });
 
         //-------------------ResourceReferenceType-------------------

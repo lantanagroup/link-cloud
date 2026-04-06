@@ -44,19 +44,21 @@ public class LogControllerTests : IClassFixture<DataAcquisitionIntegrationTestFi
     public async Task Search_ValidParameters_ReturnsOkWithPagedResults()
     {
         // Arrange
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"TestFacility_{tag}";
+        var reportTrackingId = $"TestReportId_{tag}";
+
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         // Seed a log
         var log = new DataAcquisitionLog
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             Status = RequestStatus.Pending,
             CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = "TestReportId",
+            ReportTrackingId = reportTrackingId,
             PatientId = "Patient/123",
             ReportStartDate = DateTime.UtcNow.AddDays(-1),
             ReportEndDate = DateTime.UtcNow,
@@ -69,7 +71,7 @@ public class LogControllerTests : IClassFixture<DataAcquisitionIntegrationTestFi
         var controller = CreateController(scope);
         var queryParams = new LogSearchParameters
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             PageNumber = 1,
             PageSize = 10,
             SortBy = "FacilityId",
@@ -83,6 +85,7 @@ public class LogControllerTests : IClassFixture<DataAcquisitionIntegrationTestFi
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
         var pagedModel = Assert.IsAssignableFrom<IPagedModel<QueryLogSummaryModel>>(okResult.Value);
         Assert.Single(pagedModel.Records);
+        Assert.Equal(log.Id, pagedModel.Records[0].Id);
     }
 
     [Fact]
@@ -124,8 +127,6 @@ public class LogControllerTests : IClassFixture<DataAcquisitionIntegrationTestFi
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var log = new DataAcquisitionLog
         {
@@ -167,8 +168,6 @@ public class LogControllerTests : IClassFixture<DataAcquisitionIntegrationTestFi
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var log = new DataAcquisitionLog
         {
@@ -237,8 +236,6 @@ public class LogControllerTests : IClassFixture<DataAcquisitionIntegrationTestFi
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var log = new DataAcquisitionLog
         {
@@ -292,8 +289,6 @@ public class LogControllerTests : IClassFixture<DataAcquisitionIntegrationTestFi
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var log = new DataAcquisitionLog
         {
@@ -364,8 +359,6 @@ public class LogControllerTests : IClassFixture<DataAcquisitionIntegrationTestFi
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var log = new DataAcquisitionLog
         {
