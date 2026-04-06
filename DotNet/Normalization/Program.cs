@@ -1,6 +1,6 @@
-using System.Reflection;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
+using Hl7.Fhir.Model.CdsHooks;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
@@ -33,10 +33,12 @@ using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.OpenApi.Models;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
+using System.Reflection;
 using AuditEventMessage = LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -99,6 +101,11 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddHttpClient();
     builder.Services.AddProblemDetails();
+
+    builder.Services.AddMemoryCache();
+
+    var provider = builder.Services.BuildServiceProvider();
+    var cache = provider.GetRequiredService<IMemoryCache>();
 
     // Add Link Security
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
@@ -188,17 +195,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<RetryJob>();
 
     builder.Services.AddSingleton<CopyPropertyOperationService>();
-    builder.Services.AddHostedService(provider => provider.GetRequiredService<CopyPropertyOperationService>());
-
     builder.Services.AddSingleton<CodeMapOperationService>();
-    builder.Services.AddHostedService(provider => provider.GetRequiredService<CodeMapOperationService>());
-
     builder.Services.AddSingleton<ConditionalTransformOperationService>();
-    builder.Services.AddHostedService(provider => provider.GetRequiredService<ConditionalTransformOperationService>());
-
     builder.Services.AddSingleton<CopyLocationOperationService>();
-    builder.Services.AddHostedService(provider => provider.GetRequiredService<CopyLocationOperationService>());
-
+    
     if (consumerSettings != null && !consumerSettings.DisableConsumer)
     {
         builder.Services.AddHostedService<ResourceAcquiredListener>();
