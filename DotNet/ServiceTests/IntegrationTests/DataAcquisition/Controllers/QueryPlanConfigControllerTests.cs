@@ -52,6 +52,7 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
     public async Task GetQueryPlan_ValidParameters_ReturnsOkWithQueryPlan()
     {
         // Arrange
+        var facilityId = $"TestFacility_{Guid.NewGuid():N}";
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
@@ -59,7 +60,7 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         // Seed a query plan
         var queryPlan = new QueryPlan
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             Type = Frequency.Daily,
             PlanName = "TestPlan",
             EHRDescription = "Test EHR",
@@ -74,12 +75,12 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         var queryParams = new GetQueryPlanParameters { Type = Frequency.Daily };
 
         // Act
-        var result = await controller.GetQueryPlan("TestFacility", queryParams, CancellationToken.None);
+        var result = await controller.GetQueryPlan(facilityId, queryParams, CancellationToken.None);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
         var returnedModel = Assert.IsType<QueryPlanModel>(okResult.Value);
-        Assert.Equal("TestFacility", returnedModel.FacilityId);
+        Assert.Equal(facilityId, returnedModel.FacilityId);
         Assert.Equal(Frequency.Daily, returnedModel.Type);
         Assert.Equal("TestPlan", returnedModel.PlanName);
         Assert.Equal("Test EHR", returnedModel.EHRDescription);
