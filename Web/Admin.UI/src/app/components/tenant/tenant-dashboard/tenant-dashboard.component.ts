@@ -1,4 +1,5 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import * as moment from 'moment-timezone';
 
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatToolbarModule } from '@angular/material/toolbar';
@@ -6,6 +7,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { IFacilityConfigModel, PagedFacilityConfigModel } from '../../../interfaces/tenant/facility-config-model.interface';
+import { Vendor } from '../../../interfaces/tenant/vendor.enum';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -20,12 +22,16 @@ import { QueryDispatchService } from "../../../services/gateway/query-dispatch/q
 import { OperationService } from "../../../services/gateway/normalization/operation.service";
 import { DeleteConfirmationDialogComponent } from "../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
 import { AlertDialogComponent } from "../../core/alert-dialog/alert-dialog.component";
-import { catchError, take } from 'rxjs/operators';
-import { throwError, EMPTY, concat } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, map, startWith, switchMap, take, tap } from 'rxjs/operators';
+import { throwError, EMPTY, concat, Observable, of, Subject, Subscription } from 'rxjs';
 import { AggregationService } from '../../../services/gateway/aggregation/aggregation.service';
 import { MatCheckbox } from "@angular/material/checkbox";
-import { FormsModule } from "@angular/forms";
-import { NgIf } from "@angular/common";
+import { MatFormFieldModule } from "@angular/material/form-field";
+import { MatInputModule } from "@angular/material/input";
+import { MatSelectModule } from "@angular/material/select";
+import { MatAutocompleteModule } from "@angular/material/autocomplete";
+import { FormControl, FormsModule, ReactiveFormsModule } from "@angular/forms";
+import { AsyncPipe, NgFor, NgIf } from "@angular/common";
 
 @Component({
   selector: 'app-tenant-dashboard',
@@ -43,13 +49,20 @@ import { NgIf } from "@angular/common";
     MatSortModule,
     MatIconModule,
     MatCheckbox,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+    MatAutocompleteModule,
     FormsModule,
+    ReactiveFormsModule,
+    AsyncPipe,
+    NgFor,
     NgIf
   ],
   templateUrl: './tenant-dashboard.component.html',
   styleUrls: ['./tenant-dashboard.component.scss']
 })
-export class TenantDashboardComponent implements OnInit {
+export class TenantDashboardComponent implements OnInit, OnDestroy {
   private initPageSize: number = 10;
   private initPageNumber: number = 0;
 
@@ -60,9 +73,18 @@ export class TenantDashboardComponent implements OnInit {
   dataSource = new MatTableDataSource<IFacilityConfigModel>(this.facilities);
   showDeleted = false;
 
+  readonly vendorOptions = Object.values(Vendor);
+  readonly timezoneOptions: string[] = moment.tz.names();
+
+  // Facility autocomplete
+  facilityInputControl = new FormControl<string>('');
+  selectedFacilityId: string | null = null;
+  filteredFacilities: Observable<{ facilityId: string; facilityName: string }[]> = of([]);
+  private facilityAutocompleteSubscription: Subscription | undefined;
+
   //search parameters
-  filterFacilityBy: string = '';
-  filterFacilityName: string = '';
+  filterTimeZone: string = '';
+  filterVendor: string = '';
   sortBy: string = 'FacilityId';
   sortOrder: number = 0;
 
@@ -77,18 +99,45 @@ export class TenantDashboardComponent implements OnInit {
     this.dataSource = new MatTableDataSource<IFacilityConfigModel>();
     this.paginationMetadata.pageNumber = this.initPageNumber;
     this.paginationMetadata.pageSize = this.initPageSize;
+
+    this.filteredFacilities = this.facilityInputControl.valueChanges.pipe(
+      startWith(''),
+      debounceTime(300),
+      distinctUntilChanged(),
+      switchMap(term => {
+        const search = typeof term === 'string' ? term : '';
+        return this.tenantService.autocompleteFacilities(search, this.showDeleted);
+      }),
+      map(results => Object.entries(results || {}).map(([facilityId, facilityName]) => ({ facilityId, facilityName: facilityName as string })))
+    );
+
     this.getFacilities();
   }
 
+  ngOnDestroy(): void {
+    this.facilityAutocompleteSubscription?.unsubscribe();
+  }
+
   getFacilities() {
+    const facilityIdParam = this.selectedFacilityId ?? '';
+    const facilityNameParam = !this.selectedFacilityId ? (this.facilityInputControl.value || '') : '';
     this.tenantService.listFacilities(
-      this.filterFacilityBy,
-      this.filterFacilityName,
+      facilityIdParam,
+      facilityNameParam,
+      this.filterTimeZone,
+      this.filterVendor,
       this.sortBy,
       this.sortOrder,
       this.paginationMetadata.pageSize,
       this.paginationMetadata.pageNumber,
       this.showDeleted).subscribe((facilities: PagedFacilityConfigModel) => {
+        if (!facilities) {
+          this.facilities = [];
+          this.dataSource.data = [];
+          this.paginationMetadata.totalCount = 0;
+          this.paginationMetadata.totalPages = 0;
+          return;
+        }
         this.facilities = facilities.records;
         this.dataSource.data = this.facilities;
         this.paginationMetadata = facilities.metadata;
@@ -130,7 +179,54 @@ export class TenantDashboardComponent implements OnInit {
       });
   }
 
+  onFacilityInput(): void {
+    this.selectedFacilityId = null;
+    this.onSearchChange();
+  }
+
+  onFacilitySelected(fac: { facilityId: string; facilityName: string }): void {
+    this.selectedFacilityId = fac.facilityId;
+    this.facilityInputControl.setValue(fac.facilityName || fac.facilityId, { emitEvent: false });
+    this.onSearchChange();
+  }
+
+  clearFacilityFilter(): void {
+    this.selectedFacilityId = null;
+    this.facilityInputControl.setValue('', { emitEvent: false });
+    this.onSearchChange();
+  }
+
+  displayFacility(fac: { facilityId: string; facilityName: string } | string | null): string {
+    if (!fac) return '';
+    if (typeof fac === 'string') return fac;
+    return fac.facilityName || fac.facilityId;
+  }
+
+  trackFacility(_: number, fac: { facilityId: string }): string {
+    return fac.facilityId;
+  }
+
+  clearFilters(): void {
+    this.selectedFacilityId = null;
+    this.facilityInputControl.setValue('', { emitEvent: false });
+    this.filterTimeZone = '';
+    this.filterVendor = '';
+    this.showDeleted = false;
+    this.paginationMetadata.pageNumber = 0;
+    this.getFacilities();
+  }
+
+  hasActiveFilters(): boolean {
+    return !!(this.selectedFacilityId || this.facilityInputControl.value ||
+              this.filterTimeZone || this.filterVendor || this.showDeleted);
+  }
+
   onShowDeletedChange(): void {
+    this.paginationMetadata.pageNumber = 0;
+    this.getFacilities();
+  }
+
+  onSearchChange(): void {
     this.paginationMetadata.pageNumber = 0;
     this.getFacilities();
   }
@@ -140,6 +236,7 @@ export class TenantDashboardComponent implements OnInit {
       'facilityId': 'FacilityId',
       'facilityName': 'FacilityName',
       'timeZone': 'TimeZone',
+      'vendor': 'Vendor',
       'isDeleted': 'IsDeleted'
     };
 

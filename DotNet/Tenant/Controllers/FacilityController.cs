@@ -105,12 +105,13 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet(Name = "GetFacilities")]
         public async Task<ActionResult<PagedConfigModel<FacilityModel>>> GetFacilities(string? facilityId,
-            string? facilityName, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1,
-            bool includeDeleted = false,
+            string? facilityName, string? timeZone, Vendor? vendor, string? sortBy, SortOrder? sortOrder,
+            int pageSize = 10, int pageNumber = 1, bool includeDeleted = false,
             CancellationToken cancellationToken = default)
         {
             facilityId = facilityId?.Sanitize();
             facilityName = facilityName?.Sanitize();
+            timeZone = timeZone?.Sanitize();
             sortBy = sortBy?.Sanitize();
 
             if (pageNumber < 1)
@@ -127,7 +128,13 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities");
 
-            var searchModel = new FacilitySearchModel { FacilityId = facilityId, FacilityName = facilityName };
+            var searchModel = new FacilitySearchModel
+            {
+                FacilityId = facilityId,
+                FacilityName = facilityName,
+                TimeZone = timeZone,
+                Vendor = vendor
+            };
             var pagedFacilityConfigModelDto = await _facilityQueries.PagedSearchAsync(searchModel, sortBy, sortOrder.Value, pageSize, pageNumber, includeDeleted, cancellationToken);
 
             if (pagedFacilityConfigModelDto.Records.Count == 0)
