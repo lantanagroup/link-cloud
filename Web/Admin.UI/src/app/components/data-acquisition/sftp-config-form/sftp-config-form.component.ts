@@ -1,10 +1,12 @@
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
 import {
+  AbstractControl,
   FormArray,
   FormBuilder,
   FormControl,
   FormGroup,
   ReactiveFormsModule,
+  ValidationErrors,
   Validators
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -80,7 +82,7 @@ export class SftpConfigFormComponent implements OnInit, OnChanges {
       facilityId: this.fb.control('', Validators.required),
       host: this.fb.control('', Validators.required),
       port: this.fb.control(22, [Validators.required, Validators.min(1), Validators.max(65535)]),
-      remoteDirectory: this.fb.control(''),
+      remoteDirectory: this.fb.control('/', Validators.required),
       timeout: this.fb.control('00:01:00', Validators.required),
       removeAfterProcessing: this.fb.control(false),
       enableBenchmarking: this.fb.control(false),
@@ -100,7 +102,7 @@ export class SftpConfigFormComponent implements OnInit, OnChanges {
       this.hostControl.updateValueAndValidity();
       this.portControl.setValue(this.item.port);
       this.portControl.updateValueAndValidity();
-      this.remoteDirectoryControl.setValue(this.item.remoteDirectory || '');
+      this.remoteDirectoryControl.setValue(this.item.remoteDirectory || '/');
       this.remoteDirectoryControl.updateValueAndValidity();
       this.timeoutControl.setValue(this.item.timeout);
       this.timeoutControl.updateValueAndValidity();
@@ -148,7 +150,7 @@ export class SftpConfigFormComponent implements OnInit, OnChanges {
       this.hostControl.updateValueAndValidity();
       this.portControl.setValue(this.item.port);
       this.portControl.updateValueAndValidity();
-      this.remoteDirectoryControl.setValue(this.item.remoteDirectory || '');
+      this.remoteDirectoryControl.setValue(this.item.remoteDirectory || '/');
       this.remoteDirectoryControl.updateValueAndValidity();
       this.timeoutControl.setValue(this.item.timeout);
       this.timeoutControl.updateValueAndValidity();
@@ -279,11 +281,22 @@ export class SftpConfigFormComponent implements OnInit, OnChanges {
     return this.fb.group({
       acquisitionType: [config?.acquisitionType || SftpAcquisitionType.Census, Validators.required],
       subType: [config?.subType || SftpAcquisitionSubType.None, Validators.required],
-      remoteDirectory: [config?.remoteDirectory || ''],
-      processedDirectory: [config?.processedDirectory || ''],
+      remoteDirectory: [config?.remoteDirectory || '', SftpConfigFormComponent.notBlankValidator],
+      processedDirectory: [config?.processedDirectory || '', SftpConfigFormComponent.notBlankValidator],
       fileNamePattern: [config?.fileNamePattern || ''],
       parsingConfiguration: [config?.parsingConfiguration || null]
     });
+  }
+
+  /**
+   * Validator that allows empty (inherits from parent) but rejects whitespace-only values.
+   */
+  static notBlankValidator(control: AbstractControl): ValidationErrors | null {
+    const value = control.value;
+    if (typeof value === 'string' && value.length > 0 && value.trim().length === 0) {
+      return { blank: true };
+    }
+    return null;
   }
 
   addAcquisitionConfiguration(): void {
@@ -300,7 +313,7 @@ export class SftpConfigFormComponent implements OnInit, OnChanges {
   }
 
   clearRemoteDirectory(): void {
-    this.remoteDirectoryControl.setValue('');
+    this.remoteDirectoryControl.setValue('/');
     this.remoteDirectoryControl.updateValueAndValidity();
   }
 
@@ -310,12 +323,16 @@ export class SftpConfigFormComponent implements OnInit, OnChanges {
         organizationId: this.facilityIdControl.value,
         host: this.hostControl.value,
         port: this.portControl.value,
-        remoteDirectory: this.remoteDirectoryControl.value || undefined,
+        remoteDirectory: this.remoteDirectoryControl.value,
         timeout: this.timeoutControl.value,
         removeAfterProcessing: this.removeAfterProcessingControl.value,
         authenticationProtocol: 'Basic',
         enableBenchmarking: this.enableBenchmarkingControl.value,
-        acquisitionConfigurations: this.acquisitionConfigurationsArray.value
+        acquisitionConfigurations: this.acquisitionConfigurationsArray.value.map((ac: any) => ({
+          ...ac,
+          remoteDirectory: ac.remoteDirectory || undefined,
+          processedDirectory: ac.processedDirectory || undefined
+        }))
       };
 
       // Add credentials if provided

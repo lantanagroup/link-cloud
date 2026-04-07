@@ -89,6 +89,13 @@ public class SftpSession : ISftpSession
         ObjectDisposedException.ThrowIf(_disposed, this);
         cancellationToken.ThrowIfCancellationRequested();
 
+        // Validate the remote directory path before attempting SFTP operations
+        if (string.IsNullOrWhiteSpace(remoteDirectory))
+        {
+            throw new InvalidOperationException(
+                "Remote directory path is empty. Please configure a valid remote directory path (e.g., '/' for root).");
+        }
+
         // Verify the remote directory exists before attempting to list
         if (!_client.Exists(remoteDirectory))
         {

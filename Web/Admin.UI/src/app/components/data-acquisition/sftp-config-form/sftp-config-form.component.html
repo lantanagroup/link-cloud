@@ -40,7 +40,10 @@
           <mat-icon>close</mat-icon>
         </button>
       }
-      <mat-hint>Path to the directory containing census files (optional)</mat-hint>
+      @if (!viewOnly && remoteDirectoryControl.hasError('required')) {
+        <mat-error>Remote directory is <strong>required</strong>. Use '/' for the root directory.</mat-error>
+      }
+      <mat-hint>Path to the directory on the SFTP server (use '/' for root)</mat-hint>
     </mat-form-field>
   </div>
 
@@ -125,6 +128,9 @@
               <mat-label>Remote Directory</mat-label>
               <input matInput formControlName="remoteDirectory" [readonly]="viewOnly"
                      placeholder="/path/to/files">
+              @if (!viewOnly && config.get('remoteDirectory')?.hasError('blank')) {
+                <mat-error>Remote directory cannot be blank. Provide a valid path or clear the field.</mat-error>
+              }
               <mat-hint>Directory for this acquisition type (optional, defaults to connection's remote directory)</mat-hint>
             </mat-form-field>
 
@@ -132,6 +138,9 @@
               <mat-label>Processed Directory</mat-label>
               <input matInput formControlName="processedDirectory" [readonly]="viewOnly"
                      placeholder="/path/to/processed">
+              @if (!viewOnly && config.get('processedDirectory')?.hasError('blank')) {
+                <mat-error>Processed directory cannot be blank. Provide a valid path or clear the field.</mat-error>
+              }
               <mat-hint>Move files here after processing (optional, recommended for audit trail)</mat-hint>
             </mat-form-field>
 
