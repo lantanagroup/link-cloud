@@ -338,8 +338,10 @@ public class SftpAcquisitionHandler(
             logger.LogError(ex, "Invalid operation for SFTP acquisition log {LogId} for facility {FacilityId}: {Message}",
                 log.Id, log.FacilityId, ex.Message);
 
-            // InvalidOperationException typically indicates a configuration issue (e.g., missing acquisition config)
-            await logManager.SetConfigurationRequiredAsync(log.Id, ex.Message, cancellationToken);
+            // InvalidOperationException typically indicates a configuration issue (e.g., missing acquisition config, invalid remote directory)
+            await SetStatusOrLogFailure(
+                () => logManager.SetConfigurationRequiredAsync(log.Id, ex.Message, cancellationToken),
+                log.Id, cancellationToken);
 
             return new LogProcessingResult(SessionMayBeUnhealthy: false);
         }
@@ -349,7 +351,9 @@ public class SftpAcquisitionHandler(
             activity?.AddException(ex);
 
             // NotSupportedException indicates an unsupported acquisition type - configuration issue
-            await logManager.SetConfigurationRequiredAsync(log.Id, ex.Message, cancellationToken);
+            await SetStatusOrLogFailure(
+                () => logManager.SetConfigurationRequiredAsync(log.Id, ex.Message, cancellationToken),
+                log.Id, cancellationToken);
 
             return new LogProcessingResult(SessionMayBeUnhealthy: false);
         }
@@ -362,7 +366,9 @@ public class SftpAcquisitionHandler(
             activity?.AddException(ex);
 
             // Use retry logic with exponential backoff
-            await FailLogWithRetryAsync(log, ex.Message, logManager, cancellationToken);
+            await SetStatusOrLogFailure(
+                () => FailLogWithRetryAsync(log, ex.Message, logManager, cancellationToken),
+                log.Id, cancellationToken);
 
             // Check if exception indicates potential session/connection issues
             var sessionMayBeUnhealthy = IsSessionRelatedException(ex);
@@ -405,6 +411,25 @@ public class SftpAcquisitionHandler(
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Wraps a status-transition call so that if the DB update itself fails,
+    /// the exception is logged instead of propagating out of a catch block
+    /// and leaving the log stuck in Processing state.
+    /// </summary>
+    private async Task SetStatusOrLogFailure(Func<Task> statusTransition, long logId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await statusTransition();
+        }
+        catch (Exception ex)
+        {
+            logger.LogCritical(ex,
+                "Failed to update status for SFTP acquisition log {LogId}. The log may be stuck in Processing state and require manual intervention.",
+                logId);
+        }
     }
 
     private static List<SftpAcquisitionBenchmark>? GetBenchmarks(SftpBenchmarkCollector? collector)
