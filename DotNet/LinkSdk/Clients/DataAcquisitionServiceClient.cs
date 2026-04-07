@@ -91,14 +91,16 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         string reportId,
         int pageSize = 100,
         int pageNumber = 1,
+        string sortBy = "Id",
+        string sortOrder = "Ascending",
         CancellationToken cancellationToken = default) =>
         Request("data/acquisition-logs")
             .SetQueryParam("facilityId", facilityId)
             .SetQueryParam("reportId", reportId)
             .SetQueryParam("pageSize", pageSize)
             .SetQueryParam("pageNumber", pageNumber)
-            .SetQueryParam("sortBy", "Id")
-            .SetQueryParam("sortOrder", "Ascending")
+            .SetQueryParam("sortBy", sortBy)
+            .SetQueryParam("sortOrder", sortOrder)
             .GetJsonAsync<PagedConfigModel<DataAcquisitionLogApiModel>>(cancellationToken: cancellationToken);
 
     public Task<DataAcquisitionLogApiModel?> GetAcquisitionLogByIdAsync(

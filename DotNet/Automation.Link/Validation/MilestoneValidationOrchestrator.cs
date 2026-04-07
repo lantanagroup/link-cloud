@@ -153,7 +153,7 @@ public class MilestoneValidationOrchestrator
         if (_expectedPatientCount <= 0)
             return;
 
-        var completedPatients = summary.TotalPatients;
+        var completedPatients = summary.TotalCompletedPatients;
 
         // Must satisfy basic completion criteria first.
         if (completedPatients < _expectedPatientCount)

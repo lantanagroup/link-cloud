@@ -75,12 +75,13 @@ public sealed class StoreBackedServicePoller
 
     private async Task PollAllDomainsAsync(Guid scheduleId, CancellationToken ct)
     {
-        await PollDomainAsync("schedule", () => PollScheduleAsync(scheduleId, ct));
-        await PollDomainAsync("entries", () => PollEntriesAsync(scheduleId, ct));
-        await PollDomainAsync("populations", () => PollPopulationsAsync(scheduleId, ct));
-        await PollDomainAsync("acquisitionSummary", () => PollAcquisitionAsync(ct));
-        await PollDomainAsync("measureResources", () => PollMeasureEvalResourcesAsync(scheduleId, ct));
-        await PollDomainAsync("validationResources", () => PollValidationResourcesAsync(scheduleId, ct));
+        await Task.WhenAll(
+            PollDomainAsync("schedule", () => PollScheduleAsync(scheduleId, ct)),
+            PollDomainAsync("entries", () => PollEntriesAsync(scheduleId, ct)),
+            PollDomainAsync("populations", () => PollPopulationsAsync(scheduleId, ct)),
+            PollDomainAsync("acquisitionSummary", () => PollAcquisitionAsync(ct)),
+            PollDomainAsync("measureResources", () => PollMeasureEvalResourcesAsync(scheduleId, ct)),
+            PollDomainAsync("validationResources", () => PollValidationResourcesAsync(scheduleId, ct)));
     }
 
     private async Task PollDomainAsync(string domain, Func<Task> action)
@@ -157,45 +158,11 @@ public sealed class StoreBackedServicePoller
     private async Task PollAcquisitionAsync(CancellationToken ct)
     {
         var summary = await _reader.GetDataAcquisitionReportSummaryAsync(_meta.ReportId);
-        var resourceTypeCounts = await GetDataAcquisitionResourceTypeCountsAsync();
 
         if (summary == null)
-        {
-            var totalResources = resourceTypeCounts.Sum(x => x.Count);
-            summary = new PipelineDataReader.AcquisitionSummaryInfo(
-                _meta.ReportId,
-                TotalLogs: 0,
-                TotalPatients: 0,
-                TotalResourcesAcquired: totalResources,
-                TotalRetryAttempts: 0,
-                TotalCompletionTimeMs: 0,
-                AverageCompletionTimeMs: 0,
-                StatusCounts: [],
-                ResourceTypeCounts: resourceTypeCounts);
-        }
-        else if (resourceTypeCounts.Count > 0)
-        {
-            var totalResources = resourceTypeCounts.Sum(x => x.Count);
-            summary = summary with
-            {
-                ResourceTypeCounts = resourceTypeCounts,
-                TotalResourcesAcquired = Math.Max(summary.TotalResourcesAcquired, totalResources)
-            };
-        }
+            return;
 
         await _store.SetDomainAsync(_meta.RunId, "acquisitionSummary", summary, ct);
-    }
-
-    private async Task<List<PipelineDataReader.ResourceTypeCountInfo>> GetDataAcquisitionResourceTypeCountsAsync()
-    {
-        var grouped = await _reader.GetDataAcquisitionResourceCountsByPatientTypeAsync(_meta.FacilityId, _meta.ReportId);
-
-        return grouped
-            .Where(x => !string.IsNullOrWhiteSpace(x.ResourceType))
-            .GroupBy(x => x.ResourceType)
-            .Select(g => new PipelineDataReader.ResourceTypeCountInfo(g.Key, g.Sum(x => x.Count)))
-            .OrderByDescending(x => x.Count)
-            .ToList();
     }
 
     private async Task PollMeasureEvalResourcesAsync(Guid scheduleId, CancellationToken ct)

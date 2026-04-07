@@ -22,6 +22,7 @@
 ## dataacq: 8065
 ## dataacq-worker: 8078
 ## admin-ui: 8066
+## automation-ui: 5256
 ## measureeval: 8067
 ## normalization: 8068
 ## querydispatch: 8071
@@ -657,6 +658,28 @@ services:
       - link-nw
     depends_on:
       - admin-bff
+
+  automation-ui:
+    image: link-automation-ui
+    container_name: link-automation-ui
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+    ports:
+      - "5256:5257"
+    build:
+      context: .
+      dockerfile: DotNet/Automation.UI/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
+    networks:
+      - link-nw
+    depends_on:
+      mongo:
+        condition: service_healthy
+      admin-bff:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5257/"]
 
   measureeval:
     image: link-measureeval

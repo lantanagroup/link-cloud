@@ -317,18 +317,30 @@
                     <table class="table table-sm table-striped" id="dataAcqLogTable">
                         <thead>
                             <tr>
-                                <th>Id</th>
-                                <th>Patient</th>
-                                <th>Status</th>
-                                <th>Phase</th>
-                                <th>Resources</th>
-                                <th>Notes</th>
+                                <th role="button" class="user-select-none" data-sortby="Id">Id <span id="sortIconId" class="text-muted"></span></th>
+                                <th role="button" class="user-select-none" data-sortby="PatientId">Patient <span id="sortIconPatientId" class="text-muted"></span></th>
+                                <th role="button" class="user-select-none" data-sortby="Status">Status <span id="sortIconStatus" class="text-muted"></span></th>
+                                <th role="button" class="user-select-none" data-sortby="QueryPhase">Phase <span id="sortIconQueryPhase" class="text-muted"></span></th>
+                                <th>Reference</th>
+                                <th>Resource Types</th>
+                                <th>Details</th>
                             </tr>
                         </thead>
                         <tbody id="dataAcqLogTableBody">
                         </tbody>
                     </table>
                 </div>
+
+<div id="daLogFlyout" style="position:fixed; top:0; right:-560px; width:540px; height:100%; background:#fff; box-shadow:-4px 0 20px rgba(0,0,0,.2); z-index:1060; transition:right .2s ease;">
+    <div class="d-flex justify-content-between align-items-center border-bottom p-3">
+        <div>
+            <h6 class="mb-0" id="daLogFlyoutTitle">Data Acquisition Log Details</h6>
+            <small class="text-muted" id="daLogFlyoutSubtitle"></small>
+        </div>
+        <button class="btn btn-sm btn-outline-secondary" id="closeDaLogFlyout">Close</button>
+    </div>
+    <div class="p-3" id="daLogFlyoutBody" style="overflow:auto; height: calc(100% - 72px);"></div>
+</div>
                 <div class="d-flex justify-content-between align-items-center mt-2">
                     <span class="small text-muted" id="dataAcqLogPaginationInfo"></span>
                     <div class="btn-group btn-group-sm">
@@ -1029,18 +1041,41 @@
 
         // --- DA Log Drill-Down Modal ---
         const dataAcqLogsUrl = '@Url.Action("DataAcquisitionLogs", "Runs")';
+        const dataAcqLogDetailUrl = '@Url.Action("DataAcquisitionLogDetail", "Runs")';
         let daLogPage = 1;
         const daLogPageSize = 50;
+        let daSortBy = 'Id';
+        let daSortOrder = 'Ascending';
+
+        function updateDaSortIcons() {
+            const map = {
+                Id: 'sortIconId',
+                PatientId: 'sortIconPatientId',
+                Status: 'sortIconStatus',
+                QueryPhase: 'sortIconQueryPhase'
+            };
+
+            for (const key of Object.keys(map)) {
+                const el = document.getElementById(map[key]);
+                if (!el) continue;
+                if (key !== daSortBy) {
+                    el.textContent = '';
+                    continue;
+                }
+
+                el.textContent = daSortOrder === 'Ascending' ? '▲' : '▼';
+            }
+        }
 
         async function loadDataAcqLogs(page) {
             daLogPage = page;
             const tbody = document.getElementById('dataAcqLogTableBody');
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Loading...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Loading...</td></tr>';
 
             try {
-                const res = await fetch(`${dataAcqLogsUrl}?id=${encodeURIComponent(runId)}&pageNumber=${page}&pageSize=${daLogPageSize}`);
+                const res = await fetch(`${dataAcqLogsUrl}?id=${encodeURIComponent(runId)}&pageNumber=${page}&pageSize=${daLogPageSize}&sortBy=${encodeURIComponent(daSortBy)}&sortOrder=${encodeURIComponent(daSortOrder)}`);
                 if (!res.ok) {
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Failed to load logs.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Failed to load logs.</td></tr>';
                     return;
                 }
 
@@ -1056,36 +1091,126 @@
                 document.getElementById('dataAcqLogNext').disabled = page >= totalPages;
 
                 if (!records.length) {
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No logs found.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No logs found.</td></tr>';
                     return;
                 }
 
                 tbody.innerHTML = records.map(r => {
                     const status = r.status ?? r.Status ?? '-';
                     const phase = r.queryPhase ?? r.QueryPhase ?? '-';
+                    const isReference = r.isReferenceLog === true || r.IsReferenceLog === true;
+                    const resourceTypes = r.resourceTypes || r.ResourceTypes || [];
                     const patient = r.patientId ?? r.PatientId ?? '-';
-                    const resCount = (r.resourceAcquiredIds || r.ResourceAcquiredIds || []).length;
-                    const notes = (r.notes || r.Notes || []).slice(0, 2).join('; ') || '-';
+                    const logId = r.id ?? r.Id;
                     const statusClass = status.toLowerCase() === 'completed' ? 'text-success'
                         : status.toLowerCase() === 'failed' ? 'text-danger'
                         : status.toLowerCase() === 'processing' ? 'text-info'
                         : '';
                     return `<tr>
-                        <td class="small">${r.id ?? r.Id ?? '-'}</td>
+                        <td class="small">${logId ?? '-'}</td>
                         <td class="small">${escapeHtml(patient)}</td>
                         <td class="small ${statusClass}">${escapeHtml(status)}</td>
                         <td class="small">${escapeHtml(phase)}</td>
-                        <td class="small">${resCount}</td>
-                        <td class="small" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(notes)}">${escapeHtml(notes)}</td>
+                        <td class="small">${isReference ? '<span class="badge bg-info text-dark">Reference</span>' : '<span class="text-muted">-</span>'}</td>
+                        <td class="small" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(resourceTypes.join(', '))}">${escapeHtml(resourceTypes.join(', ') || '-')}</td>
+                        <td class="small">
+                            <button type="button" class="btn btn-sm btn-outline-secondary da-detail-btn" data-logid="${logId}" title="View details">🗒️</button>
+                        </td>
                     </tr>`;
                 }).join('');
+
+                for (const btn of tbody.querySelectorAll('.da-detail-btn')) {
+                    btn.addEventListener('click', () => openDaLogDetails(btn.getAttribute('data-logid')));
+                }
             } catch {
-                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading logs.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error loading logs.</td></tr>';
             }
         }
+
+        async function openDaLogDetails(logId) {
+            if (!logId) return;
+
+            const flyout = document.getElementById('daLogFlyout');
+            const title = document.getElementById('daLogFlyoutTitle');
+            const subtitle = document.getElementById('daLogFlyoutSubtitle');
+            const body = document.getElementById('daLogFlyoutBody');
+
+            title.textContent = `Data Acquisition Log ${logId}`;
+            subtitle.textContent = 'Loading...';
+            body.innerHTML = '<div class="text-muted">Loading details...</div>';
+            flyout.style.right = '0';
+
+            try {
+                const res = await fetch(`${dataAcqLogDetailUrl}?id=${encodeURIComponent(runId)}&logId=${encodeURIComponent(logId)}`);
+                if (!res.ok) {
+                    subtitle.textContent = '';
+                    body.innerHTML = '<div class="text-danger">Failed to load log details.</div>';
+                    return;
+                }
+
+                const d = await res.json();
+                const notes = d.notes || d.Notes || [];
+                const resources = d.resourceAcquiredIds || d.ResourceAcquiredIds || [];
+                const resourceTypes = d.resourceTypes || d.ResourceTypes || [];
+                const isReference = d.isReferenceLog === true || d.IsReferenceLog === true;
+                const referenceResourceCount = d.referenceResourceCount ?? d.ReferenceResourceCount ?? 0;
+                const status = d.status ?? d.Status ?? '-';
+                const phase = d.queryPhase ?? d.QueryPhase ?? '-';
+                const patient = d.patientId ?? d.PatientId ?? '-';
+
+                subtitle.textContent = `Patient: ${patient} | Status: ${status} | Phase: ${phase}`;
+                body.innerHTML = `
+                    <div class="mb-3">
+                        <div class="small text-muted">Reference Workflow</div>
+                        <div class="small">${isReference ? 'Yes' : 'No'}${isReference ? ` (stored reference resources: ${referenceResourceCount})` : ''}</div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="small text-muted">Resource Types</div>
+                        <div class="small">${escapeHtml(resourceTypes.join(', ') || '-')}</div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="small text-muted">Completion</div>
+                        <div class="small">${escapeHtml(String(d.completionDate ?? d.CompletionDate ?? '-'))}</div>
+                        <div class="small">${escapeHtml(String(d.completionTimeMilliseconds ?? d.CompletionTimeMilliseconds ?? '-'))} ms</div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="small text-muted mb-1">Resources (${resources.length})</div>
+                        <pre style="max-height:200px;overflow:auto;background:#f8f9fa;padding:8px;">${escapeHtml(resources.join('\n') || '(none)')}</pre>
+                    </div>
+                    <div>
+                        <div class="small text-muted mb-1">Notes (${notes.length})</div>
+                        <pre style="max-height:260px;overflow:auto;background:#f8f9fa;padding:8px;">${escapeHtml(notes.join('\n') || '(none)')}</pre>
+                    </div>`;
+            } catch {
+                subtitle.textContent = '';
+                body.innerHTML = '<div class="text-danger">Error loading log details.</div>';
+            }
+        }
+
+        for (const th of document.querySelectorAll('#dataAcqLogTable thead th[data-sortby]')) {
+            th.addEventListener('click', () => {
+                const nextSortBy = th.getAttribute('data-sortby');
+                if (!nextSortBy) return;
+
+                if (daSortBy === nextSortBy) {
+                    daSortOrder = daSortOrder === 'Ascending' ? 'Descending' : 'Ascending';
+                } else {
+                    daSortBy = nextSortBy;
+                    daSortOrder = 'Ascending';
+                }
+
+                updateDaSortIcons();
+                loadDataAcqLogs(1);
+            });
+        }
+
+        updateDaSortIcons();
 
         document.getElementById('dataAcqLogModal').addEventListener('show.bs.modal', () => loadDataAcqLogs(1));
         document.getElementById('dataAcqLogPrev').addEventListener('click', () => { if (daLogPage > 1) loadDataAcqLogs(daLogPage - 1); });
         document.getElementById('dataAcqLogNext').addEventListener('click', () => loadDataAcqLogs(daLogPage + 1));
+        document.getElementById('closeDaLogFlyout').addEventListener('click', () => {
+            document.getElementById('daLogFlyout').style.right = '-560px';
+        });
     })();
 </script>

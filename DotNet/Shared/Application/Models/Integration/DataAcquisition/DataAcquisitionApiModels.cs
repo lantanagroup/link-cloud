@@ -7,9 +7,14 @@ public class DataAcquisitionLogApiModel
     public long Id { get; set; }
     public string FacilityId { get; set; } = string.Empty;
     public string? PatientId { get; set; }
+    public string? CorrelationId { get; set; }
     public string? ReportTrackingId { get; set; }
     public RequestStatus? Status { get; set; }
     public QueryPhase? QueryPhase { get; set; }
+    public DateTime? CompletionDate { get; set; }
+    public long? CompletionTimeMilliseconds { get; set; }
+    public bool IsReferenceLog { get; set; }
+    public List<string> ResourceTypes { get; set; } = [];
     public List<FhirQueryApiModel> FhirQuery { get; set; } = [];
     public List<string>? ResourceAcquiredIds { get; set; } = [];
     public List<ReferenceResourceApiModel> ReferenceResources { get; set; } = [];

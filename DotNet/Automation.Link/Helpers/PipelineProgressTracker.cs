@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Shared.Application.Enums;
+﻿using LantanaGroup.Link.Shared.Application.Enums;
 
 namespace LantanaGroup.Link.Automation.Link.Helpers;
 
@@ -111,13 +111,8 @@ public class PipelineProgressTracker
             stageDetails.Add($"valid={patientsValidated}/{_expectedPatientCount}");
             stageDetails.Add($"submit={patientsSubmitted}/{_expectedPatientCount}");
 
-            var logs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
-
-            var patientsAcquired = logs
-                .Where(l => string.Equals(l.Status, "Completed", StringComparison.OrdinalIgnoreCase) && l.PatientId != null)
-                .Select(l => l.PatientId)
-                .Distinct()
-                .Count();
+            var acqSummary = await _reader.GetDataAcquisitionReportSummaryAsync(reportId);
+            var patientsAcquired = acqSummary?.TotalCompletedPatients ?? 0;
 
             patientsAcquired = Math.Min(patientsAcquired, _expectedPatientCount);
             completedUnits += patientsAcquired;

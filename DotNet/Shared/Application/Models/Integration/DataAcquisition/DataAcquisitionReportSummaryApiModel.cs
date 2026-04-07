@@ -10,6 +10,7 @@ public class DataAcquisitionReportSummaryApiModel
     public string ReportId { get; set; } = string.Empty;
     public int TotalLogs { get; set; }
     public int TotalPatients { get; set; }
+    public int TotalCompletedPatients { get; set; }
     public int TotalResourcesAcquired { get; set; }
     public int TotalRetryAttempts { get; set; }
     public long TotalCompletionTimeMs { get; set; }

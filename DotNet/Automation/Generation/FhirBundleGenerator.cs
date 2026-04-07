@@ -34,13 +34,13 @@ public static class FhirBundleGenerator
         ("Observation",               0.28),
         ("Condition",                 0.08),
         ("Procedure",                 0.07),
+        ("Medication",                0.03),
         ("MedicationRequest",         0.06),
         ("MedicationAdministration",  0.07),
         ("DiagnosticReport",          0.06),
         ("ServiceRequest",            0.07),
         ("Coverage",                  0.01),
         ("Specimen",                  0.06),
-        ("Medication",                0.03),
         ("AllergyIntolerance",        0.02),
         ("Immunization",              0.03),
         ("ImagingStudy",              0.02),
@@ -111,8 +111,9 @@ public static class FhirBundleGenerator
             var entries = new List<Bundle.EntryComponent>();
 
             // Core anchors — order matters: Patient ? Device ? Encounter ? Diagnoses ? Care
-            entries.Add(Entry($"Patient/{patientId}",
-                PatientFactory.Generate(patientId, patientSeed, gpPractId)));
+            var patient = PatientFactory.Generate(patientId, patientSeed, gpPractId);
+            patient.ManagingOrganization = new ResourceReference($"Organization/{HospitalOrgId}", "General Test Hospital");
+            entries.Add(Entry($"Patient/{patientId}", patient));
 
             entries.Add(Entry($"Device/{patientDeviceId}",
                 DeviceFactory.Generate(patientDeviceId, patientSeed, patientId)));
@@ -162,7 +163,7 @@ public static class FhirBundleGenerator
                         "Observation" => ObservationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, specimenIds, observationIds),
                         "Condition" => ConditionFactory.Generate(resourceId, patientId, encounterId, effectiveDate, encEnd, seed, conditionIds),
                         "Procedure" => ProcedureFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, HospitalLocationId, HospitalOrgId, conditionIds),
-                        "MedicationRequest" => MedicationRequestFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, conditionIds),
+                        "MedicationRequest" => MedicationRequestFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, conditionIds, medicationIds),
                         "MedicationAdministration" => MedicationAdministrationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, medicationIds, practId),
                         "DiagnosticReport" => DiagnosticReportFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, observationIds, specimenIds, practId),
                         "ServiceRequest" => ServiceRequestFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, conditionIds),
@@ -186,6 +187,8 @@ public static class FhirBundleGenerator
             var listId = $"SyntheticList-{patientIdPrefix}-{patientId}";
             entries.Add(Entry($"List/{listId}",
                 CensusListFactory.Generate(listId, patientId, patientIdPrefix, encStart)));
+
+            EnrichPatientReferenceGraph(entries);
 
             output.WriteLine($"  Patient {patientId}: {entries.Count} entries | scenario={scenario.PrimaryDxDisplay} | " +
                              $"encounter={encounterId} LOS={(encEnd - encStart).TotalDays:F1}d " +
@@ -390,8 +393,9 @@ public static class FhirBundleGenerator
 
             var entries = new List<Bundle.EntryComponent>();
 
-            entries.Add(Entry($"Patient/{patientId}",
-                PatientFactory.Generate(patientId, patientSeed, gpPractId)));
+            var patient = PatientFactory.Generate(patientId, patientSeed, gpPractId);
+            patient.ManagingOrganization = new ResourceReference($"Organization/{HospitalOrgId}", "General Test Hospital");
+            entries.Add(Entry($"Patient/{patientId}", patient));
 
             entries.Add(Entry($"Device/{patientDeviceId}",
                 DeviceFactory.Generate(patientDeviceId, patientSeed, patientId)));
@@ -490,7 +494,7 @@ public static class FhirBundleGenerator
                         "Observation" => ObservationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, specimenIds, observationIds),
                         "Condition" => ConditionFactory.Generate(resourceId, patientId, encounterId, effectiveDate, encEnd, seed, conditionIds),
                         "Procedure" => ProcedureFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, HospitalLocationId, HospitalOrgId, conditionIds),
-                        "MedicationRequest" => MedicationRequestFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, conditionIds),
+                        "MedicationRequest" => MedicationRequestFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, conditionIds, medicationIds),
                         "MedicationAdministration" => MedicationAdministrationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, medicationIds, practId),
                         "DiagnosticReport" => DiagnosticReportFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, observationIds, specimenIds, practId),
                         "ServiceRequest" => ServiceRequestFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, conditionIds),
@@ -514,6 +518,8 @@ public static class FhirBundleGenerator
             var listId = $"SyntheticList-{patientIdPrefix}-{patientId}";
             entries.Add(Entry($"List/{listId}",
                 CensusListFactory.Generate(listId, patientId, patientIdPrefix, encStart)));
+
+            EnrichPatientReferenceGraph(entries);
 
             var tag = profile.Eligibility == MeasureEligibility.Qualifying ? "QUALIFYING" : "NON-QUALIFYING";
             output.WriteLine($"  Patient {patientId}: {entries.Count} entries [{tag}] | scenario={scenario.PrimaryDxDisplay} | " +
@@ -655,6 +661,102 @@ public static class FhirBundleGenerator
 
     private static DateTime EncounterEnd(int index) =>
         EncounterStart(index).AddDays(2 + ((index * 7) % 20)).AddHours(4);
+
+    /// <summary>
+    /// Adds realistic cross-resource references after all resources for a patient
+    /// have been generated. This keeps each patient graph clinically coherent and
+    /// guarantees reference links that downstream reference-resource workflows can follow.
+    /// </summary>
+    private static void EnrichPatientReferenceGraph(List<Bundle.EntryComponent> entries)
+    {
+        var diagnosticReportIds = entries
+            .Select(e => e.Resource)
+            .OfType<DiagnosticReport>()
+            .Select(r => r.Id)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .ToList();
+
+        var serviceRequests = entries
+            .Select(e => e.Resource)
+            .OfType<ServiceRequest>()
+            .ToList();
+
+        var imagingStudies = entries
+            .Select(e => e.Resource)
+            .OfType<ImagingStudy>()
+            .ToList();
+
+        var procedures = entries
+            .Select(e => e.Resource)
+            .OfType<Procedure>()
+            .ToList();
+
+        var medicationRequestIds = entries
+            .Select(e => e.Resource)
+            .OfType<MedicationRequest>()
+            .Select(r => r.Id)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .ToList();
+
+        var medicationAdministrations = entries
+            .Select(e => e.Resource)
+            .OfType<MedicationAdministration>()
+            .ToList();
+
+        var provenances = entries
+            .Select(e => e.Resource)
+            .OfType<Provenance>()
+            .ToList();
+
+        if (diagnosticReportIds.Count > 0)
+        {
+            var reportRef = new ResourceReference($"DiagnosticReport/{diagnosticReportIds[0]}");
+
+            foreach (var sr in serviceRequests.Take(3))
+            {
+                sr.SupportingInfo ??= [];
+                if (!sr.SupportingInfo.Any(r => r.Reference == reportRef.Reference))
+                    sr.SupportingInfo.Add(new ResourceReference(reportRef.Reference));
+            }
+
+            foreach (var proc in procedures.Take(2))
+            {
+                proc.Report ??= [];
+                if (!proc.Report.Any(r => r.Reference == reportRef.Reference))
+                    proc.Report.Add(new ResourceReference(reportRef.Reference));
+            }
+
+            foreach (var prov in provenances.Take(2))
+            {
+                prov.Target ??= [];
+                if (!prov.Target.Any(r => r.Reference == reportRef.Reference))
+                    prov.Target.Add(new ResourceReference(reportRef.Reference));
+            }
+        }
+
+        if (serviceRequests.Count > 0)
+        {
+            var serviceRequestRef = new ResourceReference($"ServiceRequest/{serviceRequests[0].Id}");
+
+            foreach (var study in imagingStudies.Take(2))
+            {
+                study.BasedOn ??= [];
+                if (!study.BasedOn.Any(r => r.Reference == serviceRequestRef.Reference))
+                    study.BasedOn.Add(new ResourceReference(serviceRequestRef.Reference));
+            }
+        }
+
+        if (medicationRequestIds.Count > 0)
+        {
+            var medReqRef = new ResourceReference($"MedicationRequest/{medicationRequestIds[0]}");
+
+            foreach (var admin in medicationAdministrations.Take(4))
+            {
+                if (admin.Request?.Reference != medReqRef.Reference)
+                    admin.Request = new ResourceReference(medReqRef.Reference);
+            }
+        }
+    }
 
     private static int Mod(int value, int modulus) => ((value % modulus) + modulus) % modulus;
 }

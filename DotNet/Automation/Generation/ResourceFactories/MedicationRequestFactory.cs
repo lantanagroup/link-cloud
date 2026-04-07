@@ -1,4 +1,4 @@
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using static LantanaGroup.Automation.Generation.ResourceFactories.FhirConceptFactory;
 
 namespace LantanaGroup.Automation.Generation.ResourceFactories;
@@ -9,17 +9,26 @@ public static class MedicationRequestFactory
     public static MedicationRequest Generate(
         string id, string patientId, string encounterId,
         DateTime authored, int seed, string practId,
-        List<string> conditionIds)
+        List<string> conditionIds,
+        List<string> medicationIds)
     {
         var v = FhirGenerationCodes.Medications[seed % FhirGenerationCodes.Medications.Length];
         var reasonConditionId = conditionIds.Count > 0
             ? conditionIds[seed % conditionIds.Count]
             : null;
+        var medicationRefId = medicationIds.Count > 0
+            ? medicationIds[seed % medicationIds.Count]
+            : null;
+
+        if (string.IsNullOrWhiteSpace(medicationRefId))
+            throw new InvalidOperationException("MedicationRequest generation requires at least one Medication id to enforce medication reference linkage.");
+
         return Create(id, patientId, encounterId, authored, seed, practId,
                       v.RxCode, v.Display, v.RouteCode, v.RouteDisplay,
                       v.DoseValue, v.DoseUnit, v.FreqPerDay, v.Prn,
                       v.IndicationSnomed, v.IndicationDisplay,
-                      reasonConditionId);
+                      reasonConditionId,
+                      medicationRefId);
     }
 
     /// <summary>Create a MedicationRequest with caller-supplied values.</summary>
@@ -40,15 +49,20 @@ public static class MedicationRequestFactory
         bool prn,
         string indicationCode,
         string indicationDisplay,
-        string? reasonConditionId = null)
+        string? reasonConditionId = null,
+        string? medicationRefId = null)
     {
+        DataType medicationChoice = !string.IsNullOrWhiteSpace(medicationRefId)
+            ? Ref($"Medication/{medicationRefId}", display)
+            : RxNorm(rxCode, display);
+
         var request = new MedicationRequest
         {
             Id = id,
             Status = seed % 5 == 0 ? MedicationRequest.MedicationrequestStatus.Completed
                                         : MedicationRequest.MedicationrequestStatus.Active,
             Intent = MedicationRequest.MedicationRequestIntent.Order,
-            Medication = RxNorm(rxCode, display),
+            Medication = medicationChoice,
             Subject = Ref($"Patient/{patientId}"),
             Encounter = Ref($"Encounter/{encounterId}"),
             AuthoredOn = authored.ToString("yyyy-MM-ddTHH:mm:ssZ"),

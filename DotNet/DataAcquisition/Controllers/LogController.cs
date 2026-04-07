@@ -343,6 +343,7 @@ public class LogController : Controller
                 ReportId = summary.ReportId,
                 TotalLogs = summary.TotalLogs,
                 TotalPatients = summary.TotalPatients,
+                TotalCompletedPatients = summary.TotalCompletedPatients,
                 TotalResourcesAcquired = summary.TotalResourcesAcquired,
                 TotalRetryAttempts = summary.TotalRetryAttempts,
                 TotalCompletionTimeMs = summary.TotalCompletionTimeMs,

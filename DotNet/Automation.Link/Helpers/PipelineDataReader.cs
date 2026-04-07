@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Sdk.Clients;
+﻿using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 
 namespace LantanaGroup.Link.Automation.Link.Helpers;
@@ -53,6 +53,7 @@ public class PipelineDataReader
         string ReportId,
         int TotalLogs,
         int TotalPatients,
+        int TotalCompletedPatients,
         int TotalResourcesAcquired,
         int TotalRetryAttempts,
         long TotalCompletionTimeMs,
@@ -504,6 +505,14 @@ public class PipelineDataReader
     public async Task<HashSet<string>> GetAcquiredResourceIdsForReportAsync(string facilityId, string reportId)
     {
         var ids = await _dataAcqClient.GetAcquiredResourceIdsForReportAsync(facilityId, reportId);
+        var normalized = ids?
+            .Where(x => !string.IsNullOrWhiteSpace(x) && x.Contains('/'))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (normalized.Count > 0 || string.IsNullOrWhiteSpace(facilityId))
+            return normalized;
+
+        ids = await _dataAcqClient.GetAcquiredResourceIdsForReportAsync(string.Empty, reportId);
         return ids?
             .Where(x => !string.IsNullOrWhiteSpace(x) && x.Contains('/'))
             .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -518,6 +527,7 @@ public class PipelineDataReader
             summary.ReportId,
             summary.TotalLogs,
             summary.TotalPatients,
+            summary.TotalCompletedPatients,
             summary.TotalResourcesAcquired,
             summary.TotalRetryAttempts,
             summary.TotalCompletionTimeMs,

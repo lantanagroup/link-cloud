@@ -466,6 +466,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     {
                         q.Id,
                         q.DataAcquisitionLogId,
+                        q.IsReference,
                         q.QueryParameters,
                         ResourceTypes = q.FhirQueryResourceTypes.Select(rt => rt.ResourceType).ToList()
                     })
@@ -476,9 +477,14 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     .GroupBy(q => q.DataAcquisitionLogId)
                     .ToDictionary(g => g.Key, g => g.First());
 
+                var hasReferenceQueryByLogId = queryInfo
+                    .GroupBy(q => q.DataAcquisitionLogId)
+                    .ToDictionary(g => g.Key, g => g.Any(x => x.IsReference == true));
+
                 records = pageLogs.Select(log =>
                 {
                     firstQueryByLogId.TryGetValue(log.Id, out var fhirQuery);
+                    hasReferenceQueryByLogId.TryGetValue(log.Id, out var isReferenceLog);
                     var resourceTypes = fhirQuery?.ResourceTypes?.Select(rt => rt.ToString()).ToList() ??
                                         new List<string>();
                     string? resourceId;
@@ -512,7 +518,8 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         RetryAttempts = log.RetryAttempts,
                         Status = log.Status,
                         IsDeleted = log.IsDeleted,
-                        ReportTrackingId = log.ReportTrackingId
+                        ReportTrackingId = log.ReportTrackingId,
+                        IsReferenceLog = isReferenceLog
                     };
                 }).ToList();
             }
@@ -811,6 +818,11 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             {
                 TotalLogs = g.Count(),
                 TotalPatients = g.Select(l => l.PatientId).Distinct().Count(),
+                TotalCompletedPatients = g
+                    .Where(l => l.PatientId != null && (l.Status == RequestStatus.Completed || l.Status == RequestStatus.Skipped))
+                    .Select(l => l.PatientId)
+                    .Distinct()
+                    .Count(),
                 TotalRetryAttempts = g.Sum(l => (int?)l.RetryAttempts ?? 0),
                 TotalCompletionTimeMs = g.Sum(l => (long?)l.CompletionTimeMilliseconds ?? 0L)
             })
@@ -828,44 +840,38 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             })
             .ToListAsync(cancellationToken);
 
-        // Resource-type counts from ResourceAcquiredIds JSON column.
-        // EF translates OPENJSON / json_each depending on provider; if that fails
-        // we fall back to a lightweight paged scan (still far cheaper than full entity load).
+        // Resource-type counts from ResourceAcquiredIds.
+        // Keep this provider-safe by materializing ResourceAcquiredIds per log,
+        // then grouping in-memory (avoids provider JSON translation edge cases).
         List<DataAcquisitionReportSummary.ResourceTypeCount> resourceTypeCounts;
         int totalResourcesAcquired;
-        try
-        {
-            var rawIds = await baseQuery
-                .Where(l => l.Status == RequestStatus.Completed && l.ResourceAcquiredIds != null)
-                .SelectMany(l => l.ResourceAcquiredIds!)
-                .ToListAsync(cancellationToken);
 
-            var grouped = rawIds
-                .Where(id => !string.IsNullOrWhiteSpace(id) && id.Contains('/'))
-                .GroupBy(id => id.Split('/')[0], StringComparer.OrdinalIgnoreCase)
-                .Select(g => new DataAcquisitionReportSummary.ResourceTypeCount
-                {
-                    ResourceType = g.Key,
-                    Count = g.Count()
-                })
-                .OrderByDescending(x => x.Count)
-                .ToList();
+        var completedLogResourceIds = await baseQuery
+            .Where(l => l.Status == RequestStatus.Completed && l.ResourceAcquiredIds != null)
+            .Select(l => l.ResourceAcquiredIds!)
+            .ToListAsync(cancellationToken);
 
-            totalResourcesAcquired = grouped.Sum(x => x.Count);
-            resourceTypeCounts = grouped;
-        }
-        catch
-        {
-            // Fallback if JSON column expansion is not supported by provider.
-            totalResourcesAcquired = 0;
-            resourceTypeCounts = [];
-        }
+        var grouped = completedLogResourceIds
+            .SelectMany(ids => ids)
+            .Where(id => !string.IsNullOrWhiteSpace(id) && id.Contains('/'))
+            .GroupBy(id => id.Split('/')[0], StringComparer.OrdinalIgnoreCase)
+            .Select(g => new DataAcquisitionReportSummary.ResourceTypeCount
+            {
+                ResourceType = g.Key,
+                Count = g.Count()
+            })
+            .OrderByDescending(x => x.Count)
+            .ToList();
+
+        totalResourcesAcquired = grouped.Sum(x => x.Count);
+        resourceTypeCounts = grouped;
 
         return new DataAcquisitionReportSummary
         {
             ReportId = reportId,
             TotalLogs = totals?.TotalLogs ?? 0,
             TotalPatients = totals?.TotalPatients ?? 0,
+            TotalCompletedPatients = totals?.TotalCompletedPatients ?? 0,
             TotalRetryAttempts = totals?.TotalRetryAttempts ?? 0,
             TotalCompletionTimeMs = totals?.TotalCompletionTimeMs ?? 0,
             TotalResourcesAcquired = totalResourcesAcquired,

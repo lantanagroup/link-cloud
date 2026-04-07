@@ -25,6 +25,7 @@ public record QueryLogSummaryModel
     public RequestStatus? Status { get; init; }
     public bool IsDeleted { get; init; }
     public string? ReportTrackingId { get; init; }
+    public bool IsReferenceLog { get; init; }
 
     public static QueryLogSummaryModel FromDomain(DataAcquisitionLogModel log)
     {
@@ -55,7 +56,8 @@ public record QueryLogSummaryModel
             CompletionDate = log.CompletionDate,
             RetryAttempts = log.RetryAttempts,
             Status = log.Status,
-            ReportTrackingId = log.ReportTrackingId
+            ReportTrackingId = log.ReportTrackingId,
+            IsReferenceLog = log.FhirQuery?.Any(q => q.IsReference == true) == true
         };
     }
 }

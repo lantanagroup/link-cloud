@@ -15,7 +15,14 @@ public interface IDataAcquisitionServiceClient
     Task<bool> CreateQueryPlanAsync(string facilityId, CreateQueryPlanRequestApiModel request, CancellationToken cancellationToken = default);
     Task DeleteQueryPlanAsync(string facilityId, string type, CancellationToken cancellationToken = default);
     Task SoftDeleteLogsByFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
-    Task<PagedConfigModel<DataAcquisitionLogApiModel>> SearchAcquisitionLogsAsync(string facilityId, string reportId, int pageSize = 100, int pageNumber = 1, CancellationToken cancellationToken = default);
+    Task<PagedConfigModel<DataAcquisitionLogApiModel>> SearchAcquisitionLogsAsync(
+        string facilityId,
+        string reportId,
+        int pageSize = 100,
+        int pageNumber = 1,
+        string sortBy = "Id",
+        string sortOrder = "Ascending",
+        CancellationToken cancellationToken = default);
     Task<DataAcquisitionLogApiModel?> GetAcquisitionLogByIdAsync(long id, CancellationToken cancellationToken = default);
     Task<DataAcquisitionLogStatusStatisticsApiModel?> GetReportStatusCountsAsync(string reportId, CancellationToken cancellationToken = default);
     Task<DataAcquisitionReportSummaryApiModel?> GetReportSummaryAsync(string reportId, CancellationToken cancellationToken = default);
