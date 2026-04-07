@@ -44,7 +44,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
                     Summary = "Get role by id",
                     Description = "Retrieves information about a role with the id provided"
                 });
-            
+
             roleEndpoints.MapGet("/role/name/{name}", GetRoleByName.Handle)
                 //.RequireAuthorization([nameof(LinkSystemPermissions.CanViewAccounts)])
                 .Produces<LinkRoleModel>(StatusCodes.Status200OK)
@@ -58,7 +58,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
                     Summary = "Get role by name",
                     Description = "Retrieves information about a role with the name provided"
                 });
-            
+
             roleEndpoints.MapGet("/role", GetRoleList.Handle)
                 //.RequireAuthorization([nameof(LinkSystemPermissions.CanViewAccounts)])
                 .Produces<ListRoleModel>(StatusCodes.Status200OK)
@@ -120,7 +120,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
                     Summary = "Delete role",
                     Description = "Deletes an existing role"
                 });
-         
+
             roleEndpoints.MapPut("/role/{id}/claims", UpdateRoleClaims.Handle)
                 //.RequireAuthorization([nameof(LinkSystemPermissions.CanAdministerAccounts)])
                 .AddEndpointFilter<ValidationFilter<LinkClaimsModel>>()

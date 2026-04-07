@@ -22,8 +22,7 @@
         <PackageReference Include="coverlet.collector" Version="6.*">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-        <PackageReference Include="System.Text.Json" Version="10.0.1" />
+        </PackageReference>        
         <PackageReference Include="xunit" Version="2.*" />
         <PackageReference Include="xunit.runner.visualstudio" Version="3.*">
             <PrivateAssets>all</PrivateAssets>
@@ -89,8 +88,11 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\..\DotNet\DataAcquisition.Domain\DataAcquisition.Domain.csproj" />
       <ProjectReference Include="..\..\DotNet\Normalization\Normalization.csproj" />
+      <ProjectReference Include="..\..\DotNet\Report\Report.csproj" />
       <ProjectReference Include="..\..\DotNet\Shared\Shared.csproj" />
+      <ProjectReference Include="..\..\DotNet\Tenant\Tenant.csproj" />
     </ItemGroup>
 
 </Project>

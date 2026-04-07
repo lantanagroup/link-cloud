@@ -10,6 +10,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="IntegrationTests\Report\Aggregators\**" />
+    <EmbeddedResource Remove="IntegrationTests\Report\Aggregators\**" />
+    <None Remove="IntegrationTests\Report\Aggregators\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Remove="Resources\indMeasureReport.json" />
   </ItemGroup>
 
@@ -23,12 +29,9 @@
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Core" Version="2.*" />
     <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="8.*" />
     <PackageReference Include="FluentAssertions" Version="8.*" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.*" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.*" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
     <PackageReference Include="Moq" Version="4.*" />
-    <PackageReference Include="Moq.AutoMock" Version="*-*" />
-    <PackageReference Include="System.Text.Json" Version="10.0.1" />
+    <PackageReference Include="Moq.AutoMock" Version="*-*" />    
     <PackageReference Include="Testcontainers" Version="4.*" />
     <PackageReference Include="Testcontainers.Azurite" Version="4.*" />
     <PackageReference Include="Testcontainers.MongoDb" Version="4.*" />

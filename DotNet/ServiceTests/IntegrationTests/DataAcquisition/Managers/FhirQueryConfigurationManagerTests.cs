@@ -217,8 +217,8 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
                 AuthType = AuthType.OAuth.ToString(),
                 Key = "test",
                 TokenUrl = "test",
-                ClientId =  "test",
-                Password = "test",  
+                ClientId = "test",
+                Password = "test",
                 UserName = "test",
             }
         };
@@ -363,5 +363,122 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
 
         // Act & Assert
         await Assert.ThrowsAsync<NotFoundException>(() => manager.DeleteAsync("NonExisting"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    [InlineData(10)]
+    public async Task CreateAsync_MaxRetries_Valid_ReturnsModel(int? maxRetries)
+    {
+        // Arrange
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var manager = CreateManager(scope);
+        var model = new CreateFhirQueryConfigurationModel
+        {
+            FacilityId = "TestFacility",
+            FhirServerBaseUrl = "http://example.com",
+            MaxRetries = maxRetries
+        };
+
+        // Act
+        var result = await manager.CreateAsync(model);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(maxRetries, result.MaxRetries);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(11)]
+    public async Task CreateAsync_MaxRetries_Invalid_ThrowsArgumentOutOfRange(int maxRetries)
+    {
+        // Arrange
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var manager = CreateManager(scope);
+        var model = new CreateFhirQueryConfigurationModel
+        {
+            FacilityId = "TestFacility",
+            FhirServerBaseUrl = "http://example.com",
+            MaxRetries = maxRetries
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => manager.CreateAsync(model));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    [InlineData(10)]
+    public async Task UpdateAsync_MaxRetries_Valid_ReturnsModel(int? maxRetries)
+    {
+        // Arrange
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var existing = new FhirQueryConfiguration
+        {
+            FacilityId = "TestFacility",
+            FhirServerBaseUrl = "http://old.com",
+        };
+        dbContext.FhirQueryConfigurations.Add(existing);
+        await dbContext.SaveChangesAsync();
+
+        var manager = CreateManager(scope);
+        var model = new UpdateFhirQueryConfigurationModel
+        {
+            FacilityId = "TestFacility",
+            FhirServerBaseUrl = "http://new.com",
+            MaxRetries = maxRetries
+        };
+
+        // Act
+        var result = await manager.UpdateAsync(model);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(maxRetries, result.MaxRetries);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(11)]
+    public async Task UpdateAsync_MaxRetries_Invalid_ThrowsArgumentOutOfRange(int maxRetries)
+    {
+        // Arrange
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var existing = new FhirQueryConfiguration
+        {
+            FacilityId = "TestFacility",
+            FhirServerBaseUrl = "http://old.com",
+        };
+        dbContext.FhirQueryConfigurations.Add(existing);
+        await dbContext.SaveChangesAsync();
+
+        var manager = CreateManager(scope);
+        var model = new UpdateFhirQueryConfigurationModel
+        {
+            FacilityId = "TestFacility",
+            FhirServerBaseUrl = "http://example.com",
+            MaxRetries = maxRetries
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => manager.UpdateAsync(model));
     }
 }

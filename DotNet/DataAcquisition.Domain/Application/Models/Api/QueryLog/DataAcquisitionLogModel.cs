@@ -9,7 +9,7 @@ using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Mo
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Models;
 
-public class DataAcquisitionLogModel 
+public class DataAcquisitionLogModel
 {
     public long Id { get; init; }
     public string FacilityId { get; set; }
@@ -36,6 +36,7 @@ public class DataAcquisitionLogModel
     public List<ReferenceResourceModel> ReferenceResources { get; set; } = new();
     public List<string>? Notes { get; set; } = new List<string>();
     public ScheduledReport? ScheduledReport { get; set; }
+    public bool IsDeleted { get; set; }
 
     public static DataAcquisitionLogModel FromDomain(DataAcquisitionLog log)
     {
@@ -100,7 +101,8 @@ public class DataAcquisitionLogModel
                 DataAcquisitionLogId = r.DataAcquisitionLogId
             }).ToList(),
             Notes = log.Notes,
-            ScheduledReport = log.ScheduledReport
+            ScheduledReport = log.ScheduledReport,
+            IsDeleted = log.IsDeleted
         };
     }
 }

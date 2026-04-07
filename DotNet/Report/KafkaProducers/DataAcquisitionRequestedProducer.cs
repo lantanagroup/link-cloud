@@ -1,7 +1,7 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Report.Domain;
+using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Domain.Enums;
-using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using System.Diagnostics;
@@ -16,13 +16,13 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         private static readonly ActivitySource _fallbackActivitySource = new ActivitySource("FallbackSource");
 
-        public DataAcquisitionRequestedProducer(IServiceScopeFactory serviceScopeFactory, IProducer<string, DataAcquisitionRequestedValue> dataAcqProducer) 
+        public DataAcquisitionRequestedProducer(IServiceScopeFactory serviceScopeFactory, IProducer<string, DataAcquisitionRequestedValue> dataAcqProducer)
         {
             _serviceScopeFactory = serviceScopeFactory;
             _dataAcqProducer = dataAcqProducer;
         }
 
-        public async Task<bool> Produce(ReportSchedule schedule, List<string>? patientsToEvaluate = null)
+        public async Task<bool> Produce(ReportScheduleModel schedule, List<string>? patientsToEvaluate = null)
         {
             var _database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
 
@@ -64,14 +64,22 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     ActivityTraceFlags.Recorded);
 
                 ActivitySource activitySource = ServiceActivitySource.Instance ?? _fallbackActivitySource;
-                
+
                 using var activity = activitySource.StartActivity(
-                    "ProduceDataAcquisitionRequested", 
+                    "ProduceDataAcquisitionRequested",
                     ActivityKind.Producer,
                     activityContext);
                 activity?.SetTag("patientId", patientId);
                 activity?.SetTag("facilityId", schedule.FacilityId);
                 activity?.SetTag("reportScheduleId", schedule.Id);
+
+                var reportStartDateUtc = schedule.ReportStartDate.Kind == DateTimeKind.Utc
+                    ? schedule.ReportStartDate
+                    : DateTime.SpecifyKind(schedule.ReportStartDate, DateTimeKind.Utc);
+
+                var reportEndDateUtc = schedule.ReportEndDate.Kind == DateTimeKind.Utc
+                    ? schedule.ReportEndDate
+                    : DateTime.SpecifyKind(schedule.ReportEndDate, DateTimeKind.Utc);
 
                 var darKey = schedule.FacilityId;
                 var darValue = new DataAcquisitionRequestedValue()
@@ -82,11 +90,11 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     {
                         new ()
                         {
-                            ReportTrackingId = schedule.Id!,
-                            StartDate = schedule.ReportStartDate,
-                            EndDate = schedule.ReportEndDate,
+                            ReportTrackingId = schedule.Id.ToString(),
+                            StartDate = reportStartDateUtc,
+                            EndDate = reportEndDateUtc,
                             Frequency = schedule.Frequency,
-                            ReportTypes = schedule.ReportTypes
+                            ReportTypes = schedule.ReportTypes,
                         }
                     },
                     QueryType = QueryType.Initial.ToString(),
@@ -97,13 +105,13 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
                 };
                 headers.Add("traceparent", Encoding.UTF8.GetBytes(traceparentValue));
-                
-                _dataAcqProducer.Produce(nameof(KafkaTopic.DataAcquisitionRequested), 
-                    new Message<string, DataAcquisitionRequestedValue> 
-                    { 
-                        Key = darKey, 
-                        Value = darValue, 
-                        Headers = headers 
+
+                _dataAcqProducer.Produce(nameof(KafkaTopic.DataAcquisitionRequested),
+                    new Message<string, DataAcquisitionRequestedValue>
+                    {
+                        Key = darKey,
+                        Value = darValue,
+                        Headers = headers
                     });
 
                 _dataAcqProducer.Flush();

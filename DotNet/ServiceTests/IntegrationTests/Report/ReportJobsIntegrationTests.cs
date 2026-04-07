@@ -1,6 +1,6 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Report.Domain;
-using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Data;
+using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Shared.Application.Enums;
@@ -13,7 +13,7 @@ using Quartz;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
-namespace IntegrationTests.Report;
+namespace IntegrationTests.Report.Jobs;
 
 [Collection("ReportIntegrationTests")]
 public class EndOfReportPeriodJobTests
@@ -30,29 +30,29 @@ public class EndOfReportPeriodJobTests
     {
         using var scope = _fixture.ScopeFactory.CreateScope();
         var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
-        var scheduleId = System.Guid.NewGuid().ToString();
+        var scheduleId = Guid.NewGuid();
         var facilityId = "test-facility";
 
         var schedule = new ReportSchedule
         {
             Id = scheduleId,
             FacilityId = facilityId,
-            ReportStartDate = System.DateTime.UtcNow.AddDays(-30),
-            ReportEndDate = System.DateTime.UtcNow.AddDays(-1),
+            ReportStartDate = DateTime.UtcNow.AddDays(-30),
+            ReportEndDate = DateTime.UtcNow.AddDays(-1),
             Status = ScheduleStatus.Scheduled,
             EndOfReportPeriodJobHasRun = false
         };
         await database.ReportScheduledRepository.AddAsync(schedule);
         await database.ReportPopulationRepository.SaveChangesAsync();
 
-        _fixture.TenantApiServiceMock.Setup(t => t.GetFacilityConfig(Moq.It.IsAny<string>(), Moq.It.IsAny<System.Threading.CancellationToken>()))
+        _fixture.TenantApiServiceMock.Setup(t => t.GetFacilityConfig(Moq.It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new FacilityModel { FacilityId = facilityId });
 
         _fixture.SubmitPayloadKafkaProducerMock
             .Setup(p => p.ProduceAsync(
-                Moq.It.IsAny<string>(),
-                Moq.It.IsAny<Message<SubmitPayloadKey, SubmitPayloadValue>>(),
-                Moq.It.IsAny<System.Threading.CancellationToken>()))
+                It.IsAny<string>(),
+                It.IsAny<Message<SubmitPayloadKey, SubmitPayloadValue>>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DeliveryResult<SubmitPayloadKey, SubmitPayloadValue>
             {
                 Status = PersistenceStatus.Persisted
@@ -60,9 +60,9 @@ public class EndOfReportPeriodJobTests
 
         _fixture.AuditableEventKafkaProducerMock
             .Setup(p => p.ProduceAsync(
-                Moq.It.IsAny<string>(),
-                Moq.It.IsAny<Message<string, AuditEventMessage>>(),
-                Moq.It.IsAny<System.Threading.CancellationToken>()))
+                It.IsAny<string>(),
+                It.IsAny<Message<string, AuditEventMessage>>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DeliveryResult<string, AuditEventMessage>
             {
                 Status = PersistenceStatus.Persisted
@@ -70,9 +70,9 @@ public class EndOfReportPeriodJobTests
 
         _fixture.DataAcquisitionRequestedKafkaProducerMock
             .Setup(p => p.ProduceAsync(
-                Moq.It.IsAny<string>(),
-                Moq.It.IsAny<Message<string, DataAcquisitionRequestedValue>>(),
-                Moq.It.IsAny<System.Threading.CancellationToken>()))
+                It.IsAny<string>(),
+                It.IsAny<Message<string, DataAcquisitionRequestedValue>>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DeliveryResult<string, DataAcquisitionRequestedValue>
             {
                 Status = PersistenceStatus.Persisted
@@ -108,8 +108,8 @@ public class EndOfReportPeriodJobTests
         _fixture.QuartzJobHelperMock.Verify(q => q.DeleteJob(
             jobKey.Name,
             jobKey.Group,
-            Moq.It.IsAny<System.Threading.CancellationToken>()),
-            Moq.Times.Once());
+            It.IsAny<CancellationToken>()),
+            Times.Once());
 
         using var assertScope = _fixture.ScopeFactory.CreateScope();
         var assertDatabase = assertScope.ServiceProvider.GetRequiredService<IDatabase>();
@@ -124,14 +124,14 @@ public class EndOfReportPeriodJobTests
     {
         using var scope = _fixture.ScopeFactory.CreateScope();
         var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
-        var scheduleId = System.Guid.NewGuid().ToString();
+        var scheduleId = Guid.NewGuid();
 
         var schedule = new ReportSchedule
         {
             Id = scheduleId,
             FacilityId = "test-facility-error",
-            ReportStartDate = System.DateTime.UtcNow.AddDays(-30),
-            ReportEndDate = System.DateTime.UtcNow.AddDays(-1),
+            ReportStartDate = DateTime.UtcNow.AddDays(-30),
+            ReportEndDate = DateTime.UtcNow.AddDays(-1),
             Status = ScheduleStatus.Scheduled
         };
         await database.ReportScheduledRepository.AddAsync(schedule);
@@ -139,7 +139,7 @@ public class EndOfReportPeriodJobTests
 
         var jobDataMap = new JobDataMap
         {
-            { "ReportScheduleId", JsonSerializer.Serialize(scheduleId) }
+            { "ReportScheduleId", scheduleId }
         };
 
         var jobKey = new JobKey("test-end-of-period-error-job", "test-group");
@@ -157,10 +157,10 @@ public class EndOfReportPeriodJobTests
         contextMock.Setup(c => c.Trigger).Returns(triggerMock.Object);
 
         _fixture.QuartzJobHelperMock.Setup(q => q.DeleteJob(
-            Moq.It.IsAny<string>(),
-            Moq.It.IsAny<string>(),
-            Moq.It.IsAny<System.Threading.CancellationToken>()))
-            .ThrowsAsync(new System.Exception("Simulated delete failure"));
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Exception("Simulated delete failure"));
 
         var job = new EndOfReportPeriodJob(
             scope.ServiceProvider.GetRequiredService<ILogger<EndOfReportPeriodJob>>(),
@@ -171,12 +171,12 @@ public class EndOfReportPeriodJobTests
         await job.Execute(contextMock.Object);
 
         _fixture.QuartzJobHelperMock.Verify(q => q.RescheduleJob<EndOfReportPeriodJob>(
-            Moq.It.IsAny<string>(),
-            Moq.It.IsAny<System.Collections.Generic.IDictionary<string, object>>(),
-            Moq.It.IsAny<System.DateTimeOffset>(),
-            Moq.It.IsAny<string>(),
-            Moq.It.IsAny<string>(),
-            Moq.It.IsAny<System.Threading.CancellationToken>()),
-            Moq.Times.AtLeastOnce());
+            It.IsAny<string>(),
+            It.IsAny<IDictionary<string, object>>(),
+            It.IsAny<DateTimeOffset>(),
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<CancellationToken>()),
+            Times.AtLeastOnce());
     }
 }

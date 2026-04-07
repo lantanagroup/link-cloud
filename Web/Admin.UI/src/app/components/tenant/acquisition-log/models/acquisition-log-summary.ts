@@ -15,7 +15,9 @@ export interface AcquisitionLogSummary {
     completionDate?: Date;
     retryAttempts: number;
     status: string;
+    reportTrackingId?: string | null;
     reportIds: string[];
+    isDeleted: boolean;
 }
 
 export interface IPagedAcquisitionLogSummary {

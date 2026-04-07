@@ -1,13 +1,15 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Report.Domain;
+using LantanaGroup.Link.Report.Data;
+using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.KafkaProducers;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using Microsoft.EntityFrameworkCore;
 using Quartz;
 using Task = System.Threading.Tasks.Task;
 
@@ -35,33 +37,33 @@ namespace LantanaGroup.Link.Report.Jobs
 
         public async Task Execute(IJobExecutionContext context)
         {
-            ReportSchedule? schedule = null;
+            ReportScheduleModel? schedule = null;
             try
             {
                 // Get the schedule ID from the job data map
                 var jobDataMap = context.JobDetail.JobDataMap;
-                string? scheduleId = jobDataMap.GetObject<string>("ReportScheduleId");
+                var scheduleId = jobDataMap.GetObject<Guid?>("ReportScheduleId");
 
-                if (string.IsNullOrEmpty(scheduleId))
+                if (scheduleId == null)
                 {
                     // Fallback: try to get from trigger data map
-                    scheduleId = context.Trigger.JobDataMap?.GetObject<string>("ReportScheduleId");
+                    scheduleId = context.Trigger.JobDataMap?.GetObject<Guid?>("ReportScheduleId");
                 }
 
-                if (string.IsNullOrEmpty(scheduleId))
+                if (scheduleId == null)
                 {
                     _logger.LogError("EndOfReportPeriodJob executed but no ReportScheduleId found in job data");
                     return;
                 }
 
                 using var scope = _serviceScopeFactory.CreateScope();
-                var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+                var dbContext = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
                 var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
                 var reportManifestProducer = scope.ServiceProvider.GetRequiredService<ReportManifestProducer>();
 
                 // Fetch the schedule from the database
-                schedule = await database.ReportScheduledRepository.GetAsync(scheduleId);
-                
+                schedule = await reportScheduledManager.SingleOrDefaultAsync(r => r.Id == scheduleId);
+
                 if (schedule == null)
                 {
                     _logger.LogWarning("ReportSchedule {ScheduleId} not found", scheduleId);
@@ -69,12 +71,12 @@ namespace LantanaGroup.Link.Report.Jobs
                 }
 
                 _logger.LogInformation("Executing EndOfReportPeriodJob for ScheduleId {ScheduleId}", schedule.Id);
-                
+
                 var manifestProduced = await reportManifestProducer.Produce(schedule);
 
                 if (!manifestProduced)
                 {
-                    var patientsToEvaluate = await database.ReportEntryRepository.AnyAsync(
+                    var patientsToEvaluate = await dbContext.ReportEntry.AnyAsync(
                         x => x.ReportScheduleId == schedule.Id && x.ReportingStatus == ReportingStatus.PatientIdentified,
                         CancellationToken.None
                     );

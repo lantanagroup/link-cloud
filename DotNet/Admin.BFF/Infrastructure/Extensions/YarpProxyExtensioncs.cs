@@ -20,7 +20,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
 
                     if (proxyOptions.Environment.IsDevelopment() && enableAnonymous)
                         logger.Error("Anonymous access is enabled in development mode. This is a security risk.");
-                    
+
                     if (!enableAnonymous)
                     {
                         if (!string.IsNullOrEmpty(builderContext.Route.AuthorizationPolicy))
@@ -33,7 +33,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
                                 transformContext.ProxyRequest.Headers.Add("Authorization", $"Bearer {token}");
                             });
                         }
-                    }                    
+                    }
 
                 });
 

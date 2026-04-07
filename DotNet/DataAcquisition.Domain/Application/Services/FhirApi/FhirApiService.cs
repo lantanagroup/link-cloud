@@ -25,6 +25,7 @@ using LantanaGroup.Link.Shared.Application.Utilities;
 using DateTime = System.DateTime;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
+using Hl7.Fhir.Serialization;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 
@@ -125,6 +126,7 @@ public class FhirApiService : IFhirApiService
             await GenerateResourceAcquiredMessage(new ResourceAcquired
             {
                 Resource = resource,
+                ResourceType = resource.TypeName,
                 ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
                 PatientId = !fhirQuery.IsReference ?? false ? log.PatientId : null,
                 QueryType = log.QueryPhase.ToString(),
@@ -146,12 +148,11 @@ public class FhirApiService : IFhirApiService
 
             if (ex.Status == HttpStatusCode.NotFound || ex.Status == HttpStatusCode.Gone || ex.Outcome != null)
             {
-                string note = ex.Outcome != null 
-                    ? $"OperationOutcome returned for HTTP {ex.Status}: {JsonSerializer.Serialize(ex.Outcome, _options)}"
-                    : $"HTTP {ex.Status} returned for Read operation.";
-                
+                string note = $"[{DateTime.UtcNow}] HTTP {ex.Status} returned for Read operation. See application logs for details.";
+
                 log.Notes ??= new List<string>();
                 log.Notes.Add(note);
+                _logger.LogError(ex, "FhirOperationException for log {LogId} with facility {FacilityId}: {note}", log.Id, log.FacilityId, note);
                 throw new OpOutcomeException(note, ex);
             }
             throw;
@@ -238,11 +239,12 @@ public class FhirApiService : IFhirApiService
                 if (outcomes.Any())
                 {
                     log.Notes ??= new List<string>();
+                    string searchOutcomeNote = $"[{DateTime.UtcNow}] OperationOutcome(s) found in search bundle. See application logs for details.";
+                    log.Notes.Add(searchOutcomeNote);
                     foreach (var outcome in outcomes)
                     {
-                        string outcomeNote = $"OperationOutcome found in search bundle: {JsonSerializer.Serialize(outcome, _options)}";
-                        log.Notes.Add(outcomeNote);
-                        _logger.LogInformation("OperationOutcome found in successful search bundle for log {LogId}: {outcomeNote}", log.Id, outcomeNote);
+                        string outcomeDetail = JsonSerializer.Serialize(outcome, _options);
+                        _logger.LogInformation("OperationOutcome found in successful search bundle for log {LogId}: {outcomeDetail}", log.Id, outcomeDetail);
                     }
                 }
 
@@ -261,6 +263,7 @@ public class FhirApiService : IFhirApiService
                     await GenerateResourceAcquiredMessage(new ResourceAcquired
                     {
                         Resource = resource,
+                        ResourceType = resource.TypeName,
                         ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
                         PatientId = !fhirQuery.IsReference ?? false ? log.PatientId : null,
                         QueryType = log.QueryPhase.ToString(),
@@ -279,13 +282,11 @@ public class FhirApiService : IFhirApiService
         {
             if (ex.Status == HttpStatusCode.NotFound || ex.Status == HttpStatusCode.Gone || ex.Outcome != null)
             {
-                string note = ex.Outcome != null
-                    ? $"OperationOutcome returned for HTTP {ex.Status}: {JsonSerializer.Serialize(ex.Outcome, _options)}"
-                    : $"HTTP {ex.Status} returned for Search operation.";
+                string note = $"[{DateTime.UtcNow}] HTTP {ex.Status} returned for Search operation. See application logs for details.";
 
                 log.Notes ??= new List<string>();
                 log.Notes.Add(note);
-                _logger.LogWarning("Expected FHIR error encountered for search: {note}", note);
+                _logger.LogWarning(ex, "Expected FHIR error encountered for search for log {LogId} with facility {FacilityId}: {note}", log.Id, log.FacilityId, note);
                 throw new OpOutcomeException(note, ex);
             }
             throw;

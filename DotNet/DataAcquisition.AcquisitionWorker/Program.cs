@@ -23,11 +23,16 @@ builder.Configuration.AddStandardEnvironmentConfiguration();
 
 var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
 
+// Determine if secret manager should be enabled based on configuration
+var secretManagerEnabled = builder.Configuration.GetValue<bool>("SecretManagement:Enabled");
+
+builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName, configureRedis: true, configureSecretManager: secretManagerEnabled);
+
+builder.Services.AddTransient<SftpAcquisitionHandler>();
+
 //register worker processor config
 builder.Services.Configure<AcquisitionWorkerProcessorSettings>(
     builder.Configuration.GetSection("AcquisitionWorkerProcessorSettings"));
-
-builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName, true);
 
 builder.Services.AddTransient<IDataAcquisitionServiceMetrics, DataAcquisitionServiceMetrics>();
 builder.Services.AddTransient<ICreateSystemToken, CreateSystemToken>();
@@ -37,7 +42,8 @@ builder.Services.AddSingleton<AcquisitionProcessorBackgroundService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<AcquisitionProcessorBackgroundService>());
 
 //Add CORS
-builder.Services.AddLinkCorsService(options => {
+builder.Services.AddLinkCorsService(options =>
+{
     options.Environment = builder.Environment;
 });
 
@@ -54,6 +60,9 @@ if (!consumerSettings?.DisableConsumer ?? true)
 {
     builder.Services.AddHostedService<ReadyToAcquireListener>();
 }
+
+//Add SFTP Acquisition Service
+builder.Services.AddHostedService<SftpAcquisitionService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>

@@ -320,6 +320,88 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
     }
 
     [Fact]
+    public async Task ProcessPendingLogs_FailedWithPerTenantMaxRetries_RetriesUpToMax()
+    {
+        _fixture.ReadyToAcquireProducerMock.Reset();
+        _fixture.ResourceAcquiredProducerMock.Reset();
+
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var config = new FhirQueryConfiguration
+        {
+            FacilityId = "TestFacility",
+            FhirServerBaseUrl = "http://example.com",
+            MinAcquisitionPullTime = null,
+            MaxAcquisitionPullTime = null,
+            MaxRetries = 2
+        };
+        dbContext.FhirQueryConfigurations.Add(config);
+
+        var log1 = new DataAcquisitionLog
+        {
+            Id = 101,
+            FacilityId = "TestFacility",
+            Status = RequestStatus.Failed,
+            RetryAttempts = 1,
+            CorrelationId = Guid.NewGuid().ToString(),
+            ReportTrackingId = "TestReportId",
+            PatientId = "Patient/123"
+        };
+        dbContext.DataAcquisitionLogs.Add(log1);
+
+        var log2 = new DataAcquisitionLog
+        {
+            Id = 102,
+            FacilityId = "TestFacility",
+            Status = RequestStatus.Failed,
+            RetryAttempts = 2,
+            CorrelationId = Guid.NewGuid().ToString(),
+            ReportTrackingId = "TestReportId",
+            PatientId = "Patient/123"
+        };
+        dbContext.DataAcquisitionLogs.Add(log2);
+        await dbContext.SaveChangesAsync();
+
+        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
+        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
+
+        var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
+        var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
+
+        var jobContextMock = new Mock<IJobExecutionContext>();
+        jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
+        await job.Execute(jobContextMock.Object);
+
+        _fixture.ReadyToAcquireProducerMock.Verify(
+            p => p.ProduceAsync(
+            KafkaTopic.ReadyToAcquire.ToString(),
+            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Key == log1.Id),
+            It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        _fixture.ReadyToAcquireProducerMock.Verify(
+            p => p.ProduceAsync(
+                KafkaTopic.ReadyToAcquire.ToString(),
+                It.Is<Message<long, ReadyToAcquire>>(msg => msg.Key == log2.Id),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        using var assertScope = _fixture.ServiceProvider.CreateScope();
+        var assertDbContext = assertScope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var updatedLog1 = await assertDbContext.DataAcquisitionLogs.FindAsync(log1.Id);
+        Assert.Equal(RequestStatus.Ready, updatedLog1.Status);
+
+        var updatedLog2 = await assertDbContext.DataAcquisitionLogs.FindAsync(log2.Id);
+        Assert.Equal(RequestStatus.MaxRetriesReached, updatedLog2.Status);
+    }
+
+    [Fact]
     public async Task ProcessPendingTailingMessages_ProducesMessagesAndUpdatesFlags()
     {
         _fixture.ReadyToAcquireProducerMock.Reset();

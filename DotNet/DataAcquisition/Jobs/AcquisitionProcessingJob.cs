@@ -46,6 +46,7 @@ public class AcquisitionProcessingJob : IJob
     {
         var stopwatch = Stopwatch.StartNew();
         await FailStalledQueuedLogs(context.CancellationToken);
+        await ResetStalledProcessingLogs(context.CancellationToken);
         await ProcessPendingLogs(stopwatch, context.CancellationToken);
         await ProcessPendingTailingMessages(context.CancellationToken);
     }
@@ -56,17 +57,46 @@ public class AcquisitionProcessingJob : IJob
         {
             using var scope = _serviceScopeFactory.CreateScope();
             var dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
-            
-            int failedCount = await dataAcquisitionLogQueries.FailStalledQueuedLogsAsync(15, _settings.MaxBatchesFailStalledPerRun, cancellationToken);
-            
+
+            int failedCount = await dataAcquisitionLogQueries.FailStalledQueuedLogsAsync(_settings.StalledQueuedThresholdMinutes, _settings.MaxBatchesFailStalledPerRun, cancellationToken);
             if (failedCount > 0)
             {
                 _logger.LogInformation("Successfully failed {count} stalled queued logs.", failedCount);
             }
         }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Failing stalled queued logs operation was cancelled.");
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error occurred while failing stalled queued logs.");
+        }
+    }
+    
+    private async Task ResetStalledProcessingLogs(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var scope = _serviceScopeFactory.CreateScope();
+            var dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+            int resetCount = await dataAcquisitionLogQueries.ResetStalledProcessingLogsAsync(_settings.StalledProcessingThresholdMinutes, _settings.MaxBatchesFailStalledPerRun, cancellationToken);
+
+            if (resetCount > 0)
+            {
+                _logger.LogInformation("Successfully reset {count} stalled processing logs to Pending.", resetCount);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Resetting stalled processing logs operation was cancelled.");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while resetting stalled processing logs.");
         }
     }
 
@@ -84,6 +114,11 @@ public class AcquisitionProcessingJob : IJob
             {
                 await ProcessFacilityPendingLogs(facilityId, stopwatch, cancellationToken);
             });
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Processing pending logs operation was cancelled.");
+            throw;
         }
         catch (Exception ex)
         {
@@ -167,11 +202,14 @@ public class AcquisitionProcessingJob : IJob
 
                 var logIds = requests.Select(r => r.Id).ToList();
                 var failedLogs = requests.Where(r => r.Status == RequestStatus.Failed).ToList();
+
+                var maxRetryAttempts = config.MaxRetries ?? DataAcquisitionLog.MaxRetryAttempts;
+
                 var maxRetriesReachedIds = failedLogs
-                    .Where(r => r.RetryAttempts >= DataAcquisitionLog.MaxRetryAttempts)
+                    .Where(r => r.RetryAttempts >= maxRetryAttempts)
                     .Select(r => r.Id)
                     .ToList();
-                
+
                 var retryableLogIds = logIds.Except(maxRetriesReachedIds).ToList();
 
                 if (maxRetriesReachedIds.Any())
@@ -184,7 +222,7 @@ public class AcquisitionProcessingJob : IJob
                     // We can't easily increment RetryAttempts in ExecuteUpdateAsync if it's null or we need different notes per record
                     // But for the job, we can assume they all get +1 and the same note if we want true bulk
                     // However, some might be Pending (RetryAttempts 0) and some Failed (RetryAttempts > 0)
-                    
+
                     // To keep it simple and safe for now, let's at least bulk update the status to Ready
                     await dataAcquisitionLogManager.UpdateStatusBatchAsync(retryableLogIds, RequestStatus.Ready, cancellationToken);
                 }
@@ -286,11 +324,11 @@ public class AcquisitionProcessingJob : IJob
                 {
                     // Parse the traceparent string (format: 00-traceId-spanId-flags)
                     ActivityContext parentContext = CreateActivityContext(message.TraceParentId);
-                    
+
                     // Start the activity with the parent context
                     using var activity = ServiceActivitySource.Instance?.StartActivity(
-                        "ProcessTailingMessage", 
-                        ActivityKind.Consumer, 
+                        "ProcessTailingMessage",
+                        ActivityKind.Consumer,
                         parentContext) ?? Activity.Current;
 
                     // Add relevant tags
@@ -302,7 +340,7 @@ public class AcquisitionProcessingJob : IJob
                         new Header(DataAcquisitionConstants.HeaderNames.CorrelationId,
                             Encoding.UTF8.GetBytes(message.CorrelationId))
                     };
-                    
+
                     string currentTraceParent;
                     if (!string.IsNullOrEmpty(message.TraceParentId))
                     {
@@ -321,9 +359,9 @@ public class AcquisitionProcessingJob : IJob
                         var newSpanId = ActivitySpanId.CreateRandom().ToHexString();
                         currentTraceParent = $"00-{newTraceId}-{newSpanId}-00";
                     }
-                    
+
                     headers.Add("traceparent", Encoding.UTF8.GetBytes(currentTraceParent));
-                    
+
                     await _resourceAcquiredProducer.ProduceAsync(
                         KafkaTopic.ResourceAcquired.ToString(),
                         new Message<ResourceKey, ResourceAcquired>
@@ -341,8 +379,13 @@ public class AcquisitionProcessingJob : IJob
                         message.LogIds,
                         message.FacilityId,
                         message.CorrelationId,
-                        message.ResourceAcquired.ScheduledReports.FirstOrDefault()?.ReportTrackingId,
+                        message.ResourceAcquired.ScheduledReports.FirstOrDefault()?.ReportTrackingId?.ToString() ?? "",
                         cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger.LogInformation("Processing tailing message for facility {facilityId} was cancelled.", message.FacilityId?.SanitizeUntrustedString());
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -375,7 +418,7 @@ public class AcquisitionProcessingJob : IJob
                     var traceId = ActivityTraceId.CreateFromString(parts[1].AsSpan());
                     var parentSpanId = ActivitySpanId.CreateFromString(parts[2].AsSpan());
                     var flags = parts[3] == "01" ? ActivityTraceFlags.Recorded : ActivityTraceFlags.None;
-            
+
                     parentContext = new ActivityContext(traceId, parentSpanId, flags);
                 }
             }

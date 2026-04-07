@@ -1,19 +1,18 @@
 ﻿using DataAcquisition.Domain.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
-using Org.BouncyCastle.Crypto;
-using Org.BouncyCastle.Crypto.Parameters;
-using Org.BouncyCastle.Security;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
 using System.Text.RegularExpressions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
+using Org.BouncyCastle.Crypto;
+using Org.BouncyCastle.Crypto.Parameters;
+using Org.BouncyCastle.Security;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
 
@@ -24,7 +23,7 @@ public class EpicAuth : IAuth
     private readonly ICacheService _cacheService;
 
     public EpicAuth(
-        HttpClient httpClient, 
+        HttpClient httpClient,
         ILogger<EpicAuth> logger,
         ICacheService cacheService
         )
@@ -44,7 +43,7 @@ public class EpicAuth : IAuth
     {
         var cachedToken = _cacheService.Get<string>(facilityId);
 
-        if(!string.IsNullOrWhiteSpace(cachedToken))
+        if (!string.IsNullOrWhiteSpace(cachedToken))
             return (false, new AuthenticationHeaderValue("Bearer", cachedToken));
 
         string jwt = GetJwt(authSettings);

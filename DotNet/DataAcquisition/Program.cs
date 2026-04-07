@@ -26,6 +26,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
@@ -42,9 +43,16 @@ static void RegisterServices(WebApplicationBuilder builder)
 {
     var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
 
+    // Determine if secret manager should be enabled based on configuration
+    var secretManagerEnabled = builder.Configuration.GetValue<bool>("SecretManagement:Enabled");
+
+    builder.RegisterAll(DataAcquisitionConstants.ServiceName, configureRedis: true, configureSecretManager: secretManagerEnabled);
+
+    // Add Data Protection
+    builder.Services.AddDataProtection()
+        .SetApplicationName(builder.Configuration.GetValue<string>("DataProtection:KeyRing") ?? "Link");
     builder.Services.Configure<AcquisitionJobSettings>(builder.Configuration.GetSection(AcquisitionJobSettings.SectionName));
 
-    builder.RegisterAll(DataAcquisitionConstants.ServiceName, true);
 
     builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
 
@@ -62,7 +70,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.JsonSerializerOptions.Converters.Add(new ParameterConverter());
         options.JsonSerializerOptions.Converters.Add(new TimeSpanConverter());
         options.JsonSerializerOptions.ForFhir(ModelInfo.ModelInspector);
-    }); 
+    });
 
     //Add Hosted Services
     builder.Services.AddHostedService<AcquisitionProcessingScheduleService>();
@@ -130,10 +138,11 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
         c.DocumentFilter<HealthChecksFilter>();
-    });    
+    });
 
     //Add CORS
-    builder.Services.AddLinkCorsService(options => {
+    builder.Services.AddLinkCorsService(options =>
+    {
         options.Environment = builder.Environment;
     });
 

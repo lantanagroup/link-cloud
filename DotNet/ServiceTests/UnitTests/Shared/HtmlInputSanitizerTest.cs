@@ -14,7 +14,7 @@ public class HtmlInputSanitizerTest
     [InlineData("", "")]
     [InlineData("smoke-test-facility", "smoke-test-facility")]
     [InlineData(null, "")]
-    public void TestSanitizeAndRemove(string input, string expected)
+    public void TestSanitizeAndRemove(string? input, string expected)
     {
         // Act
         var result = input.SanitizeAndRemove();

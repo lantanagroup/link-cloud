@@ -76,6 +76,8 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddScoped<IEntityRepository<QueryPlan>, EntityRepository<QueryPlan, DataAcquisitionDbContext>>();
             builder.Services.AddTransient<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
             builder.Services.AddTransient<IEntityRepository<ResourceReferenceType>, EntityRepository<ResourceReferenceType, DataAcquisitionDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<SftpAcquisitionLog>, EntityRepository<SftpAcquisitionLog, DataAcquisitionDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<SftpConfiguration>, EntityRepository<SftpConfiguration, DataAcquisitionDbContext>>();
 
             // Register IDatabase implementation
             builder.Services.AddScoped<IDatabase, Database>();
@@ -112,7 +114,6 @@ namespace IntegrationTests.DataAcquisition
 
             builder.Services.AddTransient<ICreateSystemToken, CreateSystemToken>();
             builder.Services.AddTransient<ITenantApiService, TenantApiService>();
-
 
             builder.Services.AddHttpClient();
 

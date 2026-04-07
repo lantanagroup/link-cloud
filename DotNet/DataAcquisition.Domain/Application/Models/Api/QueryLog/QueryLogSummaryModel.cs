@@ -22,6 +22,8 @@ public record QueryLogSummaryModel
     public DateTime? CompletionDate { get; init; }
     public int? RetryAttempts { get; init; }
     public RequestStatus? Status { get; init; }
+    public bool IsDeleted { get; init; }
+    public string? ReportTrackingId { get; init; }
 
     public static QueryLogSummaryModel FromDomain(DataAcquisitionLogModel log)
     {
@@ -51,7 +53,8 @@ public record QueryLogSummaryModel
             CreateDate = log.CreateDate,
             CompletionDate = log.CompletionDate,
             RetryAttempts = log.RetryAttempts,
-            Status = log.Status
+            Status = log.Status,
+            ReportTrackingId = log.ReportTrackingId
         };
     }
 }

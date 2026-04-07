@@ -6,6 +6,7 @@
         public const string StackTrace = "stack.trace";
         public const string Service = "service";
         public const string CorrelationId = "correlation.id";
+        public const string EntityId = "entity.id";
         public const string ReportId = "report.id";
         public const string ReportTrackingId = "report.tracking.id";
         public const string ReportScheduledId = "report.scheduled.id";
@@ -25,7 +26,7 @@
         public const string RecipientCount = "recipient.count";
         public const string ReportType = "report.type";
         public const string PeriodStart = "period.start";
-        public const string PeriodEnd = "period.end";        
+        public const string PeriodEnd = "period.end";
         public const string UserId = "user.id";
         public const string UserName = "user.name";
         public const string Email = "email";
@@ -45,6 +46,7 @@
 
         //Diagnostic tags Searching
         public const string SearchText = "search.text";
+        public const string SearchParameters = "search.parameters";
         public const string FacilityFilter = "facility.filter";
         public const string CorrelationFilter = "correlation.filter";
         public const string ServiceFilter = "service.filter";

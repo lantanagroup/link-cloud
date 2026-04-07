@@ -32,7 +32,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             _dataProtectionSettings = dataProtectionSettings ?? throw new ArgumentNullException(nameof(dataProtectionSettings));
             _dataProtectionProvider = dataProtectionProvider ?? throw new ArgumentNullException(nameof(dataProtectionProvider));
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
-            _cache = cache ?? throw new ArgumentNullException(nameof(cache));         
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         }
 
         //TODO: Add back data protection once key persience is implemented
@@ -56,17 +56,17 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
 
             _logger.LogLinkAdminTokenKeyRefreshed(DateTime.UtcNow);
             _metrics.IncrementTokenKeyRefreshCounter([]);
-        
+
             if (_dataProtectionSettings.Value.Enabled)
             {
                 var protector = _dataProtectionProvider.CreateProtector(LinkAdminConstants.LinkDataProtectors.LinkSigningKey);
-              
+
                 _cache.Set<string>(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(key), TimeSpan.FromMinutes(5));
             }
             else
             {
                 _cache.Set<string>(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, key, TimeSpan.FromMinutes(5));
-            }              
+            }
 
             return true;
         }

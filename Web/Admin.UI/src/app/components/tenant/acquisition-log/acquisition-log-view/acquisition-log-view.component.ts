@@ -6,6 +6,8 @@ import {AcquisitionLogService} from '../acquisition-log.service';
 import {FontAwesomeModule} from '@fortawesome/angular-fontawesome';
 import {
   faArrowLeft,
+  faBan,
+  faArrowRotateLeft,
   faFilter,
   faPlus,
   faRotate,
@@ -116,6 +118,8 @@ export class AcquisitionLogViewComponent implements OnInit {
   faSort = faSort;
   faSortUp = faSortUp;
   faSortDown = faSortDown;
+  faBan = faBan;
+  faArrowRotateLeft = faArrowRotateLeft;
   private readonly PAGE_SIZE_KEY = 'acquisitionLogPageSize';
 
   defaultPageNumber: number = 0
@@ -150,6 +154,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   targetPageNumber: number | null = null;
   selectedLogIds: Set<string> = new Set<string>();
   isAllSelected: boolean = false;
+  includeDeleted: boolean = false;
   statusChartExpanded: boolean = false;
   statusChartData: Record<string, number> = {};
   statusChartLoading = false;
@@ -208,7 +213,7 @@ export class AcquisitionLogViewComponent implements OnInit {
 
     forkJoin([
       this.tenantService.getAllFacilities(),
-      this.acquisitionLogService.getAcquisitionLogs(this.patientFilter === '' ? null : this.patientFilter, this.selectedFacilityFilter === 'Any' ? null : this.selectedFacilityFilter, this.reportIdFilter === '' ? null : this.reportIdFilter, null, null, null, null, null, null, null, null, this.defaultPageNumber, this.defaultPageSize, false)
+      this.acquisitionLogService.getAcquisitionLogs(this.patientFilter === '' ? null : this.patientFilter, this.selectedFacilityFilter === 'Any' ? null : this.selectedFacilityFilter, this.reportIdFilter === '' ? null : this.reportIdFilter, null, null, null, null, null, null, null, null, this.defaultPageNumber, this.defaultPageSize, false, this.includeDeleted)
 
         ]).subscribe({
           next: (response) => {
@@ -245,7 +250,8 @@ export class AcquisitionLogViewComponent implements OnInit {
       this.sortOrder,
       pageNumber,
       pageSize,
-      showLoadingIndicator
+      showLoadingIndicator,
+      this.includeDeleted
     )
     .pipe(
       finalize(() => this.loadingService.hide())
@@ -385,6 +391,19 @@ export class AcquisitionLogViewComponent implements OnInit {
     );
   }
 
+  onIncludeDeletedChange(): void {
+    this.tenantService.getAllFacilities(this.includeDeleted).subscribe({
+      next: (facilities) => {
+        this.facilityFilterOptions = facilities;
+        if (this.selectedFacilityFilter !== 'Any' && !facilities[this.selectedFacilityFilter]) {
+          this.selectedFacilityFilter = 'Any';
+        }
+        this.applyFilters();
+      },
+      error: (error) => console.error('Error loading facilities:', error)
+    });
+  }
+
   refreshLogs(): void {
     const pageIndex = this.paginationMetadata?.pageNumber ?? this.defaultPageNumber;
     const pageSize = this.paginationMetadata?.pageSize ?? this.defaultPageSize;
@@ -487,6 +506,42 @@ export class AcquisitionLogViewComponent implements OnInit {
         console.error('Error triggering bulk execution:', error);
       }
     });
+  }
+
+  disableLogsByFacility(): void {
+    const facilityId = this.selectedFacilityFilter;
+    if (!facilityId || facilityId === 'Any') return;
+
+    this.loadingService.show();
+    this.acquisitionLogService.softDeleteByFacility(facilityId)
+      .pipe(finalize(() => this.loadingService.hide()))
+      .subscribe({
+        next: (count) => {
+          console.log(`Disabled ${count} acquisition log(s) for facility ${facilityId}`);
+          this.refreshLogs();
+        },
+        error: (error) => {
+          console.error('Error disabling acquisition logs:', error);
+        }
+      });
+  }
+
+  restoreLogsByFacility(): void {
+    const facilityId = this.selectedFacilityFilter;
+    if (!facilityId || facilityId === 'Any') return;
+
+    this.loadingService.show();
+    this.acquisitionLogService.restoreByFacility(facilityId)
+      .pipe(finalize(() => this.loadingService.hide()))
+      .subscribe({
+        next: (count) => {
+          console.log(`Restored ${count} acquisition log(s) for facility ${facilityId}`);
+          this.refreshLogs();
+        },
+        error: (error) => {
+          console.error('Error restoring acquisition logs:', error);
+        }
+      });
   }
 
   onSort(column: string): void {

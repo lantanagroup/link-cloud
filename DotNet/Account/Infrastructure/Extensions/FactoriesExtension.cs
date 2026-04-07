@@ -17,12 +17,12 @@ namespace LantanaGroup.Link.Account.Infrastructure.Extensions
 
             var producer = new KafkaProducerFactory<string, object>(kafkaConnection).CreateProducer(new ProducerConfig());
             services.AddSingleton<IProducer<string, object>>(producer);
-            
+
             //Add user factories
             services.AddTransient<ILinkUserModelFactory, LinkUserModelFactory>();
             services.AddTransient<IGroupedUserModelFactory, GroupedUserModelFactory>();
             services.AddTransient<IUserSearchFilterRecordFactory, UserSearchFilterRecordFactory>();
-            
+
             //Add role factories
             services.AddTransient<ILinkRoleModelFactory, LinkRoleModelFactory>();
             services.AddTransient<IListRoleModelFactory, ListRoleModelFactory>();

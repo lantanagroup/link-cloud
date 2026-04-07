@@ -1,7 +1,6 @@
-﻿using System.Text.Json;
-using System.Text.Json.Serialization;
-using AppAny.Quartz.EntityFrameworkCore.Migrations;
+﻿using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
@@ -13,6 +12,9 @@ using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.Configuration;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using ScheduledReport = LantanaGroup.Link.Shared.Application.Models.ScheduledReport;
@@ -32,6 +34,8 @@ public class DataAcquisitionDbContext : DbContext
     public DbSet<FhirQuery> FhirQueries { get; set; }
     public virtual DbSet<FhirQueryResourceType> FhirQueryResourceTypes { get; set; }
     public DbSet<DataAcquisitionLog> DataAcquisitionLogs { get; set; }
+    public DbSet<SftpAcquisitionLog> SftpAcquisitionLogs { get; set; }
+    public DbSet<SftpConfiguration> SftpConfigurations { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -171,7 +175,6 @@ public class DataAcquisitionDbContext : DbContext
 
             entity.HasIndex(e => new { e.ExecutionDate, e.Id })
                 .IsDescending()
-                .IsDescending()
                 .HasDatabaseName("IX_DataAcquisitionLogs_Paging_Default")
                 .IncludeProperties(
                     nameof(DataAcquisitionLog.Priority),
@@ -218,6 +221,10 @@ public class DataAcquisitionDbContext : DbContext
             entity.HasIndex(e => new { e.Status, e.ExecutionDate })
                 .HasDatabaseName("IX_DataAcquisitionLogs_Status_ExecutionDate");
 
+            entity.HasIndex(e => e.FacilityId)
+                .HasDatabaseName("IX_DataAcquisitionLogs_FacilityId_IsDeleted")
+                .HasFilter("[IsDeleted] = 1");
+
             entity.HasIndex(e => new { e.TailSent, e.FacilityId, e.ReportTrackingId, e.CorrelationId, e.ReportStartDate, e.ReportEndDate, e.QueryPhase })
                 .HasDatabaseName("IX_DataAcquisitionLogs_Tailing_Optimization")
                 .HasFilter("[TailSent] = 0 AND [ReportTrackingId] IS NOT NULL AND [CorrelationId] IS NOT NULL AND [ReportStartDate] IS NOT NULL AND [ReportEndDate] IS NOT NULL");
@@ -230,6 +237,94 @@ public class DataAcquisitionDbContext : DbContext
         modelBuilder.Entity<ResourceReferenceType>()
             .Property(b => b.QueryPhase)
             .HasConversion(new EnumToStringConverter<QueryPhase>());
+
+        //-------------------SftpAcquisitionLog-------------------
+        modelBuilder.Entity<SftpAcquisitionLog>(entity =>
+        {
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
+
+            entity.Property(e => e.FacilityId)
+                .IsRequired()
+                .HasMaxLength(DataAcquisitionConstants.DatabaseSettings.MaxFacilityIdLength);
+
+            entity.HasIndex(i => i.FacilityId)
+                .HasDatabaseName("IX_SftpAcquisitionLog_FacilityId");
+
+            entity.HasIndex(i => i.ScheduledDate)
+                .HasDatabaseName("IX_SftpAcquisitionLog_ScheduledDate");
+
+            entity.Property(d => d.Status)
+                .HasMaxLength(50)
+                .HasConversion(new EnumToStringConverter<RequestStatus>());
+
+            entity.Property(d => d.AcquisitionType)
+                .HasMaxLength(50)
+                .HasConversion(new EnumToStringConverter<SftpAcquisitionType>());
+
+            entity.Property(d => d.SubType)
+                .HasMaxLength(50)
+                .HasConversion(new EnumToStringConverter<SftpAcquisitionSubType>());
+
+            entity.Property(e => e.FileNames)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
+                    v => v != null ? JsonSerializer.Deserialize<List<string>>(v, new JsonSerializerOptions()) ?? new List<string>() : new List<string>())
+                .Metadata.SetValueComparer(new ValueComparer<List<string>>(
+                    (c1, c2) => c1 != null && c2 != null && c1.SequenceEqual(c2),
+                    c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                    c => c.ToList()));
+
+            entity.Property(e => e.Notes)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
+                    v => v != null ? JsonSerializer.Deserialize<List<string>>(v, new JsonSerializerOptions()) ?? new List<string>() : new List<string>())
+                .Metadata.SetValueComparer(new ValueComparer<List<string>>(
+                    (c1, c2) => c1 != null && c2 != null && c1.SequenceEqual(c2),
+                    c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                    c => c.ToList()));
+
+            entity.Property(e => e.Benchmarks)
+                .HasConversion(
+                    v => v != null ? JsonSerializer.Serialize(v, new JsonSerializerOptions()) : null,
+                    v => v != null ? JsonSerializer.Deserialize<List<SftpAcquisitionBenchmark>>(v, new JsonSerializerOptions()) : null)
+                .Metadata.SetValueComparer(new ValueComparer<List<SftpAcquisitionBenchmark>?>(
+                    (c1, c2) => (c1 == null && c2 == null) || (c1 != null && c2 != null && c1.SequenceEqual(c2)),
+                    c => c == null ? 0 : c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                    c => c == null ? null : c.ToList()));
+        });
+
+        //-------------------SftpConfiguration-------------------
+        modelBuilder.Entity<SftpConfiguration>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.OrganizationId)
+                .IsRequired()
+                .HasMaxLength(DataAcquisitionConstants.DatabaseSettings.MaxFacilityIdLength);
+
+            entity.Property(e => e.Host)
+                .IsRequired()
+                .HasMaxLength(256);
+
+            entity.Property(e => e.RemoteDirectory)
+                .HasMaxLength(4096);
+
+            var jsonOptions = new JsonSerializerOptions
+            {
+                Converters = { new JsonStringEnumConverter() }
+            };
+
+            entity.Property(e => e.AcquisitionConfigurations)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, jsonOptions),
+                    v => v != null
+                        ? JsonSerializer.Deserialize<List<SftpAcquisitionTypeConfiguration>>(v, jsonOptions) ?? new List<SftpAcquisitionTypeConfiguration>()
+                        : new List<SftpAcquisitionTypeConfiguration>())
+                .Metadata.SetValueComparer(new ValueComparer<List<SftpAcquisitionTypeConfiguration>>(
+                    (c1, c2) => c1 != null && c2 != null && JsonSerializer.Serialize(c1, jsonOptions) == JsonSerializer.Serialize(c2, jsonOptions),
+                    c => JsonSerializer.Serialize(c, jsonOptions).GetHashCode(),
+                    c => JsonSerializer.Deserialize<List<SftpAcquisitionTypeConfiguration>>(JsonSerializer.Serialize(c, jsonOptions), jsonOptions) ?? new List<SftpAcquisitionTypeConfiguration>()));
+        });
 
         // Prefix and schema can be passed as parameters
         // Adds Quartz.NET SqlServer schema to EntityFrameworkCore

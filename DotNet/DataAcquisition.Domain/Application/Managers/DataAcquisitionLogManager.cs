@@ -22,6 +22,10 @@ public interface IDataAcquisitionLogManager
     Task<int> UpdateStatusBatchAsync(IEnumerable<long> ids, RequestStatus newStatus, CancellationToken cancellationToken = default);
     Task<List<DataAcquisitionLog>> GetLogsByIdsAsync(List<long> ids, CancellationToken cancellationToken = default);
     Task DeleteAsync(long id, CancellationToken cancellationToken = default);
+    Task<int> SoftDeleteByFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
+    Task<int> RestoreByFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
+    Task<int> SoftDeleteByReportTrackingIdAsync(string reportTrackingId, CancellationToken cancellationToken = default);
+    Task<int> RestoreByReportTrackingIdAsync(string reportTrackingId, CancellationToken cancellationToken = default);
     Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(List<long> logIds, string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default);
     Task ThrottleFacilityAcquisitions(string facilityId, DateTime executionDate, CancellationToken cancellationToken = default);
 }
@@ -47,7 +51,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
         activity?.SetTag(DiagnosticNames.CorrelationId, model.CorrelationId);
 
-        if(model.ScheduledReport == null)
+        if (model.ScheduledReport == null)
         {
             throw new ArgumentNullException("Required property ScheduledReport must not be null");
         }
@@ -121,7 +125,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
         var log = await _database.DataAcquisitionLogRepository.GetAsync(id);
 
-        if (log == null) 
+        if (log == null)
         {
             throw new NotFoundException($"No log found for id: {id}");
         }
@@ -130,6 +134,128 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         await _database.DataAcquisitionLogRepository.SaveChangesAsync();
     }
 
+    private const int SoftDeleteBatchSize = 1000;
+
+    // Soft deletes all logs for a facility in batches to avoid large update locks
+    public async Task<int> SoftDeleteByFacilityAsync(string facilityId, CancellationToken cancellationToken = default)
+    {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.SoftDeleteByFacilityAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+
+        if (string.IsNullOrWhiteSpace(facilityId))
+        {
+            throw new ArgumentNullException(nameof(facilityId), "Facility ID cannot be null or empty.");
+        }
+
+        int totalUpdated = 0;
+        int updated;
+
+        do
+        {
+            updated = await _dbContext.DataAcquisitionLogs
+                .Where(l => l.FacilityId == facilityId && !l.IsDeleted)
+                .Take(SoftDeleteBatchSize)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(l => l.IsDeleted, true)
+                    .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                    cancellationToken);
+
+            totalUpdated += updated;
+        }
+        while (updated == SoftDeleteBatchSize);
+
+        return totalUpdated;
+    }
+
+    public async Task<int> RestoreByFacilityAsync(string facilityId, CancellationToken cancellationToken = default)
+    {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.RestoreByFacilityAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+
+        if (string.IsNullOrWhiteSpace(facilityId))
+        {
+            throw new ArgumentNullException(nameof(facilityId), "Facility ID cannot be null or empty.");
+        }
+
+        int totalUpdated = 0;
+        int updated;
+
+        do
+        {
+            updated = await _dbContext.DataAcquisitionLogs
+                .Where(l => l.FacilityId == facilityId && l.IsDeleted)
+                .Take(SoftDeleteBatchSize)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(l => l.IsDeleted, false)
+                    .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                    cancellationToken);
+
+            totalUpdated += updated;
+        }
+        while (updated == SoftDeleteBatchSize);
+
+        return totalUpdated;
+    }
+
+    public async Task<int> SoftDeleteByReportTrackingIdAsync(string reportTrackingId, CancellationToken cancellationToken = default)
+    {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.SoftDeleteByReportTrackingIdAsync");
+        activity?.SetTag(DiagnosticNames.ReportTrackingId, reportTrackingId);
+
+        if (string.IsNullOrWhiteSpace(reportTrackingId))
+        {
+            throw new ArgumentNullException(nameof(reportTrackingId), "Report tracking ID cannot be null or empty.");
+        }
+
+        int totalUpdated = 0;
+        int updated;
+
+        do
+        {
+            updated = await _dbContext.DataAcquisitionLogs
+                .Where(l => l.ReportTrackingId == reportTrackingId && !l.IsDeleted)
+                .Take(SoftDeleteBatchSize)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(l => l.IsDeleted, true)
+                    .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                    cancellationToken);
+
+            totalUpdated += updated;
+        }
+        while (updated == SoftDeleteBatchSize);
+
+        return totalUpdated;
+    }
+
+    public async Task<int> RestoreByReportTrackingIdAsync(string reportTrackingId, CancellationToken cancellationToken = default)
+    {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.RestoreByReportTrackingIdAsync");
+        activity?.SetTag(DiagnosticNames.ReportTrackingId, reportTrackingId);
+
+        if (string.IsNullOrWhiteSpace(reportTrackingId))
+        {
+            throw new ArgumentNullException(nameof(reportTrackingId), "Report tracking ID cannot be null or empty.");
+        }
+
+        int totalUpdated = 0;
+        int updated;
+
+        do
+        {
+            updated = await _dbContext.DataAcquisitionLogs
+                .Where(l => l.ReportTrackingId == reportTrackingId && l.IsDeleted)
+                .Take(SoftDeleteBatchSize)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(l => l.IsDeleted, false)
+                    .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                    cancellationToken);
+
+            totalUpdated += updated;
+        }
+        while (updated == SoftDeleteBatchSize);
+
+        return totalUpdated;
+    }
 
     public async Task<DataAcquisitionLogModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default)
     {
@@ -150,7 +276,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             throw new DataAcquisitionLogNotFoundException($"Data acquisition log with ID {updateLog.Id} not found.");
         }
 
-        if(updateLog.RetryAttempts is not null)
+        if (updateLog.RetryAttempts is not null)
         {
             existingLog.RetryAttempts = updateLog.RetryAttempts;
         }
@@ -233,14 +359,14 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
         // Use ExecuteUpdateAsync for a high-performance batch update if available on the repository/context
         // Since we are using a generic repository, we might need to fall back to a manual query or range update
-        
+
         var logs = await _database.DataAcquisitionLogRepository.FindAsync(x => logIds.Contains(x.Id), cancellationToken);
 
         if (logs.Count == 0)
         {
             throw new NotFoundException($"Data acquisition logs with IDs {string.Join(", ", logIds)} not found.");
         }
-        
+
         foreach (var entity in logs)
         {
             entity.TailSent = true;
@@ -248,7 +374,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             entity.Notes ??= new();
             entity.Notes.Add("Tail Message Sent");
         }
-        
+
         await _database.DataAcquisitionLogRepository.SaveChangesAsync(cancellationToken);
     }
 
@@ -264,7 +390,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             // Get All Active Logs For Batch
             var toThrottle = await _logQueries.GetNextEligibleBatchForFacility(facilityId, lastId, batchSize, [RequestStatus.Failed, RequestStatus.Ready, RequestStatus.Pending], executionDate, cancellationToken);
 
-            if(toThrottle.Count == 0)
+            if (toThrottle.Count == 0)
             {
                 break;
             }

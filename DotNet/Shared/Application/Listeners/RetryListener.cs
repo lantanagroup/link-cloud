@@ -25,7 +25,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly IOptions<ConsumerSettings> _consumerSettings;
         private readonly IRetryModelFactory _retryEntityFactory;
-        private readonly IDeadLetterExceptionHandler<string, string> _deadLetterExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<RetryListener, string, string> _deadLetterExceptionHandler;
         private readonly RetryListenerSettings _retryListenerSettings;
         private readonly ServiceInformation _serviceInformation;
         private readonly IServiceScopeFactory _serviceScopeFactory;
@@ -35,7 +35,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
             ISchedulerFactory schedulerFactory,
             IOptions<ConsumerSettings> consumerSettings,
             IRetryModelFactory retryEntityFactory,
-            IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler,
+            IDeadLetterExceptionHandler<RetryListener, string, string> deadLetterExceptionHandler,
             RetryListenerSettings retryListenerSettings,
             ServiceInformation serviceInformation,
             IServiceScopeFactory serviceScopeFactory)
@@ -75,7 +75,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                 while (!cancellationToken.IsCancellationRequested)
                 {
                     ConsumeResult<string, string>? consumeResult;
-                    
+
                     try
                     {
                         await consumer.ConsumeWithInstrumentation(async (result, cancellationToken) =>
@@ -107,7 +107,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
 
                                 using var scope = _serviceScopeFactory.CreateScope();
 
-                                var retryModel = _retryEntityFactory.CreateRetryModel(consumeResult, _consumerSettings.Value);                                
+                                var retryModel = _retryEntityFactory.CreateRetryModel(consumeResult, _consumerSettings.Value);
 
                                 var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
 
@@ -140,7 +140,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                         _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
                         _logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
                         continue;
-                    }                    
+                    }
                 }
             }
             catch (OperationCanceledException oce)
@@ -149,7 +149,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                 consumer.Close();
                 consumer.Dispose();
             }
-            
+
         }
 
         private static string GetStringValueFromHeader(Headers headers, string key)

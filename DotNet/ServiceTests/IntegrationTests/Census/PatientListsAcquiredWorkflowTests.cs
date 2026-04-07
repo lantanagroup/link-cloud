@@ -108,7 +108,6 @@ namespace IntegrationTests.Census
             var encounter = db.PatientEncounters.FirstOrDefault(e =>
                 e.FacilityId == facilityId && e.PatientIdentifiers.Any(p => p.Identifier == admitIds[0]));
             Assert.NotNull(encounter);
-            Assert.NotNull(encounter.AdmitDate);
             Assert.NotNull(encounter.DischargeDate);
 
             // Assert PatientEventResponse for discharge of admitIds[0]
@@ -127,7 +126,7 @@ namespace IntegrationTests.Census
             var encounterManager = scope.ServiceProvider.GetRequiredService<IPatientEncounterManager>();
             var encounterQueries = scope.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
             var censusConfigManager = scope.ServiceProvider.GetRequiredService<ICensusConfigManager>();
-            
+
             // Seed test config
             var facilityId = "TestFacility" + Guid.NewGuid().ToString();
             var config = new CensusConfigEntity { FacilityID = facilityId, ScheduledTrigger = "0 0 * * *" };
@@ -158,7 +157,7 @@ namespace IntegrationTests.Census
             var responses = await patientListService.ProcessList(facilityId, list, CancellationToken.None);
 
             // Assertions
-            Assert.Empty(responses);
+            Assert.Single(responses); //admit event
             Assert.Contains(db.PatientEvents,
                 e => e.FacilityId == facilityId && e.SourcePatientId == patientId &&
                      e.EventType == EventType.FHIRListAdmit);
@@ -167,7 +166,6 @@ namespace IntegrationTests.Census
             var encounter = db.PatientEncounters.FirstOrDefault(e =>
                 e.FacilityId == facilityId && e.PatientIdentifiers.Any(p => p.Identifier == patientId));
             Assert.NotNull(encounter);
-            Assert.NotNull(encounter.AdmitDate);
             Assert.Null(encounter.DischargeDate); // Should be null since this is just an admit
         }
 
@@ -215,8 +213,8 @@ namespace IntegrationTests.Census
             var secondResponses = await patientListService.ProcessList(facilityId, list, CancellationToken.None);
 
             // Assert
-            Assert.Empty(firstResponses);
-            Assert.Empty(secondResponses);
+            Assert.Single(firstResponses); //admit event
+            Assert.Empty(secondResponses); //should not contain events
 
             // Check that there's only one event in the database (not duplicated)
             var events = db.PatientEvents.Where(e => e.FacilityId == facilityId && e.SourcePatientId == patientId)
@@ -351,7 +349,7 @@ namespace IntegrationTests.Census
             );
 
             // Assert that an ArgumentException is thrown when processing with an invalid facility ID
-            await Assert.ThrowsAsync<ArgumentException>(async () => 
+            await Assert.ThrowsAsync<ArgumentException>(async () =>
                 await patientListService.ProcessList(invalidFacilityId, list, CancellationToken.None)
             );
 

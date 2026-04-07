@@ -6,6 +6,6 @@ public class ReportScheduledMessage
     public string Frequency { get; set; }
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
-    public  string? ReportTrackingId { get; set; }
-  
+    public string? ReportTrackingId { get; set; }
+
 }

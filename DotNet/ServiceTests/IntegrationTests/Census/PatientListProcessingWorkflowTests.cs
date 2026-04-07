@@ -1,5 +1,4 @@
-﻿using System.Data.Entity;
-using LantanaGroup.Link.Census.Application.Models;
+﻿using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Application.Models.Messages;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
@@ -7,9 +6,11 @@ using LantanaGroup.Link.Census.Application.Services;
 using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Census.Domain.Queries;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.DataAcq;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.DependencyInjection;
+using System.Data.Entity;
 using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
 
@@ -37,7 +38,7 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
         var encounterManager = _fixture.ServiceProvider.GetRequiredService<IPatientEncounterManager>();
         var encounterQueries = _fixture.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
         var censusConfigManager = _fixture.ServiceProvider.GetRequiredService<ICensusConfigManager>();
-        
+
         // Create PatientListService manually like the other test class does
         var patientListService = new LantanaGroup.Link.Census.Application.Services.PatientListService(
             new Microsoft.Extensions.Logging.Abstractions.NullLogger<
@@ -73,8 +74,8 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
         int initialPatientEncounterCount = db.PatientEncounters.ToList().Count;
 
         // Act - process all the lists
-        var messages =
-            await ProcessAllListsWithDetailedResults(_patientListService, facilityLists, CancellationToken.None);
+        var response =
+            await ProcessPatientLists(_patientListService, facilityLists, CancellationToken.None);
 
         // Assert
 
@@ -130,8 +131,9 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
 
         // Verify discharge messages were returned correctly
         int expectedDischargeMessages = dischargeEvents.Count;
-        _output.WriteLine($"Expected discharge messages: {expectedDischargeMessages}, Actual: {messages.dischargeMessages.Count}");
-        Assert.Equal(expectedDischargeMessages, messages.dischargeMessages.Count);
+        int actualDischargeMessage = response.Count(x => x.PatientEvent != null && x.PatientEvent.EventType == PatientEvents.Discharge.ToString());
+        _output.WriteLine($"Expected discharge messages: {expectedDischargeMessages}, Actual: {actualDischargeMessage}");
+        Assert.Equal(expectedDischargeMessages, actualDischargeMessage);
 
         // Validate patient records for a sample of facilities
         ValidatePatientRecordsForSampleFacilities(db, facilityLists, facilityIds);
@@ -231,7 +233,7 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
     {
         // Take a sample of patients to validate event sequencing
         var samplePatientIds = patientIds.Take(5).ToList();
-    
+
         foreach (var patientId in samplePatientIds)
         {
             // Get all events for this patient, ordered by timestamp
@@ -239,19 +241,19 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
                 .Where(e => e.SourcePatientId == patientId)
                 .OrderBy(e => e.CreateDate)
                 .ToList();
-            
+
             _output.WriteLine($"Validating event sequence for patient {patientId} with {patientEvents.Count} events");
-        
+
             if (patientEvents.Count == 0)
                 continue;
-            
+
             // Basic validation rules:
             // 1. A discharge event must always be preceded by at least one admit event
             // 2. The timestamp of a discharge should be after its corresponding admit
-        
+
             bool hasHadAdmit = false;
             DateTime? lastAdmitTime = null;
-        
+
             foreach (var evt in patientEvents)
             {
                 if (evt.EventType == EventType.FHIRListAdmit)
@@ -263,11 +265,11 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
                 {
                     // A discharge must be preceded by at least one admit
                     Assert.True(hasHadAdmit, $"Patient {patientId} has a discharge event without a prior admit event");
-                
+
                     // The discharge timestamp should be after the last admit
                     if (lastAdmitTime.HasValue)
                     {
-                        Assert.True(((FHIRListDischargePayload)evt.Payload).DischargeDate >= lastAdmitTime.Value, 
+                        Assert.True(((FHIRListDischargePayload)evt.Payload).DischargeDate >= lastAdmitTime.Value,
                             $"Patient {patientId} has a discharge event with timestamp {((FHIRListDischargePayload)evt.Payload).DischargeDate} before the admit timestamp {lastAdmitTime.Value}");
                     }
                 }
@@ -282,32 +284,29 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
     /// <param name="facilityLists">Dictionary of facility IDs to their list of patient list items</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>List of all created patient events</returns>
-    private async Task<(List<IBaseMessage> dischargeMessages, int totalProcessed)>
-        ProcessAllListsWithDetailedResults(
+    private async Task<List<PatientEventResponse>> ProcessPatientLists(
             IPatientListService patientListService,
             Dictionary<string, List<PatientListItem>> facilityLists,
             CancellationToken cancellationToken)
     {
-        List<IBaseMessage> allDischargeMessages = new();
-        int totalProcessed = 0;
+        List<PatientEventResponse> patientEventResponses = new();
 
         foreach (var (facilityId, patientList) in facilityLists)
         {
             _output.WriteLine($"Processing patient list for facility {facilityId} with {patientList.Count} patients");
 
             // Process the patient list for this facility
-            var result = await patientListService.ProcessLists(facilityId, patientList, cancellationToken);
+            var results = await patientListService.ProcessLists(facilityId, patientList, cancellationToken);
 
-            // Track discharge messages specifically
-            if (result.Any())
+            foreach (var result in results)
             {
-                allDischargeMessages.AddRange(result.Select(x  => ((PatientEventResponse)x)?.PatientEvent) ?? new List<PatientEvent>() );
-                _output.WriteLine($"Facility {facilityId} returned {result.Count} responses");
+                if (result is PatientEventResponse response)
+                {
+                    patientEventResponses.Add(response);
+                }
             }
-
-            totalProcessed += patientList.Count;
         }
 
-        return (allDischargeMessages, totalProcessed);
+        return patientEventResponses;
     }
 }

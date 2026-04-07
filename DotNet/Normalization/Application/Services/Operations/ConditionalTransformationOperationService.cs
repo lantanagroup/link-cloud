@@ -11,9 +11,12 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 {
     public class ConditionalTransformOperationService : BaseOperationService<ConditionalTransformOperation>
     {
+        ILogger<ConditionalTransformOperationService> _logger;
+
         public ConditionalTransformOperationService(ILogger<ConditionalTransformOperationService> logger, TimeSpan? operationTimeout = null)
             : base(logger, operationTimeout)
         {
+            _logger = logger;
         }
 
         protected override async Task<OperationResult> ExecuteOperation(ConditionalTransformOperation operation, DomainResource resource)
@@ -22,18 +25,23 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             {
                 var conditionResult = await IsConditionPassed(condition, resource);
 
-                if(conditionResult.hasError)
+                if (conditionResult.hasError)
                 {
                     return OperationResult.Failure(conditionResult.errorMessage, resource);
                 }
 
-                if(!conditionResult.conditionMet)
+                if (!conditionResult.conditionMet)
                 {
                     return OperationResult.NoAction($"Condition was not met for this resource. FhirPathSource: {condition.FhirPathSource} - Operator: {condition.Operator} - Value: {condition.Value ?? "N/A"}", resource);
-                }                
+                }
             }
 
             var result = await SetTransformValue(resource, operation.TargetFhirPath, operation.TargetValue);
+
+            if (result.SuccessCode == OperationStatus.Success) {
+                _logger.LogDebug("Applying Conditional Transform Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName, resource.Id);
+            }
+
             return result;
         }
 

@@ -51,9 +51,10 @@ export class LinkNavBarComponent {
       label: 'Logs',
       children: [
         { label: 'Acquisition Log', path: '/tenant/acquisition-log' },
+        { label: 'SFTP Acquisition Log', path: '/data-acquisition/sftp-logs' },
         { label: 'Audit Event Log', path: '/audit' },
         { label: 'Grafana', path: this.appConfig?.config?.grafanaUrl || '/' },
-        { label: 'Kafka', path: '/kafka' },
+        { label: 'Kafka', path: '/kafka' }        
       ]
     },
     {
@@ -85,5 +86,20 @@ export class LinkNavBarComponent {
       fragment: 'ignored',
       matrixParams: 'ignored'
     });
+  }
+
+  closeMenu(event: Event): void {
+    if (event.currentTarget instanceof HTMLElement) {
+      event.currentTarget.blur();
+    }
+  }
+
+  openMenu(event: Event): void {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    if (event.currentTarget instanceof HTMLElement) {
+      event.currentTarget.focus();
+    }
   }
 }

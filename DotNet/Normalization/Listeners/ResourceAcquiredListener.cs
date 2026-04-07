@@ -1,6 +1,4 @@
-﻿using System.Text;
-using System.Text.Json;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
@@ -20,6 +18,10 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using Microsoft.OpenApi.Writers;
+using OpenTelemetry.Resources;
+using System.Text;
+using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Normalization.Listeners;
@@ -29,9 +31,9 @@ public class ResourceAcquiredListener : BackgroundService
     private readonly ILogger<ResourceAcquiredListener> _logger;
     private readonly IKafkaConsumerFactory<ResourceKey, ResourceAcquiredMessage> _consumerFactory;
     private readonly IProducer<ResourceKey, ResourceNormalizedMessage> _producer;
-    private readonly IDeadLetterExceptionHandler<ResourceKey, string> _consumeExceptionHandler;
-    private readonly IDeadLetterExceptionHandler<ResourceKey, ResourceAcquiredMessage> _deadLetterExceptionHandler;
-    private readonly ITransientExceptionHandler<ResourceKey, ResourceAcquiredMessage> _transientExceptionHandler;
+    private readonly IDeadLetterExceptionHandler<ResourceAcquiredListener, ResourceKey, string> _consumeExceptionHandler;
+    private readonly IDeadLetterExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage> _deadLetterExceptionHandler;
+    private readonly ITransientExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage> _transientExceptionHandler;
     private bool _cancelled = false;
     private readonly INormalizationServiceMetrics _metrics;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -47,9 +49,9 @@ public class ResourceAcquiredListener : BackgroundService
         ServiceInformation serviceInformation,
         IServiceScopeFactory scopeFactory,
         IKafkaConsumerFactory<ResourceKey, ResourceAcquiredMessage> consumerFactory,
-        IDeadLetterExceptionHandler<ResourceKey, string> consumeExceptionHandler,
-        IDeadLetterExceptionHandler<ResourceKey, ResourceAcquiredMessage> deadLetterExceptionHandler,
-        ITransientExceptionHandler<ResourceKey, ResourceAcquiredMessage> transientExceptionHandler,
+        IDeadLetterExceptionHandler<ResourceAcquiredListener, ResourceKey, string> consumeExceptionHandler,
+        IDeadLetterExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage> deadLetterExceptionHandler,
+        ITransientExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage> transientExceptionHandler,
         INormalizationServiceMetrics metrics,
         IProducer<ResourceKey, ResourceNormalizedMessage> producer,
         CopyPropertyOperationService copyPropertyOperationService,
@@ -100,22 +102,22 @@ public class ResourceAcquiredListener : BackgroundService
         {
             ConsumeResult<ResourceKey, ResourceAcquiredMessage>? message = default;
             try
-            {                
+            {
                 await kafkaConsumer.ConsumeWithInstrumentation(async (result, CancellationToken) =>
                 {
                     try
                     {
                         message = result;
 
-                        if (message.Key == null || string.IsNullOrWhiteSpace(message.Key.FacilityId))
+                        if (message.Message.Key == null || string.IsNullOrWhiteSpace(message.Message.Key.FacilityId))
                         {
                             throw new DeadLetterException("Message Key (FacilityId) is null or empty.");
                         }
 
                         if (
-                        message.Message.Value == null 
-                            || ((message.Message.Value.Resource == null 
-                                || string.IsNullOrWhiteSpace(message.Message.Value.QueryType) 
+                        message.Message.Value == null
+                            || ((message.Message.Value.Resource == null
+                                || string.IsNullOrWhiteSpace(message.Message.Value.QueryType)
                                 || message.Message.Value.ScheduledReports == null)
                                && !message.Message.Value.AcquisitionComplete)
                         )
@@ -142,77 +144,84 @@ public class ResourceAcquiredListener : BackgroundService
                         {
                             _logger.LogInformation("Acquisition Complete tail message received. Producing message for measure eval.");
 
-                            await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId, null);
+                            await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId, message.Message.Value.Resource);
                             return;
                         }
 
-                        DomainResource resource;
-                        try
+                        using (var scope = _scopeFactory.CreateScope())
                         {
-                            resource = DeserializeResource(message.Message.Value.Resource);
-                        }
-                        catch (Exception ex)
-                        {
-                            if (ex is JsonException || ex is NotSupportedException)
+                            var operationSequenceQueries = scope.ServiceProvider.GetRequiredService<IOperationSequenceQueries>();
+
+                            var sequences = await operationSequenceQueries.Search(new OperationSequenceSearchModel()
                             {
-                                throw new TransientException("Failed to deserialize resource.", ex);
-                            }
+                                FacilityId = messageMetaData.facilityId,
+                                ResourceType = message.Message.Value.ResourceType,
+                            });
 
-                            throw new DeadLetterException("Failed to deserialize resource.", ex);
-                        }
-
-                        var operationSequenceQueries = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<IOperationSequenceQueries>();
-
-                        var sequences = await operationSequenceQueries.Search(new OperationSequenceSearchModel()
-                        {
-                            FacilityId = messageMetaData.facilityId,
-                            ResourceType = resource.TypeName,
-                        });
-
-                        if(sequences != null && sequences.Count > 0)
-                        { 
-                            sequences.Sort((a, b) => a.Sequence.CompareTo(b.Sequence));
-
-                            foreach (var sequence in sequences)
+                            if (sequences != null && sequences.Count > 0)
                             {
-                                var dbEntity = sequence.OperationResourceType.Operation;
-
-                                var operation = OperationHelper.GetOperation(dbEntity.OperationType, dbEntity.OperationJson);
-
-                                if (operation == null)
+                                DomainResource resource;
+                                try
                                 {
-                                    throw new TransientException("Operation Data Entity found, but the operation failed to deserialize");
+                                    resource = DeserializeResource(message.Message.Value.Resource);
+                                }
+                                catch (Exception ex)
+                                {
+                                    if (ex is JsonException || ex is NotSupportedException)
+                                    {
+                                        throw new TransientException("Failed to deserialize resource.", ex);
+                                    }
+
+                                    throw new DeadLetterException("Failed to deserialize resource.", ex);
                                 }
 
-                                var operationResult = operation.OperationType switch
-                                {
-                                    OperationType.CopyProperty => await _copyPropertyOperationService.EnqueueOperationAsync((CopyPropertyOperation)operation, resource),
-                                    OperationType.CodeMap => await _codeMapOperationService.EnqueueOperationAsync((CodeMapOperation)operation, resource),
-                                    OperationType.ConditionalTransform => await _conditionalTransformOperationService.EnqueueOperationAsync((ConditionalTransformOperation)operation, resource),
-                                    OperationType.CopyLocation => await _copyLocationOperationService.EnqueueOperationAsync((CopyLocationOperation)operation, resource),
-                                    _ => null
-                                };
+                                sequences.Sort((a, b) => a.Sequence.CompareTo(b.Sequence));
 
-                                if (operationResult != null && operationResult.SuccessCode != OperationStatus.Failure)
+                                foreach (var sequence in sequences)
                                 {
-                                    resource = operationResult.Resource;
+                                    var dbEntity = sequence.OperationResourceType.Operation;
 
-                                    _metrics.IncrementResourceNormalizedCounter(new List<KeyValuePair<string, object?>>() {
+                                    var operation = OperationHelper.GetOperation(dbEntity.OperationType, dbEntity.OperationJson);
+
+                                    if (operation == null)
+                                    {
+                                        throw new TransientException("Operation Data Entity found, but the operation failed to deserialize");
+                                    }
+
+                                    var operationResult = operation.OperationType switch
+                                    {
+                                        OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operation, resource),
+                                        OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operation, resource),
+                                        OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operation, resource),
+                                        OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operation, resource),
+                                        _ => null
+                                    };
+
+                                    if (operationResult != null && operationResult.SuccessCode != OperationStatus.Failure)
+                                    {
+                                        resource = operationResult.Resource;
+
+                                        _metrics.IncrementResourceNormalizedCounter(new List<KeyValuePair<string, object?>>() {
                                         new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, messageMetaData.facilityId),
                                         new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, messageMetaData.correlationId),
                                         new KeyValuePair<string, object?>(DiagnosticNames.PatientId, message.Message.Value.PatientId),
                                         new KeyValuePair<string, object?>(DiagnosticNames.Resource, resource.TypeName),
                                         new KeyValuePair<string, object?>(DiagnosticNames.QueryType, message.Message.Value.QueryType),
                                         new KeyValuePair<string, object?>(DiagnosticNames.NormalizationOperation, operation.OperationType.ToString())});
+                                    }
+                                    else
+                                    {
+                                        _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", messageMetaData.facilityId, messageMetaData.correlationId, operation.OperationType, operationResult?.ErrorMessage ?? "No Operation Result Error Message");
+                                    }
                                 }
-                                else
-                                {
-                                    _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", messageMetaData.facilityId, messageMetaData.correlationId, operation.OperationType, operationResult?.ErrorMessage ?? "No Operation Result Error Message");
-                                }
+
+                                await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId, resource);
+                            }
+                            else
+                            {
+                                await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId, message.Message.Value.Resource);
                             }
                         }
-
-                        await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId, resource);
                     }
                     catch (DeadLetterException ex)
                     {
@@ -267,20 +276,18 @@ public class ResourceAcquiredListener : BackgroundService
                 }
                 else
                 {
-                    kafkaConsumer.Commit( new List<TopicPartitionOffset> {
+                    kafkaConsumer.Commit(new List<TopicPartitionOffset> {
                         offset
                     });
                 }
                 continue;
-            }            
+            }
         }
     }
 
 
-    private async Task ProduceResourceNormalizedMessage(ConsumeResult<ResourceKey, ResourceAcquiredMessage>? message, string facilityId, string correlationId, DomainResource? resource = null)
+    private async Task ProduceResourceNormalizedMessage(ConsumeResult<ResourceKey, ResourceAcquiredMessage>? message, string facilityId, string correlationId, object? resource)
     {
-        var serializedResource = JsonSerializer.SerializeToElement(resource, LinkFhirSerializerOptions.ForFhirLenientSerialization);
-
         var headers = new Headers
         {
             new Header(NormalizationConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(correlationId))
@@ -290,7 +297,7 @@ public class ResourceAcquiredListener : BackgroundService
         {
             AcquisitionComplete = message.Message.Value.AcquisitionComplete,
             PatientId = message.Message.Value.PatientId ?? "",
-            Resource = serializedResource,
+            Resource = resource,
             QueryType = message.Message.Value.QueryType,
             ScheduledReports = message.Message.Value.ScheduledReports,
             ReportableEvent = message.Message.Value.ReportableEvent
@@ -312,7 +319,7 @@ public class ResourceAcquiredListener : BackgroundService
         }
         catch (ProduceException<ResourceKey, ResourceNormalizedMessage> ex)
         {
-            _logger.LogError(ex, "Failed to produce ResourceNormalized message. FacilityId: {FacilityId}, CorrelationId: {CorrelationId}, FhirResourceType: {fhirResourceType}, ResourceId: {resourceId}", facilityId, correlationId, resource?.TypeName, resource?.Id);
+            _logger.LogError(ex, "Failed to produce ResourceNormalized message. FacilityId: {FacilityId}, CorrelationId: {CorrelationId}, ResourceAcquired Partition: {Partition}, ResourceAcquired Offset: {Offset}", facilityId, correlationId, message.Partition.Value, message.Offset.Value);
             throw new TransientException($"Failed to produce ResourceNormalized message: {ex.Message}", ex);
         }
     }

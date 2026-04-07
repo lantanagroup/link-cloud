@@ -3,15 +3,17 @@ using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Support;
-using LantanaGroup.Link.Report.Application.Models;
-using LantanaGroup.Link.Report.Core;
+using LantanaGroup.Link.Report.Application.Core;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Settings;
@@ -26,21 +28,22 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IKafkaConsumerFactory<string, ValidationCompleteValue> _kafkaConsumerFactory;
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ServiceInformation _serviceInformation;
-        private readonly ITransientExceptionHandler<string, ValidationCompleteValue> _transientExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<string, ValidationCompleteValue> _deadLetterExceptionHandler;
+        private readonly ITransientExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue> _deadLetterExceptionHandler;
         private readonly SubmitPayloadProducer _submitPayloadProducer;
 
-        private string Name => this.GetType().Name;
+        private readonly IExceptionLogger<ValidationCompleteListener> _exceptionLogger;
 
         public ValidationCompleteListener(
             ILogger<ValidationCompleteListener> logger,
             IKafkaConsumerFactory<string, ValidationCompleteValue> kafkaConsumerFactory,
-            ITransientExceptionHandler<string, ValidationCompleteValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<string, ValidationCompleteValue> deadLetterExceptionHandler,
+            ITransientExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue> deadLetterExceptionHandler,
             SubmitPayloadProducer submitPayloadProducer,
             IServiceScopeFactory serviceScopeFactory,
             ServiceInformation serviceInformation,
-            BlobStorageService blobStorageService)
+            BlobStorageService blobStorageService,
+            IExceptionLogger<ValidationCompleteListener> exceptionLogger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -52,6 +55,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             _transientExceptionHandler.Topic = nameof(KafkaTopic.ValidationComplete) + "-Retry";
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ValidationComplete) + "-Error";
+            _exceptionLogger = exceptionLogger ?? throw new ArgumentNullException(nameof(exceptionLogger));
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -71,7 +75,7 @@ namespace LantanaGroup.Link.Report.Listeners
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.ValidationComplete));
-                _logger.LogInformation("Started validation complete consumer for topic '{Topic}' at {StartTime}", nameof(KafkaTopic.ValidationComplete), DateTime.UtcNow);
+                _logger.LogInformation("{Name}: Started validation complete consumer for topic '{Topic}' at {StartTime}", nameof(ValidationCompleteListener), nameof(KafkaTopic.ValidationComplete), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -82,44 +86,41 @@ namespace LantanaGroup.Link.Report.Listeners
                         {
                             if (result == null)
                             {
-                                consumer.Commit();
-                                return;
+                                throw new DeadLetterException($"Received null message from topic '{nameof(KafkaTopic.ValidationComplete)}'.");
                             }
 
                             facilityId = result.Message.Key;
                             try
                             {
                                 await ProcessMessageAsync(result, consumeCancellationToken);
-                                consumer.Commit(result);
+                                consumer.SafeCommit(result, _logger);
                             }
                             catch (DeadLetterException ex)
                             {
                                 _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
-                                consumer.Commit(result);
+                                consumer.SafeCommit(result, _logger);
                             }
                             catch (TransientException ex)
                             {
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
-                                consumer.Commit(result);
+                                consumer.SafeCommit(result, _logger);
                             }
                             catch (TimeoutException ex)
                             {
                                 var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [{string.Join(", ", consumer.Subscription)}] at offset: {result.TopicPartitionOffset}";
                                 var transientException = new TransientException(exceptionMessage, ex);
                                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
-                                consumer.Commit(result);
+                                consumer.SafeCommit(result, _logger);
                             }
                             catch (Exception ex)
                             {
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
-                                consumer.Commit(result);
+                                consumer.SafeCommit(result, _logger);
                             }
                         }, cancellationToken);
                     }
                     catch (ConsumeException ex)
                     {
-                        _logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
-
                         if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                         {
                             throw new OperationCanceledException(ex.Error.Reason, ex);
@@ -129,18 +130,17 @@ namespace LantanaGroup.Link.Report.Listeners
                         _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 
                         var offset = ex.ConsumerRecord?.TopicPartitionOffset;
-                        consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
+                        consumer.SafeCommit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset }, _logger);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error encountered in ValidationCompleteListener");
-                        consumer.Commit();
+                        _exceptionLogger.Handle(ex, "Error encountered in ValidationCompleteListener", LogLevel.Error);
                     }
                 }
             }
             catch (OperationCanceledException oce)
             {
-                _logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
+                _exceptionLogger.Handle(oce, "Operation Canceled", LogLevel.Error);
                 consumer.Close();
                 consumer.Dispose();
             }
@@ -155,69 +155,44 @@ namespace LantanaGroup.Link.Report.Listeners
 
             var facilityId = result.Message.Key;
             var value = result.Message.Value;
-            var reportId = value.ReportTrackingId;
+            var reportId = Guid.Parse(value.ReportTrackingId);
 
             var schedule = await reportScheduledManager.SingleOrDefaultAsync(s => s.Id == reportId, cancellationToken);
 
             if (schedule == null)
             {
-                throw new DeadLetterException($"{Name}: No scheduled report record was found (ReportId = {reportId}, FacilityId = {facilityId}).");
+                throw new DeadLetterException($"No scheduled report record was found (ReportId = {reportId}, FacilityId = {facilityId}).");
             }
 
             if (!result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
             {
-                throw new DeadLetterException($"{Name}: Received message without correlation ID (ReportId = {reportId}, FacilityId = {facilityId}).");
+                throw new DeadLetterException($"Received message without correlation ID (ReportId = {reportId}, FacilityId = {facilityId}).");
             }
-
-            _logger.LogDebug("Consuming ValidationComplete (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", facilityId, value.PatientId, reportId);
 
             var correlationIdStr = Encoding.UTF8.GetString(headerValue);
             var reportEntry = await reportEntryManager.GetEntry(schedule.Id, value.PatientId, cancellationToken);
 
             if (reportEntry == null)
             {
-                throw new DeadLetterException($"{Name}: No patient report entry records were found (ReportId = {schedule.Id}, FacilityId = {facilityId}, PatientId {value.PatientId}).");
+                throw new DeadLetterException($"No patient report entry records were found (ReportId = {schedule.Id}, FacilityId = {facilityId})");
             }
 
             if (!value.IsValid)
             {
-                var operationOutcome = new OperationOutcome()
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    Issue = new List<OperationOutcome.IssueComponent>() {
-                        new OperationOutcome.IssueComponent() {
-                            Severity = OperationOutcome.IssueSeverity.Error,
-                            Code = OperationOutcome.IssueType.Invalid,
-                            Diagnostics = "Patient has failed Validation"
-                        }
-                    }
-                };
+                var operationOutcome = GetOperationOutcome();
 
                 var serializer = new FhirJsonSerializer();
                 string json = serializer.SerializeToString(operationOutcome);
 
-                try
-                {
-                    await patientAggregator.AppendResourceToBlob(reportEntry.AggregateReportBlobName, operationOutcome);
-                }
-                catch (Exception ex)
-                {
-                    throw new TransientException($"{Name}: Could not append OperationOutcome resource to patient aggregate report (ReportId = {schedule.Id}, FacilityId = {facilityId}, PatientId {value.PatientId}).");
-                }
+                await patientAggregator.AppendResourceToBlob(reportEntry.AggregateReportBlobName, operationOutcome);
             }
 
-            try
-            {
-                reportEntry.ReportingStatus = value.IsValid ? ReportingStatus.PassedValidation : ReportingStatus.FailedValidation;
-                reportEntry.SubmissionStatus = SubmissionStatus.Submitting;
-                await reportEntryManager.UpdateAsync(reportEntry);
+            reportEntry.ReportingStatus = value.IsValid ? ReportingStatus.PassedValidation : ReportingStatus.FailedValidation;
+            reportEntry.SubmissionStatus = SubmissionStatus.Submitting;
 
-                await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, correlationIdStr, reportEntry.AggregateReportUri);
-            }
-            catch (Exception ex)
-            {
-                throw new TransientException($"{Name}: An error was encountered when producing a Submit Payload event(ReportId = {schedule.Id}, FacilityId = {facilityId}, PatientId {value.PatientId}).", ex);
-            }
+            await reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
+
+            await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, correlationIdStr, reportEntry.AggregateReportUri);
         }
 
         private static OperationOutcome GetOperationOutcome()
@@ -226,12 +201,14 @@ namespace LantanaGroup.Link.Report.Listeners
             {
                 Id = Guid.NewGuid().ToString()
             };
+
             operationOutcome.AddIssue(new OperationOutcome.IssueComponent
             {
                 Severity = OperationOutcome.IssueSeverity.Error,
                 Code = OperationOutcome.IssueType.Invalid,
                 Diagnostics = "Patient has failed Validation"
             });
+
             return operationOutcome;
         }
 
