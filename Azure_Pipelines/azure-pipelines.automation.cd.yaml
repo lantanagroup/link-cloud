@@ -25,7 +25,7 @@ pool:
 variables:
 - group: link-cloud-variables
 - name: project
-  value: 'DotNet/Automation.UI/AutomationUI.csproj'
+  value: 'DotNet/Automation.UI/Automation.UI.csproj'
 - name: testProject
   value: 'DotNet/AutomationUnitTests/AutomationUnitTests.csproj'
 - name: serviceName
