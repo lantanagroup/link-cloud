@@ -108,9 +108,9 @@ public class QueryListControllerTests : IClassFixture<DataAcquisitionIntegration
         {
             FacilityId = "TestFacility",
             FhirBaseServerUrl = "http://example.com",
-            EHRPatientLists = new List<EhrPatientListModel>() 
-            { 
-                new EhrPatientListModel() { FhirId = "test1", Status = ListType.Admit, TimeFrame = TimeFrame.MoreThan48Hours}, 
+            EHRPatientLists = new List<EhrPatientListModel>()
+            {
+                new EhrPatientListModel() { FhirId = "test1", Status = ListType.Admit, TimeFrame = TimeFrame.MoreThan48Hours},
                 new EhrPatientListModel() { FhirId = "test2", Status = ListType.Discharge, TimeFrame = TimeFrame.MoreThan48Hours},
                 new EhrPatientListModel() { FhirId = "test3", Status = ListType.Admit, TimeFrame = TimeFrame.LessThan24Hours},
                 new EhrPatientListModel() { FhirId = "test4", Status = ListType.Discharge, TimeFrame = TimeFrame.LessThan24Hours},
@@ -303,7 +303,7 @@ public class QueryListControllerTests : IClassFixture<DataAcquisitionIntegration
         {
             FacilityId = "TestFacility",
             FhirBaseServerUrl = "http://example.com",
-            EHRPatientLists = new List<EhrPatientList>() {  new EhrPatientList() }
+            EHRPatientLists = new List<EhrPatientList>() { new EhrPatientList() }
         };
         dbContext.FhirListConfigurations.Add(config);
         await dbContext.SaveChangesAsync();

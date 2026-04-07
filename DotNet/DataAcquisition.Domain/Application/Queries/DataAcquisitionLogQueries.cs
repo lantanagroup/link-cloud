@@ -92,6 +92,8 @@ public interface IDataAcquisitionLogQueries
 
     Task<int> FailStalledQueuedLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default);
 
+    Task<int> ResetStalledProcessingLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default);
+    
     Task<DataAcquisitionLogModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog,
         CancellationToken cancellationToken = default);
 }
@@ -113,7 +115,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         var random = new Random();
         _deadlockRetryPolicy = Policy
             .Handle<SqlException>(ex => ex.Number == 1205) // SQL Deadlock error number
-            .WaitAndRetryAsync(5, retryAttempt => 
+            .WaitAndRetryAsync(5, retryAttempt =>
                 TimeSpan.FromMilliseconds(Math.Pow(2, retryAttempt) * 100) + TimeSpan.FromMilliseconds(random.Next(0, 100)),
                 (exception, timeSpan, retryCount, context) =>
                 {
@@ -136,12 +138,12 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         }
 
         var logsWithResources = await (from log in _dbContext.DataAcquisitionLogs
-            join query in _dbContext.FhirQueries on log.Id equals query.DataAcquisitionLogId
-            join resourceTypeEntry in _dbContext.FhirQueryResourceTypes on query.Id equals resourceTypeEntry.FhirQueryId
-            where query.FacilityId == facilityId
-                  && log.CorrelationId == correlationId
-                  && resourceTypeEntry.ResourceType == parsedResourceType
-            select log.ResourceAcquiredIds).ToListAsync(cancellationToken);
+                                       join query in _dbContext.FhirQueries on log.Id equals query.DataAcquisitionLogId
+                                       join resourceTypeEntry in _dbContext.FhirQueryResourceTypes on query.Id equals resourceTypeEntry.FhirQueryId
+                                       where query.FacilityId == facilityId
+                                             && log.CorrelationId == correlationId
+                                             && resourceTypeEntry.ResourceType == parsedResourceType
+                                       select log.ResourceAcquiredIds).ToListAsync(cancellationToken);
 
         var result = new List<string>();
         var resourceTypePrefix = $"{resourceType}/";
@@ -174,7 +176,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             .ThenInclude(q => q.ResourceReferenceTypes)
             .Include(l => l.ReferenceResources)
             .SingleOrDefaultAsync(l => l.Id == id, cancellationToken);
-        
+
         return entity == null ? null : DataAcquisitionLogModel.FromDomain(entity);
     }
 
@@ -198,13 +200,13 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         return await _deadlockRetryPolicy.ExecuteAsync(async () =>
         {
             return await (from l in _dbContext.DataAcquisitionLogs.AsNoTracking()
-                where l.FacilityId == facilityId
-                      && l.ReportTrackingId == reportTrackingId
-                      && l.CorrelationId == correlationId
-                      && !(l.Status == RequestStatus.Completed || l.Status == RequestStatus.MaxRetriesReached || l.Status == RequestStatus.Skipped)
-                      && !l.TailSent
-                      && l.FhirQueries.Any(fq => fq.IsReference == false)
-                select l).CountAsync(cancellationToken);
+                          where l.FacilityId == facilityId
+                                && l.ReportTrackingId == reportTrackingId
+                                && l.CorrelationId == correlationId
+                                && !(l.Status == RequestStatus.Completed || l.Status == RequestStatus.MaxRetriesReached || l.Status == RequestStatus.Skipped)
+                                && !l.TailSent
+                                && l.FhirQueries.Any(fq => fq.IsReference == false)
+                          select l).CountAsync(cancellationToken);
         });
     }
 
@@ -422,18 +424,79 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     public async Task<int> FailStalledQueuedLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default)
     {
         var stallThreshold = DateTime.UtcNow.AddMinutes(-stallMinutes);
+        int totalUpdated = 0;
+        int batchesProcessed = 0;
+        const int BatchSize = 100;
 
-        // High-speed bulk update without fetching entities or using transactions.
-        // This avoids LINQ translation errors with JSON collections and minimizes lock duration.
-        return await _deadlockRetryPolicy.ExecuteAsync(async () =>
+        while (batchesProcessed < maxBatches)
         {
-            return await _dbContext.DataAcquisitionLogs
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var batchIds = await _dbContext.DataAcquisitionLogs
                 .Where(l => l.Status == RequestStatus.Queued && l.ModifyDate <= stallThreshold)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(l => l.Status, RequestStatus.Failed)
-                    .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
-                    cancellationToken);
-        });
+                .OrderBy(l => l.Id)
+                .Select(l => l.Id)
+                .Take(BatchSize)
+                .ToListAsync(cancellationToken);
+
+            if (batchIds.Count == 0)
+                break;
+
+            totalUpdated += await _deadlockRetryPolicy.ExecuteAsync(async () =>
+            {
+                return await _dbContext.DataAcquisitionLogs
+                    .Where(l => batchIds.Contains(l.Id))
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(l => l.Status, RequestStatus.Failed)
+                        .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                        cancellationToken);
+            });
+
+            batchesProcessed++;
+            if (batchIds.Count < BatchSize)
+                break;
+        }
+
+        return totalUpdated;
+    }
+    
+    public async Task<int> ResetStalledProcessingLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default)
+    {
+        var stallThreshold = DateTime.UtcNow.AddMinutes(-stallMinutes);
+        int totalUpdated = 0;
+        int batchesProcessed = 0;
+        const int BatchSize = 100;
+
+        while (batchesProcessed < maxBatches)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var batchIds = await _dbContext.DataAcquisitionLogs
+                .Where(l => l.Status == RequestStatus.Processing && l.ModifyDate <= stallThreshold)
+                .OrderBy(l => l.Id)
+                .Select(l => l.Id)
+                .Take(BatchSize)
+                .ToListAsync(cancellationToken);
+
+            if (batchIds.Count == 0)
+                break;
+
+            totalUpdated += await _deadlockRetryPolicy.ExecuteAsync(async () =>
+            {
+                return await _dbContext.DataAcquisitionLogs
+                    .Where(l => batchIds.Contains(l.Id))
+                    .ExecuteUpdateAsync(setters => setters
+                            .SetProperty(l => l.Status, RequestStatus.Pending)
+                            .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                        cancellationToken);
+            });
+
+            batchesProcessed++;
+            if (batchIds.Count < BatchSize)
+                break;
+        }
+
+        return totalUpdated;
     }
 
     public async Task<PagedConfigModel<DataAcquisitionLogModel>> SearchAsync(SearchDataAcquisitionLogRequest model,
@@ -807,34 +870,34 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         designagtedExecutionTime ??= DateTime.UtcNow;
 
         var query = from log in _dbContext.DataAcquisitionLogs.AsNoTracking()
-            where log.FacilityId == facilityId
-                  && (lastId == null || log.Id > lastId)
-                  && (log.ExecutionDate == null || log.ExecutionDate <= designagtedExecutionTime)
-                  && (log.Status == null || statuses.Contains(log.Status.Value))
-            orderby log.Id
-            select new DataAcquisitionLogModel
-            {
-                Id = log.Id,
-                Priority = log.Priority,
-                FacilityId = log.FacilityId,
-                IsCensus = log.IsCensus,
-                PatientId = log.PatientId,
-                ReportableEvent = log.ReportableEvent,
-                ReportTrackingId = log.ReportTrackingId,
-                CorrelationId = log.CorrelationId,
-                FhirVersion = log.FhirVersion,
-                QueryType = log.QueryType,
-                QueryPhase = log.QueryPhase,
-                Status = log.Status,
-                ExecutionDate = log.ExecutionDate,
-                TraceId = log.TraceId,
-                RetryAttempts = log.RetryAttempts,
-                CompletionDate = log.CompletionDate,
-                CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
-                ResourceAcquiredIds = log.ResourceAcquiredIds,
-                Notes = log.Notes,
-                ScheduledReport = log.ScheduledReport
-            };
+                    where log.FacilityId == facilityId
+                          && (lastId == null || log.Id > lastId)
+                          && (log.ExecutionDate == null || log.ExecutionDate <= designagtedExecutionTime)
+                          && (log.Status == null || statuses.Contains(log.Status.Value))
+                    orderby log.Id
+                    select new DataAcquisitionLogModel
+                    {
+                        Id = log.Id,
+                        Priority = log.Priority,
+                        FacilityId = log.FacilityId,
+                        IsCensus = log.IsCensus,
+                        PatientId = log.PatientId,
+                        ReportableEvent = log.ReportableEvent,
+                        ReportTrackingId = log.ReportTrackingId,
+                        CorrelationId = log.CorrelationId,
+                        FhirVersion = log.FhirVersion,
+                        QueryType = log.QueryType,
+                        QueryPhase = log.QueryPhase,
+                        Status = log.Status,
+                        ExecutionDate = log.ExecutionDate,
+                        TraceId = log.TraceId,
+                        RetryAttempts = log.RetryAttempts,
+                        CompletionDate = log.CompletionDate,
+                        CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                        ResourceAcquiredIds = log.ResourceAcquiredIds,
+                        Notes = log.Notes,
+                        ScheduledReport = log.ScheduledReport
+                    };
 
         return await query
             .Take(batchSize)

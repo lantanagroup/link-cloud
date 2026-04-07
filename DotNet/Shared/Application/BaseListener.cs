@@ -2,6 +2,7 @@
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.Hosting;
@@ -36,7 +37,7 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
         //configure error handlers topic names
         DeadLetterConsumerHandler.Topic = $"{this.TopicName}-Error";
         TransientExceptionHandler.Topic = $"{this.TopicName}-Retry";
-        
+
     }
 
     public override async Task StartAsync(CancellationToken cancellationToken)
@@ -95,7 +96,7 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                         }
                         finally
                         {
-                            consumer.Commit(consumeResult);
+                            consumer.SafeCommit(consumeResult, Logger);
                         }
                     }, cancellationToken);
                 }
@@ -116,7 +117,7 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                     DeadLetterConsumerHandler.HandleConsumeException(e, facilityId);
 
                     var offset = e.ConsumerRecord?.TopicPartitionOffset;
-                    consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
+                    consumer.SafeCommit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset }, Logger);
                 }
                 catch (OperationCanceledException)
                 {
@@ -124,16 +125,8 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                 }
                 catch (Exception ex)
                 {
-                    DeadLetterConsumerHandler.HandleException(consumeResult, ex, "");
-
-
-                    if(consumeResult != null) { 
-                        consumer.Commit(consumeResult);
-                    }
-                    else
-                    {
-                        consumer.Commit();
-                    }
+                    Logger.LogError(ex, "Kafka client error in {ServiceName} on topic {Topic}",
+                        ServiceInformation.ServiceConfigName, this.TopicName);
                 }
             }
         }

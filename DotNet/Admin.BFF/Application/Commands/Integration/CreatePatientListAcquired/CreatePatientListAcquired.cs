@@ -62,7 +62,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 var message = new Message<string, PatientListMessage>
                 {
                     Key = model.FacilityId,
-                    Value = new PatientListMessage { PatientLists = model.PatientLists, ReportTrackingId = model.ReportTrackingId.ToString()},
+                    Value = new PatientListMessage { PatientLists = model.PatientLists, ReportTrackingId = model.ReportTrackingId.ToString() },
                     Headers = headers
                 };
 

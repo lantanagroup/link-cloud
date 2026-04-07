@@ -8,7 +8,7 @@
 		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
 		<RootNamespace>LantanaGroup.Link.Report</RootNamespace>
 		<DockerComposeProjectPath>..\docker-compose.dcproj</DockerComposeProjectPath>
-		<Version>0.5.0</Version>
+		<Version>0.6.0</Version>
 	</PropertyGroup>
 
 	<PropertyGroup>
@@ -18,12 +18,16 @@
 
 	<ItemGroup>
 		<Compile Remove="Attributes\**" />
+		<Compile Remove="Jobs\JobStoreFactories\**" />
 		<Compile Remove="Repositories\**" />
 		<Content Remove="Attributes\**" />
+		<Content Remove="Jobs\JobStoreFactories\**" />
 		<Content Remove="Repositories\**" />
 		<EmbeddedResource Remove="Attributes\**" />
+		<EmbeddedResource Remove="Jobs\JobStoreFactories\**" />
 		<EmbeddedResource Remove="Repositories\**" />
 		<None Remove="Attributes\**" />
+		<None Remove="Jobs\JobStoreFactories\**" />
 		<None Remove="Repositories\**" />
 	</ItemGroup>
 
@@ -40,7 +44,11 @@
 		<PackageReference Include="LinqKit.Core" Version="1.*" />
 		<PackageReference Include="Microsoft.AspNetCore.Grpc.JsonTranscoding" Version="8.*" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.25" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.25">
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.10">
+		  <PrivateAssets>all</PrivateAssets>
+		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.10">
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
@@ -63,7 +71,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Folder Include="Jobs\JobStoreFactories\" />
 	  <Folder Include="Migrations\" />
 	</ItemGroup>
 

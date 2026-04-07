@@ -10,6 +10,7 @@ using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -85,7 +86,7 @@ namespace LantanaGroup.Link.Report.Listeners
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
                             await ProcessMessageAsync(result, consumeCancellationToken);
-                            consumer.Commit(result);
+                            consumer.SafeCommit(result, _logger);
                         }, cancellationToken);
 
                     }
@@ -103,12 +104,11 @@ namespace LantanaGroup.Link.Report.Listeners
                         _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 
                         var offset = ex.ConsumerRecord?.TopicPartitionOffset;
-                        consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
+                        consumer.SafeCommit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset }, _logger);
                     }
                     catch (Exception ex)
                     {
                         _exceptionLogger.Handle(ex, "Error encountered in ReportScheduledListener", LogLevel.Error);
-                        consumer.Commit();
                     }
                 }
             }
@@ -181,26 +181,17 @@ namespace LantanaGroup.Link.Report.Listeners
                 var reportName = _blobStorageService.GetReportName(reportSchedule);
                 reportSchedule.PayloadRootUri = _blobStorageService.GetUri(reportName)?.ToString();
 
-                await database.BeginTransactionAsync(cancellationToken);
-                try
-                {
-                    reportSchedule = await reportScheduleManager.AddAsync(reportSchedule, cancellationToken);
-                    await reportPopulationManager.AddWithReportScheduleAsync(reportSchedule, cancellationToken);
+                reportSchedule = await reportScheduleManager.AddAsync(reportSchedule, cancellationToken);
 
-                    await _quartzJobHelper.ScheduleJob<EndOfReportPeriodJob>(new Dictionary<string, object>
-                    {
-                        { "ReportScheduleId", reportSchedule.Id },
-                        { "FacilityId", reportSchedule.FacilityId }
-                    }, reportSchedule.ReportEndDate, reportSchedule.Id.ToString(), ReportConstants.MeasureReportSubmissionScheduler.Group, $"{reportSchedule.Id}-{reportSchedule.ReportEndDate}");
+                var reportEndDateUtc = reportSchedule.ReportEndDate.Kind == DateTimeKind.Utc
+                    ? reportSchedule.ReportEndDate
+                    : DateTime.SpecifyKind(reportSchedule.ReportEndDate, DateTimeKind.Utc);
 
-                    await database.CommitTransactionAsync();
-                }
-                catch (Exception ex)
+                await _quartzJobHelper.ScheduleJob<EndOfReportPeriodJob>(new Dictionary<string, object>
                 {
-                    await database.RollbackTransactionAsync();
-                    _exceptionLogger.Handle(ex, "Error processing ReportScheduled event", LogLevel.Error, facilityId, new { ReportScheduleId = reportSchedule.Id });
-                    throw;
-                }
+                    { "ReportScheduleId", reportSchedule.Id },
+                    { "FacilityId", reportSchedule.FacilityId }
+                }, new DateTimeOffset(reportEndDateUtc), reportSchedule.Id.ToString(), ReportConstants.MeasureReportSubmissionScheduler.Group, $"{reportSchedule.Id}-{reportSchedule.ReportEndDate}");
             }
             catch (DeadLetterException ex)
             {

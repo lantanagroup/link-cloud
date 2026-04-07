@@ -10,14 +10,23 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 {
     public class CopyPropertyOperationService : BaseOperationService<CopyPropertyOperation>
     {
+        ILogger<CopyPropertyOperationService> _logger;
+
         public CopyPropertyOperationService(ILogger<CopyPropertyOperationService> logger, TimeSpan? operationTimeout = null)
             : base(logger, operationTimeout)
         {
+            _logger = logger;
         }
 
         protected override async Task<OperationResult> ExecuteOperation(CopyPropertyOperation operation, DomainResource resource)
         {
-            return await CopyFhirPathValue(resource, operation.SourceFhirPath, operation.TargetFhirPath);
+            var result = await CopyFhirPathValue(resource, operation.SourceFhirPath, operation.TargetFhirPath);
+
+            if (result.SuccessCode == OperationStatus.Success) {
+                _logger.LogDebug("Copy Property Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName, resource.Id);
+            }
+
+            return result;
         }
 
         private async Task<OperationResult> CopyFhirPathValue(DomainResource resource, string sourceFhirPath, string targetFhirPath)

@@ -105,6 +105,11 @@ jobs:
         repoName: audit
         containerName: audit
         healthUrl: https://$(env)-audit.nhsnlink.org/health
+      automation:
+        serviceName: automation
+        repoName: automation
+        containerName: automation
+        healthUrl: https://$(env)-automation.nhsnlink.org/health
       census:
         serviceName: census
         repoName: census

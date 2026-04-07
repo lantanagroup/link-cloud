@@ -9,6 +9,8 @@ namespace LantanaGroup.Link.Report.Data
         IEntityRepository<ReportEntry> ReportEntryRepository { get; set; }
         IEntityRepository<ReportPopulation> ReportPopulationRepository { get; set; }
         IEntityRepository<ReportResource> ReportResourceRepository { get; set; }
+        IEntityRepository<GroupPopulation> GroupPopulationRepository { get; set; }
+        IEntityRepository<MeasureReportPopulation> MeasureReportPopulationRepository { get; set; }
 
         /// <summary>
         /// Begins a new MongoDB multi-document transaction.
@@ -35,12 +37,16 @@ namespace LantanaGroup.Link.Report.Data
         public IEntityRepository<ReportEntry> ReportEntryRepository { get; set; }
         public IEntityRepository<ReportPopulation> ReportPopulationRepository { get; set; }
         public IEntityRepository<ReportResource> ReportResourceRepository { get; set; }
+        public IEntityRepository<GroupPopulation> GroupPopulationRepository { get; set; }
+        public IEntityRepository<MeasureReportPopulation> MeasureReportPopulationRepository { get; set; }
 
         public Database(ReportDbContext context,
             IEntityRepository<ReportSchedule> reportScheduledRepository,
             IEntityRepository<ReportEntry> reportEntryRepository,
             IEntityRepository<ReportPopulation> reportPopulationRepository,
-            IEntityRepository<ReportResource> reportResourceRepository)
+            IEntityRepository<ReportResource> reportResourceRepository,
+            IEntityRepository<GroupPopulation> groupPopulationRepository,
+            IEntityRepository<MeasureReportPopulation> measureReportPopulationRepository)
         {
             DbContext = context;
 
@@ -48,6 +54,8 @@ namespace LantanaGroup.Link.Report.Data
             ReportEntryRepository = reportEntryRepository;
             ReportPopulationRepository = reportPopulationRepository;
             ReportResourceRepository = reportResourceRepository;
+            GroupPopulationRepository = groupPopulationRepository;
+            MeasureReportPopulationRepository = measureReportPopulationRepository;
         }
 
         /// <summary>

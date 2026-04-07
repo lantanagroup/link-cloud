@@ -9,6 +9,7 @@ using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
@@ -115,7 +116,7 @@ namespace LantanaGroup.Link.Report.Listeners
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
                             await ProcessMessageAsync(result, consumeCancellationToken);
-                            consumer.Commit(result);
+                            consumer.SafeCommit(result, _logger);
                         }, cancellationToken);
 
                     }
@@ -133,12 +134,11 @@ namespace LantanaGroup.Link.Report.Listeners
                         _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 
                         var offset = ex.ConsumerRecord?.TopicPartitionOffset;
-                        consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
+                        consumer.SafeCommit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset }, _logger);
                     }
                     catch (Exception ex)
                     {
                         _exceptionLogger.Handle(ex, "Error encountered in GenerateReportListener", LogLevel.Error);
-                        consumer.Commit();
                     }
                 }
             }
@@ -163,6 +163,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 using var scope = _serviceScopeFactory.CreateScope();
                 var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
                 var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+                var reportPopulationManager = scope.ServiceProvider.GetRequiredService<IReportPopulationManager>();
 
                 var key = result.Message.Key;
                 var value = result.Message.Value;

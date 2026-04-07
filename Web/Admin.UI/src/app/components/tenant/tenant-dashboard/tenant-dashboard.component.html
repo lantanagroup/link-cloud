@@ -17,15 +17,47 @@
   <!-- Card -->
   <div class="link-card" style="margin-top: 2em;">
     <div class="link-card-header">
-      <div class="split-container" style="margin-bottom: 0;">
-        <div class="left-pane">
-          <p class="title">All Tenants</p>
-        </div>
+      <p class="title">All Tenants</p>
 
-        <div class="right-pane">
-          <mat-checkbox [(ngModel)]="showDeleted" (change)="onShowDeletedChange()">
-            Show deleted
-          </mat-checkbox>
+      <div class="filter-bar">
+        <mat-form-field appearance="outline" class="compact-filter">
+          <mat-label>Facility</mat-label>
+          <input matInput [formControl]="facilityInputControl" [matAutocomplete]="facilityAuto" (input)="onFacilityInput()" placeholder="Search facilities...">
+          <button *ngIf="facilityInputControl.value" matSuffix mat-icon-button aria-label="Clear facility" (click)="clearFacilityFilter()">
+            <mat-icon>close</mat-icon>
+          </button>
+          <mat-autocomplete #facilityAuto="matAutocomplete" [displayWith]="displayFacility" (optionSelected)="onFacilitySelected($event.option.value)">
+            <mat-option *ngFor="let fac of filteredFacilities | async; trackBy: trackFacility" [value]="fac">
+              <span class="facility-option-name">{{ fac.facilityName || fac.facilityId }}</span>
+              <span class="facility-option-id">{{ fac.facilityId }}</span>
+            </mat-option>
+          </mat-autocomplete>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="compact-filter">
+          <mat-label>Timezone</mat-label>
+          <mat-select [(ngModel)]="filterTimeZone" (selectionChange)="onSearchChange()">
+            <mat-option value="">All</mat-option>
+            <mat-option *ngFor="let tz of timezoneOptions" [value]="tz">{{ tz }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="compact-filter">
+          <mat-label>Vendor</mat-label>
+          <mat-select [(ngModel)]="filterVendor" (selectionChange)="onSearchChange()">
+            <mat-option value="">All</mat-option>
+            <mat-option *ngFor="let v of vendorOptions" [value]="v">{{ v }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-checkbox [(ngModel)]="showDeleted" (change)="onShowDeletedChange()">
+          Show deleted
+        </mat-checkbox>
+
+        <div class="filter-actions">
+          <button mat-stroked-button (click)="clearFilters()" *ngIf="hasActiveFilters()">
+            <mat-icon>filter_list_off</mat-icon> Clear All Filters
+          </button>
         </div>
       </div>
     </div>
@@ -58,8 +90,14 @@
 
         <!-- Timezone -->
         <ng-container matColumnDef="timeZone">
-          <th mat-header-cell *matHeaderCellDef>Timezone</th>
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Timezone</th>
           <td mat-cell *matCellDef="let row">{{ row.timeZone }}</td>
+        </ng-container>
+
+        <!-- Vendor -->
+        <ng-container matColumnDef="vendor">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Vendor</th>
+          <td mat-cell *matCellDef="let row">{{ row.vendor }}</td>
         </ng-container>
 
         <!-- Action buttons -->

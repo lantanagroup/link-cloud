@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Shared.Application.Interfaces;
+﻿using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -76,7 +77,7 @@ public class FacilityControllerTests
         };
         await _fixture.ServiceProvider.GetRequiredService<IFacilityManager>().CreateAsync(facility, CancellationToken.None);
 
-        var result = await _controller.GetFacilities(facilityId, facilityName, null, null, 10, 1, false, CancellationToken.None);
+        var result = await _controller.GetFacilities(facilityId, facilityName, null, null, null, null, 10, 1, false, CancellationToken.None);
 
         var okResult = result.Result as OkObjectResult;
         var value = okResult.Value as PagedConfigModel<FacilityModel>;
@@ -112,6 +113,7 @@ public class FacilityControllerTests
             FacilityId = facilityId,
             FacilityName = facilityName,
             TimeZone = "America/Chicago",
+            Vendor = Vendor.Epic,
             ScheduledReports = new TenantScheduledReportConfig { Daily = new string[] { }, Weekly = new string[] { }, Monthly = new string[] { } }
         };
 
@@ -138,6 +140,7 @@ public class FacilityControllerTests
             FacilityId = facilityId,
             FacilityName = "Updated Name",
             TimeZone = "America/New_York",
+            Vendor = Vendor.Epic,
             ScheduledReports = new TenantScheduledReportConfig { Daily = new string[] { "NewReport" }, Weekly = new string[] { }, Monthly = new string[] { } }
         };
 

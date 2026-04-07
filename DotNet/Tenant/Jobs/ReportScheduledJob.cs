@@ -60,7 +60,7 @@ namespace LantanaGroup.Link.Tenant.Jobs
                 switch (frequency)
                 {
                     case ScheduleService.MONTHLY:
-                        startDate = new DateTime(currentDateInTimeZone.Year, currentDateInTimeZone.Month, 1, 0, 0, 0);          
+                        startDate = new DateTime(currentDateInTimeZone.Year, currentDateInTimeZone.Month, 1, 0, 0, 0);
                         endDate = startDate.AddMonths(1).AddSeconds(-1);
                         reportTypes = facility.ScheduledReports.Monthly;
                         break;
@@ -72,7 +72,7 @@ namespace LantanaGroup.Link.Tenant.Jobs
                         int difference = currentDay - startOfWeek;
                         startDate = startDate.AddDays(-difference);
                         // end date of the week
-                        endDate = startDate.AddDays(7).AddSeconds(-1);                     
+                        endDate = startDate.AddDays(7).AddSeconds(-1);
                         reportTypes = facility.ScheduledReports.Weekly;
                         break;
                     case ScheduleService.DAILY:
@@ -96,11 +96,11 @@ namespace LantanaGroup.Link.Tenant.Jobs
                 {
                     Key = facility.FacilityId,
                     Headers = headers,
-                    Value  = new ReportScheduledMessage()
+                    Value = new ReportScheduledMessage()
                     {
                         ReportTypes = reportTypes,
                         Frequency = frequency,
-                        StartDate = startDate,                       
+                        StartDate = startDate,
                         EndDate = endDate,
                         ReportTrackingId = correlationId
                     },
@@ -116,7 +116,7 @@ namespace LantanaGroup.Link.Tenant.Jobs
                 }
                 catch (ProduceException<string, ReportScheduledMessage> ex)
                 {
-                    _logger.LogError(ex, "An error was encountered generating a ReportScheduled event.\n\tFacilityId: {facilityId}\n\tReportTypes: {reportTypes}", facility.FacilityId, string.Join(',',reportTypes));
+                    _logger.LogError(ex, "An error was encountered generating a ReportScheduled event.\n\tFacilityId: {facilityId}\n\tReportTypes: {reportTypes}", facility.FacilityId, string.Join(',', reportTypes));
                 }
 
                 _metrics.IncrementReportScheduledCounter([
