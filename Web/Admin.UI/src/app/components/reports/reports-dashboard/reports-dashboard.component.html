@@ -96,8 +96,11 @@
       </mat-checkbox>
 
       <div class="filter-actions">
-        <button class="link-button secondary" (click)="clearFilters()" *ngIf="hasActiveFilters()">Clear</button>
+        <button mat-stroked-button (click)="clearFilters()" *ngIf="hasActiveFilters()">
+          <mat-icon>filter_list_off</mat-icon> Clear All Filters
+        </button>
       </div>
+
     </div>
 
     <div class="table-container no-border">

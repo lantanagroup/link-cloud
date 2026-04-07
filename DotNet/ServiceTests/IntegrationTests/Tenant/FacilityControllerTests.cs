@@ -77,7 +77,7 @@ public class FacilityControllerTests
         };
         await _fixture.ServiceProvider.GetRequiredService<IFacilityManager>().CreateAsync(facility, CancellationToken.None);
 
-        var result = await _controller.GetFacilities(facilityId, facilityName, null, null, 10, 1, false, CancellationToken.None);
+        var result = await _controller.GetFacilities(facilityId, facilityName, null, null, null, null, 10, 1, false, CancellationToken.None);
 
         var okResult = result.Result as OkObjectResult;
         var value = okResult.Value as PagedConfigModel<FacilityModel>;
