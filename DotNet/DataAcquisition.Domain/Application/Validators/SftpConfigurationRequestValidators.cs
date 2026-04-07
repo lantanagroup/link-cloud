@@ -15,6 +15,7 @@ public class CreateSftpConfigurationModelValidator : AbstractValidator<CreateSft
         var settings = options.Value.Connection;
 
         RuleFor(x => x.Host)
+            .Cascade(CascadeMode.Stop)
             .NotEmpty()
             .WithMessage("Host is required.")
             .MaximumLength(settings.MaxHostLength)
@@ -27,6 +28,7 @@ public class CreateSftpConfigurationModelValidator : AbstractValidator<CreateSft
             .WithMessage("Port must be between 1 and 65535.");
 
         RuleFor(x => x.RemoteDirectory)
+            .Cascade(CascadeMode.Stop)
             .NotEmpty()
             .WithMessage("Remote directory is required. Use '/' for the root directory.")
             .MaximumLength(settings.MaxRemoteDirectoryLength)
@@ -63,6 +65,7 @@ public class SftpConfigurationModelValidator : AbstractValidator<SftpConfigurati
             .WithMessage("Configuration Id is required.");
 
         RuleFor(x => x.Host)
+            .Cascade(CascadeMode.Stop)
             .NotEmpty()
             .WithMessage("Host is required.")
             .MaximumLength(settings.MaxHostLength)
@@ -75,6 +78,7 @@ public class SftpConfigurationModelValidator : AbstractValidator<SftpConfigurati
             .WithMessage("Port must be between 1 and 65535.");
 
         RuleFor(x => x.RemoteDirectory)
+            .Cascade(CascadeMode.Stop)
             .NotEmpty()
             .WithMessage("Remote directory is required. Use '/' for the root directory.")
             .MaximumLength(settings.MaxRemoteDirectoryLength)
@@ -102,6 +106,7 @@ public class SftpAcquisitionTypeConfigurationValidator : AbstractValidator<SftpA
         var settings = options.Value.Connection;
 
         RuleFor(x => x.RemoteDirectory)
+            .Cascade(CascadeMode.Stop)
             .Must(path => !string.IsNullOrWhiteSpace(path))
             .WithMessage("Acquisition remote directory cannot be empty. Use '/' for the root directory or leave the field blank to inherit from the connection-level directory.")
             .MaximumLength(settings.MaxRemoteDirectoryLength)
@@ -111,6 +116,7 @@ public class SftpAcquisitionTypeConfigurationValidator : AbstractValidator<SftpA
             .When(x => x.RemoteDirectory is not null);
 
         RuleFor(x => x.ProcessedDirectory)
+            .Cascade(CascadeMode.Stop)
             .Must(path => !string.IsNullOrWhiteSpace(path))
             .WithMessage("Processed directory cannot be empty. Provide a valid path or leave the field blank.")
             .MaximumLength(settings.MaxRemoteDirectoryLength)
