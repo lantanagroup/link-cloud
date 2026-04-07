@@ -17,7 +17,7 @@ namespace DataAcquisition.Domain.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.24")
+                .HasAnnotation("ProductVersion", "8.0.25")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -836,6 +836,38 @@ namespace DataAcquisition.Domain.Migrations
                     b.HasIndex("FhirQueryId");
 
                     b.ToTable("FhirQueryResourceType");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.PendingReferenceId", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("FhirQueryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ResourceId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("ResourceType")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FhirQueryId")
+                        .HasDatabaseName("IX_PendingReferenceIds_FhirQueryId");
+
+                    b.ToTable("PendingReferenceIds");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.QueryPlan", b =>

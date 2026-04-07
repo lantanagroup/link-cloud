@@ -30,19 +30,20 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         return new FhirQueryConfigurationManager(database);
     }
 
+    private static string NewFacilityId(string prefix) => $"{prefix}_{Guid.NewGuid():N}";
+
     [Fact]
     public async Task CreateAuthenticationConfiguration_Valid_ReturnsModel()
     {
         // Arrange
+        var facilityId = NewFacilityId("TestFacility");
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var config = new FhirQueryConfiguration
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirServerBaseUrl = "http://example.com"
         };
         dbContext.FhirQueryConfigurations.Add(config);
@@ -56,7 +57,7 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         };
 
         // Act
-        var result = await manager.CreateAuthenticationConfiguration("TestFacility", authConfig);
+        var result = await manager.CreateAuthenticationConfiguration(facilityId, authConfig);
 
         // Assert
         Assert.NotNull(result);
@@ -82,15 +83,14 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
     public async Task CreateAuthenticationConfiguration_ExistingAuth_ThrowsAlreadyExists()
     {
         // Arrange
+        var facilityId = NewFacilityId("TestFacility");
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var config = new FhirQueryConfiguration
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirServerBaseUrl = "http://example.com",
             Authentication = new AuthenticationConfiguration { AuthType = AuthType.Basic.ToString() }
         };
@@ -104,22 +104,21 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         };
 
         // Act & Assert
-        await Assert.ThrowsAsync<EntityAlreadyExistsException>(() => manager.CreateAuthenticationConfiguration("TestFacility", authConfig));
+        await Assert.ThrowsAsync<EntityAlreadyExistsException>(() => manager.CreateAuthenticationConfiguration(facilityId, authConfig));
     }
 
     [Fact]
     public async Task UpdateAuthenticationConfiguration_Valid_ReturnsModel()
     {
         // Arrange
+        var facilityId = NewFacilityId("TestFacility");
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var config = new FhirQueryConfiguration
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirServerBaseUrl = "http://example.com",
             Authentication = new AuthenticationConfiguration { AuthType = AuthType.Basic.ToString() }
         };
@@ -133,7 +132,7 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         };
 
         // Act
-        var result = await manager.UpdateAuthenticationConfiguration("TestFacility", authConfig);
+        var result = await manager.UpdateAuthenticationConfiguration(facilityId, authConfig);
 
         // Assert
         Assert.NotNull(result);
@@ -159,15 +158,14 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
     public async Task DeleteAuthenticationConfiguration_Valid_DeletesAuth()
     {
         // Arrange
+        var facilityId = NewFacilityId("TestFacility");
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var config = new FhirQueryConfiguration
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirServerBaseUrl = "http://example.com",
             Authentication = new AuthenticationConfiguration { AuthType = AuthType.Basic.ToString() }
         };
@@ -177,10 +175,10 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         var manager = CreateManager(scope);
 
         // Act
-        await manager.DeleteAuthenticationConfiguration("TestFacility");
+        await manager.DeleteAuthenticationConfiguration(facilityId);
 
         // Assert
-        var updatedConfig = await dbContext.FhirQueryConfigurations.SingleOrDefaultAsync(c => c.FacilityId == "TestFacility");
+        var updatedConfig = await dbContext.FhirQueryConfigurations.SingleOrDefaultAsync(c => c.FacilityId == facilityId);
         Assert.Null(updatedConfig.Authentication);
     }
 
@@ -199,16 +197,15 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
     public async Task CreateAsync_Valid_ReturnsModel()
     {
         // Arrange
+        var facilityId = NewFacilityId("TestFacility");
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var manager = CreateManager(scope);
         var model = new CreateFhirQueryConfigurationModel
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirServerBaseUrl = "http://example.com",
             TimeZone = "utc",
             Authentication = new AuthenticationConfigurationModel
@@ -228,7 +225,7 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal("TestFacility", result.FacilityId);
+        Assert.Equal(facilityId, result.FacilityId);
     }
 
     [Fact]
@@ -265,15 +262,14 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
     public async Task UpdateAsync_Valid_ReturnsModel()
     {
         // Arrange
+        var facilityId = NewFacilityId("TestFacility");
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var existing = new FhirQueryConfiguration
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirServerBaseUrl = "http://old.com",
         };
         dbContext.FhirQueryConfigurations.Add(existing);
@@ -282,7 +278,7 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         var manager = CreateManager(scope);
         var model = new UpdateFhirQueryConfigurationModel
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirServerBaseUrl = "http://new.com"
         };
 
@@ -329,15 +325,14 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
     public async Task DeleteAsync_Valid_ReturnsTrue()
     {
         // Arrange
+        var facilityId = NewFacilityId("TestFacility");
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var config = new FhirQueryConfiguration
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirServerBaseUrl = "http://example.com"
         };
         dbContext.FhirQueryConfigurations.Add(config);
@@ -346,11 +341,11 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         var manager = CreateManager(scope);
 
         // Act
-        var result = await manager.DeleteAsync("TestFacility");
+        var result = await manager.DeleteAsync(facilityId);
 
         // Assert
         Assert.True(result);
-        var deleted = await dbContext.FhirQueryConfigurations.SingleOrDefaultAsync(c => c.FacilityId == "TestFacility");
+        var deleted = await dbContext.FhirQueryConfigurations.SingleOrDefaultAsync(c => c.FacilityId == facilityId);
         Assert.Null(deleted);
     }
 
@@ -372,16 +367,15 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
     public async Task CreateAsync_MaxRetries_Valid_ReturnsModel(int? maxRetries)
     {
         // Arrange
+        var facilityId = NewFacilityId("TestFacility");
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var manager = CreateManager(scope);
         var model = new CreateFhirQueryConfigurationModel
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirServerBaseUrl = "http://example.com",
             MaxRetries = maxRetries
         };
@@ -400,11 +394,12 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
     public async Task CreateAsync_MaxRetries_Invalid_ThrowsArgumentOutOfRange(int maxRetries)
     {
         // Arrange
+        var facilityId = NewFacilityId("TestFacility");
         using var scope = _fixture.ServiceProvider.CreateScope();
         var manager = CreateManager(scope);
         var model = new CreateFhirQueryConfigurationModel
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirServerBaseUrl = "http://example.com",
             MaxRetries = maxRetries
         };
@@ -420,15 +415,14 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
     public async Task UpdateAsync_MaxRetries_Valid_ReturnsModel(int? maxRetries)
     {
         // Arrange
+        var facilityId = NewFacilityId("TestFacility");
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var existing = new FhirQueryConfiguration
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirServerBaseUrl = "http://old.com",
         };
         dbContext.FhirQueryConfigurations.Add(existing);
@@ -437,7 +431,7 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         var manager = CreateManager(scope);
         var model = new UpdateFhirQueryConfigurationModel
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirServerBaseUrl = "http://new.com",
             MaxRetries = maxRetries
         };
@@ -456,15 +450,14 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
     public async Task UpdateAsync_MaxRetries_Invalid_ThrowsArgumentOutOfRange(int maxRetries)
     {
         // Arrange
+        var facilityId = NewFacilityId("TestFacility");
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var existing = new FhirQueryConfiguration
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirServerBaseUrl = "http://old.com",
         };
         dbContext.FhirQueryConfigurations.Add(existing);
@@ -473,7 +466,7 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         var manager = CreateManager(scope);
         var model = new UpdateFhirQueryConfigurationModel
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirServerBaseUrl = "http://example.com",
             MaxRetries = maxRetries
         };

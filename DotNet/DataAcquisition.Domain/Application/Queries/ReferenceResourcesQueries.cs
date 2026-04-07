@@ -75,6 +75,11 @@ public class ReferenceResourcesQueries : IReferenceResourcesQueries
             query = query.Where(r => r.ResourceType == model.ResourceType);
         }
 
+        if (model.ResourceTypes != null && model.ResourceTypes.Any())
+        {
+            query = query.Where(r => model.ResourceTypes.Contains(r.ResourceType));
+        }
+
         if (model.QueryPhase.HasValue)
         {
             query = query.Where(r => r.QueryPhase == model.QueryPhase.Value);

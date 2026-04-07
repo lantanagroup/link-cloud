@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -20,7 +21,8 @@ namespace IntegrationTests.DataAcquisition.Managers
         {
             var logger = new Mock<ILogger<FhirQueryManager>>().Object;
             var database = scope.ServiceProvider.GetRequiredService<LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase>();
-            return new FhirQueryManager(logger, database);
+            var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+            return new FhirQueryManager(logger, database, dbContext);
         }
 
         // Placeholder for future FhirQueryManager tests.

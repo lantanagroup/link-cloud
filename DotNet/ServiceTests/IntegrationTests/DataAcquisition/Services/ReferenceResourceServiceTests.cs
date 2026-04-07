@@ -6,6 +6,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
+using Microsoft.EntityFrameworkCore;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -40,17 +41,13 @@ namespace IntegrationTests.DataAcquisition.Services
 
             var daLogMgr = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
             var daLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
-            var fhirQueryManager = scope.ServiceProvider.GetRequiredService<IFhirQueryManager>();
+            var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
             return new ReferenceResourceService(
                 logger,
-                refMgr,
                 refQueries,
-                kafkaProducer,
-                metrics.Object,
-                daLogMgr,
                 daLogQueries,
-                fhirQueryManager);
+                dbContext);
         }
 
         [Fact]
@@ -60,13 +57,13 @@ namespace IntegrationTests.DataAcquisition.Services
             using var scope = _fixture.ServiceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-            await dbContext.Database.EnsureDeletedAsync();
-            await dbContext.Database.EnsureCreatedAsync();
 
             var logManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
             var service = CreateService(scope);
 
-            var facilityId = "TestFacility";
+            var tag = Guid.NewGuid().ToString("N");
+            var facilityId = $"TestFacility_{tag}";
+            var reportTrackingId = $"TestReport_{tag}";
             var correlationId = Guid.NewGuid().ToString();
 
             // 1. Create a parent log for the main resource
@@ -74,7 +71,7 @@ namespace IntegrationTests.DataAcquisition.Services
             {
                 FacilityId = facilityId,
                 CorrelationId = correlationId,
-                ScheduledReport = new ScheduledReport { ReportTrackingId = "TestReport", StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow },
+                ScheduledReport = new ScheduledReport { ReportTrackingId = reportTrackingId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow },
                 QueryPhase = QueryPhase.Initial,
                 QueryType = FhirQueryType.Search,
                 Status = RequestStatus.Pending,
@@ -86,7 +83,7 @@ namespace IntegrationTests.DataAcquisition.Services
             {
                 FacilityId = facilityId,
                 CorrelationId = correlationId,
-                ScheduledReport = new ScheduledReport { ReportTrackingId = "TestReport", StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow },
+                ScheduledReport = new ScheduledReport { ReportTrackingId = reportTrackingId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow },
                 QueryPhase = QueryPhase.Initial,
                 QueryType = FhirQueryType.Search,
                 Status = RequestStatus.Pending,
@@ -112,14 +109,22 @@ namespace IntegrationTests.DataAcquisition.Services
             // Act
             await service.ProcessReferences(logModel, refResources);
 
-            // Assert
-            var updatedLog = await scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>().GetAsync(referenceLog.Id);
-            Assert.NotNull(updatedLog);
-            Assert.NotEmpty(updatedLog.FhirQuery);
+            // Assert — ProcessReferences stages IDs into PendingReferenceIds,
+            // not directly into FhirQuery.QueryParameters.
+            var referenceLogModel = await scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>().GetAsync(referenceLog.Id);
+            Assert.NotNull(referenceLogModel);
+            Assert.NotEmpty(referenceLogModel.FhirQuery);
 
-            var fhirQuery = updatedLog.FhirQuery.First();
-            Assert.Equal(updatedLog.QueryType, fhirQuery.QueryType);
-            Assert.Contains("test-patient-id", fhirQuery.IdQueryParameterValues);
+            var fhirQuery = referenceLogModel.FhirQuery.First();
+            Assert.Equal(referenceLogModel.QueryType, fhirQuery.QueryType);
+
+            var pendingIds = await dbContext.PendingReferenceIds
+                .Where(p => p.FhirQueryId == fhirQuery.Id)
+                .ToListAsync();
+
+            Assert.Single(pendingIds);
+            Assert.Equal("test-patient-id", pendingIds[0].ResourceId);
+            Assert.Equal("Patient", pendingIds[0].ResourceType);
         }
     }
 }

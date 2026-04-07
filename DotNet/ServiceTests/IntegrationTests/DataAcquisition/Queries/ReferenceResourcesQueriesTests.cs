@@ -24,9 +24,6 @@ namespace IntegrationTests.DataAcquisition.Queries
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-            await dbContext.Database.EnsureDeletedAsync();
-            await dbContext.Database.EnsureCreatedAsync();
             dbContext.ReferenceResources.AddRange(resources);
             await dbContext.SaveChangesAsync();
         }
@@ -35,8 +32,9 @@ namespace IntegrationTests.DataAcquisition.Queries
         public async Task GetAsync_ExistingResource_ReturnsModel()
         {
             // Arrange
-            var facilityId = "Facility1";
-            var resourceId = "Resource1";
+            var tag = Guid.NewGuid().ToString("N");
+            var facilityId = $"Facility1_{tag}";
+            var resourceId = $"Resource1_{tag}";
             var resources = new List<ReferenceResources>
             {
                 new ReferenceResources
@@ -70,13 +68,14 @@ namespace IntegrationTests.DataAcquisition.Queries
         public async Task GetAsync_NonExistingResource_ReturnsNull()
         {
             // Arrange
+            var tag = Guid.NewGuid().ToString("N");
             await SeedReferenceResources(new List<ReferenceResources>());
 
             using var scope = _fixture.ServiceProvider.CreateScope();
             var queries = scope.ServiceProvider.GetRequiredService<IReferenceResourcesQueries>();
 
             // Act
-            var result = await queries.GetAsync("NonExisting", "Facility1");
+            var result = await queries.GetAsync($"NonExisting_{tag}", $"Facility1_{tag}");
 
             // Assert
             Assert.Null(result);
@@ -86,51 +85,56 @@ namespace IntegrationTests.DataAcquisition.Queries
         public async Task GetByResourceIdsAsync_MultipleIds_ReturnsMatchingModels()
         {
             // Arrange
-            var facilityId = "Facility1";
+            var tag = Guid.NewGuid().ToString("N");
+            var facilityId = $"Facility1_{tag}";
+            var resource1 = $"R1_{tag}";
+            var resource2 = $"R2_{tag}";
             var resources = new List<ReferenceResources>
             {
-                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = facilityId, ResourceId = "R1", ResourceType = "Type1", QueryPhase = QueryPhase.Initial, ReferenceResource = "Ref1" },
-                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = facilityId, ResourceId = "R2", ResourceType = "Type2", QueryPhase = QueryPhase.Supplemental, ReferenceResource = "Ref2" },
-                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = "Other", ResourceId = "R3", ResourceType = "Type3", QueryPhase = QueryPhase.Initial, ReferenceResource = "Ref3" }
+                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = facilityId, ResourceId = resource1, ResourceType = "Type1", QueryPhase = QueryPhase.Initial, ReferenceResource = "Ref1" },
+                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = facilityId, ResourceId = resource2, ResourceType = "Type2", QueryPhase = QueryPhase.Supplemental, ReferenceResource = "Ref2" },
+                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = $"Other_{tag}", ResourceId = $"R3_{tag}", ResourceType = "Type3", QueryPhase = QueryPhase.Initial, ReferenceResource = "Ref3" }
             };
             await SeedReferenceResources(resources);
 
             using var scope = _fixture.ServiceProvider.CreateScope();
             var queries = scope.ServiceProvider.GetRequiredService<IReferenceResourcesQueries>();
-            var ids = new List<string> { "R1", "R2", "NonExisting" };
+            var ids = new List<string> { resource1, resource2, $"NonExisting_{tag}" };
 
             // Act
             var results = (await queries.SearchAsync(new SearchReferenceResourcesModel
             {
                 ResourceIds = ids,
-                FacilityId = "Facility1"
+                FacilityId = facilityId
             })).Records;
 
             // Assert
             Assert.Equal(2, results.Count);
-            Assert.Contains(results, r => r.ResourceId == "R1");
-            Assert.Contains(results, r => r.ResourceId == "R2");
+            Assert.Contains(results, r => r.ResourceId == resource1);
+            Assert.Contains(results, r => r.ResourceId == resource2);
         }
 
         [Fact]
         public async Task GetByResourceIdsAsync_NoMatches_ReturnsEmptyList()
         {
             // Arrange
+            var tag = Guid.NewGuid().ToString("N");
+            var facilityId = $"Facility1_{tag}";
             var resources = new List<ReferenceResources>
             {
-                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = "Facility1", ResourceId = "R1", ResourceType = "Type1", QueryPhase = QueryPhase.Initial, ReferenceResource = "Ref1" }
+                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = facilityId, ResourceId = $"R1_{tag}", ResourceType = "Type1", QueryPhase = QueryPhase.Initial, ReferenceResource = "Ref1" }
             };
             await SeedReferenceResources(resources);
 
             using var scope = _fixture.ServiceProvider.CreateScope();
             var queries = scope.ServiceProvider.GetRequiredService<IReferenceResourcesQueries>();
-            var ids = new List<string> { "NonExisting" };
+            var ids = new List<string> { $"NonExisting_{tag}" };
 
             // Act
             var results = (await queries.SearchAsync(new SearchReferenceResourcesModel
             {
                 ResourceIds = ids,
-                FacilityId = "Facility1"
+                FacilityId = facilityId
             })).Records;
 
             // Assert
@@ -141,16 +145,18 @@ namespace IntegrationTests.DataAcquisition.Queries
         public async Task SearchAsync_NoFilters_ReturnsAllPaged()
         {
             // Arrange
+            var tag = Guid.NewGuid().ToString("N");
+            var facilityId = $"F1_{tag}";
             var resources = new List<ReferenceResources>
             {
-                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = "F1", ResourceId = "R1", ResourceType = "T1", ReferenceResource = "Ref1", QueryPhase = QueryPhase.Initial, DataAcquisitionLogId = null },
-                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = "F2", ResourceId = "R2", ResourceType = "T2", ReferenceResource = "Ref2", QueryPhase = QueryPhase.Supplemental, DataAcquisitionLogId = null }
+                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = facilityId, ResourceId = $"R1_{tag}", ResourceType = "T1", ReferenceResource = "Ref1", QueryPhase = QueryPhase.Initial, DataAcquisitionLogId = null },
+                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = facilityId, ResourceId = $"R2_{tag}", ResourceType = "T2", ReferenceResource = "Ref2", QueryPhase = QueryPhase.Supplemental, DataAcquisitionLogId = null }
             };
             await SeedReferenceResources(resources);
 
             using var scope = _fixture.ServiceProvider.CreateScope();
             var queries = scope.ServiceProvider.GetRequiredService<IReferenceResourcesQueries>();
-            var request = new SearchReferenceResourcesModel { PageNumber = 1, PageSize = 10 };
+            var request = new SearchReferenceResourcesModel { FacilityId = facilityId, PageNumber = 1, PageSize = 10 };
 
             // Act
             var result = await queries.SearchAsync(request);
@@ -164,85 +170,93 @@ namespace IntegrationTests.DataAcquisition.Queries
         public async Task SearchAsync_WithFacilityIdFilter_ReturnsFiltered()
         {
             // Arrange
+            var tag = Guid.NewGuid().ToString("N");
+            var facilityId = $"F1_{tag}";
             var resources = new List<ReferenceResources>
             {
-                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = "F1", ResourceId = "R1", ResourceType = "T1", ReferenceResource = "Ref1", QueryPhase = QueryPhase.Initial },
-                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = "F2", ResourceId = "R2", ResourceType = "T2", ReferenceResource = "Ref2", QueryPhase = QueryPhase.Supplemental }
+                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = facilityId, ResourceId = $"R1_{tag}", ResourceType = "T1", ReferenceResource = "Ref1", QueryPhase = QueryPhase.Initial },
+                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = $"F2_{tag}", ResourceId = $"R2_{tag}", ResourceType = "T2", ReferenceResource = "Ref2", QueryPhase = QueryPhase.Supplemental }
             };
             await SeedReferenceResources(resources);
 
             using var scope = _fixture.ServiceProvider.CreateScope();
             var queries = scope.ServiceProvider.GetRequiredService<IReferenceResourcesQueries>();
-            var request = new SearchReferenceResourcesModel { FacilityId = "F1", PageNumber = 1, PageSize = 10 };
+            var request = new SearchReferenceResourcesModel { FacilityId = facilityId, PageNumber = 1, PageSize = 10 };
 
             // Act
             var result = await queries.SearchAsync(request);
 
             // Assert
             Assert.Equal(1, result.Metadata.TotalCount);
-            Assert.Equal("F1", result.Records[0].FacilityId);
+            Assert.Equal(facilityId, result.Records[0].FacilityId);
         }
 
         [Fact]
         public async Task SearchAsync_WithResourceIdFilter_ReturnsFiltered()
         {
             // Arrange
+            var tag = Guid.NewGuid().ToString("N");
+            var resourceId = $"R1_{tag}";
             var resources = new List<ReferenceResources>
             {
-                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = "F1", ResourceId = "R1", ResourceType = "T1", ReferenceResource = "Ref1", QueryPhase = QueryPhase.Initial },
-                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = "F2", ResourceId = "R2", ResourceType = "T2", ReferenceResource = "Ref2", QueryPhase = QueryPhase.Supplemental }
+                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = $"F1_{tag}", ResourceId = resourceId, ResourceType = "T1", ReferenceResource = "Ref1", QueryPhase = QueryPhase.Initial },
+                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = $"F2_{tag}", ResourceId = $"R2_{tag}", ResourceType = "T2", ReferenceResource = "Ref2", QueryPhase = QueryPhase.Supplemental }
             };
             await SeedReferenceResources(resources);
 
             using var scope = _fixture.ServiceProvider.CreateScope();
             var queries = scope.ServiceProvider.GetRequiredService<IReferenceResourcesQueries>();
-            var request = new SearchReferenceResourcesModel { ResourceId = "R1", PageNumber = 1, PageSize = 10 };
+            var request = new SearchReferenceResourcesModel { ResourceId = resourceId, PageNumber = 1, PageSize = 10 };
 
             // Act
             var result = await queries.SearchAsync(request);
 
             // Assert
             Assert.Equal(1, result.Metadata.TotalCount);
-            Assert.Equal("R1", result.Records[0].ResourceId);
+            Assert.Equal(resourceId, result.Records[0].ResourceId);
         }
 
         [Fact]
         public async Task SearchAsync_WithResourceTypeFilter_ReturnsFiltered()
         {
             // Arrange
+            var tag = Guid.NewGuid().ToString("N");
+            var resourceType = $"T1_{tag}";
             var resources = new List<ReferenceResources>
             {
-                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = "F1", ResourceId = "R1", ResourceType = "T1", ReferenceResource = "Ref1", QueryPhase = QueryPhase.Initial },
-                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = "F2", ResourceId = "R2", ResourceType = "T2", ReferenceResource = "Ref2", QueryPhase = QueryPhase.Supplemental }
+                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = $"F1_{tag}", ResourceId = $"R1_{tag}", ResourceType = resourceType, ReferenceResource = "Ref1", QueryPhase = QueryPhase.Initial },
+                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = $"F2_{tag}", ResourceId = $"R2_{tag}", ResourceType = $"T2_{tag}", ReferenceResource = "Ref2", QueryPhase = QueryPhase.Supplemental }
             };
             await SeedReferenceResources(resources);
 
             using var scope = _fixture.ServiceProvider.CreateScope();
             var queries = scope.ServiceProvider.GetRequiredService<IReferenceResourcesQueries>();
-            var request = new SearchReferenceResourcesModel { ResourceType = "T1", PageNumber = 1, PageSize = 10 };
+            var request = new SearchReferenceResourcesModel { ResourceType = resourceType, PageNumber = 1, PageSize = 10 };
 
             // Act
             var result = await queries.SearchAsync(request);
 
             // Assert
             Assert.Equal(1, result.Metadata.TotalCount);
-            Assert.Equal("T1", result.Records[0].ResourceType);
+            Assert.Equal(resourceType, result.Records[0].ResourceType);
         }
 
         [Fact]
         public async Task SearchAsync_WithQueryPhaseFilter_ReturnsFiltered()
         {
             // Arrange
+            var tag = Guid.NewGuid().ToString("N");
+            var facilityId = $"Phase_{tag}";
             var resources = new List<ReferenceResources>
             {
-                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = "F1", ResourceId = "R1", ResourceType = "T1", ReferenceResource = "Ref1", QueryPhase = QueryPhase.Initial },
-                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = "F2", ResourceId = "R2", ResourceType = "T2", ReferenceResource = "Ref2", QueryPhase = QueryPhase.Supplemental }
+                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = facilityId, ResourceId = $"R1_{tag}", ResourceType = "T1", ReferenceResource = "Ref1", QueryPhase = QueryPhase.Initial },
+                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = facilityId, ResourceId = $"R2_{tag}", ResourceType = "T2", ReferenceResource = "Ref2", QueryPhase = QueryPhase.Supplemental }
             };
             await SeedReferenceResources(resources);
 
             using var scope = _fixture.ServiceProvider.CreateScope();
             var queries = scope.ServiceProvider.GetRequiredService<IReferenceResourcesQueries>();
-            var request = new SearchReferenceResourcesModel { QueryPhase = QueryPhase.Initial, PageNumber = 1, PageSize = 10 };
+            var request = new SearchReferenceResourcesModel { FacilityId = facilityId, QueryPhase = QueryPhase.Initial, PageNumber = 1, PageSize = 10 };
 
             // Act
             var result = await queries.SearchAsync(request);
@@ -258,13 +272,9 @@ namespace IntegrationTests.DataAcquisition.Queries
             // Arrange
             using var scopeSeed = _fixture.ServiceProvider.CreateScope();
             var dbContext = scopeSeed.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-            await dbContext.Database.EnsureDeletedAsync();
-            await dbContext.Database.EnsureCreatedAsync();
 
             var log1 = new DataAcquisitionLog
             {
-                Id = 1,
                 FacilityId = "F1",
                 Status = RequestStatus.Pending,
                 CreateDate = DateTime.UtcNow,
@@ -272,7 +282,6 @@ namespace IntegrationTests.DataAcquisition.Queries
             };
             var log2 = new DataAcquisitionLog
             {
-                Id = 2,
                 FacilityId = "F2",
                 Status = RequestStatus.Pending,
                 CreateDate = DateTime.UtcNow,
@@ -285,33 +294,35 @@ namespace IntegrationTests.DataAcquisition.Queries
 
             var resources = new List<ReferenceResources>
             {
-                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = "F1", ResourceId = "R1", ResourceType = "T1", ReferenceResource = "Ref1", QueryPhase = QueryPhase.Initial, DataAcquisitionLogId = 1 },
-                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = "F2", ResourceId = "R2", ResourceType = "T2", ReferenceResource = "Ref2", QueryPhase = QueryPhase.Supplemental, DataAcquisitionLogId = 2 }
+                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = "F1", ResourceId = "R1", ResourceType = "T1", ReferenceResource = "Ref1", QueryPhase = QueryPhase.Initial, DataAcquisitionLogId = log1.Id },
+                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = "F2", ResourceId = "R2", ResourceType = "T2", ReferenceResource = "Ref2", QueryPhase = QueryPhase.Supplemental, DataAcquisitionLogId = log2.Id }
             };
             dbContext.ReferenceResources.AddRange(resources);
             await dbContext.SaveChangesAsync();
 
             using var scope = _fixture.ServiceProvider.CreateScope();
             var queries = scope.ServiceProvider.GetRequiredService<IReferenceResourcesQueries>();
-            var request = new SearchReferenceResourcesModel { DataAcquisitionLogId = 1, PageNumber = 1, PageSize = 10 };
+            var request = new SearchReferenceResourcesModel { DataAcquisitionLogId = log1.Id, PageNumber = 1, PageSize = 10 };
 
             // Act
             var result = await queries.SearchAsync(request);
 
             // Assert
             Assert.Equal(1, result.Metadata.TotalCount);
-            Assert.Equal(1, result.Records[0].DataAcquisitionLogId);
+            Assert.Equal(log1.Id, result.Records[0].DataAcquisitionLogId);
         }
 
         [Fact]
         public async Task SearchAsync_Pagination_ReturnsCorrectPage()
         {
             // Arrange
+            var tag = Guid.NewGuid().ToString("N");
+            var facilityId = $"Paging_{tag}";
             var resources = Enumerable.Range(1, 5).Select(i => new ReferenceResources
             {
                 Id = Guid.NewGuid(),
-                FacilityId = $"F{i}",
-                ResourceId = $"R{i}",
+                FacilityId = facilityId,
+                ResourceId = $"R{i}_{tag}",
                 ResourceType = $"T{i}",
                 ReferenceResource = $"Ref{i}",
                 QueryPhase = QueryPhase.Initial
@@ -320,7 +331,7 @@ namespace IntegrationTests.DataAcquisition.Queries
 
             using var scope = _fixture.ServiceProvider.CreateScope();
             var queries = scope.ServiceProvider.GetRequiredService<IReferenceResourcesQueries>();
-            var request = new SearchReferenceResourcesModel { PageNumber = 2, PageSize = 2 };
+            var request = new SearchReferenceResourcesModel { FacilityId = facilityId, PageNumber = 2, PageSize = 2 };
 
             // Act
             var result = await queries.SearchAsync(request);
@@ -335,16 +346,18 @@ namespace IntegrationTests.DataAcquisition.Queries
         public async Task SearchAsync_SortAscending_ReturnsSorted()
         {
             // Arrange
+            var tag = Guid.NewGuid().ToString("N");
+            var facilityId = $"SortAsc_{tag}";
             var resources = new List<ReferenceResources>
             {
-                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = "F1", ResourceId = "B", ResourceType = "T1", ReferenceResource = "Ref1", QueryPhase = QueryPhase.Initial },
-                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = "F2", ResourceId = "A", ResourceType = "T2", ReferenceResource = "Ref2", QueryPhase = QueryPhase.Supplemental }
+                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = facilityId, ResourceId = "B", ResourceType = "T1", ReferenceResource = "Ref1", QueryPhase = QueryPhase.Initial },
+                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = facilityId, ResourceId = "A", ResourceType = "T2", ReferenceResource = "Ref2", QueryPhase = QueryPhase.Supplemental }
             };
             await SeedReferenceResources(resources);
 
             using var scope = _fixture.ServiceProvider.CreateScope();
             var queries = scope.ServiceProvider.GetRequiredService<IReferenceResourcesQueries>();
-            var request = new SearchReferenceResourcesModel { SortBy = "ResourceId", SortOrder = SortOrder.Ascending, PageNumber = 1, PageSize = 10 };
+            var request = new SearchReferenceResourcesModel { FacilityId = facilityId, SortBy = "ResourceId", SortOrder = SortOrder.Ascending, PageNumber = 1, PageSize = 10 };
 
             // Act
             var result = await queries.SearchAsync(request);
@@ -358,16 +371,18 @@ namespace IntegrationTests.DataAcquisition.Queries
         public async Task SearchAsync_SortDescending_ReturnsSorted()
         {
             // Arrange
+            var tag = Guid.NewGuid().ToString("N");
+            var facilityId = $"SortDesc_{tag}";
             var resources = new List<ReferenceResources>
             {
-                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = "F1", ResourceId = "A", ResourceType = "T1", ReferenceResource = "Ref1", QueryPhase = QueryPhase.Initial },
-                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = "F2", ResourceId = "B", ResourceType = "T2", ReferenceResource = "Ref2", QueryPhase = QueryPhase.Supplemental }
+                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = facilityId, ResourceId = "A", ResourceType = "T1", ReferenceResource = "Ref1", QueryPhase = QueryPhase.Initial },
+                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = facilityId, ResourceId = "B", ResourceType = "T2", ReferenceResource = "Ref2", QueryPhase = QueryPhase.Supplemental }
             };
             await SeedReferenceResources(resources);
 
             using var scope = _fixture.ServiceProvider.CreateScope();
             var queries = scope.ServiceProvider.GetRequiredService<IReferenceResourcesQueries>();
-            var request = new SearchReferenceResourcesModel { SortBy = "ResourceId", SortOrder = SortOrder.Descending, PageNumber = 1, PageSize = 10 };
+            var request = new SearchReferenceResourcesModel { FacilityId = facilityId, SortBy = "ResourceId", SortOrder = SortOrder.Descending, PageNumber = 1, PageSize = 10 };
 
             // Act
             var result = await queries.SearchAsync(request);
@@ -381,16 +396,18 @@ namespace IntegrationTests.DataAcquisition.Queries
         public async Task SearchAsync_InvalidSortBy_FallsBackToDefault()
         {
             // Arrange
+            var tag = Guid.NewGuid().ToString("N");
+            var facilityId = $"SortDefault_{tag}";
             var resources = new List<ReferenceResources>
             {
-                new ReferenceResources { Id = new Guid("00000000-0000-0000-0000-000000000002"), FacilityId = "F2", ResourceId = "R2", ResourceType = "T2", ReferenceResource = "Ref2", QueryPhase = QueryPhase.Supplemental },
-                new ReferenceResources { Id = new Guid("00000000-0000-0000-0000-000000000001"), FacilityId = "F1", ResourceId = "R1", ResourceType = "T1", ReferenceResource = "Ref1", QueryPhase = QueryPhase.Initial }
+                new ReferenceResources { Id = new Guid("00000000-0000-0000-0000-000000000002"), FacilityId = facilityId, ResourceId = $"R2_{tag}", ResourceType = "T2", ReferenceResource = "Ref2", QueryPhase = QueryPhase.Supplemental },
+                new ReferenceResources { Id = new Guid("00000000-0000-0000-0000-000000000001"), FacilityId = facilityId, ResourceId = $"R1_{tag}", ResourceType = "T1", ReferenceResource = "Ref1", QueryPhase = QueryPhase.Initial }
             };
             await SeedReferenceResources(resources);
 
             using var scope = _fixture.ServiceProvider.CreateScope();
             var queries = scope.ServiceProvider.GetRequiredService<IReferenceResourcesQueries>();
-            var request = new SearchReferenceResourcesModel { SortBy = "Invalid", SortOrder = SortOrder.Ascending, PageNumber = 1, PageSize = 10 };
+            var request = new SearchReferenceResourcesModel { FacilityId = facilityId, SortBy = "Invalid", SortOrder = SortOrder.Ascending, PageNumber = 1, PageSize = 10 };
 
             // Act
             var result = await queries.SearchAsync(request);
@@ -417,11 +434,12 @@ namespace IntegrationTests.DataAcquisition.Queries
         public async Task SearchAsync_EmptyDatabase_ReturnsEmptyPaged()
         {
             // Arrange
+            var tag = Guid.NewGuid().ToString("N");
             await SeedReferenceResources(new List<ReferenceResources>());
 
             using var scope = _fixture.ServiceProvider.CreateScope();
             var queries = scope.ServiceProvider.GetRequiredService<IReferenceResourcesQueries>();
-            var request = new SearchReferenceResourcesModel { PageNumber = 1, PageSize = 10 };
+            var request = new SearchReferenceResourcesModel { FacilityId = $"NoData_{tag}", PageNumber = 1, PageSize = 10 };
 
             // Act
             var result = await queries.SearchAsync(request);

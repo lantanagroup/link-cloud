@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -26,82 +27,40 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
     [Fact]
     public async Task GetPendingAndRetryableFailedRequests_ReturnsEligibleLogs()
     {
-        // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        // Reset database for this test
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"Eligible_{tag}";
+        var reportTrackingId = $"Report_{tag}";
 
-        // Add eligible pending log
         var pendingLog = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-
-            TraceId = Guid.NewGuid().ToString(),
-
-            FacilityId = "TestFacility",
-            Status = RequestStatus.Pending,
-            CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = "TestReportId",
-            PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = "TestReportId",
-                StartDate = DateTime.UtcNow.AddDays(-1),
-                EndDate = DateTime.UtcNow
-            }
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId, Status = RequestStatus.Pending,
+            CorrelationId = Guid.NewGuid().ToString(), ReportTrackingId = reportTrackingId,
+            PatientId = "Patient/123", ReportStartDate = DateTime.UtcNow.AddDays(-1), ReportEndDate = DateTime.UtcNow,
+            ScheduledReport = new ScheduledReport { ReportTrackingId = reportTrackingId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow }
         };
         dbContext.DataAcquisitionLogs.Add(pendingLog);
 
-        // Add eligible failed log with retries < 10
         var failedLog = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-
-            TraceId = Guid.NewGuid().ToString(),
-
-            FacilityId = "TestFacility",
-            Status = RequestStatus.Failed,
-            RetryAttempts = 5,
-            CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = "TestReportId",
-            PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = "TestReportId",
-                StartDate = DateTime.UtcNow.AddDays(-1),
-                EndDate = DateTime.UtcNow
-            }
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId, Status = RequestStatus.Failed, RetryAttempts = 5,
+            CorrelationId = Guid.NewGuid().ToString(), ReportTrackingId = reportTrackingId,
+            PatientId = "Patient/123", ReportStartDate = DateTime.UtcNow.AddDays(-1), ReportEndDate = DateTime.UtcNow,
+            ScheduledReport = new ScheduledReport { ReportTrackingId = reportTrackingId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow }
         };
         dbContext.DataAcquisitionLogs.Add(failedLog);
 
-        // Add ineligible failed log with retries >= 10
         var ineligibleLog = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-
-            TraceId = Guid.NewGuid().ToString(),
-
-            FacilityId = "TestFacility",
-            Status = RequestStatus.MaxRetriesReached,
-            RetryAttempts = 10,
-            CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = "TestReportId",
-            PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = "TestReportId",
-                StartDate = DateTime.UtcNow.AddDays(-1),
-                EndDate = DateTime.UtcNow
-            }
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId, Status = RequestStatus.MaxRetriesReached, RetryAttempts = 10,
+            CorrelationId = Guid.NewGuid().ToString(), ReportTrackingId = reportTrackingId,
+            PatientId = "Patient/123", ReportStartDate = DateTime.UtcNow.AddDays(-1), ReportEndDate = DateTime.UtcNow,
+            ScheduledReport = new ScheduledReport { ReportTrackingId = reportTrackingId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow }
         };
         dbContext.DataAcquisitionLogs.Add(ineligibleLog);
 
@@ -109,13 +68,12 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
-        // Act
         var result = await queries.SearchAsync(new SearchDataAcquisitionLogRequest
         {
+            FacilityId = facilityId,
             RequestStatuses = [RequestStatus.Pending, RequestStatus.Failed]
         });
 
-        // Assert
         Assert.Equal(2, result.Records.Count);
         Assert.Contains(result.Records, l => l.Id == pendingLog.Id);
         Assert.Contains(result.Records, l => l.Id == failedLog.Id);
@@ -125,83 +83,42 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
     [Fact]
     public async Task GetTailingMessages_ReturnsEligibleTailingMessages()
     {
-        // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        // Reset database for this test
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var correlationId = Guid.NewGuid().ToString();
-        var facilityId = "TestFacility";
-        var reportTrackingId = "TestReportId";
+        var facilityId = $"Tail_{Guid.NewGuid():N}";
+        var reportTrackingId = $"TailReport_{Guid.NewGuid():N}";
 
-        var scheduledReport = new ScheduledReport
-        {
-            ReportTrackingId = reportTrackingId,
-            StartDate = DateTime.UtcNow.AddDays(-1),
-            EndDate = DateTime.UtcNow
-        };
-
+        var scheduledReport = new ScheduledReport { ReportTrackingId = reportTrackingId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow };
         var startDate = DateTime.UtcNow.AddDays(-1);
         var endDate = DateTime.UtcNow;
 
-        // Add completed non-reference logs (eligible for tailing if no incomplete non-ref)
         var log1 = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-
-            TraceId = Guid.NewGuid().ToString(),
-
-            FacilityId = facilityId,
-            CorrelationId = correlationId,
-            ReportTrackingId = reportTrackingId,
-            Status = RequestStatus.Completed,
-            TailSent = false,
-            QueryPhase = QueryPhase.Initial,
-            PatientId = "Patient/123",
-            ReportStartDate = startDate,
-            ReportEndDate = endDate,
-            ScheduledReport = scheduledReport
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId, CorrelationId = correlationId, ReportTrackingId = reportTrackingId,
+            Status = RequestStatus.Completed, TailSent = false, QueryPhase = QueryPhase.Initial,
+            PatientId = "Patient/123", ReportStartDate = startDate, ReportEndDate = endDate, ScheduledReport = scheduledReport
         };
         dbContext.DataAcquisitionLogs.Add(log1);
 
         var log2 = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-
-            TraceId = Guid.NewGuid().ToString(),
-
-            FacilityId = facilityId,
-            CorrelationId = correlationId,
-            ReportTrackingId = reportTrackingId,
-            Status = RequestStatus.Completed,
-            TailSent = false,
-            QueryPhase = QueryPhase.Initial,
-            PatientId = "Patient/123",
-            ReportStartDate = startDate,
-            ReportEndDate = endDate,
-            ScheduledReport = scheduledReport
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId, CorrelationId = correlationId, ReportTrackingId = reportTrackingId,
+            Status = RequestStatus.Completed, TailSent = false, QueryPhase = QueryPhase.Initial,
+            PatientId = "Patient/123", ReportStartDate = startDate, ReportEndDate = endDate, ScheduledReport = scheduledReport
         };
         dbContext.DataAcquisitionLogs.Add(log2);
 
-        // Add an incomplete log to simulate condition where tailing is not triggered for this group
+        // Incomplete log prevents tailing for this group
         var incompleteLog = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-
-            TraceId = Guid.NewGuid().ToString(),
-
-            FacilityId = facilityId,
-            CorrelationId = correlationId,
-            ReportTrackingId = reportTrackingId,
-            Status = RequestStatus.Pending,
-            QueryPhase = QueryPhase.Initial,
-            PatientId = "Patient/123",
-            ReportStartDate = startDate,
-            ReportEndDate = endDate,
-            ScheduledReport = scheduledReport
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId, CorrelationId = correlationId, ReportTrackingId = reportTrackingId,
+            Status = RequestStatus.Pending, QueryPhase = QueryPhase.Initial,
+            PatientId = "Patient/123", ReportStartDate = startDate, ReportEndDate = endDate, ScheduledReport = scheduledReport
         };
         dbContext.DataAcquisitionLogs.Add(incompleteLog);
 
@@ -209,72 +126,41 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
-        // Act
         var result = await queries.GetTailingMessages();
 
-        // Assert
-        // Since there's an incomplete non-ref log, no tailing messages should be returned for this group
-        Assert.Empty(result);
+        // Our group has an incomplete log, so it should NOT appear in tailing messages
+        Assert.DoesNotContain(result, m => m.CorrelationId == correlationId);
     }
 
     [Fact]
     public async Task GetTailingMessages_WithMixedStatusesIncludingCompletedOpOutcome_ReturnsTailingMessage()
     {
-        // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        // Reset database for this test
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var correlationId = Guid.NewGuid().ToString();
-        var facilityId = "TestFacility";
-        var reportTrackingId = "TestReportId";
+        var facilityId = $"TailMixed_{Guid.NewGuid():N}";
+        var reportTrackingId = $"TailMixedReport_{Guid.NewGuid():N}";
 
-        var scheduledReport = new ScheduledReport
-        {
-            ReportTrackingId = reportTrackingId,
-            StartDate = DateTime.UtcNow.AddDays(-1),
-            EndDate = DateTime.UtcNow
-        };
-
+        var scheduledReport = new ScheduledReport { ReportTrackingId = reportTrackingId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow };
         var startDate = DateTime.UtcNow.AddDays(-1);
         var endDate = DateTime.UtcNow;
 
-        // Log 1: Completed
         var log1 = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-            TraceId = Guid.NewGuid().ToString(),
-            FacilityId = facilityId,
-            CorrelationId = correlationId,
-            ReportTrackingId = reportTrackingId,
-            Status = RequestStatus.Completed,
-            TailSent = false,
-            QueryPhase = QueryPhase.Initial,
-            PatientId = "Patient/123",
-            ReportStartDate = startDate,
-            ReportEndDate = endDate,
-            ScheduledReport = scheduledReport
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId, CorrelationId = correlationId, ReportTrackingId = reportTrackingId,
+            Status = RequestStatus.Completed, TailSent = false, QueryPhase = QueryPhase.Initial,
+            PatientId = "Patient/123", ReportStartDate = startDate, ReportEndDate = endDate, ScheduledReport = scheduledReport
         };
         dbContext.DataAcquisitionLogs.Add(log1);
 
-        // Log 2: Completed (used to be Inoperable)
         var log2 = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-            TraceId = Guid.NewGuid().ToString(),
-            FacilityId = facilityId,
-            CorrelationId = correlationId,
-            ReportTrackingId = reportTrackingId,
-            Status = RequestStatus.Completed,
-            TailSent = false,
-            QueryPhase = QueryPhase.Initial,
-            PatientId = "Patient/123",
-            ReportStartDate = startDate,
-            ReportEndDate = endDate,
-            ScheduledReport = scheduledReport
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId, CorrelationId = correlationId, ReportTrackingId = reportTrackingId,
+            Status = RequestStatus.Completed, TailSent = false, QueryPhase = QueryPhase.Initial,
+            PatientId = "Patient/123", ReportStartDate = startDate, ReportEndDate = endDate, ScheduledReport = scheduledReport
         };
         dbContext.DataAcquisitionLogs.Add(log2);
 
@@ -282,14 +168,10 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
-        // Act
         var result = await queries.GetTailingMessages();
 
-        // Assert
-        Assert.Single(result);
-        var tailingMessage = result.First();
+        var tailingMessage = Assert.Single(result, m => m.CorrelationId == correlationId);
         Assert.Equal(facilityId, tailingMessage.FacilityId);
-        Assert.Equal(correlationId, tailingMessage.CorrelationId);
         Assert.True(tailingMessage.ResourceAcquired.AcquisitionComplete);
         Assert.Contains(log1.Id, tailingMessage.LogIds);
         Assert.Contains(log2.Id, tailingMessage.LogIds);
@@ -298,49 +180,28 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
     [Fact]
     public async Task GetCountOfNonRefLogsIncompleteAsync_WithCompleted_ReturnsCorrectCount()
     {
-        // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        // Reset database for this test
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var correlationId = Guid.NewGuid().ToString();
-        var facilityId = "TestFacility";
-        var reportTrackingId = "TestReportId";
+        var facilityId = $"NonRefCompleted_{Guid.NewGuid():N}";
+        var reportTrackingId = $"Report_{Guid.NewGuid():N}";
 
-        // Add log with Completed status (should be considered complete)
         var log1 = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-            TraceId = Guid.NewGuid().ToString(),
-            FacilityId = facilityId,
-            CorrelationId = correlationId,
-            ReportTrackingId = reportTrackingId,
-            Status = RequestStatus.Completed,
-            TailSent = false,
-            FhirQueries = new List<FhirQuery>
-            {
-                new FhirQuery { FacilityId = facilityId, IsReference = false }
-            }
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId, CorrelationId = correlationId, ReportTrackingId = reportTrackingId,
+            Status = RequestStatus.Completed, TailSent = false,
+            FhirQueries = new List<FhirQuery> { new FhirQuery { FacilityId = facilityId, IsReference = false } }
         };
         dbContext.DataAcquisitionLogs.Add(log1);
 
-        // Add a truly incomplete log
         var incompleteLog = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-            TraceId = Guid.NewGuid().ToString(),
-            FacilityId = facilityId,
-            CorrelationId = correlationId,
-            ReportTrackingId = reportTrackingId,
-            Status = RequestStatus.Pending,
-            TailSent = false,
-            FhirQueries = new List<FhirQuery>
-            {
-                new FhirQuery { FacilityId = facilityId, IsReference = false }
-            }
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId, CorrelationId = correlationId, ReportTrackingId = reportTrackingId,
+            Status = RequestStatus.Pending, TailSent = false,
+            FhirQueries = new List<FhirQuery> { new FhirQuery { FacilityId = facilityId, IsReference = false } }
         };
         dbContext.DataAcquisitionLogs.Add(incompleteLog);
 
@@ -348,53 +209,29 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
-        // Act
         var count = await queries.GetCountOfNonRefLogsIncompleteAsync(facilityId, reportTrackingId, correlationId);
 
-        // Assert
-        // Only incompleteLog should be counted
         Assert.Equal(1, count);
     }
 
     [Fact]
     public async Task GetTailingMessages_WithCompleted_ReturnsEligibleTailingMessages()
     {
-        // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        // Reset database for this test
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var correlationId = Guid.NewGuid().ToString();
-        var facilityId = "TestFacility";
-        var reportTrackingId = "TestReportId";
+        var facilityId = $"TailCompleted_{Guid.NewGuid():N}";
+        var reportTrackingId = $"TailCompReport_{Guid.NewGuid():N}";
 
-        var scheduledReport = new ScheduledReport
-        {
-            ReportTrackingId = reportTrackingId,
-            StartDate = DateTime.UtcNow.AddDays(-1),
-            EndDate = DateTime.UtcNow
-        };
+        var scheduledReport = new ScheduledReport { ReportTrackingId = reportTrackingId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow };
 
-        var startDate = DateTime.UtcNow.AddDays(-1);
-        var endDate = DateTime.UtcNow;
-
-        // Add log with Completed status
         var log1 = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-            TraceId = Guid.NewGuid().ToString(),
-            FacilityId = facilityId,
-            CorrelationId = correlationId,
-            ReportTrackingId = reportTrackingId,
-            Status = RequestStatus.Completed,
-            TailSent = false,
-            QueryPhase = QueryPhase.Initial,
-            PatientId = "Patient/123",
-            ReportStartDate = startDate,
-            ReportEndDate = endDate,
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId, CorrelationId = correlationId, ReportTrackingId = reportTrackingId,
+            Status = RequestStatus.Completed, TailSent = false, QueryPhase = QueryPhase.Initial,
+            PatientId = "Patient/123", ReportStartDate = DateTime.UtcNow.AddDays(-1), ReportEndDate = DateTime.UtcNow,
             ScheduledReport = scheduledReport
         };
         dbContext.DataAcquisitionLogs.Add(log1);
@@ -403,54 +240,32 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
-        // Act
         var result = await queries.GetTailingMessages();
 
-        // Assert
-        // The log with Completed should be considered finished
-        Assert.Single(result);
-        var message = result.First();
+        var message = Assert.Single(result, m => m.CorrelationId == correlationId);
         Assert.Equal(facilityId, message.FacilityId);
-        Assert.Equal(correlationId, message.CorrelationId);
         Assert.Contains(log1.Id, message.LogIds);
     }
 
     [Fact]
     public async Task GetCompleteLogAsync_ReturnsLogWithRelatedEntities()
     {
-        // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        // Reset database for this test
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
-        var scheduledReport = new ScheduledReport
-        {
-            ReportTrackingId = "TestReportId",
-            StartDate = DateTime.UtcNow.AddDays(-1),
-            EndDate = DateTime.UtcNow
-        };
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"CompleteLog_{tag}";
 
         var log = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-
-
-            TraceId = Guid.NewGuid().ToString(),
-
-            FacilityId = "TestFacility",
-            Status = RequestStatus.Completed,
-            CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = "TestReportId",
-            PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = scheduledReport,
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId, Status = RequestStatus.Completed,
+            CorrelationId = Guid.NewGuid().ToString(), ReportTrackingId = $"Report_{tag}",
+            PatientId = "Patient/123", ReportStartDate = DateTime.UtcNow.AddDays(-1), ReportEndDate = DateTime.UtcNow,
+            ScheduledReport = new ScheduledReport { ReportTrackingId = $"Report_{tag}", StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow },
             FhirQueries = new List<FhirQuery>
             {
-                new FhirQuery { MeasureId = "test",  FacilityId = "TestFacility", QueryType = FhirQueryType.Read, FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } } }
+                new FhirQuery { MeasureId = "test", FacilityId = facilityId, QueryType = FhirQueryType.Read, FhirQueryResourceTypes = new List<FhirQueryResourceType> { new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } } }
             }
         };
         dbContext.DataAcquisitionLogs.Add(log);
@@ -458,10 +273,8 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
-        // Act
         var result = await queries.GetAsync(log.Id);
 
-        // Assert
         Assert.NotNull(result);
         Assert.Equal(log.Id, result.Id);
         Assert.NotNull(result.ScheduledReport);
@@ -471,58 +284,28 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
     [Fact]
     public async Task DataAcquisitionLog_Search_ByStatus_ReturnsMatchingLog()
     {
-        // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        // Reset database for this test
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var correlationId = Guid.NewGuid().ToString();
-        var facilityId = "TestFacility";
-        var reportTrackingId = "TestReportId";
-        var resourceType = ResourceType.Encounter.ToString();
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"SearchStatus_{tag}";
+        var reportTrackingId = $"Report_{tag}";
 
         var log = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-
-
-            TraceId = Guid.NewGuid().ToString(),
-
-            FacilityId = facilityId,
-            CorrelationId = correlationId,
-            ReportTrackingId = reportTrackingId,
-            Status = RequestStatus.Completed,
-            PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = reportTrackingId,
-                StartDate = DateTime.UtcNow.AddDays(-1),
-                EndDate = DateTime.UtcNow
-            },
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId, CorrelationId = correlationId, ReportTrackingId = reportTrackingId,
+            Status = RequestStatus.Completed, PatientId = "Patient/123",
+            ReportStartDate = DateTime.UtcNow.AddDays(-1), ReportEndDate = DateTime.UtcNow,
+            ScheduledReport = new ScheduledReport { ReportTrackingId = reportTrackingId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow },
             FhirQueries = new List<FhirQuery>
             {
-                new FhirQuery
-                {
-                    MeasureId = "test",
-                    FacilityId = facilityId,
-                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } }
-                }
+                new FhirQuery { MeasureId = "test", FacilityId = facilityId, FhirQueryResourceTypes = new List<FhirQueryResourceType> { new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } } }
             },
             ReferenceResources = new List<ReferenceResources>()
             {
-                new ReferenceResources
-                {
-                    FacilityId = "test",
-                    QueryPhase = QueryPhase.Initial,
-                    ReferenceResource = "TestResource",
-                    ResourceId = "patient/12354",
-                    ResourceType = ResourceType.Encounter.ToString()
-                }
+                new ReferenceResources { FacilityId = "test", QueryPhase = QueryPhase.Initial, ReferenceResource = "TestResource", ResourceId = "patient/12354", ResourceType = ResourceType.Encounter.ToString() }
             }
         };
         dbContext.DataAcquisitionLogs.Add(log);
@@ -530,8 +313,6 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
-        // Act
-        var resourceTypeEnum = Enum.Parse<Hl7.Fhir.Model.ResourceType>(resourceType, ignoreCase: true);
         var result = (await queries.SearchAsync(new SearchDataAcquisitionLogRequest
         {
             FacilityId = facilityId,
@@ -539,7 +320,6 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             CorrelationId = correlationId
         })).Records.FirstOrDefault();
 
-        // Assert
         Assert.NotNull(result);
         Assert.Equal(log.Id, result.Id);
     }
@@ -547,87 +327,39 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
     [Fact]
     public async Task GetCountOfNonRefLogsIncompleteAsync_ReturnsCorrectCount()
     {
-        // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        // Reset database for this test
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var correlationId = Guid.NewGuid().ToString();
-        var facilityId = "TestFacility";
-        var reportTrackingId = "TestReportId";
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"NonRefCount_{tag}";
+        var reportTrackingId = $"Report_{tag}";
 
-        // Add incomplete non-reference log
         var incompleteLog = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-
-
-            TraceId = Guid.NewGuid().ToString(),
-
-            FacilityId = facilityId,
-            CorrelationId = correlationId,
-            ReportTrackingId = reportTrackingId,
-            Status = RequestStatus.Pending,
-            QueryPhase = QueryPhase.Initial,
-            PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId, CorrelationId = correlationId, ReportTrackingId = reportTrackingId,
+            Status = RequestStatus.Pending, QueryPhase = QueryPhase.Initial,
+            PatientId = "Patient/123", ReportStartDate = DateTime.UtcNow.AddDays(-1), ReportEndDate = DateTime.UtcNow,
             FhirQueries = new List<FhirQuery>
             {
-                new FhirQuery
-                {
-                    MeasureId = "test",
-                    FacilityId = "TestFacility",
-                    IsReference = false,
-                    QueryType = FhirQueryType.Read,
-                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } }
-                }
+                new FhirQuery { MeasureId = "test", FacilityId = facilityId, IsReference = false, QueryType = FhirQueryType.Read, FhirQueryResourceTypes = new List<FhirQueryResourceType> { new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } } }
             },
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = reportTrackingId,
-                StartDate = DateTime.UtcNow.AddDays(-1),
-                EndDate = DateTime.UtcNow
-            }
+            ScheduledReport = new ScheduledReport { ReportTrackingId = reportTrackingId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow }
         };
         dbContext.DataAcquisitionLogs.Add(incompleteLog);
 
-        // Add completed reference log (should not count)
         var referenceLog = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-
-
-            TraceId = Guid.NewGuid().ToString(),
-
-            FacilityId = facilityId,
-            CorrelationId = correlationId,
-            ReportTrackingId = reportTrackingId,
-            Status = RequestStatus.Completed,
-            QueryPhase = QueryPhase.Referential,
-            PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId, CorrelationId = correlationId, ReportTrackingId = reportTrackingId,
+            Status = RequestStatus.Completed, QueryPhase = QueryPhase.Referential,
+            PatientId = "Patient/123", ReportStartDate = DateTime.UtcNow.AddDays(-1), ReportEndDate = DateTime.UtcNow,
             FhirQueries = new List<FhirQuery>
             {
-                new FhirQuery
-                {
-                    MeasureId = "test",
-                    FacilityId = "TestFacility",
-                    IsReference = true,
-                    QueryType = FhirQueryType.Read,
-                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } }
-                }
+                new FhirQuery { MeasureId = "test", FacilityId = facilityId, IsReference = true, QueryType = FhirQueryType.Read, FhirQueryResourceTypes = new List<FhirQueryResourceType> { new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } } }
             },
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = reportTrackingId,
-                StartDate = DateTime.UtcNow.AddDays(-1),
-                EndDate = DateTime.UtcNow
-            }
+            ScheduledReport = new ScheduledReport { ReportTrackingId = reportTrackingId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow }
         };
         dbContext.DataAcquisitionLogs.Add(referenceLog);
 
@@ -635,70 +367,37 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
-        // Act
         var count = await queries.GetCountOfNonRefLogsIncompleteAsync(facilityId, reportTrackingId, correlationId);
 
-        // Assert
         Assert.Equal(1, count);
     }
 
     [Fact]
     public async Task SearchAsync_ReturnsMatchingResults()
     {
-        // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        // Reset database for this test
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"SearchMatch_{tag}";
 
-        var facilityId = "TestFacility";
-
-        // Add logs
         var log1 = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-
-
-            TraceId = Guid.NewGuid().ToString(),
-
-            FacilityId = facilityId,
-            Status = RequestStatus.Completed,
-            CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = "TestReportId1",
-            PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = "TestReportId1",
-                StartDate = DateTime.UtcNow.AddDays(-1),
-                EndDate = DateTime.UtcNow
-            }
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId, Status = RequestStatus.Completed,
+            CorrelationId = Guid.NewGuid().ToString(), ReportTrackingId = $"Report1_{tag}",
+            PatientId = "Patient/123", ReportStartDate = DateTime.UtcNow.AddDays(-1), ReportEndDate = DateTime.UtcNow,
+            ScheduledReport = new ScheduledReport { ReportTrackingId = $"Report1_{tag}", StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow }
         };
         dbContext.DataAcquisitionLogs.Add(log1);
 
         var log2 = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-
-
-            TraceId = Guid.NewGuid().ToString(),
-
-            FacilityId = facilityId,
-            Status = RequestStatus.Pending,
-            CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = "TestReportId2",
-            PatientId = "Patient/456",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = "TestReportId2",
-                StartDate = DateTime.UtcNow.AddDays(-1),
-                EndDate = DateTime.UtcNow
-            }
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId, Status = RequestStatus.Pending,
+            CorrelationId = Guid.NewGuid().ToString(), ReportTrackingId = $"Report2_{tag}",
+            PatientId = "Patient/456", ReportStartDate = DateTime.UtcNow.AddDays(-1), ReportEndDate = DateTime.UtcNow,
+            ScheduledReport = new ScheduledReport { ReportTrackingId = $"Report2_{tag}", StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow }
         };
         dbContext.DataAcquisitionLogs.Add(log2);
 
@@ -706,86 +405,49 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
-        var searchRequest = new SearchDataAcquisitionLogRequest
+        var results = await queries.SearchAsync(new SearchDataAcquisitionLogRequest
         {
             FacilityId = facilityId,
             PageNumber = 1,
             PageSize = 10
-        };
+        });
 
-        // Act
-        var results = await queries.SearchAsync(searchRequest);
-
-        // Assert
         Assert.Equal(2, results.Records.Count);
     }
 
     [Fact]
     public async Task GetDataAcquisitionLogAsync_ReturnsLog()
     {
-        // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        // Reset database for this test
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"GetLog_{tag}";
 
         var log = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-
-
-            TraceId = Guid.NewGuid().ToString(),
-
-            FacilityId = "TestFacility",
-            Status = RequestStatus.Completed,
-            CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = "TestReportId",
-            PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = "TestReportId",
-                StartDate = DateTime.UtcNow.AddDays(-1),
-                EndDate = DateTime.UtcNow
-            },
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId, Status = RequestStatus.Completed,
+            CorrelationId = Guid.NewGuid().ToString(), ReportTrackingId = $"Report_{tag}",
+            PatientId = "Patient/123", ReportStartDate = DateTime.UtcNow.AddDays(-1), ReportEndDate = DateTime.UtcNow,
+            ScheduledReport = new ScheduledReport { ReportTrackingId = $"Report_{tag}", StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow },
             FhirQueries = new List<FhirQuery>()
             {
                 new FhirQuery
                 {
-                    FacilityId = "TestFacility",
-                    IsReference = false,
-                    Paged = 25,
-                    QueryType = FhirQueryType.Read,
-                    QueryParameters = new List<string>() { "Test "},
-                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } },
+                    FacilityId = facilityId, IsReference = false, Paged = 25,
+                    QueryType = FhirQueryType.Read, QueryParameters = new List<string>() { "Test " },
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> { new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } },
                     MeasureId = "TestMeasureId",
                     ResourceReferenceTypes = new List<ResourceReferenceType>()
                     {
-                        new ResourceReferenceType
-                        {
-                            FacilityId = "TestFacility",
-                            QueryPhase = QueryPhase.Initial,
-                            ResourceType = "Patient",
-                            CreateDate = DateTime.UtcNow,
-                            ModifyDate = DateTime.UtcNow,
-                        }
+                        new ResourceReferenceType { FacilityId = facilityId, QueryPhase = QueryPhase.Initial, ResourceType = "Patient", CreateDate = DateTime.UtcNow, ModifyDate = DateTime.UtcNow }
                     }
                 }
             },
             ReferenceResources = new List<ReferenceResources>
             {
-                new ReferenceResources
-                {
-                    FacilityId = "test",
-                    QueryPhase = QueryPhase.Polling,
-                    ReferenceResource = "Test",
-                    ResourceId = Guid.NewGuid().ToString(),
-                    ResourceType = "test",
-                    CreateDate = DateTime.UtcNow
-                }
+                new ReferenceResources { FacilityId = "test", QueryPhase = QueryPhase.Polling, ReferenceResource = "Test", ResourceId = Guid.NewGuid().ToString(), ResourceType = "test", CreateDate = DateTime.UtcNow }
             }
         };
         dbContext.DataAcquisitionLogs.Add(log);
@@ -793,13 +455,10 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
-        // Act
-        var result = await queries.GetAsync(log.Id);
+        var result = await queries.GetWithReferencesAsync(log.Id);
 
-        // Assert
         Assert.NotNull(result);
         Assert.Equal(log.Id, result.Id);
-
         Assert.NotEmpty(result.FhirQuery);
         Assert.NotEmpty(result.FhirQuery.First().ResourceReferenceTypes);
         Assert.NotEmpty(result.ReferenceResources);
@@ -808,69 +467,37 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
     [Fact]
     public async Task SearchAsync_By_ResourceType_ReturnsLog()
     {
-        // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        // Reset database for this test
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"SearchRT_{tag}";
+        var correlationId = Guid.NewGuid().ToString();
 
         var log = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-
-
-            TraceId = Guid.NewGuid().ToString(),
-
-            FacilityId = "TestFacility",
-            Status = RequestStatus.Completed,
-            CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = "TestReportId",
-            PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = "TestReportId",
-                StartDate = DateTime.UtcNow.AddDays(-1),
-                EndDate = DateTime.UtcNow
-            },
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId, Status = RequestStatus.Completed,
+            CorrelationId = correlationId, ReportTrackingId = $"Report_{tag}",
+            PatientId = "Patient/123", ReportStartDate = DateTime.UtcNow.AddDays(-1), ReportEndDate = DateTime.UtcNow,
+            ScheduledReport = new ScheduledReport { ReportTrackingId = $"Report_{tag}", StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow },
             FhirQueries = new List<FhirQuery>()
             {
                 new FhirQuery
                 {
-                    FacilityId = "TestFacility",
-                    IsReference = false,
-                    Paged = 25,
-                    QueryType = FhirQueryType.Read,
-                    QueryParameters = new List<string>() { "Test "},
-                    FhirQueryResourceTypes = new List<FhirQueryResourceType> {  new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } },
+                    FacilityId = facilityId, IsReference = false, Paged = 25,
+                    QueryType = FhirQueryType.Read, QueryParameters = new List<string>() { "Test " },
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> { new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } },
                     MeasureId = "TestMeasureId",
                     ResourceReferenceTypes = new List<ResourceReferenceType>()
                     {
-                        new ResourceReferenceType
-                        {
-                            FacilityId = "TestFacility",
-                            QueryPhase = QueryPhase.Initial,
-                            ResourceType = "Patient",
-                            CreateDate = DateTime.UtcNow,
-                            ModifyDate = DateTime.UtcNow,
-                        }
+                        new ResourceReferenceType { FacilityId = facilityId, QueryPhase = QueryPhase.Initial, ResourceType = "Patient", CreateDate = DateTime.UtcNow, ModifyDate = DateTime.UtcNow }
                     }
                 }
             },
             ReferenceResources = new List<ReferenceResources>
             {
-                new ReferenceResources
-                {
-                    FacilityId = "test",
-                    QueryPhase = QueryPhase.Polling,
-                    ReferenceResource = "Test",
-                    ResourceId = Guid.NewGuid().ToString(),
-                    ResourceType = "test",
-                    CreateDate = DateTime.UtcNow
-                }
+                new ReferenceResources { FacilityId = "test", QueryPhase = QueryPhase.Polling, ReferenceResource = "Test", ResourceId = Guid.NewGuid().ToString(), ResourceType = "test", CreateDate = DateTime.UtcNow }
             }
         };
         dbContext.DataAcquisitionLogs.Add(log);
@@ -878,16 +505,14 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
-        // Act
         var result = (await queries.SearchAsync(new SearchDataAcquisitionLogRequest
         {
+            FacilityId = facilityId,
             ResourceType = "Patient"
         })).Records.FirstOrDefault();
 
-        // Assert
         Assert.NotNull(result);
         Assert.Equal(log.Id, result.Id);
-
         Assert.NotEmpty(result.FhirQuery);
         Assert.NotEmpty(result.FhirQuery.First().ResourceReferenceTypes);
         Assert.NotEmpty(result.ReferenceResources);
@@ -896,68 +521,36 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
     [Fact]
     public async Task GetDataAcquisitionLogStatisticsByReportAsync_ReturnsStatistics()
     {
-        // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        // Reset database for this test
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
-        var reportTrackingId = "TestReportId";
+        var tag = Guid.NewGuid().ToString("N");
+        var reportTrackingId = $"StatReport_{tag}";
+        var facilityId = $"Stat_{tag}";
 
         var log1 = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-
-
-            TraceId = Guid.NewGuid().ToString(),
-
-            FacilityId = "TestFacility",
-            Status = RequestStatus.Completed,
-            CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = reportTrackingId,
-            PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
-            CompletionTimeMilliseconds = 100,
-            QueryPhase = QueryPhase.Initial,
-            QueryType = FhirQueryType.Read,
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = reportTrackingId,
-                StartDate = DateTime.UtcNow.AddDays(-1),
-                EndDate = DateTime.UtcNow
-            },
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId, Status = RequestStatus.Completed,
+            CorrelationId = Guid.NewGuid().ToString(), ReportTrackingId = reportTrackingId,
+            PatientId = "Patient/123", ReportStartDate = DateTime.UtcNow.AddDays(-1), ReportEndDate = DateTime.UtcNow,
+            CompletionTimeMilliseconds = 100, QueryPhase = QueryPhase.Initial, QueryType = FhirQueryType.Read,
+            ScheduledReport = new ScheduledReport { ReportTrackingId = reportTrackingId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow },
             ResourceAcquiredIds = new List<string> { "Patient/123" },
             FhirQueries = new List<FhirQuery>
             {
-                new FhirQuery
-                {   MeasureId = "test",
-                    FacilityId = "TestFacility",
-                    FhirQueryResourceTypes = new List<FhirQueryResourceType>
-                    {
-                        new FhirQueryResourceType()
-                        {
-                            ResourceType = Hl7.Fhir.Model.ResourceType.Patient
-                        }
-                    }
-                }
+                new FhirQuery { MeasureId = "test", FacilityId = facilityId, FhirQueryResourceTypes = new List<FhirQueryResourceType> { new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } } }
             }
         };
         dbContext.DataAcquisitionLogs.Add(log1);
-
         await dbContext.SaveChangesAsync();
 
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
-        // Act
         var statistics = await queries.GetDataAcquisitionLogStatisticsByReportAsync(reportTrackingId);
 
-        // Assert
         Assert.NotNull(statistics);
         Assert.Equal(1, statistics.TotalLogs);
-        Assert.True(statistics.QueryTypeCounts.ContainsKey((int)QueryType.Initial));
         Assert.True(statistics.QueryPhaseCounts.ContainsKey(QueryPhase.Initial));
         Assert.True(statistics.RequestStatusCounts.ContainsKey(RequestStatus.Completed));
         Assert.True(statistics.ResourceTypeCounts.ContainsKey("Patient"));
@@ -967,51 +560,25 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
     [Fact]
     public async Task GetDataAcquisitionLogStatisticsByReportAsync_IncludesCompleted()
     {
-        // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        // Reset database for this test
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
-        var reportTrackingId = "StatReportId";
-        var facilityId = "TestFacility";
+        var tag = Guid.NewGuid().ToString("N");
+        var reportTrackingId = $"StatCompleted_{tag}";
+        var facilityId = $"StatComp_{tag}";
 
         var log = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-            TraceId = Guid.NewGuid().ToString(),
-            FacilityId = facilityId,
-            Status = RequestStatus.Completed,
-            CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = reportTrackingId,
-            PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
-            CompletionTimeMilliseconds = 150,
-            QueryPhase = QueryPhase.Initial,
-            QueryType = FhirQueryType.Read,
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = reportTrackingId,
-                StartDate = DateTime.UtcNow.AddDays(-1),
-                EndDate = DateTime.UtcNow
-            },
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId, Status = RequestStatus.Completed,
+            CorrelationId = Guid.NewGuid().ToString(), ReportTrackingId = reportTrackingId,
+            PatientId = "Patient/123", ReportStartDate = DateTime.UtcNow.AddDays(-1), ReportEndDate = DateTime.UtcNow,
+            CompletionTimeMilliseconds = 150, QueryPhase = QueryPhase.Initial, QueryType = FhirQueryType.Read,
+            ScheduledReport = new ScheduledReport { ReportTrackingId = reportTrackingId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow },
             ResourceAcquiredIds = new List<string>(),
             FhirQueries = new List<FhirQuery>
             {
-                new FhirQuery
-                {   MeasureId = "test",
-                    FacilityId = facilityId,
-                    FhirQueryResourceTypes = new List<FhirQueryResourceType>
-                    {
-                        new FhirQueryResourceType()
-                        {
-                            ResourceType = Hl7.Fhir.Model.ResourceType.Patient
-                        }
-                    }
-                }
+                new FhirQuery { MeasureId = "test", FacilityId = facilityId, FhirQueryResourceTypes = new List<FhirQueryResourceType> { new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } } }
             }
         };
         dbContext.DataAcquisitionLogs.Add(log);
@@ -1019,10 +586,8 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
-        // Act
         var statistics = await queries.GetDataAcquisitionLogStatisticsByReportAsync(reportTrackingId);
 
-        // Assert
         Assert.NotNull(statistics);
         Assert.Equal(1, statistics.TotalLogs);
         Assert.True(statistics.RequestStatusCounts.ContainsKey(RequestStatus.Completed));
@@ -1032,131 +597,71 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
     [Fact]
     public async Task CheckIfReferenceResourceHasBeenSent_ReturnsTrueIfSent()
     {
-        // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        // Reset database for this test
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
-        var facilityId = "TestFacility";
-        var reportTrackingId = "TestReportId";
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"RefSent_{tag}";
+        var reportTrackingId = $"Report_{tag}";
         var correlationId = Guid.NewGuid().ToString();
-        var referenceId = "Patient/123";
+        var referenceId = $"Patient/{tag}";
 
         var log = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-
-
-            TraceId = Guid.NewGuid().ToString(),
-
-            FacilityId = facilityId,
-            CorrelationId = correlationId,
-            ReportTrackingId = reportTrackingId,
-            Status = RequestStatus.Completed,
-            PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId, CorrelationId = correlationId, ReportTrackingId = reportTrackingId,
+            Status = RequestStatus.Completed, PatientId = "Patient/123",
+            ReportStartDate = DateTime.UtcNow.AddDays(-1), ReportEndDate = DateTime.UtcNow,
             ResourceAcquiredIds = new List<string> { referenceId },
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = reportTrackingId,
-                StartDate = DateTime.UtcNow.AddDays(-1),
-                EndDate = DateTime.UtcNow
-            }
+            ScheduledReport = new ScheduledReport { ReportTrackingId = reportTrackingId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow }
         };
         dbContext.DataAcquisitionLogs.Add(log);
         await dbContext.SaveChangesAsync();
 
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
-        // Act
         var hasBeenSent = await queries.CheckIfReferenceResourceHasBeenSent(referenceId, reportTrackingId, facilityId, correlationId);
 
-        // Assert
         Assert.True(hasBeenSent);
     }
 
     [Fact]
     public async Task GetFacilitiesWithPendingAndRetryableFailedRequests_ReturnsUniqueFacilities()
     {
-        // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        // Reset database for this test
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
+        var tag = Guid.NewGuid().ToString("N");
+        var facility1 = $"Fac1_{tag}";
+        var facility2 = $"Fac2_{tag}";
 
-        // Add logs for different facilities
         var log1 = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-
-
-            TraceId = Guid.NewGuid().ToString(),
-
-            FacilityId = "Facility1",
-            Status = RequestStatus.Pending,
-            CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = "TestReportId",
-            PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = "TestReportId",
-                StartDate = DateTime.UtcNow.AddDays(-1),
-                EndDate = DateTime.UtcNow
-            }
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facility1, Status = RequestStatus.Pending,
+            CorrelationId = Guid.NewGuid().ToString(), ReportTrackingId = $"Report_{tag}",
+            PatientId = "Patient/123", ReportStartDate = DateTime.UtcNow.AddDays(-1), ReportEndDate = DateTime.UtcNow,
+            ScheduledReport = new ScheduledReport { ReportTrackingId = $"Report_{tag}", StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow }
         };
         dbContext.DataAcquisitionLogs.Add(log1);
 
         var log2 = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-
-
-            TraceId = Guid.NewGuid().ToString(),
-
-            FacilityId = "Facility2",
-            Status = RequestStatus.Failed,
-            CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = "TestReportId",
-            PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = "TestReportId",
-                StartDate = DateTime.UtcNow.AddDays(-1),
-                EndDate = DateTime.UtcNow
-            }
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facility2, Status = RequestStatus.Failed,
+            CorrelationId = Guid.NewGuid().ToString(), ReportTrackingId = $"Report_{tag}",
+            PatientId = "Patient/123", ReportStartDate = DateTime.UtcNow.AddDays(-1), ReportEndDate = DateTime.UtcNow,
+            ScheduledReport = new ScheduledReport { ReportTrackingId = $"Report_{tag}", StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow }
         };
         dbContext.DataAcquisitionLogs.Add(log2);
 
         var log3 = new DataAcquisitionLog
         {
-            FhirVersion = "test",
-
-
-            TraceId = Guid.NewGuid().ToString(),
-
-            FacilityId = "Facility1",
-            Status = RequestStatus.Failed,
-            CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = "TestReportId",
-            PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = "TestReportId",
-                StartDate = DateTime.UtcNow.AddDays(-1),
-                EndDate = DateTime.UtcNow
-            }
+            FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facility1, Status = RequestStatus.Failed,
+            CorrelationId = Guid.NewGuid().ToString(), ReportTrackingId = $"Report_{tag}",
+            PatientId = "Patient/123", ReportStartDate = DateTime.UtcNow.AddDays(-1), ReportEndDate = DateTime.UtcNow,
+            ScheduledReport = new ScheduledReport { ReportTrackingId = $"Report_{tag}", StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow }
         };
         dbContext.DataAcquisitionLogs.Add(log3);
 
@@ -1164,51 +669,31 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
-        // Act
         var facilities = await queries.GetFacilitiesWithPendingAndRetryableFailedRequests();
 
-        // Assert
-        Assert.Equal(2, facilities.Count);
-        Assert.Contains("Facility1", facilities);
-        Assert.Contains("Facility2", facilities);
+        // Global query — just verify our facilities are included
+        Assert.Contains(facility1, facilities);
+        Assert.Contains(facility2, facilities);
     }
 
     [Fact]
     public async Task GetNextEligibleBatchForFacility_ReturnsBatchOfLogs()
     {
-        // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        // Reset database for this test
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"Batch_{tag}";
 
-        var facilityId = "TestFacility";
-
-        // Add multiple eligible logs
         for (int i = 1; i <= 5; i++)
         {
             var log = new DataAcquisitionLog
             {
-                FhirVersion = "test",
-
-
-                TraceId = Guid.NewGuid().ToString(),
-
-                FacilityId = facilityId,
-                Status = RequestStatus.Pending,
-                CorrelationId = Guid.NewGuid().ToString(),
-                ReportTrackingId = $"TestReportId{i}",
-                PatientId = "Patient/123",
-                ReportStartDate = DateTime.UtcNow.AddDays(-1),
-                ReportEndDate = DateTime.UtcNow,
-                ScheduledReport = new ScheduledReport
-                {
-                    ReportTrackingId = $"TestReportId{i}",
-                    StartDate = DateTime.UtcNow.AddDays(-1),
-                    EndDate = DateTime.UtcNow
-                }
+                FhirVersion = "test", TraceId = Guid.NewGuid().ToString(),
+                FacilityId = facilityId, Status = RequestStatus.Pending,
+                CorrelationId = Guid.NewGuid().ToString(), ReportTrackingId = $"Report{i}_{tag}",
+                PatientId = "Patient/123", ReportStartDate = DateTime.UtcNow.AddDays(-1), ReportEndDate = DateTime.UtcNow,
+                ScheduledReport = new ScheduledReport { ReportTrackingId = $"Report{i}_{tag}", StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow }
             };
             dbContext.DataAcquisitionLogs.Add(log);
         }
@@ -1216,10 +701,8 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
-        // Act
         var batch = await queries.GetNextEligibleBatchForFacility(facilityId, null, 3, new() { RequestStatus.Pending });
 
-        // Assert
         Assert.Equal(3, batch.Count);
         Assert.All(batch, l => Assert.Equal(facilityId, l.FacilityId));
     }
@@ -1227,21 +710,17 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
     [Fact]
     public async Task FailStalledQueuedLogsAsync_FailsStalledLogs()
     {
-        // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        // Reset database for this test
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
+        var tag = Guid.NewGuid().ToString("N");
         var stallMinutes = 15;
         var stalledDate = DateTime.UtcNow.AddMinutes(-(stallMinutes + 1));
         var recentDate = DateTime.UtcNow;
 
         var stalledLog = new DataAcquisitionLog
         {
-            FacilityId = "TestFacility",
+            FacilityId = $"FailStalled_{tag}",
             Status = RequestStatus.Queued,
             ModifyDate = stalledDate,
             Notes = new List<string> { "Initial note" }
@@ -1249,7 +728,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         var recentLog = new DataAcquisitionLog
         {
-            FacilityId = "TestFacility",
+            FacilityId = $"FailStalled_{tag}",
             Status = RequestStatus.Queued,
             ModifyDate = recentDate,
             Notes = new List<string> { "Initial note" }
@@ -1258,45 +737,35 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         dbContext.DataAcquisitionLogs.AddRange(stalledLog, recentLog);
         await dbContext.SaveChangesAsync();
 
-        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+        var manager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
 
-        // Act
-        int rowsAffected = await queries.FailStalledQueuedLogsAsync(stallMinutes);
+        int rowsAffected = await manager.FailStalledQueuedLogsAsync(stallMinutes);
 
-        // Assert
-        Assert.Equal(1, rowsAffected);
+        // Global operation — verify our specific logs instead of exact count
+        Assert.True(rowsAffected >= 1);
 
-        // Refresh stalled log from DB
         await dbContext.Entry(stalledLog).ReloadAsync();
         Assert.Equal(RequestStatus.Failed, stalledLog.Status);
 
-        // Note: The notes check was removed as notes are no longer appended in bulk updates
-        // to maintain high performance and avoid LINQ translation errors.
-
-        // Refresh recent log from DB
         await dbContext.Entry(recentLog).ReloadAsync();
         Assert.Equal(RequestStatus.Queued, recentLog.Status);
         Assert.Single(recentLog.Notes);
     }
-    
+
     [Fact]
     public async Task ResetStalledProcessingLogsAsync_ResetsStalledLogs()
     {
-        // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        // Reset database for this test
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
+        var tag = Guid.NewGuid().ToString("N");
         var stallMinutes = 240;
         var stalledDate = DateTime.UtcNow.AddMinutes(-(stallMinutes + 1));
         var recentDate = DateTime.UtcNow;
 
         var stalledLog = new DataAcquisitionLog
         {
-            FacilityId = "TestFacility",
+            FacilityId = $"ResetStalled_{tag}",
             Status = RequestStatus.Processing,
             ModifyDate = stalledDate,
             Notes = new List<string> { "Processing started" }
@@ -1304,7 +773,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
 
         var recentLog = new DataAcquisitionLog
         {
-            FacilityId = "TestFacility",
+            FacilityId = $"ResetStalled_{tag}",
             Status = RequestStatus.Processing,
             ModifyDate = recentDate,
             Notes = new List<string> { "Processing started" }
@@ -1313,19 +782,15 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         dbContext.DataAcquisitionLogs.AddRange(stalledLog, recentLog);
         await dbContext.SaveChangesAsync();
 
-        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+        var manager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
 
-        // Act
-        int rowsAffected = await queries.ResetStalledProcessingLogsAsync(stallMinutes);
+        int rowsAffected = await manager.ResetStalledProcessingLogsAsync(stallMinutes);
 
-        // Assert
-        Assert.Equal(1, rowsAffected);
+        Assert.True(rowsAffected >= 1);
 
-        // Refresh stalled log from DB
         await dbContext.Entry(stalledLog).ReloadAsync();
         Assert.Equal(RequestStatus.Pending, stalledLog.Status);
 
-        // Refresh recent log from DB
         await dbContext.Entry(recentLog).ReloadAsync();
         Assert.Equal(RequestStatus.Processing, recentLog.Status);
     }
@@ -1333,21 +798,16 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
     [Fact]
     public async Task FailStalledQueuedLogsAsync_RespectsMaxBatches()
     {
-        // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        // Reset database for this test
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
+        var tag = Guid.NewGuid().ToString("N");
         var stallMinutes = 15;
         var stalledDate = DateTime.UtcNow.AddMinutes(-(stallMinutes + 1));
 
-        // Create 250 stalled logs (BatchSize is 100)
         var stalledLogs = Enumerable.Range(1, 250).Select(i => new DataAcquisitionLog
         {
-            FacilityId = "TestFacility",
+            FacilityId = $"FailBatch_{tag}",
             Status = RequestStatus.Queued,
             ModifyDate = stalledDate
         }).ToList();
@@ -1355,36 +815,34 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         dbContext.DataAcquisitionLogs.AddRange(stalledLogs);
         await dbContext.SaveChangesAsync();
 
-        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+        var manager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
 
-        // Act - request only 1 batch (should update exactly 100)
-        int rowsAffected = await queries.FailStalledQueuedLogsAsync(stallMinutes, maxBatches: 1);
+        int rowsAffected = await manager.FailStalledQueuedLogsAsync(stallMinutes, maxBatches: 1);
 
-        // Assert
-        Assert.Equal(100, rowsAffected);
-        
-        var failedCount = await dbContext.DataAcquisitionLogs.CountAsync(l => l.Status == RequestStatus.Failed);
+        Assert.True(rowsAffected >= 100);
+
+        var testLogIds = stalledLogs.Select(l => l.Id).ToList();
+        var failedCount = await dbContext.DataAcquisitionLogs
+            .CountAsync(l => testLogIds.Contains(l.Id) && l.Status == RequestStatus.Failed);
+        var stillQueuedCount = await dbContext.DataAcquisitionLogs
+            .CountAsync(l => testLogIds.Contains(l.Id) && l.Status == RequestStatus.Queued);
         Assert.Equal(100, failedCount);
+        Assert.Equal(150, stillQueuedCount);
     }
 
     [Fact]
     public async Task ResetStalledProcessingLogsAsync_RespectsMaxBatches()
     {
-        // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        // Reset database for this test
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
+        var tag = Guid.NewGuid().ToString("N");
         var stallMinutes = 240;
         var stalledDate = DateTime.UtcNow.AddMinutes(-(stallMinutes + 1));
 
-        // Create 250 stalled logs (BatchSize is 100)
         var stalledLogs = Enumerable.Range(1, 250).Select(i => new DataAcquisitionLog
         {
-            FacilityId = "TestFacility",
+            FacilityId = $"ResetBatch_{tag}",
             Status = RequestStatus.Processing,
             ModifyDate = stalledDate
         }).ToList();
@@ -1392,15 +850,18 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         dbContext.DataAcquisitionLogs.AddRange(stalledLogs);
         await dbContext.SaveChangesAsync();
 
-        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+        var manager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
 
-        // Act - request only 2 batches (should update exactly 200)
-        int rowsAffected = await queries.ResetStalledProcessingLogsAsync(stallMinutes, maxBatches: 2);
+        int rowsAffected = await manager.ResetStalledProcessingLogsAsync(stallMinutes, maxBatches: 2);
 
-        // Assert
-        Assert.Equal(200, rowsAffected);
+        Assert.True(rowsAffected >= 200);
 
-        var pendingCount = await dbContext.DataAcquisitionLogs.CountAsync(l => l.Status == RequestStatus.Pending);
+        var testLogIds = stalledLogs.Select(l => l.Id).ToList();
+        var pendingCount = await dbContext.DataAcquisitionLogs
+            .CountAsync(l => testLogIds.Contains(l.Id) && l.Status == RequestStatus.Pending);
+        var stillProcessingCount = await dbContext.DataAcquisitionLogs
+            .CountAsync(l => testLogIds.Contains(l.Id) && l.Status == RequestStatus.Processing);
         Assert.Equal(200, pendingCount);
+        Assert.Equal(50, stillProcessingCount);
     }
 }

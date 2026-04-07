@@ -1,9 +1,11 @@
 ﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 
@@ -19,11 +21,13 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
 {
     private readonly ILogger<ReferenceResourcesManager> _logger;
     private readonly IDatabase _database;
+    private readonly DataAcquisitionDbContext _dbContext;
 
-    public ReferenceResourcesManager(ILogger<ReferenceResourcesManager> logger, IDatabase database)
+    public ReferenceResourcesManager(ILogger<ReferenceResourcesManager> logger, IDatabase database, DataAcquisitionDbContext dbContext)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _database = database ?? throw new ArgumentNullException(nameof(database));
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
     public async Task<ReferenceResourcesModel> CreateAsync(CreateReferenceResourcesModel model, CancellationToken cancellationToken = default)
@@ -68,19 +72,26 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
             throw new ArgumentNullException(nameof(model));
         }
 
-        var existing = await _database.ReferenceResourcesRepository.FirstOrDefaultAsync(x => x.Id == model.Id, cancellationToken);
-        if (existing == null)
+        var updated = await _dbContext.ReferenceResources
+            .Where(r => r.Id == model.Id)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(r => r.QueryPhase, model.QueryPhase)
+                .SetProperty(r => r.ResourceType, model.ResourceType)
+                .SetProperty(r => r.ReferenceResource, model.ReferenceResource)
+                .SetProperty(r => r.ModifyDate, DateTime.UtcNow),
+            cancellationToken);
+
+        if (updated == 0)
         {
             throw new KeyNotFoundException($"ReferenceResources with ID {model.Id} not found.");
         }
 
-        existing.QueryPhase = model.QueryPhase;
-        existing.ResourceType = model.ResourceType;
-        existing.ReferenceResource = model.ReferenceResource;
-        existing.ModifyDate = DateTime.UtcNow;
-
-        await _database.ReferenceResourcesRepository.SaveChangesAsync(cancellationToken);
-
-        return ReferenceResourcesModel.FromDomain(existing);
+        return new ReferenceResourcesModel
+        {
+            Id = model.Id,
+            QueryPhase = model.QueryPhase,
+            ResourceType = model.ResourceType,
+            ReferenceResource = model.ReferenceResource
+        };
     }
 }
