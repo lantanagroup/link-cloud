@@ -109,7 +109,6 @@ public class Result {
             case I18nConstants.MEASURE_MR_GRP_POP_NO_SUBJECTS:
             case I18nConstants.MEASURE_MR_GRP_POP_UNK_CODE:
             case I18nConstants.MEASURE_MR_GRP_UNK_CODE:
-            case I18nConstants.MEASURE_MR_GRPST_POP_UNK_CODE:
             case I18nConstants.MEASURE_MR_M_SCORING_UNK:
             case I18nConstants.MEASURE_MR_SCORE_PROHIBITED_MS:
             case I18nConstants.MEASURE_MR_SCORE_PROHIBITED_RT:
@@ -250,9 +249,6 @@ public class Result {
             case I18nConstants.SD_TYPE_NOT_MATCH_NS:
             case I18nConstants.SECURITY_STRING_CONTENT_ERROR:
             case I18nConstants.SECURITY_STRING_CONTENT_WARNING:
-            case I18nConstants.STATUS_CODE_HINT:
-            case I18nConstants.STATUS_CODE_HINT_CODE:
-            case I18nConstants.STATUS_CODE_WARNING:
             case I18nConstants.STATUS_CODE_WARNING_CODE:
             case I18nConstants.TYPE_SPECIFIC_CHECKS_CANONICAL_ABSOLUTE:
             case I18nConstants.TYPE_SPECIFIC_CHECKS_CANONICAL_CONTAINED:
@@ -339,8 +335,6 @@ public class Result {
             case I18nConstants.VALIDATION_VAL_PROFILE_OUTOFORDER:
             case I18nConstants.VALIDATION_VAL_PROFILE_SLICEORDER:
             case I18nConstants.VALIDATION_VAL_PROFILE_WRONGTYPE:
-            case I18nConstants.XHTML_IDREF_NOT_FOUND:
-            case I18nConstants.XHTML_IDREF_NOT_MULTIPLE_MATCHES:
             case I18nConstants.XHTML_URL_INVALID:
             case I18nConstants.XHTML_XHTML_ATTRIBUTE_ILLEGAL:
             case I18nConstants.XHTML_XHTML_DOCTYPE_ILLEGAL:
