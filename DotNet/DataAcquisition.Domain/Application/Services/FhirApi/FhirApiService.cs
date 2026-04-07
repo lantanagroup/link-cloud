@@ -297,19 +297,23 @@ public class FhirApiService : IFhirApiService
     /// </summary>
     private async Task HandleReferenceResourceBatch(DataAcquisitionLogModel log, List<Resource> resources, CancellationToken cancellationToken)
     {
-        // Pre-fetch all existing reference resources for this facility + resource IDs in a single query
+        static string BuildReferenceKey(string resourceType, string resourceId) => $"{resourceType}/{resourceId}";
+
+        // Pre-fetch all existing reference resources for this facility + resource IDs/types in a single query
         var resourceIds = resources.Select(r => r.Id).Distinct().ToList();
+        var resourceTypes = resources.Select(r => r.TypeName).Distinct().ToList();
         var existingRecords = (await _referenceResourcesQueries.SearchAsync(new SearchReferenceResourcesModel
         {
             FacilityId = log.FacilityId,
             ResourceIds = resourceIds,
+            ResourceTypes = resourceTypes,
             PageSize = int.MaxValue
         })).Records;
 
-        // Group by ResourceId and keep the most recent record per ID, since the same
+        // Group by resource type + id and keep the most recent record per key, since the same
         // resource can appear multiple times (different query phases, prior runs, etc.)
-        var existingByResourceId = existingRecords
-            .GroupBy(r => r.ResourceId)
+        var existingByResourceKey = existingRecords
+            .GroupBy(r => BuildReferenceKey(r.ResourceType, r.ResourceId))
             .ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.ModifyDate ?? r.CreateDate).First());
 
         // Deduplicate incoming resources — a bundle page can contain the same resource twice
@@ -317,12 +321,14 @@ public class FhirApiService : IFhirApiService
 
         foreach (var resource in resources)
         {
-            if (!seen.Add(resource.Id))
+            var resourceKey = BuildReferenceKey(resource.TypeName, resource.Id);
+            if (!seen.Add(resourceKey))
                 continue;
+
             InsertDateExtension((DomainResource)resource);
             var serialized = JsonSerializer.Serialize(resource, LinkFhirSerializerOptions.ForFhirLenientSerialization);
 
-            if (existingByResourceId.TryGetValue(resource.Id, out var existing))
+            if (existingByResourceKey.TryGetValue(resourceKey, out var existing))
             {
                 await _referenceResourceManager.UpdateAsync(new UpdateReferenceResourcesModel
                 {

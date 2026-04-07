@@ -1,6 +1,5 @@
 ﻿using LantanaGroup.Link.Tests.E2ETests.Helpers;
 using LantanaGroup.Link.Tests.E2ETests.Services;
-using LantanaGroup.Link.Tests.E2ETests.Validation;
 using RestSharp;
 using Xunit;
 using Task = System.Threading.Tasks.Task;

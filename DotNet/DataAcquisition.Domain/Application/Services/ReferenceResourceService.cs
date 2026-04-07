@@ -11,6 +11,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Task = System.Threading.Tasks.Task;
 
@@ -138,7 +139,18 @@ public class ReferenceResourceService : IReferenceResourceService
 
             // Stage each discovered ID as an independent row — no shared mutable state.
             var newIds = group.Select(i => i.Id).Distinct().ToList();
-            var entities = newIds.Select(id => new PendingReferenceId
+
+            var existingIds = await _dbContext.PendingReferenceIds
+                .Where(p => p.FhirQueryId == lookup.FhirQueryId
+                    && p.ResourceType == resourceType
+                    && newIds.Contains(p.ResourceId))
+                .Select(p => p.ResourceId)
+                .ToListAsync(cancellationToken);
+
+            var existingIdSet = existingIds.ToHashSet(StringComparer.Ordinal);
+            var entities = newIds
+                .Where(id => !existingIdSet.Contains(id))
+                .Select(id => new PendingReferenceId
             {
                 FhirQueryId = lookup.FhirQueryId,
                 ResourceId = id,

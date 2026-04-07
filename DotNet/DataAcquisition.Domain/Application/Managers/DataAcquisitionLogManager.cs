@@ -1,4 +1,4 @@
-using DataAcquisition.Domain.Application.Models;
+﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -383,7 +383,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             updated = await _dbContext.DataAcquisitionLogs
                 .Where(l => l.FacilityId == facilityId
                     && l.Status != null && eligibleStatuses.Contains(l.Status.Value)
-                    && (l.ExecutionDate == null || l.ExecutionDate <= executionDate))
+                    && (l.ExecutionDate == null || l.ExecutionDate < executionDate))
                 .Take(batchSize)
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(l => l.ExecutionDate, executionDate)
@@ -438,7 +438,9 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                 break;
 
             totalUpdated += await _dbContext.DataAcquisitionLogs
-                .Where(l => batchIds.Contains(l.Id))
+                .Where(l => batchIds.Contains(l.Id)
+                    && l.Status == RequestStatus.Queued
+                    && l.ModifyDate < stallThreshold)
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(l => l.Status, RequestStatus.Failed)
                     .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
@@ -474,7 +476,9 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                 break;
 
             totalUpdated += await _dbContext.DataAcquisitionLogs
-                .Where(l => batchIds.Contains(l.Id))
+                .Where(l => batchIds.Contains(l.Id)
+                    && l.Status == RequestStatus.Processing
+                    && l.ModifyDate < stallThreshold)
                 .ExecuteUpdateAsync(setters => setters
                         .SetProperty(l => l.Status, RequestStatus.Pending)
                         .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
@@ -499,13 +503,14 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         if (pendingIds.Count == 0)
             return;
 
-        var currentParams = await _dbContext.FhirQueries
+        var fhirQuery = await _dbContext.FhirQueries
             .Where(q => q.Id == fhirQueryId)
-            .Select(q => q.QueryParameters)
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (currentParams == null)
+        if (fhirQuery == null)
             return;
+
+        var currentParams = fhirQuery.QueryParameters ?? [];
 
         const string idPrefix = "_id=";
         var existingIds = currentParams

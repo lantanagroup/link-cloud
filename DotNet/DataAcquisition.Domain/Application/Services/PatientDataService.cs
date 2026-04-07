@@ -378,9 +378,11 @@ public class PatientDataService : IPatientDataService
                 throw new ArgumentException($"Log with ID {log.Id} has a FHIR query with no resource types defined.");
             }
 
-            //check if query type is search and there are no query parameters in FhirQuery
+            //check if non-reference query type is search and there are no query parameters in FhirQuery
             if (log.FhirQuery != null && log.FhirQuery.Any() &&
-                log.FhirQuery.Any(x => x.QueryType == FhirQueryType.Search && !x.QueryParameters.Any()))
+                log.FhirQuery.Any(x => x.QueryType == FhirQueryType.Search
+                    && !(x.IsReference ?? false)
+                    && (x.QueryParameters == null || !x.QueryParameters.Any())))
             {
                 throw new ArgumentException(
                     $"Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
@@ -615,10 +617,19 @@ public class PatientDataService : IPatientDataService
                 // (the merge step is idempotent — uses DISTINCT).
                 if (isReferenceLog)
                 {
-                    foreach (var refQuery in log.FhirQuery.Where(q => q.IsReference == true && q.Id.HasValue))
+                    try
                     {
-                        await _dataAcquisitionLogManager.CleanupPendingReferenceIdsAsync(
-                            refQuery.Id!.Value, cancellationToken);
+                        foreach (var refQuery in log.FhirQuery.Where(q => q.IsReference == true && q.Id.HasValue))
+                        {
+                            await _dataAcquisitionLogManager.CleanupPendingReferenceIdsAsync(
+                                refQuery.Id!.Value, cancellationToken);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex,
+                            "Failed to clean pending reference IDs after successful acquisition update for LogId {LogId}.",
+                            log.Id);
                     }
                 }
             }

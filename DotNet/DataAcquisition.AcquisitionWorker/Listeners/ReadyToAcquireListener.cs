@@ -76,8 +76,17 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
         {
             _logger.LogError(ex, "Failed to enqueue work item for LogId {LogId}. Attempting to revert status.", logId);
             // Revert to Pending so the next trigger can try again — single atomic write, no read needed
-            await logManager.TrySetLogStatusAsync(logId,
+            bool compensationSucceeded = await logManager.TrySetLogStatusAsync(logId,
                 new List<RequestStatus> { RequestStatus.Queued }, RequestStatus.Pending, cancellationToken);
+
+            if (!compensationSucceeded)
+            {
+                _logger.LogError(ex,
+                    "Failed to enqueue work item for LogId {LogId} and compensation status update from Queued to Pending also failed.",
+                    logId);
+                throw new TransientException($"Compensation failed for LogId {logId} after enqueue failure.", ex);
+            }
+
             throw new DeadLetterException("Failed to enqueue work item", ex);
         }
         // Method ends → offset committed quickly by base class
