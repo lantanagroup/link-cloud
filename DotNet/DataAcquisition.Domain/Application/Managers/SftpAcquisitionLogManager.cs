@@ -307,11 +307,11 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
         if (retryAfter.HasValue)
         {
             log.ScheduledDate = retryAfter.Value.ToUniversalTime();
-            log.Notes.Add($"[{DateTime.UtcNow:O}] Processing failed (attempt {log.RetryAttempts}): {errorMessage}. Retry scheduled for {log.ScheduledDate:O}");
+            log.Notes.Add($"[{DateTime.UtcNow:O}] Processing failed (attempt {log.RetryAttempts}). Retry scheduled for {log.ScheduledDate:O}");
         }
         else
         {
-            log.Notes.Add($"[{DateTime.UtcNow:O}] Processing failed (attempt {log.RetryAttempts}): {errorMessage}");
+            log.Notes.Add($"[{DateTime.UtcNow:O}] Processing failed (attempt {log.RetryAttempts})");
         }
 
         await database.SaveChangesAsync();
