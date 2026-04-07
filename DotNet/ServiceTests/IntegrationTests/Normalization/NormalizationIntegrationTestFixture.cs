@@ -7,6 +7,7 @@ using LantanaGroup.Link.Normalization.Domain.Repositories;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using ResourceType = LantanaGroup.Link.Normalization.Domain.Entities.ResourceType;
@@ -39,16 +40,9 @@ namespace IntegrationTests.Normalization
 
                     // Register CopyPropertyOperationService as a singleton and hosted service
                     services.AddSingleton<CopyPropertyOperationService>();
-                    services.AddHostedService(provider => provider.GetRequiredService<CopyPropertyOperationService>());
-
                     services.AddSingleton<CopyLocationOperationService>();
-                    services.AddHostedService(provider => provider.GetRequiredService<CopyLocationOperationService>());
-
                     services.AddSingleton<CodeMapOperationService>();
-                    services.AddHostedService(provider => provider.GetRequiredService<CodeMapOperationService>());
-
                     services.AddSingleton<ConditionalTransformOperationService>();
-                    services.AddHostedService(provider => provider.GetRequiredService<ConditionalTransformOperationService>());
 
                     // Register other services
                     services.AddScoped<IEntityRepository<Operation>, OperationRepository>();
@@ -69,6 +63,11 @@ namespace IntegrationTests.Normalization
                     services.AddScoped<IOperationSequenceQueries, OperationSequenceQueries>();
                     services.AddScoped<IVendorQueries, VendorQueries>();
                     services.AddScoped<IResourceQueries, ResourceQueries>();
+
+                    services.AddMemoryCache();
+
+                    var provider = services.BuildServiceProvider();
+                    var cache = provider.GetRequiredService<IMemoryCache>();
                 })
                 .Build();
 

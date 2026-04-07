@@ -26,6 +26,7 @@ using LantanaGroup.Link.Shared.Application.Utilities;
 using DateTime = System.DateTime;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
+using Hl7.Fhir.Serialization;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 
@@ -125,6 +126,7 @@ public class FhirApiService : IFhirApiService
             await GenerateResourceAcquiredMessage(new ResourceAcquired
             {
                 Resource = resource,
+                ResourceType = resource.TypeName,
                 ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
                 PatientId = !fhirQuery.IsReference ?? false ? log.PatientId : null,
                 QueryType = log.QueryPhase.ToString(),
@@ -262,6 +264,7 @@ public class FhirApiService : IFhirApiService
                     await GenerateResourceAcquiredMessage(new ResourceAcquired
                     {
                         Resource = resource,
+                        ResourceType = resource.TypeName,
                         ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
                         PatientId = !fhirQuery.IsReference ?? false ? log.PatientId : null,
                         QueryType = log.QueryPhase.ToString(),
