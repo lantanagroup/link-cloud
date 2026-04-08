@@ -1,14 +1,8 @@
-﻿using System.Diagnostics;
-using System.Net;
-using System.Text;
-using System.Text.Json;
-using Confluent.Kafka;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using Microsoft.Extensions.Logging;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
@@ -23,10 +17,14 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using Microsoft.Extensions.Logging;
+using System.Diagnostics;
+using System.Net;
+using System.Text;
+using System.Text.Json;
 using DateTime = System.DateTime;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
-using Hl7.Fhir.Serialization;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 

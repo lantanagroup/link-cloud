@@ -501,7 +501,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         _fixture.ResourceAcquiredProducerMock.Reset();
 
         var testTag = Guid.NewGuid().ToString("N");
-        const int numFacilities = 4; const int logsPerFacility = 60; var facilities = new List<string>();
+        const int numFacilities = 4; const int logsPerFacility = 120; var facilities = new List<string>();
 
         using var setupScope = _fixture.ServiceProvider.CreateScope();
         var dbContext = setupScope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();

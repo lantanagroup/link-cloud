@@ -49,7 +49,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
             });
     }
 
-    public async ValueTask EnqueueAsync(AcquisitionWorkItem item, CancellationToken ct = default)
+    public virtual async ValueTask EnqueueAsync(AcquisitionWorkItem item, CancellationToken ct = default)
     {
         // Wait up to 5 seconds for space to become available
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);

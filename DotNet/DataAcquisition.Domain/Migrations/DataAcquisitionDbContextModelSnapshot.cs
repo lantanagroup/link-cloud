@@ -872,6 +872,10 @@ namespace DataAcquisition.Domain.Migrations
                     b.HasIndex("FhirQueryId")
                         .HasDatabaseName("IX_PendingReferenceIds_FhirQueryId");
 
+                    b.HasIndex("FhirQueryId", "ResourceType", "ResourceId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_PendingReferenceIds_FhirQueryId_ResourceType_ResourceId");
+
                     b.ToTable("PendingReferenceIds");
                 });
 

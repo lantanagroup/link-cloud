@@ -671,23 +671,44 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var facilityId = CreateFacilityId();
-        var queryPlanManagerMock = new Mock<IQueryPlanManager>();
-        queryPlanManagerMock.Setup(m => m.DeleteAsync(It.IsAny<string>(), It.IsAny<Frequency>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new Exception("Test exception"));
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        var logger = new Mock<ILogger<QueryPlanConfigController>>().Object;
-        var queryPlanQueries = scope.ServiceProvider.GetRequiredService<IQueryPlanQueries>();
-        var controller = new QueryPlanConfigController(logger, queryPlanManagerMock.Object, queryPlanQueries);
+        dbContext.QueryPlans.Add(new QueryPlan
+        {
+            FacilityId = facilityId,
+            Type = Frequency.Daily,
+            PlanName = "TestPlan",
+            EHRDescription = "TestEHR",
+            LookBack = "1d",
+            InitialQueries = new Dictionary<string, IQueryConfig>(),
+            SupplementalQueries = new Dictionary<string, IQueryConfig>()
+        });
+        await dbContext.SaveChangesAsync();
 
-        var deleteParams = new DeleteQueryPlanParameters { Type = Frequency.Daily };
+        try
+        {
+            var queryPlanManagerMock = new Mock<IQueryPlanManager>();
+            queryPlanManagerMock.Setup(m => m.DeleteAsync(It.IsAny<string>(), It.IsAny<Frequency>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new Exception("Test exception"));
 
-        // Act
-        var result = await controller.DeleteQueryPlan(facilityId, deleteParams, CancellationToken.None);
+            var logger = new Mock<ILogger<QueryPlanConfigController>>().Object;
+            var queryPlanQueries = scope.ServiceProvider.GetRequiredService<IQueryPlanQueries>();
+            var controller = new QueryPlanConfigController(logger, queryPlanManagerMock.Object, queryPlanQueries);
 
-        // Assert
-        var objectResult = Assert.IsType<ObjectResult>(result);
-        Assert.Equal((int)HttpStatusCode.InternalServerError, objectResult.StatusCode);
-        Assert.Equal("Internal Server Error", ((ProblemDetails)objectResult.Value).Title);
+            var deleteParams = new DeleteQueryPlanParameters { Type = Frequency.Daily };
+
+            // Act
+            var result = await controller.DeleteQueryPlan(facilityId, deleteParams, CancellationToken.None);
+
+            // Assert
+            var objectResult = Assert.IsType<ObjectResult>(result);
+            Assert.Equal((int)HttpStatusCode.InternalServerError, objectResult.StatusCode);
+            Assert.Equal("Internal Server Error", ((ProblemDetails)objectResult.Value).Title);
+        }
+        finally
+        {
+            await CleanupFacilityQueryPlansAsync(dbContext, facilityId);
+        }
     }
 
     private QueryPlanApiModel CreateValidQueryPlanApiModel(string facilityId)

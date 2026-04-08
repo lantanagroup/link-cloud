@@ -11,6 +11,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Task = System.Threading.Tasks.Task;
@@ -163,7 +164,30 @@ public class ReferenceResourceService : IReferenceResourceService
         // Single SaveChangesAsync for all resource type groups in this call
         if (_dbContext.ChangeTracker.HasChanges())
         {
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+            {
+                _logger.LogDebug("Duplicate PendingReferenceIds insert detected during SaveChangesAsync; ignoring as idempotent race.");
+
+                foreach (var entry in _dbContext.ChangeTracker.Entries<PendingReferenceId>()
+                             .Where(e => e.State == EntityState.Added))
+                {
+                    entry.State = EntityState.Detached;
+                }
+            }
         }
+    }
+
+    private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+    {
+        if (ex.InnerException is SqlException sqlException)
+        {
+            return sqlException.Number is 2601 or 2627;
+        }
+
+        return false;
     }
 }
