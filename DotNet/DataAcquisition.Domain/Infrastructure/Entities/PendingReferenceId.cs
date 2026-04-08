@@ -24,6 +24,9 @@ public class PendingReferenceId
     [Required]
     public Guid FhirQueryId { get; set; }
 
+    [ForeignKey(nameof(FhirQueryId))]
+    public virtual FhirQuery FhirQuery { get; set; } = null!;
+
     /// <summary>
     /// The reference resource ID (e.g. "Location/Gen-Location-ICU", "Medication/med-123").
     /// Stored as the bare ID without the resource type prefix.

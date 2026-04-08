@@ -330,6 +330,12 @@ public class AcquisitionProcessingJob : IJob
         {
             foreach (var message in tailingMessages)
             {
+                if (stopwatch.Elapsed.TotalSeconds >= _settings.TimeBudgetPerRunSeconds)
+                {
+                    _logger.LogDebug("Skipping tailing messages — time budget exhausted after {elapsed:F1}s.", stopwatch.Elapsed.TotalSeconds);
+                    break;
+                }
+
                 try
                 {
                     // Parse the traceparent string (format: 00-traceId-spanId-flags)

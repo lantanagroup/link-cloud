@@ -1,5 +1,4 @@
 ﻿using Confluent.Kafka;
-using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
@@ -26,7 +25,6 @@ using System.Text.Json;
 using DateTime = System.DateTime;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
-using Hl7.Fhir.Serialization;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 
@@ -403,17 +401,17 @@ public class FhirApiService : IFhirApiService
         if (resource == null)
             throw new ArgumentNullException(nameof(resource));
 
-        if (resource.Meta == null)
-        {
-            resource.Meta = new Meta();
-            resource.Meta.Extension = new List<Extension> { };
-        }
-
-        if (resource.Meta.Extension == null)
-            resource.Meta.Extension = new List<Extension> { };
+        resource.Meta ??= new Meta();
+        resource.Meta.Extension ??= new List<Extension>();
 
         if (!resource.Meta.Extension.Any(e => e.Url == DataAcquisitionConstants.Extension.DateReceivedExtensionUri))
-            resource.Meta.Extension.Add(new Extension { Url = DataAcquisitionConstants.Extension.DateReceivedExtensionUri, Value = new FhirDateTime(DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")) });
+        {
+            resource.Meta.Extension.Add(new Extension
+            {
+                Url = DataAcquisitionConstants.Extension.DateReceivedExtensionUri,
+                Value = new FhirDateTime(DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"))
+            });
+        }
     }
     #endregion
 }

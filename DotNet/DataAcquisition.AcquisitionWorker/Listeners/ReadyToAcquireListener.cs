@@ -73,6 +73,10 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
             ), cancellationToken);
             _logger.LogInformation("Queued LogId {LogId} for facility {FacilityId}", logId, value.FacilityId);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to enqueue work item for LogId {LogId}. Attempting to revert status.", logId);
@@ -85,10 +89,10 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
                 _logger.LogError(ex,
                     "Failed to enqueue work item for LogId {LogId} and compensation status update from Queued to Pending also failed.",
                     logId);
-                throw new TransientException($"Compensation failed for LogId {logId} after enqueue failure.", ex);
+                throw new DeadLetterException($"Compensation failed for LogId {logId} after enqueue failure.", ex);
             }
 
-            throw new DeadLetterException("Failed to enqueue work item", ex);
+            throw new TransientException("Failed to enqueue work item", ex);
         }
     }
 

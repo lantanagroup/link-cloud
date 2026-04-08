@@ -13,7 +13,7 @@ namespace LantanaGroup.Link.Report.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_ReportResources_Facility_Schedule",
                 table: "ReportResource",
-                columns: new[] { "FacilityId", "ReportScheduleId" });
+                columns: new[] { "FacilityId", "ReportScheduleId", "CreateDate" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_ReportEntries_Schedule_Patient",

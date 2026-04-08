@@ -872,6 +872,10 @@ namespace DataAcquisition.Domain.Migrations
                     b.HasIndex("FhirQueryId")
                         .HasDatabaseName("IX_PendingReferenceIds_FhirQueryId");
 
+                    b.HasIndex("FhirQueryId", "ResourceType", "ResourceId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_PendingReferenceIds_FhirQueryId_ResourceType_ResourceId");
+
                     b.ToTable("PendingReferenceIds");
                 });
 
@@ -1178,6 +1182,18 @@ namespace DataAcquisition.Domain.Migrations
                         .HasConstraintName("FK_FhirQuery_DataAcquisitionLog");
 
                     b.Navigation("DataAcquisitionLog");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.PendingReferenceId", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirQuery", "FhirQuery")
+                        .WithMany("PendingReferenceIds")
+                        .HasForeignKey("FhirQueryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_PendingReferenceIds_FhirQuery_FhirQueryId");
+
+                    b.Navigation("FhirQuery");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirQueryResourceType", b =>

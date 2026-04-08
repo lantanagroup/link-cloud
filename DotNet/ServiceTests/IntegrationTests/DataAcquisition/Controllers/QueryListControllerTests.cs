@@ -39,6 +39,7 @@ public class QueryListControllerTests : IClassFixture<DataAcquisitionIntegration
     public async Task GetFhirConfiguration_ValidFacilityId_ReturnsOkWithConfiguration()
     {
         // Arrange
+        var facilityId = $"TestFacility_{Guid.NewGuid():N}";
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
@@ -46,7 +47,7 @@ public class QueryListControllerTests : IClassFixture<DataAcquisitionIntegration
         // Seed a configuration
         var config = new FhirListConfiguration
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirBaseServerUrl = "http://example.com",
             EHRPatientLists = new List<EhrPatientList>() { new EhrPatientList() }
         };
@@ -56,7 +57,7 @@ public class QueryListControllerTests : IClassFixture<DataAcquisitionIntegration
         var controller = CreateController(scope);
 
         // Act
-        var result = await controller.GetFhirConfiguration("TestFacility", CancellationToken.None);
+        var result = await controller.GetFhirConfiguration(facilityId, CancellationToken.None);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
@@ -174,6 +175,7 @@ public class QueryListControllerTests : IClassFixture<DataAcquisitionIntegration
     public async Task PostFhirConfiguration_Existing_ReturnsBadRequest()
     {
         // Arrange
+        var facilityId = $"TestFacility_{Guid.NewGuid():N}";
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
@@ -181,7 +183,7 @@ public class QueryListControllerTests : IClassFixture<DataAcquisitionIntegration
         // Seed existing
         var existing = new FhirListConfiguration
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirBaseServerUrl = "http://example.com",
             EHRPatientLists = new List<EhrPatientList>() { new EhrPatientList() }
         };
@@ -191,7 +193,7 @@ public class QueryListControllerTests : IClassFixture<DataAcquisitionIntegration
         var controller = CreateController(scope);
         var config = new FhirListConfigurationModel
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirBaseServerUrl = "http://example.com",
             EHRPatientLists = new List<EhrPatientListModel>() { new EhrPatientListModel() }
         };

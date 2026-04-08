@@ -49,8 +49,7 @@ namespace IntegrationTests.DataAcquisition
             ReadyToAcquireProducerMock = new Mock<IProducer<long, ReadyToAcquire>>();
             ResourceAcquiredProducerMock = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
 
-            _sqlContainer = new MsSqlBuilder()
-                .WithImage("mcr.microsoft.com/mssql/server:2022-latest")
+            _sqlContainer = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest")
                 .Build();
         }
 

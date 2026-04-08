@@ -31,8 +31,8 @@ public interface IDataAcquisitionLogManager
     Task<bool> TrySetLogToQueuedAsync(long logId, CancellationToken cancellationToken);
     Task<int> FailStalledQueuedLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default);
     Task<int> ResetStalledProcessingLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default);
-    Task CollectPendingReferenceIdsAsync(Guid fhirQueryId, CancellationToken cancellationToken = default);
-    Task CleanupPendingReferenceIdsAsync(Guid fhirQueryId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<long>> CollectPendingReferenceIdsAsync(Guid fhirQueryId, CancellationToken cancellationToken = default);
+    Task CleanupPendingReferenceIdsAsync(Guid fhirQueryId, IReadOnlyCollection<long> pendingReferenceIds, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogManager : IDataAcquisitionLogManager
@@ -308,18 +308,17 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             throw new DataAcquisitionLogNotFoundException($"Data acquisition log with ID {logId} not found.");
         }
 
-        return new DataAcquisitionLogModel
+        var updatedLog = await _dbContext.DataAcquisitionLogs
+            .AsNoTracking()
+            .FirstOrDefaultAsync(l => l.Id == logId, cancellationToken);
+
+        if (updatedLog == null)
         {
-            Id = logId,
-            Status = status,
-            RetryAttempts = retryAttempts,
-            TraceId = traceId,
-            ExecutionDate = executionDate,
-            CompletionDate = completionDate,
-            CompletionTimeMilliseconds = completionTimeMs,
-            ResourceAcquiredIds = resourceAcquiredIds,
-            Notes = notes
-        };
+            activity?.SetStatus(ActivityStatusCode.Error, "Updated data acquisition log could not be reloaded");
+            throw new DataAcquisitionLogNotFoundException($"Data acquisition log with ID {logId} not found after update.");
+        }
+
+        return DataAcquisitionLogModel.FromDomain(updatedLog);
     }
 
     public async Task<List<DataAcquisitionLog>> GetLogsByIdsAsync(List<long> ids, CancellationToken cancellationToken = default)
@@ -356,7 +355,10 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         if (logIds == null || logIds.Count == 0) return;
 
         var updated = await _dbContext.DataAcquisitionLogs
-            .Where(l => logIds.Contains(l.Id))
+            .Where(l => logIds.Contains(l.Id)
+                && l.FacilityId == facilityId
+                && l.CorrelationId == correlationId
+                && l.ReportTrackingId == reportTrackingId)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(l => l.TailSent, true)
                 .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
@@ -492,23 +494,31 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         return totalUpdated;
     }
 
-    public async Task CollectPendingReferenceIdsAsync(Guid fhirQueryId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<long>> CollectPendingReferenceIdsAsync(Guid fhirQueryId, CancellationToken cancellationToken = default)
     {
-        var pendingIds = await _dbContext.PendingReferenceIds
+        var pendingRows = await _dbContext.PendingReferenceIds
             .Where(p => p.FhirQueryId == fhirQueryId)
-            .Select(p => p.ResourceId)
-            .Distinct()
+            .Select(p => new { p.Id, p.ResourceId })
             .ToListAsync(cancellationToken);
 
-        if (pendingIds.Count == 0)
-            return;
+        if (pendingRows.Count == 0)
+            return [];
+
+        var consumedPendingReferenceIds = pendingRows
+            .Select(p => p.Id)
+            .ToList();
+
+        var pendingIds = pendingRows
+            .Select(p => p.ResourceId)
+            .Distinct()
+            .ToList();
 
         var fhirQuery = await _dbContext.FhirQueries
             .Where(q => q.Id == fhirQueryId)
             .FirstOrDefaultAsync(cancellationToken);
 
         if (fhirQuery == null)
-            return;
+            return [];
 
         var currentParams = fhirQuery.QueryParameters ?? [];
 
@@ -535,12 +545,17 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                 .SetProperty(q => q.QueryParameters, nonIdParams)
                 .SetProperty(q => q.ModifyDate, DateTime.UtcNow),
             cancellationToken);
+
+        return consumedPendingReferenceIds;
     }
 
-    public async Task CleanupPendingReferenceIdsAsync(Guid fhirQueryId, CancellationToken cancellationToken = default)
+    public async Task CleanupPendingReferenceIdsAsync(Guid fhirQueryId, IReadOnlyCollection<long> pendingReferenceIds, CancellationToken cancellationToken = default)
     {
+        if (pendingReferenceIds.Count == 0)
+            return;
+
         await _dbContext.PendingReferenceIds
-            .Where(p => p.FhirQueryId == fhirQueryId)
+            .Where(p => p.FhirQueryId == fhirQueryId && pendingReferenceIds.Contains(p.Id))
             .ExecuteDeleteAsync(cancellationToken);
     }
 }

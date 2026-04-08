@@ -479,9 +479,8 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     .ToListAsync(cancellationToken);
 
                 var firstQueryByLogId = queryInfo
-                    .OrderBy(q => q.Id)
                     .GroupBy(q => q.DataAcquisitionLogId)
-                    .ToDictionary(g => g.Key, g => g.First());
+                    .ToDictionary(g => g.Key, g => g.FirstOrDefault(q => q.IsReference != true) ?? g.First());
 
                 var hasReferenceQueryByLogId = queryInfo
                     .GroupBy(q => q.DataAcquisitionLogId)
@@ -674,6 +673,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
         // QueryType counts via DB GroupBy
         var queryTypeCounts = await baseQuery
+            .Where(l => l.QueryType != null)
             .GroupBy(l => l.QueryType)
             .Select(g => new { QueryType = g.Key, Count = g.Count() })
             .ToListAsync(cancellationToken);
