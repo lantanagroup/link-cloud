@@ -10,11 +10,13 @@ public class AuthenticationRetrievalService : IAuthenticationRetrievalService
 {
     private readonly EpicAuth _epicAuth;
     private readonly BasicAuth _basicAuth;
+    private readonly CustomHeaderAuth _customHeaderAuth;
 
-    public AuthenticationRetrievalService(EpicAuth epicAuth, BasicAuth basicAuth)
+    public AuthenticationRetrievalService(EpicAuth epicAuth, BasicAuth basicAuth, CustomHeaderAuth customHeaderAuth)
     {
         _epicAuth = epicAuth;
         _basicAuth = basicAuth;
+        _customHeaderAuth = customHeaderAuth;
     }
 
     public IAuth GetAuthenticationService(AuthenticationConfigurationModel authenticationSettings)
@@ -25,6 +27,7 @@ public class AuthenticationRetrievalService : IAuthenticationRetrievalService
         {
             nameof(AuthType.Epic) => _epicAuth,
             nameof(AuthType.Basic) => _basicAuth,
+            nameof(AuthType.CustomHeaders) => _customHeaderAuth,
             _ => null,
         };
         return service;

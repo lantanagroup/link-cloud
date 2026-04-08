@@ -6,4 +6,5 @@ export interface IDataAcquisitionAuthenticationConfigModel {
     clientId: string;
     userName: string;
     password: string;
+    customHeaders: { [key: string]: string };
 }

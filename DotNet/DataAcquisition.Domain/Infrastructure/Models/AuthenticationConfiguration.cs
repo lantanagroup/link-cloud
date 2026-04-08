@@ -33,4 +33,8 @@ public class AuthenticationConfiguration
     [DataMember]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Password { get; set; }
+
+    [DataMember]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, string>? CustomHeaders { get; set; }
 }
