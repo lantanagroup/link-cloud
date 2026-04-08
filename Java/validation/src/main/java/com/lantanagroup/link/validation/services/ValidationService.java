@@ -91,8 +91,8 @@ public class ValidationService {
                     // MeasureValidator.validateMeasureReport() calls fetchResourcesByUrl() which is
                     // unimplemented in WorkerContextValidationSupportAdapter (HAPI-2509).
                     // With concurrent validation, this may be wrapped in ExecutionException.
-                    logger.warn("Validation skipped due to known HAPI bug (HAPI-2509): {}", ex.getMessage());
-                    return List.of();
+                    throw new ValidationSkippedException(
+                            "Validation skipped due to known HAPI bug (HAPI-2509): " + ex.getMessage(), ex);
                 }
                 logger.error("Validation failed", ex);
                 throw ex;

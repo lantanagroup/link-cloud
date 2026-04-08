@@ -76,7 +76,14 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
             bundle = getBundleViaRest(facilityId, patientId, reportId);
         }
         Instant start = Instant.now();
-        List<Result> results = validate(facilityId, patientId, reportId, bundle);
+        List<Result> results;
+        try {
+            results = validate(facilityId, patientId, reportId, bundle);
+        } catch (ValidationSkippedException ex) {
+            _logger.warn("Validation skipped for patient {} in report {} (facility {}): {}",
+                    patientId, reportId, facilityId, ex.getMessage());
+            return;
+        }
         Instant end = Instant.now();
         Duration duration = Duration.between(start, end);
         produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results);
