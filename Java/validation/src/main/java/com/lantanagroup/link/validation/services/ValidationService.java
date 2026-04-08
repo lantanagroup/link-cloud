@@ -102,7 +102,7 @@ public class ValidationService {
 
     private static boolean isHapi2509(Throwable ex) {
         for (Throwable t = ex; t != null; t = t.getCause()) {
-            if (t instanceof UnsupportedOperationException && t.getMessage() != null && t.getMessage().contains("HAPI-2509")) {
+            if (t.getMessage() != null && t.getMessage().contains("HAPI-2509")) {
                 return true;
             }
         }
