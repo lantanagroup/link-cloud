@@ -12,6 +12,7 @@ public class PipelineProgressTracker
     private readonly int _expectedPatientCount;
     private readonly int _totalUnits;
     private readonly PipelineDataReader _reader;
+    private readonly bool _expectsDataAcquisition;
     private int _lastReportedPercent = -1;
     private string? _lastProgressBar;
 
@@ -34,12 +35,15 @@ public class PipelineProgressTracker
     /// </summary>
     public string? StalledStage => _stalledStage;
 
-    public PipelineProgressTracker(IAutomationOutput output, int expectedPatientCount, PipelineDataReader reader)
+    public PipelineProgressTracker(IAutomationOutput output, int expectedPatientCount, PipelineDataReader reader, bool expectsDataAcquisition = true)
     {
         _output = output;
         _expectedPatientCount = expectedPatientCount;
         _reader = reader;
-        _totalUnits = (expectedPatientCount * 4) + 2;
+        _expectsDataAcquisition = expectsDataAcquisition;
+        _totalUnits = expectsDataAcquisition
+            ? (expectedPatientCount * 4) + 2
+            : (expectedPatientCount * 3) + 2;
     }
 
     public async Task UpdateAsync(string facilityId, string reportId)
@@ -111,13 +115,16 @@ public class PipelineProgressTracker
             stageDetails.Add($"valid={patientsValidated}/{_expectedPatientCount}");
             stageDetails.Add($"submit={patientsSubmitted}/{_expectedPatientCount}");
 
-            var acqSummary = await _reader.GetDataAcquisitionReportSummaryAsync(reportId);
-            var patientsAcquired = acqSummary?.TotalCompletedPatients ?? 0;
+            if (_expectsDataAcquisition)
+            {
+                var acqSummary = await _reader.GetDataAcquisitionReportSummaryAsync(reportId);
+                var patientsAcquired = acqSummary?.TotalCompletedPatients ?? 0;
 
-            patientsAcquired = Math.Min(patientsAcquired, _expectedPatientCount);
-            completedUnits += patientsAcquired;
+                patientsAcquired = Math.Min(patientsAcquired, _expectedPatientCount);
+                completedUnits += patientsAcquired;
 
-            stageDetails.Insert(1, $"acq={patientsAcquired}/{_expectedPatientCount}");
+                stageDetails.Insert(1, $"acq={patientsAcquired}/{_expectedPatientCount}");
+            }
 
             PrintIfChanged(completedUnits, stageDetails);
         }

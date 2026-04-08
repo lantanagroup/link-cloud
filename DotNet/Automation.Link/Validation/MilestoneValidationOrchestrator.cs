@@ -22,6 +22,7 @@ public class MilestoneValidationOrchestrator
     private readonly IAutomationOutput _output;
     private readonly PipelineDataReader _reader;
     private readonly int _expectedPatientCount;
+    private readonly bool _expectsDataAcquisition;
     private readonly HashSet<Milestone> _completed = [];
     private readonly List<string> _issues = [];
 
@@ -38,11 +39,13 @@ public class MilestoneValidationOrchestrator
     public MilestoneValidationOrchestrator(
         IAutomationOutput output,
         PipelineDataReader reader,
-        int expectedPatientCount)
+        int expectedPatientCount,
+        bool expectsDataAcquisition = true)
     {
         _output = output;
         _expectedPatientCount = expectedPatientCount;
         _reader = reader;
+        _expectsDataAcquisition = expectsDataAcquisition;
     }
 
     public async Task CheckAsync(string facilityId, string reportId)
@@ -54,8 +57,17 @@ public class MilestoneValidationOrchestrator
         {
             await CheckReportScheduleCreated(scheduleId, facilityId);
             await CheckReportEntriesCreated(scheduleId);
-            await CheckAcquisitionStarted(facilityId, reportId);
-            await CheckAcquisitionCompleted(facilityId, reportId);
+
+            if (_expectsDataAcquisition)
+            {
+                await CheckAcquisitionStarted(facilityId, reportId);
+                await CheckAcquisitionCompleted(facilityId, reportId);
+            }
+            else
+            {
+                AutoCompleteAcquisitionMilestones();
+            }
+
             await CheckMeasureReportsGenerated(scheduleId);
             await CheckSubmissionCompleted(scheduleId);
         }
@@ -196,6 +208,15 @@ public class MilestoneValidationOrchestrator
         _acquisitionCompletionCandidateSinceUtc = null;
         _acquisitionCompletionCandidateLogCount = 0;
         _acquisitionCompletionCandidateCompletedPatients = 0;
+    }
+
+    private void AutoCompleteAcquisitionMilestones()
+    {
+        if (_completed.Add(Milestone.AcquisitionStarted))
+            _output.WriteLine("[DIAG][Milestone] Reached: AcquisitionStarted (auto-completed — data acquisition not expected for this scenario)");
+
+        if (_completed.Add(Milestone.AcquisitionCompleted))
+            _output.WriteLine("[DIAG][Milestone] Reached: AcquisitionCompleted (auto-completed — data acquisition not expected for this scenario)");
     }
 
     private async Task CheckMeasureReportsGenerated(Guid scheduleId)

@@ -38,13 +38,13 @@ public class ProgressMonitor
     /// </summary>
     public TimeSpan StallDuration => _progressTracker?.StallDuration ?? TimeSpan.Zero;
 
-    public ProgressMonitor(IAutomationOutput output, int expectedPatientCount, LokiScraper? lokiScraper, PipelineDataReader reader)
+    public ProgressMonitor(IAutomationOutput output, int expectedPatientCount, LokiScraper? lokiScraper, PipelineDataReader reader, bool expectsDataAcquisition = true)
     {
         _output = output;
         _lokiScraper = lokiScraper;
         _reader = reader;
         _progressTracker = expectedPatientCount > 0
-            ? new PipelineProgressTracker(output, expectedPatientCount, reader)
+            ? new PipelineProgressTracker(output, expectedPatientCount, reader, expectsDataAcquisition)
             : null;
     }
 

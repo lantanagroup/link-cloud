@@ -154,7 +154,8 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
             Output, lokiScraper, AutomationCfg,
             _config.PatientIds.Count,
             forwardInternalLogsToOutput: false,
-            pipelineReader: dataReader);
+            pipelineReader: dataReader,
+            expectsDataAcquisition: false);
         await using var regenWatcher = DiagnosticsEventWatcher.Start(regenDiagnostics, Output);
 
         await regenDiagnostics.StartAsync(_facilityId, regeneratedReportId);
