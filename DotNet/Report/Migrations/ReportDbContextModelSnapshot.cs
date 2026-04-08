@@ -817,7 +817,7 @@ namespace LantanaGroup.Link.Report.Migrations
 
                     b.HasIndex(new[] { "FacilityId", "ResourceType", "ResourceId" }, "IX_ReportResources_Facility_Resource");
 
-                    b.HasIndex(new[] { "FacilityId", "ReportScheduleId" }, "IX_ReportResources_Facility_Schedule");
+                    b.HasIndex(new[] { "FacilityId", "ReportScheduleId", "CreateDate" }, "IX_ReportResources_Facility_Schedule");
 
                     b.HasIndex(new[] { "ResourceType" }, "IX_ReportResources_ResourceType");
 

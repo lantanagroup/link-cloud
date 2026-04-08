@@ -24,10 +24,11 @@ public class ReferenceQueryLookupResult
         {
             const string prefix = "_id=";
             return (QueryParameters ?? [])
-                .Where(p => p.StartsWith(prefix))
+                .Where(p => !string.IsNullOrEmpty(p) && p.StartsWith(prefix))
                 .Select(p => p[prefix.Length..])
                 .SelectMany(p => p.Split(','))
-                .Where(id => id != "");
+                .Select(id => id?.Trim())
+                .Where(id => !string.IsNullOrWhiteSpace(id));
         }
     }
 }

@@ -228,6 +228,18 @@ public class DataAcquisitionDbContext : DbContext
                 .HasDatabaseName("IX_DataAcquisitionLogs_Tailing_Optimization")
                 .HasFilter("[TailSent] = 0 AND [ReportTrackingId] IS NOT NULL AND [CorrelationId] IS NOT NULL AND [ReportStartDate] IS NOT NULL AND [ReportEndDate] IS NOT NULL");
 
+            // Covers GetReportSummaryAsync and other queries that aggregate by ReportTrackingId.
+            // Without this, those queries do a full table scan and time out under load.
+            entity.HasIndex(e => new { e.ReportTrackingId, e.IsDeleted })
+                .HasDatabaseName("IX_DataAcquisitionLogs_ReportTrackingId_IsDeleted")
+                .IncludeProperties(
+                    nameof(DataAcquisitionLog.PatientId),
+                    nameof(DataAcquisitionLog.Status),
+                    nameof(DataAcquisitionLog.RetryAttempts),
+                    nameof(DataAcquisitionLog.CompletionTimeMilliseconds),
+                    nameof(DataAcquisitionLog.ResourceAcquiredIds)
+                );
+
             entity.Property(e => e.ResourceAcquiredIds)
                 .HasConversion(
                     v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),

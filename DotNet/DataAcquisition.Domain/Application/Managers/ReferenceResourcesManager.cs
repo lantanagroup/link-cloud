@@ -72,13 +72,15 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
             throw new ArgumentNullException(nameof(model));
         }
 
+        var modifyDate = DateTime.UtcNow;
+
         var updated = await _dbContext.ReferenceResources
             .Where(r => r.Id == model.Id)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(r => r.QueryPhase, model.QueryPhase)
                 .SetProperty(r => r.ResourceType, model.ResourceType)
                 .SetProperty(r => r.ReferenceResource, model.ReferenceResource)
-                .SetProperty(r => r.ModifyDate, DateTime.UtcNow),
+                .SetProperty(r => r.ModifyDate, modifyDate),
             cancellationToken);
 
         if (updated == 0)
@@ -86,12 +88,15 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
             throw new KeyNotFoundException($"ReferenceResources with ID {model.Id} not found.");
         }
 
-        return new ReferenceResourcesModel
+        var updatedEntity = await _dbContext.ReferenceResources
+            .AsNoTracking()
+            .SingleOrDefaultAsync(r => r.Id == model.Id, cancellationToken);
+
+        if (updatedEntity == null)
         {
-            Id = model.Id,
-            QueryPhase = model.QueryPhase,
-            ResourceType = model.ResourceType,
-            ReferenceResource = model.ReferenceResource
-        };
+            throw new KeyNotFoundException($"ReferenceResources with ID {model.Id} not found.");
+        }
+
+        return ReferenceResourcesModel.FromDomain(updatedEntity);
     }
 }
