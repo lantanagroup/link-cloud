@@ -169,9 +169,16 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
     this.authTypeControl?.valueChanges.subscribe((value) => {
       this.updateValidators(value);
 
-      // Add a default custom header row when Custom headers is selected
-      if (value === 'CustomHeaders' && this.customHeadersArray.length === 0) {
-        this.addCustomHeader();
+      if (value === 'CustomHeaders') {
+        // Enable customHeadersArray and ensure at least one row
+        this.customHeadersArray.enable();
+        if (this.customHeadersArray.length === 0) {
+          this.addCustomHeader();
+        }
+      } else {
+        // Clear and disable customHeadersArray when not using CustomHeaders
+        this.customHeadersArray.clear();
+        this.customHeadersArray.disable();
       }
     });
 
@@ -352,6 +359,17 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
     // Manage validators for Basic Auth fields
     this.toggleValidators('userName', authType === 'Basic');
     this.toggleValidators('password', authType === 'Basic');
+
+    // Manage customHeadersArray lifecycle based on authType
+    if (authType === 'CustomHeaders') {
+      // Ensure customHeadersArray is enabled and has validators
+      this.customHeadersArray.enable();
+      // Individual header rows have their own validators set in addCustomHeader
+    } else {
+      // Clear and disable customHeadersArray when not using CustomHeaders
+      this.customHeadersArray.clear();
+      this.customHeadersArray.disable();
+    }
   }
 
   private toggleValidators(controlName: string, shouldRequire: boolean): void {
@@ -494,9 +512,11 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
   }
 
   addCustomHeader(key: string = '', value: string = ''): void {
+    // Only apply validators when authType is CustomHeaders
+    const validators = this.authTypeControl.value === 'CustomHeaders' ? Validators.required : null;
     const headerGroup = new FormGroup({
-      key: new FormControl(key, Validators.required),
-      value: new FormControl(value, Validators.required)
+      key: new FormControl(key, validators),
+      value: new FormControl(value, validators)
     });
     this.customHeadersArray.push(headerGroup);
   }
@@ -604,7 +624,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
               clientId: this.clientIdControl.value || null,
               userName: this.userNameControl.value || null,
               password: this.passwordControl.value || null,
-              customHeaders: this.getCustomHeadersObject() || {}
+              ...(this.getCustomHeadersObject() && { customHeaders: this.getCustomHeadersObject() })
             }
             : null
         } as IDataAcquisitionQueryConfigModel).subscribe((response: IEntityCreatedResponse) => {
@@ -630,7 +650,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
                 clientId: this.clientIdControl.value || null,
                 userName: this.userNameControl.value || null,
                 password: this.passwordControl.value || null,
-                customHeaders: this.getCustomHeadersObject() || {}
+                ...(this.getCustomHeadersObject() && { customHeaders: this.getCustomHeadersObject() })
               }
               : null
           } as IDataAcquisitionQueryConfigModel).subscribe((response: IEntityCreatedResponse) => {
