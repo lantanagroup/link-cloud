@@ -68,8 +68,12 @@ public static class TestConfig
         {
             BootstrapServers = Environment.GetEnvironmentVariable("E2E_KAFKA_BOOTSTRAP_SERVERS") ?? "localhost:9094",
             RestProxyBaseUrl = Environment.GetEnvironmentVariable("E2E_KAFKA_REST_PROXY_URL") ?? "http://localhost:8082",
-            User = Environment.GetEnvironmentVariable("E2E_KAFKA_USER") ?? string.Empty,
-            Password = Environment.GetEnvironmentVariable("E2E_KAFKA_PASSWORD") ?? string.Empty
+            User = Environment.GetEnvironmentVariable("E2E_KAFKA_USER")
+                ?? Environment.GetEnvironmentVariable("KAFKA_SASL_CLIENT_USER")
+                ?? "user",
+            Password = Environment.GetEnvironmentVariable("E2E_KAFKA_PASSWORD")
+                ?? Environment.GetEnvironmentVariable("KAFKA_SASL_CLIENT_PASSWORD")
+                ?? "password"
         }
     };
 
