@@ -77,6 +77,9 @@ public class CreateFhirQueryConfigurationRequestApiModel
     public string FhirServerBaseUrl { get; set; } = string.Empty;
     public int MaxConcurrentRequests { get; set; }
     public int? MaxRetries { get; set; }
+    public TimeSpan? MinAcquisitionPullTime { get; set; }
+    public TimeSpan? MaxAcquisitionPullTime { get; set; }
+    public string? TimeZone { get; set; }
 }
 
 public class CreateQueryPlanRequestApiModel
