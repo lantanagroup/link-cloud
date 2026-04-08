@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.ForkJoinPool;
 
 @Service
 @Scope(value = "prototype", proxyMode = ScopedProxyMode.TARGET_CLASS)
@@ -45,7 +46,8 @@ public class ValidationService {
         IValidatorModule validatorModule = new FhirInstanceValidator(cachingValidationSupport);
         fhirValidator = new FhirValidator(fhirContext);
         fhirValidator.registerValidatorModule(validatorModule);
-        fhirValidator.setConcurrentBundleValidation(false);
+        fhirValidator.setConcurrentBundleValidation(true);
+        fhirValidator.setExecutorService(ForkJoinPool.commonPool());
     }
 
     private static void loadTerminologyValidationSupport(FhirContext fhirContext, LinkConfig linkConfig, ValidationSupportChain validationSupportChain, ValidationCacheService validationCacheService) {
@@ -83,20 +85,27 @@ public class ValidationService {
                 return validationResult.getMessages().stream()
                         .map(Result::fromMessage)
                         .toList();
-            } catch (UnsupportedOperationException ex) {
-                if (ex.getMessage() != null && ex.getMessage().contains("HAPI-2509")) {
+            } catch (Exception ex) {
+                if (isHapi2509(ex)) {
                     // Workaround for HAPI FHIR bug https://github.com/hapifhir/hapi-fhir/issues/7200
                     // MeasureValidator.validateMeasureReport() calls fetchResourcesByUrl() which is
                     // unimplemented in WorkerContextValidationSupportAdapter (HAPI-2509).
+                    // With concurrent validation, this may be wrapped in ExecutionException.
                     logger.warn("Validation skipped due to known HAPI bug (HAPI-2509): {}", ex.getMessage());
                     return List.of();
                 }
                 logger.error("Validation failed", ex);
                 throw ex;
-            } catch (Exception ex) {
-                logger.error("Validation failed", ex);
-                throw ex;
             }
         }
+    }
+
+    private static boolean isHapi2509(Throwable ex) {
+        for (Throwable t = ex; t != null; t = t.getCause()) {
+            if (t instanceof UnsupportedOperationException && t.getMessage() != null && t.getMessage().contains("HAPI-2509")) {
+                return true;
+            }
+        }
+        return false;
     }
 }
