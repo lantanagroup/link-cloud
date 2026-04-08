@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "baselineName": "RegenerateReportTest",
+  "measureId": "NHSNAcuteCareHospitalMonthlyInitialPopulation",
+  "expectedPatientIds": [
+    "RegenPatient-001"
+  ],
+  "generatedInputCountsByType": {
+    "AllergyIntolerance": 2,
+    "CarePlan": 2,
+    "CareTeam": 2,
+    "Condition": 9,
+    "Coverage": 1,
+    "Device": 4,
+    "DiagnosticReport": 6,
+    "DocumentReference": 2,
+    "Encounter": 1,
+    "ImagingStudy": 2,
+    "Immunization": 3,
+    "List": 1,
+    "Location": 5,
+    "Medication": 3,
+    "MedicationAdministration": 7,
+    "MedicationRequest": 6,
+    "Observation": 28,
+    "Organization": 1,
+    "Patient": 1,
+    "Practitioner": 6,
+    "Procedure": 7,
+    "Provenance": 2,
+    "ServiceRequest": 7,
+    "Specimen": 6
+  },
+  "dataAcquisitionCountsByPatientType": {},
+  "measureEvalCountsByPatientType": {
+    "RegenPatient-001": {
+      "Condition": 7,
+      "Coverage": 1,
+      "DiagnosticReport": 6,
+      "Encounter": 1,
+      "Location": 3,
+      "MeasureReport": 1,
+      "Medication": 3,
+      "MedicationRequest": 6,
+      "Observation": 28,
+      "Patient": 1,
+      "Procedure": 7,
+      "ServiceRequest": 7
+    }
+  },
+  "reportCountsByPatientType": {
+    "RegenPatient-001": {
+      "Condition": 7,
+      "Coverage": 1,
+      "DiagnosticReport": 6,
+      "Encounter": 1,
+      "Location": 3,
+      "MeasureReport": 1,
+      "Medication": 3,
+      "MedicationRequest": 6,
+      "Observation": 28,
+      "Patient": 1,
+      "Procedure": 7,
+      "ServiceRequest": 7
+    }
+  },
+  "absCountsByPatientType": {
+    "RegenPatient-001": {
+      "Condition": 7,
+      "Coverage": 1,
+      "DiagnosticReport": 6,
+      "Encounter": 1,
+      "Location": 3,
+      "MeasureReport": 1,
+      "Medication": 3,
+      "MedicationRequest": 6,
+      "Observation": 28,
+      "OperationOutcome": 1,
+      "Patient": 1,
+      "Procedure": 7,
+      "ServiceRequest": 7
+    }
+  }
+}
