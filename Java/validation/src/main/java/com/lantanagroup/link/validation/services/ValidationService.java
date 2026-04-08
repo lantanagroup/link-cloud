@@ -22,7 +22,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.ForkJoinPool;
 
 @Service
 @Scope(value = "prototype", proxyMode = ScopedProxyMode.TARGET_CLASS)
@@ -46,8 +45,7 @@ public class ValidationService {
         IValidatorModule validatorModule = new FhirInstanceValidator(cachingValidationSupport);
         fhirValidator = new FhirValidator(fhirContext);
         fhirValidator.registerValidatorModule(validatorModule);
-        fhirValidator.setConcurrentBundleValidation(true);
-        fhirValidator.setExecutorService(ForkJoinPool.commonPool());
+        fhirValidator.setConcurrentBundleValidation(false);
     }
 
     private static void loadTerminologyValidationSupport(FhirContext fhirContext, LinkConfig linkConfig, ValidationSupportChain validationSupportChain, ValidationCacheService validationCacheService) {
