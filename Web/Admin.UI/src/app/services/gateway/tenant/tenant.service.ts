@@ -127,12 +127,12 @@ export class TenantService {
   }
 
 
-  listFacilities(facilityId: string, facilityName: string, sortBy: string, sortOrder: number, pageSize: number, pageNumber: number, showDeleted: boolean): Observable<PagedFacilityConfigModel> {
+  listFacilities(facilityId: string, facilityName: string, timeZone: string, vendor: string, sortBy: string, sortOrder: number, pageSize: number, pageNumber: number, showDeleted: boolean): Observable<PagedFacilityConfigModel> {
 
     //javascript based paging is zero based, so increment page number by 1
     pageNumber = pageNumber + 1;
 
-    const params = new HttpParams()
+    let params = new HttpParams()
       .set('facilityId', facilityId)
       .set('facilityName', facilityName)
       .set('sortBy', sortBy)
@@ -140,6 +140,9 @@ export class TenantService {
       .set('pageSize', pageSize)
       .set('pageNumber', pageNumber)
       .set('includeDeleted', showDeleted.toString());
+
+    if (timeZone) { params = params.set('timeZone', timeZone); }
+    if (vendor) { params = params.set('vendor', vendor); }
 
     return this.http.get<PagedFacilityConfigModel>(`${this.appConfigService.config?.baseApiUrl}/facility`, {params})
       .pipe(
