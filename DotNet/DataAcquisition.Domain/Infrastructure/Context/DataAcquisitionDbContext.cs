@@ -264,6 +264,12 @@ public class DataAcquisitionDbContext : DbContext
 
             entity.HasIndex(e => e.FhirQueryId)
                 .HasDatabaseName("IX_PendingReferenceIds_FhirQueryId");
+
+            entity.HasOne(p => p.FhirQuery)
+                .WithMany(q => q.PendingReferenceIds)
+                .HasForeignKey(p => p.FhirQueryId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_PendingReferenceIds_FhirQuery_FhirQueryId");
         });
 
         //-------------------SftpAcquisitionLog-------------------

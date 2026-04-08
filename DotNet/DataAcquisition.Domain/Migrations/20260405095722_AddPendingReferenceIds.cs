@@ -31,6 +31,14 @@ namespace DataAcquisition.Domain.Migrations
                 name: "IX_PendingReferenceIds_FhirQueryId",
                 table: "PendingReferenceIds",
                 column: "FhirQueryId");
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_PendingReferenceIds_FhirQuery_FhirQueryId",
+                table: "PendingReferenceIds",
+                column: "FhirQueryId",
+                principalTable: "FhirQuery",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Cascade);
         }
 
         /// <inheritdoc />

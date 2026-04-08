@@ -47,6 +47,9 @@ public partial class FhirQuery
     [InverseProperty("FhirQuery")]
     public virtual ICollection<FhirQueryResourceType> FhirQueryResourceTypes { get; set; } = new List<FhirQueryResourceType>();
 
+    [InverseProperty("FhirQuery")]
+    public virtual ICollection<PendingReferenceId> PendingReferenceIds { get; set; } = new List<PendingReferenceId>();
+
     [NotMapped]
     public IEnumerable<string> IdQueryParameterValues
     {

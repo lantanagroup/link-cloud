@@ -1180,6 +1180,18 @@ namespace DataAcquisition.Domain.Migrations
                     b.Navigation("DataAcquisitionLog");
                 });
 
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.PendingReferenceId", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirQuery", "FhirQuery")
+                        .WithMany("PendingReferenceIds")
+                        .HasForeignKey("FhirQueryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_PendingReferenceIds_FhirQuery_FhirQueryId");
+
+                    b.Navigation("FhirQuery");
+                });
+
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirQueryResourceType", b =>
                 {
                     b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirQuery", "FhirQuery")

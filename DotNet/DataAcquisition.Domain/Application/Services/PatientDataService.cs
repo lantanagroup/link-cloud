@@ -476,8 +476,14 @@ public class PatientDataService : IPatientDataService
             }
 
             //2. atomically update to "Processing" — single DB write, no follow-up UpdateAsync needed
+            var allowedStatuses = new List<RequestStatus> { RequestStatus.Queued };
+            if (request.ignoreStatusConstraint && log.Status.HasValue)
+            {
+                allowedStatuses.Add(log.Status.Value);
+            }
+
             var successfullyUpdatedLog = await _dataAcquisitionLogManager.TrySetLogStatusAsync(log.Id,
-                new List<RequestStatus> { RequestStatus.Queued }, RequestStatus.Processing,
+                allowedStatuses, RequestStatus.Processing,
                 cancellationToken);
 
             if (successfullyUpdatedLog)
@@ -508,12 +514,15 @@ public class PatientDataService : IPatientDataService
                 // If this is a reference log, collect all staged IDs from concurrent
                 // patient workers into the FhirQuery before executing.
                 var isReferenceLog = log.FhirQuery.Any(x => x.IsReference.HasValue && x.IsReference.Value);
+                var consumedPendingReferenceIdsByQuery = new Dictionary<Guid, IReadOnlyList<long>>();
                 if (isReferenceLog)
                 {
                     foreach (var refQuery in log.FhirQuery.Where(q => q.IsReference == true && q.Id.HasValue))
                     {
-                        await _dataAcquisitionLogManager.CollectPendingReferenceIdsAsync(
+                        var consumedPendingReferenceIds = await _dataAcquisitionLogManager.CollectPendingReferenceIdsAsync(
                             refQuery.Id!.Value, cancellationToken);
+
+                        consumedPendingReferenceIdsByQuery[refQuery.Id!.Value] = consumedPendingReferenceIds;
                     }
 
                     // Re-fetch the log so the FhirQuery.QueryParameters reflect the merged IDs.
@@ -534,8 +543,8 @@ public class PatientDataService : IPatientDataService
                     if ((fhirQuery.QueryType == FhirQueryType.Search ||
                          fhirQuery.QueryType == FhirQueryType.SearchPost) && !log.IsCensus)
                     {
-                        var idParams = fhirQuery.QueryParameters
-                            .Where(x => x.StartsWith("_id=", StringComparison.InvariantCultureIgnoreCase)).ToList();
+                        var idParams = fhirQuery.QueryParameters?
+                            .Where(x => x.StartsWith("_id=", StringComparison.InvariantCultureIgnoreCase)).ToList() ?? [];
                         if (idParams.Any())
                         {
                             var ids = new List<string>();
@@ -621,8 +630,11 @@ public class PatientDataService : IPatientDataService
                     {
                         foreach (var refQuery in log.FhirQuery.Where(q => q.IsReference == true && q.Id.HasValue))
                         {
+                            consumedPendingReferenceIdsByQuery.TryGetValue(refQuery.Id!.Value, out var consumedPendingReferenceIds);
                             await _dataAcquisitionLogManager.CleanupPendingReferenceIdsAsync(
-                                refQuery.Id!.Value, cancellationToken);
+                                refQuery.Id!.Value,
+                                consumedPendingReferenceIds ?? [],
+                                cancellationToken);
                         }
                     }
                     catch (Exception ex)

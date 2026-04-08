@@ -48,45 +48,63 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         return new QueryPlanConfigController(logger, queryPlanManager, queryPlanQueries);
     }
 
+    private static string CreateFacilityId() => $"TestFacility_{Guid.NewGuid():N}";
+
+    private static async Task CleanupFacilityQueryPlansAsync(DataAcquisitionDbContext dbContext, string facilityId)
+    {
+        var plans = await dbContext.QueryPlans.Where(q => q.FacilityId == facilityId).ToListAsync();
+        if (plans.Count == 0)
+            return;
+
+        dbContext.QueryPlans.RemoveRange(plans);
+        await dbContext.SaveChangesAsync();
+    }
+
     [Fact]
     public async Task GetQueryPlan_ValidParameters_ReturnsOkWithQueryPlan()
     {
         // Arrange
-        var facilityId = $"TestFacility_{Guid.NewGuid():N}";
+        var facilityId = CreateFacilityId();
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-
-        // Seed a query plan
-        var queryPlan = new QueryPlan
+        try
         {
-            FacilityId = facilityId,
-            Type = Frequency.Daily,
-            PlanName = "TestPlan",
-            EHRDescription = "Test EHR",
-            LookBack = "1d",
-            InitialQueries = new Dictionary<string, IQueryConfig>(),
-            SupplementalQueries = new Dictionary<string, IQueryConfig>()
-        };
-        dbContext.QueryPlans.Add(queryPlan);
-        await dbContext.SaveChangesAsync();
+            // Seed a query plan
+            var queryPlan = new QueryPlan
+            {
+                FacilityId = facilityId,
+                Type = Frequency.Daily,
+                PlanName = "TestPlan",
+                EHRDescription = "Test EHR",
+                LookBack = "1d",
+                InitialQueries = new Dictionary<string, IQueryConfig>(),
+                SupplementalQueries = new Dictionary<string, IQueryConfig>()
+            };
+            dbContext.QueryPlans.Add(queryPlan);
+            await dbContext.SaveChangesAsync();
 
-        var controller = CreateController(scope);
-        var queryParams = new GetQueryPlanParameters { Type = Frequency.Daily };
+            var controller = CreateController(scope);
+            var queryParams = new GetQueryPlanParameters { Type = Frequency.Daily };
 
-        // Act
-        var result = await controller.GetQueryPlan(facilityId, queryParams, CancellationToken.None);
+            // Act
+            var result = await controller.GetQueryPlan(facilityId, queryParams, CancellationToken.None);
 
-        // Assert
-        var okResult = Assert.IsType<OkObjectResult>(result);
-        var returnedModel = Assert.IsType<QueryPlanModel>(okResult.Value);
-        Assert.Equal(facilityId, returnedModel.FacilityId);
-        Assert.Equal(Frequency.Daily, returnedModel.Type);
-        Assert.Equal("TestPlan", returnedModel.PlanName);
-        Assert.Equal("Test EHR", returnedModel.EHRDescription);
-        Assert.Equal("1d", returnedModel.LookBack);
-        Assert.Empty(returnedModel.InitialQueries);
-        Assert.Empty(returnedModel.SupplementalQueries);
+            // Assert
+            var okResult = Assert.IsType<OkObjectResult>(result);
+            var returnedModel = Assert.IsType<QueryPlanModel>(okResult.Value);
+            Assert.Equal(facilityId, returnedModel.FacilityId);
+            Assert.Equal(Frequency.Daily, returnedModel.Type);
+            Assert.Equal("TestPlan", returnedModel.PlanName);
+            Assert.Equal("Test EHR", returnedModel.EHRDescription);
+            Assert.Equal("1d", returnedModel.LookBack);
+            Assert.Empty(returnedModel.InitialQueries);
+            Assert.Empty(returnedModel.SupplementalQueries);
+        }
+        finally
+        {
+            await CleanupFacilityQueryPlansAsync(dbContext, facilityId);
+        }
     }
 
     [Fact]
@@ -113,9 +131,10 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var controller = CreateController(scope);
+        var facilityId = CreateFacilityId();
 
         // Act
-        var result = await controller.GetQueryPlan("TestFacility", new GetQueryPlanParameters(), CancellationToken.None);
+        var result = await controller.GetQueryPlan(facilityId, new GetQueryPlanParameters(), CancellationToken.None);
 
         // Assert
         var objectResult = Assert.IsType<ObjectResult>(result);
@@ -130,11 +149,12 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var controller = CreateController(scope);
+        var facilityId = CreateFacilityId();
         controller.ModelState.AddModelError("Type", "Invalid");
         var queryParams = new GetQueryPlanParameters { Type = Frequency.Daily };
 
         // Act
-        var result = await controller.GetQueryPlan("TestFacility", queryParams, CancellationToken.None);
+        var result = await controller.GetQueryPlan(facilityId, queryParams, CancellationToken.None);
 
         // Assert
         var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
@@ -167,6 +187,7 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
     {
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
+        var facilityId = CreateFacilityId();
         var queryPlanQueriesMock = new Mock<IQueryPlanQueries>();
         queryPlanQueriesMock.Setup(q => q.GetAsync(It.IsAny<string>(), It.IsAny<Frequency>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Test exception"));
@@ -178,7 +199,7 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         var queryParams = new GetQueryPlanParameters { Type = Frequency.Daily };
 
         // Act
-        var result = await controller.GetQueryPlan("TestFacility", queryParams, CancellationToken.None);
+        var result = await controller.GetQueryPlan(facilityId, queryParams, CancellationToken.None);
 
         // Assert
         var objectResult = Assert.IsType<ObjectResult>(result);
@@ -192,26 +213,34 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var facilityId = CreateFacilityId();
 
 
         var controller = CreateController(scope);
-        var model = CreateValidQueryPlanApiModel();
+        var model = CreateValidQueryPlanApiModel(facilityId);
 
-        // Act
-        var result = await controller.CreateQueryPlan("TestFacility", model, CancellationToken.None);
+        try
+        {
+            // Act
+            var result = await controller.CreateQueryPlan(facilityId, model, CancellationToken.None);
 
-        // Assert
-        var createdResult = Assert.IsType<CreatedAtActionResult>(result);
-        var returnedModel = Assert.IsType<QueryPlanModel>(createdResult.Value);
-        Assert.Equal("TestFacility", returnedModel.FacilityId);
-        Assert.Equal(Frequency.Daily, returnedModel.Type);
-        Assert.Equal("TestPlan", returnedModel.PlanName);
-        Assert.NotNull(returnedModel.ModifyDate);
+            // Assert
+            var createdResult = Assert.IsType<CreatedAtActionResult>(result);
+            var returnedModel = Assert.IsType<QueryPlanModel>(createdResult.Value);
+            Assert.Equal(facilityId, returnedModel.FacilityId);
+            Assert.Equal(Frequency.Daily, returnedModel.Type);
+            Assert.Equal("TestPlan", returnedModel.PlanName);
+            Assert.NotNull(returnedModel.ModifyDate);
 
-        // Verify database
-        var savedPlan = await dbContext.QueryPlans.FirstOrDefaultAsync(q => q.FacilityId == "TestFacility" && q.Type == Frequency.Daily);
-        Assert.NotNull(savedPlan);
-        Assert.Equal("TestPlan", savedPlan.PlanName);
+            // Verify database
+            var savedPlan = await dbContext.QueryPlans.FirstOrDefaultAsync(q => q.FacilityId == facilityId && q.Type == Frequency.Daily);
+            Assert.NotNull(savedPlan);
+            Assert.Equal("TestPlan", savedPlan.PlanName);
+        }
+        finally
+        {
+            await CleanupFacilityQueryPlansAsync(dbContext, facilityId);
+        }
     }
 
     [Fact]
@@ -220,6 +249,7 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var controller = CreateController(scope);
+        var facilityId = CreateFacilityId();
         var model = new QueryPlanApiModel()
         {
             FacilityId = "",
@@ -227,7 +257,7 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         };
 
         // Act
-        var result = await controller.CreateQueryPlan("TestFacility", model, CancellationToken.None);
+        var result = await controller.CreateQueryPlan(facilityId, model, CancellationToken.None);
 
         // Assert
         var objectResult = Assert.IsType<ObjectResult>(result);
@@ -240,11 +270,12 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
     {
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
+        var facilityId = CreateFacilityId();
         var controller = CreateController(scope);
-        var model = CreateInvalidOrderQueryPlanApiModel();
+        var model = CreateInvalidOrderQueryPlanApiModel(facilityId);
 
         // Act
-        var result = await controller.CreateQueryPlan("TestFacility", model, CancellationToken.None);
+        var result = await controller.CreateQueryPlan(facilityId, model, CancellationToken.None);
 
         // Assert
         var objectResult = Assert.IsType<ObjectResult>(result);
@@ -259,9 +290,10 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var controller = CreateController(scope);
+        var facilityId = CreateFacilityId();
 
         // Act
-        var result = await controller.CreateQueryPlan("TestFacility", null, CancellationToken.None);
+        var result = await controller.CreateQueryPlan(facilityId, null, CancellationToken.None);
 
         // Assert
         var objectResult = Assert.IsType<ObjectResult>(result);
@@ -275,7 +307,7 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var controller = CreateController(scope);
-        var model = CreateValidQueryPlanApiModel();
+        var model = CreateValidQueryPlanApiModel(CreateFacilityId());
 
         // Act
         var result = await controller.CreateQueryPlan(string.Empty, model, CancellationToken.None);
@@ -291,6 +323,7 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
     {
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
+        var facilityId = CreateFacilityId();
         var queryPlanManagerMock = new Mock<IQueryPlanManager>();
         queryPlanManagerMock.Setup(m => m.AddAsync(It.IsAny<CreateQueryPlanModel>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Test exception"));
@@ -299,10 +332,10 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         var queryPlanQueries = scope.ServiceProvider.GetRequiredService<IQueryPlanQueries>();
         var controller = new QueryPlanConfigController(logger, queryPlanManagerMock.Object, queryPlanQueries);
 
-        var model = CreateValidQueryPlanApiModel();
+        var model = CreateValidQueryPlanApiModel(facilityId);
 
         // Act
-        var result = await controller.CreateQueryPlan("TestFacility", model, CancellationToken.None);
+        var result = await controller.CreateQueryPlan(facilityId, model, CancellationToken.None);
 
         // Assert
         var objectResult = Assert.IsType<ObjectResult>(result);
@@ -316,12 +349,13 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var facilityId = CreateFacilityId();
 
 
         // Seed existing query plan
         var existingPlan = new QueryPlan
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             Type = Frequency.Daily,
             PlanName = "OldPlan",
             EHRDescription = "OldEHR",
@@ -333,20 +367,27 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         await dbContext.SaveChangesAsync();
 
         var controller = CreateController(scope);
-        var model = CreateValidQueryPlanApiModel();
+        var model = CreateValidQueryPlanApiModel(facilityId);
 
-        // Act
-        var result = await controller.UpdateQueryPlan("TestFacility", model, CancellationToken.None);
+        try
+        {
+            // Act
+            var result = await controller.UpdateQueryPlan(facilityId, model, CancellationToken.None);
 
-        // Assert
-        Assert.IsType<AcceptedResult>(result);
+            // Assert
+            Assert.IsType<AcceptedResult>(result);
 
-        // Verify database
-        var updatedPlan = await dbContext.QueryPlans.FirstOrDefaultAsync(q => q.FacilityId == "TestFacility" && q.Type == Frequency.Daily);
-        Assert.NotNull(updatedPlan);
-        Assert.Equal("TestPlan", updatedPlan.PlanName);
-        Assert.Equal("TestEHR", updatedPlan.EHRDescription);
-        Assert.Equal("2d", updatedPlan.LookBack);
+            // Verify database
+            var updatedPlan = await dbContext.QueryPlans.FirstOrDefaultAsync(q => q.FacilityId == facilityId && q.Type == Frequency.Daily);
+            Assert.NotNull(updatedPlan);
+            Assert.Equal("TestPlan", updatedPlan.PlanName);
+            Assert.Equal("TestEHR", updatedPlan.EHRDescription);
+            Assert.Equal("2d", updatedPlan.LookBack);
+        }
+        finally
+        {
+            await CleanupFacilityQueryPlansAsync(dbContext, facilityId);
+        }
     }
 
     [Fact]
@@ -355,6 +396,7 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var controller = CreateController(scope);
+        var facilityId = CreateFacilityId();
         var model = new QueryPlanApiModel()
         {
             FacilityId = "",
@@ -362,7 +404,7 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         };
 
         // Act
-        var result = await controller.UpdateQueryPlan("TestFacility", model, CancellationToken.None);
+        var result = await controller.UpdateQueryPlan(facilityId, model, CancellationToken.None);
 
         // Assert
         var objectResult = Assert.IsType<ObjectResult>(result);
@@ -375,18 +417,28 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
     {
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var facilityId = CreateFacilityId();
         var controller = CreateController(scope);
-        var model = CreateInvalidOrderQueryPlanApiModel();
-        await controller.CreateQueryPlan("TestFacility", CreateValidQueryPlanApiModel(), CancellationToken.None);
+        var model = CreateInvalidOrderQueryPlanApiModel(facilityId);
 
-        // Act
-        var result = await controller.UpdateQueryPlan("TestFacility", model, CancellationToken.None);
+        try
+        {
+            await controller.CreateQueryPlan(facilityId, CreateValidQueryPlanApiModel(facilityId), CancellationToken.None);
 
-        // Assert
-        var objectResult = Assert.IsType<ObjectResult>(result);
-        Assert.Equal((int)HttpStatusCode.BadRequest, objectResult.StatusCode);
-        Assert.Equal("Bad Request", ((ProblemDetails)objectResult.Value).Title);
-        Assert.Contains("Query Plan validation failed: Query Plan", ((ProblemDetails)objectResult.Value).Detail, StringComparison.OrdinalIgnoreCase);
+            // Act
+            var result = await controller.UpdateQueryPlan(facilityId, model, CancellationToken.None);
+
+            // Assert
+            var objectResult = Assert.IsType<ObjectResult>(result);
+            Assert.Equal((int)HttpStatusCode.BadRequest, objectResult.StatusCode);
+            Assert.Equal("Bad Request", ((ProblemDetails)objectResult.Value).Title);
+            Assert.Contains("Query Plan validation failed: Query Plan", ((ProblemDetails)objectResult.Value).Detail, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            await CleanupFacilityQueryPlansAsync(dbContext, facilityId);
+        }
     }
 
     [Fact]
@@ -398,7 +450,7 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
 
 
         var controller = CreateController(scope);
-        var model = CreateValidQueryPlanApiModel();
+        var model = CreateValidQueryPlanApiModel(CreateFacilityId());
 
         // Act
         var result = await controller.UpdateQueryPlan("NonExisting", model, CancellationToken.None);
@@ -415,17 +467,18 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
     {
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
+        var facilityId = CreateFacilityId();
         var tenantApiServiceMock = new Mock<ITenantApiService>();
         tenantApiServiceMock.Setup(x => x.GetFacilityConfig(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((LantanaGroup.Link.Shared.Application.Models.Tenant.FacilityModel)null);
 
         var controller = CreateControllerWithTenantMock(scope, tenantApiServiceMock);
-        var model = CreateValidQueryPlanApiModel();
+        var model = CreateValidQueryPlanApiModel(facilityId);
 
-        await controller.DeleteQueryPlan("TestFacility", new DeleteQueryPlanParameters() { Type = Frequency.Daily }, CancellationToken.None);
+        await controller.DeleteQueryPlan(facilityId, new DeleteQueryPlanParameters() { Type = Frequency.Daily }, CancellationToken.None);
 
         // Act
-        var result = await controller.UpdateQueryPlan("TestFacility", model, CancellationToken.None);
+        var result = await controller.UpdateQueryPlan(facilityId, model, CancellationToken.None);
 
         // Assert
         var objectResult = Assert.IsType<ObjectResult>(result);
@@ -440,9 +493,10 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var controller = CreateController(scope);
+        var facilityId = CreateFacilityId();
 
         // Act
-        var result = await controller.UpdateQueryPlan("TestFacility", null, CancellationToken.None);
+        var result = await controller.UpdateQueryPlan(facilityId, null, CancellationToken.None);
 
         // Assert
         var objectResult = Assert.IsType<ObjectResult>(result);
@@ -456,7 +510,7 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var controller = CreateController(scope);
-        var model = CreateValidQueryPlanApiModel();
+        var model = CreateValidQueryPlanApiModel(CreateFacilityId());
 
         // Act
         var result = await controller.UpdateQueryPlan(string.Empty, model, CancellationToken.None);
@@ -472,6 +526,7 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
     {
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
+        var facilityId = CreateFacilityId();
         var queryPlanManagerMock = new Mock<IQueryPlanManager>();
         queryPlanManagerMock.Setup(m => m.UpdateAsync(It.IsAny<UpdateQueryPlanModel>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Test exception"));
@@ -480,10 +535,10 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         var queryPlanQueries = scope.ServiceProvider.GetRequiredService<IQueryPlanQueries>();
         var controller = new QueryPlanConfigController(logger, queryPlanManagerMock.Object, queryPlanQueries);
 
-        var model = CreateValidQueryPlanApiModel();
+        var model = CreateValidQueryPlanApiModel(facilityId);
 
         // Act
-        var result = await controller.UpdateQueryPlan("TestFacility", model, CancellationToken.None);
+        var result = await controller.UpdateQueryPlan(facilityId, model, CancellationToken.None);
 
         // Assert
         var objectResult = Assert.IsType<ObjectResult>(result);
@@ -497,12 +552,13 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var facilityId = CreateFacilityId();
 
 
         // Seed a query plan
         var queryPlan = new QueryPlan
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             Type = Frequency.Monthly,
             PlanName = "TestPlan",
             EHRDescription = "Test EHR",
@@ -516,15 +572,22 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         var controller = CreateController(scope);
         var deleteParams = new DeleteQueryPlanParameters { Type = Frequency.Monthly };
 
-        // Act
-        var result = await controller.DeleteQueryPlan("TestFacility", deleteParams, CancellationToken.None);
+        try
+        {
+            // Act
+            var result = await controller.DeleteQueryPlan(facilityId, deleteParams, CancellationToken.None);
 
-        // Assert
-        Assert.IsType<AcceptedResult>(result);
+            // Assert
+            Assert.IsType<AcceptedResult>(result);
 
-        // Verify deleted
-        var deletedPlan = await dbContext.QueryPlans.FirstOrDefaultAsync(q => q.FacilityId == "TestFacility" && q.Type == Frequency.Monthly);
-        Assert.Null(deletedPlan);
+            // Verify deleted
+            var deletedPlan = await dbContext.QueryPlans.FirstOrDefaultAsync(q => q.FacilityId == facilityId && q.Type == Frequency.Monthly);
+            Assert.Null(deletedPlan);
+        }
+        finally
+        {
+            await CleanupFacilityQueryPlansAsync(dbContext, facilityId);
+        }
     }
 
     [Fact]
@@ -533,11 +596,12 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var controller = CreateController(scope);
+        var facilityId = CreateFacilityId();
         controller.ModelState.AddModelError("Type", "Invalid");
         var deleteParams = new DeleteQueryPlanParameters { Type = Frequency.Daily };
 
         // Act
-        var result = await controller.DeleteQueryPlan("TestFacility", deleteParams, CancellationToken.None);
+        var result = await controller.DeleteQueryPlan(facilityId, deleteParams, CancellationToken.None);
 
         // Assert
         var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
@@ -550,9 +614,10 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var controller = CreateController(scope);
+        var facilityId = CreateFacilityId();
 
         // Act
-        var result = await controller.DeleteQueryPlan("TestFacility", new DeleteQueryPlanParameters(), CancellationToken.None);
+        var result = await controller.DeleteQueryPlan(facilityId, new DeleteQueryPlanParameters(), CancellationToken.None);
 
         // Assert
         var objectResult = Assert.IsType<ObjectResult>(result);
@@ -605,6 +670,7 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
     {
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
+        var facilityId = CreateFacilityId();
         var queryPlanManagerMock = new Mock<IQueryPlanManager>();
         queryPlanManagerMock.Setup(m => m.DeleteAsync(It.IsAny<string>(), It.IsAny<Frequency>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Test exception"));
@@ -616,7 +682,7 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         var deleteParams = new DeleteQueryPlanParameters { Type = Frequency.Daily };
 
         // Act
-        var result = await controller.DeleteQueryPlan("TestFacility", deleteParams, CancellationToken.None);
+        var result = await controller.DeleteQueryPlan(facilityId, deleteParams, CancellationToken.None);
 
         // Assert
         var objectResult = Assert.IsType<ObjectResult>(result);
@@ -624,12 +690,12 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         Assert.Equal("Internal Server Error", ((ProblemDetails)objectResult.Value).Title);
     }
 
-    private QueryPlanApiModel CreateValidQueryPlanApiModel()
+    private QueryPlanApiModel CreateValidQueryPlanApiModel(string facilityId)
     {
         return new QueryPlanApiModel
         {
             PlanName = "TestPlan",
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             Type = Frequency.Daily,
             EHRDescription = "TestEHR",
             LookBack = "2d",
@@ -644,12 +710,12 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         };
     }
 
-    private QueryPlanApiModel CreateInvalidOrderQueryPlanApiModel()
+    private QueryPlanApiModel CreateInvalidOrderQueryPlanApiModel(string facilityId)
     {
         return new QueryPlanApiModel
         {
             PlanName = "InvalidPlan",
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             Type = Frequency.Daily,
             EHRDescription = "TestEHR",
             LookBack = "2d",
