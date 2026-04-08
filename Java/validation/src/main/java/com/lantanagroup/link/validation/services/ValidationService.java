@@ -83,6 +83,16 @@ public class ValidationService {
                 return validationResult.getMessages().stream()
                         .map(Result::fromMessage)
                         .toList();
+            } catch (UnsupportedOperationException ex) {
+                if (ex.getMessage() != null && ex.getMessage().contains("HAPI-2509")) {
+                    // Workaround for HAPI FHIR bug https://github.com/hapifhir/hapi-fhir/issues/7200
+                    // MeasureValidator.validateMeasureReport() calls fetchResourcesByUrl() which is
+                    // unimplemented in WorkerContextValidationSupportAdapter (HAPI-2509).
+                    logger.warn("Validation skipped due to known HAPI bug (HAPI-2509): {}", ex.getMessage());
+                    return List.of();
+                }
+                logger.error("Validation failed", ex);
+                throw ex;
             } catch (Exception ex) {
                 logger.error("Validation failed", ex);
                 throw ex;
