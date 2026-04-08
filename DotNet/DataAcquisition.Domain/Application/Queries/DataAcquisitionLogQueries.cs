@@ -272,7 +272,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                             && l.CorrelationId == correlationId
                             && !(l.Status == RequestStatus.Completed || l.Status == RequestStatus.MaxRetriesReached || l.Status == RequestStatus.Skipped)
                             && !l.TailSent
-                            && l.FhirQueries.Any(fq => fq.IsReference == false)
+                            && l.FhirQueries.Any(fq => fq.IsReference != true)
                       select l).CountAsync(cancellationToken);
     }
 
@@ -309,8 +309,14 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     log.CorrelationId,
                     log.QueryPhase,
                 })
-                .Select(g => g.Key)
+                .Select(g => new
+                {
+                    Key = g.Key,
+                    EarliestStart = g.Min(x => x.ReportStartDate)
+                })
+                .OrderBy(x => x.EarliestStart)
                 .Take(100)
+                .Select(x => x.Key)
                 .ToListAsync(cancellationToken);
 
             if (candidateGroups.Count == 0)
@@ -830,9 +836,11 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 && l.FacilityId == facilityId
                 && l.ReportTrackingId == reportTrackingId
                 && l.CorrelationId == correlationId
-                && l.FhirQueries.Any(q => q.FhirQueryResourceTypes.Any(r => r.ResourceType == parsedResourceType)))
+                && l.FhirQueries.Any(q => q.IsReference == true
+                    && q.FhirQueryResourceTypes.Any(r => r.ResourceType == parsedResourceType)))
             .SelectMany(l => l.FhirQueries
-                .Where(q => q.FhirQueryResourceTypes.Any(r => r.ResourceType == parsedResourceType))
+                .Where(q => q.IsReference == true
+                    && q.FhirQueryResourceTypes.Any(r => r.ResourceType == parsedResourceType))
                 .Select(q => new ReferenceQueryLookupResult
                 {
                     FhirQueryId = q.Id,

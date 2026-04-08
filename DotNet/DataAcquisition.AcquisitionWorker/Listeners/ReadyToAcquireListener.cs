@@ -89,7 +89,6 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
 
             throw new DeadLetterException("Failed to enqueue work item", ex);
         }
-        // Method ends → offset committed quickly by base class
     }
 
     protected override string ExtractCorrelationId(ConsumeResult<long, ReadyToAcquire> consumeResult)
