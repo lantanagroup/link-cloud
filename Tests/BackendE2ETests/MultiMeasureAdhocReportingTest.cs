@@ -26,7 +26,7 @@ public sealed class MultiMeasureAdhocReportingTest : IAsyncLifetime, IClassFixtu
         "MULTI_MEASURE_TEST",
         defaultPatientIds: [],
         defaultPollingIntervalSeconds: 3,
-        defaultMaxRetryCount: 140,
+        defaultMaxPollingDurationMinutes: 7,
         defaultLokiScrapeWindowMinutes: 10);
 
     private readonly IServiceProvider _sp;
@@ -45,6 +45,8 @@ public sealed class MultiMeasureAdhocReportingTest : IAsyncLifetime, IClassFixtu
 
     public async Task InitializeAsync()
     {
+        _sp.GetRequiredService<PipelineDataReader>().InvalidateCache();
+
         Output.WriteLine($"Using deterministic generation seed: {GenerationSeed}");
 
         // One qualifying patient (must satisfy BOTH Monthly ACH and Hypo criteria)
@@ -205,6 +207,9 @@ public sealed class MultiMeasureAdhocReportingTest : IAsyncLifetime, IClassFixtu
             $"Expected report to include patient-{qualifyingPatientId}.ndjson (qualifying) but it was not");
 
         Output.WriteLine("Done generating and validating multi-measure report.");
+
+        // Flush stale cache from diagnostics polling so validators read authoritative data.
+        dataReader.InvalidateCache();
 
         // Step 9: Database validation with all measure IDs.
         await _sp.GetRequiredService<ReportDatabaseValidator>().ValidateAllAsync(

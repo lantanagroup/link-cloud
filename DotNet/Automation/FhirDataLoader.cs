@@ -1,5 +1,6 @@
-using LantanaGroup.Automation.Configuration;
+﻿using LantanaGroup.Automation.Configuration;
 using LantanaGroup.Automation.Helpers;
+using System.Collections.Concurrent;
 
 namespace LantanaGroup.Automation;
 
@@ -13,13 +14,14 @@ using RestSharp;
 /// </summary>
 public class FhirDataLoader
 {
-    private readonly List<string> _createdResources = new List<string>();
+    private readonly ConcurrentBag<string> _createdResources = new();
     private string? _authorization;
     private readonly RestClient _restClient;
     private readonly OAuthConfig? _oauthConfig;
     private readonly BasicAuthConfig? _basicAuthConfig;
 
     private const int MaxRetries = 3;
+    private const int MaxConcurrentUploads = 4;
     private static readonly TimeSpan InitialRetryDelay = TimeSpan.FromSeconds(2);
 
     public FhirDataLoader(string fhirServerBaseUrl, OAuthConfig? oauthConfig = null, BasicAuthConfig? basicAuthConfig = null)
@@ -143,9 +145,7 @@ public class FhirDataLoader
                         if (!string.IsNullOrEmpty(location))
                         {
                             var resourcePath = location.Split("/_history")[0];
-
-                            if (!_createdResources.Contains(resourcePath))
-                                _createdResources.Add(resourcePath);
+                            _createdResources.Add(resourcePath);
                         }
                     }
                 }
@@ -219,60 +219,75 @@ public class FhirDataLoader
         IAutomationOutput output,
         IReadOnlyList<(string Name, string Json)> bundles)
     {
-        output.WriteLine($"Loading {bundles.Count} generated bundles onto FHIR server...");
+        output.WriteLine($"Loading {bundles.Count} generated bundles onto FHIR server (concurrency={MaxConcurrentUploads})...");
 
         var successCount = 0;
         var failCount = 0;
+        var completed = 0;
+        var semaphore = new SemaphoreSlim(MaxConcurrentUploads, MaxConcurrentUploads);
 
-        for (var b = 0; b < bundles.Count; b++)
+        var tasks = bundles.Select(async (bundle, index) =>
         {
-            var (name, json) = bundles[b];
-            var progress = $"[{b + 1}/{bundles.Count}]";
-            var response = await PostBundleWithRetryAsync(json, name, progress, output);
-
-            if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
-            {
-                failCount++;
-                output.WriteLine($"  {progress} FAILED {name}: {response.StatusCode} {response.Content}");
-                continue;
-            }
-
-            successCount++;
-
+            await semaphore.WaitAsync();
             try
             {
-                var jsonNode = JsonNode.Parse(response.Content)?.AsObject();
-                var entries = jsonNode?["entry"]?.AsArray();
+                var (name, json) = bundle;
+                var progress = $"[{Interlocked.Increment(ref completed)}/{bundles.Count}]";
+                var response = await PostBundleWithRetryAsync(json, name, progress, output);
 
-                if (entries != null)
+                if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
                 {
-                    foreach (var entry in entries)
+                    Interlocked.Increment(ref failCount);
+                    output.WriteLine($"  {progress} FAILED {name}: {response.StatusCode} {response.Content}");
+                    return;
+                }
+
+                Interlocked.Increment(ref successCount);
+                TrackCreatedResources(response.Content, name, progress, output);
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        }).ToArray();
+
+        await Task.WhenAll(tasks);
+
+        output.WriteLine($"Bundle loading complete: {successCount} succeeded, {failCount} failed.");
+    }
+
+    private void TrackCreatedResources(string responseContent, string name, string progress, IAutomationOutput output)
+    {
+        try
+        {
+            var jsonNode = JsonNode.Parse(responseContent)?.AsObject();
+            var entries = jsonNode?["entry"]?.AsArray();
+
+            if (entries != null)
+            {
+                foreach (var entry in entries)
+                {
+                    var responseNode = entry?["response"]?.AsObject();
+                    var location = responseNode?["location"]?.ToString();
+                    var status = responseNode?["status"]?.ToString();
+
+                    if (status == null || !status.StartsWith("20"))
                     {
-                        var responseNode = entry?["response"]?.AsObject();
-                        var location = responseNode?["location"]?.ToString();
-                        var status = responseNode?["status"]?.ToString();
+                        output.WriteLine($"  {progress} Entry error in {name}: {responseNode}");
+                    }
 
-                        if (status == null || !status.StartsWith("20"))
-                        {
-                            output.WriteLine($"  {progress} Entry error in {name}: {responseNode}");
-                        }
-
-                        if (!string.IsNullOrEmpty(location))
-                        {
-                            var resourcePath = location.Split("/_history")[0];
-                            if (!_createdResources.Contains(resourcePath))
-                                _createdResources.Add(resourcePath);
-                        }
+                    if (!string.IsNullOrEmpty(location))
+                    {
+                        var resourcePath = location.Split("/_history")[0];
+                        _createdResources.Add(resourcePath);
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                output.WriteLine($"  {progress} Error parsing response for {name}: {ex.Message}");
-            }
         }
-
-        output.WriteLine($"Bundle loading complete: {successCount} succeeded, {failCount} failed.");
+        catch (Exception ex)
+        {
+            output.WriteLine($"  {progress} Error parsing response for {name}: {ex.Message}");
+        }
     }
 
     private async Task<RestResponse> PostBundleWithRetryAsync(

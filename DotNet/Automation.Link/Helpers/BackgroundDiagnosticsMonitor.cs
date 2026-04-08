@@ -38,6 +38,40 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
     public IReadOnlyList<string> KafkaErrors => _kafkaMonitor.CapturedErrors;
     public IReadOnlyCollection<string> CompletedMilestones => _monitor.State.CompletedMilestones;
 
+    /// <summary>
+    /// Returns true if the named milestone has been reached.
+    /// Milestone names match <see cref="MilestoneValidationOrchestrator.Milestone"/> enum values as strings.
+    /// </summary>
+    public bool HasReachedMilestone(string milestoneName)
+        => _monitor.State.CompletedMilestones.Contains(milestoneName);
+
+    /// <summary>
+    /// Waits until the specified milestone is reached, a critical failure is detected,
+    /// or the timeout expires. Returns true if the milestone was reached.
+    /// </summary>
+    public async Task<bool> WaitForMilestoneAsync(string milestoneName, TimeSpan timeout, TimeSpan? pollInterval = null)
+    {
+        var interval = pollInterval ?? TimeSpan.FromSeconds(2);
+        var deadline = DateTime.UtcNow + timeout;
+
+        while (DateTime.UtcNow < deadline)
+        {
+            if (HasCriticalFailure)
+                return false;
+
+            if (HasReachedMilestone(milestoneName))
+                return true;
+
+            var remaining = deadline - DateTime.UtcNow;
+            if (remaining <= TimeSpan.Zero)
+                break;
+
+            await Task.Delay(remaining < interval ? remaining : interval);
+        }
+
+        return HasReachedMilestone(milestoneName);
+    }
+
     public BackgroundDiagnosticsMonitor(
         IAutomationOutput output,
         LokiScraper lokiScraper,

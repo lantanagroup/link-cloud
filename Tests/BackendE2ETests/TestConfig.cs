@@ -54,22 +54,22 @@ public static class TestConfig
         FhirQuery = new AutomationConfig.FhirQuerySettings
         {
             MaxConcurrentRequests = 8,
-            MinAcquisitionPullTime = TimeSpan.FromHours(1),
-            MaxAcquisitionPullTime = TimeSpan.FromHours(24),
-            TimeZone = "America/New_York"
+            MinAcquisitionPullTime = null,
+            MaxAcquisitionPullTime = null,
+            TimeZone = null
         },
         Database = new AutomationConfig.DatabaseConfig
         {
             Server = Environment.GetEnvironmentVariable("E2E_SQL_SERVER") ?? "localhost,1433",
             UserId = Environment.GetEnvironmentVariable("E2E_SQL_USER") ?? "sa",
-            Password = Environment.GetEnvironmentVariable("E2E_SQL_PASSWORD") ?? "7h3I^xMY%cgO"
+            Password = Environment.GetEnvironmentVariable("E2E_SQL_PASSWORD") ?? string.Empty
         },
         Kafka = new AutomationConfig.KafkaConfig
         {
             BootstrapServers = Environment.GetEnvironmentVariable("E2E_KAFKA_BOOTSTRAP_SERVERS") ?? "localhost:9094",
             RestProxyBaseUrl = Environment.GetEnvironmentVariable("E2E_KAFKA_REST_PROXY_URL") ?? "http://localhost:8082",
-            User = Environment.GetEnvironmentVariable("E2E_KAFKA_USER") ?? "user",
-            Password = Environment.GetEnvironmentVariable("E2E_KAFKA_PASSWORD") ?? "password"
+            User = Environment.GetEnvironmentVariable("E2E_KAFKA_USER") ?? string.Empty,
+            Password = Environment.GetEnvironmentVariable("E2E_KAFKA_PASSWORD") ?? string.Empty
         }
     };
 
@@ -79,14 +79,14 @@ public static class TestConfig
     public static TestScenarioConfig MegaPatientTestConfig => BuildScenarioConfig("MEGA_PATIENT_TEST",
         defaultPatientIds: [],
         defaultPollingIntervalSeconds: 5,
-        defaultMaxRetryCount: 300,
+        defaultMaxPollingDurationMinutes: 25,
         defaultLokiScrapeWindowMinutes: 20);
 
     public static TestScenarioConfig BuildScenarioConfig(
         string prefix,
         List<string>? defaultPatientIds = null,
         int defaultPollingIntervalSeconds = 3,
-        int defaultMaxRetryCount = 60,
+        int defaultMaxPollingDurationMinutes = 3,
         int defaultLokiScrapeWindowMinutes = 5)
     {
         return new TestScenarioConfig
@@ -99,7 +99,7 @@ public static class TestConfig
             RemoveFacilityConfig = bool.Parse(Environment.GetEnvironmentVariable($"{prefix}_REMOVE_FACILITY_CONFIG") ?? "false"),
             RemoveReport = Environment.GetEnvironmentVariable($"{prefix}_REMOVE_REPORT")?.ToLower() == "true",
             PollingIntervalSeconds = int.Parse(Environment.GetEnvironmentVariable($"{prefix}_POLLING_INTERVAL_SECONDS") ?? defaultPollingIntervalSeconds.ToString()),
-            MaxRetryCount = int.Parse(Environment.GetEnvironmentVariable($"{prefix}_MAX_RETRY_COUNT") ?? defaultMaxRetryCount.ToString()),
+            MaxPollingDurationMinutes = int.Parse(Environment.GetEnvironmentVariable($"{prefix}_MAX_POLLING_DURATION_MINUTES") ?? defaultMaxPollingDurationMinutes.ToString()),
             DownloadFileName = Environment.GetEnvironmentVariable($"{prefix}_DOWNLOAD_FILENAME") ?? $"{prefix.ToLower().Replace('_', '-')}-submission.zip",
             LokiScrapeWindowMinutes = int.Parse(Environment.GetEnvironmentVariable($"{prefix}_LOKI_SCRAPE_WINDOW_MINUTES") ?? defaultLokiScrapeWindowMinutes.ToString())
         };

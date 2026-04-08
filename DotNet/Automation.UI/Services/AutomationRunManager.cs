@@ -1,5 +1,4 @@
 ﻿using Automation.UI.Services;
-using Automation.UI.Services.Persistence;
 using Automation.UI.Models;
 using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
@@ -53,7 +52,21 @@ public class AutomationRunManager : IAutomationRunManager
 
         _ = PersistRunSummaryAsync(state);
 
-        _ = Task.Run(() => ExecuteAsync(state, cancellationToken), CancellationToken.None);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await ExecuteAsync(state, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unhandled exception in run {RunId}", state.RunId);
+                state.Status = AutomationRunStatus.Failed;
+                state.Error = ex.Message;
+                state.FinishedAt = DateTimeOffset.UtcNow;
+                await BroadcastStatus(state);
+            }
+        }, CancellationToken.None);
         return Task.FromResult(runId);
     }
 
@@ -344,7 +357,18 @@ public class AutomationRunManager : IAutomationRunManager
             // Register with orchestrator so store-backed pollers start automatically.
             await _orchestrator.RegisterRunAsync(state.RunId, facilityId, reportId);
 
-            await using (var diagnostics = new BackgroundDiagnosticsMonitor(output, lokiScraper, _automationConfig, scenarioConfig.PatientIds.Count, forwardInternalLogsToOutput: true, pipelineReader: services.GetRequiredService<PipelineDataReader>()))
+            var diagnosticsPollInterval = scenarioConfig.PatientIds.Count >= 500
+                ? TimeSpan.FromSeconds(15)
+                : TimeSpan.FromSeconds(5);
+
+            await using (var diagnostics = new BackgroundDiagnosticsMonitor(
+                output,
+                lokiScraper,
+                _automationConfig,
+                scenarioConfig.PatientIds.Count,
+                pollInterval: diagnosticsPollInterval,
+                forwardInternalLogsToOutput: true,
+                pipelineReader: services.GetRequiredService<PipelineDataReader>()))
             {
                 await diagnostics.StartAsync(facilityId, reportId);
                 var submitted = await reportHelper.CheckSubmissionStatusAsync(reportId, scenarioConfig, diagnostics);
@@ -486,7 +510,7 @@ public class AutomationRunManager : IAutomationRunManager
             PatientIds = [],
             RemoveFacilityConfig = options.RemoveFacilityConfig,
             PollingIntervalSeconds = options.PollingIntervalSeconds,
-            MaxRetryCount = options.MaxRetryCount,
+            MaxPollingDurationMinutes = options.MaxPollingDurationMinutes,
             DownloadFileName = downloadFileName,
             LokiScrapeWindowMinutes = options.LokiScrapeWindowMinutes
         };
@@ -529,7 +553,7 @@ public class AutomationRunManager : IAutomationRunManager
             Prefix = prefix,
             Seed = request.Seed ?? defaults.Seed,
             PollingIntervalSeconds = 3,
-            MaxRetryCount = 0,
+            MaxPollingDurationMinutes = 0,
             LokiScrapeWindowMinutes = 30,
             RemoveFacilityConfig = request.RemoveFacilityConfig ?? defaults.RemoveFacilityConfig,
             CleanupTestData = request.CleanupTestData ?? defaults.CleanupTestData,
@@ -692,7 +716,7 @@ public class AutomationRunManager : IAutomationRunManager
         string Prefix,
         int Seed,
         int PollingIntervalSeconds,
-        int MaxRetryCount,
+        int MaxPollingDurationMinutes,
         int LokiScrapeWindowMinutes,
         bool RemoveFacilityConfig,
         bool CleanupTestData,

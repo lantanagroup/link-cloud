@@ -1,4 +1,4 @@
-using Flurl.Http;
+﻿using Flurl.Http;
 using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
@@ -164,7 +164,7 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
         {
             FacilityId = _facilityId,
             FhirServerBaseUrl = AutomationCfg.InternalFhirServerBase,
-            MaxConcurrentRequests = AutomationCfg.FhirQuery.MaxConcurrentRequests,
+            MaxConcurrentRequests = Math.Max(2, AutomationCfg.FhirQuery.MaxConcurrentRequests),
             MaxRetries = 3
         };
 
@@ -286,7 +286,7 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
         await RunAsync(results, "Report.GetPopulationsBySchedule",
             () => ReportClient.GetPopulationsByScheduleAsync(Guid.NewGuid().ToString()));
 
-        // Submission service � non-existent report returns 404; that proves the service is reachable
+        // Submission service – non-existent report returns 404; that proves the service is reachable
         await RunExpecting404Async(results, "Submission.DownloadSubmission",
             () => SubmissionClient.DownloadSubmissionAsync(_facilityId, Guid.NewGuid().ToString()));
 

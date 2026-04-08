@@ -20,9 +20,6 @@ public static class MedicationRequestFactory
             ? medicationIds[seed % medicationIds.Count]
             : null;
 
-        if (string.IsNullOrWhiteSpace(medicationRefId))
-            throw new InvalidOperationException("MedicationRequest generation requires at least one Medication id to enforce medication reference linkage.");
-
         return Create(id, patientId, encounterId, authored, seed, practId,
                       v.RxCode, v.Display, v.RouteCode, v.RouteDisplay,
                       v.DoseValue, v.DoseUnit, v.FreqPerDay, v.Prn,

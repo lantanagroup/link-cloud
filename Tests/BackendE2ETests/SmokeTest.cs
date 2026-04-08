@@ -37,6 +37,8 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
 
     public async Task InitializeAsync()
     {
+        _sp.GetRequiredService<PipelineDataReader>().InvalidateCache();
+
         Output.WriteLine($"Using deterministic generation seed: {GenerationSeed}");
         var (patientIds, bundles) = FhirBundleGenerator.Generate(Output, 1, 1000, "SmokePatient", GenerationSeed);
         _generatedBundles = bundles;
@@ -171,6 +173,9 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
         }
 
         Output.WriteLine("Done generating and validating report.");
+
+        // Flush stale cache from diagnostics polling so validators read authoritative data.
+        dataReader.InvalidateCache();
 
         await _sp.GetRequiredService<ReportAbsManifestValidator>().ValidateAllAsync(
             internalAbsResources,

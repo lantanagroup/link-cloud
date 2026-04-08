@@ -137,58 +137,10 @@ public static class FhirBundleGenerator
             entries.Add(Entry($"CarePlan/{carePlanId}",
                 CarePlanFactory.Generate(carePlanId, patientId, encounterId, careTeamId, encStart, patientSeed)));
 
-            var medicationIds = new List<string>();
-            var specimenIds = new List<string>();
-            var observationIds = new List<string>();
-            var conditionIds = new List<string> { primaryDxId };
-            var resourceIndex = 0;
-
-            foreach (var (resourceType, fraction) in ResourceDistribution)
-            {
-                var count = Math.Max(1, (int)(totalResourcesPerPatient * fraction));
-
-                for (var i = 0; i < count; i++)
-                {
-                    resourceIndex++;
-                    // Combine patient seed (p) with loop counter (i) so every patient
-                    // gets a distinct clinical variation even for the same resource index.
-                    var seed = baseSeed + (p * 31 + i);
-                    var resourceId = $"{patientId}-{resourceType}-{resourceIndex:D5}";
-                    var offset = TimeSpan.FromMinutes((double)i / Math.Max(count, 1) * (encEnd - encStart).TotalMinutes);
-                    var effectiveDate = encStart.Add(offset);
-                    var practId = sharedPractitionerIds[Mod(seed, sharedPractitionerIds.Count)];
-
-                    Resource resource = resourceType switch
-                    {
-                        "Observation" => ObservationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, specimenIds, observationIds),
-                        "Condition" => ConditionFactory.Generate(resourceId, patientId, encounterId, effectiveDate, encEnd, seed, conditionIds),
-                        "Procedure" => ProcedureFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, HospitalLocationId, HospitalOrgId, conditionIds),
-                        "MedicationRequest" => MedicationRequestFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, conditionIds, medicationIds),
-                        "MedicationAdministration" => MedicationAdministrationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, medicationIds, practId),
-                        "DiagnosticReport" => DiagnosticReportFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, observationIds, specimenIds, practId),
-                        "ServiceRequest" => ServiceRequestFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, conditionIds),
-                        "Coverage" => CoverageFactory.Generate(resourceId, patientId, encStart, encEnd, seed),
-                        "Specimen" => SpecimenFactory.Generate(resourceId, patientId, effectiveDate, seed, specimenIds, practId),
-                        "Medication" => MedicationFactory.Generate(resourceId, seed, medicationIds),
-                        "AllergyIntolerance" => AllergyIntoleranceFactory.Generate(resourceId, patientId, encStart, seed, practId),
-                        "Immunization" => ImmunizationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalLocationId),
-                        "ImagingStudy" => ImagingStudyFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalLocationId, practId),
-                        "CareTeam" => CareTeamFactory.Generate(resourceId, patientId, encounterId, attendingPractId, effectiveDate, HospitalOrgId),
-                        "CarePlan" => CarePlanFactory.Generate(resourceId, patientId, encounterId, careTeamId, effectiveDate, seed),
-                        "DocumentReference" => DocumentReferenceFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalOrgId, attendingPractId),
-                        "Provenance" => ProvenanceFactory.Generate(resourceId, patientId, encounterId, effectiveDate, practId, HospitalOrgId),
-                        _ => throw new InvalidOperationException($"Unknown resource type: {resourceType}")
-                    };
-
-                    entries.Add(Entry($"{resourceType}/{resourceId}", resource));
-                }
-            }
-
-            var listId = $"SyntheticList-{patientIdPrefix}-{patientId}";
-            entries.Add(Entry($"List/{listId}",
-                CensusListFactory.Generate(listId, patientId, patientIdPrefix, encStart)));
-
-            EnrichPatientReferenceGraph(entries);
+            var scenarioIdx = Mod(patientSeed, FhirGenerationCodes.ClinicalScenarios.Length);
+            GenerateScenarioDrivenResources(entries, scenarioIdx, patientId, encounterId,
+                encStart, encEnd, primaryDxId, attendingPractId, careTeamId, patientIdPrefix,
+                totalResourcesPerPatient, baseSeed, p, sharedPractitionerIds);
 
             output.WriteLine($"  Patient {patientId}: {entries.Count} entries | scenario={scenario.PrimaryDxDisplay} | " +
                              $"encounter={encounterId} LOS={(encEnd - encStart).TotalDays:F1}d " +
@@ -198,7 +150,7 @@ public static class FhirBundleGenerator
         }
 
         // ------------------------------------------------------------------
-        // Chunk into transaction bundles
+        // Chunk into batch bundles
         // ------------------------------------------------------------------
         var bundles = new List<(string Name, string Json)>();
         var currentChunk = new List<Bundle.EntryComponent>(sharedEntries);
@@ -226,7 +178,7 @@ public static class FhirBundleGenerator
             bundles.Add(($"{currentPatientId}_chunk{chunkIndex:D2}", Serialize(currentChunk)));
         }
 
-        output.WriteLine($"Generated {bundles.Count} transaction bundles for {patientCount} patients.");
+        output.WriteLine($"Generated {bundles.Count} batch bundles for {patientCount} patients.");
         return (patientIds, bundles);
     }
 
@@ -469,57 +421,10 @@ public static class FhirBundleGenerator
                 AddHypoglycemicQualifyingMedicationEntries(entries, patientId, encounterId, attendingPractId, patientSeed, encStart);
             }
 
-            // Bulk resources — identical seed-driven loop as Generate()
-            var medicationIds = new List<string>();
-            var specimenIds = new List<string>();
-            var observationIds = new List<string>();
-            var conditionIds = new List<string> { primaryDxId };
-            var resourceIndex = 0;
-
-            foreach (var (resourceType, fraction) in ResourceDistribution)
-            {
-                var count = Math.Max(1, (int)(totalResourcesPerPatient * fraction));
-
-                for (var i = 0; i < count; i++)
-                {
-                    resourceIndex++;
-                    var seed = baseSeed + (p * 31 + i);
-                    var resourceId = $"{patientId}-{resourceType}-{resourceIndex:D5}";
-                    var offset = TimeSpan.FromMinutes((double)i / Math.Max(count, 1) * (encEnd - encStart).TotalMinutes);
-                    var effectiveDate = encStart.Add(offset);
-                    var practId = sharedPractitionerIds[Mod(seed, sharedPractitionerIds.Count)];
-
-                    Resource resource = resourceType switch
-                    {
-                        "Observation" => ObservationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, specimenIds, observationIds),
-                        "Condition" => ConditionFactory.Generate(resourceId, patientId, encounterId, effectiveDate, encEnd, seed, conditionIds),
-                        "Procedure" => ProcedureFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, HospitalLocationId, HospitalOrgId, conditionIds),
-                        "MedicationRequest" => MedicationRequestFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, conditionIds, medicationIds),
-                        "MedicationAdministration" => MedicationAdministrationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, medicationIds, practId),
-                        "DiagnosticReport" => DiagnosticReportFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, observationIds, specimenIds, practId),
-                        "ServiceRequest" => ServiceRequestFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, practId, conditionIds),
-                        "Coverage" => CoverageFactory.Generate(resourceId, patientId, encStart, encEnd, seed),
-                        "Specimen" => SpecimenFactory.Generate(resourceId, patientId, effectiveDate, seed, specimenIds, practId),
-                        "Medication" => MedicationFactory.Generate(resourceId, seed, medicationIds),
-                        "AllergyIntolerance" => AllergyIntoleranceFactory.Generate(resourceId, patientId, encStart, seed, practId),
-                        "Immunization" => ImmunizationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalLocationId),
-                        "ImagingStudy" => ImagingStudyFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalLocationId, practId),
-                        "CareTeam" => CareTeamFactory.Generate(resourceId, patientId, encounterId, attendingPractId, effectiveDate, HospitalOrgId),
-                        "CarePlan" => CarePlanFactory.Generate(resourceId, patientId, encounterId, careTeamId, effectiveDate, seed),
-                        "DocumentReference" => DocumentReferenceFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalOrgId, attendingPractId),
-                        "Provenance" => ProvenanceFactory.Generate(resourceId, patientId, encounterId, effectiveDate, practId, HospitalOrgId),
-                        _ => throw new InvalidOperationException($"Unknown resource type: {resourceType}")
-                    };
-
-                    entries.Add(Entry($"{resourceType}/{resourceId}", resource));
-                }
-            }
-
-            var listId = $"SyntheticList-{patientIdPrefix}-{patientId}";
-            entries.Add(Entry($"List/{listId}",
-                CensusListFactory.Generate(listId, patientId, patientIdPrefix, encStart)));
-
-            EnrichPatientReferenceGraph(entries);
+            var scenarioIdx = Mod(patientSeed, FhirGenerationCodes.ClinicalScenarios.Length);
+            GenerateScenarioDrivenResources(entries, scenarioIdx, patientId, encounterId,
+                encStart, encEnd, primaryDxId, attendingPractId, careTeamId, patientIdPrefix,
+                totalResourcesPerPatient, baseSeed, p, sharedPractitionerIds);
 
             var tag = profile.Eligibility == MeasureEligibility.Qualifying ? "QUALIFYING" : "NON-QUALIFYING";
             output.WriteLine($"  Patient {patientId}: {entries.Count} entries [{tag}] | scenario={scenario.PrimaryDxDisplay} | " +
@@ -529,7 +434,7 @@ public static class FhirBundleGenerator
         }
 
         // ------------------------------------------------------------------
-        // Chunk into transaction bundles — same as Generate()
+        // Chunk into batch bundles — same as Generate()
         // ------------------------------------------------------------------
         var bundles = new List<(string Name, string Json)>();
         var currentChunk = new List<Bundle.EntryComponent>(sharedEntries);
@@ -557,7 +462,7 @@ public static class FhirBundleGenerator
             bundles.Add(($"{currentPatientId}_chunk{chunkIndex:D2}", Serialize(currentChunk)));
         }
 
-        output.WriteLine($"Generated {bundles.Count} transaction bundles for {profiles.Count} profiled patients.");
+        output.WriteLine($"Generated {bundles.Count} batch bundles for {profiles.Count} profiled patients.");
         return (patientIds, bundles);
     }
 
@@ -644,7 +549,7 @@ public static class FhirBundleGenerator
 
     private static string Serialize(List<Bundle.EntryComponent> entries)
     {
-        var bundle = new Bundle { Type = Bundle.BundleType.Transaction, Entry = entries };
+        var bundle = new Bundle { Type = Bundle.BundleType.Batch, Entry = entries };
         return JsonSerializer.Serialize(bundle, FhirSerializerOptions.ForFhirWithoutValidation());
     }
 
@@ -663,99 +568,246 @@ public static class FhirBundleGenerator
         EncounterStart(index).AddDays(2 + ((index * 7) % 20)).AddHours(4);
 
     /// <summary>
-    /// Adds realistic cross-resource references after all resources for a patient
-    /// have been generated. This keeps each patient graph clinically coherent and
-    /// guarantees reference links that downstream reference-resource workflows can follow.
+    /// Generates all bulk resources for a single patient using scenario-driven
+    /// resource selection. Resources are picked from clinically appropriate subsets
+    /// of the global pools so a pneumonia patient gets antibiotics and chest X-rays,
+    /// not insulin and echocardiograms.
+    ///
+    /// Also builds natural clinical reference chains during generation:
+    /// ServiceRequest → Specimen → Observation → DiagnosticReport,
+    /// MedicationRequest → Medication, MedicationAdministration → MedicationRequest.
     /// </summary>
-    private static void EnrichPatientReferenceGraph(List<Bundle.EntryComponent> entries)
+    private static void GenerateScenarioDrivenResources(
+        List<Bundle.EntryComponent> entries,
+        int scenarioIdx,
+        string patientId,
+        string encounterId,
+        DateTime encStart,
+        DateTime encEnd,
+        string primaryDxId,
+        string attendingPractId,
+        string careTeamId,
+        string patientIdPrefix,
+        int totalResourcesPerPatient,
+        int baseSeed,
+        int patientOrdinal,
+        List<string> sharedPractitionerIds)
     {
-        var diagnosticReportIds = entries
-            .Select(e => e.Resource)
-            .OfType<DiagnosticReport>()
-            .Select(r => r.Id)
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .ToList();
+        // Build scenario-appropriate index subsets
+        var medIndices = ScenarioResourceMap.GetMergedIndices(
+            ScenarioResourceMap.UniversalMedicationIndices, ScenarioResourceMap.ScenarioMedicationIndices,
+            scenarioIdx, FhirGenerationCodes.Medications.Length);
+        var obsIndices = ScenarioResourceMap.GetMergedIndices(
+            ScenarioResourceMap.UniversalObservationIndices, ScenarioResourceMap.ScenarioObservationIndices,
+            scenarioIdx, FhirGenerationCodes.Observations.Length);
+        var procIndices = ScenarioResourceMap.ScenarioProcedureIndices[
+            Mod(scenarioIdx, ScenarioResourceMap.ScenarioProcedureIndices.Length)];
+        var specIndices = ScenarioResourceMap.GetMergedIndices(
+            ScenarioResourceMap.UniversalSpecimenIndices, ScenarioResourceMap.ScenarioSpecimenIndices,
+            scenarioIdx, FhirGenerationCodes.Specimens.Length);
+        var imgIndices = ScenarioResourceMap.ScenarioImagingIndices[
+            Mod(scenarioIdx, ScenarioResourceMap.ScenarioImagingIndices.Length)];
+        var srIndices = ScenarioResourceMap.GetMergedIndices(
+            ScenarioResourceMap.UniversalServiceRequestIndices, ScenarioResourceMap.ScenarioServiceRequestIndices,
+            scenarioIdx, FhirGenerationCodes.ServiceRequests.Length);
+        var condIndices = ScenarioResourceMap.GetMergedIndices(
+            ScenarioResourceMap.UniversalConditionIndices, ScenarioResourceMap.ScenarioConditionIndices,
+            scenarioIdx, FhirGenerationCodes.Conditions.Length);
 
-        var serviceRequests = entries
-            .Select(e => e.Resource)
-            .OfType<ServiceRequest>()
-            .ToList();
+        var medicationIds = new List<string>();
+        var medicationRequestIds = new List<string>();
+        var specimenIds = new List<string>();
+        var observationIds = new List<string>();
+        var conditionIds = new List<string> { primaryDxId };
+        var serviceRequestIds = new List<string>();
+        var diagnosticReportIds = new List<string>();
+        var resourceIndex = 0;
 
-        var imagingStudies = entries
-            .Select(e => e.Resource)
-            .OfType<ImagingStudy>()
-            .ToList();
+        foreach (var (resourceType, fraction) in ResourceDistribution)
+        {
+            var count = Math.Max(1, (int)(totalResourcesPerPatient * fraction));
 
-        var procedures = entries
-            .Select(e => e.Resource)
-            .OfType<Procedure>()
-            .ToList();
+            for (var i = 0; i < count; i++)
+            {
+                resourceIndex++;
+                var seed = baseSeed + (patientOrdinal * 31 + i);
+                var resourceId = $"{patientId}-{resourceType}-{resourceIndex:D5}";
+                var offset = TimeSpan.FromMinutes((double)i / Math.Max(count, 1) * (encEnd - encStart).TotalMinutes);
+                var effectiveDate = encStart.Add(offset);
+                var practId = sharedPractitionerIds[Mod(seed, sharedPractitionerIds.Count)];
 
-        var medicationRequestIds = entries
-            .Select(e => e.Resource)
-            .OfType<MedicationRequest>()
-            .Select(r => r.Id)
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .ToList();
+                Resource resource = resourceType switch
+                {
+                    "Observation" => GenerateScenarioObservation(resourceId, patientId, encounterId, effectiveDate, seed, obsIndices, specimenIds, observationIds),
+                    "Condition" => GenerateScenarioCondition(resourceId, patientId, encounterId, effectiveDate, encEnd, seed, condIndices, conditionIds),
+                    "Procedure" => GenerateScenarioProcedure(resourceId, patientId, encounterId, effectiveDate, seed, practId, procIndices, conditionIds),
+                    "Medication" => MedicationFactory.Generate(resourceId, ScenarioResourceMap.PickIndex(medIndices, seed, FhirGenerationCodes.Medications.Length), medicationIds),
+                    "MedicationRequest" => GenerateScenarioMedicationRequest(resourceId, patientId, encounterId, effectiveDate, seed, practId, medIndices, conditionIds, medicationIds, medicationRequestIds),
+                    "MedicationAdministration" => GenerateScenarioMedicationAdministration(resourceId, patientId, encounterId, effectiveDate, seed, medIndices, medicationIds, medicationRequestIds, practId),
+                    "DiagnosticReport" => GenerateScenarioDiagnosticReport(resourceId, patientId, encounterId, effectiveDate, seed, observationIds, specimenIds, practId, diagnosticReportIds),
+                    "ServiceRequest" => GenerateScenarioServiceRequest(resourceId, patientId, encounterId, effectiveDate, seed, practId, srIndices, conditionIds, serviceRequestIds),
+                    "Coverage" => CoverageFactory.Generate(resourceId, patientId, encStart, encEnd, seed),
+                    "Specimen" => GenerateScenarioSpecimen(resourceId, patientId, effectiveDate, seed, specIndices, specimenIds, practId),
+                    "AllergyIntolerance" => AllergyIntoleranceFactory.Generate(resourceId, patientId, encStart, seed, practId),
+                    "Immunization" => ImmunizationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalLocationId),
+                    "ImagingStudy" => GenerateScenarioImagingStudy(resourceId, patientId, encounterId, effectiveDate, seed, imgIndices, serviceRequestIds, practId),
+                    "CareTeam" => CareTeamFactory.Generate(resourceId, patientId, encounterId, attendingPractId, effectiveDate, HospitalOrgId),
+                    "CarePlan" => CarePlanFactory.Generate(resourceId, patientId, encounterId, careTeamId, effectiveDate, seed),
+                    "DocumentReference" => DocumentReferenceFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalOrgId, attendingPractId),
+                    "Provenance" => GenerateScenarioProvenance(resourceId, patientId, encounterId, effectiveDate, practId, diagnosticReportIds),
+                    _ => throw new InvalidOperationException($"Unknown resource type: {resourceType}")
+                };
 
-        var medicationAdministrations = entries
-            .Select(e => e.Resource)
-            .OfType<MedicationAdministration>()
-            .ToList();
+                entries.Add(Entry($"{resourceType}/{resourceId}", resource));
+            }
+        }
 
-        var provenances = entries
-            .Select(e => e.Resource)
-            .OfType<Provenance>()
-            .ToList();
+        var listId = $"SyntheticList-{patientIdPrefix}-{patientId}";
+        entries.Add(Entry($"List/{listId}",
+            CensusListFactory.Generate(listId, patientId, patientIdPrefix, encStart)));
+    }
 
+    // ------------------------------------------------------------------
+    //  Scenario-aware resource generators — pick from scenario subsets
+    //  and wire up reference chains during creation
+    // ------------------------------------------------------------------
+
+    private static Observation GenerateScenarioObservation(
+        string id, string patientId, string encounterId, DateTime effective, int seed,
+        int[] obsIndices, List<string> specimenIds, List<string> observationIds)
+    {
+        var poolIdx = ScenarioResourceMap.PickIndex(obsIndices, seed, FhirGenerationCodes.Observations.Length);
+        var v = FhirGenerationCodes.Observations[poolIdx];
+        observationIds.Add(id);
+        return ObservationFactory.Create(id, patientId, encounterId, effective,
+            v.Code, v.Display, v.Category, v.Unit,
+            v.CritLow, v.NormLow, v.NormHigh, v.CritHigh, seed, specimenIds);
+    }
+
+    private static Condition GenerateScenarioCondition(
+        string id, string patientId, string encounterId, DateTime onset, DateTime abatement, int seed,
+        int[] condIndices, List<string> conditionIds)
+    {
+        var poolIdx = ScenarioResourceMap.PickIndex(condIndices, seed, FhirGenerationCodes.Conditions.Length);
+        var v = FhirGenerationCodes.Conditions[poolIdx];
+        conditionIds.Add(id);
+        return ConditionFactory.Create(id, patientId, encounterId, onset, abatement, seed,
+            v.Code, v.Display, v.IcdCode, v.Category);
+    }
+
+    private static Procedure GenerateScenarioProcedure(
+        string id, string patientId, string encounterId, DateTime performed, int seed, string practId,
+        int[] procIndices, List<string> conditionIds)
+    {
+        var poolIdx = ScenarioResourceMap.PickIndex(procIndices, seed, FhirGenerationCodes.Procedures.Length);
+        var v = FhirGenerationCodes.Procedures[poolIdx];
+        return ProcedureFactory.Create(id, patientId, encounterId, performed, seed, practId,
+            HospitalLocationId, HospitalOrgId,
+            v.Code, v.Display, v.BodySiteCode, v.BodySiteDisplay,
+            v.OutcomeCode, v.OutcomeDisplay,
+            conditionIds.Count > 0 ? conditionIds[seed % conditionIds.Count] : null);
+    }
+
+    private static MedicationRequest GenerateScenarioMedicationRequest(
+        string id, string patientId, string encounterId, DateTime authored, int seed, string practId,
+        int[] medIndices, List<string> conditionIds, List<string> medicationIds, List<string> medicationRequestIds)
+    {
+        var poolIdx = ScenarioResourceMap.PickIndex(medIndices, seed, FhirGenerationCodes.Medications.Length);
+        var v = FhirGenerationCodes.Medications[poolIdx];
+        var reasonConditionId = conditionIds.Count > 0 ? conditionIds[seed % conditionIds.Count] : null;
+        var medicationRefId = medicationIds.Count > 0 ? medicationIds[seed % medicationIds.Count] : null;
+        var req = MedicationRequestFactory.Create(id, patientId, encounterId, authored, seed, practId,
+            v.RxCode, v.Display, v.RouteCode, v.RouteDisplay,
+            v.DoseValue, v.DoseUnit, v.FreqPerDay, v.Prn,
+            v.IndicationSnomed, v.IndicationDisplay, reasonConditionId, medicationRefId);
+        medicationRequestIds.Add(id);
+        return req;
+    }
+
+    private static MedicationAdministration GenerateScenarioMedicationAdministration(
+        string id, string patientId, string encounterId, DateTime effective, int seed,
+        int[] medIndices, List<string> medicationIds, List<string> medicationRequestIds, string practId)
+    {
+        var poolIdx = ScenarioResourceMap.PickIndex(medIndices, seed, FhirGenerationCodes.Medications.Length);
+        var v = FhirGenerationCodes.Medications[poolIdx];
+        var medRefId = medicationIds.Count > 0 ? medicationIds[seed % medicationIds.Count] : null;
+        var isIv = v.RouteCode == "47625008";
+        var admin = MedicationAdministrationFactory.Create(id, patientId, encounterId, effective, seed, practId,
+            v.RxCode, v.Display, v.RouteCode, v.RouteDisplay,
+            v.DoseValue, v.DoseUnit, v.IndicationSnomed, v.IndicationDisplay, isIv, medRefId);
+        // Wire MedicationAdministration.request → MedicationRequest
+        if (medicationRequestIds.Count > 0)
+            admin.Request = new ResourceReference($"MedicationRequest/{medicationRequestIds[seed % medicationRequestIds.Count]}");
+        return admin;
+    }
+
+    private static Specimen GenerateScenarioSpecimen(
+        string id, string patientId, DateTime collected, int seed,
+        int[] specIndices, List<string> specimenIds, string practId)
+    {
+        var poolIdx = ScenarioResourceMap.PickIndex(specIndices, seed, FhirGenerationCodes.Specimens.Length);
+        specimenIds.Add(id);
+        var v = FhirGenerationCodes.Specimens[poolIdx];
+        return SpecimenFactory.Create(id, patientId, collected, seed,
+            v.TypeCode, v.TypeDisplay, v.TypeSystem,
+            v.ContainerCode, v.ContainerDisplay,
+            v.CollectionMethod, v.BodySiteCode, v.BodySiteDisplay, practId);
+    }
+
+    private static DiagnosticReport GenerateScenarioDiagnosticReport(
+        string id, string patientId, string encounterId, DateTime effective, int seed,
+        List<string> observationIds, List<string> specimenIds, string practId,
+        List<string> diagnosticReportIds)
+    {
+        var report = DiagnosticReportFactory.Generate(id, patientId, encounterId, effective, seed,
+            observationIds, specimenIds, practId);
+        diagnosticReportIds.Add(id);
+        return report;
+    }
+
+    private static ServiceRequest GenerateScenarioServiceRequest(
+        string id, string patientId, string encounterId, DateTime authored, int seed, string practId,
+        int[] srIndices, List<string> conditionIds, List<string> serviceRequestIds)
+    {
+        var poolIdx = ScenarioResourceMap.PickIndex(srIndices, seed, FhirGenerationCodes.ServiceRequests.Length);
+        var v = FhirGenerationCodes.ServiceRequests[poolIdx];
+        var reasonConditionId = conditionIds.Count > 0 ? conditionIds[seed % conditionIds.Count] : null;
+        var sr = ServiceRequestFactory.Create(id, patientId, encounterId, authored, seed, practId,
+            v.Code, v.Display, v.IsLab, v.System, reasonConditionId);
+        serviceRequestIds.Add(id);
+        return sr;
+    }
+
+    private static ImagingStudy GenerateScenarioImagingStudy(
+        string id, string patientId, string encounterId, DateTime started, int seed,
+        int[] imgIndices, List<string> serviceRequestIds, string practId)
+    {
+        var poolIdx = ScenarioResourceMap.PickIndex(imgIndices, seed, FhirGenerationCodes.ImagingStudies.Length);
+        var v = FhirGenerationCodes.ImagingStudies[poolIdx];
+        var study = ImagingStudyFactory.Create(id, patientId, encounterId, started, HospitalLocationId, practId,
+            v.SnomedCode, v.Display, v.Modality,
+            v.BodySiteCode, v.BodySiteDisplay, v.ReasonCode, v.ReasonDisplay);
+        // Wire ImagingStudy.basedOn → ServiceRequest
+        if (serviceRequestIds.Count > 0)
+        {
+            study.BasedOn ??= [];
+            study.BasedOn.Add(new ResourceReference($"ServiceRequest/{serviceRequestIds[seed % serviceRequestIds.Count]}"));
+        }
+        return study;
+    }
+
+    private static Provenance GenerateScenarioProvenance(
+        string id, string patientId, string encounterId, DateTime recorded, string practId,
+        List<string> diagnosticReportIds)
+    {
+        var prov = ProvenanceFactory.Create(id, patientId, encounterId, recorded, practId, HospitalOrgId);
+        // Wire Provenance.target to include a DiagnosticReport when available
         if (diagnosticReportIds.Count > 0)
         {
-            var reportRef = new ResourceReference($"DiagnosticReport/{diagnosticReportIds[0]}");
-
-            foreach (var sr in serviceRequests.Take(3))
-            {
-                sr.SupportingInfo ??= [];
-                if (!sr.SupportingInfo.Any(r => r.Reference == reportRef.Reference))
-                    sr.SupportingInfo.Add(new ResourceReference(reportRef.Reference));
-            }
-
-            foreach (var proc in procedures.Take(2))
-            {
-                proc.Report ??= [];
-                if (!proc.Report.Any(r => r.Reference == reportRef.Reference))
-                    proc.Report.Add(new ResourceReference(reportRef.Reference));
-            }
-
-            foreach (var prov in provenances.Take(2))
-            {
-                prov.Target ??= [];
-                if (!prov.Target.Any(r => r.Reference == reportRef.Reference))
-                    prov.Target.Add(new ResourceReference(reportRef.Reference));
-            }
+            prov.Target ??= [];
+            prov.Target.Add(new ResourceReference($"DiagnosticReport/{diagnosticReportIds[^1]}"));
         }
-
-        if (serviceRequests.Count > 0)
-        {
-            var serviceRequestRef = new ResourceReference($"ServiceRequest/{serviceRequests[0].Id}");
-
-            foreach (var study in imagingStudies.Take(2))
-            {
-                study.BasedOn ??= [];
-                if (!study.BasedOn.Any(r => r.Reference == serviceRequestRef.Reference))
-                    study.BasedOn.Add(new ResourceReference(serviceRequestRef.Reference));
-            }
-        }
-
-        if (medicationRequestIds.Count > 0)
-        {
-            var medReqRef = new ResourceReference($"MedicationRequest/{medicationRequestIds[0]}");
-
-            foreach (var admin in medicationAdministrations.Take(4))
-            {
-                if (admin.Request?.Reference != medReqRef.Reference)
-                    admin.Request = new ResourceReference(medReqRef.Reference);
-            }
-        }
+        return prov;
     }
 
     private static int Mod(int value, int modulus) => ((value % modulus) + modulus) % modulus;

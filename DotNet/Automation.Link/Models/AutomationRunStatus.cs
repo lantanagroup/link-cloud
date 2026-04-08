@@ -1,4 +1,4 @@
-﻿namespace Automation.UI.Models;
+﻿namespace LantanaGroup.Link.Automation.Link.Models;
 
 public enum AutomationRunStatus
 {

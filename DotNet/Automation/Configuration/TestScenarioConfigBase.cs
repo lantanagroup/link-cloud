@@ -12,10 +12,10 @@ public class TestScenarioConfigBase
     public int PollingIntervalSeconds { get; set; } = 3;
 
     /// <summary>
-    /// Maximum number of polling attempts before timing out.
-    /// A non-positive value indicates unlimited polling.
+    /// Maximum wall-clock minutes the polling loop will run before timing out.
+    /// Zero or negative indicates unlimited polling.
     /// </summary>
-    public int MaxRetryCount { get; set; } = 60;
+    public int MaxPollingDurationMinutes { get; set; } = 3;
 
     /// <summary>
     /// Path/location of the measure bundle to load. Implementations may support
@@ -54,13 +54,12 @@ public class TestScenarioConfigBase
     public int LogScrapeWindowMinutes { get; set; } = 5;
 
     /// <summary>
-    /// The maximum wall-clock time the polling loop will run,
-    /// computed from <see cref="MaxRetryCount"/> × <see cref="PollingIntervalSeconds"/>.
-    /// Non-positive <see cref="MaxRetryCount"/> indicates unlimited polling.
+    /// The maximum wall-clock time the polling loop will run.
+    /// Zero or negative <see cref="MaxPollingDurationMinutes"/> indicates unlimited polling.
     /// </summary>
-    public TimeSpan MaxPollingDuration => MaxRetryCount <= 0
+    public TimeSpan MaxPollingDuration => MaxPollingDurationMinutes <= 0
         ? TimeSpan.MaxValue
-        : TimeSpan.FromSeconds(MaxRetryCount * PollingIntervalSeconds);
+        : TimeSpan.FromMinutes(MaxPollingDurationMinutes);
 
     /// <summary>
     /// The log scrape window as a <see cref="TimeSpan"/>.

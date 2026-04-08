@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Sdk.Clients;
+﻿using System.Collections.Concurrent;
+using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 
 namespace LantanaGroup.Link.Automation.Link.Helpers;
@@ -10,6 +11,17 @@ public class PipelineDataReader
     private readonly INormalizationServiceClient _normalizationClient;
     private readonly IFacilityServiceClient _facilityClient;
 
+    // ---------------------------------------------------------------
+    // Time-based cache — collapses duplicate HTTP calls from the
+    // many consumers (ProgressMonitor, PipelineProgressTracker,
+    // MilestoneValidationOrchestrator, StoreBackedServicePoller,
+    // PipelineSnapshot) into a single call per TTL window.
+    // ---------------------------------------------------------------
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromSeconds(8);
+
+    private readonly ConcurrentDictionary<string, (object? Value, DateTime ExpiresAt)> _cache = new();
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _cacheLocks = new();
+
     public PipelineDataReader(
         IReportServiceClient reportClient,
         IDataAcquisitionServiceClient dataAcqClient,
@@ -20,6 +32,43 @@ public class PipelineDataReader
         _dataAcqClient = dataAcqClient;
         _normalizationClient = normalizationClient;
         _facilityClient = facilityClient;
+    }
+
+    /// <summary>
+    /// Returns a cached value if fresh, otherwise calls the factory once (per key)
+    /// and caches the result. Concurrent callers for the same key wait for the
+    /// single in-flight fetch rather than issuing duplicate HTTP calls.
+    /// </summary>
+    private async Task<T?> GetOrFetchAsync<T>(string cacheKey, Func<Task<T?>> factory)
+    {
+        if (_cache.TryGetValue(cacheKey, out var entry) && DateTime.UtcNow < entry.ExpiresAt)
+            return (T?)entry.Value;
+
+        var keyLock = _cacheLocks.GetOrAdd(cacheKey, _ => new SemaphoreSlim(1, 1));
+        await keyLock.WaitAsync();
+        try
+        {
+            // Double-check after acquiring lock
+            if (_cache.TryGetValue(cacheKey, out entry) && DateTime.UtcNow < entry.ExpiresAt)
+                return (T?)entry.Value;
+
+            var result = await factory();
+            _cache[cacheKey] = (result, DateTime.UtcNow.Add(CacheTtl));
+            return result;
+        }
+        finally
+        {
+            keyLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Evicts all cached data. Call between test runs or when the pipeline
+    /// context changes (e.g., new facilityId / reportId).
+    /// </summary>
+    public void InvalidateCache()
+    {
+        _cache.Clear();
     }
 
     public record ResourceGroupSummary(string PatientId, string ResourceType, int Count);
@@ -69,23 +118,26 @@ public class PipelineDataReader
     public record FacilityScheduledReports(string[] Monthly, string[] Daily, string[] Weekly);
     public record FacilityInfo(string FacilityId, string? FacilityName, string? TimeZone, bool IsDeleted, DateTime? CreateDate, FacilityScheduledReports? ScheduledReports);
 
-    public async Task<ReportScheduleInfo?> GetReportScheduleAsync(Guid scheduleId)
+    public Task<ReportScheduleInfo?> GetReportScheduleAsync(Guid scheduleId)
     {
-        var page = await _reportClient.SearchSchedulesAsync(scheduleId.ToString());
-        var record = page?.Records?.FirstOrDefault();
-        if (record == null)
-            return null;
+        return GetOrFetchAsync($"schedule:{scheduleId}", async () =>
+        {
+            var page = await _reportClient.SearchSchedulesAsync(scheduleId.ToString());
+            var record = page?.Records?.FirstOrDefault();
+            if (record == null)
+                return null;
 
-        return new ReportScheduleInfo(
-            record.FacilityId,
-            record.Status.ToString(),
-            record.Frequency.ToString(),
-            record.AdHocType.ToString(),
-            record.EnableSubmission,
-            record.EndOfReportPeriodJobHasRun,
-            record.PayloadRootUri,
-            record.ReportStartDate,
-            record.ReportEndDate);
+            return new ReportScheduleInfo(
+                record.FacilityId,
+                record.Status.ToString(),
+                record.Frequency.ToString(),
+                record.AdHocType.ToString(),
+                record.EnableSubmission,
+                record.EndOfReportPeriodJobHasRun,
+                record.PayloadRootUri,
+                record.ReportStartDate,
+                record.ReportEndDate);
+        });
     }
 
     public Task<List<ReportEntryInfo>> GetReportEntriesAsync(Guid scheduleId)
@@ -93,26 +145,31 @@ public class PipelineDataReader
 
     public async Task<List<ReportEntryInfo>> GetReportEntriesWithMeasureReportsAsync(Guid scheduleId)
     {
-        var entries = await _reportClient.GetEntriesByScheduleAsync(scheduleId.ToString());
-        if (entries == null)
-            return [];
-
-        return entries.Select(e =>
+        var result = await GetOrFetchAsync($"entries:{scheduleId}", async () =>
         {
-            var mrs = e.MeasureReports.Select(mr => new MeasureReportInfo(
-                mr.MeasureReportId,
-                mr.Status?.ToString(),
-                mr.ReportType,
-                mr.ResourceCount.Select(rc => new ResourceCountInfo(rc.Key, rc.Value)).ToList())).ToList();
+            var entries = await _reportClient.GetEntriesByScheduleAsync(scheduleId.ToString());
+            if (entries == null)
+                return new List<ReportEntryInfo>();
 
-            return new ReportEntryInfo(
-                e.Id,
-                e.FacilityId,
-                e.PatientId,
-                e.ReportingStatus.ToString(),
-                e.SubmissionStatus?.ToString(),
-                mrs);
-        }).ToList();
+            return entries.Select(e =>
+            {
+                var mrs = e.MeasureReports.Select(mr => new MeasureReportInfo(
+                    mr.MeasureReportId,
+                    mr.Status?.ToString(),
+                    mr.ReportType,
+                    mr.ResourceCount.Select(rc => new ResourceCountInfo(rc.Key, rc.Value)).ToList())).ToList();
+
+                return new ReportEntryInfo(
+                    e.Id,
+                    e.FacilityId,
+                    e.PatientId,
+                    e.ReportingStatus.ToString(),
+                    e.SubmissionStatus?.ToString(),
+                    mrs);
+            }).ToList();
+        });
+
+        return result ?? [];
     }
 
     public async Task<List<EntryMeasureReportInfo>> GetEntryMeasureReportsAsync(Guid scheduleId)
@@ -152,38 +209,48 @@ public class PipelineDataReader
 
     public async Task<List<ReportPopulationInfo>> GetReportPopulationsAsync(Guid scheduleId, string facilityId)
     {
-        var pops = await _reportClient.GetPopulationsByScheduleAsync(scheduleId.ToString());
-        if (pops == null)
-            return [];
+        var result = await GetOrFetchAsync($"populations:{scheduleId}:{facilityId}", async () =>
+        {
+            var pops = await _reportClient.GetPopulationsByScheduleAsync(scheduleId.ToString());
+            if (pops == null)
+                return new List<ReportPopulationInfo>();
 
-        return pops.Select(p => new ReportPopulationInfo(
-            p.ReportType,
-            p.GroupPopulations.Select(gp => new GroupPopulationInfo(
-                gp.PopulationCodeJson,
-                gp.MeasureReportPopulations.Select(mrp => new MeasureReportPopulationInfo(mrp.MeasureReportId)).ToList())).ToList())).ToList();
+            return pops.Select(p => new ReportPopulationInfo(
+                p.ReportType,
+                p.GroupPopulations.Select(gp => new GroupPopulationInfo(
+                    gp.PopulationCodeJson,
+                    gp.MeasureReportPopulations.Select(mrp => new MeasureReportPopulationInfo(mrp.MeasureReportId)).ToList())).ToList())).ToList();
+        });
+
+        return result ?? [];
     }
 
     public async Task<List<ReportResourceIdentity>> GetReportResourceIdentitiesAsync(Guid scheduleId, string facilityId)
     {
-        var pageNumber = 1;
-        const int pageSize = 100;
-        var results = new List<ReportResourceIdentity>();
-
-        while (true)
+        var result = await GetOrFetchAsync($"resourceIdentities:{scheduleId}:{facilityId}", async () =>
         {
-            var page = await _reportClient.SearchResourcesAsync(facilityId, scheduleId.ToString(), pageSize: pageSize, pageNumber: pageNumber);
-            if (page?.Records == null || page.Records.Count == 0)
-                break;
+            var pageNumber = 1;
+            const int pageSize = 100;
+            var results = new List<ReportResourceIdentity>();
 
-            results.AddRange(page.Records.Select(r => new ReportResourceIdentity(r.PatientId, r.ResourceType, r.ResourceId)));
+            while (true)
+            {
+                var page = await _reportClient.SearchResourcesAsync(facilityId, scheduleId.ToString(), pageSize: pageSize, pageNumber: pageNumber);
+                if (page?.Records == null || page.Records.Count == 0)
+                    break;
 
-            if (page.Records.Count < pageSize)
-                break;
+                results.AddRange(page.Records.Select(r => new ReportResourceIdentity(r.PatientId, r.ResourceType, r.ResourceId)));
 
-            pageNumber++;
-        }
+                if (page.Records.Count < pageSize)
+                    break;
 
-        return results;
+                pageNumber++;
+            }
+
+            return results;
+        });
+
+        return result ?? [];
     }
 
     public async Task<List<ReportEntryInfo>> GetSubmittedReportEntriesAsync(Guid scheduleId)
@@ -518,27 +585,30 @@ public class PipelineDataReader
             .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     }
 
-    public async Task<AcquisitionSummaryInfo?> GetDataAcquisitionReportSummaryAsync(string reportId)
+    public Task<AcquisitionSummaryInfo?> GetDataAcquisitionReportSummaryAsync(string reportId)
     {
-        var summary = await _dataAcqClient.GetReportSummaryAsync(reportId);
-        if (summary == null) return null;
+        return GetOrFetchAsync($"acqSummary:{reportId}", async () =>
+        {
+            var summary = await _dataAcqClient.GetReportSummaryAsync(reportId);
+            if (summary == null) return null;
 
-        return new AcquisitionSummaryInfo(
-            summary.ReportId,
-            summary.TotalLogs,
-            summary.TotalPatients,
-            summary.TotalCompletedPatients,
-            summary.TotalResourcesAcquired,
-            summary.TotalRetryAttempts,
-            summary.TotalCompletionTimeMs,
-            summary.AverageCompletionTimeMs,
-            summary.StatusCounts
-                .Where(s => !string.IsNullOrWhiteSpace(s.Status))
-                .Select(s => new StatusCountInfo(s.Status, s.Count))
-                .ToList(),
-            summary.ResourceTypeCounts
-                .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType))
-                .Select(r => new ResourceTypeCountInfo(r.ResourceType, r.Count))
-                .ToList());
+            return new AcquisitionSummaryInfo(
+                summary.ReportId,
+                summary.TotalLogs,
+                summary.TotalPatients,
+                summary.TotalCompletedPatients,
+                summary.TotalResourcesAcquired,
+                summary.TotalRetryAttempts,
+                summary.TotalCompletionTimeMs,
+                summary.AverageCompletionTimeMs,
+                summary.StatusCounts
+                    .Where(s => !string.IsNullOrWhiteSpace(s.Status))
+                    .Select(s => new StatusCountInfo(s.Status, s.Count))
+                    .ToList(),
+                summary.ResourceTypeCounts
+                    .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType))
+                    .Select(r => new ResourceTypeCountInfo(r.ResourceType, r.Count))
+                    .ToList());
+        });
     }
 }

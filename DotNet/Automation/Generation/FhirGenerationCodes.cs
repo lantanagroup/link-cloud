@@ -1,4 +1,4 @@
-namespace LantanaGroup.Automation.Generation;
+﻿namespace LantanaGroup.Automation.Generation;
 
 /// <summary>
 /// Shared clinical code tables used across all resource factories.
@@ -7,7 +7,7 @@ namespace LantanaGroup.Automation.Generation;
 ///
 /// Clinical design principle: each "scenario" row ties together a primary
 /// diagnosis, a set of plausible medications, a set of plausible procedures,
-/// and an appropriate set of observations � so the resources for a single
+/// and an appropriate set of observations — so the resources for a single
 /// patient form a coherent clinical story.
 /// </summary>
 public static class FhirGenerationCodes
@@ -48,7 +48,7 @@ public static class FhirGenerationCodes
     ];
 
     // -----------------------------------------------------------------------
-    //  Clinical scenarios � each row is a coherent admission story
+    //  Clinical scenarios — each row is a coherent admission story
     //  Scenario drives: primary diagnosis, admit reason, medications, procedures
     // -----------------------------------------------------------------------
 
@@ -60,27 +60,43 @@ public static class FhirGenerationCodes
         string ServiceTypeCode, string ServiceTypeDisplay,
         string PriorityCode, string PriorityDisplay)[] ClinicalScenarios =
     [
-        // 0 � Community-acquired pneumonia, emergency admission
+        // 0 — Community-acquired pneumonia, emergency admission
         ("233604007", "Pneumonia (disorder)",                               "J18.9",  "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "305",  "General Medicine",  "EM", "emergency"),
-        // 1 � Acute decompensated heart failure, urgent admission
+        // 1 — Acute decompensated heart failure, urgent admission
         ("84114007",  "Heart failure (disorder)",                           "I50.9",  "32485007",  "Hospital admission (procedure)", "hosp-trans", "Transferred from other hospital",     "snf",     "Skilled nursing facility", "303", "Cardiology",   "R",  "routine"),
-        // 2 � Acute myocardial infarction, emergency admission
+        // 2 — Acute myocardial infarction, emergency admission
         ("57054005",  "Acute myocardial infarction (disorder)",             "I21.9",  "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "306",  "Cardiothoracic Surgery", "EM", "emergency"),
-        // 3 � COPD exacerbation, emergency admission
+        // 3 — COPD exacerbation, emergency admission
         ("195951007", "Acute exacerbation of chronic obstructive airways disease (disorder)", "J44.1", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "305", "Pulmonology", "EM", "emergency"),
-        // 4 � Sepsis from urinary source, emergency admission
+        // 4 — Sepsis from urinary source, emergency admission
         ("10001005",  "Septicemia (disorder)",                              "A41.9",  "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "305",  "General Medicine",  "EM", "emergency"),
-        // 5 � Hip fracture, elective surgical admission
+        // 5 — Hip fracture, elective surgical admission
         ("700097003", "Fracture of bone of hip region (disorder)",          "S72.001A","32485007", "Hospital admission (procedure)", "gp",   "General practitioner referral",       "home",    "Home",              "308",  "Orthopaedics",      "R",  "routine"),
-        // 6 � Acute renal failure, urgent admission
+        // 6 — Acute renal failure, urgent admission
         ("14669001",  "Acute renal failure syndrome (disorder)",            "N17.9",  "32485007",  "Hospital admission (procedure)", "hosp-trans", "Transferred from other hospital",     "home",    "Home",              "310",  "Nephrology",        "R",  "routine"),
-        // 7 � Ischaemic stroke, emergency admission
+        // 7 — Ischaemic stroke, emergency admission
         ("422504002", "Ischemic stroke (disorder)",                         "I63.9",  "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "rehab",   "Inpatient rehabilitation", "320", "Neurology",    "EM", "emergency"),
+        // 8 — Diabetic ketoacidosis (DKA), emergency admission
+        ("420422005", "Diabetic ketoacidosis (disorder)",                    "E11.10", "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "305",  "Endocrinology",    "EM", "emergency"),
+        // 9 — Gastrointestinal bleeding, emergency admission
+        ("74474003",  "Gastrointestinal hemorrhage (disorder)",              "K92.2",  "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "305",  "Gastroenterology", "EM", "emergency"),
+        // 10 — Pulmonary embolism, emergency admission
+        ("59282003",  "Pulmonary embolism (disorder)",                       "I26.99", "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "305",  "Pulmonology",      "EM", "emergency"),
+        // 11 — Acute pancreatitis, emergency admission
+        ("197456007", "Acute pancreatitis (disorder)",                       "K85.9",  "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "305",  "Gastroenterology", "EM", "emergency"),
+        // 12 — Cellulitis, urgent admission
+        ("128045006", "Cellulitis (disorder)",                               "L03.90", "32485007",  "Hospital admission (procedure)", "gp",   "General practitioner referral",       "home",    "Home",              "305",  "General Medicine",  "R",  "routine"),
+        // 13 — Atrial fibrillation with rapid ventricular response, emergency admission
+        ("49436004",  "Atrial fibrillation (disorder)",                      "I48.91", "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "303",  "Cardiology",       "EM", "emergency"),
+        // 14 — Diabetic hypoglycemia, emergency admission (relevant to Hypo measure)
+        ("421725003", "Diabetes mellitus type 2 with hypoglycemia (disorder)","E11.649","183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "305",  "Endocrinology",    "EM", "emergency"),
+        // 15 — Acute appendicitis, emergency surgical admission
+        ("74400008",  "Appendicitis (disorder)",                             "K35.80", "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "301",  "General Surgery",  "EM", "emergency"),
     ];
 
     // -----------------------------------------------------------------------
     //  Observations with interpretation thresholds (criticalLow, normalLow,
-    //  normalHigh, criticalHigh) � used to populate interpretation codes
+    //  normalHigh, criticalHigh) — used to populate interpretation codes
     // -----------------------------------------------------------------------
 
     public static readonly (
@@ -96,12 +112,12 @@ public static class FhirGenerationCodes
         ("55284-4", "Blood pressure systolic and diastolic",                   "vital-signs", "mm[Hg]",           0,   90,   140, 220),
         ("9279-1",  "Respiratory rate",                                        "vital-signs", "{breaths}/min",    4,   12,   20,  40),
         ("59576-9", "Body mass index (BMI) [Ratio]",                           "vital-signs", "kg/m2",            0,   18.5, 29.9, 60),
-        // Laboratory � haematology
+        // Laboratory — haematology
         ("718-7",   "Hemoglobin [Mass/volume] in Blood",                       "laboratory",  "g/dL",             5,   12.0, 17.5, 20),
         ("4544-3",  "Hematocrit [Volume Fraction] of Blood",                   "laboratory",  "%",                15,  36,   52,  65),
         ("6690-2",  "Leukocytes [#/volume] in Blood",                          "laboratory",  "10*3/uL",          1,   4.5,  11,  30),
         ("777-3",   "Platelets [#/volume] in Blood",                           "laboratory",  "10*3/uL",          20,  150,  400, 1000),
-        // Laboratory � chemistry
+        // Laboratory — chemistry
         ("2160-0",  "Creatinine [Mass/volume] in Serum or Plasma",             "laboratory",  "mg/dL",            0,   0.6,  1.2, 10),
         ("2345-7",  "Glucose [Mass/volume] in Serum or Plasma",                "laboratory",  "mg/dL",            40,  70,   99,  500),
         ("2951-2",  "Sodium [Moles/volume] in Serum or Plasma",                "laboratory",  "mmol/L",           120, 136,  145, 160),
@@ -116,18 +132,26 @@ public static class FhirGenerationCodes
         ("2571-8",  "Triglycerides [Mass/volume] in Serum or Plasma",          "laboratory",  "mg/dL",            0,   0,    150, 1000),
         ("48643-1", "Glomerular filtration rate/1.73 sq M.predicted [Volume Rate/Area] in Serum, Plasma or Blood by Creatinine-based formula (MDRD)", "laboratory", "mL/min/{1.73_m2}", 0, 60, 999, 999),
         ("2532-0",  "Lactate dehydrogenase [Enzymatic activity/volume]",       "laboratory",  "U/L",              0,   122,  222, 1000),
-        // Laboratory � microbiology / culture
+        // Laboratory — microbiology / culture
         ("600-7",   "Bacteria identified in Blood by Culture",                 "laboratory",  "",                 0,   0,    0,   0),
-        // Laboratory � coagulation
+        // Laboratory — coagulation
         ("5902-2",  "Prothrombin time (PT)",                                   "laboratory",  "s",                0,   11,   13,  30),
         ("6301-6",  "INR in Platelet poor plasma by Coagulation assay",        "laboratory",  "{INR}",            0,   0.9,  1.1, 5),
-        // Laboratory � cardiac
+        // Laboratory — cardiac
         ("33762-6", "NT-proBNP [Mass/volume] in Serum or Plasma",              "laboratory",  "pg/mL",            0,   0,    125, 35000),
         ("10839-9", "Troponin I.cardiac [Mass/volume] in Serum or Plasma",     "laboratory",  "ng/mL",            0,   0,    0.04, 50),
+        // Laboratory — endocrine / metabolic
+        ("2339-0",  "Glucose [Mass/volume] in Blood",                          "laboratory",  "mg/dL",            20,  70,   99,  600),
+        ("11555-0", "Base excess in Blood by calculation",                     "laboratory",  "mmol/L",           -10, -2,    2,   10),
+        ("2000-8",  "Calcium [Moles/volume] in Serum or Plasma",              "laboratory",  "mg/dL",            6,   8.5,  10.5, 14),
+        ("1988-5",  "C reactive protein [Mass/volume] in Serum or Plasma",    "laboratory",  "mg/L",             0,   0,    5,   300),
+        ("2532-0",  "Lipase [Enzymatic activity/volume] in Serum or Plasma",  "laboratory",  "U/L",              0,   0,    60,  5000),
+        ("2524-7",  "Lactate [Moles/volume] in Serum or Plasma",             "laboratory",  "mmol/L",           0,   0.5,  2.0, 15),
+        ("1751-7",  "Albumin [Mass/volume] in Serum or Plasma",              "laboratory",  "g/dL",             1.5, 3.5,  5.5, 6.5),
     ];
 
     // -----------------------------------------------------------------------
-    //  Conditions (secondary / comorbidities � primary dx comes from scenario)
+    //  Conditions (secondary / comorbidities — primary dx comes from scenario)
     // -----------------------------------------------------------------------
 
     public static readonly (string Code, string Display, string IcdCode, string Category)[] Conditions =
@@ -148,10 +172,24 @@ public static class FhirGenerationCodes
         ("422587007", "Nausea (finding)",                                       "R11.0",  "encounter-diagnosis"),
         ("57676002",  "Joint pain (finding)",                                   "M79.3",  "problem-list-item"),
         ("73595000",  "Stress (finding)",                                       "Z73.3",  "problem-list-item"),
+        // 16 — DKA-related
+        ("420422005", "Diabetic ketoacidosis (disorder)",                       "E11.10", "encounter-diagnosis"),
+        ("237633009", "Dehydration (disorder)",                                 "E86.0",  "encounter-diagnosis"),
+        // 18 — GI-related
+        ("74474003",  "Gastrointestinal hemorrhage (disorder)",                 "K92.2",  "encounter-diagnosis"),
+        ("49436004",  "Atrial fibrillation (disorder)",                         "I48.91", "encounter-diagnosis"),
+        // 20 — PE-related
+        ("128053003", "Deep venous thrombosis (disorder)",                      "I82.40", "problem-list-item"),
+        // 21 — Pancreatitis-related
+        ("235595009", "Gallstone (disorder)",                                   "K80.20", "problem-list-item"),
+        // 22 — Infection-related
+        ("302866003", "Hypoglycemia (disorder)",                                "E16.2",  "encounter-diagnosis"),
+        // 23 — Surgical
+        ("22298006",  "Myocardial infarction (disorder)",                       "I21.9",  "problem-list-item"),
     ];
 
     // -----------------------------------------------------------------------
-    //  Procedures � with associated condition reason for clinical coherence
+    //  Procedures — with associated condition reason for clinical coherence
     // -----------------------------------------------------------------------
 
     public static readonly (string Code, string Display, string ReasonCode, string ReasonDisplay, string BodySiteCode, string BodySiteDisplay, string OutcomeCode, string OutcomeDisplay)[] Procedures =
@@ -169,10 +207,24 @@ public static class FhirGenerationCodes
         ("108290001", "Repair of aortic aneurysm",            "57054005",  "Acute myocardial infarction","15825003",  "Aortic structure",           "385669000","Successful"),
         ("69261000",  "Endotracheal intubation",              "195951007", "Acute COPD exacerbation",    "44567001",  "Tracheal structure",         "385669000","Successful"),
         ("392230005", "Echocardiography",                     "84114007",  "Heart failure",              "80891009",  "Heart structure",            "385669000","Successful"),
+        // 13 — EGD (upper endoscopy) for GI bleed
+        ("386548000", "Esophagogastroduodenoscopy",           "74474003",  "GI hemorrhage",              "69536005",  "Upper GI tract structure",   "385669000","Successful"),
+        // 14 — CT pulmonary angiography
+        ("418891003", "CT angiography of pulmonary arteries", "59282003",  "Pulmonary embolism",         "39607008",  "Lung structure",             "385669000","Successful"),
+        // 15 — Appendectomy
+        ("80146002",  "Appendectomy",                         "74400008",  "Appendicitis",               "66754008",  "Appendix structure",         "385669000","Successful"),
+        // 16 — Cardioversion
+        ("308945005", "Electrical cardioversion",              "49436004",  "Atrial fibrillation",        "80891009",  "Heart structure",            "385669000","Successful"),
+        // 17 — Incision and drainage
+        ("36228007",  "Incision and drainage",                "128045006", "Cellulitis",                 "68505006",  "Skin structure",             "385669000","Successful"),
+        // 18 — Blood transfusion
+        ("116859006", "Transfusion of blood product",         "74474003",  "GI hemorrhage",              "39607008",  "Vascular structure",         "385669000","Successful"),
+        // 19 — Insulin infusion (DKA protocol)
+        ("225444004", "Administration of insulin by IV",      "420422005", "Diabetic ketoacidosis",       "39607008",  "Vascular structure",         "385669000","Successful"),
     ];
 
     // -----------------------------------------------------------------------
-    //  Medications � with explicit frequency, PRN flag, and indication
+    //  Medications — with explicit frequency, PRN flag, and indication
     // -----------------------------------------------------------------------
 
     public static readonly (
@@ -195,6 +247,26 @@ public static class FhirGenerationCodes
         ("582620",   "Pantoprazole 40 MG Delayed Release Oral Tablet","26643006", "Oral route",          40,   "mg",    1, false, "34000006",  "Stress ulcer prophylaxis"),
         ("197319",   "Albuterol 0.083 MG/ML Inhalation Solution",     "6064005",  "Inhalation route",   2.5,  "mg",    4, true,  "195951007", "COPD exacerbation"),
         ("855332",   "Atorvastatin 40 MG Oral Tablet",                "26643006", "Oral route",          40,   "mg",    1, false, "414545008", "Ischemic heart disease"),
+        // 15 — Insulin regular IV for DKA
+        ("311040",   "Insulin regular 100 UNT/ML Injectable Solution", "47625008", "Intravenous route",  10,   "[iU]",  1, false, "420422005", "Diabetic ketoacidosis"),
+        // 16 — Potassium chloride replacement
+        ("204520",   "Potassium chloride 20 MEQ Oral Tablet",          "26643006", "Oral route",          20,   "mEq",   3, false, "431855005", "Hypokalemia"),
+        // 17 — Omeprazole (GI bleed)
+        ("198405",   "Omeprazole 40 MG Delayed Release Oral Capsule",  "26643006", "Oral route",          40,   "mg",    2, false, "74474003",  "GI hemorrhage"),
+        // 18 — Warfarin (anticoagulation)
+        ("855350",   "Warfarin 5 MG Oral Tablet",                      "26643006", "Oral route",           5,   "mg",    1, false, "59282003",  "Pulmonary embolism"),
+        // 19 — Diltiazem IV (rate control)
+        ("309846",   "Diltiazem 5 MG/ML Injectable Solution",          "47625008", "Intravenous route",   25,   "mg",    1, false, "49436004",  "Atrial fibrillation"),
+        // 20 — Dextrose 50% (hypoglycemia rescue)
+        ("245247",   "Dextrose 50% Injectable Solution",               "47625008", "Intravenous route",   25,   "g",     1, false, "302866003", "Hypoglycemia"),
+        // 21 — Cefazolin (surgical prophylaxis)
+        ("309090",   "Cefazolin 1 GM Injection",                       "47625008", "Intravenous route",  2000, "mg",    3, false, "74400008",  "Appendicitis"),
+        // 22 — Metronidazole (anaerobic coverage)
+        ("311681",   "Metronidazole 500 MG Injection",                 "47625008", "Intravenous route",   500, "mg",    3, false, "128045006", "Cellulitis"),
+        // 23 — Normal saline (fluid resuscitation)
+        ("313572",   "Sodium chloride 0.9% Injectable Solution",       "47625008", "Intravenous route",  1000, "mL",    1, false, "420422005", "Diabetic ketoacidosis"),
+        // 24 — Glucagon (hypoglycemia)
+        ("1649592",  "Glucagon 1 MG Injection",                        "47625008", "Intravenous route",    1, "mg",    1, false, "302866003", "Hypoglycemia"),
     ];
 
     // -----------------------------------------------------------------------
@@ -215,10 +287,20 @@ public static class FhirGenerationCodes
         ("11429006",  "Consultation",                                           false, "http://snomed.info/sct"),
         ("310127009", "Physiotherapy",                                          false, "http://snomed.info/sct"),
         ("710830003", "Portable chest X-ray",                                   false, "http://snomed.info/sct"),
+        // 12 — Coagulation panel
+        ("38875-1",   "INR/PT panel",                                           true,  "http://loinc.org"),
+        // 13 — Hepatic function panel
+        ("24325-3",   "Hepatic function panel - Serum or Plasma",               true,  "http://loinc.org"),
+        // 14 — Blood type and crossmatch
+        ("882-1",     "ABO and Rh group [Type] in Blood",                       true,  "http://loinc.org"),
+        // 15 — Endocrinology consult
+        ("3457005",   "Patient referral to endocrinologist",                    false, "http://snomed.info/sct"),
+        // 16 — Surgical consult
+        ("3457005",   "Patient referral to surgeon",                            false, "http://snomed.info/sct"),
     ];
 
     // -----------------------------------------------------------------------
-    //  Specimens � with container and handling
+    //  Specimens — with container and handling
     // -----------------------------------------------------------------------
 
     public static readonly (
@@ -236,7 +318,7 @@ public static class FhirGenerationCodes
     ];
 
     // -----------------------------------------------------------------------
-    //  Allergies � with substance, reaction, and route of exposure
+    //  Allergies — with substance, reaction, and route of exposure
     // -----------------------------------------------------------------------
 
     public static readonly (
@@ -273,7 +355,7 @@ public static class FhirGenerationCodes
     ];
 
     // -----------------------------------------------------------------------
-    //  Imaging studies � with interpreter and reason
+    //  Imaging studies — with interpreter and reason
     // -----------------------------------------------------------------------
 
     public static readonly (
@@ -288,10 +370,18 @@ public static class FhirGenerationCodes
         ("44179004",  "Fluoroscopy of chest",              "RF", "39607008", "Lung structure",      "233604007", "Pneumonia"),
         ("42146005",  "Ultrasound of abdomen",             "US", "818983003","Abdomen",             "14669001",  "Acute renal failure"),
         ("80966001",  "CT of pelvis",                      "CT", "816092008","Pelvis",              "700097003", "Hip fracture"),
+        // 7 — CT abdomen/pelvis
+        ("169070004", "CT of abdomen and pelvis",           "CT", "818983003","Abdomen",             "197456007", "Acute pancreatitis"),
+        // 8 — CT pulmonary angiography
+        ("241523006", "CT pulmonary angiography",           "CT", "39607008", "Lung structure",      "59282003",  "Pulmonary embolism"),
+        // 9 — Ultrasound of lower extremity
+        ("16310003",  "Ultrasonography of lower extremity","US", "61685007", "Lower extremity",     "128045006", "Cellulitis evaluation"),
+        // 10 — Abdominal X-ray
+        ("363680008", "Plain radiograph of abdomen",        "DX", "818983003","Abdomen",             "74400008",  "Appendicitis"),
     ];
 
     // -----------------------------------------------------------------------
-    //  Diagnostic report panels � all genuine lab/radiology panels.
+    //  Diagnostic report panels — all genuine lab/radiology panels.
     //  category uses v2-0074 codes only (HM, CH, UA, MB, RAD, PT).
     //  Clinical notes (H&P, discharge summary) live in DocumentTypes only.
     // -----------------------------------------------------------------------

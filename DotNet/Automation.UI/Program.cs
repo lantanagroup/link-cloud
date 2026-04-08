@@ -1,5 +1,5 @@
 ﻿using Automation.UI.Services;
-using Automation.UI.Services.Persistence;
+using Automation.UI.Services.Persistence; // MongoSnapshotStore implementation
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.DependencyInjection;
@@ -93,6 +93,8 @@ else
             options.ClientSecret = oidcClientSecret;
             options.ResponseType = OpenIdConnectResponseType.Code;
             options.CallbackPath = oidcCallbackPath;
+            // Tokens are not saved in the cookie — service calls use system tokens
+            // (ICreateSystemToken), not the user's token. Change only if user-delegated calls are added.
             options.SaveTokens = false;
             options.MapInboundClaims = false;
             options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();

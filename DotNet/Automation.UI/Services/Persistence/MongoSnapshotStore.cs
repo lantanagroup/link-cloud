@@ -1,5 +1,4 @@
 ﻿using System.Text.Json;
-using Automation.UI.Models;
 using MongoDB.Driver;
 using Microsoft.Extensions.Logging;
 
@@ -31,6 +30,33 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         _snapshots = database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
         _logs = database.GetCollection<RunLogDocument>("automation_logs");
         _logger = logger;
+
+        EnsureIndexes();
+    }
+
+    private void EnsureIndexes()
+    {
+        try
+        {
+            _runs.Indexes.CreateOne(new CreateIndexModel<AutomationRunDocument>(
+                Builders<AutomationRunDocument>.IndexKeys.Ascending(r => r.RunId),
+                new CreateIndexOptions { Unique = true }));
+            _runs.Indexes.CreateOne(new CreateIndexModel<AutomationRunDocument>(
+                Builders<AutomationRunDocument>.IndexKeys.Descending(r => r.CreatedAt)));
+
+            _snapshots.Indexes.CreateOne(new CreateIndexModel<DomainSnapshotDocument>(
+                Builders<DomainSnapshotDocument>.IndexKeys
+                    .Ascending(s => s.RunId)
+                    .Ascending(s => s.Domain),
+                new CreateIndexOptions { Unique = true }));
+
+            _logs.Indexes.CreateOne(new CreateIndexModel<RunLogDocument>(
+                Builders<RunLogDocument>.IndexKeys.Ascending(l => l.RunId)));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to ensure MongoDB indexes — queries may be slower.");
+        }
     }
 
     // --- Run metadata ---

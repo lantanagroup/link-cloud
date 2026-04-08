@@ -12,7 +12,7 @@ namespace Automation.UI.Services;
 /// </summary>
 public sealed class StoreBackedServicePoller
 {
-    private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(5);
 
     private readonly ISnapshotStore _store;
     private readonly PipelineDataReader _reader;

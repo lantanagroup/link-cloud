@@ -1,4 +1,4 @@
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using LantanaGroup.Link.Sdk.ApiClient;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Automation.Link.Configuration;
@@ -54,23 +54,88 @@ public class ReportApiHelper
 
     public async Task<bool> CheckSubmissionStatusAsync(string reportId, TestScenarioConfig config, BackgroundDiagnosticsMonitor? diagnostics = null)
     {
-        var pollingIntervalSeconds = config.PollingIntervalSeconds;
-        var maxRetryCount = config.MaxRetryCount;
-        var unlimited = maxRetryCount <= 0;
+        var pollingInterval = TimeSpan.FromSeconds(Math.Max(1, config.PollingIntervalSeconds));
+        var hardTimeout = GetEffectiveSubmissionTimeout(config);
+        var timeoutLabel = hardTimeout == TimeSpan.MaxValue ? "no timeout" : $"hard timeout={hardTimeout.TotalSeconds:F0}s";
 
-        _output.WriteLine(unlimited
-            ? $"Polling for report submission (reportId={reportId}, no timeout)..."
-            : $"Polling for report submission (reportId={reportId}, max {maxRetryCount * pollingIntervalSeconds}s)...");
+        // -------------------------------------------------------------------
+        //  Phase 1: Wait for MeasureReportsGenerated milestone
+        //  The pipeline must complete DA → Normalization → MeasureEval before
+        //  submission can happen. Do not burn submission poll retries before
+        //  this milestone is reached.
+        // -------------------------------------------------------------------
+        if (diagnostics != null)
+        {
+            var milestoneToAwait = "MeasureReportsGenerated";
+            _output.WriteLine($"Waiting for pipeline milestone '{milestoneToAwait}' before polling submission (reportId={reportId}, {timeoutLabel})...");
+
+            var milestoneReached = false;
+            var milestonePhaseStart = DateTime.UtcNow;
+            while (hardTimeout == TimeSpan.MaxValue || DateTime.UtcNow - milestonePhaseStart < hardTimeout)
+            {
+                if (diagnostics.HasCriticalFailure)
+                {
+                    _output.WriteLine("[EARLY EXIT] Background diagnostics detected a critical failure before submission polling.");
+                    _output.WriteLine("Review the [DIAG] entries above for details on the root cause.");
+                    return false;
+                }
+
+                if (diagnostics.HasReachedMilestone(milestoneToAwait))
+                {
+                    milestoneReached = true;
+                    var elapsed = (DateTime.UtcNow - milestonePhaseStart).TotalSeconds;
+                    _output.WriteLine($"Milestone '{milestoneToAwait}' reached after {elapsed:F0}s.");
+                    break;
+                }
+
+                await Task.Delay(pollingInterval);
+            }
+
+            if (diagnostics.HasCriticalFailure)
+            {
+                _output.WriteLine("[EARLY EXIT] Background diagnostics detected a critical failure before submission polling.");
+                _output.WriteLine("Review the [DIAG] entries above for details on the root cause.");
+                return false;
+            }
+
+            if (!milestoneReached)
+            {
+                _output.WriteLine($"Milestone '{milestoneToAwait}' was not reached before timeout.");
+                return false;
+            }
+        }
+
+        // -------------------------------------------------------------------
+        //  Phase 2: Poll the Report API for Submitted status
+        //  Prefer state-based completion: if diagnostics already reports
+        //  SubmissionCompleted, return success immediately.
+        //  Otherwise poll schedule status until submitted / critical failure /
+        //  hard timeout.
+        // -------------------------------------------------------------------
+        if (diagnostics?.HasReachedMilestone("SubmissionCompleted") == true)
+        {
+            _output.WriteLine("Submission milestone already reached. Skipping schedule polling.");
+            return true;
+        }
+
+        _output.WriteLine($"Polling for report submission (reportId={reportId}, {timeoutLabel})...");
 
         string? lastStatus = null;
-
-        for (var retry = 0; unlimited || retry < maxRetryCount; retry++)
+        var submissionPhaseStart = DateTime.UtcNow;
+        while (hardTimeout == TimeSpan.MaxValue || DateTime.UtcNow - submissionPhaseStart < hardTimeout)
         {
             if (diagnostics?.HasCriticalFailure == true)
             {
-                _output.WriteLine("[EARLY EXIT] Background diagnostics detected a critical failure � aborting poll loop.");
+                _output.WriteLine("[EARLY EXIT] Background diagnostics detected a critical failure — aborting poll loop.");
                 _output.WriteLine("Review the [DIAG] entries above for details on the root cause.");
                 return false;
+            }
+
+            if (diagnostics?.HasReachedMilestone("SubmissionCompleted") == true)
+            {
+                var elapsedMilestone = (DateTime.UtcNow - submissionPhaseStart).TotalSeconds;
+                _output.WriteLine($"Submission milestone reached after {elapsedMilestone:F0}s of status polling.");
+                return true;
             }
 
             string currentStatus;
@@ -85,7 +150,8 @@ public class ReportApiHelper
 
                 if (string.Equals(currentStatus, "Submitted", StringComparison.OrdinalIgnoreCase))
                 {
-                    _output.WriteLine($"Report submitted (after {retry * pollingIntervalSeconds}s).");
+                    var elapsed = (DateTime.UtcNow - submissionPhaseStart).TotalSeconds;
+                    _output.WriteLine($"Report submitted (after {elapsed:F0}s of status polling).");
                     return true;
                 }
             }
@@ -96,11 +162,24 @@ public class ReportApiHelper
                 lastStatus = currentStatus;
             }
 
-            await Task.Delay(pollingIntervalSeconds * 1000);
+            await Task.Delay(pollingInterval);
         }
 
-        _output.WriteLine($"Report {reportId} was not submitted after {maxRetryCount * pollingIntervalSeconds}s.");
+        _output.WriteLine($"Report {reportId} was not submitted before timeout.");
         return false;
+    }
+
+    public static TimeSpan GetEffectiveSubmissionTimeout(TestScenarioConfig config)
+    {
+        if (config.MaxPollingDurationMinutes <= 0)
+            return TimeSpan.MaxValue;
+
+        // Adaptive lower bound to avoid premature timeout on high-volume tests.
+        // Example: 1000 patients => at least ~20 minutes.
+        var adaptiveFloor = TimeSpan.FromSeconds(Math.Max(300, config.PatientIds.Count * 1.2));
+        return config.MaxPollingDuration > adaptiveFloor
+            ? config.MaxPollingDuration
+            : adaptiveFloor;
     }
 
     public async Task<Dictionary<string, object>> DownloadReportAsync(string facilityId, string reportId, TestScenarioConfig config, bool external = true)

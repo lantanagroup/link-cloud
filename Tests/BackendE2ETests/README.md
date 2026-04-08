@@ -14,17 +14,35 @@ The tests exercise the pipeline by:
 
 ## Test suites
 
-- `SmokeTest` - single-patient, fast feedback path.
-- `MegaPatientTest` - high-volume scenario.
-- `MultiPatientTest` - multi-patient volume scenario.
+| Suite | Description |
+|---|---|
+| `SmokeTest` | Single-patient, fast feedback path. |
+| `MultiPatientTest` | Multi-patient volume scenario. |
+| `MegaPatientTest` | High-volume stress scenario (thousands of resources). |
+| `MultiMeasureAdhocReportingTest` | Ad-hoc reporting across multiple measures simultaneously. |
+| `ReportScheduledWorkflowTest` | Scheduled (non-ad-hoc) report generation workflow. |
+| `RegenerateReportTest` | Re-generation of an existing report. |
+| `ApiStabilityTest` | Verifies API surface stability under normal conditions. |
 
 ## Project behavior highlights
 
-- **Deterministic generation** using explicit seeds.
+- **Deterministic generation** using explicit seeds — same inputs always produce the same FHIR bundles.
+- **Scenario-driven FHIR data** — patients are generated with clinically coherent resources driven by 16 clinical scenarios (pneumonia, MI, DKA, GI bleed, etc.) via `ScenarioResourceMap`.
+- **Measure-aware profiles** — `GenerateWithProfiles()` creates qualifying and non-qualifying patients for specific measures (ACH Monthly, ACH Daily, Hypo).
 - **Background diagnostics monitoring** with event-driven output.
 - **Deep ABS validation** via `ReportAbsManifestValidator`.
 - **Baseline comparison** for static test scenarios via `ValidationBaselineManager`.
 - **FHIR snapshot output** saved locally only when generated bundle content changes.
+
+## Architecture
+
+```
+BackendE2ETests
+├── references Automation.Link (orchestration, validation, config)
+├── references Automation (FHIR generation, helpers)
+├── references LinkSdk (service API clients)
+└── references Shared (common models, extensions)
+```
 
 ## Running
 
@@ -32,6 +50,12 @@ From repo root:
 
 ```bash
 dotnet test Tests/BackendE2ETests/BackendE2ETests.csproj
+```
+
+Run a specific suite:
+
+```bash
+dotnet test Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=SmokeTest"
 ```
 
 ## Configuration (environment variables)

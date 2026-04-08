@@ -37,6 +37,8 @@ public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETe
 
     public async Task InitializeAsync()
     {
+        _sp.GetRequiredService<PipelineDataReader>().InvalidateCache();
+
         Output.WriteLine($"Using deterministic generation seed: {GenerationSeed}");
         var (patientIds, bundles) = FhirBundleGenerator.Generate(Output, generationSeed: GenerationSeed);
         _generatedBundles = bundles;
@@ -108,9 +110,6 @@ public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETe
 
         Output.WriteLine($"MeasureId: {measureId}");
         Output.WriteLine($"Patients : {Config.PatientIds.Count}");
-        Output.WriteLine(
-            $"Submission polling timeout: up to {Config.MaxPollingDuration.TotalMinutes:F1} minutes " +
-            $"({Config.MaxRetryCount} checks every {Config.PollingIntervalSeconds} seconds).");
 
         // Step 2: Create facility.
         await FacilitySetupHelper.EnsureFacilityAsync(
@@ -174,6 +173,9 @@ public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETe
         }
 
         Output.WriteLine("Done generating and validating report.");
+
+        // Flush stale cache from diagnostics polling so validators read authoritative data.
+        dataReader.InvalidateCache();
 
         await _sp.GetRequiredService<ReportAbsManifestValidator>().ValidateAllAsync(
             internalAbsResources,

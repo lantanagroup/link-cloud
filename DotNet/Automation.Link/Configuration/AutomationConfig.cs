@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.Automation.Link.Configuration;
+﻿namespace LantanaGroup.Link.Automation.Link.Configuration;
 
 /// <summary>
 /// Configuration for the Link automation library.
@@ -27,23 +27,23 @@ public class AutomationConfig
     public class FhirQuerySettings
     {
         public int MaxConcurrentRequests { get; set; } = 8;
-        public TimeSpan MinAcquisitionPullTime { get; set; } = TimeSpan.FromHours(1);
-        public TimeSpan MaxAcquisitionPullTime { get; set; } = TimeSpan.FromHours(24);
-        public string TimeZone { get; set; } = "America/New_York";
+        public TimeSpan? MinAcquisitionPullTime { get; set; }
+        public TimeSpan? MaxAcquisitionPullTime { get; set; }
+        public string? TimeZone { get; set; }
     }
 
     public class DatabaseConfig
     {
-        public string Server { get; set; } = "localhost,1433";
-        public string UserId { get; set; } = "sa";
-        public string Password { get; set; } = "7h3I^xMY%cgO";
+        public string Server { get; set; } = string.Empty;
+        public string UserId { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
     }
 
     public class KafkaConfig
     {
-        public string BootstrapServers { get; set; } = "localhost:9094";
-        public string RestProxyBaseUrl { get; set; } = "http://localhost:8082";
-        public string User { get; set; } = "user";
-        public string Password { get; set; } = "password";
+        public string BootstrapServers { get; set; } = string.Empty;
+        public string RestProxyBaseUrl { get; set; } = string.Empty;
+        public string User { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
     }
 }

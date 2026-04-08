@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.Automation.Link.Configuration;
+ï»¿namespace LantanaGroup.Link.Automation.Link.Configuration;
 
 /// <summary>
 /// Configuration for a specific test scenario (smoke test, mega-patient test, etc.).
@@ -31,18 +31,23 @@ public class TestScenarioConfig
     public bool RemoveFacilityConfig { get; set; } = true;
     public bool RemoveReport { get; set; }
     public int PollingIntervalSeconds { get; set; } = 3;
-    public int MaxRetryCount { get; set; } = 60;
+
+    /// <summary>
+    /// Maximum wall-clock minutes the polling loop will run before timing out.
+    /// Zero or negative indicates unlimited polling.
+    /// </summary>
+    public int MaxPollingDurationMinutes { get; set; } = 3;
+
     public string DownloadFileName { get; set; } = "submission.zip";
     public int LokiScrapeWindowMinutes { get; set; } = 5;
 
     /// <summary>
-    /// The maximum wall-clock time the polling loop will run,
-    /// computed from <see cref="MaxRetryCount"/> × <see cref="PollingIntervalSeconds"/>.
-    /// Non-positive <see cref="MaxRetryCount"/> indicates unlimited polling.
+    /// The maximum wall-clock time the polling loop will run.
+    /// Zero or negative <see cref="MaxPollingDurationMinutes"/> indicates unlimited polling.
     /// </summary>
-    public TimeSpan MaxPollingDuration => MaxRetryCount <= 0
+    public TimeSpan MaxPollingDuration => MaxPollingDurationMinutes <= 0
         ? TimeSpan.MaxValue
-        : TimeSpan.FromSeconds(MaxRetryCount * PollingIntervalSeconds);
+        : TimeSpan.FromMinutes(MaxPollingDurationMinutes);
 
     /// <summary>
     /// The Loki scrape window as a <see cref="TimeSpan"/>.

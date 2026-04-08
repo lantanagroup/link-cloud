@@ -1,4 +1,4 @@
-namespace LantanaGroup.Automation.Helpers;
+﻿namespace LantanaGroup.Automation.Helpers;
 
 /// <summary>
 /// Platform-agnostic output abstraction for automation diagnostics.
@@ -13,26 +13,20 @@ public interface IAutomationOutput
 /// <summary>
 /// Writes automation output directly to <see cref="Console"/>.
 /// </summary>
-public sealed class ConsoleAutomationOutput : IAutomationOutput
+public class ConsoleAutomationOutput : IAutomationOutput
 {
     public void WriteLine(string message) => Console.WriteLine(message);
     public void WriteLine(string format, params object[] args) => Console.WriteLine(format, args);
 }
 
 /// <summary>
-/// Writes automation diagnostics directly to <see cref="Console"/>.
+/// Alias kept for backward compatibility with existing DI registrations.
+/// Functionally identical to <see cref="ConsoleAutomationOutput"/>.
+/// New code should use <see cref="ConsoleAutomationOutput"/> directly.
 /// </summary>
-public class DualOutputHelper : IAutomationOutput
+[Obsolete("Use ConsoleAutomationOutput instead. This alias exists only for backward compatibility.")]
+public class DualOutputHelper : ConsoleAutomationOutput
 {
-    public void WriteLine(string message)
-    {
-        Console.WriteLine(message);
-    }
-
-    public void WriteLine(string format, params object[] args)
-    {
-        Console.WriteLine(format, args);
-    }
 }
 
 /// <summary>

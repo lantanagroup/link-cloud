@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Automation.Link.Configuration;
+﻿using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
@@ -108,12 +108,19 @@ public static class FacilitySetupHelper
         IAutomationOutput output,
         string facilityId)
     {
+        // Keep concurrency high enough to avoid single-request bottlenecks,
+        // but cap it to reduce downstream service saturation in large volume runs.
+        var effectiveMaxConcurrentRequests = Math.Clamp(config.FhirQuery.MaxConcurrentRequests, 4, 8);
+
         var created = await dataAcqClient.CreateFhirQueryConfigurationAsync(new CreateFhirQueryConfigurationRequestApiModel
         {
             FacilityId = facilityId,
             FhirServerBaseUrl = config.InternalFhirServerBase,
-            MaxConcurrentRequests = config.FhirQuery.MaxConcurrentRequests,
-            MaxRetries = 3
+            MaxConcurrentRequests = effectiveMaxConcurrentRequests,
+            MaxRetries = 3,
+            MinAcquisitionPullTime = config.FhirQuery.MinAcquisitionPullTime,
+            MaxAcquisitionPullTime = config.FhirQuery.MaxAcquisitionPullTime,
+            TimeZone = config.FhirQuery.TimeZone
         });
 
         if (!created)

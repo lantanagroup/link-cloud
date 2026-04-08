@@ -1,5 +1,4 @@
-﻿using Automation.UI.Models;
-namespace Automation.UI.Services.Persistence;
+﻿namespace LantanaGroup.Link.Automation.Link.Models;
 
 /// <summary>
 /// Per-run, per-domain snapshot data stored in the database.
