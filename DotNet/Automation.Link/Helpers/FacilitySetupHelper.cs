@@ -110,7 +110,7 @@ public static class FacilitySetupHelper
     {
         // Keep concurrency high enough to avoid single-request bottlenecks,
         // but cap it to reduce downstream service saturation in large volume runs.
-        var effectiveMaxConcurrentRequests = Math.Clamp(config.FhirQuery.MaxConcurrentRequests, 1, 4);
+        var effectiveMaxConcurrentRequests = Math.Clamp(config.FhirQuery.MaxConcurrentRequests, 1, 8);
 
         var created = await dataAcqClient.CreateFhirQueryConfigurationAsync(new CreateFhirQueryConfigurationRequestApiModel
         {
