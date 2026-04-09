@@ -37,6 +37,7 @@ export class TableCommandComponent implements OnInit, OnDestroy {
   @Input() priority: string | undefined;
   @Input() status: string = '';
   @Input() createDate: string | Date | undefined;
+  @Input() cancelMinAgeHours: number = 0;
 
   @Output() queryLogAddedToQueue = new EventEmitter<string>();
   @Output() queryLogCancelled = new EventEmitter<string>();
@@ -49,9 +50,10 @@ export class TableCommandComponent implements OnInit, OnDestroy {
 
   get isCancelEligible(): boolean {
     if (['MaxRetriesReached', 'Completed', 'Cancelled', 'Skipped'].includes(this.status)) return false;
+    if (this.cancelMinAgeHours === 0) return true;
     if (!this.createDate) return false;
     const ageMs = Date.now() - new Date(this.createDate).getTime();
-    return ageMs > 24 * 60 * 60 * 1000;
+    return ageMs > this.cancelMinAgeHours * 60 * 60 * 1000;
   }
 
   private subscription = new Subscription();
@@ -123,8 +125,14 @@ export class TableCommandComponent implements OnInit, OnDestroy {
 
   cancelLog() {
     this.isOpen = false;
-    this.acquisitionLogService.cancelBulkAcquisitionLogs([this.acquisitionLogId]).subscribe({
-      next: () => this.queryLogCancelled.emit(this.acquisitionLogId),
+    this.acquisitionLogService.cancelBulkAcquisitionLogs([this.acquisitionLogId], this.cancelMinAgeHours).subscribe({
+      next: (result) => {
+        if (result?.cancelled > 0) {
+          this.queryLogCancelled.emit(this.acquisitionLogId);
+        } else {
+          console.warn(`Acquisition log ${this.acquisitionLogId} was not cancelled (ineligible).`);
+        }
+      },
       error: (error) => console.error('Error cancelling acquisition log:', error)
     });
   }

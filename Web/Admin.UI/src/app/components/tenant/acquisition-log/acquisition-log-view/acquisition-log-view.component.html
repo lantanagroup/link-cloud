@@ -204,13 +204,25 @@
           </mat-form-field>
         </div>
 
-        <div class="btn-group" role="group" aria-label="Filtering">
-          <mat-checkbox [(ngModel)]="includeDeleted" (change)="onIncludeDeletedChange()">
+        <div class="btn-group" role="group" aria-label="View options">
+          <mat-checkbox [(ngModel)]="includeDeleted" (change)="onIncludeDeletedChange()" style="margin-right: 16px;">
             Show Deleted
           </mat-checkbox>
+          <div class="cancel-filter-group">
+            <mat-checkbox [checked]="isStuckLogsFilterActive" (change)="toggleCancellableFilter($event.checked)"
+                          [matTooltip]="'Show only logs eligible for cancellation: non-terminal (Pending, Ready, Queued, Processing, Failed) and created more than ' + cancelMinAgeHours + ' hours ago.'">
+              Show Cancellable Logs
+            </mat-checkbox>
+            <mat-form-field appearance="outline" class="compact-filter cancel-age-field">
+              <mat-label>Min Age (hrs)</mat-label>
+              <input matInput type="number" min="0" [(ngModel)]="cancelMinAgeHours"
+                     (ngModelChange)="onCancelMinAgeChange()"
+                     matTooltip="Minimum age in hours a log must have before it can be cancelled.">
+            </mat-form-field>
+          </div>
+        </div>
 
-          <span style="flex: 1;"></span>
-
+        <div class="btn-group" role="group" aria-label="Actions">
           <button class="link-button secondary"
                   aria-label="Clear filters"
                   (click)="clearFilters()"
@@ -223,10 +235,8 @@
             <fa-icon [icon]="faRotate"></fa-icon>
             Refresh
           </button>
-        </div>
 
-        @if (selectedFacilityFilter !== 'Any') {
-          <div class="btn-group">
+          @if (reportIdFromRoute && selectedFacilityFilter !== 'Any') {
             <button type="button" class="link-button warning" (click)="disableLogsByFacility()"
                     matTooltip="Soft-delete all acquisition logs for the selected facility">
               <fa-icon [icon]="faBan"></fa-icon>
@@ -237,32 +247,29 @@
               <fa-icon [icon]="faArrowRotateLeft"></fa-icon>
               Restore Logs
             </button>
-          </div>
-        }
-
-        <button type="button" class="link-button error" (click)="applyStuckLogsFilter()"
-                matTooltip="Filter to Pending, Ready, Queued, Processing, and Failed logs. The Cancel option in each row's menu is only available for logs created more than 24 hours ago.">
-          <fa-icon [icon]="faBan" style="margin-right: 5px;"></fa-icon>
-          Stuck Logs
-        </button>
+          }
 
         @if (selectedLogIds.size > 0 || isAllSelected) {
-          <div class="btn-group">
-            <button type="button" class="link-button secondary" (click)="clearSelection()">
-              Clear Selection
-            </button>
-            <button type="button" class="link-button success" [disabled]="selectedLogIds.size === 0 && !isAllSelected" (click)="bulkExecute()">
-              <fa-icon [icon]="faPlus" style="margin-right: 5px;"></fa-icon>
-              Execute Selected ({{ isAllSelected ? paginationMetadata.totalCount : selectedLogIds.size }})
-            </button>
-            @if (selectedLogIds.size > 0 || (isAllSelected && isStuckLogsFilterActive)) {
-              <button type="button" class="link-button error" (click)="bulkCancel()" matTooltip="Only Pending, Ready, and Queued logs can be cancelled. When all rows are selected, cancels the current page only.">
-                <fa-icon [icon]="faBan" style="margin-right: 5px;"></fa-icon>
-                Cancel Selected ({{ isAllSelected ? acquisitionLogs.length : selectedLogIds.size }})
-              </button>
-            }
-          </div>
+          <button type="button" class="link-button secondary" (click)="clearSelection()">
+            Clear Selection
+          </button>
+          <button type="button" class="link-button success" [disabled]="selectedLogIds.size === 0 && !isAllSelected" (click)="bulkExecute()">
+            <fa-icon [icon]="faPlus" style="margin-right: 5px;"></fa-icon>
+            Execute Selected ({{ isAllSelected ? paginationMetadata.totalCount : selectedLogIds.size }})
+          </button>
+          <button type="button" class="link-button error" (click)="bulkCancel()" [disabled]="!canBulkCancel"
+            [matTooltip]="canBulkCancel
+              ? (isAllSelected
+                ? 'Cancels every non-terminal log matching the current filters older than ' + cancelMinAgeHours + ' hours.'
+                : 'Only non-terminal logs older than ' + cancelMinAgeHours + ' hours will be cancelled.')
+              : (isAllSelected
+                ? 'No eligible logs to cancel. Only non-terminal logs older than ' + cancelMinAgeHours + ' hours qualify.'
+                : 'None of the selected logs can be cancelled. Only non-terminal logs older than ' + cancelMinAgeHours + ' hours are eligible.')">
+            <fa-icon [icon]="faBan" style="margin-right: 5px;"></fa-icon>
+            Cancel Selected ({{ isAllSelected ? (canBulkCancel ? paginationMetadata.totalCount : 0) : eligibleSelectedCount }})
+          </button>
         }
+        </div>
       </div>
     </div>
     @if (acquisitionLogs.length > 0) {
@@ -342,9 +349,11 @@
               'priority-critical': log.priority === 'Critical',
               'priority-high': log.priority === 'High',
               'row-deleted': log.isDeleted,
-              'row-status-failed': (log.status === 'Failed' || log.status === 'MaxRetriesReached') && log.priority !== 'Critical' && log.priority !== 'High'
+              'row-status-failed': (log.status === 'Failed' || log.status === 'MaxRetriesReached') && log.priority !== 'Critical' && log.priority !== 'High',
+              'row-cancel-ineligible': !isLogCancelEligible(log)
             }">
-              <td class="table-cell" style="position: relative;">
+              <td class="table-cell" style="position: relative;"
+                  [matTooltip]="!isLogCancelEligible(log) ? 'Not eligible for cancellation (terminal status or less than ' + cancelMinAgeHours + ' hours old). Can still be executed.' : ''">
                   @if (allowLogSelection)
                   {
                     <mat-checkbox [checked]="isLogSelected(log.id)" (change)="toggleSelection(log.id)" [disabled]="!allowLogSelection"></mat-checkbox>
@@ -429,6 +438,7 @@
                     [priority]="log.priority"
                     [status]="log.status"
                     [createDate]="log.createDate"
+                    [cancelMinAgeHours]="cancelMinAgeHours"
                     (queryLogAddedToQueue)="handleLogScheduled($event)"
                     (queryLogCancelled)="handleLogCancelled($event)">
                   </app-table-command>

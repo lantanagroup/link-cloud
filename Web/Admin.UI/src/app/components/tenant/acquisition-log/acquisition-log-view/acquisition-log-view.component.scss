@@ -121,6 +121,40 @@ $skipped-status: #ffbf00;
   &:hover { background-color: rgba(161, 3, 14, 0.15) !important; }
 }
 
+.row-cancel-ineligible {
+  .mat-mdc-checkbox { opacity: 0.5; }
+}
+
+.cancel-filter-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 4px 10px;
+  background-color: #f9fafb;
+}
+
+.cancel-age-field {
+  width: 110px;
+  flex: 0 0 auto;
+
+  input { text-align: right; font-weight: 600; }
+
+  ::ng-deep .mat-mdc-form-field-subscript-wrapper { display: none; }
+
+  ::ng-deep .mdc-floating-label {
+    font-weight: 600;
+    color: #1f2937;
+  }
+}
+
+// Tighten the gap between the checkbox and its label (e.g. "Show Deleted")
+.mat-mdc-checkbox label.mdc-label {
+  padding-left: 0 !important;
+  margin-left: -4px;
+}
+
 .animate-spin {
   height: 1.25rem;
   width: 1.25rem;

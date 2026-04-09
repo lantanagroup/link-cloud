@@ -27,6 +27,8 @@ import {LoadingService} from 'src/app/services/loading.service';
 import {finalize, forkJoin} from 'rxjs';
 import {TenantService} from 'src/app/services/gateway/tenant/tenant.service';
 import {MatDialogModule} from '@angular/material/dialog';
+import {MatSnackBar} from '@angular/material/snack-bar';
+import {SnackbarHelper} from 'src/app/services/snackbar-helper';
 import {MatFormFieldModule} from '@angular/material/form-field';
 import {MatInputModule} from '@angular/material/input';
 import {MatAutocompleteModule} from '@angular/material/autocomplete';
@@ -156,6 +158,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   isAllSelected: boolean = false;
   includeDeleted: boolean = false;
   isStuckLogsFilterActive: boolean = false;
+  createdBeforeFilter: string | null = null;
   statusChartExpanded: boolean = false;
   statusChartData: Record<string, number> = {};
   statusChartLoading = false;
@@ -168,7 +171,50 @@ export class AcquisitionLogViewComponent implements OnInit {
     private loadingService: LoadingService,
     private tenantService: TenantService,
     private reportService: ReportService,
-    private acquisitionLogService: AcquisitionLogService) { }
+    private acquisitionLogService: AcquisitionLogService,
+    private snackBar: MatSnackBar) { }
+
+  private readonly TERMINAL_STATUSES = ['Completed', 'MaxRetriesReached', 'Skipped', 'Cancelled'];
+  cancelMinAgeHours: number = 0;
+
+  private get cancelMinAgeMs(): number {
+    return this.cancelMinAgeHours * 60 * 60 * 1000;
+  }
+
+  isLogCancelEligible(log: AcquisitionLogSummary): boolean {
+    if (this.TERMINAL_STATUSES.includes(log.status)) return false;
+    if (this.cancelMinAgeHours === 0) return true;
+    if (!log.createDate) return false;
+    return (Date.now() - new Date(log.createDate).getTime()) > this.cancelMinAgeMs;
+  }
+
+  get eligibleSelectedCount(): number {
+    if (this.isAllSelected) {
+      return this.acquisitionLogs.filter(l => this.isLogCancelEligible(l)).length;
+    }
+    return this.acquisitionLogs.filter(l => this.selectedLogIds.has(l.id) && this.isLogCancelEligible(l)).length;
+  }
+
+  get canBulkCancel(): boolean {
+    if (this.isAllSelected) {
+      // In Select-All mode the count shown is paginationMetadata.totalCount, which only
+      // matches cancel-eligibility when the Cancellable Logs filter is active.
+      return this.isStuckLogsFilterActive;
+    }
+    return this.eligibleSelectedCount > 0;
+  }
+
+  get hasCancelEligibleOnPage(): boolean {
+    return this.acquisitionLogs.some(l => this.isLogCancelEligible(l));
+  }
+
+  selectCancelEligibleOnPage(): void {
+    this.isAllSelected = false;
+    this.selectedLogIds.clear();
+    this.acquisitionLogs
+      .filter(l => this.isLogCancelEligible(l))
+      .forEach(l => this.selectedLogIds.add(l.id));
+  }
 
   ngOnInit(): void {
     const savedPageSize = localStorage.getItem(this.PAGE_SIZE_KEY);
@@ -252,7 +298,8 @@ export class AcquisitionLogViewComponent implements OnInit {
       pageNumber,
       pageSize,
       showLoadingIndicator,
-      this.includeDeleted
+      this.includeDeleted,
+      this.createdBeforeFilter
     )
     .pipe(
       finalize(() => this.loadingService.hide())
@@ -333,6 +380,7 @@ export class AcquisitionLogViewComponent implements OnInit {
       case 'status':
         this.selectedStatusFilter = [];
         this.isStuckLogsFilterActive = false;
+        this.createdBeforeFilter = null;
         break;
       case 'reportId':
         this.reportIdFilter = this.reportIdFromRoute;
@@ -425,6 +473,7 @@ export class AcquisitionLogViewComponent implements OnInit {
     this.selectedQueryTypeFilter = 'Any';
     this.selectedStatusFilter = [];
     this.isStuckLogsFilterActive = false;
+    this.createdBeforeFilter = null;
     this.onFilterApplication();
     this.clearSelection();
     this.loadLogs(this.defaultPageNumber, this.defaultPageSize, true);
@@ -461,17 +510,43 @@ export class AcquisitionLogViewComponent implements OnInit {
   applyStuckLogsFilter(): void {
     this.selectedStatusFilter = ['Pending', 'Ready', 'Queued', 'Processing', 'Failed'];
     this.isStuckLogsFilterActive = true;
+    this.createdBeforeFilter = this.cancelMinAgeHours > 0
+      ? new Date(Date.now() - this.cancelMinAgeMs).toISOString()
+      : null;
     this.applyFilters();
+  }
+
+  onCancelMinAgeChange(): void {
+    if (this.cancelMinAgeHours == null || isNaN(this.cancelMinAgeHours) || this.cancelMinAgeHours < 0) {
+      this.cancelMinAgeHours = 0;
+    }
+    this.cancelMinAgeHours = Math.floor(this.cancelMinAgeHours);
+    if (this.isStuckLogsFilterActive) {
+      this.applyStuckLogsFilter();
+    }
+  }
+
+  toggleCancellableFilter(checked: boolean): void {
+    if (checked) {
+      this.applyStuckLogsFilter();
+    } else {
+      this.selectedStatusFilter = [];
+      this.isStuckLogsFilterActive = false;
+      this.createdBeforeFilter = null;
+      this.applyFilters();
+    }
   }
 
   handleLogCancelled(logId: string): void {
     const index = this.acquisitionLogs.findIndex(log => log.id === logId);
     if (index !== -1) {
-      this.acquisitionLogs[index].status = 'Cancelled';
+      this.acquisitionLogs[index] = { ...this.acquisitionLogs[index], status: 'Cancelled' };
     }
   }
 
   bulkExecute() {
+    const BULK_EXECUTE_MAX = 1000;
+
     if (!this.isAllSelected && this.selectedLogIds.size === 0) {
       return;
     }
@@ -490,7 +565,22 @@ export class AcquisitionLogViewComponent implements OnInit {
       if (this.selectedLogIds.size === 0) {
         return;
       }
-    } else {
+
+      if (this.selectedLogIds.size > BULK_EXECUTE_MAX) {
+        alert(`Cannot execute more than ${BULK_EXECUTE_MAX} acquisition logs at once. You selected ${this.selectedLogIds.size}.`);
+        return;
+      }
+    }
+
+    const confirmMsg = this.isAllSelected
+      ? `Execute all acquisition logs matching the current filters?`
+      : `Execute ${this.selectedLogIds.size} acquisition log${this.selectedLogIds.size === 1 ? '' : 's'}?`;
+
+    if (!window.confirm(confirmMsg)) {
+      return;
+    }
+
+    if (this.isAllSelected) {
       this.selectedLogIds.clear();
     }
 
@@ -506,7 +596,8 @@ export class AcquisitionLogViewComponent implements OnInit {
         this.selectedQueryTypeFilter !== 'Any' ? this.selectedQueryTypeFilter : null,
         this.selectedQueryPhaseFilter !== 'Any' ? this.selectedQueryPhaseFilter : null,
         this.selectedStatusFilter.length > 0 ? this.selectedStatusFilter : null,
-        this.selectedPriorityFilter !== 'Any' ? this.selectedPriorityFilter : null
+        this.selectedPriorityFilter !== 'Any' ? this.selectedPriorityFilter : null,
+        this.createdBeforeFilter
       );
     } else {
       obs$ = this.acquisitionLogService.bulkExecuteAcquisitionLogs(Array.from(this.selectedLogIds));
@@ -520,42 +611,92 @@ export class AcquisitionLogViewComponent implements OnInit {
       })
     ).subscribe({
       next: () => {
-        console.log('Bulk execution triggered successfully');
+        SnackbarHelper.showSuccessMessage(this.snackBar, 'Acquisition logs queued for execution.');
       },
       error: (error) => {
         console.error('Error triggering bulk execution:', error);
+        SnackbarHelper.showErrorMessage(this.snackBar, 'Error queueing acquisition logs for execution.');
       }
     });
   }
 
   bulkCancel() {
-    let ids: string[];
+    const BULK_CANCEL_MAX = 1000;
 
-    if (this.isAllSelected) {
-      ids = this.acquisitionLogs.map(log => log.id);
-    } else {
-      if (this.selectedLogIds.size === 0) return;
-      ids = Array.from(this.selectedLogIds);
+    if (!this.isAllSelected && this.selectedLogIds.size === 0) {
+      return;
     }
 
-    if (ids.length === 0) return;
+    // Filter to only cancel-eligible ids (non-terminal + >24h). Ineligible selections are dropped.
+    const eligibleIds = this.isAllSelected
+      ? []
+      : this.acquisitionLogs
+          .filter(l => this.selectedLogIds.has(l.id) && this.isLogCancelEligible(l))
+          .map(l => l.id);
+
+    if (!this.isAllSelected && eligibleIds.length === 0) {
+      SnackbarHelper.showErrorMessage(this.snackBar, 'None of the selected logs are eligible for cancellation.');
+      return;
+    }
+
+    if (!this.isAllSelected && eligibleIds.length > BULK_CANCEL_MAX) {
+      alert(`Cannot cancel more than ${BULK_CANCEL_MAX} acquisition logs at once. ${eligibleIds.length} eligible were selected.`);
+      return;
+    }
+
+    const skipped = this.isAllSelected ? 0 : this.selectedLogIds.size - eligibleIds.length;
+    const confirmMsg = this.isAllSelected
+      ? `Cancel all acquisition logs matching the current filters? This cannot be undone.`
+      : `Cancel ${eligibleIds.length} acquisition log${eligibleIds.length === 1 ? '' : 's'}?${skipped > 0 ? ` (${skipped} ineligible will be skipped.)` : ''} This cannot be undone.`;
+
+    if (!window.confirm(confirmMsg)) {
+      return;
+    }
 
     this.loadingService.show();
-    this.acquisitionLogService.cancelBulkAcquisitionLogs(ids)
-      .pipe(
-        finalize(() => {
-          this.loadingService.hide();
-          this.clearSelection();
-          this.refreshLogs();
-        })
-      ).subscribe({
-        next: () => {
-          console.log('Bulk cancellation triggered successfully');
-        },
-        error: (error) => {
-          console.error('Error triggering bulk cancellation:', error);
+    let obs$;
+    if (this.isAllSelected) {
+      obs$ = this.acquisitionLogService.cancelAcquisitionLogsByFilter(
+        this.patientFilter !== 'Any' ? this.patientFilter : null,
+        this.selectedFacilityFilter !== 'Any' ? this.selectedFacilityFilter : null,
+        this.reportIdFilter.length > 0 ? this.reportIdFilter : null,
+        this.selectedResourceTypeFilter !== 'Any' ? this.selectedResourceTypeFilter : null,
+        this.resourceIdFilter.length > 0 ? this.resourceIdFilter : null,
+        this.selectedQueryTypeFilter !== 'Any' ? this.selectedQueryTypeFilter : null,
+        this.selectedQueryPhaseFilter !== 'Any' ? this.selectedQueryPhaseFilter : null,
+        this.selectedStatusFilter.length > 0 ? this.selectedStatusFilter : null,
+        this.selectedPriorityFilter !== 'Any' ? this.selectedPriorityFilter : null,
+        this.createdBeforeFilter,
+        this.cancelMinAgeHours
+      );
+    } else {
+      obs$ = this.acquisitionLogService.cancelBulkAcquisitionLogs(eligibleIds, this.cancelMinAgeHours);
+    }
+
+    obs$.pipe(
+      finalize(() => {
+        this.loadingService.hide();
+        this.clearSelection();
+        this.refreshLogs();
+      })
+    ).subscribe({
+      next: (result) => {
+        const cancelled = result?.cancelled ?? 0;
+        const requested = result?.requested ?? 0;
+        const ineligible = result?.ineligible ?? 0;
+        if (cancelled === 0) {
+          SnackbarHelper.showErrorMessage(this.snackBar, `No logs were cancelled. ${ineligible} were not eligible (terminal status or less than ${this.cancelMinAgeHours} hours old).`);
+        } else if (ineligible > 0) {
+          SnackbarHelper.showSuccessMessage(this.snackBar, `Cancelled ${cancelled} of ${requested} logs. ${ineligible} were not eligible.`);
+        } else {
+          SnackbarHelper.showSuccessMessage(this.snackBar, `Cancelled ${cancelled} log${cancelled === 1 ? '' : 's'}.`);
         }
-      });
+      },
+      error: (error) => {
+        console.error('Error triggering bulk cancellation:', error);
+        SnackbarHelper.showErrorMessage(this.snackBar, 'Error cancelling acquisition logs.');
+      }
+    });
   }
 
   disableLogsByFacility(): void {

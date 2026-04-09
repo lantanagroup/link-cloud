@@ -837,6 +837,11 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 log.FhirQueries.Any(q => q.FhirQueryResourceTypes.Any(r => r.ResourceType == resourceType)));
         }
 
+        if (model.CreatedBefore.HasValue)
+        {
+            query = query.Where(log => log.CreateDate <= model.CreatedBefore.Value);
+        }
+
         return query;
     }
 

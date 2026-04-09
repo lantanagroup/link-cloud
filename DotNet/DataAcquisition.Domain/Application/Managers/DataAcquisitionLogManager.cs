@@ -21,7 +21,7 @@ public interface IDataAcquisitionLogManager
     Task<DataAcquisitionLogModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default);
     Task<int> UpdateStatusBatchAsync(IEnumerable<long> ids, RequestStatus newStatus, CancellationToken cancellationToken = default);
     Task<int> IncrementRetriesAndSetStatusAsync(IEnumerable<long> ids, RequestStatus newStatus, CancellationToken cancellationToken = default);
-    Task<int> CancelBulkAsync(IEnumerable<long> ids, CancellationToken cancellationToken = default);
+    Task<int> CancelBulkAsync(IEnumerable<long> ids, int minAgeHours, CancellationToken cancellationToken = default);
     Task<List<DataAcquisitionLog>> GetLogsByIdsAsync(List<long> ids, CancellationToken cancellationToken = default);
     Task DeleteAsync(long id, CancellationToken cancellationToken = default);
     Task<int> SoftDeleteByFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
@@ -357,14 +357,18 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                 cancellationToken);
     }
 
-    public async Task<int> CancelBulkAsync(IEnumerable<long> ids, CancellationToken cancellationToken = default)
+    public async Task<int> CancelBulkAsync(IEnumerable<long> ids, int minAgeHours, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.CancelBulkAsync");
 
-        var cancellableStatuses = new[] { RequestStatus.Pending, RequestStatus.Ready, RequestStatus.Queued };
+        var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.Cancelled };
+        var minAgeCutoff = DateTime.UtcNow.AddHours(-minAgeHours);
 
         return await _dbContext.DataAcquisitionLogs
-            .Where(l => ids.Contains(l.Id) && l.Status != null && cancellableStatuses.Contains(l.Status.Value))
+            .Where(l => ids.Contains(l.Id)
+                && l.Status != null
+                && !terminalStatuses.Contains(l.Status.Value)
+                && l.CreateDate <= minAgeCutoff)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(l => l.Status, RequestStatus.Cancelled)
                 .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
