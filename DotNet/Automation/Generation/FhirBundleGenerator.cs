@@ -150,7 +150,7 @@ public static class FhirBundleGenerator
         }
 
         // ------------------------------------------------------------------
-        // Chunk into batch bundles
+        // Chunk into transaction bundles
         // ------------------------------------------------------------------
         var bundles = new List<(string Name, string Json)>();
         var currentChunk = new List<Bundle.EntryComponent>(sharedEntries);
@@ -178,7 +178,7 @@ public static class FhirBundleGenerator
             bundles.Add(($"{currentPatientId}_chunk{chunkIndex:D2}", Serialize(currentChunk)));
         }
 
-        output.WriteLine($"Generated {bundles.Count} batch bundles for {patientCount} patients.");
+        output.WriteLine($"Generated {bundles.Count} transaction bundles for {patientCount} patients.");
         return (patientIds, bundles);
     }
 
@@ -549,7 +549,7 @@ public static class FhirBundleGenerator
 
     private static string Serialize(List<Bundle.EntryComponent> entries)
     {
-        var bundle = new Bundle { Type = Bundle.BundleType.Batch, Entry = entries };
+        var bundle = new Bundle { Type = Bundle.BundleType.Transaction, Entry = entries };
         return JsonSerializer.Serialize(bundle, FhirSerializerOptions.ForFhirWithoutValidation());
     }
 

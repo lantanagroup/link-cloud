@@ -39,9 +39,6 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         try
         {
             _runs.Indexes.CreateOne(new CreateIndexModel<AutomationRunDocument>(
-                Builders<AutomationRunDocument>.IndexKeys.Ascending(r => r.RunId),
-                new CreateIndexOptions { Unique = true }));
-            _runs.Indexes.CreateOne(new CreateIndexModel<AutomationRunDocument>(
                 Builders<AutomationRunDocument>.IndexKeys.Descending(r => r.CreatedAt)));
 
             _snapshots.Indexes.CreateOne(new CreateIndexModel<DomainSnapshotDocument>(
@@ -49,9 +46,6 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                     .Ascending(s => s.RunId)
                     .Ascending(s => s.Domain),
                 new CreateIndexOptions { Unique = true }));
-
-            _logs.Indexes.CreateOne(new CreateIndexModel<RunLogDocument>(
-                Builders<RunLogDocument>.IndexKeys.Ascending(l => l.RunId)));
         }
         catch (Exception ex)
         {
