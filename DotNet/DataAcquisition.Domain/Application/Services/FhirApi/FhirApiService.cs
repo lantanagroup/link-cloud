@@ -319,6 +319,7 @@ public class FhirApiService : IFhirApiService
 
         // Deduplicate incoming resources — a bundle page can contain the same resource twice
         var seen = new HashSet<string>(StringComparer.Ordinal);
+        var now = DateTime.UtcNow;
 
         foreach (var resource in resources)
         {

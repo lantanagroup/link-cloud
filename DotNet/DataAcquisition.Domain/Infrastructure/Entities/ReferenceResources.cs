@@ -6,18 +6,22 @@ using IndexAttribute = Microsoft.EntityFrameworkCore.IndexAttribute;
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
 [Index("DataAcquisitionLogId", Name = "IX_ReferenceResources_DataAcquisitionLogId")]
+[Index("FacilityId", "ResourceType", "ResourceId", Name = "IX_ReferenceResources_Facility_Type_ResourceId")]
 public partial class ReferenceResources
 {
     [Key]
     public Guid Id { get; set; }
 
     [Required]
+    [MaxLength(256)]
     public string FacilityId { get; set; }
 
     [Required]
+    [MaxLength(256)]
     public string ResourceId { get; set; }
 
     [Required]
+    [MaxLength(128)]
     public string ResourceType { get; set; }
 
     [Column("ReferenceResource")]

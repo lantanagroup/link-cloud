@@ -88,15 +88,13 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
             throw new KeyNotFoundException($"ReferenceResources with ID {model.Id} not found.");
         }
 
-        var updatedEntity = await _dbContext.ReferenceResources
-            .AsNoTracking()
-            .SingleOrDefaultAsync(r => r.Id == model.Id, cancellationToken);
-
-        if (updatedEntity == null)
+        return new ReferenceResourcesModel
         {
-            throw new KeyNotFoundException($"ReferenceResources with ID {model.Id} not found.");
-        }
-
-        return ReferenceResourcesModel.FromDomain(updatedEntity);
+            Id = model.Id,
+            QueryPhase = model.QueryPhase,
+            ResourceType = model.ResourceType,
+            ReferenceResource = model.ReferenceResource,
+            ModifyDate = modifyDate
+        };
     }
 }
