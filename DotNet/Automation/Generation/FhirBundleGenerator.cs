@@ -29,33 +29,26 @@ public static class FhirBundleGenerator
     public const string OutpatientLocationId = "Gen-Location-Outpatient";
     public const string HospitalOrgId = "Gen-Org-Hospital";
 
-    private static readonly (string ResourceType, double Fraction)[] ResourceDistribution =
-    [
-        ("Observation",               0.28),
-        ("Condition",                 0.08),
-        ("Procedure",                 0.07),
-        ("Medication",                0.03),
-        ("MedicationRequest",         0.06),
-        ("MedicationAdministration",  0.07),
-        ("DiagnosticReport",          0.06),
-        ("ServiceRequest",            0.07),
-        ("Coverage",                  0.01),
-        ("Specimen",                  0.06),
-        ("AllergyIntolerance",        0.02),
-        ("Immunization",              0.03),
-        ("ImagingStudy",              0.02),
-        ("CareTeam",                  0.01),
-        ("CarePlan",                  0.01),
-        ("DocumentReference",         0.02),
-        ("Provenance",                0.02),
-    ];
+    /// <summary>
+    /// Shared Medication for the insulin glargine concept (RxNorm 274783) used by
+    /// the Hypoglycemic measure value set. This is distinct from the formulary entry
+    /// at index 8 (RxNorm 1116635) which is a different clinical drug concept.
+    /// </summary>
+    public const string HypoInsulinGlargineMedicationId = "Gen-Medication-HypoInsulinGlargine";
+
+    private static (string ResourceType, double Fraction)[] ResolveDistribution(FhirGenerationConfig? config)
+    {
+        var dict = (config ?? new FhirGenerationConfig()).ResourceDistribution;
+        return dict.Select(kv => (kv.Key, kv.Value)).ToArray();
+    }
 
     public static (List<string> PatientIds, List<(string Name, string Json)> Bundles) Generate(
         IAutomationOutput output,
         int patientCount = DefaultPatientCount,
         int totalResourcesPerPatient = DefaultResourcesPerPatient,
         string patientIdPrefix = "MegaPatient",
-        int? generationSeed = null)
+        int? generationSeed = null,
+        FhirGenerationConfig? config = null)
     {
         var patientIds = new List<string>();
         var allEntries = new List<(string PatientId, List<Bundle.EntryComponent> Entries)>();
@@ -87,6 +80,8 @@ public static class FhirBundleGenerator
             sharedPractitionerIds.Add(practId);
             sharedEntries.Add(Entry($"Practitioner/{practId}", PractitionerFactory.Generate(practId, pi)));
         }
+
+        var sharedMedicationIds = GenerateSharedMedications(sharedEntries);
 
         // ------------------------------------------------------------------
         // Per-patient generation
@@ -140,7 +135,7 @@ public static class FhirBundleGenerator
             var scenarioIdx = Mod(patientSeed, FhirGenerationCodes.ClinicalScenarios.Length);
             GenerateScenarioDrivenResources(entries, scenarioIdx, patientId, encounterId,
                 encStart, encEnd, primaryDxId, attendingPractId, careTeamId, patientIdPrefix,
-                totalResourcesPerPatient, baseSeed, p, sharedPractitionerIds);
+                totalResourcesPerPatient, baseSeed, p, sharedPractitionerIds, sharedMedicationIds, config);
 
             output.WriteLine($"  Patient {patientId}: {entries.Count} entries | scenario={scenario.PrimaryDxDisplay} | " +
                              $"encounter={encounterId} LOS={(encEnd - encStart).TotalDays:F1}d " +
@@ -195,7 +190,8 @@ public static class FhirBundleGenerator
         IReadOnlyList<PatientProfile> profiles,
         int totalResourcesPerPatient = DefaultResourcesPerPatient,
         string patientIdPrefix = "ProfilePatient",
-        int? generationSeed = null)
+        int? generationSeed = null,
+        FhirGenerationConfig? config = null)
     {
         return GenerateWithProfiles(
             output,
@@ -203,7 +199,8 @@ public static class FhirBundleGenerator
             profiles,
             totalResourcesPerPatient,
             patientIdPrefix,
-            generationSeed);
+            generationSeed,
+            config);
     }
 
     /// <summary>
@@ -216,9 +213,10 @@ public static class FhirBundleGenerator
         IReadOnlyList<PatientProfile> profiles,
         int totalResourcesPerPatient = DefaultResourcesPerPatient,
         string patientIdPrefix = "ProfilePatient",
-        int? generationSeed = null)
+        int? generationSeed = null,
+        FhirGenerationConfig? config = null)
     {
-        return GenerateWithProfiles(output, [measure], profiles, totalResourcesPerPatient, patientIdPrefix, generationSeed);
+        return GenerateWithProfiles(output, [measure], profiles, totalResourcesPerPatient, patientIdPrefix, generationSeed, config);
     }
 
     /// <summary>
@@ -233,7 +231,8 @@ public static class FhirBundleGenerator
         IReadOnlyList<PatientProfile> profiles,
         int totalResourcesPerPatient = DefaultResourcesPerPatient,
         string patientIdPrefix = "ProfilePatient",
-        int? generationSeed = null)
+        int? generationSeed = null,
+        FhirGenerationConfig? config = null)
     {
         if (measures == null || measures.Count == 0)
             throw new ArgumentException("At least one measure is required.", nameof(measures));
@@ -262,7 +261,8 @@ public static class FhirBundleGenerator
             totalResourcesPerPatient,
             patientIdPrefix,
             generationSeed,
-            requireDiabeticMedicationForQualifying: requireDiabeticMed);
+            requireDiabeticMedicationForQualifying: requireDiabeticMed,
+            config: config);
     }
 
     private static (List<string> PatientIds, List<(string Name, string Json)> Bundles) GenerateWithProfilesForNhsnAcuteCareHospital(
@@ -271,7 +271,8 @@ public static class FhirBundleGenerator
         int totalResourcesPerPatient = DefaultResourcesPerPatient,
         string patientIdPrefix = "ProfilePatient",
         int? generationSeed = null,
-        bool requireDiabeticMedicationForQualifying = false)
+        bool requireDiabeticMedicationForQualifying = false,
+        FhirGenerationConfig? config = null)
     {
         var patientIds = new List<string>();
         var allEntries = new List<(string PatientId, List<Bundle.EntryComponent> Entries)>();
@@ -306,6 +307,8 @@ public static class FhirBundleGenerator
             sharedPractitionerIds.Add(practId);
             sharedEntries.Add(Entry($"Practitioner/{practId}", PractitionerFactory.Generate(practId, pi)));
         }
+
+        var sharedMedicationIds = GenerateSharedMedications(sharedEntries);
 
         // ------------------------------------------------------------------
         // Per-patient generation — profile-driven
@@ -424,7 +427,7 @@ public static class FhirBundleGenerator
             var scenarioIdx = Mod(patientSeed, FhirGenerationCodes.ClinicalScenarios.Length);
             GenerateScenarioDrivenResources(entries, scenarioIdx, patientId, encounterId,
                 encStart, encEnd, primaryDxId, attendingPractId, careTeamId, patientIdPrefix,
-                totalResourcesPerPatient, baseSeed, p, sharedPractitionerIds);
+                totalResourcesPerPatient, baseSeed, p, sharedPractitionerIds, sharedMedicationIds, config);
 
             var tag = profile.Eligibility == MeasureEligibility.Qualifying ? "QUALIFYING" : "NON-QUALIFYING";
             output.WriteLine($"  Patient {patientId}: {entries.Count} entries [{tag}] | scenario={scenario.PrimaryDxDisplay} | " +
@@ -482,20 +485,12 @@ public static class FhirBundleGenerator
         const string diabetesIndicationCode = "44054006";
         const string diabetesIndicationDisplay = "Diabetes mellitus type 2";
 
-        var medicationId = $"{patientId}-Medication-ADD-001";
+        // Shared formulary Medication for insulin glargine (RxNorm 274783).
+        // The Medication resource itself is already in sharedEntries; we only need
+        // the per-patient MedicationRequest and MedicationAdministration.
         var medicationRequestId = $"{patientId}-MedicationRequest-ADD-001";
         var medicationAdministrationId = $"{patientId}-MedicationAdministration-ADD-001";
         var medicationTime = encounterStart.AddHours(1);
-
-        entries.Add(Entry($"Medication/{medicationId}",
-            MedicationFactory.Create(
-                medicationId,
-                insulinRxNorm,
-                insulinDisplay,
-                20,
-                "[iU]",
-                subcutaneousRouteCode,
-                subcutaneousRouteDisplay)));
 
         entries.Add(Entry($"MedicationRequest/{medicationRequestId}",
             MedicationRequestFactory.Create(
@@ -514,7 +509,8 @@ public static class FhirBundleGenerator
                 1,
                 false,
                 diabetesIndicationCode,
-                diabetesIndicationDisplay)));
+                diabetesIndicationDisplay,
+                medicationRefId: HypoInsulinGlargineMedicationId)));
 
         entries.Add(Entry($"MedicationAdministration/{medicationAdministrationId}",
             MedicationAdministrationFactory.Create(
@@ -533,7 +529,7 @@ public static class FhirBundleGenerator
                 diabetesIndicationCode,
                 diabetesIndicationDisplay,
                 infusionPeriod: false,
-                medicationRefId: null)));
+                medicationRefId: HypoInsulinGlargineMedicationId)));
     }
 
     // ------------------------------------------------------------------
@@ -591,7 +587,9 @@ public static class FhirBundleGenerator
         int totalResourcesPerPatient,
         int baseSeed,
         int patientOrdinal,
-        List<string> sharedPractitionerIds)
+        List<string> sharedPractitionerIds,
+        List<string> sharedMedicationIds,
+        FhirGenerationConfig? config = null)
     {
         // Build scenario-appropriate index subsets
         var medIndices = ScenarioResourceMap.GetMergedIndices(
@@ -614,7 +612,6 @@ public static class FhirBundleGenerator
             ScenarioResourceMap.UniversalConditionIndices, ScenarioResourceMap.ScenarioConditionIndices,
             scenarioIdx, FhirGenerationCodes.Conditions.Length);
 
-        var medicationIds = new List<string>();
         var medicationRequestIds = new List<string>();
         var specimenIds = new List<string>();
         var observationIds = new List<string>();
@@ -622,8 +619,9 @@ public static class FhirBundleGenerator
         var serviceRequestIds = new List<string>();
         var diagnosticReportIds = new List<string>();
         var resourceIndex = 0;
+        var distribution = ResolveDistribution(config);
 
-        foreach (var (resourceType, fraction) in ResourceDistribution)
+        foreach (var (resourceType, fraction) in distribution)
         {
             var count = Math.Max(1, (int)(totalResourcesPerPatient * fraction));
 
@@ -641,9 +639,8 @@ public static class FhirBundleGenerator
                     "Observation" => GenerateScenarioObservation(resourceId, patientId, encounterId, effectiveDate, seed, obsIndices, specimenIds, observationIds),
                     "Condition" => GenerateScenarioCondition(resourceId, patientId, encounterId, effectiveDate, encEnd, seed, condIndices, conditionIds),
                     "Procedure" => GenerateScenarioProcedure(resourceId, patientId, encounterId, effectiveDate, seed, practId, procIndices, conditionIds),
-                    "Medication" => MedicationFactory.Generate(resourceId, ScenarioResourceMap.PickIndex(medIndices, seed, FhirGenerationCodes.Medications.Length), medicationIds),
-                    "MedicationRequest" => GenerateScenarioMedicationRequest(resourceId, patientId, encounterId, effectiveDate, seed, practId, medIndices, conditionIds, medicationIds, medicationRequestIds),
-                    "MedicationAdministration" => GenerateScenarioMedicationAdministration(resourceId, patientId, encounterId, effectiveDate, seed, medIndices, medicationIds, medicationRequestIds, practId),
+                    "MedicationRequest" => GenerateScenarioMedicationRequest(resourceId, patientId, encounterId, effectiveDate, seed, practId, medIndices, conditionIds, sharedMedicationIds, medicationRequestIds),
+                    "MedicationAdministration" => GenerateScenarioMedicationAdministration(resourceId, patientId, encounterId, effectiveDate, seed, medIndices, sharedMedicationIds, medicationRequestIds, practId),
                     "DiagnosticReport" => GenerateScenarioDiagnosticReport(resourceId, patientId, encounterId, effectiveDate, seed, observationIds, specimenIds, practId, diagnosticReportIds),
                     "ServiceRequest" => GenerateScenarioServiceRequest(resourceId, patientId, encounterId, effectiveDate, seed, practId, srIndices, conditionIds, serviceRequestIds),
                     "Coverage" => CoverageFactory.Generate(resourceId, patientId, encStart, encEnd, seed),
@@ -710,12 +707,13 @@ public static class FhirBundleGenerator
 
     private static MedicationRequest GenerateScenarioMedicationRequest(
         string id, string patientId, string encounterId, DateTime authored, int seed, string practId,
-        int[] medIndices, List<string> conditionIds, List<string> medicationIds, List<string> medicationRequestIds)
+        int[] medIndices, List<string> conditionIds, List<string> sharedMedicationIds, List<string> medicationRequestIds)
     {
         var poolIdx = ScenarioResourceMap.PickIndex(medIndices, seed, FhirGenerationCodes.Medications.Length);
         var v = FhirGenerationCodes.Medications[poolIdx];
         var reasonConditionId = conditionIds.Count > 0 ? conditionIds[seed % conditionIds.Count] : null;
-        var medicationRefId = medicationIds.Count > 0 ? medicationIds[seed % medicationIds.Count] : null;
+        // Reference the shared formulary Medication that matches this drug.
+        var medicationRefId = poolIdx < sharedMedicationIds.Count ? sharedMedicationIds[poolIdx] : null;
         var req = MedicationRequestFactory.Create(id, patientId, encounterId, authored, seed, practId,
             v.RxCode, v.Display, v.RouteCode, v.RouteDisplay,
             v.DoseValue, v.DoseUnit, v.FreqPerDay, v.Prn,
@@ -726,11 +724,12 @@ public static class FhirBundleGenerator
 
     private static MedicationAdministration GenerateScenarioMedicationAdministration(
         string id, string patientId, string encounterId, DateTime effective, int seed,
-        int[] medIndices, List<string> medicationIds, List<string> medicationRequestIds, string practId)
+        int[] medIndices, List<string> sharedMedicationIds, List<string> medicationRequestIds, string practId)
     {
         var poolIdx = ScenarioResourceMap.PickIndex(medIndices, seed, FhirGenerationCodes.Medications.Length);
         var v = FhirGenerationCodes.Medications[poolIdx];
-        var medRefId = medicationIds.Count > 0 ? medicationIds[seed % medicationIds.Count] : null;
+        // Reference the shared formulary Medication that matches this drug.
+        var medRefId = poolIdx < sharedMedicationIds.Count ? sharedMedicationIds[poolIdx] : null;
         var isIv = v.RouteCode == "47625008";
         var admin = MedicationAdministrationFactory.Create(id, patientId, encounterId, effective, seed, practId,
             v.RxCode, v.Display, v.RouteCode, v.RouteDisplay,
@@ -808,6 +807,33 @@ public static class FhirBundleGenerator
             prov.Target.Add(new ResourceReference($"DiagnosticReport/{diagnosticReportIds[^1]}"));
         }
         return prov;
+    }
+
+    /// <summary>
+    /// Generates shared hospital formulary Medication resources — one per
+    /// <see cref="FhirGenerationCodes.Medications"/> entry. In a real EHR the
+    /// formulary is facility-level; every patient's MedicationRequest /
+    /// MedicationAdministration references the same Medication resource.
+    /// </summary>
+    private static List<string> GenerateSharedMedications(List<Bundle.EntryComponent> sharedEntries)
+    {
+        var ids = new List<string>(FhirGenerationCodes.Medications.Length + 1);
+        for (var i = 0; i < FhirGenerationCodes.Medications.Length; i++)
+        {
+            var v = FhirGenerationCodes.Medications[i];
+            var medId = $"Gen-Medication-{i + 1:D3}";
+            ids.Add(medId);
+            sharedEntries.Add(Entry($"Medication/{medId}",
+                MedicationFactory.Create(medId, v.RxCode, v.Display, v.DoseValue, v.DoseUnit, v.RouteCode, v.RouteDisplay)));
+        }
+
+        // Hypoglycemic-measure-specific insulin glargine (RxNorm 274783) —
+        // a separate clinical drug concept from the formulary entry above.
+        sharedEntries.Add(Entry($"Medication/{HypoInsulinGlargineMedicationId}",
+            MedicationFactory.Create(HypoInsulinGlargineMedicationId, "274783", "insulin glargine",
+                20, "[iU]", "34206005", "Subcutaneous route")));
+
+        return ids;
     }
 
     private static int Mod(int value, int modulus) => ((value % modulus) + modulus) % modulus;

@@ -1,8 +1,7 @@
-﻿using Automation.UI.Services;
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
+using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
-using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Automation.Link.Services;
 using LantanaGroup.Link.Automation.Link.Validation;
@@ -260,6 +259,7 @@ public class AutomationRunManager : IAutomationRunManager
             // the most restrictive measure — patients qualifying for all measures must meet
             // the criteria of each). For multi-measure, GenerateWithProfiles handles the union.
             var primaryMeasure = state.Options.SelectedMeasures[0];
+            var generationConfig = ResolveFhirGenerationConfig(_automationConfig);
 
             if (state.Options.PatientProfiles is { Count: > 0 })
             {
@@ -274,7 +274,8 @@ public class AutomationRunManager : IAutomationRunManager
                         profiles,
                         state.Options.ResourcesPerPatient,
                         state.Options.Prefix,
-                        state.Options.Seed);
+                        state.Options.Seed,
+                        generationConfig);
                 }
                 else
                 {
@@ -284,7 +285,8 @@ public class AutomationRunManager : IAutomationRunManager
                         profiles,
                         state.Options.ResourcesPerPatient,
                         state.Options.Prefix,
-                        state.Options.Seed);
+                        state.Options.Seed,
+                        generationConfig);
                 }
 
                 expectedSubmittedPatientIds = patientIds
@@ -294,7 +296,8 @@ public class AutomationRunManager : IAutomationRunManager
             else
             {
                 (patientIds, bundles) = FhirBundleGenerator.Generate(
-                    output, state.Options.PatientCount, state.Options.ResourcesPerPatient, state.Options.Prefix, state.Options.Seed);
+                    output, state.Options.PatientCount, state.Options.ResourcesPerPatient, state.Options.Prefix, state.Options.Seed,
+                    generationConfig);
 
                 expectedSubmittedPatientIds = patientIds.ToList();
             }
@@ -392,6 +395,9 @@ public class AutomationRunManager : IAutomationRunManager
                     throw new InvalidOperationException($"Expected report to include patient-{patientId}.ndjson but it was not");
             }
 
+            // Flush stale cache from diagnostics polling so validators read authoritative data.
+            services.GetRequiredService<PipelineDataReader>().InvalidateCache();
+
             await reportAbsValidator.ValidateAllAsync(
                 internalAbsResources,
                 expectedSubmittedPatientIds,
@@ -451,6 +457,18 @@ public class AutomationRunManager : IAutomationRunManager
             await BroadcastStatus(state);
             WriteLog(state, $"Run failed: {ex.Message}");
         }
+    }
+
+    private static FhirGenerationConfig ResolveFhirGenerationConfig(AutomationConfig automationConfig)
+    {
+        var distribution = automationConfig.FhirGeneration?.ResourceDistribution;
+        if (distribution == null || distribution.Count == 0)
+            return new FhirGenerationConfig();
+
+        return new FhirGenerationConfig
+        {
+            ResourceDistribution = new Dictionary<string, double>(distribution, StringComparer.OrdinalIgnoreCase)
+        };
     }
 
     private ServiceProvider BuildRunServiceProvider(IAutomationOutput output)

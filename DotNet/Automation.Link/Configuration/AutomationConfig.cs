@@ -20,6 +20,12 @@ public class AutomationConfig
 
     public FhirQuerySettings FhirQuery { get; set; } = new();
 
+    /// <summary>
+    /// Link-specific FHIR bundle generation controls that are mapped into
+    /// <c>LantanaGroup.Automation.Generation.FhirGenerationConfig</c> at runtime.
+    /// </summary>
+    public FhirGenerationSettings FhirGeneration { get; set; } = new();
+
     public DatabaseConfig Database { get; set; } = new();
 
     public KafkaConfig Kafka { get; set; } = new();
@@ -30,6 +36,26 @@ public class AutomationConfig
         public TimeSpan? MinAcquisitionPullTime { get; set; }
         public TimeSpan? MaxAcquisitionPullTime { get; set; }
         public string? TimeZone { get; set; }
+    }
+
+    public class FhirGenerationSettings
+    {
+        /// <summary>
+        /// Resource distribution optimized for Link processing pipelines.
+        /// Contains only the resource types Link consumes.
+        /// </summary>
+        public Dictionary<string, double> ResourceDistribution { get; set; } = new()
+        {
+            ["Observation"] = 0.30,
+            ["Condition"] = 0.10,
+            ["Procedure"] = 0.08,
+            ["MedicationRequest"] = 0.08,
+            ["MedicationAdministration"] = 0.10,
+            ["DiagnosticReport"] = 0.07,
+            ["ServiceRequest"] = 0.08,
+            ["Coverage"] = 0.02,
+            ["Specimen"] = 0.07,
+        };
     }
 
     public class DatabaseConfig

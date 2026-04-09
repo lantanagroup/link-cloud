@@ -302,6 +302,9 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
         await RunAsync(results, "DataAcq.GetAcquiredResourceIdsForReport",
             () => DataAcqClient.GetAcquiredResourceIdsForReportAsync(_facilityId, Guid.NewGuid().ToString()));
 
+        await RunAsync(results, "DataAcq.GetReferenceResourcesForLog",
+            () => DataAcqClient.GetReferenceResourcesForLogAsync(0));
+
         await RunAsync(results, "DataAcq.SoftDeleteLogsByFacility",
             () => DataAcqClient.SoftDeleteLogsByFacilityAsync(_facilityId));
 

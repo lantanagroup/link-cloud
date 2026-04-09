@@ -193,8 +193,8 @@ public class RunsController(
                 QueryPhase = detailed.QueryPhase?.ToString(),
                 IsReferenceLog = detailed.IsReferenceLog
                                  || string.Equals(detailed.QueryPhase?.ToString(), "Referential", StringComparison.OrdinalIgnoreCase)
-                                 || (detailed.ReferenceResources?.Count ?? 0) > 0,
-                ReferenceResourceCount = detailed.ReferenceResources?.Count ?? 0,
+                                 || detailed.ReferenceResourceCount > 0,
+                ReferenceResourceCount = detailed.ReferenceResourceCount,
                 detailed.ReportTrackingId,
                 detailed.CorrelationId,
                 detailed.CompletionDate,

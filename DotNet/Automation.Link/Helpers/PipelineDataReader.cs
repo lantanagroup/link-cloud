@@ -293,7 +293,7 @@ public class PipelineDataReader
         var result = await HasAnyDetailedRowsForReportCoreAsync(
             facilityId,
             reportId,
-            detailed => (detailed?.ReferenceResources?.Count ?? 0) > 0);
+            detailed => (detailed?.ReferenceResourceCount ?? 0) > 0);
 
         if (result || string.IsNullOrWhiteSpace(facilityId))
             return result;
@@ -301,7 +301,7 @@ public class PipelineDataReader
         return await HasAnyDetailedRowsForReportCoreAsync(
             string.Empty,
             reportId,
-            detailed => (detailed?.ReferenceResources?.Count ?? 0) > 0);
+            detailed => (detailed?.ReferenceResourceCount ?? 0) > 0);
     }
 
     private async Task<List<AcquisitionLogInfo>> GetAcquisitionLogsCoreAsync(string facilityId, string reportId)
