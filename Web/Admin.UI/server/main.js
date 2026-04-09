@@ -1,7 +1,6 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const { blockPathMatchers } = require('./blocked-paths');
 
@@ -14,13 +13,6 @@ console.log(`Express trust proxy is set to: ${trustProxyValue}`);
 
 
 const port = process.env.PORT || 80;
-
-// Basic rate limiting middleware
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later'
-});
 
 let distFolder = getDistFolder();
 console.log(`Using dist folder: ${distFolder}`);
@@ -38,7 +30,7 @@ app.get('/assets/app.config.local.json', (req, res) => {
   res.json(config); // Don't log every time the request is made
 });
 
-app.get('/*any', apiLimiter, (req, res) => {
+app.get('/*any', (req, res) => {
   const p = req.path; // pathname only (no querystring)
 
   const isExcluded = blockPathMatchers.some((rule) => {
