@@ -50,8 +50,10 @@ public class EncounterMappingManagerUnitTests
         };
 
         EncounterMapping capturedEntity = null!;
-        _mockMappingRepo.Setup(r => r.AddAsync(It.IsAny<EncounterMapping>(), It.IsAny<CancellationToken>()))
-            .Callback<EncounterMapping, CancellationToken>((e, c) => capturedEntity = e);
+        _mockMappingRepo
+            .Setup(r => r.AddAsync(It.IsAny<EncounterMapping>()))
+            .Callback<EncounterMapping>(e => capturedEntity = e)
+            .ReturnsAsync((EncounterMapping e) => e);
 
         // Act
         await _manager.CreateAsync(model);
@@ -78,7 +80,7 @@ public class EncounterMappingManagerUnitTests
             ModifiedDate = DateTime.UtcNow.AddDays(-1)
         };
 
-        _mockMappingRepo.Setup(r => r.GetAsync(1, default)).ReturnsAsync(existing);
+        _mockMappingRepo.Setup(r => r.GetAsync(1)).ReturnsAsync(existing);
 
         var updateModel = new UpdateEncounterMappingModel { MappedToOrg = true };
 
@@ -103,7 +105,7 @@ public class EncounterMappingManagerUnitTests
             ModifiedDate = DateTime.UtcNow.AddDays(-1)
         };
 
-        _mockMappingRepo.Setup(r => r.GetAsync(1, default)).ReturnsAsync(existing);
+        _mockMappingRepo.Setup(r => r.GetAsync(1)).ReturnsAsync(existing);
 
         // Update with null OrganizationLocationMappingIds should NOT touch locations
         var updateModel = new UpdateEncounterMappingModel 
@@ -136,8 +138,8 @@ public class EncounterMappingManagerUnitTests
             new EncounterMapping { EncounterMappingId = 1, FacilityId = "Fac1", MappedToOrg = true }
         };
 
-        _mockMappingRepo.Setup(r => r.FindAsync(It.IsAny<Expression<Func<EncounterMapping, bool>>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(expectedResults);
+        _mockMappingRepo.Setup(r => r.SearchAsync(It.IsAny<Expression<Func<EncounterMapping, bool>>>(), It.IsAny<string>(), It.IsAny<LantanaGroup.Link.Shared.Application.Enums.SortOrder?>(), It.IsAny<int>(), It.IsAny<int>()))
+            .ReturnsAsync((expectedResults, new LantanaGroup.Link.Shared.Application.Models.Responses.PaginationMetadata { TotalCount = 1, PageSize = 10, PageNumber = 1 }));
 
         // Act
         var result = await mockQueries.SearchAsync(searchModel, 1, 10);
@@ -145,6 +147,6 @@ public class EncounterMappingManagerUnitTests
         // Assert
         Assert.Single(result.Records);
         Assert.Equal("Fac1", result.Records.First().FacilityId);
-        _mockMappingRepo.Verify(r => r.FindAsync(It.IsAny<Expression<Func<EncounterMapping, bool>>>(), It.IsAny<CancellationToken>()), Times.Once);
+        _mockMappingRepo.Verify(r => r.SearchAsync(It.IsAny<Expression<Func<EncounterMapping, bool>>>(), It.IsAny<string>(), It.IsAny<LantanaGroup.Link.Shared.Application.Enums.SortOrder?>(), It.IsAny<int>(), It.IsAny<int>()), Times.Once);
     }
 }

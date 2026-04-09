@@ -26,14 +26,15 @@ public class EncounterMappingManager : IEncounterMappingManager
 
     public async Task<EncounterMappingModel> CreateAsync(CreateEncounterMappingModel model)
     {
+        var now = DateTime.UtcNow;
         var entity = new EncounterMapping
         {
             FacilityId = model.FacilityId,
             PatientId = model.PatientId,
             EncounterId = model.EncounterId,
             MappedToOrg = model.MappedToOrg,
-            CreateDate = DateTime.UtcNow,
-            ModifiedDate = DateTime.UtcNow
+            CreateDate = now,
+            ModifiedDate = now
         };
 
         if (model.OrganizationLocationMappingIds != null)
@@ -43,8 +44,8 @@ public class EncounterMappingManager : IEncounterMappingManager
                 entity.EncounterLocations.Add(new EncounterLocation
                 {
                     OrganizationLocationMappingId = locId,
-                    CreateDate = DateTime.UtcNow,
-                    ModifiedDate = DateTime.UtcNow
+                    CreateDate = now,
+                    ModifiedDate = now
                 });
             }
         }
@@ -157,14 +158,14 @@ public class EncounterMappingManager : IEncounterMappingManager
             MappedToOrg = entity.MappedToOrg,
             CreateDate = entity.CreateDate,
             ModifiedDate = entity.ModifiedDate,
-            EncounterLocations = entity.EncounterLocations.Select(l => new EncounterLocationModel
+            EncounterLocations = entity.EncounterLocations?.Select(l => new EncounterLocationModel
             {
                 EncounterLocationId = l.EncounterLocationId,
                 EncounterMappingId = l.EncounterMappingId,
                 OrganizationLocationMappingId = l.OrganizationLocationMappingId,
                 CreateDate = l.CreateDate,
                 ModifiedDate = l.ModifiedDate
-            }).ToList()
+            }).ToList() ?? new List<EncounterLocationModel>()
         };
     }
 }
