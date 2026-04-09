@@ -110,8 +110,10 @@ public class MeasureEvaluator {
             Bundle additionalData) {
         IRepository repository = new LinkInMemoryFhirRepository(fhirContext, bundle);
         R4MultiMeasureService measureService = new R4MultiMeasureService(repository, options, null, new MeasurePeriodValidator());
-        ZonedDateTime start = periodStart == null ? null : periodStart.getValue().toInstant().atZone(ZoneOffset.UTC);
-        ZonedDateTime end = periodEnd == null ? null : periodEnd.getValue().toInstant().atZone(ZoneOffset.UTC);
+        ZonedDateTime start = periodStart != null && periodStart.getValue() != null
+                ? periodStart.getValue().toInstant().atZone(ZoneOffset.UTC) : null;
+        ZonedDateTime end = periodEnd != null && periodEnd.getValue() != null
+                ? periodEnd.getValue().toInstant().atZone(ZoneOffset.UTC) : null;
         return measureService.evaluate(
                 Eithers.forRight3(measure),
                 start,
