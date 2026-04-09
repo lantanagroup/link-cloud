@@ -90,8 +90,6 @@ public class ReferenceResourcesQueries : IReferenceResourcesQueries
             query = query.Where(r => r.DataAcquisitionLogId == model.DataAcquisitionLogId.Value);
         }
 
-        var total = await query.CountAsync(cancellationToken);
-
         query = model.SortOrder switch
         {
             SortOrder.Ascending => query.OrderBy(SetSortBy<ReferenceResources>(model.SortBy)),
@@ -99,11 +97,51 @@ public class ReferenceResourcesQueries : IReferenceResourcesQueries
             _ => query
         };
 
-        var resources = await query
-            .Skip((model.PageNumber - 1) * model.PageSize)
-            .Take(model.PageSize)
-            .Select(r => ReferenceResourcesModel.FromDomain(r))
-            .ToListAsync(cancellationToken);
+        int total;
+        List<ReferenceResourcesModel> resources;
+
+        // Fast path: when on page 1, skip the separate COUNT round-trip.
+        // When PageSize is int.MaxValue the caller wants every row — skip Take
+        // entirely (adding 1 would overflow). Otherwise fetch one extra row to
+        // cheaply detect whether more pages exist.
+        if (model.PageNumber == 1)
+        {
+            if (model.PageSize == int.MaxValue)
+            {
+                // Unbounded — caller wants all rows; skip Take entirely
+                resources = await query
+                    .Select(r => ReferenceResourcesModel.FromDomain(r))
+                    .ToListAsync(cancellationToken);
+                total = resources.Count;
+            }
+            else
+            {
+                resources = await query
+                    .Take(model.PageSize + 1)
+                    .Select(r => ReferenceResourcesModel.FromDomain(r))
+                    .ToListAsync(cancellationToken);
+
+                if (resources.Count > model.PageSize)
+                {
+                    total = model.PageSize + 1;
+                    resources.RemoveAt(resources.Count - 1);
+                }
+                else
+                {
+                    total = resources.Count;
+                }
+            }
+        }
+        else
+        {
+            total = await query.CountAsync(cancellationToken);
+
+            resources = await query
+                .Skip((model.PageNumber - 1) * model.PageSize)
+                .Take(model.PageSize)
+                .Select(r => ReferenceResourcesModel.FromDomain(r))
+                .ToListAsync(cancellationToken);
+        }
 
         return new PagedConfigModel<ReferenceResourcesModel>
         {

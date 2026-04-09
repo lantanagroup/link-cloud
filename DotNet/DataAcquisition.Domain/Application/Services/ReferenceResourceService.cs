@@ -76,10 +76,11 @@ public class ReferenceResourceService : IReferenceResourceService
             ?.Where(x => x.TypeName == referenceQueryConfig.ResourceType || x.Reference.StartsWith(referenceQueryConfig.ResourceType, StringComparison.InvariantCultureIgnoreCase))
             .ToList();
 
+        var referenceIds = validReferenceResources.Select(x => x.Reference.SplitReference()).ToList();
         var existingReferenceResources = (await _referenceResourcesQueries.SearchAsync(new SearchReferenceResourcesModel
         {
             FacilityId = request.FacilityId,
-            ResourceIds = validReferenceResources.Select(x => x.Reference.SplitReference()).ToList(),
+            ResourceIds = referenceIds,
             PageSize = int.MaxValue
         })).Records;
 
