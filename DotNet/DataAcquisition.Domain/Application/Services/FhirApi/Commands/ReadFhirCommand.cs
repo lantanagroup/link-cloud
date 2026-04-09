@@ -83,7 +83,17 @@ public class ReadFhirCommand : IReadFhirCommand
             var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.fhirQueryConfiguration.Authentication);
             if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
             {
-                fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
+                if (authBuilderResults.authHeader is AuthenticationHeaderValue authHeaderValue)
+                {
+                    fhirClient.RequestHeaders.Authorization = authHeaderValue;
+                }
+                else if (authBuilderResults.authHeader is Dictionary<string, string> customHeaders)
+                {
+                    foreach (var header in customHeaders)
+                    {
+                        fhirClient.RequestHeaders.Add(header.Key, header.Value);
+                    }
+                }
             }
 
             string location = request.resourceType switch

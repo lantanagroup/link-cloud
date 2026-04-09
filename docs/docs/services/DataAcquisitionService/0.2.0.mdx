@@ -262,7 +262,43 @@ Below is an example of a monthly query plan that's configured to acquire the fol
 
 Data sources (where the FHIR server is located and how to authenticate) are configured via "Query Configs". There is currently no association between a query _plan_ and data source. Whenever data acquisition attempts to execute a query plan against a data source, it uses the FHIR server and authentication method specified by the "Query Config", for the specified facility/tenant.
 
-TODO: Add details about how to authenticate against Epic, Cerner, Basic, and/or OAuth data sources.
+#### Authentication Methods
+
+The Data Acquisition service supports multiple authentication methods to connect to different FHIR servers and EHR systems:
+
+**1. Basic Authentication**
+- Uses HTTP Basic Authentication with username and password credentials
+- Credentials are Base64-encoded and sent in the `Authorization` header
+- Configuration requires `UserName` and `Password` fields
+- Suitable for FHIR servers that support basic authentication
+
+**2. Epic Authentication**
+- Specifically designed for Epic's FHIR implementation
+- Uses OAuth 2.0 client credentials flow with JWT assertion
+- Requires Epic-specific configuration including:
+  - Client ID
+  - Private key for JWT signing
+  - Token endpoint URL
+- Automatically handles token acquisition and renewal
+
+**3. OAuth / OpenID Connect**
+- Standard OAuth 2.0 and OpenID Connect authentication
+- Supports various OAuth flows depending on the EHR system
+- Configuration requires:
+  - Client ID and Client Secret
+  - Token endpoint
+  - Authorization scopes
+- Suitable for FHIR servers implementing standard OAuth 2.0
+
+**4. Custom Headers**
+- Allows configuration of custom HTTP headers for authentication
+- Useful for EHR systems with proprietary authentication mechanisms
+- Supports multiple custom headers as key-value pairs
+- Headers are added to every FHIR API request
+- Configuration requires a `CustomHeaders` dictionary with header names and values
+- Does not use query parameters; all authentication data is sent as HTTP headers
+
+Each authentication method is implemented as a separate service implementing the `IAuth` interface, ensuring consistent authentication handling across different EHR systems.
 
 
 ## Logging
