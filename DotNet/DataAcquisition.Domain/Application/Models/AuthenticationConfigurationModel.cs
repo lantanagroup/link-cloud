@@ -34,6 +34,10 @@ public class AuthenticationConfigurationModel : IValidatableObject
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Password { get; set; }
 
+    [DataMember]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, string>? CustomHeaders { get; set; }
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         if (string.IsNullOrWhiteSpace(AuthType))
@@ -56,6 +60,12 @@ public class AuthenticationConfigurationModel : IValidatableObject
             if (string.IsNullOrWhiteSpace(Audience))
                 yield return new ValidationResult("Audience is required for OAuth2 authentication.", new[] { nameof(Audience) });
         }
+
+        if (AuthType?.Equals("CustomHeaders", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            if (CustomHeaders == null || !CustomHeaders.Any())
+                yield return new ValidationResult("CustomHeaders is required for CustomHeaders authentication.", new[] { nameof(CustomHeaders) });
+        }
     }
 
     public AuthenticationConfiguration ToDomain()
@@ -68,7 +78,8 @@ public class AuthenticationConfigurationModel : IValidatableObject
             Audience = this.Audience,
             ClientId = this.ClientId,
             UserName = this.UserName,
-            Password = this.Password
+            Password = this.Password,
+            CustomHeaders = this.CustomHeaders
         };
     }
 
@@ -85,7 +96,8 @@ public class AuthenticationConfigurationModel : IValidatableObject
             Audience = config.Audience,
             ClientId = config.ClientId,
             UserName = config.UserName,
-            Password = config.Password
+            Password = config.Password,
+            CustomHeaders = config.CustomHeaders
         };
     }
 }
