@@ -27,4 +27,5 @@ public interface IDataAcquisitionServiceClient
     Task<DataAcquisitionLogStatusStatisticsApiModel?> GetReportStatusCountsAsync(string reportId, CancellationToken cancellationToken = default);
     Task<DataAcquisitionReportSummaryApiModel?> GetReportSummaryAsync(string reportId, CancellationToken cancellationToken = default);
     Task<List<string>> GetAcquiredResourceIdsForReportAsync(string facilityId, string reportId, CancellationToken cancellationToken = default);
+    Task<PagedConfigModel<ReferenceResourceApiModel>> GetReferenceResourcesForLogAsync(long logId, int pageSize = 100, int pageNumber = 1, CancellationToken cancellationToken = default);
 }

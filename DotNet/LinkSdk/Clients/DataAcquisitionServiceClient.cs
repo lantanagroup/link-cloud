@@ -128,4 +128,14 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         Request($"data/acquisition-logs/report/{reportId}/acquired-resource-ids")
             .SetQueryParam("facilityId", facilityId)
             .GetJsonAsync<List<string>>(cancellationToken: cancellationToken);
+
+    public Task<PagedConfigModel<ReferenceResourceApiModel>> GetReferenceResourcesForLogAsync(
+        long logId,
+        int pageSize = 100,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default) =>
+        Request($"data/acquisition-logs/{logId}/reference-resources")
+            .SetQueryParam("pageSize", pageSize)
+            .SetQueryParam("pageNumber", pageNumber)
+            .GetJsonAsync<PagedConfigModel<ReferenceResourceApiModel>>(cancellationToken: cancellationToken);
 }

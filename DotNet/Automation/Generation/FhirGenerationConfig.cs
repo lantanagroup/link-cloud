@@ -44,4 +44,10 @@ public class FhirGenerationConfig
         ["DocumentReference"] = 0.02,
         ["Provenance"] = 0.02,
     };
+
+    /// <summary>
+    /// Controls optional cross-resource links that are not required for core
+    /// patient/encounter queryability (e.g., Provenance.target, ImagingStudy.basedOn).
+    /// </summary>
+    public bool IncludeLowValueOptionalReferences { get; set; } = true;
 }

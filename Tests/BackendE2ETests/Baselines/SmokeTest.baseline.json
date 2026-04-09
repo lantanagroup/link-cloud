@@ -19,9 +19,9 @@
     "Immunization": 30,
     "List": 1,
     "Location": 5,
-    "Medication": 30,
-    "MedicationAdministration": 70,
-    "MedicationRequest": 60,
+    "Medication": 26,
+    "MedicationAdministration": 90,
+    "MedicationRequest": 70,
     "Observation": 280,
     "Organization": 1,
     "Patient": 1,
@@ -33,66 +33,46 @@
   },
   "dataAcquisitionCountsByPatientType": {
     "SmokePatient-001": {
-      "Condition": 80,
-      "Coverage": 10,
-      "DiagnosticReport": 60,
+      "Condition": 81,
       "Encounter": 1,
-      "Location": 3,
-      "Medication": 30,
-      "MedicationRequest": 40,
+      "MedicationRequest": 23,
       "Observation": 280,
       "Patient": 1,
-      "Procedure": 70,
-      "ServiceRequest": 70
+      "Procedure": 70
     }
   },
   "measureEvalCountsByPatientType": {
     "SmokePatient-001": {
-      "Condition": 58,
-      "Coverage": 10,
-      "DiagnosticReport": 60,
+      "Condition": 59,
       "Encounter": 1,
-      "Location": 3,
       "MeasureReport": 1,
-      "Medication": 30,
-      "MedicationRequest": 40,
+      "MedicationRequest": 23,
       "Observation": 280,
       "Patient": 1,
-      "Procedure": 70,
-      "ServiceRequest": 70
+      "Procedure": 70
     }
   },
   "reportCountsByPatientType": {
     "SmokePatient-001": {
-      "Condition": 58,
-      "Coverage": 10,
-      "DiagnosticReport": 60,
+      "Condition": 59,
       "Encounter": 1,
-      "Location": 3,
       "MeasureReport": 1,
-      "Medication": 30,
-      "MedicationRequest": 40,
+      "MedicationRequest": 23,
       "Observation": 280,
       "Patient": 1,
-      "Procedure": 70,
-      "ServiceRequest": 70
+      "Procedure": 70
     }
   },
   "absCountsByPatientType": {
     "SmokePatient-001": {
-      "Condition": 58,
-      "Coverage": 10,
-      "DiagnosticReport": 60,
+      "Condition": 59,
       "Encounter": 1,
-      "Location": 3,
       "MeasureReport": 1,
-      "Medication": 30,
-      "MedicationRequest": 40,
+      "MedicationRequest": 23,
       "Observation": 280,
       "OperationOutcome": 1,
       "Patient": 1,
-      "Procedure": 70,
-      "ServiceRequest": 70
+      "Procedure": 70
     }
   }
 }

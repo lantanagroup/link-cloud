@@ -261,6 +261,11 @@ public class MilestoneValidationOrchestrator
         if (_completed.Contains(Milestone.SubmissionCompleted))
             return;
 
+        var schedule = await _reader.GetReportScheduleAsync(scheduleId);
+        if (schedule == null) return;
+        if(schedule.Status != "Submitted")
+            return;
+
         // Cannot mark submission complete until measure reports are generated.
         if (!_completed.Contains(Milestone.MeasureReportsGenerated))
             return;

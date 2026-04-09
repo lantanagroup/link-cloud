@@ -39,7 +39,7 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
     private List<(string Name, string Json)> _generatedBundles = [];
 
     private AutomationConfig AutomationCfg => _sp.GetRequiredService<AutomationConfig>();
-    private DualOutputHelper Output => _sp.GetRequiredService<DualOutputHelper>();
+    private ConsoleAutomationOutput Output => _sp.GetRequiredService<ConsoleAutomationOutput>();
     private FhirDataLoader FhirDataLoader => _sp.GetRequiredService<FhirDataLoader>();
 
     public ReportScheduledWorkflowTest(BackendE2ETestFixture fixture)
@@ -71,6 +71,8 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
     {
         Output.WriteLine("Cleaning up...\n");
 
+        return;
+
         if (_config.RemoveFacilityConfig)
         {
             await FacilitySetupHelper.CleanupFacilityAsync(
@@ -96,10 +98,12 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
     [Trait("Category", "ReportScheduledWorkflowTest")]
     public async Task ExecuteReportScheduledWorkflowTest()
     {
+
         var measureLoader = new MeasureLoader(
             _sp.GetRequiredService<IMeasureEvalServiceClient>(),
             _sp.GetRequiredService<IValidationServiceClient>(),
             Output, _config);
+
         await measureLoader.LoadAsync();
 
         var measureId = measureLoader.MeasureId
@@ -107,18 +111,23 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
 
         await FacilitySetupHelper.EnsureFacilityAsync(
             _sp.GetRequiredService<IFacilityServiceClient>(), Output, _facilityId, measureId);
+
         await FacilitySetupHelper.EnsureNormalizationConfigAsync(
             _sp.GetRequiredService<INormalizationServiceClient>(), Output, _facilityId);
+
         await FacilitySetupHelper.EnsureQueryPlansAsync(
             _sp.GetRequiredService<IDataAcquisitionServiceClient>(), Output, _facilityId, measureId, "Epic");
+
         await FacilitySetupHelper.EnsureQueryConfigAsync(
             _sp.GetRequiredService<IDataAcquisitionServiceClient>(), AutomationCfg, Output, _facilityId);
+
         await FacilitySetupHelper.EnsureQueryDispatchConfigAsync(
             _sp.GetRequiredService<IQueryDispatchServiceClient>(),
             Output,
             _facilityId);
 
         var reportId = await ProduceReportScheduledEventAsync(_facilityId, measureId, TimeSpan.FromMinutes(2));
+
         await WaitForScheduleCreationAsync(reportId);
         await ProduceAdmitPatientEventAsync(_facilityId, _config.PatientIds[0]);
         await Task.Delay(TimeSpan.FromSeconds(30));
@@ -197,6 +206,7 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
             _facilityId, reportId, measureId, _config.PatientIds,
             expectedFrequency: Frequency.Monthly,
             expectedAdHocType: null);
+
         await _sp.GetRequiredService<DataAcquisitionDatabaseValidator>().ValidateAllAsync(_facilityId, reportId, measureId, _config.PatientIds);
         await _sp.GetRequiredService<NormalizationDatabaseValidator>().ValidateAllAsync(_facilityId);
         await _sp.GetRequiredService<TenantDatabaseValidator>().ValidateAllAsync(_facilityId, measureId);

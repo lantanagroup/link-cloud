@@ -41,6 +41,12 @@ public class AutomationConfig
     public class FhirGenerationSettings
     {
         /// <summary>
+        /// Controls low-value optional cross-resource references in generated FHIR
+        /// (e.g., Provenance.target, ImagingStudy.basedOn, MedicationAdministration.request).
+        /// </summary>
+        public bool IncludeLowValueOptionalReferences { get; set; } = false;
+
+        /// <summary>
         /// Resource distribution optimized for Link processing pipelines.
         /// Contains only the resource types Link consumes.
         /// </summary>

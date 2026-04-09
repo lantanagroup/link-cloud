@@ -124,6 +124,7 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
         // Step 5: Create FHIR query config.
         await FacilitySetupHelper.EnsureQueryConfigAsync(
             _sp.GetRequiredService<IDataAcquisitionServiceClient>(), AutomationCfg, Output, _facilityId);
+
         await FacilitySetupHelper.EnsureQueryDispatchConfigAsync(
             _sp.GetRequiredService<IQueryDispatchServiceClient>(),
             Output,

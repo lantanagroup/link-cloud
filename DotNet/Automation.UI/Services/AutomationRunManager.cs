@@ -461,12 +461,17 @@ public class AutomationRunManager : IAutomationRunManager
 
     private static FhirGenerationConfig ResolveFhirGenerationConfig(AutomationConfig automationConfig)
     {
+        var includeLowValueOptionalReferences = automationConfig.FhirGeneration?.IncludeLowValueOptionalReferences ?? true;
         var distribution = automationConfig.FhirGeneration?.ResourceDistribution;
         if (distribution == null || distribution.Count == 0)
-            return new FhirGenerationConfig();
+            return new FhirGenerationConfig
+            {
+                IncludeLowValueOptionalReferences = includeLowValueOptionalReferences
+            };
 
         return new FhirGenerationConfig
         {
+            IncludeLowValueOptionalReferences = includeLowValueOptionalReferences,
             ResourceDistribution = new Dictionary<string, double>(distribution, StringComparer.OrdinalIgnoreCase)
         };
     }

@@ -620,6 +620,7 @@ public static class FhirBundleGenerator
         var diagnosticReportIds = new List<string>();
         var resourceIndex = 0;
         var distribution = ResolveDistribution(config);
+        var includeLowValueOptionalReferences = config?.IncludeLowValueOptionalReferences ?? true;
 
         foreach (var (resourceType, fraction) in distribution)
         {
@@ -640,18 +641,18 @@ public static class FhirBundleGenerator
                     "Condition" => GenerateScenarioCondition(resourceId, patientId, encounterId, effectiveDate, encEnd, seed, condIndices, conditionIds),
                     "Procedure" => GenerateScenarioProcedure(resourceId, patientId, encounterId, effectiveDate, seed, practId, procIndices, conditionIds),
                     "MedicationRequest" => GenerateScenarioMedicationRequest(resourceId, patientId, encounterId, effectiveDate, seed, practId, medIndices, conditionIds, sharedMedicationIds, medicationRequestIds),
-                    "MedicationAdministration" => GenerateScenarioMedicationAdministration(resourceId, patientId, encounterId, effectiveDate, seed, medIndices, sharedMedicationIds, medicationRequestIds, practId),
+                    "MedicationAdministration" => GenerateScenarioMedicationAdministration(resourceId, patientId, encounterId, effectiveDate, seed, medIndices, sharedMedicationIds, medicationRequestIds, practId, includeLowValueOptionalReferences),
                     "DiagnosticReport" => GenerateScenarioDiagnosticReport(resourceId, patientId, encounterId, effectiveDate, seed, observationIds, specimenIds, practId, diagnosticReportIds),
                     "ServiceRequest" => GenerateScenarioServiceRequest(resourceId, patientId, encounterId, effectiveDate, seed, practId, srIndices, conditionIds, serviceRequestIds),
                     "Coverage" => CoverageFactory.Generate(resourceId, patientId, encStart, encEnd, seed),
                     "Specimen" => GenerateScenarioSpecimen(resourceId, patientId, effectiveDate, seed, specIndices, specimenIds, practId),
                     "AllergyIntolerance" => AllergyIntoleranceFactory.Generate(resourceId, patientId, encStart, seed, practId),
                     "Immunization" => ImmunizationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalLocationId),
-                    "ImagingStudy" => GenerateScenarioImagingStudy(resourceId, patientId, encounterId, effectiveDate, seed, imgIndices, serviceRequestIds, practId),
+                    "ImagingStudy" => GenerateScenarioImagingStudy(resourceId, patientId, encounterId, effectiveDate, seed, imgIndices, serviceRequestIds, practId, includeLowValueOptionalReferences),
                     "CareTeam" => CareTeamFactory.Generate(resourceId, patientId, encounterId, attendingPractId, effectiveDate, HospitalOrgId),
                     "CarePlan" => CarePlanFactory.Generate(resourceId, patientId, encounterId, careTeamId, effectiveDate, seed),
                     "DocumentReference" => DocumentReferenceFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, HospitalOrgId, attendingPractId),
-                    "Provenance" => GenerateScenarioProvenance(resourceId, patientId, encounterId, effectiveDate, practId, diagnosticReportIds),
+                    "Provenance" => GenerateScenarioProvenance(resourceId, patientId, encounterId, effectiveDate, practId, diagnosticReportIds, includeLowValueOptionalReferences),
                     _ => throw new InvalidOperationException($"Unknown resource type: {resourceType}")
                 };
 
@@ -724,7 +725,8 @@ public static class FhirBundleGenerator
 
     private static MedicationAdministration GenerateScenarioMedicationAdministration(
         string id, string patientId, string encounterId, DateTime effective, int seed,
-        int[] medIndices, List<string> sharedMedicationIds, List<string> medicationRequestIds, string practId)
+        int[] medIndices, List<string> sharedMedicationIds, List<string> medicationRequestIds, string practId,
+        bool includeLowValueOptionalReferences)
     {
         var poolIdx = ScenarioResourceMap.PickIndex(medIndices, seed, FhirGenerationCodes.Medications.Length);
         var v = FhirGenerationCodes.Medications[poolIdx];
@@ -734,8 +736,8 @@ public static class FhirBundleGenerator
         var admin = MedicationAdministrationFactory.Create(id, patientId, encounterId, effective, seed, practId,
             v.RxCode, v.Display, v.RouteCode, v.RouteDisplay,
             v.DoseValue, v.DoseUnit, v.IndicationSnomed, v.IndicationDisplay, isIv, medRefId);
-        // Wire MedicationAdministration.request → MedicationRequest
-        if (medicationRequestIds.Count > 0)
+        // Optional link: MedicationAdministration.request → MedicationRequest
+        if (includeLowValueOptionalReferences && medicationRequestIds.Count > 0)
             admin.Request = new ResourceReference($"MedicationRequest/{medicationRequestIds[seed % medicationRequestIds.Count]}");
         return admin;
     }
@@ -779,15 +781,16 @@ public static class FhirBundleGenerator
 
     private static ImagingStudy GenerateScenarioImagingStudy(
         string id, string patientId, string encounterId, DateTime started, int seed,
-        int[] imgIndices, List<string> serviceRequestIds, string practId)
+        int[] imgIndices, List<string> serviceRequestIds, string practId,
+        bool includeLowValueOptionalReferences)
     {
         var poolIdx = ScenarioResourceMap.PickIndex(imgIndices, seed, FhirGenerationCodes.ImagingStudies.Length);
         var v = FhirGenerationCodes.ImagingStudies[poolIdx];
         var study = ImagingStudyFactory.Create(id, patientId, encounterId, started, HospitalLocationId, practId,
             v.SnomedCode, v.Display, v.Modality,
             v.BodySiteCode, v.BodySiteDisplay, v.ReasonCode, v.ReasonDisplay);
-        // Wire ImagingStudy.basedOn → ServiceRequest
-        if (serviceRequestIds.Count > 0)
+        // Optional link: ImagingStudy.basedOn → ServiceRequest
+        if (includeLowValueOptionalReferences && serviceRequestIds.Count > 0)
         {
             study.BasedOn ??= [];
             study.BasedOn.Add(new ResourceReference($"ServiceRequest/{serviceRequestIds[seed % serviceRequestIds.Count]}"));
@@ -797,11 +800,12 @@ public static class FhirBundleGenerator
 
     private static Provenance GenerateScenarioProvenance(
         string id, string patientId, string encounterId, DateTime recorded, string practId,
-        List<string> diagnosticReportIds)
+        List<string> diagnosticReportIds,
+        bool includeLowValueOptionalReferences)
     {
         var prov = ProvenanceFactory.Create(id, patientId, encounterId, recorded, practId, HospitalOrgId);
-        // Wire Provenance.target to include a DiagnosticReport when available
-        if (diagnosticReportIds.Count > 0)
+        // Optional link: Provenance.target to DiagnosticReport
+        if (includeLowValueOptionalReferences && diagnosticReportIds.Count > 0)
         {
             prov.Target ??= [];
             prov.Target.Add(new ResourceReference($"DiagnosticReport/{diagnosticReportIds[^1]}"));

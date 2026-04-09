@@ -62,7 +62,9 @@ public static class TestConfig
         {
             Server = Environment.GetEnvironmentVariable("E2E_SQL_SERVER") ?? "localhost,1433",
             UserId = Environment.GetEnvironmentVariable("E2E_SQL_USER") ?? "sa",
-            Password = Environment.GetEnvironmentVariable("E2E_SQL_PASSWORD") ?? string.Empty
+            Password = Environment.GetEnvironmentVariable("E2E_SQL_PASSWORD")
+                ?? Environment.GetEnvironmentVariable("LINK_DB_PASS")
+                ?? string.Empty
         },
         Kafka = new AutomationConfig.KafkaConfig
         {

@@ -30,6 +30,7 @@ public static class FacilitySetupHelper
         if (existing != null)
         {
             output.WriteLine($"Facility '{facilityId}' already exists. Skipping create.");
+            await WaitForFacilityReadConsistencyAsync(facilityClient, output, facilityId);
             return;
         }
 
@@ -46,6 +47,30 @@ public static class FacilitySetupHelper
                 Weekly = []
             }
         });
+
+        await WaitForFacilityReadConsistencyAsync(facilityClient, output, facilityId);
+    }
+
+    private static async Task WaitForFacilityReadConsistencyAsync(
+        IFacilityServiceClient facilityClient,
+        IAutomationOutput output,
+        string facilityId,
+        CancellationToken cancellationToken = default)
+    {
+        var timeout = TimeSpan.FromSeconds(20);
+        var started = DateTime.UtcNow;
+
+        while (DateTime.UtcNow - started < timeout)
+        {
+            var facility = await facilityClient.GetAsync(facilityId, cancellationToken);
+            if (facility != null)
+                return;
+
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+        }
+
+        throw new InvalidOperationException(
+            $"Facility '{facilityId}' was created but could not be read back from Tenant service within {timeout.TotalSeconds:F0}s.");
     }
 
     public static async Task EnsureNormalizationConfigAsync(
