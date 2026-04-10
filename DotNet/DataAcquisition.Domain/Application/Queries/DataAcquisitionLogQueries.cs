@@ -203,7 +203,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                           where l.FacilityId == facilityId
                                 && l.ReportTrackingId == reportTrackingId
                                 && l.CorrelationId == correlationId
-                                && !(l.Status == RequestStatus.Completed || l.Status == RequestStatus.MaxRetriesReached || l.Status == RequestStatus.Skipped)
+                                && !(l.Status == RequestStatus.Completed || l.Status == RequestStatus.MaxRetriesReached || l.Status == RequestStatus.Skipped || l.Status == RequestStatus.Cancelled)
                                 && !l.TailSent
                                 && l.FhirQueries.Any(fq => fq.IsReference == false)
                           select l).CountAsync(cancellationToken);
@@ -214,7 +214,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         CancellationToken cancellationToken = default)
     {
         var completedOrFailedStatuses = new[]
-            { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped };
+            { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.Cancelled };
 
         try
         {
@@ -835,6 +835,11 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             var resourceType = Enum.Parse<ResourceType>(model.ResourceType, ignoreCase: true);
             query = query.Where(log =>
                 log.FhirQueries.Any(q => q.FhirQueryResourceTypes.Any(r => r.ResourceType == resourceType)));
+        }
+
+        if (model.CreatedBefore.HasValue)
+        {
+            query = query.Where(log => log.CreateDate <= model.CreatedBefore.Value);
         }
 
         return query;

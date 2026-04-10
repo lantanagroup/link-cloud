@@ -48,5 +48,6 @@ public static class DataAcquisitionConstants
     {
         public const int MaxFacilityIdLength = 250;
         public const int MaxFacilityNameLength = 1000;
+        public const int MaxBulkIds = 1000;
     }
 }

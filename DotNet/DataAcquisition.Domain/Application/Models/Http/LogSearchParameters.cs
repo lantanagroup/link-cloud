@@ -14,6 +14,7 @@ public class LogSearchParameters : GenericLogSearchParameters
     public List<RequestStatus>? Statuses { get; set; }
     public AcquisitionPriority? Priority { get; set; }
     public string? ResourceType { get; set; }
+    public DateTime? CreatedBefore { get; set; }
 }
 
 public class SftpLogSearchParameters : GenericLogSearchParameters
