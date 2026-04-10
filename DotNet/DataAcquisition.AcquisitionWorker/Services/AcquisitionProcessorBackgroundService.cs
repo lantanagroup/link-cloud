@@ -111,7 +111,6 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
 
         DataAcquisitionLogModel? log = null;
 
-        //debug line
         _logger.LogInformation("Processing acquisition work for LogId {LogId} at FacilityId {FacilityId}", item.LogId, item.FacilityId);
 
         try
@@ -130,32 +129,50 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                 return;
             }
         }
+        catch (OperationCanceledException)
+        {
+            throw; // Shutdown — must propagate
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to process LogId {LogId} for facility {FacilityId}", item.LogId, item.FacilityId);
+            _logger.LogError(ex, "Failed to fetch/validate LogId {LogId} for facility {FacilityId}. " +
+                "The log will be recovered by the stalled-queue housekeeping job.", item.LogId, item.FacilityId);
 
-            if (log != null)
+            try
             {
-                log.Notes ??= new List<string>();
-                var safeMessage = $"[{DateTime.UtcNow:O}] Processing failed: {ex.GetType().Name} - {ex.Message}";
-                log.Notes.Add(safeMessage);
-                log.Status = RequestStatus.Failed;
-
-                await logManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                if (log != null)
                 {
-                    Id = log.Id,
-                    Status = log.Status,
-                    Notes = log.Notes,
-                    ResourceAcquiredIds = log.ResourceAcquiredIds,
-                    RetryAttempts = log.RetryAttempts,
-                    CompletionDate = log.CompletionDate,
-                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
-                    TraceId = log.TraceId,
-                    ExecutionDate = log.ExecutionDate
-                }, ct);
+                    log.Notes ??= new List<string>();
+                    var safeMessage = $"[{DateTime.UtcNow:O}] Processing failed: {ex.GetType().Name} - {ex.Message}";
+                    log.Notes.Add(safeMessage);
+                    log.Status = RequestStatus.Failed;
+
+                    await logManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                    {
+                        Id = log.Id,
+                        Status = log.Status,
+                        Notes = log.Notes,
+                        ResourceAcquiredIds = log.ResourceAcquiredIds,
+                        RetryAttempts = log.RetryAttempts,
+                        CompletionDate = log.CompletionDate,
+                        CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                        TraceId = log.TraceId,
+                        ExecutionDate = log.ExecutionDate
+                    }, ct);
+                }
+            }
+            catch (Exception updateEx)
+            {
+                _logger.LogError(updateEx,
+                    "Additionally failed to update status for LogId {LogId}. " +
+                    "The log will be recovered by the stalled-queue housekeeping job.", item.LogId);
             }
 
-            throw;
+            // Do NOT re-throw — a transient DB error for one work item must not
+            // kill the Parallel.ForEachAsync loop and take down the entire
+            // background service. The log stays in Queued state and will be
+            // recovered by FailStalledQueuedLogsAsync on the next job cycle.
+            return;
         }
 
         try

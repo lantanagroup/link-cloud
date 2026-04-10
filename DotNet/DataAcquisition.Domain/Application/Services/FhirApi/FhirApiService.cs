@@ -110,16 +110,11 @@ public class FhirApiService : IFhirApiService
 
             resourceIds.Add($"{resourceType}/{resource.Id}");
 
-            if (fhirQuery.IsReference.HasValue && fhirQuery.IsReference.Value)
-            {
-                await HandleReferenceResourceBatch(log, [resource], cancellationToken);
-            }
-
             InsertDateExtension(resource);
 
             //get references
             var refResources = ReferenceResourceBundleExtractor.Extract(resource, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
-            await _referenceResourceService.ProcessReferences(log, refResources, cancellationToken);
+            await _referenceResourceService.ProcessReferences(log, refResources, fhirQueryConfiguration, cancellationToken);
 
             await GenerateResourceAcquiredMessage(new ResourceAcquired
             {
@@ -222,7 +217,7 @@ public class FhirApiService : IFhirApiService
             {
                 var refResources = ReferenceResourceBundleExtractor.Extract(bundle, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
 
-                await _referenceResourceService.ProcessReferences(log, refResources, cancellationToken);
+                await _referenceResourceService.ProcessReferences(log, refResources, fhirQueryConfiguration, cancellationToken);
 
                 var resources = bundle.Entry
                     .Where(e => e.Resource != null && e.Resource.TypeName != "OperationOutcome")
@@ -247,13 +242,6 @@ public class FhirApiService : IFhirApiService
                 }
 
                 resourceIds.AddRange(resources.Select(r => $"{r.TypeName}/{r.Id}"));
-
-                // Batch reference resource handling: collect all reference resources in this page,
-                // do a single bulk lookup, then bulk create/update — instead of N individual round-trips.
-                if (fhirQuery.IsReference.HasValue && fhirQuery.IsReference.Value && resources.Count > 0)
-                {
-                    await HandleReferenceResourceBatch(log, resources, cancellationToken);
-                }
 
                 foreach (var resource in resources)
                 {
@@ -289,69 +277,6 @@ public class FhirApiService : IFhirApiService
                 throw new OpOutcomeException(note, ex);
             }
             throw;
-        }
-    }
-
-    /// <summary>
-    /// Batch-processes reference resources: one bulk lookup for the entire page,
-    /// then bulk create/update — replaces the previous per-resource round-trip pattern.
-    /// </summary>
-    private async Task HandleReferenceResourceBatch(DataAcquisitionLogModel log, List<Resource> resources, CancellationToken cancellationToken)
-    {
-        static string BuildReferenceKey(string resourceType, string resourceId) => $"{resourceType}/{resourceId}";
-
-        // Pre-fetch all existing reference resources for this facility + resource IDs/types in a single query
-        var resourceIds = resources.Select(r => r.Id).Distinct().ToList();
-        var resourceTypes = resources.Select(r => r.TypeName).Distinct().ToList();
-        var existingRecords = (await _referenceResourcesQueries.SearchAsync(new SearchReferenceResourcesModel
-        {
-            FacilityId = log.FacilityId,
-            ResourceIds = resourceIds,
-            ResourceTypes = resourceTypes,
-            PageSize = int.MaxValue
-        })).Records;
-
-        // Group by resource type + id and keep the most recent record per key, since the same
-        // resource can appear multiple times (different query phases, prior runs, etc.)
-        var existingByResourceKey = existingRecords
-            .GroupBy(r => BuildReferenceKey(r.ResourceType, r.ResourceId))
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.ModifyDate ?? r.CreateDate).First());
-
-        // Deduplicate incoming resources — a bundle page can contain the same resource twice
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        var now = DateTime.UtcNow;
-
-        foreach (var resource in resources)
-        {
-            var resourceKey = BuildReferenceKey(resource.TypeName, resource.Id);
-            if (!seen.Add(resourceKey))
-                continue;
-
-            InsertDateExtension((DomainResource)resource);
-            var serialized = JsonSerializer.Serialize(resource, LinkFhirSerializerOptions.ForFhirLenientSerialization);
-
-            if (existingByResourceKey.TryGetValue(resourceKey, out var existing))
-            {
-                await _referenceResourceManager.UpdateAsync(new UpdateReferenceResourcesModel
-                {
-                    Id = existing.Id,
-                    QueryPhase = existing.QueryPhase,
-                    ResourceType = resource.TypeName,
-                    ReferenceResource = serialized
-                }, cancellationToken);
-            }
-            else
-            {
-                await _referenceResourceManager.CreateAsync(new CreateReferenceResourcesModel
-                {
-                    DataAcquisitionLogId = log.Id,
-                    QueryPhase = QueryPhase.Referential,
-                    FacilityId = log.FacilityId,
-                    ResourceId = resource.Id,
-                    ResourceType = resource.TypeName,
-                    ReferenceResource = serialized
-                }, cancellationToken);
-            }
         }
     }
 

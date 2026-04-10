@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
+using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Shared.Application.Enums;
@@ -28,6 +29,8 @@ public class EndOfReportPeriodJobTests
     [Fact]
     public async Task Execute_UpdatesScheduleStatusAndDeletesJob()
     {
+        _fixture.QuartzJobHelperMock.Reset();
+
         using var scope = _fixture.ScopeFactory.CreateScope();
         var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
         var scheduleId = Guid.NewGuid();
@@ -43,6 +46,19 @@ public class EndOfReportPeriodJobTests
             EndOfReportPeriodJobHasRun = false
         };
         await database.ReportScheduledRepository.AddAsync(schedule);
+
+        var reportEntry = new ReportEntry
+        {
+            Id = Guid.NewGuid(),
+            CreateDate = DateTime.UtcNow,
+            FacilityId = facilityId,
+            ReportScheduleId = scheduleId,
+            PatientId = "test-patient",
+            ReportingStatus = ReportingStatus.PatientIdentified,
+            SubmissionStatus = null
+        };
+        await database.ReportEntryRepository.AddAsync(reportEntry);
+
         await database.ReportPopulationRepository.SaveChangesAsync();
 
         _fixture.TenantApiServiceMock.Setup(t => t.GetFacilityConfig(Moq.It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -85,6 +101,13 @@ public class EndOfReportPeriodJobTests
 
         var jobKey = new JobKey("test-end-of-period-job", "test-group");
 
+        _fixture.QuartzJobHelperMock
+            .Setup(q => q.DeleteJob(
+                jobKey.Name,
+                jobKey.Group,
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
         var jobDetailMock = new Mock<IJobDetail>();
         jobDetailMock.Setup(j => j.JobDataMap).Returns(jobDataMap);
         jobDetailMock.Setup(j => j.Key).Returns(jobKey);
@@ -122,6 +145,8 @@ public class EndOfReportPeriodJobTests
     [Fact]
     public async Task Execute_OnException_ReschedulesJob()
     {
+        _fixture.QuartzJobHelperMock.Reset();
+
         using var scope = _fixture.ScopeFactory.CreateScope();
         var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
         var scheduleId = Guid.NewGuid();

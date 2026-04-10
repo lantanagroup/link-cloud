@@ -50,6 +50,7 @@ export class AcquisitionLogService {
     if(sortBy) {
         params = params.set('sortBy', sortBy);
     }
+
     if(sortOrder) {
         params = params.set('sortOrder', sortOrder);
     }
@@ -122,6 +123,19 @@ export class AcquisitionLogService {
         })
       )
     }
+  }
+
+  getNotesForLog(id: string): Observable<string[]> {
+    const headers = new HttpHeaders({ 'X-Skip-Loading': 'true' });
+
+    return this.http.get<string[]>(`${this.baseUrl}/${id}/notes`, { headers })
+      .pipe(
+        map((response: string[]) => response ?? []),
+        catchError((error: HttpErrorResponse) => {
+          var err = this.errorHandler.handleError(error);
+          return err;
+        })
+      );
   }
 
   getAcquisitionLog(id: string) : Observable<AcquisitionLog> {
@@ -256,4 +270,32 @@ export class AcquisitionLogService {
       );
   }
 
+  getReferenceResourcesForLog(logId: string, pageSize: number = 1000, pageNumber: number = 1): Observable<PagedReferenceResources> {
+    let params = new HttpParams()
+      .set('pageSize', pageSize.toString())
+      .set('pageNumber', pageNumber.toString());
+
+    return this.http.get<PagedReferenceResources>(`${this.baseUrl}/${logId}/reference-resources`, { params })
+      .pipe(
+        catchError((error: HttpErrorResponse) => {
+          return this.errorHandler.handleError(error);
+        })
+      );
+  }
+
 }
+
+export interface PagedReferenceResources {
+  records: ReferenceResourceRecord[];
+  metadata: { pageNumber: number; pageSize: number; totalCount: number; totalPages: number };
+}
+
+export interface ReferenceResourceRecord {
+  id: string;
+  facilityId: string;
+  resourceId: string;
+  resourceType: string;
+  queryPhase: string;
+  dataAcquisitionLogId: number;
+}
+

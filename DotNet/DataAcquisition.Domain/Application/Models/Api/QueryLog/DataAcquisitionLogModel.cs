@@ -33,7 +33,7 @@ public class DataAcquisitionLogModel
     public DateTime? CompletionDate { get; set; }
     public long? CompletionTimeMilliseconds { get; set; }
     public List<string>? ResourceAcquiredIds { get; set; } = new List<string>();
-    public List<ReferenceResourceModel> ReferenceResources { get; set; } = new();
+    public int ReferenceResourceCount { get; set; }
     public List<string>? Notes { get; set; } = new List<string>();
     public ScheduledReport? ScheduledReport { get; set; }
     public bool IsDeleted { get; set; }
@@ -90,18 +90,18 @@ public class DataAcquisitionLogModel
             CompletionDate = log.CompletionDate,
             CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
             ResourceAcquiredIds = log.ResourceAcquiredIds,
-            ReferenceResources = log.ReferenceResources.Select(r => new ReferenceResourceModel
-            {
-                Id = r.Id,
-                FacilityId = r.FacilityId,
-                ResourceId = r.ResourceId,
-                ResourceType = r.ResourceType,
-                ReferenceResource = r.ReferenceResource,
-                QueryPhase = r.QueryPhase,
-                DataAcquisitionLogId = r.DataAcquisitionLogId
-            }).ToList(),
-            Notes = log.Notes,
-            ScheduledReport = log.ScheduledReport,
+            ReferenceResourceCount = log.ReferenceResources?.Count ?? 0,
+            Notes = null,
+            ScheduledReport = log.ScheduledReportEntity != null
+                ? new ScheduledReport
+                {
+                    ReportTrackingId = log.ScheduledReportEntity.ReportTrackingId,
+                    Frequency = log.ScheduledReportEntity.Frequency,
+                    StartDate = DateTime.SpecifyKind(log.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
+                    EndDate = DateTime.SpecifyKind(log.ScheduledReportEntity.EndDate, DateTimeKind.Utc),
+                    ReportTypes = log.ScheduledReportEntity.ReportTypes?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList() ?? new()
+                }
+                : null,
             IsDeleted = log.IsDeleted
         };
     }

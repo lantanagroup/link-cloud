@@ -44,14 +44,26 @@ public class AcquisitionProcessingJob : IJob
 
     public async Task Execute(IJobExecutionContext context)
     {
-        await FailStalledQueuedLogs(context.CancellationToken);
-        await ResetStalledProcessingLogs(context.CancellationToken);
+        try
+        {
+            await FailStalledQueuedLogs(context.CancellationToken);
+            await ResetStalledProcessingLogs(context.CancellationToken);
 
-        // Start the stopwatch AFTER housekeeping so the full time budget
-        // is available for the primary work of dispatching pending logs.
-        var stopwatch = Stopwatch.StartNew();
-        await ProcessPendingLogs(stopwatch, context.CancellationToken);
-        await ProcessPendingTailingMessages(stopwatch, context.CancellationToken);
+            // Start the stopwatch AFTER housekeeping so the full time budget
+            // is available for the primary work of dispatching pending logs.
+            var stopwatch = Stopwatch.StartNew();
+            await ProcessPendingLogs(stopwatch, context.CancellationToken);
+            await ProcessPendingTailingMessages(stopwatch, context.CancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled exception in AcquisitionProcessingJob.");
+            throw new JobExecutionException(ex, refireImmediately: false);
+        }
     }
 
     private async Task FailStalledQueuedLogs(CancellationToken cancellationToken)
@@ -111,12 +123,16 @@ public class AcquisitionProcessingJob : IJob
             var dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
             var facilities = await dataAcquisitionLogQueries.GetFacilitiesWithPendingAndRetryableFailedRequests(cancellationToken);
 
-            var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = _settings.MaxConcurrentAcquisitions, CancellationToken = cancellationToken };
-
-            await Parallel.ForEachAsync(facilities, parallelOptions, async (facilityId, ct) =>
+            foreach (var facilityId in facilities)
             {
+                if (stopwatch.Elapsed.TotalSeconds >= _settings.TimeBudgetPerRunSeconds)
+                {
+                    _logger.LogInformation("ProcessPendingLogs reached time budget of {budget}s. Skipping remaining facilities.", _settings.TimeBudgetPerRunSeconds);
+                    break;
+                }
+
                 await ProcessFacilityPendingLogs(facilityId, stopwatch, cancellationToken);
-            });
+            }
         }
         catch (OperationCanceledException)
         {
@@ -161,8 +177,14 @@ public class AcquisitionProcessingJob : IJob
                     var requests = await dataAcquisitionLogQueries.GetNextEligibleBatchForFacility(facilityId, lastMissingConfigId, BatchSize, statuses, dateTimeNow, cancellationToken);
                     if (!requests.Any()) break;
 
-                    var logIds = requests.Select(r => r.Id).ToList();
-                    await dataAcquisitionLogManager.UpdateStatusBatchAsync(logIds, RequestStatus.Failed, cancellationToken);
+                    // Missing config is a configuration error, not a transient failure.
+                    // Move all affected logs directly to the terminal MaxRetriesReached status
+                    // so they are never re-queued, and record the reason as a note.
+                    var allIds = requests.Select(r => r.Id).ToList();
+                    await dataAcquisitionLogManager.SetMaxRetriesReachedWithNoteBatchAsync(
+                        allIds,
+                        "FhirQueryConfiguration not found for this facility.",
+                        cancellationToken);
 
                     lastMissingConfigId = requests.Last().Id;
                     batchesProcessedMissing++;
@@ -217,17 +239,12 @@ public class AcquisitionProcessingJob : IJob
 
                 if (maxRetriesReachedIds.Any())
                 {
-                    await dataAcquisitionLogManager.UpdateStatusBatchAsync(maxRetriesReachedIds, RequestStatus.MaxRetriesReached, cancellationToken);
+                    await dataAcquisitionLogManager.UpdateStatusBatchAsync(maxRetriesReachedIds, RequestStatus.MaxRetriesReached, false, cancellationToken);
                 }
 
                 if (retryableLogIds.Any())
                 {
-                    // We can't easily increment RetryAttempts in ExecuteUpdateAsync if it's null or we need different notes per record
-                    // But for the job, we can assume they all get +1 and the same note if we want true bulk
-                    // However, some might be Pending (RetryAttempts 0) and some Failed (RetryAttempts > 0)
-
-                    // To keep it simple and safe for now, let's at least bulk update the status to Ready
-                    await dataAcquisitionLogManager.UpdateStatusBatchAsync(retryableLogIds, RequestStatus.Ready, cancellationToken);
+                    await dataAcquisitionLogManager.UpdateStatusBatchAsync(retryableLogIds, RequestStatus.Ready, true, cancellationToken);
                 }
 
                 foreach (var request in requests)
@@ -260,7 +277,7 @@ public class AcquisitionProcessingJob : IJob
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error producing ReadyToAcquire message for log id: {logId}", request.Id);
-                        await dataAcquisitionLogManager.UpdateStatusBatchAsync([request.Id], RequestStatus.Failed, cancellationToken);
+                        await dataAcquisitionLogManager.UpdateStatusBatchAsync([request.Id], RequestStatus.Failed, false, cancellationToken);
                     }
                 }
                 _readyToAcquireProducer.Flush(cancellationToken);
@@ -321,10 +338,15 @@ public class AcquisitionProcessingJob : IJob
         {
             tailingMessages = await dataAcquisitionLogQueries.GetTailingMessages(cancellationToken);
         }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Retrieving tailing messages was cancelled.");
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "An exception occurred while attempting to retrieve pending tail messages.");
-            throw;
+            return;
         }
 
         try
@@ -418,7 +440,6 @@ public class AcquisitionProcessingJob : IJob
         catch (Exception ex)
         {
             _logger.LogError(ex, "Aggregated errors during tailing message processing.");
-            throw;
         }
     }
 

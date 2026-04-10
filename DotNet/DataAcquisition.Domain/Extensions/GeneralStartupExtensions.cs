@@ -224,6 +224,7 @@ public static class GeneralStartupExtensions
     {
         //Queries
         services.AddTransient<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();
+        services.AddTransient<IDataAcquisitionLogNotesQueries, DataAcquisitionLogNotesQueries>();
         services.AddTransient<ISftpAcquisitionLogQueries, SftpAcquisitionLogQueries>();
         services.AddTransient<IFhirQueryConfigurationQueries, FhirQueryConfigurationQueries>();
         services.AddTransient<IFhirQueryListConfigurationQueries, FhirQueryListConfigurationQueries>();

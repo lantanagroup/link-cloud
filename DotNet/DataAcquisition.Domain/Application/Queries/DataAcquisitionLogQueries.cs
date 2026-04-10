@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
@@ -8,16 +7,16 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using System.Diagnostics;
-using DataAcquisition.Domain.Application.Models;
 using IDatabase = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
@@ -35,12 +34,6 @@ public interface IDataAcquisitionLogQueries
     /// <exception cref="ArgumentNullException"></exception>
     /// <exception cref="KeyNotFoundException"></exception>
     Task<DataAcquisitionLogModel?> GetAsync(long id, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Same as <see cref="GetAsync"/> but also includes the ReferenceResources collection.
-    /// Use only when reference resources are needed (e.g. API detail endpoints).
-    /// </summary>
-    Task<DataAcquisitionLogModel?> GetWithReferencesAsync(long id, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retrieves a list of TailingMessageModel objects that represent the tailing messages for data acquisition logs.
@@ -61,13 +54,10 @@ public interface IDataAcquisitionLogQueries
     /// that are incomplete for the specified parameters.</returns>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="facilityId"/>, <paramref name="reportTrackingId"/>, or <paramref
     /// name="correlationId"/> is null or empty.</exception>
-    Task<int> GetCountOfNonRefLogsIncompleteAsync(string facilityId, string reportTrackingId, string correlationId,
-        CancellationToken cancellationToken = default);
-
     Task<IPagedModel<QueryLogSummaryModel>> SearchQueryLogSummaryAsync(SearchDataAcquisitionLogRequest request,
         CancellationToken cancellationToken = default);
 
-    Task<PagedConfigModel<DataAcquisitionLogModel>> SearchAsync(SearchDataAcquisitionLogRequest model,
+    Task<PagedConfigModel<DataAcquisitionLogSummaryModel>> SearchAsync(SearchDataAcquisitionLogRequest model,
         CancellationToken cancellationToken = default);
 
     Task<DataAcquisitionLogStatistics> GetDataAcquisitionLogStatisticsByReportAsync(string reportId,
@@ -89,14 +79,6 @@ public interface IDataAcquisitionLogQueries
     Task<List<string>> GetResourceIdsForReportPatient(string correlationId, string facilityId, string resourceType,
         CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Lightweight lookup that returns only the FhirQuery ID, facility, query type
-    /// and query parameters for a reference resource type. Used by reference
-    /// processing to avoid loading the full entity graph.
-    /// </summary>
-    Task<ReferenceQueryLookupResult?> FindReferenceQueryAsync(
-        string facilityId, string reportTrackingId, string correlationId,
-        string resourceType, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
@@ -159,18 +141,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetAsync");
         activity?.SetTag(DiagnosticNames.ReportId, id);
 
-        return await ProjectLogById(id, includeReferenceResources: false)
-            .FirstOrDefaultAsync(cancellationToken);
-    }
-
-    /// <summary>
-    /// Retrieves a data acquisition log by ID including its ReferenceResources
-    /// collection. Use this only when reference resources are actually needed
-    /// (e.g. API detail endpoints). For the worker hot path, use <see cref="GetAsync"/>.
-    /// </summary>
-    public async Task<DataAcquisitionLogModel?> GetWithReferencesAsync(long id, CancellationToken cancellationToken = default)
-    {
-        return await ProjectLogById(id, includeReferenceResources: true)
+        return await ProjectLogById(id)
             .FirstOrDefaultAsync(cancellationToken);
     }
 
@@ -179,7 +150,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     /// All columns are projected directly into <see cref="DataAcquisitionLogModel"/>
     /// without materialising the entity first.
     /// </summary>
-    private IQueryable<DataAcquisitionLogModel> ProjectLogById(long id, bool includeReferenceResources)
+    private IQueryable<DataAcquisitionLogModel> ProjectLogById(long id)
     {
         return _dbContext.DataAcquisitionLogs
             .AsNoTracking()
@@ -231,49 +202,20 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 CompletionDate = l.CompletionDate,
                 CompletionTimeMilliseconds = l.CompletionTimeMilliseconds,
                 ResourceAcquiredIds = l.ResourceAcquiredIds,
-                ReferenceResources = includeReferenceResources
-                    ? l.ReferenceResources.Select(r => new ReferenceResourceModel
-                    {
-                        Id = r.Id,
-                        FacilityId = r.FacilityId,
-                        ResourceId = r.ResourceId,
-                        ResourceType = r.ResourceType,
-                        ReferenceResource = r.ReferenceResource,
-                        QueryPhase = r.QueryPhase,
-                        DataAcquisitionLogId = r.DataAcquisitionLogId
-                    }).ToList()
-                    : new List<ReferenceResourceModel>(),
-                Notes = l.Notes,
-                ScheduledReport = l.ScheduledReport,
+                ReferenceResourceCount = l.ReferenceResources.Count(),
+                Notes = null,
+                ScheduledReport = l.ScheduledReportEntity != null ? new ScheduledReport
+                {
+                    ReportTrackingId = l.ScheduledReportEntity.ReportTrackingId,
+                    Frequency = l.ScheduledReportEntity.Frequency,
+                    StartDate = DateTime.SpecifyKind(l.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
+                    EndDate = DateTime.SpecifyKind(l.ScheduledReportEntity.EndDate, DateTimeKind.Utc),
+                    ReportTypes = l.ScheduledReportEntity.ReportTypes != null
+                        ? l.ScheduledReportEntity.ReportTypes.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).ToList()
+                        : new List<string>()
+                } : null,
                 IsDeleted = l.IsDeleted
             });
-    }
-
-    public async Task<int> GetCountOfNonRefLogsIncompleteAsync(string facilityId, string reportTrackingId,
-        string correlationId, CancellationToken cancellationToken = default)
-    {
-        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetCountOfNonRefLogsIncompleteAsync");
-        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
-        activity?.SetTag(DiagnosticNames.ReportTrackingId, reportTrackingId);
-        activity?.SetTag(DiagnosticNames.CorrelationId, correlationId);
-
-        if (string.IsNullOrWhiteSpace(facilityId))
-            throw new ArgumentNullException(nameof(facilityId), "Facility ID cannot be null or empty.");
-
-        if (string.IsNullOrWhiteSpace(reportTrackingId))
-            throw new ArgumentNullException(nameof(reportTrackingId), "Report Tracking ID cannot be null or empty.");
-
-        if (string.IsNullOrWhiteSpace(correlationId))
-            throw new ArgumentNullException(nameof(correlationId), "Correlation ID cannot be null or empty.");
-
-        return await (from l in _dbContext.DataAcquisitionLogs.AsNoTracking()
-                      where l.FacilityId == facilityId
-                            && l.ReportTrackingId == reportTrackingId
-                            && l.CorrelationId == correlationId
-                            && !(l.Status == RequestStatus.Completed || l.Status == RequestStatus.MaxRetriesReached || l.Status == RequestStatus.Skipped)
-                            && !l.TailSent
-                            && l.FhirQueries.Any(fq => fq.IsReference != true)
-                      select l).CountAsync(cancellationToken);
     }
 
     public async Task<IEnumerable<TailingMessageModel>> GetTailingMessages(
@@ -355,7 +297,16 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         log.TraceId,
                         log.PatientId,
                         log.ReportableEvent,
-                        log.ScheduledReport,
+                        ScheduledReport = log.ScheduledReportEntity != null ? new ScheduledReport
+                        {
+                            ReportTrackingId = log.ScheduledReportEntity.ReportTrackingId,
+                            Frequency = log.ScheduledReportEntity.Frequency,
+                            StartDate = DateTime.SpecifyKind(log.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
+                            EndDate = DateTime.SpecifyKind(log.ScheduledReportEntity.EndDate, DateTimeKind.Utc),
+                            ReportTypes = log.ScheduledReportEntity.ReportTypes != null
+                                ? log.ScheduledReportEntity.ReportTypes.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).ToList()
+                                : new List<string>()
+                        } : null,
                         log.ReportStartDate,
                         log.ReportEndDate
                     })
@@ -524,7 +475,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     }
 
 
-    public async Task<PagedConfigModel<DataAcquisitionLogModel>> SearchAsync(SearchDataAcquisitionLogRequest model,
+    public async Task<PagedConfigModel<DataAcquisitionLogSummaryModel>> SearchAsync(SearchDataAcquisitionLogRequest model,
         CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.SearchAsync");
@@ -538,7 +489,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         var logs = await query
             .Skip((model.PageNumber - 1) * model.PageSize)
             .Take(model.PageSize)
-            .Select(l => new DataAcquisitionLogModel
+            .Select(l => new DataAcquisitionLogSummaryModel
             {
                 Id = l.Id,
                 Priority = l.Priority,
@@ -551,37 +502,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 FhirVersion = l.FhirVersion,
                 QueryType = l.QueryType,
                 QueryPhase = l.QueryPhase,
-                FhirQuery = l.FhirQueries != null
-                    ? l.FhirQueries.Select(q =>
-                        new FhirQueryModel
-                        {
-                            Id = q.Id,
-                            FacilityId = q.FacilityId,
-                            MeasureId = q.MeasureId,
-                            IdQueryParameterValues = q.IdQueryParameterValues.ToList(),
-                            IsReference = q.IsReference,
-                            QueryType = q.QueryType,
-                            ResourceTypes = q.FhirQueryResourceTypes.Select(r => r.ResourceType).ToList(),
-                            QueryParameters = q.QueryParameters,
-                            Paged = q.Paged,
-                            DataAcquisitionLogId = q.DataAcquisitionLogId,
-                            CensusListId = q.CensusListId,
-                            CensusPatientStatus = q.CensusPatientStatus,
-                            CensusTimeFrame = q.CensusTimeFrame,
-                            ResourceReferenceTypes = q.ResourceReferenceTypes != null
-                                ? q.ResourceReferenceTypes.Select(rt => new ResourceReferenceTypeModel
-                                {
-                                    Id = rt.Id,
-                                    FacilityId = rt.FacilityId,
-                                    QueryPhase = rt.QueryPhase,
-                                    ResourceType = rt.ResourceType,
-                                    FhirQueryId = rt.FhirQueryId,
-                                    CreateDate = rt.CreateDate,
-                                    ModifyDate = rt.ModifyDate,
-                                }).ToList()
-                                : new()
-                        }).ToList()
-                    : new(),
                 Status = l.Status,
                 ExecutionDate = l.ExecutionDate,
                 CreateDate = l.CreateDate,
@@ -590,22 +510,11 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 CompletionDate = l.CompletionDate,
                 CompletionTimeMilliseconds = l.CompletionTimeMilliseconds,
                 ResourceAcquiredIds = l.ResourceAcquiredIds,
-                ReferenceResources = l.ReferenceResources.Select(r => new ReferenceResourceModel
-                {
-                    Id = r.Id,
-                    FacilityId = r.FacilityId,
-                    ResourceId = r.ResourceId,
-                    ResourceType = r.ResourceType,
-                    ReferenceResource = r.ReferenceResource,
-                    QueryPhase = r.QueryPhase,
-                    DataAcquisitionLogId = r.DataAcquisitionLogId
-                }).ToList(),
-                Notes = l.Notes,
-                ScheduledReport = l.ScheduledReport,
+                Notes = null,
                 IsDeleted = l.IsDeleted
             }).ToListAsync(cancellationToken);
 
-        return new PagedConfigModel<DataAcquisitionLogModel>
+        return new PagedConfigModel<DataAcquisitionLogSummaryModel>
         {
             Metadata = new PaginationMetadata
             {
@@ -825,33 +734,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<ReferenceQueryLookupResult?> FindReferenceQueryAsync(
-        string facilityId, string reportTrackingId, string correlationId,
-        string resourceType, CancellationToken cancellationToken = default)
-    {
-        var parsedResourceType = Enum.Parse<ResourceType>(resourceType, ignoreCase: true);
-
-        return await _dbContext.DataAcquisitionLogs
-            .AsNoTracking()
-            .Where(l => !l.IsDeleted
-                && l.FacilityId == facilityId
-                && l.ReportTrackingId == reportTrackingId
-                && l.CorrelationId == correlationId
-                && l.FhirQueries.Any(q => q.IsReference == true
-                    && q.FhirQueryResourceTypes.Any(r => r.ResourceType == parsedResourceType)))
-            .SelectMany(l => l.FhirQueries
-                .Where(q => q.IsReference == true
-                    && q.FhirQueryResourceTypes.Any(r => r.ResourceType == parsedResourceType))
-                .Select(q => new ReferenceQueryLookupResult
-                {
-                    FhirQueryId = q.Id,
-                    FacilityId = l.FacilityId,
-                    QueryType = q.QueryType,
-                    QueryParameters = q.QueryParameters
-                }))
-            .FirstOrDefaultAsync(cancellationToken);
-    }
-
     private IQueryable<DataAcquisitionLog> BuildSearchQuery(SearchDataAcquisitionLogRequest model)
     {
         var query = _dbContext.DataAcquisitionLogs.AsNoTracking().AsQueryable();
@@ -966,8 +848,17 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         CompletionDate = log.CompletionDate,
                         CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
                         ResourceAcquiredIds = log.ResourceAcquiredIds,
-                        Notes = log.Notes,
-                        ScheduledReport = log.ScheduledReport
+                        Notes = null,
+                        ScheduledReport = log.ScheduledReportEntity != null ? new ScheduledReport
+                        {
+                            ReportTrackingId = log.ScheduledReportEntity.ReportTrackingId,
+                            Frequency = log.ScheduledReportEntity.Frequency,
+                            StartDate = DateTime.SpecifyKind(log.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
+                            EndDate = DateTime.SpecifyKind(log.ScheduledReportEntity.EndDate, DateTimeKind.Utc),
+                            ReportTypes = log.ScheduledReportEntity.ReportTypes != null
+                                ? log.ScheduledReportEntity.ReportTypes.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).ToList()
+                                : new List<string>()
+                        } : null
                     };
 
         return await query

@@ -327,7 +327,7 @@ public class PatientDataServiceTests
                 ResourceReferenceTypes = new List<ResourceReferenceType>()
             }
         },
-            ScheduledReport = new ScheduledReport(),
+            ScheduledReportEntity = new ScheduledReportEntity(),
             PatientId = "patient-1",
             CorrelationId = "corr-1"
         };
@@ -398,7 +398,7 @@ public class PatientDataServiceTests
                     ResourceReferenceTypes = new List<ResourceReferenceType>()
                 }
             },
-            ScheduledReport = new ScheduledReport(),
+            ScheduledReportEntity = new ScheduledReportEntity(),
             PatientId = "patient-1",
             CorrelationId = "corr-1"
         };
@@ -471,7 +471,7 @@ public class PatientDataServiceTests
                     ResourceReferenceTypes = new List<ResourceReferenceType>()
                 }
             },
-            ScheduledReport = new ScheduledReport(),
+            ScheduledReportEntity = new ScheduledReportEntity(),
             PatientId = "patient-1",
             CorrelationId = "corr-1"
         };
@@ -619,7 +619,6 @@ public class PatientDataServiceTests
             FacilityId = facilityId,
             Status = RequestStatus.Queued,
             IsCensus = false,
-            Notes = new List<string>(),
             FhirQueries = new List<FhirQuery>
         {
             new FhirQuery
@@ -736,7 +735,6 @@ public class PatientDataServiceTests
             FacilityId = facilityId,
             Status = RequestStatus.Queued,
             IsCensus = false,
-            Notes = new List<string>(),
             FhirQueries = new List<FhirQuery>
         {
             new FhirQuery
@@ -877,7 +875,7 @@ public class PatientDataServiceTests
             }
         }
     },
-            ScheduledReport = new ScheduledReport()
+            ScheduledReportEntity = new ScheduledReportEntity()
         };
 
         var model = DataAcquisitionLogModel.FromDomain(log);

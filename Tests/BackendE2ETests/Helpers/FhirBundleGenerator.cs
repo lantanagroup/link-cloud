@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Tests.E2ETests.Helpers;
@@ -39,16 +39,20 @@ public static class FhirBundleGenerator
     private const string PulseOxDeviceId = "MegaTest-Device-PulseOx";
     private const string VentilatorDeviceId = "MegaTest-Device-Ventilator";
 
-    // Encounter period per patient (offset by patient index to avoid identical data)
+    // Encounter period per patient (offset by patient index to avoid identical data).
+    // All encounters are kept within the 2023 measurement period (Jan 1 – Dec 31)
+    // so that every patient qualifies for the ACH Initial Population.
     private static DateTime EncounterStart(int patientIndex)
     {
-        // Start at March 2023, cycle months, increment year as needed
-        int baseYear = 2023;
-        int baseMonth = 3;
-        int monthOffset = patientIndex;
-        int month = ((baseMonth - 1 + monthOffset) % 12) + 1;
-        int year = baseYear + (baseMonth - 1 + monthOffset) / 12;
-        return new DateTime(year, month, 1, 8, 0, 0, DateTimeKind.Utc);
+        // Spread encounters evenly across Jan 1 – Dec 15 2023.
+        // Dec 15 leaves room for a 10-day encounter to finish before year-end.
+        var periodStart = new DateTime(2023, 1, 1, 8, 0, 0, DateTimeKind.Utc);
+        var periodEnd = new DateTime(2023, 12, 15, 8, 0, 0, DateTimeKind.Utc);
+        double totalMinutes = (periodEnd - periodStart).TotalMinutes;
+
+        // Use modulo so any patient count wraps around within the year
+        double offsetMinutes = (patientIndex % 1000) * (totalMinutes / 1000);
+        return periodStart.AddMinutes(offsetMinutes);
     }
 
     private static DateTime EncounterEnd(int patientIndex) =>
