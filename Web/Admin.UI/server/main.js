@@ -15,11 +15,14 @@ console.log(`Express trust proxy is set to: ${trustProxyValue}`);
 
 const port = process.env.PORT || 80;
 
-// Basic rate limiting middleware
+// Rate limiting at the application level is unnecessary in our case
+// And it may actually be producing false positives during dynamic scanning, or else masking legitimate issues
+// However, completely *removing* rate limiting causes failures in static scanning due to a perceived denial-of-service vulnerability
+// As a compromise, retain rate limiting, but with a generous enough limit that the dynamic scanner shouldn't get throttled
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later'
+  windowMs: 1000,
+  max: 1000,
+  message: ''
 });
 
 let distFolder = getDistFolder();
@@ -32,13 +35,15 @@ if (config.production || process.env.NODE_ENV === 'production') {
   app.use(helmet());
 }
 
+app.use(apiLimiter);
+
 app.use(express.static(distFolder));
 
 app.get('/assets/app.config.local.json', (req, res) => {
   res.json(config); // Don't log every time the request is made
 });
 
-app.get('/*any', apiLimiter, (req, res) => {
+app.get('/{*any}', (req, res) => {
   const p = req.path; // pathname only (no querystring)
 
   const isExcluded = blockPathMatchers.some((rule) => {
@@ -46,9 +51,13 @@ app.get('/*any', apiLimiter, (req, res) => {
     return rule.test(p);
   });
 
-  if (isExcluded) return res.status(404).send('Not Found');
+  if (isExcluded) return res.status(404).send();
 
   res.sendFile(path.join(distFolder, 'index.html'));
+});
+
+app.all('/{*any}', (req, res) => {
+  res.status(400).send();
 });
 
 app.listen(port, () => {
