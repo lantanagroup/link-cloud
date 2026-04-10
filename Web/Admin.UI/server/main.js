@@ -30,7 +30,7 @@ app.get('/assets/app.config.local.json', (req, res) => {
   res.json(config); // Don't log every time the request is made
 });
 
-app.get('/*any', (req, res) => {
+app.get('/{*any}', (req, res) => {
   const p = req.path; // pathname only (no querystring)
 
   const isExcluded = blockPathMatchers.some((rule) => {
@@ -41,6 +41,10 @@ app.get('/*any', (req, res) => {
   if (isExcluded) return res.status(404).send();
 
   res.sendFile(path.join(distFolder, 'index.html'));
+});
+
+app.all('/{*any}', (req, res) => {
+  res.status(400).send();
 });
 
 app.listen(port, () => {
