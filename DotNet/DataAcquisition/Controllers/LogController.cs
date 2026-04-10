@@ -11,6 +11,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Settings;
 using Link.Authorization.Policies;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -25,6 +26,8 @@ public class LogController : Controller
     private readonly IDataAcquisitionLogService _logService;
     private readonly IDataAcquisitionLogManager _logManager;
     private readonly IDataAcquisitionLogQueries _logQueries;
+
+    private const int DefaultCancelMinAgeHours = 24;
 
     public LogController(ILogger<LogController> logger, IDataAcquisitionLogService logService, IDataAcquisitionLogManager logManager, IDataAcquisitionLogQueries queries)
     {
@@ -100,7 +103,8 @@ public class LogController : Controller
                         PageSize = queryParameters.PageSize,
                         SortBy = queryParameters.SortBy,
                         SortOrder = queryParameters.SortOrder,
-                        IncludeDeleted = queryParameters.IncludeDeleted
+                        IncludeDeleted = queryParameters.IncludeDeleted,
+                        CreatedBefore = queryParameters.CreatedBefore
                     }, cancellationToken);
 
                 return Ok(result);
@@ -675,6 +679,42 @@ public class LogController : Controller
     }
 
     /// <summary>
+    /// Cancel multiple data acquisition log entries.
+    /// </summary>
+    /// <param name="ids">The IDs of the logs to cancel.</param>
+    /// <param name="minAgeHours">Minimum age in hours a log must have to be eligible for cancellation. Defaults to 24.</param>
+    /// <param name="cancellationToken"></param>
+    /// <returns>
+    /// A response indicating the result of the cancellation.
+    /// </returns>
+    [HttpPost("cancel-bulk")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> CancelBulk([FromBody] List<long> ids, [FromQuery] int minAgeHours = DefaultCancelMinAgeHours, CancellationToken cancellationToken = default)
+    {
+        if (ids == null || !ids.Any())
+        {
+            return BadRequest("IDs cannot be null or empty.");
+        }
+
+        if (minAgeHours < 0) 
+        { 
+            return BadRequest("minAgeHours must be zero or greater.");
+        }
+        try
+        {
+            var cancelledCount = await _logManager.CancelBulkAsync(ids, minAgeHours, cancellationToken);
+            return Accepted(new { requested = ids.Count, cancelled = cancelledCount, ineligible = ids.Count - cancelledCount });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "CancelBulk"), ex, "An Exception occurred while attempting to cancel logs in bulk.");
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
     /// Process data acquisition log entries based on search criteria.
     /// </summary>
     /// <returns>
@@ -723,6 +763,7 @@ public class LogController : Controller
                     AcquisitionPriority = queryParameters.Priority,
                     ResourceType = queryParameters.ResourceType,
                     IncludeDeleted = queryParameters.IncludeDeleted,
+                    CreatedBefore = queryParameters.CreatedBefore,
                     PageNumber = 1,
                     PageSize = int.MaxValue // Get all matching IDs
                 }, cancellationToken);
@@ -738,6 +779,69 @@ public class LogController : Controller
         catch (Exception ex)
         {
             _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "ProcessByFilter"), ex, "An Exception occurred while attempting to process logs by filter.");
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Cancel data acquisition log entries based on search criteria.
+    /// </summary>
+    /// <returns>
+    /// A response indicating the result of the cancellation.
+    /// </returns>
+    [HttpPost("cancel-by-filter")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> CancelByFilter([FromBody] LogSearchParameters queryParameters, [FromQuery] int minAgeHours = DefaultCancelMinAgeHours, CancellationToken cancellationToken = default)
+    {
+        if (queryParameters == null)
+        {
+            return BadRequest("Query parameters are required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(queryParameters.FacilityId) &&
+            string.IsNullOrWhiteSpace(queryParameters.PatientId) &&
+            string.IsNullOrWhiteSpace(queryParameters.ReportId) &&
+            string.IsNullOrWhiteSpace(queryParameters.ResourceId) &&
+            !queryParameters.QueryPhase.HasValue &&
+            !queryParameters.QueryType.HasValue &&
+            (queryParameters.Statuses == null || !queryParameters.Statuses.Any()) &&
+            !queryParameters.Priority.HasValue &&
+            string.IsNullOrWhiteSpace(queryParameters.ResourceType))
+        {
+            return BadRequest("At least one filter criteria must be provided.");
+        }
+
+        try
+        {
+            var facilityId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.FacilityId);
+            var patientId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.PatientId);
+            var reportId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ReportId);
+            var resourceId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ResourceId);
+
+            var filter = new SearchDataAcquisitionLogRequest
+            {
+                FacilityId = facilityId,
+                PatientId = patientId,
+                ReportTrackingId = reportId,
+                ResourceId = resourceId,
+                QueryPhase = queryParameters.QueryPhase,
+                QueryType = queryParameters.QueryType,
+                RequestStatuses = queryParameters.Statuses,
+                AcquisitionPriority = queryParameters.Priority,
+                ResourceType = queryParameters.ResourceType,
+                IncludeDeleted = queryParameters.IncludeDeleted,
+                CreatedBefore = queryParameters.CreatedBefore
+            };
+
+            var (requested, cancelled) = await _logManager.CancelByFilterAsync(filter, minAgeHours, cancellationToken);
+
+            return Accepted(new { requested, cancelled, ineligible = requested - cancelled });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "CancelByFilter"), ex, "An Exception occurred while attempting to cancel logs by filter.");
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
