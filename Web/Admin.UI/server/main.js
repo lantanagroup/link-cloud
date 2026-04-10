@@ -38,7 +38,7 @@ app.get('/*any', (req, res) => {
     return rule.test(p);
   });
 
-  if (isExcluded) return res.status(404).send('Not Found');
+  if (isExcluded) return res.status(404).send();
 
   res.sendFile(path.join(distFolder, 'index.html'));
 });
