@@ -665,14 +665,13 @@ public class LogController : Controller
             return BadRequest("IDs cannot be null or empty.");
         }
 
-        if (ids.Count > MaxBulkIds)
-        {
-            return BadRequest($"Too many IDs in request. Maximum allowed is {MaxBulkIds}, received {ids.Count}.");
-        }
-
         try
         {
-            await _logService.StartRetrievalProcessBulk(ids, cancellationToken);
+            // Batch processing to avoid exceeding MaxBulkIds per call
+            foreach (var batch in ids.Chunk(MaxBulkIds))
+            {
+                await _logService.StartRetrievalProcessBulk(batch.ToList(), cancellationToken);
+            }
 
             return Accepted();
         }
