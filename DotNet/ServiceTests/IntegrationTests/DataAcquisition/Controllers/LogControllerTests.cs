@@ -38,7 +38,9 @@ public class LogControllerTests : IClassFixture<DataAcquisitionIntegrationTestFi
         var logService = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogService>();
         var logManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
         var logQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
-        return new LogController(logger, logService, logManager, logQueries);
+        var logNotesQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogNotesQueries>();
+        var referenceResourcesQueries = scope.ServiceProvider.GetRequiredService<IReferenceResourcesQueries>();
+        return new LogController(logger, logService, logManager, logQueries, logNotesQueries, referenceResourcesQueries);
     }
 
     [Fact]

@@ -10,6 +10,5 @@ namespace DataAcquisition.Domain.Application.Models
         public string ResourceType { get; set; }
         public string ReferenceResource { get; set; }
         public QueryPhase QueryPhase { get; set; }
-        public long? DataAcquisitionLogId { get; set; }
     }
 }

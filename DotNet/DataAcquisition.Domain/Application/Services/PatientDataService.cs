@@ -438,37 +438,6 @@ public class PatientDataService : IPatientDataService
             activity?.SetTag(DiagnosticNames.ReportTrackingId, log.ReportTrackingId ?? string.Empty);
             activity?.SetTag(DiagnosticNames.PatientId, log.PatientId?.Sanitize());
 
-            //check if log is flagged as a reference, if yes, check if all non-reference logs for a facility, correlationId, and reportTrackingId are marked as 'Completed'
-            if (log.FhirQuery is not null && log.FhirQuery.Any(x => x.IsReference.HasValue && x.IsReference.Value))
-            {
-                var nonReferenceLogsCnt = await _dataAcquisitionLogQueries.GetCountOfNonRefLogsIncompleteAsync(
-                    log.FacilityId,
-                    log.ReportTrackingId,
-                    log.CorrelationId,
-                    cancellationToken);
-
-                if (nonReferenceLogsCnt > 0)
-                {
-                    log.Notes ??= new List<string>();
-                    log.Status = RequestStatus.Pending;
-                    log.Notes.Add(
-                        $"[{DateTime.UtcNow}] Deferring log with ID {log.Id} due to {nonReferenceLogsCnt} incomplete non-reference log(s).");
-                    await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
-                    {
-                        Id = log.Id,
-                        ResourceAcquiredIds = log.ResourceAcquiredIds,
-                        RetryAttempts = log.RetryAttempts,
-                        CompletionDate = log.CompletionDate,
-                        CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
-                        TraceId = log.TraceId,
-                        ExecutionDate = log.ExecutionDate,
-                        Notes = log.Notes,
-                        Status = log.Status,
-                    }, cancellationToken);
-                    return;
-                }
-            }
-
             //check if log is not in ready state
             if (!request.ignoreStatusConstraint && log.Status != RequestStatus.Queued)
             {
@@ -511,26 +480,6 @@ public class PatientDataService : IPatientDataService
                 var resourceIds = new HashSet<string>();
 
                 bool skipFetch = false;
-
-                // If this is a reference log, collect all staged IDs from concurrent
-                // patient workers into the FhirQuery before executing.
-                var isReferenceLog = log.FhirQuery.Any(x => x.IsReference.HasValue && x.IsReference.Value);
-                var consumedPendingReferenceIdsByQuery = new Dictionary<Guid, IReadOnlyList<long>>();
-                if (isReferenceLog)
-                {
-                    foreach (var refQuery in log.FhirQuery.Where(q => q.IsReference == true && q.Id.HasValue))
-                    {
-                        var consumedPendingReferenceIds = await _dataAcquisitionLogManager.CollectPendingReferenceIdsAsync(
-                            refQuery.Id!.Value, cancellationToken);
-
-                        consumedPendingReferenceIdsByQuery[refQuery.Id!.Value] = consumedPendingReferenceIds;
-                    }
-
-                    // Re-fetch the log so the FhirQuery.QueryParameters reflect the merged IDs.
-                    log = await _dataAcquisitionLogQueries.GetAsync(log.Id, cancellationToken);
-                    if (log == null)
-                        throw new InvalidOperationException($"Reference log {request.logId} disappeared after collecting pending IDs.");
-                }
 
                 //4. call api
                 foreach (var fhirQuery in log.FhirQuery.ToList())
@@ -621,30 +570,6 @@ public class PatientDataService : IPatientDataService
                     Notes = log.Notes,
                     Status = log.Status,
                 }, cancellationToken);
-
-                // Clean up staging rows only after the reference log succeeds.
-                // If the log failed, the rows are preserved for the next retry
-                // (the merge step is idempotent — uses DISTINCT).
-                if (isReferenceLog)
-                {
-                    try
-                    {
-                        foreach (var refQuery in log.FhirQuery.Where(q => q.IsReference == true && q.Id.HasValue))
-                        {
-                            consumedPendingReferenceIdsByQuery.TryGetValue(refQuery.Id!.Value, out var consumedPendingReferenceIds);
-                            await _dataAcquisitionLogManager.CleanupPendingReferenceIdsAsync(
-                                refQuery.Id!.Value,
-                                consumedPendingReferenceIds ?? [],
-                                cancellationToken);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex,
-                            "Failed to clean pending reference IDs after successful acquisition update for LogId {LogId}.",
-                            log.Id);
-                    }
-                }
             }
         }
         catch (OpOutcomeException ex)

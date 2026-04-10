@@ -7,6 +7,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -18,7 +19,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
-using ScheduledReport = LantanaGroup.Link.Shared.Application.Models.ScheduledReport;
+
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 
@@ -37,7 +38,9 @@ public class DataAcquisitionDbContext : DbContext
     public DbSet<DataAcquisitionLog> DataAcquisitionLogs { get; set; }
     public DbSet<SftpAcquisitionLog> SftpAcquisitionLogs { get; set; }
     public DbSet<SftpConfiguration> SftpConfigurations { get; set; }
-    public DbSet<PendingReferenceId> PendingReferenceIds { get; set; }
+    public DbSet<DataAcquisitionLogReferenceResource> DataAcquisitionLogReferenceResources { get; set; }
+    public DbSet<DataAcquisitionLogNote> DataAcquisitionLogNotes { get; set; }
+    public DbSet<ScheduledReportEntity> ScheduledReports { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -110,7 +113,6 @@ public class DataAcquisitionDbContext : DbContext
         {
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
             entity.Property(e => e.QueryPhase).HasConversion(new EnumToStringConverter<QueryPhase>());
-            entity.HasOne(d => d.DataAcquisitionLog).WithMany(p => p.ReferenceResources).HasConstraintName("FK_ReferenceResources_DataAcquisitionLog");
         });
 
         //-------------------FhirQuery-------------------
@@ -150,11 +152,11 @@ public class DataAcquisitionDbContext : DbContext
             .HasForeignKey(x => x.DataAcquisitionLogId)
             .HasPrincipalKey(x => x.Id);
 
-            entity.Property(d => d.ScheduledReport)
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                v => JsonSerializer.Deserialize<ScheduledReport>(v, new JsonSerializerOptions())
-            );
+            entity.HasMany(x => x.NoteEntries)
+                .WithOne(x => x.DataAcquisitionLog)
+                .HasForeignKey(x => x.DataAcquisitionLogId)
+                .HasPrincipalKey(x => x.Id)
+                .OnDelete(DeleteBehavior.Cascade);
 
             entity.Property(d => d.Status)
                 .HasConversion(new EnumToStringConverter<RequestStatus>())
@@ -209,9 +211,7 @@ public class DataAcquisitionDbContext : DbContext
                     nameof(DataAcquisitionLog.RetryAttempts),
                     nameof(DataAcquisitionLog.CompletionDate),
                     nameof(DataAcquisitionLog.CompletionTimeMilliseconds),
-                    nameof(DataAcquisitionLog.ResourceAcquiredIds),
-                    nameof(DataAcquisitionLog.Notes),
-                    nameof(DataAcquisitionLog.ScheduledReport)
+                    nameof(DataAcquisitionLog.ResourceAcquiredIds)
                 );
 
             entity.HasIndex(e => new { e.Status, e.ModifyDate })
@@ -258,24 +258,47 @@ public class DataAcquisitionDbContext : DbContext
             .Property(b => b.QueryPhase)
             .HasConversion(new EnumToStringConverter<QueryPhase>());
 
-        //-------------------PendingReferenceId-------------------
-        modelBuilder.Entity<PendingReferenceId>(entity =>
+        //-------------------DataAcquisitionLogNote-------------------
+        modelBuilder.Entity<DataAcquisitionLogNote>(entity =>
         {
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
 
-            entity.HasIndex(e => e.FhirQueryId)
-                .HasDatabaseName("IX_PendingReferenceIds_FhirQueryId");
-
-            entity.HasIndex(e => new { e.FhirQueryId, e.ResourceType, e.ResourceId })
-                .IsUnique()
-                .HasDatabaseName("UX_PendingReferenceIds_FhirQueryId_ResourceType_ResourceId");
-
-            entity.HasOne(p => p.FhirQuery)
-                .WithMany(q => q.PendingReferenceIds)
-                .HasForeignKey(p => p.FhirQueryId)
-                .OnDelete(DeleteBehavior.Cascade)
-                .HasConstraintName("FK_PendingReferenceIds_FhirQuery_FhirQueryId");
+            entity.HasIndex(e => e.DataAcquisitionLogId)
+                .HasDatabaseName("IX_DataAcquisitionLogNotes_DataAcquisitionLogId");
         });
+
+        //-------------------ScheduledReportEntity-------------------
+        modelBuilder.Entity<ScheduledReportEntity>(entity =>
+        {
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
+
+            entity.HasIndex(e => e.ReportTrackingId)
+                .IsUnique()
+                .HasDatabaseName("UX_ScheduledReports_ReportTrackingId");
+
+            entity.Property(e => e.Frequency)
+                .HasConversion(new EnumToStringConverter<Frequency>());
+        });
+
+        //-------------------DataAcquisitionLogReferenceResource (junction via skip-navigation)-------------------
+        modelBuilder.Entity<DataAcquisitionLog>()
+            .HasMany(l => l.ReferenceResources)
+            .WithMany(r => r.DataAcquisitionLogs)
+            .UsingEntity<DataAcquisitionLogReferenceResource>(
+                "DataAcquisitionLogReferenceResource",
+                right => right.HasOne<ReferenceResources>()
+                    .WithMany()
+                    .HasForeignKey(j => j.ReferenceResourceId)
+                    .OnDelete(DeleteBehavior.Cascade),
+                left => left.HasOne<DataAcquisitionLog>()
+                    .WithMany()
+                    .HasForeignKey(j => j.DataAcquisitionLogId)
+                    .OnDelete(DeleteBehavior.Cascade),
+                junction =>
+                {
+                    junction.HasKey(j => new { j.DataAcquisitionLogId, j.ReferenceResourceId });
+                    junction.ToTable("DataAcquisitionLogReferenceResource");
+                });
 
         //-------------------SftpAcquisitionLog-------------------
         modelBuilder.Entity<SftpAcquisitionLog>(entity =>

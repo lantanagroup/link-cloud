@@ -1,5 +1,6 @@
-﻿using System.Net;
+﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
@@ -8,15 +9,15 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
-using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using LantanaGroup.Link.Shared.Settings;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using LantanaGroup.Link.Shared.Application.Enums;
+using System.Net;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -29,13 +30,23 @@ public class LogController : Controller
     private readonly IDataAcquisitionLogService _logService;
     private readonly IDataAcquisitionLogManager _logManager;
     private readonly IDataAcquisitionLogQueries _logQueries;
+    private readonly IDataAcquisitionLogNotesQueries _logNotesQueries;
+    private readonly IReferenceResourcesQueries _referenceResourcesQueries;
 
-    public LogController(ILogger<LogController> logger, IDataAcquisitionLogService logService, IDataAcquisitionLogManager logManager, IDataAcquisitionLogQueries queries)
+    public LogController(
+        ILogger<LogController> logger,
+        IDataAcquisitionLogService logService,
+        IDataAcquisitionLogManager logManager,
+        IDataAcquisitionLogQueries queries,
+        IDataAcquisitionLogNotesQueries logNotesQueries,
+        IReferenceResourcesQueries referenceResourcesQueries)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
         _logManager = logManager ?? throw new ArgumentNullException(nameof(logManager));
         _logQueries = queries ?? throw new ArgumentNullException(nameof(queries));
+        _logNotesQueries = logNotesQueries ?? throw new ArgumentNullException(nameof(logNotesQueries));
+        _referenceResourcesQueries = referenceResourcesQueries ?? throw new ArgumentNullException(nameof(referenceResourcesQueries));
     }
 
     /// <summary>
@@ -161,7 +172,7 @@ public class LogController : Controller
 
         try
         {
-            var logEntry = await _logQueries.GetWithReferencesAsync(id, cancellationToken);
+            var logEntry = await _logQueries.GetAsync(id, cancellationToken);
             if (logEntry == null)
             {
                 return NotFound();
@@ -177,7 +188,72 @@ public class LogController : Controller
     }
 
     /// <summary>
-    /// Get a list of data acquisition logs for a facility.
+    /// Get note entries for a data acquisition log entry.
+    /// </summary>
+    [HttpGet("{id}/notes")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<string>))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetNotesForLog(
+        [FromRoute] long id,
+        CancellationToken cancellationToken = default)
+    {
+        if (id == default)
+            return BadRequest("ID cannot be null or zero.");
+
+        try
+        {
+            var notes = await _logNotesQueries.GetByLogIdAsync(id, cancellationToken);
+            return Ok(notes);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetNotesForLog"), ex,
+                "An exception occurred while attempting to get notes for log {id}", id);
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Get reference resources for a data acquisition log entry.
+    /// </summary>
+    /// <param name="id">The ID of the log entry.</param>
+    /// <param name="pageNumber">Page number (1-based). Defaults to 1.</param>
+    /// <param name="pageSize">Page size. Defaults to 100.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    [HttpGet("{id}/reference-resources")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<ReferenceResourcesModel>))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetReferenceResourcesForLog(
+        [FromRoute] long id,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 100,
+        CancellationToken cancellationToken = default)
+    {
+        if (id == default)
+            return BadRequest("ID cannot be null or zero.");
+
+        try
+        {
+            var result = await _referenceResourcesQueries.SearchAsync(
+                new SearchReferenceResourcesModel
+                {
+                    DataAcquisitionLogId = id,
+                    PageNumber = pageNumber,
+                    PageSize = pageSize
+                }, cancellationToken);
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetReferenceResourcesForLog"), ex,
+                "An exception occurred while attempting to get reference resources for log {id}", id);
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
     /// </summary>
     /// This endpoint retrieves a list of data acquisition logs.
     /// <param name="facilityId"></param>

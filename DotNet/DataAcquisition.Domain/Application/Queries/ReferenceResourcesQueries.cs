@@ -4,14 +4,13 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Diagnostics;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
@@ -87,7 +86,7 @@ public class ReferenceResourcesQueries : IReferenceResourcesQueries
 
         if (model.DataAcquisitionLogId.HasValue)
         {
-            query = query.Where(r => r.DataAcquisitionLogId == model.DataAcquisitionLogId.Value);
+            query = query.Where(r => r.DataAcquisitionLogs.Any(l => l.Id == model.DataAcquisitionLogId.Value));
         }
 
         query = model.SortOrder switch

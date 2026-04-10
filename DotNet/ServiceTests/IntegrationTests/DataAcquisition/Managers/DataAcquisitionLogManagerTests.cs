@@ -11,10 +11,13 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
@@ -134,7 +137,7 @@ public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionInteg
             FacilityId = "TestFacility",
             Status = RequestStatus.Pending,
             CorrelationId = Guid.NewGuid().ToString(),
-            ScheduledReport = new ScheduledReport { ReportTrackingId = "TestReport", StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow }
+            ScheduledReportEntity = new ScheduledReportEntity { ReportTrackingId = "TestReport", StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow }
         };
         dbContext.DataAcquisitionLogs.Add(log);
         await dbContext.SaveChangesAsync();
@@ -310,5 +313,63 @@ public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionInteg
             if (rec.Status != RequestStatus.Pending && rec.Status != RequestStatus.Failed)
                 Assert.Fail("Search results should only have Pending and Failed statuses");
         }
+    }
+
+    [Fact]
+    public async Task SetMaxRetriesReachedWithNoteBatchAsync_SetsStatusAndWritesNote()
+    {
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"TestFacility_{tag}";
+        const string expectedNote = "FhirQueryConfiguration not found for this facility.";
+
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var log1 = new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Pending };
+        var log2 = new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Failed, RetryAttempts = 2 };
+        dbContext.DataAcquisitionLogs.AddRange(log1, log2);
+        await dbContext.SaveChangesAsync();
+
+        var manager = CreateManager(scope);
+
+        var updated = await manager.SetMaxRetriesReachedWithNoteBatchAsync(
+            new[] { log1.Id, log2.Id },
+            expectedNote);
+
+        Assert.Equal(2, updated);
+
+        using var assertScope = _fixture.ServiceProvider.CreateScope();
+        var assertDb = assertScope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var updatedLog1 = await assertDb.DataAcquisitionLogs.FindAsync(log1.Id);
+        var updatedLog2 = await assertDb.DataAcquisitionLogs.FindAsync(log2.Id);
+        Assert.Equal(RequestStatus.MaxRetriesReached, updatedLog1.Status);
+        Assert.Equal(RequestStatus.MaxRetriesReached, updatedLog2.Status);
+
+        var notes = await assertDb.DataAcquisitionLogNotes
+            .Where(n => n.DataAcquisitionLogId == log1.Id || n.DataAcquisitionLogId == log2.Id)
+            .ToListAsync();
+        Assert.Equal(2, notes.Count);
+        Assert.All(notes, n => Assert.Equal(expectedNote, n.Note));
+    }
+
+    [Fact]
+    public async Task SetMaxRetriesReachedWithNoteBatchAsync_NoMatchingIds_ReturnsZeroAndWritesNoNotes()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var manager = CreateManager(scope);
+
+        var updated = await manager.SetMaxRetriesReachedWithNoteBatchAsync(
+            new[] { -1L, -2L },
+            "should not be written");
+
+        Assert.Equal(0, updated);
+
+        using var assertScope = _fixture.ServiceProvider.CreateScope();
+        var assertDb = assertScope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var orphanNotes = await assertDb.DataAcquisitionLogNotes
+            .Where(n => n.DataAcquisitionLogId == -1 || n.DataAcquisitionLogId == -2)
+            .ToListAsync();
+        Assert.Empty(orphanNotes);
     }
 }

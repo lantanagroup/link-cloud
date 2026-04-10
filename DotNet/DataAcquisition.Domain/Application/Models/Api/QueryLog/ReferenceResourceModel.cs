@@ -11,7 +11,6 @@ public class ReferenceResourceModel
     public string ResourceType { get; set; }
     public string ReferenceResource { get; set; }
     public QueryPhase QueryPhase { get; set; }
-    public long? DataAcquisitionLogId { get; set; }
 
     public static ReferenceResourceModel FromDomain(ReferenceResources referenceResource)
     {
@@ -22,8 +21,7 @@ public class ReferenceResourceModel
             ResourceId = referenceResource.ResourceId,
             ResourceType = referenceResource.ResourceType,
             ReferenceResource = referenceResource.ReferenceResource,
-            QueryPhase = referenceResource.QueryPhase,
-            DataAcquisitionLogId = referenceResource.DataAcquisitionLogId
+            QueryPhase = referenceResource.QueryPhase
         };
     }
 }

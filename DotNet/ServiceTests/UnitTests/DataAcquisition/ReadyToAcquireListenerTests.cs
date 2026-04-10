@@ -12,7 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using DaRequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.DataAcquisition;
@@ -38,7 +38,7 @@ public class ReadyToAcquireListenerTests
 
         Assert.Equal(0, processor.EnqueueCallCount);
         logManagerMock.Verify(m => m.TrySetLogToQueuedAsync(123, It.IsAny<CancellationToken>()), Times.Once);
-        logManagerMock.Verify(m => m.TrySetLogStatusAsync(It.IsAny<long>(), It.IsAny<List<RequestStatus>>(), It.IsAny<RequestStatus>(), It.IsAny<CancellationToken>()), Times.Never);
+        logManagerMock.Verify(m => m.TrySetLogStatusAsync(It.IsAny<long>(), It.IsAny<List<DaRequestStatus>>(), It.IsAny<DaRequestStatus>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public class ReadyToAcquireListenerTests
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
             listener.InvokeExecuteListenerAsync(CreateConsumeResult(456, "facility-b"), CancellationToken.None));
 
-        logManagerMock.Verify(m => m.TrySetLogStatusAsync(It.IsAny<long>(), It.IsAny<List<RequestStatus>>(), It.IsAny<RequestStatus>(), It.IsAny<CancellationToken>()), Times.Never);
+        logManagerMock.Verify(m => m.TrySetLogStatusAsync(It.IsAny<long>(), It.IsAny<List<DaRequestStatus>>(), It.IsAny<DaRequestStatus>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -72,8 +72,8 @@ public class ReadyToAcquireListenerTests
         logManagerMock
             .Setup(m => m.TrySetLogStatusAsync(
                 789,
-                It.Is<List<RequestStatus>>(s => s.Count == 1 && s[0] == RequestStatus.Queued),
-                RequestStatus.Pending,
+                It.Is<List<DaRequestStatus>>(s => s.Count == 1 && s[0] == DaRequestStatus.Queued),
+                DaRequestStatus.Pending,
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
@@ -89,8 +89,8 @@ public class ReadyToAcquireListenerTests
 
         logManagerMock.Verify(m => m.TrySetLogStatusAsync(
             789,
-            It.Is<List<RequestStatus>>(s => s.Count == 1 && s[0] == RequestStatus.Queued),
-            RequestStatus.Pending,
+            It.Is<List<DaRequestStatus>>(s => s.Count == 1 && s[0] == DaRequestStatus.Queued),
+            DaRequestStatus.Pending,
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -104,8 +104,8 @@ public class ReadyToAcquireListenerTests
         logManagerMock
             .Setup(m => m.TrySetLogStatusAsync(
                 999,
-                It.Is<List<RequestStatus>>(s => s.Count == 1 && s[0] == RequestStatus.Queued),
-                RequestStatus.Pending,
+                It.Is<List<DaRequestStatus>>(s => s.Count == 1 && s[0] == DaRequestStatus.Queued),
+                DaRequestStatus.Pending,
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
@@ -121,8 +121,8 @@ public class ReadyToAcquireListenerTests
 
         logManagerMock.Verify(m => m.TrySetLogStatusAsync(
             999,
-            It.Is<List<RequestStatus>>(s => s.Count == 1 && s[0] == RequestStatus.Queued),
-            RequestStatus.Pending,
+            It.Is<List<DaRequestStatus>>(s => s.Count == 1 && s[0] == DaRequestStatus.Queued),
+            DaRequestStatus.Pending,
             It.IsAny<CancellationToken>()), Times.Once);
     }
 

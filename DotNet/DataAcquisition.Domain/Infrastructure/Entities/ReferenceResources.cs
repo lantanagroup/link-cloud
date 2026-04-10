@@ -5,8 +5,7 @@ using IndexAttribute = Microsoft.EntityFrameworkCore.IndexAttribute;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
-[Index("DataAcquisitionLogId", Name = "IX_ReferenceResources_DataAcquisitionLogId")]
-[Index("FacilityId", "ResourceType", "ResourceId", Name = "IX_ReferenceResources_Facility_Type_ResourceId")]
+[Index("FacilityId", "ResourceType", "ResourceId", Name = "IX_ReferenceResources_Facility_Type_ResourceId", IsUnique = true)]
 public partial class ReferenceResources
 {
     [Key]
@@ -34,9 +33,5 @@ public partial class ReferenceResources
     [Required]
     public QueryPhase QueryPhase { get; set; }
 
-    public long? DataAcquisitionLogId { get; set; }
-
-    [ForeignKey("DataAcquisitionLogId")]
-    [InverseProperty("ReferenceResources")]
-    public virtual DataAcquisitionLog DataAcquisitionLog { get; set; }
+    public virtual ICollection<DataAcquisitionLog> DataAcquisitionLogs { get; set; } = new List<DataAcquisitionLog>();
 }

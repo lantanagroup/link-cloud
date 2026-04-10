@@ -6,6 +6,7 @@ using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using Microsoft.Extensions.DependencyInjection;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using DaRequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition.Queries
@@ -45,7 +46,6 @@ namespace IntegrationTests.DataAcquisition.Queries
                     ResourceType = "Type1",
                     ReferenceResource = "Ref1",
                     QueryPhase = QueryPhase.Initial,
-                    DataAcquisitionLogId = null,
                     CreateDate = DateTime.UtcNow,
                     ModifyDate = DateTime.UtcNow
                 }
@@ -149,8 +149,8 @@ namespace IntegrationTests.DataAcquisition.Queries
             var facilityId = $"F1_{tag}";
             var resources = new List<ReferenceResources>
             {
-                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = facilityId, ResourceId = $"R1_{tag}", ResourceType = "T1", ReferenceResource = "Ref1", QueryPhase = QueryPhase.Initial, DataAcquisitionLogId = null },
-                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = facilityId, ResourceId = $"R2_{tag}", ResourceType = "T2", ReferenceResource = "Ref2", QueryPhase = QueryPhase.Supplemental, DataAcquisitionLogId = null }
+                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = facilityId, ResourceId = $"R1_{tag}", ResourceType = "T1", ReferenceResource = "Ref1", QueryPhase = QueryPhase.Initial },
+                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = facilityId, ResourceId = $"R2_{tag}", ResourceType = "T2", ReferenceResource = "Ref2", QueryPhase = QueryPhase.Supplemental }
             };
             await SeedReferenceResources(resources);
 
@@ -267,23 +267,24 @@ namespace IntegrationTests.DataAcquisition.Queries
         }
 
         [Fact]
-        public async Task SearchAsync_WithDataAcquisitionLogIdFilter_ReturnsFiltered()
+        public async Task SearchAsync_WithDataAcquisitionLogId_ReturnsLinkedResources()
         {
             // Arrange
             using var scopeSeed = _fixture.ServiceProvider.CreateScope();
             var dbContext = scopeSeed.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
+            var tag = Guid.NewGuid().ToString("N");
             var log1 = new DataAcquisitionLog
             {
-                FacilityId = "F1",
-                Status = RequestStatus.Pending,
+                FacilityId = $"F1_{tag}",
+                Status = DaRequestStatus.Pending,
                 CreateDate = DateTime.UtcNow,
                 ModifyDate = DateTime.UtcNow
             };
             var log2 = new DataAcquisitionLog
             {
-                FacilityId = "F2",
-                Status = RequestStatus.Pending,
+                FacilityId = $"F2_{tag}",
+                Status = DaRequestStatus.Pending,
                 CreateDate = DateTime.UtcNow,
                 ModifyDate = DateTime.UtcNow
             };
@@ -292,24 +293,30 @@ namespace IntegrationTests.DataAcquisition.Queries
             dbContext.DataAcquisitionLogs.Add(log2);
             await dbContext.SaveChangesAsync();
 
-            var resources = new List<ReferenceResources>
-            {
-                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = "F1", ResourceId = "R1", ResourceType = "T1", ReferenceResource = "Ref1", QueryPhase = QueryPhase.Initial, DataAcquisitionLogId = log1.Id },
-                new ReferenceResources { Id = Guid.NewGuid(), FacilityId = "F2", ResourceId = "R2", ResourceType = "T2", ReferenceResource = "Ref2", QueryPhase = QueryPhase.Supplemental, DataAcquisitionLogId = log2.Id }
-            };
-            dbContext.ReferenceResources.AddRange(resources);
+            var ref1 = new ReferenceResources { Id = Guid.NewGuid(), FacilityId = $"F1_{tag}", ResourceId = $"R1_{tag}", ResourceType = "T1", ReferenceResource = "Ref1", QueryPhase = QueryPhase.Initial };
+            var ref2 = new ReferenceResources { Id = Guid.NewGuid(), FacilityId = $"F2_{tag}", ResourceId = $"R2_{tag}", ResourceType = "T2", ReferenceResource = "Ref2", QueryPhase = QueryPhase.Supplemental };
+            dbContext.ReferenceResources.AddRange(ref1, ref2);
+            await dbContext.SaveChangesAsync();
+
+            // Link via skip-navigation
+            log1.ReferenceResources.Add(ref1);
+            log2.ReferenceResources.Add(ref2);
             await dbContext.SaveChangesAsync();
 
             using var scope = _fixture.ServiceProvider.CreateScope();
             var queries = scope.ServiceProvider.GetRequiredService<IReferenceResourcesQueries>();
-            var request = new SearchReferenceResourcesModel { DataAcquisitionLogId = log1.Id, PageNumber = 1, PageSize = 10 };
 
             // Act
-            var result = await queries.SearchAsync(request);
+            var result = await queries.SearchAsync(new SearchReferenceResourcesModel
+            {
+                DataAcquisitionLogId = log1.Id,
+                PageNumber = 1,
+                PageSize = 10
+            });
 
             // Assert
             Assert.Equal(1, result.Metadata.TotalCount);
-            Assert.Equal(log1.Id, result.Records[0].DataAcquisitionLogId);
+            Assert.Equal(ref1.Id, result.Records[0].Id);
         }
 
         [Fact]

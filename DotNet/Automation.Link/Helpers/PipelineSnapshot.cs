@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.Automation.Link.Helpers;
+﻿namespace LantanaGroup.Link.Automation.Link.Helpers;
 
 /// <summary>
 /// Non-asserting, read-only snapshot of the pipeline's database state.
@@ -17,7 +17,7 @@ public class PipelineSnapshot
 
     /// <summary>
     /// Writes a complete, non-asserting pipeline snapshot to test output.
-    /// Safe to call at any point � never throws.
+    /// Safe to call at any point — never throws.
     /// </summary>
     public async Task WriteFullSnapshotAsync(
         IAutomationOutput output,

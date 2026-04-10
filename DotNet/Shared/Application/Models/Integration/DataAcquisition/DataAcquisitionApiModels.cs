@@ -17,7 +17,7 @@ public class DataAcquisitionLogApiModel
     public List<string> ResourceTypes { get; set; } = [];
     public List<FhirQueryApiModel> FhirQuery { get; set; } = [];
     public List<string>? ResourceAcquiredIds { get; set; } = [];
-    public List<ReferenceResourceApiModel> ReferenceResources { get; set; } = [];
+    public int ReferenceResourceCount { get; set; }
     public List<string>? Notes { get; set; } = [];
 }
 

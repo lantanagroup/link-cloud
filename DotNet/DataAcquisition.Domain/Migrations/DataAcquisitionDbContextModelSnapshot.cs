@@ -564,6 +564,21 @@ namespace DataAcquisition.Domain.Migrations
                     b.ToTable("QRTZ_TRIGGERS", "quartz");
                 });
 
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLogReferenceResource", b =>
+                {
+                    b.Property<long>("DataAcquisitionLogId")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("ReferenceResourceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("DataAcquisitionLogId", "ReferenceResourceId");
+
+                    b.HasIndex("ReferenceResourceId");
+
+                    b.ToTable("DataAcquisitionLogReferenceResource");
+                });
+
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog", b =>
                 {
                     b.Property<long>("Id")
@@ -843,42 +858,6 @@ namespace DataAcquisition.Domain.Migrations
                     b.ToTable("FhirQueryResourceType");
                 });
 
-            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.PendingReferenceId", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime>("CreateDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid>("FhirQueryId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("ResourceId")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<string>("ResourceType")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("FhirQueryId")
-                        .HasDatabaseName("IX_PendingReferenceIds_FhirQueryId");
-
-                    b.HasIndex("FhirQueryId", "ResourceType", "ResourceId")
-                        .IsUnique()
-                        .HasDatabaseName("UX_PendingReferenceIds_FhirQueryId_ResourceType_ResourceId");
-
-                    b.ToTable("PendingReferenceIds");
-                });
-
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.QueryPlan", b =>
                 {
                     b.Property<Guid>("Id")
@@ -934,9 +913,6 @@ namespace DataAcquisition.Domain.Migrations
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<long?>("DataAcquisitionLogId")
-                        .HasColumnType("bigint");
-
                     b.Property<string>("FacilityId")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -963,7 +939,8 @@ namespace DataAcquisition.Domain.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex(new[] { "DataAcquisitionLogId" }, "IX_ReferenceResources_DataAcquisitionLogId");
+                    b.HasIndex(new[] { "FacilityId", "ResourceType", "ResourceId" }, "IX_ReferenceResources_Facility_Type_ResourceId")
+                        .IsUnique();
 
                     b.ToTable("ReferenceResources");
                 });
@@ -1126,6 +1103,21 @@ namespace DataAcquisition.Domain.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLogReferenceResource", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog", null)
+                        .WithMany()
+                        .HasForeignKey("DataAcquisitionLogId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.ReferenceResources", null)
+                        .WithMany()
+                        .HasForeignKey("ReferenceResourceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
                     b.Navigation("Trigger");
                 });
 
@@ -1184,18 +1176,6 @@ namespace DataAcquisition.Domain.Migrations
                     b.Navigation("DataAcquisitionLog");
                 });
 
-            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.PendingReferenceId", b =>
-                {
-                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirQuery", "FhirQuery")
-                        .WithMany("PendingReferenceIds")
-                        .HasForeignKey("FhirQueryId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("FK_PendingReferenceIds_FhirQuery_FhirQueryId");
-
-                    b.Navigation("FhirQuery");
-                });
-
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirQueryResourceType", b =>
                 {
                     b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirQuery", "FhirQuery")
@@ -1205,16 +1185,6 @@ namespace DataAcquisition.Domain.Migrations
                         .HasConstraintName("FK_FhirQueryResourceType_FhirQuery");
 
                     b.Navigation("FhirQuery");
-                });
-
-            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.ReferenceResources", b =>
-                {
-                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog", "DataAcquisitionLog")
-                        .WithMany("ReferenceResources")
-                        .HasForeignKey("DataAcquisitionLogId")
-                        .HasConstraintName("FK_ReferenceResources_DataAcquisitionLog");
-
-                    b.Navigation("DataAcquisitionLog");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.ResourceReferenceType", b =>
@@ -1245,8 +1215,6 @@ namespace DataAcquisition.Domain.Migrations
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog", b =>
                 {
                     b.Navigation("FhirQueries");
-
-                    b.Navigation("ReferenceResources");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirQuery", b =>

@@ -212,24 +212,9 @@ public class QueryListProcessor : IQueryListProcessor
             }
             else if (builtQuery is ReferenceQueryFactoryResult)
             {
-                var config = (ReferenceQueryConfig)queryConfig;
-                _logger.LogDebug("Resource: {resourceType}", config.ResourceType);
-
-                var fhirQueryType = FhirQueryTypeUtilities.ToDomain(config.OperationType.ToString());
-                fhirQuery.QueryType = fhirQueryType;
-                fhirQuery.ResourceTypes = [Enum.Parse<ResourceType>(config.ResourceType)];
-                fhirQuery.QueryParameters = ["_id="];
-                fhirQuery.ResourceReferenceTypes = [];
-                fhirQuery.Paged = config.Paged;
-                fhirQuery.IsReference = true;
-
-                await CreateDataAcquisitionLogAsync(
-                    request,
-                    fhirQueryType,
-                    scheduledReport,
-                    fhirQuery,
-                    traceAndSpanDelimited,
-                    cancellationToken);
+                // Reference resources are now fetched inline during normal log
+                // processing (in ProcessReferences). No separate log is needed.
+                _logger.LogDebug("Skipping separate log creation for reference query {ResourceType} — references are resolved inline.", ((ReferenceQueryConfig)queryConfig).ResourceType);
             }
         }
     }
