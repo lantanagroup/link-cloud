@@ -23,7 +23,8 @@ public class PatientEncounter : BaseEntityExtended
     public ICollection<PatientVisitIdentifier> PatientVisitIdentifiers { get; set; } = new List<PatientVisitIdentifier>();
     public ICollection<PatientIdentifier> PatientIdentifiers { get; set; } = new List<PatientIdentifier>();
 
-    public PatientIdentifier GetIdentifierByType(SourceType sourceType) {
+    public PatientIdentifier GetIdentifierByType(SourceType sourceType)
+    {
         return this.PatientIdentifiers.FirstOrDefault(x => x.SourceType == sourceType.ToString());
     }
 }

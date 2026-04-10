@@ -46,7 +46,7 @@ public class FhirQueriesController : ControllerBase
     public async Task<ActionResult<QueryResultsModel>> GetQueries(
         [FromRoute] string facilityId, [FromQuery] string correlationId, [FromQuery] string patientId, [FromQuery] string resourceType, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(facilityId)) 
+        if (string.IsNullOrWhiteSpace(facilityId))
         {
             return BadRequest("facility Id is empty");
         }

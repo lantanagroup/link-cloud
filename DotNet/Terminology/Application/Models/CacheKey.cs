@@ -107,7 +107,7 @@ public class CacheKey : IComparable<CacheKey>
         ArgumentNullException.ThrowIfNull(url);
         ArgumentNullException.ThrowIfNull(version);
         ArgumentNullException.ThrowIfNull(id);
-        
+
         _type = type;
         _url = url;
         _version = version;

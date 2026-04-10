@@ -23,7 +23,7 @@ public class EpicAuth : IAuth
     private readonly ICacheService _cacheService;
 
     public EpicAuth(
-        HttpClient httpClient, 
+        HttpClient httpClient,
         ILogger<EpicAuth> logger,
         ICacheService cacheService
         )
@@ -43,7 +43,7 @@ public class EpicAuth : IAuth
     {
         var cachedToken = _cacheService.Get<string>(facilityId);
 
-        if(!string.IsNullOrWhiteSpace(cachedToken))
+        if (!string.IsNullOrWhiteSpace(cachedToken))
             return (false, new AuthenticationHeaderValue("Bearer", cachedToken));
 
         string jwt = GetJwt(authSettings);

@@ -45,7 +45,7 @@ public class SftpConfigurationManagerTests(DataAcquisitionIntegrationTestFixture
             FhirBaseServerUrl = "https://fhir.example.com",
             EHRPatientLists = new List<EhrPatientList>()
         };
-        
+
         dbContext.FhirListConfigurations.Add(fhirListConfig);
         await dbContext.SaveChangesAsync();
 
@@ -61,7 +61,7 @@ public class SftpConfigurationManagerTests(DataAcquisitionIntegrationTestFixture
         // Act & Assert
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => manager.CreateAsync(sftpConfigModel, organizationId, CancellationToken.None));
-        
+
         Assert.Contains(organizationId, exception.Message);
     }
 
@@ -88,7 +88,7 @@ public class SftpConfigurationManagerTests(DataAcquisitionIntegrationTestFixture
             RemoteDirectory = "/data",
             Timeout = TimeSpan.FromSeconds(60)
         };
-        
+
         dbContext.SftpConfigurations.Add(existingConfig);
         await dbContext.SaveChangesAsync();
 

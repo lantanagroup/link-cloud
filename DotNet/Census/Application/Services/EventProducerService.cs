@@ -7,12 +7,12 @@ using System.Text;
 
 namespace LantanaGroup.Link.Census.Application.Services;
 
-public interface IEventProducerService<MessageType> 
+public interface IEventProducerService<MessageType>
 {
     Task ProduceEventsAsync(string key, IEnumerable<IBaseResponse> events, CancellationToken cancellationToken = default);
 }
 
-public class EventProducerService<MessageType> : IEventProducerService<MessageType> 
+public class EventProducerService<MessageType> : IEventProducerService<MessageType>
 {
     private readonly ILogger<EventProducerService<MessageType>> _logger;
     private readonly IProducer<string, MessageType> _kafkaProducer;
@@ -30,7 +30,7 @@ public class EventProducerService<MessageType> : IEventProducerService<MessageTy
             if (ev is PatientEventResponse patientEventResponse)
             {
                 //We are not going to generate an PatienEvent messages that are marked as 'Update'. We should only process admits and discharges.
-                if (patientEventResponse.PatientEvent.EventType == PatientEvents.Update.ToString()) 
+                if (patientEventResponse.PatientEvent.EventType == PatientEvents.Update.ToString())
                 {
                     continue;
                 }
@@ -50,14 +50,14 @@ public class EventProducerService<MessageType> : IEventProducerService<MessageTy
                     Value = (MessageType)(object)patientEventResponse.PatientEvent
                 };
 
-                try 
+                try
                 {
                     _logger.LogDebug("Producing PatientEvent (Facility = {FacilityId}, PatientId = {PatientId}, Event = {Event})", patientEventResponse.FacilityId, patientEventResponse.PatientEvent.PatientId, patientEventResponse.PatientEvent.EventType);
                     await _kafkaProducer.ProduceAsync(KafkaTopic.PatientEvent.ToString(), message, cancellationToken);
                 }
                 catch (ProduceException<string, MessageType> ex)
                 {
-                   _logger.LogError(ex, "EventProducerService: Error producing event to Kafka topic {Topic} for facility: {FacilityId}.", KafkaTopic.PatientEvent.ToString(), patientEventResponse.FacilityId);
+                    _logger.LogError(ex, "EventProducerService: Error producing event to Kafka topic {Topic} for facility: {FacilityId}.", KafkaTopic.PatientEvent.ToString(), patientEventResponse.FacilityId);
                     throw;
                 }
             }

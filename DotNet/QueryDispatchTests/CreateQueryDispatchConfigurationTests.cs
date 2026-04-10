@@ -16,7 +16,7 @@ namespace QueryDispatchUnitTests
         private AutoMocker _mocker;
 
         [Fact]
-        public async void TestCreateQueryDispatchConfigurationAsync()
+        public async Task TestCreateQueryDispatchConfigurationAsync()
         {
             _mocker = new AutoMocker();
 
@@ -47,7 +47,7 @@ namespace QueryDispatchUnitTests
         }
 
         [Fact]
-        public async void NegativeTestCreateQueryDispatchConfigurationAsync()
+        public async Task NegativeTestCreateQueryDispatchConfigurationAsync()
         {
             _mocker = new AutoMocker();
             var _controller = _mocker.CreateInstance<QueryDispatchController>();

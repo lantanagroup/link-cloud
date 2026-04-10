@@ -36,7 +36,7 @@ public class MeasureReportGeneratedListenerTests : IClassFixture<ReportIntegrati
             ReportStartDate = DateTime.UtcNow.AddDays(-30),
             ReportEndDate = DateTime.UtcNow.AddDays(30),
             Frequency = Frequency.Monthly,
-            ReportTypes = { "DE-111" } ,
+            ReportTypes = { "DE-111" },
             Status = ScheduleStatus.Scheduled,
             CreateDate = DateTime.UtcNow,
             EndOfReportPeriodJobHasRun = true,

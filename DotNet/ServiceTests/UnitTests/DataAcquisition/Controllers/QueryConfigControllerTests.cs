@@ -19,7 +19,7 @@ namespace UnitTests.DataAcquisition.Controllers
         private const string facilityId = "testFacilityId";
 
         [Fact]
-        public async void GetFhirConfigurationTest()
+        public async System.Threading.Tasks.Task GetFhirConfigurationTest()
         {
             // Arrange
             var facilityId = "test-facility";
@@ -62,7 +62,7 @@ namespace UnitTests.DataAcquisition.Controllers
         }
 
         [Fact]
-        public async void GetFhirConfigurationNegativeTest_NullResult()
+        public async System.Threading.Tasks.Task GetFhirConfigurationNegativeTest_NullResult()
         {
             _mocker = new AutoMocker();
             _mocker.GetMock<IFhirQueryConfigurationQueries>().Setup(x => x.GetByFacilityIdAsync(It.IsAny<string>(), CancellationToken.None))
@@ -79,7 +79,7 @@ namespace UnitTests.DataAcquisition.Controllers
         }
 
         [Fact]
-        public async void GetFhirConfigurationNegativeTest_InvalidFacilityId()
+        public async System.Threading.Tasks.Task GetFhirConfigurationNegativeTest_InvalidFacilityId()
         {
             _mocker = new AutoMocker();
             var _controller = _mocker.CreateInstance<QueryConfigController>();
@@ -93,7 +93,7 @@ namespace UnitTests.DataAcquisition.Controllers
         }
 
         [Fact]
-        public async void CreateFhirConfigurationTest()
+        public async System.Threading.Tasks.Task CreateFhirConfigurationTest()
         {
             _mocker = new AutoMocker();
             _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.CreateAsync(It.IsAny<CreateFhirQueryConfigurationModel>(), CancellationToken.None))
@@ -108,7 +108,7 @@ namespace UnitTests.DataAcquisition.Controllers
         }
 
         [Fact]
-        public async void CreateFhirConfigurationNegativeTest_NullBody()
+        public async System.Threading.Tasks.Task CreateFhirConfigurationNegativeTest_NullBody()
         {
             _mocker = new AutoMocker();
             var _controller = _mocker.CreateInstance<QueryConfigController>();
@@ -122,7 +122,7 @@ namespace UnitTests.DataAcquisition.Controllers
         }
 
         [Fact]
-        public async void UpdateFhirConfigurationTest()
+        public async System.Threading.Tasks.Task UpdateFhirConfigurationTest()
         {
             _mocker = new AutoMocker();
             _mocker.GetMock<IFhirQueryConfigurationQueries>().Setup(x => x.GetByFacilityIdAsync(It.IsAny<string>(), CancellationToken.None))
@@ -133,12 +133,12 @@ namespace UnitTests.DataAcquisition.Controllers
 
             var _controller = _mocker.CreateInstance<QueryConfigController>();
 
-            var result = await _controller.UpdateFhirConfiguration(new ApiUpdateFhirQueryConfigurationModel() { FacilityId = "test", FhirServerBaseUrl = "test"}, CancellationToken.None);
+            var result = await _controller.UpdateFhirConfiguration(new ApiUpdateFhirQueryConfigurationModel() { FacilityId = "test", FhirServerBaseUrl = "test" }, CancellationToken.None);
             Assert.IsType<AcceptedResult>(result);
         }
 
         [Fact]
-        public async void UpdateFhirConfigurationNegativeTest_NullBody()
+        public async System.Threading.Tasks.Task UpdateFhirConfigurationNegativeTest_NullBody()
         {
             _mocker = new AutoMocker();
             var _controller = _mocker.CreateInstance<QueryConfigController>();
@@ -152,7 +152,7 @@ namespace UnitTests.DataAcquisition.Controllers
         }
 
         [Fact]
-        public async void DeleteFhirConfigurationTest()
+        public async System.Threading.Tasks.Task DeleteFhirConfigurationTest()
         {
             _mocker = new AutoMocker();
             _mocker.GetMock<IFhirQueryConfigurationManager>()
@@ -165,7 +165,7 @@ namespace UnitTests.DataAcquisition.Controllers
         }
 
         [Fact]
-        public async void DeleteFhirConfigurationNegativeTest_NullResult()
+        public async System.Threading.Tasks.Task DeleteFhirConfigurationNegativeTest_NullResult()
         {
             _mocker = new AutoMocker();
             _mocker.GetMock<IFhirQueryConfigurationManager>()
@@ -181,7 +181,7 @@ namespace UnitTests.DataAcquisition.Controllers
         }
 
         [Fact]
-        public async void DeleteFhirConfigurationNegativeTest_InvalidFacilityId()
+        public async System.Threading.Tasks.Task DeleteFhirConfigurationNegativeTest_InvalidFacilityId()
         {
             _mocker = new AutoMocker();
             var _controller = _mocker.CreateInstance<QueryConfigController>();

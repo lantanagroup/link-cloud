@@ -61,7 +61,7 @@ public class ScheduleService : BackgroundService
             // Get all existing jobs and their facility IDs
             var groupMatcher = GroupMatcher<JobKey>.GroupContains(KafkaTopic.PatientCensusScheduled.ToString());
             var allJobKeys = await Scheduler.GetJobKeys(groupMatcher);
-            
+
             // Process jobs concurrently with controlled parallelism
             var maxDegreeOfParallelism = 20; // Tune based on your database/scheduler capacity
             var semaphore = new SemaphoreSlim(maxDegreeOfParallelism);

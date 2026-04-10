@@ -29,12 +29,12 @@ public class PatientEncounterManager : IPatientEncounterManager
             throw new ArgumentNullException(nameof(patientEncounter));
         }
 
-        if( string.IsNullOrEmpty(patientEncounter.FacilityId))
+        if (string.IsNullOrEmpty(patientEncounter.FacilityId))
         {
             throw new ArgumentException("FacilityId cannot be null or empty.", nameof(patientEncounter.FacilityId));
         }
 
-        if ( string.IsNullOrEmpty(patientEncounter.Id))
+        if (string.IsNullOrEmpty(patientEncounter.Id))
         {
             patientEncounter.Id = Guid.NewGuid().ToString();
         }
@@ -89,7 +89,7 @@ public class PatientEncounterManager : IPatientEncounterManager
         return models;
     }
 
-    
+
 
     public Task<PatientEncounter> UpdatePatientEncounterAsync(PatientEncounter patientEncounter, CancellationToken cancellationToken)
     {

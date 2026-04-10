@@ -1,24 +1,17 @@
-﻿using Hl7.Fhir.Model;
-using LantanaGroup.Link.Census.Application.Interfaces;
+﻿using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Cerner;
 using LantanaGroup.Link.Census.Application.Models.Payloads.CernerList;
-using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Census.Domain.Queries;
-using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.DataAcq;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Models.Telemetry;
-using System.Diagnostics.Metrics;
-using System.Diagnostics.Tracing;
 
 namespace LantanaGroup.Link.Census.Application.Services
 {
-    public interface ICernerListService 
+    public interface ICernerListService
     {
         Task<List<IBaseResponse>> ProcessAdmits(string facilityId, CernerPatientsAcquired cernerEventValue, CancellationToken cancellationToken);
         Task<List<IBaseResponse>> ProcessDischarges(string facilityId, CernerPatientsAcquired cernerEventValue, CancellationToken cancellationToken);
@@ -50,7 +43,8 @@ namespace LantanaGroup.Link.Census.Application.Services
         {
             var admittedPatients = await _patientEncounterQueries.GetAdmittedPatientsByFacility(facilityId, cancellationToken);
 
-            if (admittedPatients.Count() == 0) {
+            if (admittedPatients.Count() == 0)
+            {
                 return new List<IBaseResponse>();
             }
 
@@ -58,11 +52,11 @@ namespace LantanaGroup.Link.Census.Application.Services
 
             List<IBaseResponse> messages = new List<IBaseResponse>();
 
-            foreach (var admitPatient in admittedPatients) 
+            foreach (var admitPatient in admittedPatients)
             {
                 string admitPatientIdentifier = admitPatient.GetIdentifierByType(SourceType.SFTP_FHIR).Identifier;
 
-                if (cernerEventValue.PatientEncounters.Any(x => x.PatientId == admitPatientIdentifier)) 
+                if (cernerEventValue.PatientEncounters.Any(x => x.PatientId == admitPatientIdentifier))
                 {
                     continue;
                 }
@@ -71,10 +65,9 @@ namespace LantanaGroup.Link.Census.Application.Services
                 var patientEvent = dischargePayload.CreatePatientEvent(facilityId, admitPatient.CorrelationId);
 
                 dischargePayload.UpdatePatientEncounter(admitPatient);
-                
+
                 await _patientEventManager.AddPatientEvent(patientEvent, cancellationToken);
                 await _patientEncounterManager.UpdatePatientEncounterAsync(admitPatient, cancellationToken);
-                await _patientEventQueries.CommitTransaction(transaction, cancellationToken);
 
                 messages.Add(new PatientEventResponse()
                 {
@@ -89,6 +82,8 @@ namespace LantanaGroup.Link.Census.Application.Services
                 });
             }
 
+            await _patientEventQueries.CommitTransaction(transaction, cancellationToken);
+
             return messages;
         }
         public async Task<List<IBaseResponse>> ProcessAdmits(string facilityId, CernerPatientsAcquired cernerEventValue, CancellationToken cancellationToken)
@@ -96,18 +91,19 @@ namespace LantanaGroup.Link.Census.Application.Services
             List<IBaseResponse> messages = new List<IBaseResponse>();
             var admittedPatients = await _patientEncounterQueries.GetAdmittedPatientsByFacility(facilityId, cancellationToken);
 
-            foreach (var eventEncounter in cernerEventValue.PatientEncounters)
+            await using var transaction = await _patientEventQueries.StartTransaction(cancellationToken);
+
+            try
             {
-                await using var transaction = await _patientEventQueries.StartTransaction(cancellationToken);
-                try
+                foreach (var eventEncounter in cernerEventValue.PatientEncounters)
                 {
                     var foundPatientEncounter = admittedPatients.FirstOrDefault(
-                        x => x.MedicalRecordNumber == eventEncounter.MRN && 
+                        x => x.MedicalRecordNumber == eventEncounter.MRN &&
                         x.PatientIdentifiers.Any(
-                            y => y.Identifier == eventEncounter.PatientId && 
+                            y => y.Identifier == eventEncounter.PatientId &&
                             y.SourceType == SourceType.SFTP_FHIR.ToString()));
 
-                    if (foundPatientEncounter != null && foundPatientEncounter.EncounterStatus == eventEncounter.EncounterStatus && foundPatientEncounter.EncounterType == eventEncounter.EncounterType && foundPatientEncounter.MedicalRecordNumber == eventEncounter.MRN) 
+                    if (foundPatientEncounter != null && foundPatientEncounter.EncounterStatus == eventEncounter.EncounterStatus && foundPatientEncounter.EncounterType == eventEncounter.EncounterType && foundPatientEncounter.MedicalRecordNumber == eventEncounter.MRN)
                     {
                         continue;
                     }
@@ -127,13 +123,14 @@ namespace LantanaGroup.Link.Census.Application.Services
                             CorrelationId = foundPatientEncounter.CorrelationId,
                             FacilityId = facilityId,
                             TopicName = KafkaTopic.CernerPatientsAcquired.ToString(),
-                            PatientEvent = new Models.Messages.PatientEvent() { 
+                            PatientEvent = new Models.Messages.PatientEvent()
+                            {
                                 PatientId = eventEncounter.PatientId,
                                 EventType = PatientEvents.Update.ToString()
                             }
                         });
                     }
-                    else 
+                    else
                     {
                         var correlationId = Guid.NewGuid().ToString();
                         var admitPayload = new CernerListAdmitPayload(eventEncounter.PatientId, DateTime.UtcNow, eventEncounter.EncounterId, eventEncounter.FinNumber, eventEncounter.MRN, eventEncounter.EncounterStatus, eventEncounter.EncounterType);
@@ -163,15 +160,15 @@ namespace LantanaGroup.Link.Census.Application.Services
                             }
                         });
                     }
+                }
 
-                    await _patientEventQueries.CommitTransaction(transaction, cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error processing Cerner list for facility {FacilityId}", facilityId);
-                    await _patientEventQueries.RollbackTransaction(transaction, cancellationToken);
-                    throw;
-                }
+                await _patientEventQueries.CommitTransaction(transaction, cancellationToken);
+            } 
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing Cerner list for facility {FacilityId}", facilityId);
+                await _patientEventQueries.RollbackTransaction(transaction, cancellationToken);
+                throw;
             }
 
             return messages;

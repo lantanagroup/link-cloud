@@ -3,16 +3,16 @@
 public class ConnectionValidationRequestValidator
 {
     public static bool ValidateRequest(
-        string facilityId, 
-        string? patientId, 
-        string? patientIdentifier, 
-        string? measureId, 
-        DateTime? start, 
+        string facilityId,
+        string? patientId,
+        string? patientIdentifier,
+        string? measureId,
+        DateTime? start,
         DateTime? end,
         out string errorMessage
         )
     {
-        if(string.IsNullOrWhiteSpace(facilityId))
+        if (string.IsNullOrWhiteSpace(facilityId))
         {
             errorMessage = "No Facility ID was provided. One is required to validate.";
             return false;
@@ -24,7 +24,7 @@ public class ConnectionValidationRequestValidator
             return false;
         }
 
-        if(string.IsNullOrWhiteSpace(measureId))
+        if (string.IsNullOrWhiteSpace(measureId))
         {
             errorMessage = "No Measure ID was provided. One is required to validate.";
             return false;
