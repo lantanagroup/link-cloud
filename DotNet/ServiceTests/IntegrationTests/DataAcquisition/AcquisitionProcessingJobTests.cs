@@ -291,7 +291,8 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var testTag = Guid.NewGuid().ToString("N");
         var facilityId = $"TestFacility_{testTag}";
-        var reportTrackingId = $"TestReportId_{testTag}";
+        var reportTrackingId1 = $"TestReportId_1_{testTag}";
+        var reportTrackingId2 = $"TestReportId_2_{testTag}";
 
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
@@ -312,12 +313,12 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
             Status = RequestStatus.Failed,
             RetryAttempts = DataAcquisitionLog.MaxRetryAttempts - 1,
             CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = reportTrackingId,
+            ReportTrackingId = reportTrackingId1,
             PatientId = "Patient/123",
             ReportStartDate = DateTime.UtcNow.AddDays(-1),
             ReportEndDate = DateTime.UtcNow,
             ScheduledReportEntity = new ScheduledReportEntity {
-                ReportTrackingId = reportTrackingId,
+                ReportTrackingId = reportTrackingId1,
                 StartDate = DateTime.UtcNow.AddDays(-1),
                 EndDate = DateTime.UtcNow
             }
@@ -330,12 +331,12 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
             Status = RequestStatus.Failed,
             RetryAttempts = DataAcquisitionLog.MaxRetryAttempts,
             CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = reportTrackingId,
+            ReportTrackingId = reportTrackingId2,
             PatientId = "Patient/123",
             ReportStartDate = DateTime.UtcNow.AddDays(-1),
             ReportEndDate = DateTime.UtcNow,
             ScheduledReportEntity = new ScheduledReportEntity {
-                ReportTrackingId = reportTrackingId,
+                ReportTrackingId = reportTrackingId2,
                 StartDate = DateTime.UtcNow.AddDays(-1),
                 EndDate = DateTime.UtcNow
             }
@@ -375,8 +376,8 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         Assert.Equal(RequestStatus.Ready, updatedLog1.Status);
         // Note: The bulk update in AcquisitionProcessingJob.ProcessFacilityPendingLogs (line 189)
         // only updates Status and ModifyDate to maintain high performance.
-        // It does not increment RetryAttempts or add notes anymore.
-        Assert.Equal(DataAcquisitionLog.MaxRetryAttempts - 1, updatedLog1.RetryAttempts);
+        // It increments retry attempts when failed logs are moved back to Ready.
+        Assert.Equal(DataAcquisitionLog.MaxRetryAttempts, updatedLog1.RetryAttempts);
 
         var updatedLog2 = await assertDbContext.DataAcquisitionLogs.FindAsync(log2.Id);
         Assert.Equal(RequestStatus.MaxRetriesReached, updatedLog2.Status);
@@ -664,17 +665,18 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
             for (int i = 1; i <= pendingPerFacility; i++)
             {
+                var reportTrackingId = $"Pending{f}_{i}_{testTag}";
                 var log = new DataAcquisitionLog
                 {
                     FacilityId = facilityId,
                     Status = RequestStatus.Pending,
                     CorrelationId = Guid.NewGuid().ToString(),
-                    ReportTrackingId = $"Pending{i}_{testTag}",
+                    ReportTrackingId = reportTrackingId,
                     PatientId = $"Patient/{i}",
                     ReportStartDate = DateTime.UtcNow.AddDays(-1),
                     ReportEndDate = DateTime.UtcNow,
                     ScheduledReportEntity = new ScheduledReportEntity {
-                        ReportTrackingId = $"Pending{i}_{testTag}",
+                        ReportTrackingId = reportTrackingId,
                         StartDate = DateTime.UtcNow.AddDays(-1),
                         EndDate = DateTime.UtcNow
                     }
@@ -685,18 +687,19 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
             for (int i = 1; i <= failedRetryablePerFacility; i++)
             {
+                var reportTrackingId = $"FailedRetry{f}_{i}_{testTag}";
                 var log = new DataAcquisitionLog
                 {
                     FacilityId = facilityId,
                     Status = RequestStatus.Failed,
                     RetryAttempts = 0,
                     CorrelationId = Guid.NewGuid().ToString(),
-                    ReportTrackingId = $"FailedRetry{i}_{testTag}",
+                    ReportTrackingId = reportTrackingId,
                     PatientId = $"Patient/{i + pendingPerFacility}",
                     ReportStartDate = DateTime.UtcNow.AddDays(-1),
                     ReportEndDate = DateTime.UtcNow,
                     ScheduledReportEntity = new ScheduledReportEntity {
-                        ReportTrackingId = $"FailedRetry{i}_{testTag}",
+                        ReportTrackingId = reportTrackingId,
                         StartDate = DateTime.UtcNow.AddDays(-1),
                         EndDate = DateTime.UtcNow
                     }
@@ -707,18 +710,19 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
             for (int i = 1; i <= failedMaxRetriesPerFacility; i++)
             {
+                var reportTrackingId = $"MaxRetry{f}_{i}_{testTag}";
                 var log = new DataAcquisitionLog
                 {
                     FacilityId = facilityId,
                     Status = RequestStatus.Failed,
                     RetryAttempts = DataAcquisitionLog.MaxRetryAttempts,
                     CorrelationId = Guid.NewGuid().ToString(),
-                    ReportTrackingId = $"MaxRetry{i}_{testTag}",
+                    ReportTrackingId = reportTrackingId,
                     PatientId = $"Patient/{i + pendingPerFacility + failedRetryablePerFacility}",
                     ReportStartDate = DateTime.UtcNow.AddDays(-1),
                     ReportEndDate = DateTime.UtcNow,
                     ScheduledReportEntity = new ScheduledReportEntity {
-                        ReportTrackingId = $"MaxRetry{i}_{testTag}",
+                        ReportTrackingId = reportTrackingId,
                         StartDate = DateTime.UtcNow.AddDays(-1),
                         EndDate = DateTime.UtcNow
                     }
@@ -767,10 +771,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
             Assert.All(retryableLogs, log =>
             {
                 Assert.Equal(RequestStatus.Ready, log.Status);
-                // Note: The bulk update in AcquisitionProcessingJob.ProcessFacilityPendingLogs (line 189)
-                // only updates Status and ModifyDate to maintain high performance.
-                // It does not increment RetryAttempts anymore.
-                Assert.Equal(0, log.RetryAttempts);
+                Assert.Equal(1, log.RetryAttempts);
             });
 
             var maxRetryLogs = allLogs.Where(l => l.ReportTrackingId.StartsWith("MaxRetry") && l.ReportTrackingId.EndsWith($"_{testTag}")).ToList();

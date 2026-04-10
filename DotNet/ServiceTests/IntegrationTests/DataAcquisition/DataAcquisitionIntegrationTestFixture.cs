@@ -119,6 +119,7 @@ namespace IntegrationTests.DataAcquisition
 
             // Register queries
             builder.Services.AddScoped<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();
+            builder.Services.AddScoped<IDataAcquisitionLogNotesQueries, DataAcquisitionLogNotesQueries>();
             builder.Services.AddScoped<IFhirQueryQueries, FhirQueryQueries>();
             builder.Services.AddScoped<IFhirQueryConfigurationQueries, FhirQueryConfigurationQueries>();
             builder.Services.AddScoped<IFhirQueryListConfigurationQueries, FhirQueryListConfigurationQueries>();
