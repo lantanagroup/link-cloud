@@ -144,7 +144,7 @@ export class AcquisitionLogService {
   }
 
   executeAcquisitionLog(id: string) : Observable<any> {
-    return this.http.post<any>(`${this.baseUrl}/${id}/process`, id)
+    return this.http.post<any>(`${this.baseUrl}/${id}/process`, Number(id))
     .pipe(
       map((response: any) => {
         return response;
@@ -158,7 +158,8 @@ export class AcquisitionLogService {
 
   cancelBulkAcquisitionLogs(ids: string[], minAgeHours: number = 24) : Observable<{ requested: number; cancelled: number; ineligible: number }> {
     const params = new HttpParams().set('minAgeHours', minAgeHours.toString());
-    return this.http.post<{ requested: number; cancelled: number; ineligible: number }>(`${this.baseUrl}/cancel-bulk`, ids, { params })
+    const numericIds = ids.map(id => Number(id));
+    return this.http.post<{ requested: number; cancelled: number; ineligible: number }>(`${this.baseUrl}/cancel-bulk`, numericIds, { params })
     .pipe(
       map((response: any) => {
         return response;
@@ -210,7 +211,8 @@ export class AcquisitionLogService {
   }
 
   bulkExecuteAcquisitionLogs(ids: string[]) : Observable<any> {
-    return this.http.post<any>(`${this.baseUrl}/process-bulk`, ids)
+    const numericIds = ids.map(id => Number(id));
+    return this.http.post<any>(`${this.baseUrl}/process-bulk`, numericIds)
     .pipe(
       map((response: any) => {
         return response;

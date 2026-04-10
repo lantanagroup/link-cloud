@@ -185,7 +185,9 @@ export class AcquisitionLogViewComponent implements OnInit {
     if (this.TERMINAL_STATUSES.includes(log.status)) return false;
     if (this.cancelMinAgeHours === 0) return true;
     if (!log.createDate) return false;
-    return (Date.now() - new Date(log.createDate).getTime()) > this.cancelMinAgeMs;
+    // Match backend: CreateDate <= UtcNow.AddHours(-minAgeHours)
+    const minAgeCutoff = Date.now() - this.cancelMinAgeMs;
+    return new Date(log.createDate).getTime() <= minAgeCutoff;
   }
 
   get eligibleSelectedCount(): number {
@@ -542,6 +544,7 @@ export class AcquisitionLogViewComponent implements OnInit {
     if (index !== -1) {
       this.acquisitionLogs[index] = { ...this.acquisitionLogs[index], status: 'Cancelled' };
     }
+    setTimeout(() => this.refreshLogs(), 1500);
   }
 
   bulkExecute() {
@@ -621,31 +624,27 @@ export class AcquisitionLogViewComponent implements OnInit {
   }
 
   bulkCancel() {
-    const BULK_CANCEL_MAX = 1000;
-
     if (!this.isAllSelected && this.selectedLogIds.size === 0) {
       return;
     }
 
-    // Filter to only cancel-eligible ids (non-terminal + >24h). Ineligible selections are dropped.
-    const eligibleIds = this.isAllSelected
+    // Capture select-all state before clearSelection() resets it
+    const wasAllSelected = this.isAllSelected;
+
+    // Filter to only cancel-eligible ids (non-terminal + age check). Ineligible selections are dropped.
+    const eligibleIds = wasAllSelected
       ? []
       : this.acquisitionLogs
           .filter(l => this.selectedLogIds.has(l.id) && this.isLogCancelEligible(l))
           .map(l => l.id);
 
-    if (!this.isAllSelected && eligibleIds.length === 0) {
+    if (!wasAllSelected && eligibleIds.length === 0) {
       SnackbarHelper.showErrorMessage(this.snackBar, 'None of the selected logs are eligible for cancellation.');
       return;
     }
 
-    if (!this.isAllSelected && eligibleIds.length > BULK_CANCEL_MAX) {
-      alert(`Cannot cancel more than ${BULK_CANCEL_MAX} acquisition logs at once. ${eligibleIds.length} eligible were selected.`);
-      return;
-    }
-
-    const skipped = this.isAllSelected ? 0 : this.selectedLogIds.size - eligibleIds.length;
-    const confirmMsg = this.isAllSelected
+    const skipped = wasAllSelected ? 0 : this.selectedLogIds.size - eligibleIds.length;
+    const confirmMsg = wasAllSelected
       ? `Cancel all acquisition logs matching the current filters? This cannot be undone.`
       : `Cancel ${eligibleIds.length} acquisition log${eligibleIds.length === 1 ? '' : 's'}?${skipped > 0 ? ` (${skipped} ineligible will be skipped.)` : ''} This cannot be undone.`;
 
@@ -655,7 +654,7 @@ export class AcquisitionLogViewComponent implements OnInit {
 
     this.loadingService.show();
     let obs$;
-    if (this.isAllSelected) {
+    if (wasAllSelected) {
       obs$ = this.acquisitionLogService.cancelAcquisitionLogsByFilter(
         this.patientFilter !== 'Any' ? this.patientFilter : null,
         this.selectedFacilityFilter !== 'Any' ? this.selectedFacilityFilter : null,
@@ -677,20 +676,41 @@ export class AcquisitionLogViewComponent implements OnInit {
       finalize(() => {
         this.loadingService.hide();
         this.clearSelection();
-        this.refreshLogs();
       })
     ).subscribe({
       next: (result) => {
         const cancelled = result?.cancelled ?? 0;
         const requested = result?.requested ?? 0;
         const ineligible = result?.ineligible ?? 0;
+
+        // Update status in-place for immediate visual feedback
+        if (cancelled > 0) {
+          if (wasAllSelected) {
+            this.acquisitionLogs.forEach((log, i) => {
+              if (this.isLogCancelEligible(log)) {
+                this.acquisitionLogs[i] = { ...log, status: 'Cancelled' };
+              }
+            });
+          } else {
+            const eligibleSet = new Set(eligibleIds);
+            this.acquisitionLogs.forEach((log, i) => {
+              if (eligibleSet.has(log.id)) {
+                this.acquisitionLogs[i] = { ...log, status: 'Cancelled' };
+              }
+            });
+          }
+        }
+
         if (cancelled === 0) {
           SnackbarHelper.showErrorMessage(this.snackBar, `No logs were cancelled. ${ineligible} were not eligible (terminal status or less than ${this.cancelMinAgeHours} hours old).`);
         } else if (ineligible > 0) {
-          SnackbarHelper.showSuccessMessage(this.snackBar, `Cancelled ${cancelled} of ${requested} logs. ${ineligible} were not eligible.`);
+          SnackbarHelper.showSuccessMessage(this.snackBar, `Cancelled ${cancelled} log${cancelled === 1 ? '' : 's'} (${ineligible} were not eligible).`);
         } else {
           SnackbarHelper.showSuccessMessage(this.snackBar, `Cancelled ${cancelled} log${cancelled === 1 ? '' : 's'}.`);
         }
+
+        // Refresh after delay so the user sees the status change before filters take effect
+        setTimeout(() => this.refreshLogs(), 1500);
       },
       error: (error) => {
         console.error('Error triggering bulk cancellation:', error);

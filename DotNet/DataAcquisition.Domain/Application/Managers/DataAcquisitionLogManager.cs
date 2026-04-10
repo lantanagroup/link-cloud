@@ -1,5 +1,6 @@
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
@@ -9,9 +10,11 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using ResourceType = Hl7.Fhir.Model.ResourceType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
@@ -20,8 +23,8 @@ public interface IDataAcquisitionLogManager
     Task<DataAcquisitionLogModel> CreateAsync(CreateDataAcquisitionLogModel log, CancellationToken cancellationToken = default);
     Task<DataAcquisitionLogModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default);
     Task<int> UpdateStatusBatchAsync(IEnumerable<long> ids, RequestStatus newStatus, CancellationToken cancellationToken = default);
-    Task<int> IncrementRetriesAndSetStatusAsync(IEnumerable<long> ids, RequestStatus newStatus, CancellationToken cancellationToken = default);
     Task<int> CancelBulkAsync(IEnumerable<long> ids, int minAgeHours, CancellationToken cancellationToken = default);
+    Task<(int requested, int cancelled)> CancelByFilterAsync(SearchDataAcquisitionLogRequest filter, int minAgeHours, CancellationToken cancellationToken = default);
     Task<List<DataAcquisitionLog>> GetLogsByIdsAsync(List<long> ids, CancellationToken cancellationToken = default);
     Task DeleteAsync(long id, CancellationToken cancellationToken = default);
     Task<int> SoftDeleteByFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
@@ -335,26 +338,19 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.UpdateStatusBatchAsync");
 
-        // High-speed bulk update without fetching entities. 
-        return await _dbContext.DataAcquisitionLogs
-            .Where(l => ids.Contains(l.Id))
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(l => l.Status, newStatus)
-                .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
-                cancellationToken);
-    }
+        var updatedCount = 0;
+        // Batch updates to avoid exceeding MaxBulkIds per database call
+        foreach (var batch in ids.Chunk(DataAcquisitionConstants.DatabaseSettings.MaxBulkIds))
+        {
+            updatedCount += await _dbContext.DataAcquisitionLogs
+                .Where(l => batch.Contains(l.Id))
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(l => l.Status, newStatus)
+                    .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                    cancellationToken);
+        }
 
-    public async Task<int> IncrementRetriesAndSetStatusAsync(IEnumerable<long> ids, RequestStatus newStatus, CancellationToken cancellationToken = default)
-    {
-        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.IncrementRetriesAndSetStatusAsync");
-
-        return await _dbContext.DataAcquisitionLogs
-            .Where(l => ids.Contains(l.Id))
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(l => l.Status, newStatus)
-                .SetProperty(l => l.RetryAttempts, l => (l.RetryAttempts ?? 0) + 1)
-                .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
-                cancellationToken);
+        return updatedCount;
     }
 
     public async Task<int> CancelBulkAsync(IEnumerable<long> ids, int minAgeHours, CancellationToken cancellationToken = default)
@@ -364,15 +360,95 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.Cancelled };
         var minAgeCutoff = DateTime.UtcNow.AddHours(-minAgeHours);
 
-        return await _dbContext.DataAcquisitionLogs
-            .Where(l => ids.Contains(l.Id)
-                && l.Status != null
-                && !terminalStatuses.Contains(l.Status.Value)
-                && l.CreateDate <= minAgeCutoff)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(l => l.Status, RequestStatus.Cancelled)
-                .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
-                cancellationToken);
+        var cancelledCount = 0;
+        // Batch cancellations to avoid exceeding MaxBulkIds per database call
+        foreach (var batch in ids.Chunk(DataAcquisitionConstants.DatabaseSettings.MaxBulkIds))
+        {
+            cancelledCount += await _dbContext.DataAcquisitionLogs
+                .Where(l => batch.Contains(l.Id)
+                    && l.Status != null
+                    && !terminalStatuses.Contains(l.Status.Value)
+                    && l.CreateDate <= minAgeCutoff)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(l => l.Status, RequestStatus.Cancelled)
+                    .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                    cancellationToken);
+        }
+
+        return cancelledCount;
+    }
+
+    public async Task<(int requested, int cancelled)> CancelByFilterAsync(SearchDataAcquisitionLogRequest filter, int minAgeHours, CancellationToken cancellationToken = default)
+    {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.CancelByFilterAsync");
+
+        var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.Cancelled };
+        var minAgeCutoff = DateTime.UtcNow.AddHours(-minAgeHours);
+
+        var query = _dbContext.DataAcquisitionLogs.AsQueryable();
+
+        if (!filter.IncludeDeleted)
+            query = query.Where(l => !l.IsDeleted);
+
+        if (!string.IsNullOrEmpty(filter.FacilityId))
+            query = query.Where(l => l.FacilityId == filter.FacilityId);
+
+        if (!string.IsNullOrEmpty(filter.PatientId))
+            query = query.Where(l => l.PatientId == filter.PatientId);
+
+        if (!string.IsNullOrEmpty(filter.ReportTrackingId))
+            query = query.Where(l => l.ReportTrackingId == filter.ReportTrackingId);
+
+        if (!string.IsNullOrEmpty(filter.ResourceId))
+            query = query.Where(l => l.ResourceAcquiredIds != null && l.ResourceAcquiredIds.Contains(filter.ResourceId));
+
+        if (filter.QueryPhase.HasValue)
+            query = query.Where(l => l.QueryPhase == filter.QueryPhase.Value);
+
+        if (filter.QueryType.HasValue)
+            query = query.Where(l => l.QueryType == filter.QueryType.Value);
+
+        if (filter.AcquisitionPriority.HasValue)
+            query = query.Where(l => l.Priority == filter.AcquisitionPriority.Value);
+
+        if (filter.RequestStatuses != null && filter.RequestStatuses.Any())
+            query = query.Where(l => l.Status != null && filter.RequestStatuses.Contains(l.Status.Value));
+
+        if (!string.IsNullOrEmpty(filter.ResourceType))
+        {
+            var resourceType = Enum.Parse<ResourceType>(filter.ResourceType, ignoreCase: true);
+            query = query.Where(l => l.FhirQueries.Any(q => q.FhirQueryResourceTypes.Any(r => r.ResourceType == resourceType)));
+        }
+
+        if (filter.CreatedBefore.HasValue)
+            query = query.Where(l => l.CreateDate <= filter.CreatedBefore.Value);
+
+        // Count all matching logs before applying eligibility filters
+        var requested = await query.CountAsync(cancellationToken);
+
+        // Get IDs of logs eligible for cancellation
+        var eligibleIds = await query.Where(l => l.Status != null
+            && !terminalStatuses.Contains(l.Status.Value)
+            && l.CreateDate <= minAgeCutoff)
+            .Select(l => l.Id)
+            .ToListAsync(cancellationToken);
+
+        var cancelled = 0;
+        if (eligibleIds.Any())
+        {
+            // Batch cancellations to avoid exceeding MaxBulkIds per database call
+            foreach (var batch in eligibleIds.Chunk(DataAcquisitionConstants.DatabaseSettings.MaxBulkIds))
+            {
+                cancelled += await _dbContext.DataAcquisitionLogs
+                    .Where(l => batch.Contains(l.Id))
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(l => l.Status, RequestStatus.Cancelled)
+                        .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                        cancellationToken);
+            }
+        }
+
+        return (requested, cancelled);
     }
 
     public async Task<List<DataAcquisitionLog>> GetPendingRequests(CancellationToken cancellationToken = default)

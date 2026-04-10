@@ -11,6 +11,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Settings;
 using Link.Authorization.Policies;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -26,7 +27,6 @@ public class LogController : Controller
     private readonly IDataAcquisitionLogManager _logManager;
     private readonly IDataAcquisitionLogQueries _logQueries;
 
-    private const int MaxBulkIds = 1000;
     private const int DefaultCancelMinAgeHours = 24;
 
     public LogController(ILogger<LogController> logger, IDataAcquisitionLogService logService, IDataAcquisitionLogManager logManager, IDataAcquisitionLogQueries queries)
@@ -667,11 +667,7 @@ public class LogController : Controller
 
         try
         {
-            // Batch processing to avoid exceeding MaxBulkIds per call
-            foreach (var batch in ids.Chunk(MaxBulkIds))
-            {
-                await _logService.StartRetrievalProcessBulk(batch.ToList(), cancellationToken);
-            }
+            await _logService.StartRetrievalProcessBulk(ids, cancellationToken);
 
             return Accepted();
         }
@@ -702,14 +698,13 @@ public class LogController : Controller
             return BadRequest("IDs cannot be null or empty.");
         }
 
+        if (minAgeHours < 0) 
+        { 
+            return BadRequest("minAgeHours must be zero or greater.");
+        }
         try
         {
-            // Batch cancellations to avoid exceeding MaxBulkIds per database call
-            var cancelledCount = 0;
-            foreach (var batch in ids.Chunk(MaxBulkIds))
-            {
-                cancelledCount += await _logManager.CancelBulkAsync(batch.ToList(), minAgeHours, cancellationToken);
-            }
+            var cancelledCount = await _logManager.CancelBulkAsync(ids, minAgeHours, cancellationToken);
             return Accepted(new { requested = ids.Count, cancelled = cancelledCount, ineligible = ids.Count - cancelledCount });
         }
         catch (Exception ex)
@@ -825,33 +820,22 @@ public class LogController : Controller
             var reportId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ReportId);
             var resourceId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ResourceId);
 
-            var result = await _logQueries.SearchAsync(
-                new SearchDataAcquisitionLogRequest
-                {
-                    FacilityId = facilityId,
-                    PatientId = patientId,
-                    ReportTrackingId = reportId,
-                    ResourceId = resourceId,
-                    QueryPhase = queryParameters.QueryPhase,
-                    QueryType = queryParameters.QueryType,
-                    RequestStatuses = queryParameters.Statuses,
-                    AcquisitionPriority = queryParameters.Priority,
-                    ResourceType = queryParameters.ResourceType,
-                    IncludeDeleted = queryParameters.IncludeDeleted,
-                    CreatedBefore = queryParameters.CreatedBefore,
-                    PageNumber = 1,
-                    PageSize = int.MaxValue
-                }, cancellationToken);
-
-            var ids = result.Records?.Select(r => r.Id).ToList() ?? new List<long>();
-            var requested = ids.Count;
-            var cancelled = 0;
-
-            // Batch cancellations to avoid exceeding MaxBulkIds per database call
-            foreach (var batch in ids.Chunk(MaxBulkIds))
+            var filter = new SearchDataAcquisitionLogRequest
             {
-                cancelled += await _logManager.CancelBulkAsync(batch.ToList(), minAgeHours, cancellationToken);
-            }
+                FacilityId = facilityId,
+                PatientId = patientId,
+                ReportTrackingId = reportId,
+                ResourceId = resourceId,
+                QueryPhase = queryParameters.QueryPhase,
+                QueryType = queryParameters.QueryType,
+                RequestStatuses = queryParameters.Statuses,
+                AcquisitionPriority = queryParameters.Priority,
+                ResourceType = queryParameters.ResourceType,
+                IncludeDeleted = queryParameters.IncludeDeleted,
+                CreatedBefore = queryParameters.CreatedBefore
+            };
+
+            var (requested, cancelled) = await _logManager.CancelByFilterAsync(filter, minAgeHours, cancellationToken);
 
             return Accepted(new { requested, cancelled, ineligible = requested - cancelled });
         }
