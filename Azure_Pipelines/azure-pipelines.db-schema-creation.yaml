@@ -79,6 +79,10 @@ stages:
             $changedFilesFile = "$(Build.SourcesDirectory)/changedfiles.txt"
             $changedServicesFile = "$(Build.SourcesDirectory)/changedServices.txt"
 
+            # Ensure files exist even if empty
+            New-Item -ItemType File -Path $changedFilesFile -Force | Out-Null
+            New-Item -ItemType File -Path $changedServicesFile -Force | Out-Null
+
             Write-Host "Previous Release: $prev"
             Write-Host "Current Release: $curr"
 
