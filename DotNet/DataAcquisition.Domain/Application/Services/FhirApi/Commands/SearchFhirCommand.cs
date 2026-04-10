@@ -97,7 +97,17 @@ public class SearchFhirCommand : ISearchFhirCommand
             var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.queryConfig.Authentication);
             if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
             {
-                fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
+                if (authBuilderResults.authHeader is AuthenticationHeaderValue authHeaderValue)
+                {
+                    fhirClient.RequestHeaders.Authorization = authHeaderValue;
+                }
+                else if (authBuilderResults.authHeader is Dictionary<string, string> customHeaders)
+                {
+                    foreach (var header in customHeaders)
+                    {
+                        fhirClient.RequestHeaders.Add(header.Key, header.Value);
+                    }
+                }
             }
 
             Bundle? resultBundle = null;
@@ -190,7 +200,17 @@ public class SearchFhirCommand : ISearchFhirCommand
             var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.queryConfig.Authentication);
             if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
             {
-                fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
+                if (authBuilderResults.authHeader is AuthenticationHeaderValue authHeaderValue)
+                {
+                    fhirClient.RequestHeaders.Authorization = authHeaderValue;
+                }
+                else if (authBuilderResults.authHeader is Dictionary<string, string> customHeaders)
+                {
+                    foreach (var header in customHeaders)
+                    {
+                        fhirClient.RequestHeaders.Add(header.Key, header.Value);
+                    }
+                }
             }
 
             Bundle resultBundle;
