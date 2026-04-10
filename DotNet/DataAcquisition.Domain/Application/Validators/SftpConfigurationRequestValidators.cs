@@ -1,5 +1,6 @@
 using FluentValidation;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
@@ -14,6 +15,7 @@ public class CreateSftpConfigurationModelValidator : AbstractValidator<CreateSft
         var settings = options.Value.Connection;
 
         RuleFor(x => x.Host)
+            .Cascade(CascadeMode.Stop)
             .NotEmpty()
             .WithMessage("Host is required.")
             .MaximumLength(settings.MaxHostLength)
@@ -26,11 +28,17 @@ public class CreateSftpConfigurationModelValidator : AbstractValidator<CreateSft
             .WithMessage("Port must be between 1 and 65535.");
 
         RuleFor(x => x.RemoteDirectory)
+            .Cascade(CascadeMode.Stop)
+            .NotEmpty()
+            .WithMessage("Remote directory is required. Use '/' for the root directory.")
             .MaximumLength(settings.MaxRemoteDirectoryLength)
             .WithMessage($"Remote directory path cannot exceed {settings.MaxRemoteDirectoryLength} characters.")
             .Must(SftpConfigurationValidationRules.BeValidRemoteDirectoryPath)
-            .WithMessage("Remote directory path contains invalid characters.")
-            .When(x => !string.IsNullOrEmpty(x.RemoteDirectory));
+            .WithMessage("Remote directory path contains invalid characters.");
+
+        // Validate nested acquisition configurations
+        RuleForEach(x => x.AcquisitionConfigurations)
+            .SetValidator(new SftpAcquisitionTypeConfigurationValidator(options));
 
         RuleFor(x => x.Timeout)
             .Must(timeout => timeout >= TimeSpan.Zero && timeout <= TimeSpan.FromMinutes(settings.MaxTimeoutMinutes))
@@ -57,6 +65,7 @@ public class SftpConfigurationModelValidator : AbstractValidator<SftpConfigurati
             .WithMessage("Configuration Id is required.");
 
         RuleFor(x => x.Host)
+            .Cascade(CascadeMode.Stop)
             .NotEmpty()
             .WithMessage("Host is required.")
             .MaximumLength(settings.MaxHostLength)
@@ -69,15 +78,52 @@ public class SftpConfigurationModelValidator : AbstractValidator<SftpConfigurati
             .WithMessage("Port must be between 1 and 65535.");
 
         RuleFor(x => x.RemoteDirectory)
+            .Cascade(CascadeMode.Stop)
+            .NotEmpty()
+            .WithMessage("Remote directory is required. Use '/' for the root directory.")
             .MaximumLength(settings.MaxRemoteDirectoryLength)
             .WithMessage($"Remote directory path cannot exceed {settings.MaxRemoteDirectoryLength} characters.")
             .Must(SftpConfigurationValidationRules.BeValidRemoteDirectoryPath)
-            .WithMessage("Remote directory path contains invalid characters.")
-            .When(x => !string.IsNullOrEmpty(x.RemoteDirectory));
+            .WithMessage("Remote directory path contains invalid characters.");
+
+        // Validate nested acquisition configurations
+        RuleForEach(x => x.AcquisitionConfigurations)
+            .SetValidator(new SftpAcquisitionTypeConfigurationValidator(options));
 
         RuleFor(x => x.Timeout)
             .Must(timeout => timeout >= TimeSpan.Zero && timeout <= TimeSpan.FromMinutes(settings.MaxTimeoutMinutes))
             .WithMessage($"Timeout must be between 0 and {settings.MaxTimeoutMinutes} minutes.");
+    }
+}
+
+/// <summary>
+/// Validator for SftpAcquisitionTypeConfiguration (nested within SFTP configuration)
+/// </summary>
+public class SftpAcquisitionTypeConfigurationValidator : AbstractValidator<SftpAcquisitionTypeConfiguration>
+{
+    public SftpAcquisitionTypeConfigurationValidator(IOptions<SftpValidationSettings> options)
+    {
+        var settings = options.Value.Connection;
+
+        RuleFor(x => x.RemoteDirectory)
+            .Cascade(CascadeMode.Stop)
+            .Must(path => !string.IsNullOrWhiteSpace(path))
+            .WithMessage("Acquisition remote directory cannot be empty. Use '/' for the root directory or leave the field blank to inherit from the connection-level directory.")
+            .MaximumLength(settings.MaxRemoteDirectoryLength)
+            .WithMessage($"Acquisition remote directory path cannot exceed {settings.MaxRemoteDirectoryLength} characters.")
+            .Must(SftpConfigurationValidationRules.BeValidRemoteDirectoryPath)
+            .WithMessage("Acquisition remote directory path contains invalid characters.")
+            .When(x => x.RemoteDirectory is not null);
+
+        RuleFor(x => x.ProcessedDirectory)
+            .Cascade(CascadeMode.Stop)
+            .Must(path => !string.IsNullOrWhiteSpace(path))
+            .WithMessage("Processed directory cannot be empty. Provide a valid path or leave the field blank.")
+            .MaximumLength(settings.MaxRemoteDirectoryLength)
+            .WithMessage($"Processed directory path cannot exceed {settings.MaxRemoteDirectoryLength} characters.")
+            .Must(SftpConfigurationValidationRules.BeValidRemoteDirectoryPath)
+            .WithMessage("Processed directory path contains invalid characters.")
+            .When(x => x.ProcessedDirectory is not null);
     }
 }
 
@@ -140,7 +186,7 @@ public static class SftpConfigurationValidationRules
     public static bool BeValidRemoteDirectoryPath(string? path)
     {
         if (string.IsNullOrWhiteSpace(path))
-            return true; // Empty path is allowed
+            return false;
 
         return !path.Any(c => InvalidPathChars.Contains(c));
     }

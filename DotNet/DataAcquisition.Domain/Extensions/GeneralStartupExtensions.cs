@@ -192,6 +192,7 @@ public static class GeneralStartupExtensions
         //Fhir Authentication Handlers
         services.AddSingleton<EpicAuth>();
         services.AddSingleton<BasicAuth>();
+        services.AddSingleton<CustomHeaderAuth>();
         services.AddSingleton<IAuthenticationRetrievalService, AuthenticationRetrievalService>();
     }
 

@@ -8,6 +8,8 @@ namespace LantanaGroup.Link.Tenant.Business.Models
         public string? FacilityName { get; set; }
         public Guid? Id { get; set; }
         public bool? FacilityNameContains { get; set; }
+        public string? TimeZone { get; set; }
+        public Vendor? Vendor { get; set; }
 
         public bool? IsDeleted { get; set; }
     }
