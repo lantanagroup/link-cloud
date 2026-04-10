@@ -703,14 +703,14 @@ public class LogController : Controller
             return BadRequest("IDs cannot be null or empty.");
         }
 
-        if (ids.Count > MaxBulkIds)
-        {
-            return BadRequest($"Too many IDs in request. Maximum allowed is {MaxBulkIds}, received {ids.Count}.");
-        }
-
         try
         {
-            var cancelledCount = await _logManager.CancelBulkAsync(ids, minAgeHours, cancellationToken);
+            // Batch cancellations to avoid exceeding MaxBulkIds per database call
+            var cancelledCount = 0;
+            foreach (var batch in ids.Chunk(MaxBulkIds))
+            {
+                cancelledCount += await _logManager.CancelBulkAsync(batch.ToList(), minAgeHours, cancellationToken);
+            }
             return Accepted(new { requested = ids.Count, cancelled = cancelledCount, ineligible = ids.Count - cancelledCount });
         }
         catch (Exception ex)
@@ -848,9 +848,10 @@ public class LogController : Controller
             var requested = ids.Count;
             var cancelled = 0;
 
-            if (requested > 0)
+            // Batch cancellations to avoid exceeding MaxBulkIds per database call
+            foreach (var batch in ids.Chunk(MaxBulkIds))
             {
-                cancelled = await _logManager.CancelBulkAsync(ids, minAgeHours, cancellationToken);
+                cancelled += await _logManager.CancelBulkAsync(batch.ToList(), minAgeHours, cancellationToken);
             }
 
             return Accepted(new { requested, cancelled, ineligible = requested - cancelled });
