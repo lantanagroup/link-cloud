@@ -1,8 +1,9 @@
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
 using Microsoft.EntityFrameworkCore;
 using Xunit.Abstractions;
+using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 
 namespace LantanaGroup.Link.Tests.E2ETests.Helpers;
 

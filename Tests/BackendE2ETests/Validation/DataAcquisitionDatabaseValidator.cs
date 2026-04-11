@@ -4,6 +4,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Tests.E2ETests.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 
 namespace LantanaGroup.Link.Tests.E2ETests.Validation;
 

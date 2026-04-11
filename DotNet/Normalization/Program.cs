@@ -1,6 +1,5 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using HealthChecks.UI.Client;
-using Hl7.Fhir.Model.CdsHooks;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;

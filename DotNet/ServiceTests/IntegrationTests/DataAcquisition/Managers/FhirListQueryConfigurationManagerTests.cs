@@ -1,4 +1,4 @@
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
@@ -12,7 +12,6 @@ namespace IntegrationTests.DataAcquisition.Managers;
 [Collection("DataAcquisitionIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
 public class FhirListQueryConfigurationManagerTests(DataAcquisitionIntegrationTestFixture fixture)
-    : IClassFixture<DataAcquisitionIntegrationTestFixture>
 {
     private IFhirListQueryConfigurationManager CreateManager(IServiceScope scope)
     {
@@ -27,10 +26,8 @@ public class FhirListQueryConfigurationManagerTests(DataAcquisitionIntegrationTe
         using var scope = fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
-        const string facilityId = "TestFacility";
+        var facilityId = $"TestFacility_{Guid.NewGuid():N}";
 
         // Create existing SFTP configuration for the facility
         var sftpConfig = new SftpConfiguration
@@ -61,3 +58,4 @@ public class FhirListQueryConfigurationManagerTests(DataAcquisitionIntegrationTe
         Assert.Contains(facilityId, exception.Message);
     }
 }
+

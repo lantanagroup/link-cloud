@@ -1,4 +1,4 @@
-using HealthChecks.UI.Client;
+﻿using HealthChecks.UI.Client;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
@@ -52,6 +52,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddDataProtection()
         .SetApplicationName(builder.Configuration.GetValue<string>("DataProtection:KeyRing") ?? "Link");
     builder.Services.Configure<AcquisitionJobSettings>(builder.Configuration.GetSection(AcquisitionJobSettings.SectionName));
+    builder.Services.Configure<TailMessageRecoveryJobSettings>(builder.Configuration.GetSection(TailMessageRecoveryJobSettings.SectionName));
 
 
     builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();

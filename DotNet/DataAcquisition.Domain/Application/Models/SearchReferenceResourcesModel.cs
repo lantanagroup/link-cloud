@@ -8,6 +8,7 @@ namespace DataAcquisition.Domain.Application.Models
         public string? FacilityId { get; set; }
         public string? ResourceId { get; set; }
         public string? ResourceType { get; set; }
+        public List<string>? ResourceTypes { get; set; }
         public QueryPhase? QueryPhase { get; set; }
         public long? DataAcquisitionLogId { get; set; }
         public int PageNumber { get; set; } = 1;

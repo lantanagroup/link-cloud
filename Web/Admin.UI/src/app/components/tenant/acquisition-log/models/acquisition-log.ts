@@ -15,7 +15,8 @@ export interface AcquisitionLog {
     completionDate?: Date;
     completionTimeMilliseconds?: number;
     resourceAcquiredIds?: string[];
-    referenceResources?: ReferencedResource[];
+    resourceAcquiredCount?: number;
+    referenceResourceCount?: number;
     notes?: string[];
     scheduledReport: ScheduledReport;
     isDeleted: boolean;

@@ -71,7 +71,6 @@ import {
         animate('500ms ease-out', style({ opacity: 1, transform: 'translateY(0)' }))
       ])
     ]),
-    ,
     trigger('fadeGrowRightOut', [
       transition(':enter', [
         style({ opacity: 0, transform: 'scaleX(0.5) scaleY(0.8) translateX(40px) translateY(10px)' }),

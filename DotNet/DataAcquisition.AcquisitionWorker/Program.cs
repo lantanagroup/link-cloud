@@ -1,4 +1,4 @@
-using HealthChecks.UI.Client;
+﻿using HealthChecks.UI.Client;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
@@ -78,6 +78,9 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 var app = builder.Build();
+
+// Ensure schema is up to date even when worker starts before API.
+app.AutoMigrateEF<DataAcquisitionDbContext>();
 
 app.UseRouting();
 app.MapControllers();

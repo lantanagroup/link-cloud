@@ -1,13 +1,8 @@
-﻿using System.Diagnostics;
-using System.Net;
-using System.Text;
-using System.Text.Json;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using Microsoft.Extensions.Logging;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
@@ -22,10 +17,14 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using Microsoft.Extensions.Logging;
+using System.Diagnostics;
+using System.Net;
+using System.Text;
+using System.Text.Json;
 using DateTime = System.DateTime;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
-using Hl7.Fhir.Serialization;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 
@@ -111,17 +110,11 @@ public class FhirApiService : IFhirApiService
 
             resourceIds.Add($"{resourceType}/{resource.Id}");
 
-            if (fhirQuery.IsReference.HasValue && fhirQuery.IsReference.Value)
-            {
-                //if this is a reference resource, we need to handle it differently
-                await HandleReferenceResource(log, resource, cancellationToken);
-            }
-
             InsertDateExtension(resource);
 
             //get references
             var refResources = ReferenceResourceBundleExtractor.Extract(resource, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
-            await _referenceResourceService.ProcessReferences(log, refResources, cancellationToken);
+            await _referenceResourceService.ProcessReferences(log, refResources, fhirQueryConfiguration, cancellationToken);
 
             await GenerateResourceAcquiredMessage(new ResourceAcquired
             {
@@ -224,7 +217,7 @@ public class FhirApiService : IFhirApiService
             {
                 var refResources = ReferenceResourceBundleExtractor.Extract(bundle, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
 
-                await _referenceResourceService.ProcessReferences(log, refResources, cancellationToken);
+                await _referenceResourceService.ProcessReferences(log, refResources, fhirQueryConfiguration, cancellationToken);
 
                 var resources = bundle.Entry
                     .Where(e => e.Resource != null && e.Resource.TypeName != "OperationOutcome")
@@ -252,12 +245,6 @@ public class FhirApiService : IFhirApiService
 
                 foreach (var resource in resources)
                 {
-                    if (fhirQuery.IsReference.HasValue && fhirQuery.IsReference.Value)
-                    {
-                        //if this is a reference resource, we need to handle it differently
-                        await HandleReferenceResource(log, resource, cancellationToken);
-                    }
-
                     InsertDateExtension((DomainResource)resource);
 
                     await GenerateResourceAcquiredMessage(new ResourceAcquired
@@ -290,39 +277,6 @@ public class FhirApiService : IFhirApiService
                 throw new OpOutcomeException(note, ex);
             }
             throw;
-        }
-    }
-
-    private async Task HandleReferenceResource(DataAcquisitionLogModel log, Resource resource, CancellationToken cancellationToken)
-    {
-        if (resource == null) throw new ArgumentNullException(nameof(resource));
-
-        InsertDateExtension((DomainResource)resource);
-
-        //get existing reference resource record
-        var existingReference = await _referenceResourcesQueries.GetAsync(resource.Id, log.FacilityId, cancellationToken);
-
-        if (existingReference == null)
-        {
-            existingReference = await _referenceResourceManager.CreateAsync(new CreateReferenceResourcesModel
-            {
-                DataAcquisitionLogId = log.Id,
-                QueryPhase = QueryPhase.Referential,
-                FacilityId = log.FacilityId,
-                ResourceId = resource.Id,
-                ResourceType = resource.TypeName,
-                ReferenceResource = JsonSerializer.Serialize(resource, LinkFhirSerializerOptions.ForFhirLenientSerialization)
-            }, cancellationToken);
-        }
-        else
-        {
-            existingReference = await _referenceResourceManager.UpdateAsync(new UpdateReferenceResourcesModel
-            {
-                Id = existingReference.Id,
-                QueryPhase = existingReference.QueryPhase,
-                ResourceType = resource.TypeName,
-                ReferenceResource = JsonSerializer.Serialize(resource, LinkFhirSerializerOptions.ForFhirLenientSerialization)
-            }, cancellationToken);
         }
     }
 
@@ -373,17 +327,17 @@ public class FhirApiService : IFhirApiService
         if (resource == null)
             throw new ArgumentNullException(nameof(resource));
 
-        if (resource.Meta == null)
+        resource.Meta ??= new Meta();
+        resource.Meta.Extension ??= new List<Extension>();
+
+        if (!resource.Meta.Extension.Any(e => e.Url == DataAcquisitionConstants.Extension.DateReceivedExtensionUri))
         {
-            resource.Meta = new Meta();
-            resource.Meta.Extension = new List<Extension> { };
+            resource.Meta.Extension.Add(new Extension
+            {
+                Url = DataAcquisitionConstants.Extension.DateReceivedExtensionUri,
+                Value = new FhirDateTime(DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"))
+            });
         }
-
-        if (resource.Meta.Extension == null)
-            resource.Meta.Extension = new List<Extension> { };
-
-        if (!resource.Extension.Any(e => e.Url == DataAcquisitionConstants.Extension.DateReceivedExtensionUri))
-            resource.Meta.Extension.Add(new Extension { Url = DataAcquisitionConstants.Extension.DateReceivedExtensionUri, Value = new FhirDateTime(DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")) });
     }
     #endregion
 }

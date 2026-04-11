@@ -163,7 +163,8 @@ namespace IntegrationTests.Report
                     TenantApiServiceMock.Object,
                     sp.GetRequiredService<BlobStorageService>(),
                     sp.GetRequiredService<SubmitPayloadProducer>(),
-                    sp.GetRequiredService<AuditableEventOccurredProducer>()));
+                    sp.GetRequiredService<AuditableEventOccurredProducer>(),
+                    sp.GetRequiredService<IReportEntryManager>()));
 
             builder.Services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
             builder.Services.AddSingleton<IKafkaConsumerFactory<string, ReportScheduledValue>>(ReportScheduledConsumerFactoryMock.Object);

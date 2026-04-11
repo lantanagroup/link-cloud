@@ -13,6 +13,7 @@ namespace LantanaGroup.Link.Report.Data.Entities;
 [Index("FacilityId", "PatientId", Name = "IX_ReportEntries_Facility_Patient")]
 [Index("FacilityId", "ReportScheduleId", "PatientId", Name = "IX_ReportEntries_Facility_Schedule_Patient")]
 [Index("ReportScheduleId", Name = "IX_ReportEntries_ReportScheduleId")]
+[Index("ReportScheduleId", "PatientId", Name = "IX_ReportEntries_Schedule_Patient")]
 [Index("ReportingStatus", "SubmissionStatus", Name = "IX_ReportEntries_Reporting_Submission")]
 [Index("ReportScheduleId", "ReportingStatus", Name = "IX_ReportEntries_Schedule_Status")]
 public partial class ReportEntry
