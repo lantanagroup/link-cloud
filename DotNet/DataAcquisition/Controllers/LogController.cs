@@ -8,6 +8,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
+using LantanaGroup.Link.DataAcquisition.Filters;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
@@ -767,7 +768,7 @@ public class LogController : Controller
     /// <returns>
     /// A response indicating the result of the cancellation.
     /// </returns>
-    [ValidateAntiForgeryToken]
+    [ValidateAntiForgeryOrBearerToken]
     [HttpPost("cancel-bulk")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -870,7 +871,7 @@ public class LogController : Controller
     /// <returns>
     /// A response indicating the result of the cancellation.
     /// </returns>
-    [ValidateAntiForgeryToken]
+    [ValidateAntiForgeryOrBearerToken]
     [HttpPost("cancel-by-filter")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
