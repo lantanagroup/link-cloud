@@ -136,21 +136,21 @@ jobs:
 
       - name: Run integration tests
         run: |
-          mkdir -p "$GITHUB_WORKSPACE/TestResults"
+          mkdir -p ./TestResults
           dotnet test DotNet/ServiceTests/ServiceTests.csproj \
             --configuration Release \
             --no-build \
             --verbosity detailed \
             --logger "trx;LogFileName=dotnet-integration-test-results.trx" \
-            --results-directory "$GITHUB_WORKSPACE/TestResults" \
+            --results-directory ./TestResults \
             --filter "Category=IntegrationTests"
         continue-on-error: true
         timeout-minutes: 5
 
       - name: Debug test results
         run: |
-          ls -la "$GITHUB_WORKSPACE/TestResults" || true
-          find "$GITHUB_WORKSPACE" -type f -name "*.trx" -print || true
+          ls -la ./TestResults || true
+          find . -type f -name "*.trx" -print || true
         continue-on-error: true
 
       - name: Upload Test Results
@@ -158,14 +158,18 @@ jobs:
         if: always()
         with:
           name: integration-test-results
-          path: ${{ github.workspace }}/TestResults/**/*.trx
+          path: |
+            ./TestResults/*.trx
+            ./TestResults/**/*.trx
 
       - name: .NET Integration Test Report
         uses: dorny/test-reporter@v2
         if: always()
         with:
           name: XUnit Integration Tests
-          path: ${{ github.workspace }}/TestResults/**/*.trx
+          path: |
+            ./TestResults/*.trx
+            ./TestResults/**/*.trx
           reporter: dotnet-trx
 
   dotnet-unit-tests:
