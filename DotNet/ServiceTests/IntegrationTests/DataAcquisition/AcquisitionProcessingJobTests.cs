@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
@@ -22,7 +22,7 @@ namespace IntegrationTests.DataAcquisition;
 
 [Collection("DataAcquisitionIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+public class AcquisitionProcessingJobTests
 {
     private readonly DataAcquisitionIntegrationTestFixture _fixture;
     private readonly IOptions<AcquisitionWorkerProcessorSettings> _settings;
@@ -1001,3 +1001,4 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         Assert.Equal(RequestStatus.Pending, updatedLog.Status);
     }
 }
+

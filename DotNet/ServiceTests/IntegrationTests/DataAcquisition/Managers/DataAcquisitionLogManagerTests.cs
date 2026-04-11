@@ -1,4 +1,4 @@
-﻿using DataAcquisition.Domain.Application.Models;
+using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
@@ -22,7 +22,7 @@ namespace IntegrationTests.DataAcquisition.Managers;
 
 [Collection("DataAcquisitionIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+public class DataAcquisitionLogManagerTests
 {
     private readonly DataAcquisitionIntegrationTestFixture _fixture;
 
@@ -933,3 +933,4 @@ public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionInteg
         Assert.Empty(orphanNotes);
     }
 }
+

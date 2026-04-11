@@ -1,20 +1,14 @@
-﻿using System.Linq;
-using System.Threading.Tasks;
-using DataAcquisition.Domain.Application.Models;
-using IntegrationTests.DataAcquisition;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Xunit;
-using ResourceType = Hl7.Fhir.Model.ResourceType;
 
 namespace IntegrationTests.DataAcquisition.Managers
 {
     [Collection("DataAcquisitionIntegrationTests")]
     [Trait("Category", "IntegrationTests")]
-    public class FhirQueryManagerTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+    public class FhirQueryManagerTests
     {
         private readonly DataAcquisitionIntegrationTestFixture _fixture;
 
@@ -34,3 +28,4 @@ namespace IntegrationTests.DataAcquisition.Managers
         // Placeholder for future FhirQueryManager tests.
     }
 }
+

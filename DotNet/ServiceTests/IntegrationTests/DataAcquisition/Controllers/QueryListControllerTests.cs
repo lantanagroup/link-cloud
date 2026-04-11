@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.DataAcquisition.Controllers;
+using LantanaGroup.Link.DataAcquisition.Controllers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -17,7 +17,7 @@ namespace IntegrationTests.DataAcquisition.Controllers;
 
 [Collection("DataAcquisitionIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class QueryListControllerTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+public class QueryListControllerTests
 {
     private readonly DataAcquisitionIntegrationTestFixture _fixture;
 
@@ -338,3 +338,4 @@ public class QueryListControllerTests : IClassFixture<DataAcquisitionIntegration
         Assert.IsType<NotFoundObjectResult>(result);
     }
 }
+

@@ -1,4 +1,4 @@
-﻿using DataAcquisition.Domain.Application.Models;
+using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Controllers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
@@ -23,7 +23,7 @@ namespace IntegrationTests.DataAcquisition.Controllers;
 
 [Collection("DataAcquisitionIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+public class QueryPlanConfigControllerTests
 {
     private readonly DataAcquisitionIntegrationTestFixture _fixture;
 
@@ -752,3 +752,4 @@ public class QueryPlanConfigControllerTests : IClassFixture<DataAcquisitionInteg
         };
     }
 }
+

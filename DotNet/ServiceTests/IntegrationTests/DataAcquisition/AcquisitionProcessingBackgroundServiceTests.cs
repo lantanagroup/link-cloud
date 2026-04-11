@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
+using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Internal;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
@@ -10,7 +10,7 @@ namespace IntegrationTests.DataAcquisition;
 
 [Collection("DataAcquisitionIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class AcquisitionProcessorBackgroundServiceTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+public class AcquisitionProcessorBackgroundServiceTests
 {
     private readonly DataAcquisitionIntegrationTestFixture _fixture;
     private readonly Mock<IPatientDataService> _patientDataServiceMock;

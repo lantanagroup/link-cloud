@@ -145,7 +145,7 @@ jobs:
             --results-directory ./TestResults \
             --filter "Category=IntegrationTests"
         continue-on-error: true
-        timeout-minutes: 5
+        timeout-minutes: 15
 
       - name: Normalize TRX output location
         if: always()

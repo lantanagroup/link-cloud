@@ -1,6 +1,5 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Controllers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Models;
@@ -11,14 +10,13 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Moq.AutoMock;
 using System.Net;
-using System.Net.Sockets;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition.Controllers;
 
 [Collection("DataAcquisitionIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class QueryConfigControllerTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+public class QueryConfigControllerTests
 {
     private readonly DataAcquisitionIntegrationTestFixture _fixture;
 
@@ -334,3 +332,4 @@ public class QueryConfigControllerTests : IClassFixture<DataAcquisitionIntegrati
         Assert.Equal((int)HttpStatusCode.NotFound, problemResult.StatusCode);
     }
 }
+

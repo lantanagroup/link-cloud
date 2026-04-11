@@ -12,14 +12,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 using RequestStatusEnum = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
-using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition.Services
 {
     [Collection("DataAcquisitionIntegrationTests")]
     [Trait("Category", "IntegrationTests")]
-    public class ReferenceResourceServiceTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+    public class ReferenceResourceServiceTests
     {
         private readonly DataAcquisitionIntegrationTestFixture _fixture;
 
@@ -110,3 +109,4 @@ namespace IntegrationTests.DataAcquisition.Services
         }
     }
 }
+

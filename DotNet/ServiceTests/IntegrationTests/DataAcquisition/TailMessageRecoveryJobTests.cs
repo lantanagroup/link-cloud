@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -20,7 +20,7 @@ namespace IntegrationTests.DataAcquisition;
 
 [Collection("DataAcquisitionIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class TailMessageRecoveryJobTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+public class TailMessageRecoveryJobTests
 {
     private readonly DataAcquisitionIntegrationTestFixture _fixture;
 
@@ -183,3 +183,4 @@ public class TailMessageRecoveryJobTests : IClassFixture<DataAcquisitionIntegrat
         await db.SaveChangesAsync();
     }
 }
+

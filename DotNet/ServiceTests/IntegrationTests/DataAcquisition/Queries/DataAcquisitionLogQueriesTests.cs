@@ -3,21 +3,19 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using FhirQueryType = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.FhirQueryType;
 using QueryPhase = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.QueryPhase;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.ResourceType;
 using Task = System.Threading.Tasks.Task;
-using Microsoft.EntityFrameworkCore;
 
 namespace IntegrationTests.DataAcquisition.Queries;
 
 [Collection("DataAcquisitionIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+public class DataAcquisitionLogQueriesTests
 {
     private readonly DataAcquisitionIntegrationTestFixture _fixture;
 
@@ -789,3 +787,4 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         Assert.Equal(50, stillProcessingCount);
     }
 }
+

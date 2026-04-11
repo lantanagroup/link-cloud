@@ -1,5 +1,4 @@
-﻿using System.Net;
-using LantanaGroup.Link.DataAcquisition.Controllers;
+﻿using LantanaGroup.Link.DataAcquisition.Controllers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
@@ -16,6 +15,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
+using System.Net;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using Task = System.Threading.Tasks.Task;
 
@@ -23,7 +23,7 @@ namespace IntegrationTests.DataAcquisition.Controllers;
 
 [Collection("DataAcquisitionIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class LogControllerTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+public class LogControllerTests
 {
     private readonly DataAcquisitionIntegrationTestFixture _fixture;
 
@@ -884,3 +884,4 @@ public class LogControllerTests : IClassFixture<DataAcquisitionIntegrationTestFi
         Assert.IsType<AcceptedResult>(result);
     }
 }
+
