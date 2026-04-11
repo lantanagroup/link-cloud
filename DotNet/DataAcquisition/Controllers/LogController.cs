@@ -767,7 +767,7 @@ public class LogController : Controller
     /// <returns>
     /// A response indicating the result of the cancellation.
     /// </returns>
-    [IgnoreAntiforgeryToken]
+    [ValidateAntiForgeryToken]
     [HttpPost("cancel-bulk")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -870,7 +870,7 @@ public class LogController : Controller
     /// <returns>
     /// A response indicating the result of the cancellation.
     /// </returns>
-    [IgnoreAntiforgeryToken]
+    [ValidateAntiForgeryToken]
     [HttpPost("cancel-by-filter")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
