@@ -867,11 +867,11 @@ namespace LantanaGroup.Link.Report.Migrations
                         .HasMaxLength(1024)
                         .HasColumnType("nvarchar(1024)");
 
-                    b.Property<DateTimeOffset>("ReportEndDate")
-                        .HasColumnType("datetimeoffset(7)");
+                    b.Property<DateTime>("ReportEndDate")
+                        .HasColumnType("datetime2");
 
-                    b.Property<DateTimeOffset>("ReportStartDate")
-                        .HasColumnType("datetimeoffset(7)");
+                    b.Property<DateTime>("ReportStartDate")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Status")
                         .IsRequired()

@@ -1,21 +1,27 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
+using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
-using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Settings;
+using Microsoft.Extensions.Options;
+using System.Net.Http.Headers;
 using System.Text;
+using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Listeners
@@ -26,8 +32,13 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IKafkaConsumerFactory<string, GenerateReportValue> _kafkaConsumerFactory;
         private readonly ITransientExceptionHandler<GenerateReportListener, string, GenerateReportValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<GenerateReportListener, string, GenerateReportValue> _deadLetterExceptionHandler;
+        private readonly ServiceRegistry _serviceRegistry;
         private readonly IServiceScopeFactory _serviceScopeFactory;
-        private readonly ICensusServiceClient _censusClient;
+
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
+        private readonly IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> _linkBearerServiceOptions;
+        private readonly ICreateSystemToken _createSystemToken;
 
         private readonly DataAcquisitionRequestedProducer _dataAcqProducer;
         private readonly IProducer<string, EvaluationRequestedValue> _evaluationProducer;
@@ -43,27 +54,35 @@ namespace LantanaGroup.Link.Report.Listeners
             ITransientExceptionHandler<GenerateReportListener, string, GenerateReportValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<GenerateReportListener, string, GenerateReportValue> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory,
-            ICensusServiceClient censusClient,
+            IHttpClientFactory httpClientFactory,
+            IOptions<LinkTokenServiceSettings> linkTokenService,
+            ICreateSystemToken createSystemToken,
+            IOptions<ServiceRegistry> serviceRegistry,
             DataAcquisitionRequestedProducer dataAcqProducer,
             IProducer<string, EvaluationRequestedValue> evaluationProducer,
             BlobStorageService blobStorageService,
             ServiceInformation serviceInformation,
+            IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions,
             IExceptionLogger<GenerateReportListener> exceptionLogger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
-            _censusClient = censusClient ?? throw new ArgumentNullException(nameof(censusClient));
 
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
             _transientExceptionHandler.Topic = nameof(KafkaTopic.GenerateReportRequested) + "-Retry";
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.GenerateReportRequested) + "-Error";
+            _httpClientFactory = httpClientFactory;
+            _linkTokenServiceConfig = linkTokenService;
+            _createSystemToken = createSystemToken;
+            _serviceRegistry = serviceRegistry.Value;
             _dataAcqProducer = dataAcqProducer;
             _evaluationProducer = evaluationProducer;
             _blobStorageService = blobStorageService;
             _serviceInformation = serviceInformation;
+            _linkBearerServiceOptions = linkBearerServiceOptions;
             _exceptionLogger = exceptionLogger ?? throw new ArgumentNullException(nameof(exceptionLogger));
         }
 
@@ -148,8 +167,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 var key = result.Message.Key;
                 var value = result.Message.Value;
-                DateTimeOffset? startDate = value.StartDate.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(value.StartDate.Value, DateTimeKind.Utc)) : null;
-                DateTimeOffset? endDate = value.EndDate.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(value.EndDate.Value, DateTimeKind.Utc)) : null;
+                var startDate = value.StartDate;
+                var endDate = value.EndDate;
                 var reportTypes = value.ReportTypes;
                 var reportId = value.ReportId;
 
@@ -169,8 +188,8 @@ namespace LantanaGroup.Link.Report.Listeners
                         throw new DeadLetterException("No ReportSchedule found for the provided ID: " + value.ReportId.ToString());
                     }
 
-                    startDate = existing.ReportStartDate;
-                    endDate = existing.ReportEndDate;
+                    startDate = existing.ReportStartDate.DateTime;
+                    endDate = existing.ReportEndDate.DateTime;
                     reportTypes = existing.ReportTypes;
                 }
                 else
@@ -190,11 +209,8 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                 }
 
-                // Truncate to second precision for consistency
-                var truncatedStart = new DateTimeOffset(startDate!.Value.Year, startDate.Value.Month, startDate.Value.Day,
-                    startDate.Value.Hour, startDate.Value.Minute, startDate.Value.Second, startDate.Value.Offset);
-                var truncatedEnd = new DateTimeOffset(endDate!.Value.Year, endDate.Value.Month, endDate.Value.Day,
-                    endDate.Value.Hour, endDate.Value.Minute, endDate.Value.Second, endDate.Value.Offset);
+                startDate = new DateTime(startDate.Value.Year, startDate.Value.Month, startDate.Value.Day, startDate.Value.Hour, startDate.Value.Minute, startDate.Value.Second, DateTimeKind.Utc);
+                endDate = new DateTime(endDate.Value.Year, endDate.Value.Month, endDate.Value.Day, endDate.Value.Hour, endDate.Value.Minute, endDate.Value.Second, DateTimeKind.Utc);
 
                 bool isCensus = !value.Regenerate && (value.PatientIds == null || value.PatientIds.Count == 0);
 
@@ -202,8 +218,8 @@ namespace LantanaGroup.Link.Report.Listeners
                 {
                     Id = value.AdhocReportId,
                     FacilityId = facilityId,
-                    ReportStartDate = truncatedStart,
-                    ReportEndDate = truncatedEnd,
+                    ReportStartDate = startDate.Value,
+                    ReportEndDate = endDate.Value,
                     Frequency = Frequency.Adhoc,
                     AdHocType = isCensus ? AdHocType.Census : AdHocType.Manual,
                     ReportTypes = reportTypes,
@@ -259,7 +275,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             Name, reportSchedule.Id);
 
                         value.PatientIds =
-                            await GetPatientList(facilityId, truncatedStart.UtcDateTime, truncatedEnd.UtcDateTime);
+                            await GetPatientList(facilityId, startDate.Value, endDate.Value);
                     }
 
                     var patientIds = value.PatientIds.Distinct().ToList();
@@ -348,19 +364,31 @@ namespace LantanaGroup.Link.Report.Listeners
 
         private async Task<List<string>> GetPatientList(string facilityId, DateTime startDate, DateTime enddate)
         {
+            string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+            var httpClient = _httpClientFactory.CreateClient();
+
+            string censusRequestUrl = $"{_serviceRegistry.CensusServiceApiUrl}/Census/{Uri.EscapeDataString(facilityId)}/history/admitted?startDate={Uri.EscapeDataString(startDate.ToString(dtFormat))}&endDate={Uri.EscapeDataString(enddate.ToString(dtFormat))}";
+
+            if (_linkTokenServiceConfig.Value.SigningKey is null)
+                throw new Exception("Link Token Service Signing Key is missing.");
+
+            if (!_linkBearerServiceOptions.Value.AllowAnonymous)
+            {
+                var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 5);
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
-            var censusList = await _censusClient.GetAdmittedPatientsAsync(facilityId, startDate, enddate, cts.Token);
+            var censusResponse = await httpClient.GetAsync(censusRequestUrl, cts.Token);
+            var censusContent = await censusResponse.Content.ReadAsStringAsync(cts.Token);
 
-            var patientIds = censusList?.Entry?
-                .Where(e => !string.IsNullOrWhiteSpace(e.Item?.Reference))
-                .Select(e => e.Item!.Reference!.Split('/').Last())
-                .Distinct()
-                .ToList() ?? [];
+            if (!censusResponse.IsSuccessStatusCode)
+                throw new TransientException("Response from Census service is not successful: " + censusContent);
 
-            if (patientIds.Count == 0)
-                throw new TransientException("Response from Census service is not successful: empty or unavailable patient list");
+            List? admittedPatients;
+            admittedPatients = JsonSerializer.Deserialize<List>(censusContent, LinkFhirSerializerOptions.ForFhirLenientSerialization);
 
-            return patientIds;
+            return admittedPatients?.Entry?.Select(p => p.Item.Reference.Split('/').Last()).Distinct().ToList() ?? new List<string>();
         }
 
         private static string GetFacilityIdFromHeader(Headers headers)

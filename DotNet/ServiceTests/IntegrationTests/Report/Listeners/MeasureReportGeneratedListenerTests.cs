@@ -8,7 +8,6 @@ using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,8 +33,8 @@ public class MeasureReportGeneratedListenerTests : IClassFixture<ReportIntegrati
         {
             Id = reportId,
             FacilityId = facilityId,
-            ReportStartDate = DateTimeOffset.UtcNow.AddDays(-30),
-            ReportEndDate = DateTimeOffset.UtcNow.AddDays(30),
+            ReportStartDate = DateTime.UtcNow.AddDays(-30),
+            ReportEndDate = DateTime.UtcNow.AddDays(30),
             Frequency = Frequency.Monthly,
             ReportTypes = { "DE-111" },
             Status = ScheduleStatus.Scheduled,
@@ -158,7 +157,7 @@ public class MeasureReportGeneratedListenerTests : IClassFixture<ReportIntegrati
     public async Task ProcessMessageAsync_AllNonReportable_UpdatesAndProducesManifest()
     {
         _fixture.SubmitPayloadKafkaProducerMock.Reset();
-        _fixture.FacilityServiceClientMock.Setup(x => x.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _fixture.TenantApiServiceMock.Setup(x => x.GetFacilityConfig(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new FacilityModel { FacilityName = "Test Facility" });
 
         using var scope = _fixture.ScopeFactory.CreateScope();
@@ -211,7 +210,7 @@ public class MeasureReportGeneratedListenerTests : IClassFixture<ReportIntegrati
     public async Task ProcessMessageAsync_NotReadyForAggregation_ProducesManifest()
     {
         _fixture.SubmitPayloadKafkaProducerMock.Reset();
-        _fixture.FacilityServiceClientMock.Setup(x => x.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _fixture.TenantApiServiceMock.Setup(x => x.GetFacilityConfig(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new FacilityModel { FacilityName = "Test Facility" });
 
         using var scope = _fixture.ScopeFactory.CreateScope();
@@ -306,7 +305,7 @@ public class MeasureReportGeneratedListenerTests : IClassFixture<ReportIntegrati
         var facilityId = "test-facility-016";
 
         _fixture.ReadyForValidationKafkaProducerMock.Reset();
-        _fixture.FacilityServiceClientMock.Setup(x => x.GetAsync(facilityId, It.IsAny<CancellationToken>()))
+        _fixture.TenantApiServiceMock.Setup(x => x.GetFacilityConfig(facilityId, It.IsAny<CancellationToken>()))
                     .ReturnsAsync(new FacilityModel { FacilityId = facilityId, FacilityName = "Test Facility" });
 
         using var scope = _fixture.ScopeFactory.CreateScope();

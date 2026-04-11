@@ -1,15 +1,18 @@
-ï»¿using Confluent.Kafka;
+using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Internal;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.Shared.Application;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 
 namespace LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
 
@@ -55,7 +58,7 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
         var logManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
         var processor = scope.ServiceProvider.GetRequiredService<AcquisitionProcessorBackgroundService>();
 
-        // ATOMIC STEP: Attempt to "claim" the log â€” single DB write, no read needed
+        // ATOMIC STEP: Attempt to "claim" the log — single DB write, no read needed
         var logId = value.LogId.Value;
         bool claimed = await logManager.TrySetLogToQueuedAsync(logId, cancellationToken);
 
@@ -80,7 +83,7 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to enqueue work item for LogId {LogId}. Attempting to revert status.", logId);
-            // Revert to Pending so the next trigger can try again â€” single atomic write, no read needed
+            // Revert to Pending so the next trigger can try again — single atomic write, no read needed
             bool compensationSucceeded = await logManager.TrySetLogStatusAsync(logId,
                 new List<RequestStatus> { RequestStatus.Queued }, RequestStatus.Pending, cancellationToken);
 

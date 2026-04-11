@@ -1,6 +1,9 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 
@@ -21,4 +24,5 @@ public class SearchDataAcquisitionLogRequest
     public string? CorrelationId { get; set; }
     public string? ResourceType { get; set; }
     public bool IncludeDeleted { get; set; } = false;
+    public DateTime? CreatedBefore { get; set; }
 }

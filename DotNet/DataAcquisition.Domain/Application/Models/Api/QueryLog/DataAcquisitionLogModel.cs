@@ -1,11 +1,14 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Models;
 
@@ -89,7 +92,7 @@ public class DataAcquisitionLogModel
             RetryAttempts = log.RetryAttempts,
             CompletionDate = log.CompletionDate,
             CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
-            ResourceAcquiredIds = log.ResourceAcquiredIds,
+            ResourceAcquiredIds = log.ResourceIds?.Select(r => r.ResourceId).ToList() ?? new List<string>(),
             ReferenceResourceCount = log.ReferenceResources?.Count ?? 0,
             Notes = null,
             ScheduledReport = log.ScheduledReportEntity != null

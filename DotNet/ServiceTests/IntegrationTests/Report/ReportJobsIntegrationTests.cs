@@ -1,10 +1,10 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
+using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Shared.Application.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,9 +19,9 @@ namespace IntegrationTests.Report.Jobs;
 [Collection("ReportIntegrationTests")]
 public class EndOfReportPeriodJobTests
 {
-    private readonly IntegrationTests.Report.ReportIntegrationTestFixture _fixture;
+    private readonly ReportIntegrationTestFixture _fixture;
 
-    public EndOfReportPeriodJobTests(IntegrationTests.Report.ReportIntegrationTestFixture fixture)
+    public EndOfReportPeriodJobTests(ReportIntegrationTestFixture fixture)
     {
         _fixture = fixture;
     }
@@ -40,8 +40,8 @@ public class EndOfReportPeriodJobTests
         {
             Id = scheduleId,
             FacilityId = facilityId,
-            ReportStartDate = DateTimeOffset.UtcNow.AddDays(-30),
-            ReportEndDate = DateTimeOffset.UtcNow.AddDays(-1),
+            ReportStartDate = DateTime.UtcNow.AddDays(-30),
+            ReportEndDate = DateTime.UtcNow.AddDays(-1),
             Status = ScheduleStatus.Scheduled,
             EndOfReportPeriodJobHasRun = false
         };
@@ -61,7 +61,7 @@ public class EndOfReportPeriodJobTests
 
         await database.ReportPopulationRepository.SaveChangesAsync();
 
-        _fixture.FacilityServiceClientMock.Setup(x => x.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _fixture.TenantApiServiceMock.Setup(t => t.GetFacilityConfig(Moq.It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new FacilityModel { FacilityId = facilityId });
 
         _fixture.SubmitPayloadKafkaProducerMock
@@ -155,8 +155,8 @@ public class EndOfReportPeriodJobTests
         {
             Id = scheduleId,
             FacilityId = "test-facility-error",
-            ReportStartDate = DateTimeOffset.UtcNow.AddDays(-30),
-            ReportEndDate = DateTimeOffset.UtcNow.AddDays(-1),
+            ReportStartDate = DateTime.UtcNow.AddDays(-30),
+            ReportEndDate = DateTime.UtcNow.AddDays(-1),
             Status = ScheduleStatus.Scheduled
         };
         await database.ReportScheduledRepository.AddAsync(schedule);

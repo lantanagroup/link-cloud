@@ -1,4 +1,4 @@
-ï»¿using LantanaGroup.Link.Report.Data;
+using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Models;
@@ -6,6 +6,8 @@ using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
+using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
+using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
@@ -81,7 +83,7 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="active"></param>
         /// <param name="blocking">
         /// When set to <c>true</c>, returns only report schedules with a status of <c>New</c> or <c>EndOfPeriod</c>
-        /// â€” the statuses that indicate a report is actively in progress and would block a facility soft-delete.
+        /// — the statuses that indicate a report is actively in progress and would block a facility soft-delete.
         /// Defaults to <c>false</c>.
         /// </param>
         /// <param name="includeDeleted">
@@ -244,7 +246,7 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="reportType">Optional report type filter</param>
         /// <param name="reportStartDate">Optional report start date filter (inclusive)</param>
         /// <param name="reportEndDate">Optional report end date filter (inclusive)</param>
-        /// <param name="status">Optional status filter â€” supports multiple values (e.g. status=New&amp;status=Submitted)</param>
+        /// <param name="status">Optional status filter — supports multiple values (e.g. status=New&amp;status=Submitted)</param>
         /// <param name="endOfReportPeriodJobHasRun">Optional end of report period job flag filter</param>
         /// <param name="includeDeleted">Optional include deleted filter</param>
         /// <param name="sortBy">Optional sort field (e.g., "CreateDate", "ReportStartDate")</param>

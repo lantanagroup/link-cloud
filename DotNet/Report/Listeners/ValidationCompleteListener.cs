@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
@@ -16,6 +16,8 @@ using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
+using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
+using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
 using Task = System.Threading.Tasks.Task;

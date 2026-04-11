@@ -1,4 +1,4 @@
-﻿using AppAny.Quartz.EntityFrameworkCore.Migrations;
+using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
@@ -6,9 +6,12 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Design;
@@ -17,7 +20,6 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.Configuration;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 
 
@@ -40,6 +42,7 @@ public class DataAcquisitionDbContext : DbContext
     public DbSet<SftpConfiguration> SftpConfigurations { get; set; }
     public DbSet<DataAcquisitionLogReferenceResource> DataAcquisitionLogReferenceResources { get; set; }
     public DbSet<DataAcquisitionLogNote> DataAcquisitionLogNotes { get; set; }
+    public DbSet<DataAcquisitionLogResourceId> DataAcquisitionLogResourceIds { get; set; }
     public DbSet<ScheduledReportEntity> ScheduledReports { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -210,8 +213,7 @@ public class DataAcquisitionDbContext : DbContext
                     nameof(DataAcquisitionLog.TraceId),
                     nameof(DataAcquisitionLog.RetryAttempts),
                     nameof(DataAcquisitionLog.CompletionDate),
-                    nameof(DataAcquisitionLog.CompletionTimeMilliseconds),
-                    nameof(DataAcquisitionLog.ResourceAcquiredIds)
+                    nameof(DataAcquisitionLog.CompletionTimeMilliseconds)
                 );
 
             entity.HasIndex(e => new { e.Status, e.ModifyDate })
@@ -228,6 +230,10 @@ public class DataAcquisitionDbContext : DbContext
                 .HasDatabaseName("IX_DataAcquisitionLogs_Tailing_Optimization")
                 .HasFilter("[TailSent] = 0 AND [ReportTrackingId] IS NOT NULL AND [CorrelationId] IS NOT NULL AND [ReportStartDate] IS NOT NULL AND [ReportEndDate] IS NOT NULL");
 
+            entity.HasIndex(e => new { e.TailSent, e.SiblingCount, e.FacilityId, e.CorrelationId, e.QueryPhase, e.Status })
+                .HasDatabaseName("IX_DataAcquisitionLogs_InlineTail")
+                .HasFilter("[TailSent] = 0 AND [SiblingCount] IS NOT NULL AND [CorrelationId] IS NOT NULL AND [QueryPhase] IS NOT NULL");
+
             // Covers GetReportSummaryAsync and other queries that aggregate by ReportTrackingId.
             // Without this, those queries do a full table scan and time out under load.
             entity.HasIndex(e => new { e.ReportTrackingId, e.IsDeleted })
@@ -236,21 +242,21 @@ public class DataAcquisitionDbContext : DbContext
                     nameof(DataAcquisitionLog.PatientId),
                     nameof(DataAcquisitionLog.Status),
                     nameof(DataAcquisitionLog.RetryAttempts),
-                    nameof(DataAcquisitionLog.CompletionTimeMilliseconds),
-                    nameof(DataAcquisitionLog.ResourceAcquiredIds)
+                    nameof(DataAcquisitionLog.CompletionTimeMilliseconds)
                 );
 
-            entity.Property(e => e.ResourceAcquiredIds)
-                .HasConversion(
-                    v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                    v => v != null ? JsonSerializer.Deserialize<List<string>>(v, new JsonSerializerOptions()) ?? new List<string>() : new List<string>())
-                .Metadata.SetValueComparer(new ValueComparer<List<string>?>(
-                    (c1, c2) => c1 != null && c2 != null && c1.SequenceEqual(c2),
-                    c => c != null ? c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())) : 0,
-                    c => c != null ? c.ToList() : new List<string>()));
-        });
+            });
 
-        //-------------------ResourceReferenceType-------------------
+            //-------------------DataAcquisitionLogResourceId-------------------
+            modelBuilder.Entity<DataAcquisitionLogResourceId>(entity =>
+            {
+                entity.Property(e => e.Id).ValueGeneratedOnAdd();
+
+                entity.HasIndex(e => e.DataAcquisitionLogId)
+                    .HasDatabaseName("IX_DataAcquisitionLogResourceIds_DataAcquisitionLogId");
+            });
+
+            //-------------------ResourceReferenceType-------------------
         modelBuilder.Entity<ResourceReferenceType>()
             .Property(b => b.Id).ValueGeneratedOnAdd();
 

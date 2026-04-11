@@ -1,4 +1,4 @@
-ï»¿using Confluent.Kafka;
+using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
@@ -14,16 +14,18 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Comm
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Net;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using StringComparison = System.StringComparison;
 using Task = System.Threading.Tasks.Task;
@@ -242,6 +244,7 @@ public class PatientDataService : IPatientDataService
                     ResourceType = x,
                 }).ToList();
 
+            int totalLogsCreated = 0;
 
             foreach (var schedReport in request.ConsumeResult.Message.Value.ScheduledReports)
             {
@@ -289,6 +292,8 @@ public class PatientDataService : IPatientDataService
                                     }
                                 },
                             }, cancellationToken);
+
+                        totalLogsCreated++;
                     }
                     catch (Exception ex)
                     {
@@ -302,7 +307,7 @@ public class PatientDataService : IPatientDataService
 
                 try
                 {
-                    await _queryListProcessor.Process(
+                    totalLogsCreated += await _queryListProcessor.Process(
                         dataAcqRequested.QueryType.Equals("Initial", System.StringComparison.InvariantCultureIgnoreCase)
                             ? initialQueries
                             : supplementalQueries,
@@ -322,6 +327,18 @@ public class PatientDataService : IPatientDataService
                         request.FacilityId);
                     throw;
                 }
+            }
+
+            // All logs committed — stamp the sibling count so workers know the full set exists.
+            if (totalLogsCreated > 0)
+            {
+                var queryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Value.QueryType);
+                await _dataAcquisitionLogManager.StampSiblingCountAsync(
+                    request.FacilityId,
+                    request.CorrelationId,
+                    queryPhase,
+                    totalLogsCreated,
+                    cancellationToken);
             }
         }
     }
@@ -343,7 +360,7 @@ public class PatientDataService : IPatientDataService
         //1. get log
         var log = await _dataAcquisitionLogQueries.GetAsync(request.logId, cancellationToken);
 
-        // Read facility config once â€” reused by the happy path and all error handlers
+        // Read facility config once — reused by the happy path and all error handlers
         FhirQueryConfigurationModel? fhirQueryConfiguration = null;
 
         try
@@ -445,7 +462,7 @@ public class PatientDataService : IPatientDataService
                     $"Log with ID {log.Id} is not in a queued state. Current status: {log.Status}");
             }
 
-            //2. atomically update to "Processing" â€” single DB write, no follow-up UpdateAsync needed
+            //2. atomically update to "Processing" — single DB write, no follow-up UpdateAsync needed
             var allowedStatuses = new List<RequestStatus> { RequestStatus.Queued };
             if (request.ignoreStatusConstraint && log.Status.HasValue)
             {
@@ -481,6 +498,8 @@ public class PatientDataService : IPatientDataService
 
                 bool skipFetch = false;
 
+                var newNotes = new List<string>();
+
                 //4. call api
                 foreach (var fhirQuery in log.FhirQuery.ToList())
                 {
@@ -509,8 +528,7 @@ public class PatientDataService : IPatientDataService
 
                             if (!ids.Any())
                             {
-                                log.Notes ??= [];
-                                log.Notes.Add(
+                                newNotes.Add(
                                     $"[{DateTime.UtcNow}] No IDs found in _id query parameter for {fhirQuery.QueryType} FHIR query. Marking log as Completed.");
                                 skipFetch = true;
                             }
@@ -556,18 +574,17 @@ public class PatientDataService : IPatientDataService
                 log.CompletionTimeMilliseconds = stopwatch.ElapsedMilliseconds;
                 log.CompletionDate = System.DateTime.UtcNow;
                 log.Status = skipFetch ? RequestStatus.Skipped : RequestStatus.Completed;
-                log.ResourceAcquiredIds = resourceIds.ToList();
 
                 await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {
                     Id = log.Id,
                     RetryAttempts = log.RetryAttempts,
-                    ResourceAcquiredIds = log.ResourceAcquiredIds,
+                    ResourceAcquiredIds = resourceIds.ToList(),
                     CompletionDate = log.CompletionDate,
                     CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
                     TraceId = log.TraceId,
                     ExecutionDate = log.ExecutionDate,
-                    Notes = log.Notes,
+                    NewNotes = newNotes.Count > 0 ? newNotes : null,
                     Status = log.Status,
                 }, cancellationToken);
             }
@@ -576,7 +593,7 @@ public class PatientDataService : IPatientDataService
         {
             _logger.LogWarning(ex, "OperationOutcome encountered for facility {FacilityId}", log.FacilityId.Sanitize());
 
-            log.Notes ??= new List<string>();
+            string? newNote = null;
 
             if (ex.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Gone)
             {
@@ -593,12 +610,12 @@ public class PatientDataService : IPatientDataService
                 if (log.RetryAttempts >= maxRetryAttempts)
                 {
                     log.Status = RequestStatus.MaxRetriesReached;
-                    log.Notes.Add($"[{DateTime.UtcNow}] OperationOutcome encountered (HTTP {ex.StatusCode}): Maximum retry attempts reached ({maxRetryAttempts}).");
+                    newNote = $"[{DateTime.UtcNow}] OperationOutcome encountered (HTTP {ex.StatusCode}): Maximum retry attempts reached ({maxRetryAttempts}).";
                 }
                 else
                 {
                     log.Status = RequestStatus.Failed;
-                    log.Notes.Add($"[{DateTime.UtcNow}] OperationOutcome encountered (HTTP {ex.StatusCode}): Retrying. Attempt {log.RetryAttempts}.");
+                    newNote = $"[{DateTime.UtcNow}] OperationOutcome encountered (HTTP {ex.StatusCode}): Retrying. Attempt {log.RetryAttempts}.";
                 }
             }
 
@@ -606,23 +623,20 @@ public class PatientDataService : IPatientDataService
             {
                 Id = log.Id,
                 RetryAttempts = log.RetryAttempts,
-                ResourceAcquiredIds = log.ResourceAcquiredIds,
                 CompletionDate = log.CompletionDate,
                 CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
                 TraceId = log.TraceId,
                 ExecutionDate = log.ExecutionDate,
-                Notes = log.Notes,
+                NewNotes = newNote != null ? [newNote] : null,
                 Status = log.Status,
             }, cancellationToken);
         }
         catch (ProcessingDelayException ex)
         {
-            log!.Notes ??= new List<string>();
-
-            log.RetryAttempts ??= 0;
+            log!.RetryAttempts ??= 0;
 
             log.Status = RequestStatus.Pending;
-            log.Notes.Add($"[{DateTime.UtcNow}] Processing delay encountered. Retrying at {log.ExecutionDate}. See application logs for details.");
+            var newNote = $"[{DateTime.UtcNow}] Processing delay encountered. Retrying at {log.ExecutionDate}. See application logs for details.";
 
             await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
             {
@@ -630,8 +644,7 @@ public class PatientDataService : IPatientDataService
                 RetryAttempts = log.RetryAttempts,
                 ExecutionDate = log.ExecutionDate,
                 Status = log.Status,
-                Notes = log.Notes,
-                ResourceAcquiredIds = log.ResourceAcquiredIds,
+                NewNotes = [newNote],
                 CompletionDate = log.CompletionDate,
                 CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
                 TraceId = log.TraceId
@@ -641,14 +654,12 @@ public class PatientDataService : IPatientDataService
         {
             _logger.LogWarning(ex, "Throttled by 429 for facility {FacilityId}", log.FacilityId.Sanitize());
 
-            log.Notes ??= new List<string>();
-
             log.RetryAttempts ??= 0;
 
             log.ExecutionDate = DateTime.UtcNow.Add(ex.RetryAfter);
             log.Status = RequestStatus.Failed; //Don't count this as a failure
-            log.Notes.Add(
-                $"[{DateTime.UtcNow}] Throttled (429): Retrying after {ex.RetryAfter.TotalSeconds}s. Attempt {log.RetryAttempts}.");
+            var newNote =
+                $"[{DateTime.UtcNow}] Throttled (429): Retrying after {ex.RetryAfter.TotalSeconds}s. Attempt {log.RetryAttempts}.";
 
             await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
             {
@@ -656,8 +667,7 @@ public class PatientDataService : IPatientDataService
                 RetryAttempts = log.RetryAttempts,
                 ExecutionDate = log.ExecutionDate,
                 Status = log.Status,
-                Notes = log.Notes,
-                ResourceAcquiredIds = log.ResourceAcquiredIds,
+                NewNotes = [newNote],
                 CompletionDate = log.CompletionDate,
                 CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
                 TraceId = log.TraceId
@@ -670,36 +680,34 @@ public class PatientDataService : IPatientDataService
         {
             _logger.LogError(ex, "PatientDataService.ExecuteLogRequest error");
 
-            log.Notes ??= new List<string>();
-
             var maxRetryAttempts = fhirQueryConfiguration?.MaxRetries ?? DataAcquisitionLog.MaxRetryAttempts;
 
             log.RetryAttempts ??= 0;
             log.RetryAttempts++;
 
+            string newNote;
             if (log.RetryAttempts >= maxRetryAttempts)
             {
                 log.Status = RequestStatus.MaxRetriesReached;
-                log.Notes.Add(
-                    $"[{DateTime.UtcNow}] Error encountered. Maximum retry attempts reached ({maxRetryAttempts}). See application logs for details.");
+                newNote =
+                    $"[{DateTime.UtcNow}] Error encountered. Maximum retry attempts reached ({maxRetryAttempts}). See application logs for details.";
             }
             else
             {
                 log.Status = RequestStatus.Failed;
-                log.Notes.Add(
-                    $"[{DateTime.UtcNow}] Error encountered. Retrying. Attempt {log.RetryAttempts}. See application logs for details.");
+                newNote =
+                    $"[{DateTime.UtcNow}] Error encountered. Retrying. Attempt {log.RetryAttempts}. See application logs for details.";
             }
 
             await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
             {
                 Id = log.Id,
-                ResourceAcquiredIds = log.ResourceAcquiredIds,
                 RetryAttempts = log.RetryAttempts,
                 CompletionDate = log.CompletionDate,
                 CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
                 TraceId = log.TraceId,
                 ExecutionDate = log.ExecutionDate,
-                Notes = log.Notes,
+                NewNotes = [newNote],
                 Status = log.Status,
             }, cancellationToken);
 

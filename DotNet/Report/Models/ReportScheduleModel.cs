@@ -1,7 +1,9 @@
-﻿using LantanaGroup.Link.Report.Data.Entities;
+using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
+using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
+using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 
 namespace LantanaGroup.Link.Report.Models;
 

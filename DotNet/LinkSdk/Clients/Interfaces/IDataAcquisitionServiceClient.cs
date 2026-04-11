@@ -1,5 +1,4 @@
 ﻿using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 
 namespace LantanaGroup.Link.Sdk.Clients;

@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LantanaGroup.Link.Report.Migrations
 {
     [DbContext(typeof(ReportDbContext))]
-    [Migration("20260408182331_EnableReadCommittedSnapshotIsolation")]
-    partial class EnableReadCommittedSnapshotIsolation
+    [Migration("20260418000000_PerformanceTuningCollapsed")]
+    partial class PerformanceTuningCollapsed
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -870,11 +870,11 @@ namespace LantanaGroup.Link.Report.Migrations
                         .HasMaxLength(1024)
                         .HasColumnType("nvarchar(1024)");
 
-                    b.Property<DateTimeOffset>("ReportEndDate")
-                        .HasColumnType("datetimeoffset(7)");
+                    b.Property<DateTime>("ReportEndDate")
+                        .HasColumnType("datetime2");
 
-                    b.Property<DateTimeOffset>("ReportStartDate")
-                        .HasColumnType("datetimeoffset(7)");
+                    b.Property<DateTime>("ReportStartDate")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Status")
                         .IsRequired()

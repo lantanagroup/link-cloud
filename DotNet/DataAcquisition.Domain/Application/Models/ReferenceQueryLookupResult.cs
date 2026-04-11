@@ -1,10 +1,13 @@
-﻿using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 /// <summary>
 /// Lightweight projection of a FhirQuery used by reference resource processing.
-/// Contains only the fields needed to merge reference IDs — avoids loading
+/// Contains only the fields needed to merge reference IDs � avoids loading
 /// the full DataAcquisitionLog entity graph.
 /// </summary>
 public class ReferenceQueryLookupResult

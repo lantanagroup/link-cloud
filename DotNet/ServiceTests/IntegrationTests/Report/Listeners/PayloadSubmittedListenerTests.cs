@@ -1,11 +1,11 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Listeners;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using Microsoft.Extensions.DependencyInjection;
@@ -79,8 +79,8 @@ public class PayloadSubmittedListenerTests : IClassFixture<ReportIntegrationTest
         {
             Id = reportId,
             FacilityId = facilityId,
-            ReportStartDate = DateTimeOffset.UtcNow.AddDays(-30),
-            ReportEndDate = DateTimeOffset.UtcNow.AddDays(30),
+            ReportStartDate = DateTime.UtcNow.AddDays(-30),
+            ReportEndDate = DateTime.UtcNow.AddDays(30),
             Frequency = Frequency.Monthly,
             ReportTypes = { "DE-111" },
             Status = ScheduleStatus.Scheduled,
@@ -117,7 +117,7 @@ public class PayloadSubmittedListenerTests : IClassFixture<ReportIntegrationTest
     public async Task ProcessMessageAsync_MeasureReportSubmissionEntry_UpdatesEntryAndProducesManifest()
     {
         _fixture.SubmitPayloadKafkaProducerMock.Reset();
-        _fixture.FacilityServiceClientMock.Setup(x => x.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _fixture.TenantApiServiceMock.Setup(x => x.GetFacilityConfig(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new FacilityModel { FacilityName = "Test Facility" });
 
         using var scope = _fixture.ScopeFactory.CreateScope();
@@ -133,8 +133,8 @@ public class PayloadSubmittedListenerTests : IClassFixture<ReportIntegrationTest
         {
             Id = reportId,
             FacilityId = facilityId,
-            ReportStartDate = DateTimeOffset.UtcNow.AddDays(-30),
-            ReportEndDate = DateTimeOffset.UtcNow.AddDays(30),
+            ReportStartDate = DateTime.UtcNow.AddDays(-30),
+            ReportEndDate = DateTime.UtcNow.AddDays(30),
             Frequency = Frequency.Monthly,
             ReportTypes = { "DE-111" },
             Status = ScheduleStatus.Scheduled,

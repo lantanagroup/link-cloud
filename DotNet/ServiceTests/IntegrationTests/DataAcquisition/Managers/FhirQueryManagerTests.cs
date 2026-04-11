@@ -8,7 +8,7 @@ namespace IntegrationTests.DataAcquisition.Managers
 {
     [Collection("DataAcquisitionIntegrationTests")]
     [Trait("Category", "IntegrationTests")]
-    public class FhirQueryManagerTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+    public class FhirQueryManagerTests
     {
         private readonly DataAcquisitionIntegrationTestFixture _fixture;
 
@@ -28,3 +28,4 @@ namespace IntegrationTests.DataAcquisition.Managers
         // Placeholder for future FhirQueryManager tests.
     }
 }
+

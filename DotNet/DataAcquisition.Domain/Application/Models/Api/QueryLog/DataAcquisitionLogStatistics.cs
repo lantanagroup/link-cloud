@@ -1,4 +1,7 @@
 ﻿using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 
@@ -11,6 +14,7 @@ public class DataAcquisitionLogStatistics
     public Dictionary<string, long> ResourceTypeCompletionTimeMilliseconds { get; set; } = new();
     public int TotalLogs { get; set; }
     public int TotalPatients { get; set; }
+    public int TotalCompletedPatients { get; set; }
     public int TotalResourcesAcquired { get; set; }
     public int TotalRetryAttempts { get; set; }
     public ResourceCompletionTime FastestCompletionTimeMilliseconds { get; set; } = null!;

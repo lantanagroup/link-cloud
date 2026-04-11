@@ -3,21 +3,20 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
-using ResourceType = Hl7.Fhir.Model.ResourceType;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using ResourceType = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.ResourceType;
 using Task = System.Threading.Tasks.Task;
-using Microsoft.EntityFrameworkCore;
 
 namespace IntegrationTests.DataAcquisition.Queries;
 
 [Collection("DataAcquisitionIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+public class DataAcquisitionLogQueriesTests
 {
     private readonly DataAcquisitionIntegrationTestFixture _fixture;
 
@@ -462,7 +461,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             PatientId = "Patient/123", ReportStartDate = DateTime.UtcNow.AddDays(-1), ReportEndDate = DateTime.UtcNow,
             CompletionTimeMilliseconds = 100, QueryPhase = QueryPhase.Initial, QueryType = FhirQueryType.Read,
             ScheduledReportEntity = new ScheduledReportEntity { ReportTrackingId = reportTrackingId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow },
-            ResourceAcquiredIds = new List<string> { "Patient/123" },
+            ResourceIds = new List<DataAcquisitionLogResourceId> { new() { ResourceId = "Patient/123" } },
             FhirQueries = new List<FhirQuery>
             {
                 new FhirQuery { MeasureId = "test", FacilityId = facilityId, FhirQueryResourceTypes = new List<FhirQueryResourceType> { new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } } }
@@ -501,7 +500,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             PatientId = "Patient/123", ReportStartDate = DateTime.UtcNow.AddDays(-1), ReportEndDate = DateTime.UtcNow,
             CompletionTimeMilliseconds = 150, QueryPhase = QueryPhase.Initial, QueryType = FhirQueryType.Read,
             ScheduledReportEntity = new ScheduledReportEntity { ReportTrackingId = reportTrackingId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow },
-            ResourceAcquiredIds = new List<string>(),
+            ResourceIds = new List<DataAcquisitionLogResourceId>(),
             FhirQueries = new List<FhirQuery>
             {
                 new FhirQuery { MeasureId = "test", FacilityId = facilityId, FhirQueryResourceTypes = new List<FhirQueryResourceType> { new FhirQueryResourceType() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } } }
@@ -538,7 +537,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
             FacilityId = facilityId, CorrelationId = correlationId, ReportTrackingId = reportTrackingId,
             Status = RequestStatus.Completed, PatientId = "Patient/123",
             ReportStartDate = DateTime.UtcNow.AddDays(-1), ReportEndDate = DateTime.UtcNow,
-            ResourceAcquiredIds = new List<string> { referenceId },
+            ResourceIds = new List<DataAcquisitionLogResourceId> { new() { ResourceId = referenceId } },
             ScheduledReportEntity = new ScheduledReportEntity { ReportTrackingId = reportTrackingId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow }
         };
         dbContext.DataAcquisitionLogs.Add(log);
@@ -789,3 +788,4 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         Assert.Equal(50, stillProcessingCount);
     }
 }
+

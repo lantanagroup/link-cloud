@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Listeners;
 using LantanaGroup.Link.Report.Models;
@@ -6,6 +6,8 @@ using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
+using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
+using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Task = System.Threading.Tasks.Task;

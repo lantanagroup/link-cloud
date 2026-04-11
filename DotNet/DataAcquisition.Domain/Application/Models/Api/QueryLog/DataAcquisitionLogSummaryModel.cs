@@ -1,6 +1,10 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 
@@ -30,7 +34,7 @@ public class DataAcquisitionLogSummaryModel
     public int? RetryAttempts { get; init; }
     public DateTime? CompletionDate { get; init; }
     public long? CompletionTimeMilliseconds { get; init; }
-    public List<string>? ResourceAcquiredIds { get; init; }
+    public int ResourceAcquiredCount { get; init; }
     public List<string>? Notes { get; init; }
     public bool IsDeleted { get; init; }
     public bool IsCensus { get; init; }

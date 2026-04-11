@@ -1,9 +1,12 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
@@ -40,8 +43,6 @@ public class DataAcquisitionLog
 
     public long? CompletionTimeMilliseconds { get; set; }
 
-    public List<string>? ResourceAcquiredIds { get; set; } = new();
-
     public long? ScheduledReportId { get; set; }
 
     [ForeignKey("ScheduledReportId")]
@@ -65,6 +66,14 @@ public class DataAcquisitionLog
     [StringLength(64)]
     public string? TraceId { get; set; }
 
+    /// <summary>
+    /// The total number of sibling logs created in the same
+    /// (FacilityId, CorrelationId, QueryPhase) group.
+    /// Stamped by the creator after all logs are committed.
+    /// Null means creation is still in progress (or legacy row).
+    /// </summary>
+    public int? SiblingCount { get; set; }
+
     [Key]
     public long Id { get; set; }
     public DateTime CreateDate { get; set; } = DateTime.UtcNow;
@@ -76,6 +85,9 @@ public class DataAcquisitionLog
 
     [InverseProperty("DataAcquisitionLog")]
     public virtual ICollection<DataAcquisitionLogNote> NoteEntries { get; set; } = new List<DataAcquisitionLogNote>();
+
+    [InverseProperty("DataAcquisitionLog")]
+    public virtual ICollection<DataAcquisitionLogResourceId> ResourceIds { get; set; } = new List<DataAcquisitionLogResourceId>();
 
     public virtual ICollection<ReferenceResources> ReferenceResources { get; set; } = new List<ReferenceResources>();
 }

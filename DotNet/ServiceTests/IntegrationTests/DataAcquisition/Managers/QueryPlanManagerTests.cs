@@ -1,4 +1,4 @@
-﻿using DataAcquisition.Domain.Application.Models;
+using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -20,7 +20,7 @@ namespace IntegrationTests.DataAcquisition.Managers;
 
 [Collection("DataAcquisitionIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+public class QueryPlanManagerTests
 {
     private readonly DataAcquisitionIntegrationTestFixture _fixture;
 
@@ -763,3 +763,4 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         return model;
     }
 }
+

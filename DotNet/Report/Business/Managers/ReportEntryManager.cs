@@ -3,7 +3,6 @@ using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LinqKit;
 using Microsoft.EntityFrameworkCore;
@@ -54,6 +53,14 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             CancellationToken cancellationToken = default);
 
         Task<ReportEntrySummary> GetSummaryByReportScheduleIdAsync(Guid reportScheduleId,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Returns <c>true</c> when every entry for the given facility/schedule
+        /// has reached a terminal reporting + submission status.
+        /// Uses a lightweight scalar COUNT query — no entity materialisation.
+        /// </summary>
+        Task<bool> AreAllEntriesCompleteAsync(string facilityId, Guid reportScheduleId,
             CancellationToken cancellationToken = default);
     }
 
@@ -605,6 +612,35 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             }
 
             return summary;
+        }
+
+        private static readonly ReportingStatus[] TerminalReportingStatuses =
+        [
+            ReportingStatus.NotReportable,
+            ReportingStatus.PassedValidation,
+            ReportingStatus.FailedValidation
+        ];
+
+        private static readonly SubmissionStatus[] TerminalSubmissionStatuses =
+        [
+            SubmissionStatus.Submitted,
+            SubmissionStatus.NotEligable
+        ];
+
+        public async Task<bool> AreAllEntriesCompleteAsync(string facilityId, Guid reportScheduleId,
+            CancellationToken cancellationToken = default)
+        {
+            var incompleteCount = await _dbContext.ReportEntry
+                .Where(e => e.FacilityId == facilityId
+                         && e.ReportScheduleId == reportScheduleId
+                         && !(
+                             TerminalReportingStatuses.Contains(e.ReportingStatus)
+                             && e.SubmissionStatus != null
+                             && TerminalSubmissionStatuses.Contains(e.SubmissionStatus.Value)
+                         ))
+                .CountAsync(cancellationToken);
+
+            return incompleteCount == 0;
         }
     }
 }

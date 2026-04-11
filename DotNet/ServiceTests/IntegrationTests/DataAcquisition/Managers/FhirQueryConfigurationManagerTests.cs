@@ -1,4 +1,4 @@
-﻿using DataAcquisition.Domain.Application.Models;
+using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
@@ -15,7 +15,7 @@ namespace IntegrationTests.DataAcquisition.Managers;
 
 [Collection("DataAcquisitionIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+public class FhirQueryConfigurationManagerTests
 {
     private readonly DataAcquisitionIntegrationTestFixture _fixture;
 
@@ -475,3 +475,4 @@ public class FhirQueryConfigurationManagerTests : IClassFixture<DataAcquisitionI
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => manager.UpdateAsync(model));
     }
 }
+

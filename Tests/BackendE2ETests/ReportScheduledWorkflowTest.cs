@@ -71,7 +71,6 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
     {
         Output.WriteLine("Cleaning up...\n");
 
-        return;
 
         if (_config.RemoveFacilityConfig)
         {

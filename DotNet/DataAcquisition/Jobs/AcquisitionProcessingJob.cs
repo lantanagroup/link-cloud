@@ -1,12 +1,11 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Options;
 using Quartz;
@@ -23,7 +22,6 @@ public class AcquisitionProcessingJob : IJob
     private readonly ILogger<AcquisitionProcessingJob> _logger;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly IProducer<long, ReadyToAcquire> _readyToAcquireProducer;
-    private readonly IProducer<ResourceKey, ResourceAcquired> _resourceAcquiredProducer;
     private readonly AcquisitionWorkerProcessorSettings _settings;
     private const int BatchSize = 100;
 
@@ -31,13 +29,11 @@ public class AcquisitionProcessingJob : IJob
         ILogger<AcquisitionProcessingJob> logger,
         IServiceScopeFactory serviceScopeFactory,
         IProducer<long, ReadyToAcquire> readyToAcquireProducer,
-        IProducer<ResourceKey, ResourceAcquired> resourceAcquiredProducer,
         IOptions<AcquisitionWorkerProcessorSettings> settings)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
         _readyToAcquireProducer = readyToAcquireProducer ?? throw new ArgumentNullException(nameof(readyToAcquireProducer));
-        _resourceAcquiredProducer = resourceAcquiredProducer ?? throw new ArgumentNullException(nameof(resourceAcquiredProducer));
         _settings = settings?.Value ?? new AcquisitionWorkerProcessorSettings();
     }
 
@@ -52,7 +48,6 @@ public class AcquisitionProcessingJob : IJob
             // is available for the primary work of dispatching pending logs.
             var stopwatch = Stopwatch.StartNew();
             await ProcessPendingLogs(stopwatch, context.CancellationToken);
-            await ProcessPendingTailingMessages(stopwatch, context.CancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -318,152 +313,4 @@ public class AcquisitionProcessingJob : IJob
         return currentTime >= minAcquisitionPullTime || currentTime <= maxAcquisitionPullTime;
     }
 
-    public async Task ProcessPendingTailingMessages(Stopwatch stopwatch, CancellationToken cancellationToken)
-    {
-        // Skip tailing entirely if the time budget is already exhausted —
-        // dispatching pending logs to workers is higher priority.
-        if (stopwatch.Elapsed.TotalSeconds >= _settings.TimeBudgetPerRunSeconds)
-        {
-            _logger.LogDebug("Skipping tailing messages — time budget exhausted after {elapsed:F1}s.", stopwatch.Elapsed.TotalSeconds);
-            return;
-        }
-
-        using var scope = _serviceScopeFactory.CreateScope();
-        var dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
-        var dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
-
-        IEnumerable<TailingMessageModel> tailingMessages = null;
-        try
-        {
-            tailingMessages = await dataAcquisitionLogQueries.GetTailingMessages(cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Retrieving tailing messages was cancelled.");
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "An exception occurred while attempting to retrieve pending tail messages.");
-            return;
-        }
-
-        try
-        {
-            foreach (var message in tailingMessages)
-            {
-                if (stopwatch.Elapsed.TotalSeconds >= _settings.TimeBudgetPerRunSeconds)
-                {
-                    _logger.LogDebug("Skipping tailing messages — time budget exhausted after {elapsed:F1}s.", stopwatch.Elapsed.TotalSeconds);
-                    break;
-                }
-
-                try
-                {
-                    // Parse the traceparent string (format: 00-traceId-spanId-flags)
-                    ActivityContext parentContext = CreateActivityContext(message.TraceParentId);
-
-                    // Start the activity with the parent context
-                    using var activity = ServiceActivitySource.Instance?.StartActivity(
-                        "ProcessTailingMessage",
-                        ActivityKind.Consumer,
-                        parentContext) ?? Activity.Current;
-
-                    // Add relevant tags
-                    activity?.SetTag("reportTrackingId", message.ResourceAcquired.ScheduledReports.FirstOrDefault()?.ReportTrackingId);
-                    activity?.SetTag("facilityId", message.FacilityId);
-
-                    var headers = new Headers
-                    {
-                        new Header(DataAcquisitionConstants.HeaderNames.CorrelationId,
-                            Encoding.UTF8.GetBytes(message.CorrelationId))
-                    };
-
-                    string currentTraceParent;
-                    if (!string.IsNullOrEmpty(message.TraceParentId))
-                    {
-                        currentTraceParent = message.TraceParentId;
-                    }
-                    else if (activity is not null)
-                    {
-                        var ctx = activity.Context;
-                        var flags = ctx.TraceFlags.HasFlag(ActivityTraceFlags.Recorded) ? "01" : "00";
-                        currentTraceParent = $"00-{ctx.TraceId.ToHexString()}-{ctx.SpanId.ToHexString()}-{flags}";
-                    }
-                    else
-                    {
-                        // Generate a valid traceparent as last resort
-                        var newTraceId = ActivityTraceId.CreateRandom().ToHexString();
-                        var newSpanId = ActivitySpanId.CreateRandom().ToHexString();
-                        currentTraceParent = $"00-{newTraceId}-{newSpanId}-00";
-                    }
-
-                    headers.Add("traceparent", Encoding.UTF8.GetBytes(currentTraceParent));
-
-                    await _resourceAcquiredProducer.ProduceAsync(
-                        KafkaTopic.ResourceAcquired.ToString(),
-                        new Message<ResourceKey, ResourceAcquired>
-                        {
-                            Key = new ResourceKey
-                            {
-                                FacilityId = message.FacilityId,
-                                CorrelationId = message.CorrelationId
-                            },
-                            Headers = headers,
-                            Value = message.ResourceAcquired
-                        }, cancellationToken);
-
-                    await dataAcquisitionLogManager.UpdateTailFlagForFacilityCorrelationIdReportTrackingId(
-                        message.LogIds,
-                        message.FacilityId,
-                        message.CorrelationId,
-                        message.ResourceAcquired.ScheduledReports.FirstOrDefault()?.ReportTrackingId?.ToString() ?? "",
-                        cancellationToken);
-                }
-                catch (OperationCanceledException)
-                {
-                    _logger.LogInformation("Processing tailing message for facility {facilityId} was cancelled.", message.FacilityId?.SanitizeUntrustedString());
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex,
-                        "An exception occurred while attempting to send Tail Kafka Messages for facility {facilityId}.",
-                        message.FacilityId?.SanitizeUntrustedString());
-                }
-
-            }
-
-            _resourceAcquiredProducer.Flush(cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Aggregated errors during tailing message processing.");
-        }
-    }
-
-    private ActivityContext CreateActivityContext(string? traceParentId)
-    {
-        ActivityContext parentContext = default;
-        if (!string.IsNullOrEmpty(traceParentId))
-        {
-            try
-            {
-                var parts = traceParentId.Split('-');
-                if (parts.Length >= 4)
-                {
-                    var traceId = ActivityTraceId.CreateFromString(parts[1].AsSpan());
-                    var parentSpanId = ActivitySpanId.CreateFromString(parts[2].AsSpan());
-                    var flags = parts[3] == "01" ? ActivityTraceFlags.Recorded : ActivityTraceFlags.None;
-
-                    parentContext = new ActivityContext(traceId, parentSpanId, flags);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to parse traceparent: {TraceParentId}", traceParentId?.SanitizeUntrustedString());
-            }
-        }
-        return parentContext;
-    }
 }

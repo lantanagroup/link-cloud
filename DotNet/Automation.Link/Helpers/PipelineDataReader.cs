@@ -1,6 +1,9 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 
 namespace LantanaGroup.Link.Automation.Link.Helpers;
 
@@ -12,7 +15,7 @@ public class PipelineDataReader
     private readonly IFacilityServiceClient _facilityClient;
 
     // ---------------------------------------------------------------
-    // Time-based cache — collapses duplicate HTTP calls from the
+    // Time-based cache � collapses duplicate HTTP calls from the
     // many consumers (ProgressMonitor, PipelineProgressTracker,
     // MilestoneValidationOrchestrator, StoreBackedServicePoller,
     // PipelineSnapshot) into a single call per TTL window.

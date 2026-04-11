@@ -1,8 +1,10 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
+using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
+using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using System.Diagnostics;
 using System.Text;

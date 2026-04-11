@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -15,7 +15,6 @@ namespace IntegrationTests.DataAcquisition.Managers;
 [Collection("DataAcquisitionIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
 public class SftpConfigurationManagerTests(DataAcquisitionIntegrationTestFixture fixture)
-    : IClassFixture<DataAcquisitionIntegrationTestFixture>
 {
     private ISftpConfigurationManager CreateManager(IServiceScope scope)
     {
@@ -134,3 +133,4 @@ public class SftpConfigurationManagerTests(DataAcquisitionIntegrationTestFixture
             () => manager.DeleteAsync(requestOrganizationId, existingConfig.Id, CancellationToken.None));
     }
 }
+

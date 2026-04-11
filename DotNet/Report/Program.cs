@@ -14,7 +14,6 @@ using LantanaGroup.Link.Report.Listeners;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
-using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
@@ -122,6 +121,8 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.RegisterQuartzDatabase(connectionString);
     builder.Services.AddSingleton<IQuartzJobHelper, QuartzJobHelper>();
+
+    builder.Services.AddHttpClient();
 
     builder.Services.AddTransient<IKafkaConsumerFactory<string, GenerateReportValue>, KafkaConsumerFactory<string, GenerateReportValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, ReportScheduledValue>, KafkaConsumerFactory<string, ReportScheduledValue>>();
@@ -242,7 +243,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<SubmitPayloadProducer>();
     builder.Services.AddTransient<ReadyForValidationProducer>();
     builder.Services.AddTransient<DataAcquisitionRequestedProducer>();
-    builder.Services.AddLinkSdk();
+    builder.Services.AddTransient<ITenantApiService, TenantApiService>();
     builder.Services.AddSingleton<BlobStorageService>();
 
     builder.Services.AddTransient<AuditableEventOccurredProducer>();

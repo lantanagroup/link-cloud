@@ -125,7 +125,9 @@ public enum RequestStatus
     [StringValue("Skipped")]
     Skipped,
     [StringValue("Configuration Required")]
-    ConfigurationRequired
+    ConfigurationRequired,
+    [StringValue("Cancelled")]
+    Cancelled
 }
 
 public enum QueryPhase

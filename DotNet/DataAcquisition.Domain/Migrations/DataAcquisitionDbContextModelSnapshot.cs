@@ -564,7 +564,7 @@ namespace DataAcquisition.Domain.Migrations
                     b.ToTable("QRTZ_TRIGGERS", "quartz");
                 });
 
-            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLogReferenceResource", b =>
+            modelBuilder.Entity("DataAcquisitionLogReferenceResource", b =>
                 {
                     b.Property<long>("DataAcquisitionLogId")
                         .HasColumnType("bigint");
@@ -576,7 +576,7 @@ namespace DataAcquisition.Domain.Migrations
 
                     b.HasIndex("ReferenceResourceId");
 
-                    b.ToTable("DataAcquisitionLogReferenceResource");
+                    b.ToTable("DataAcquisitionLogReferenceResource", (string)null);
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog", b =>
@@ -619,10 +619,6 @@ namespace DataAcquisition.Domain.Migrations
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("Notes")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("PatientId")
                         .HasColumnType("nvarchar(max)");
 
@@ -652,14 +648,14 @@ namespace DataAcquisition.Domain.Migrations
                     b.Property<int?>("ReportableEvent")
                         .HasColumnType("int");
 
-                    b.Property<string>("ResourceAcquiredIds")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<int?>("RetryAttempts")
                         .HasColumnType("int");
 
-                    b.Property<string>("ScheduledReport")
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<long?>("ScheduledReportId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int?>("SiblingCount")
+                        .HasColumnType("int");
 
                     b.Property<string>("Status")
                         .HasMaxLength(50)
@@ -678,6 +674,8 @@ namespace DataAcquisition.Domain.Migrations
                         .HasDatabaseName("IX_DataAcquisitionLogs_FacilityId_IsDeleted")
                         .HasFilter("[IsDeleted] = 1");
 
+                    b.HasIndex("ScheduledReportId");
+
                     b.HasIndex("ExecutionDate", "Id")
                         .IsDescending()
                         .HasDatabaseName("IX_DataAcquisitionLogs_Paging_Default");
@@ -687,7 +685,7 @@ namespace DataAcquisition.Domain.Migrations
                     b.HasIndex("ReportTrackingId", "IsDeleted")
                         .HasDatabaseName("IX_DataAcquisitionLogs_ReportTrackingId_IsDeleted");
 
-                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("ReportTrackingId", "IsDeleted"), new[] { "PatientId", "Status", "RetryAttempts", "CompletionTimeMilliseconds", "ResourceAcquiredIds" });
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("ReportTrackingId", "IsDeleted"), new[] { "PatientId", "Status", "RetryAttempts", "CompletionTimeMilliseconds" });
 
                     b.HasIndex("Status", "ExecutionDate")
                         .HasDatabaseName("IX_DataAcquisitionLogs_Status_ExecutionDate");
@@ -698,13 +696,70 @@ namespace DataAcquisition.Domain.Migrations
                     b.HasIndex("FacilityId", "Status", "ExecutionDate", "Id")
                         .HasDatabaseName("IX_DataAcquisitionLogs_Facility_Status_ExecutionDate_Id");
 
-                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("FacilityId", "Status", "ExecutionDate", "Id"), new[] { "Priority", "IsCensus", "PatientId", "ReportableEvent", "ReportTrackingId", "CorrelationId", "FhirVersion", "QueryType", "QueryPhase", "TraceId", "RetryAttempts", "CompletionDate", "CompletionTimeMilliseconds", "ResourceAcquiredIds", "Notes", "ScheduledReport" });
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("FacilityId", "Status", "ExecutionDate", "Id"), new[] { "Priority", "IsCensus", "PatientId", "ReportableEvent", "ReportTrackingId", "CorrelationId", "FhirVersion", "QueryType", "QueryPhase", "TraceId", "RetryAttempts", "CompletionDate", "CompletionTimeMilliseconds" });
+
+                    b.HasIndex("TailSent", "SiblingCount", "FacilityId", "CorrelationId", "QueryPhase", "Status")
+                        .HasDatabaseName("IX_DataAcquisitionLogs_InlineTail")
+                        .HasFilter("[TailSent] = 0 AND [SiblingCount] IS NOT NULL AND [CorrelationId] IS NOT NULL AND [QueryPhase] IS NOT NULL");
 
                     b.HasIndex("TailSent", "FacilityId", "ReportTrackingId", "CorrelationId", "ReportStartDate", "ReportEndDate", "QueryPhase")
                         .HasDatabaseName("IX_DataAcquisitionLogs_Tailing_Optimization")
                         .HasFilter("[TailSent] = 0 AND [ReportTrackingId] IS NOT NULL AND [CorrelationId] IS NOT NULL AND [ReportStartDate] IS NOT NULL AND [ReportEndDate] IS NOT NULL");
 
                     b.ToTable("DataAcquisitionLog");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLogNote", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long>("DataAcquisitionLogId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DataAcquisitionLogId")
+                        .HasDatabaseName("IX_DataAcquisitionLogNotes_DataAcquisitionLogId");
+
+                    b.ToTable("DataAcquisitionLogNotes");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLogResourceId", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long>("DataAcquisitionLogId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ResourceId")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DataAcquisitionLogId")
+                        .HasDatabaseName("IX_DataAcquisitionLogResourceIds_DataAcquisitionLogId");
+
+                    b.ToTable("DataAcquisitionLogResourceIds");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirListConfiguration", b =>
@@ -915,7 +970,8 @@ namespace DataAcquisition.Domain.Migrations
 
                     b.Property<string>("FacilityId")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
 
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
@@ -931,11 +987,13 @@ namespace DataAcquisition.Domain.Migrations
 
                     b.Property<string>("ResourceId")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
 
                     b.Property<string>("ResourceType")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
 
                     b.HasKey("Id");
 
@@ -978,6 +1036,45 @@ namespace DataAcquisition.Domain.Migrations
                     b.HasIndex(new[] { "FhirQueryId" }, "IX_ResourceReferenceType_FhirQueryId");
 
                     b.ToTable("ResourceReferenceType");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.ScheduledReportEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("EndDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Frequency")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ReportTrackingId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("ReportTypes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReportTrackingId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ScheduledReports_ReportTrackingId");
+
+                    b.ToTable("ScheduledReports");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.SftpAcquisitionLog", b =>
@@ -1103,21 +1200,6 @@ namespace DataAcquisition.Domain.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLogReferenceResource", b =>
-                {
-                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog", null)
-                        .WithMany()
-                        .HasForeignKey("DataAcquisitionLogId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.ReferenceResources", null)
-                        .WithMany()
-                        .HasForeignKey("ReferenceResourceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
                     b.Navigation("Trigger");
                 });
 
@@ -1163,6 +1245,52 @@ namespace DataAcquisition.Domain.Migrations
                         .IsRequired();
 
                     b.Navigation("JobDetail");
+                });
+
+            modelBuilder.Entity("DataAcquisitionLogReferenceResource", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog", null)
+                        .WithMany()
+                        .HasForeignKey("DataAcquisitionLogId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.ReferenceResources", null)
+                        .WithMany()
+                        .HasForeignKey("ReferenceResourceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.ScheduledReportEntity", "ScheduledReportEntity")
+                        .WithMany("DataAcquisitionLogs")
+                        .HasForeignKey("ScheduledReportId");
+
+                    b.Navigation("ScheduledReportEntity");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLogNote", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog", "DataAcquisitionLog")
+                        .WithMany("NoteEntries")
+                        .HasForeignKey("DataAcquisitionLogId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("DataAcquisitionLog");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLogResourceId", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog", "DataAcquisitionLog")
+                        .WithMany("ResourceIds")
+                        .HasForeignKey("DataAcquisitionLogId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("DataAcquisitionLog");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirQuery", b =>
@@ -1215,6 +1343,10 @@ namespace DataAcquisition.Domain.Migrations
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog", b =>
                 {
                     b.Navigation("FhirQueries");
+
+                    b.Navigation("NoteEntries");
+
+                    b.Navigation("ResourceIds");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirQuery", b =>
@@ -1222,6 +1354,11 @@ namespace DataAcquisition.Domain.Migrations
                     b.Navigation("FhirQueryResourceTypes");
 
                     b.Navigation("ResourceReferenceTypes");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.ScheduledReportEntity", b =>
+                {
+                    b.Navigation("DataAcquisitionLogs");
                 });
 #pragma warning restore 612, 618
         }

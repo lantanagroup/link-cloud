@@ -6,23 +6,22 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
+using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
-using RequestStatusEnum = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
-using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
-using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
-using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition.Services
 {
     [Collection("DataAcquisitionIntegrationTests")]
     [Trait("Category", "IntegrationTests")]
-    public class ReferenceResourceServiceTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+    public class ReferenceResourceServiceTests
     {
         private readonly DataAcquisitionIntegrationTestFixture _fixture;
 
@@ -81,7 +80,7 @@ namespace IntegrationTests.DataAcquisition.Services
                 ScheduledReport = new ScheduledReport { ReportTrackingId = reportTrackingId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow },
                 QueryPhase = QueryPhase.Initial,
                 QueryType = FhirQueryType.Search,
-                Status = RequestStatusEnum.Pending,
+                Status = RequestStatus.Pending,
                 Priority = AcquisitionPriority.Normal
             });
 
@@ -113,3 +112,4 @@ namespace IntegrationTests.DataAcquisition.Services
         }
     }
 }
+

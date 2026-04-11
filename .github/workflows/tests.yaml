@@ -1,4 +1,4 @@
-name: "Tests"
+﻿name: "Tests"
 
 on:
 #  schedule:
@@ -299,12 +299,33 @@ jobs:
         run: dotnet build DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-restore
 
       - name: Run integration tests
-        run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-build --verbosity detailed --logger "trx;LogFileName=dotnet-integration-test-results.trx" --results-directory ./TestResults --filter "Category=IntegrationTests"
+        run: |
+          mkdir -p ./TestResults
+          dotnet test DotNet/ServiceTests/ServiceTests.csproj \
+            --configuration Release \
+            --no-build \
+            --verbosity detailed \
+            --logger "trx;LogFileName=dotnet-integration-test-results.trx" \
+            --results-directory ./TestResults \
+            --filter "Category=IntegrationTests"
         continue-on-error: true
-        timeout-minutes: 5
+        timeout-minutes: 15
+
+      - name: Normalize TRX output location
+        if: always()
+        run: |
+          mkdir -p ./TestResults
+          i=0
+          while IFS= read -r -d '' file; do
+            i=$((i+1))
+            cp "$file" "./TestResults/integration-$i.trx"
+          done < <(find . -type f -name "*.trx" -print0)
+          echo "Collected $i trx file(s) into ./TestResults"
 
       - name: Debug test results
-        run: ls -la ./TestResults
+        run: |
+          ls -la ./TestResults || true
+          find . -type f -name "*.trx" -print || true
         continue-on-error: true
 
       - name: Upload Test Results
@@ -319,7 +340,7 @@ jobs:
         if: always()
         with:
           name: XUnit Integration Tests
-          path: ./TestResults/dotnet-integration-test-results.trx
+          path: ./TestResults/*.trx
           reporter: dotnet-trx
 
   dotnet-unit-tests:
