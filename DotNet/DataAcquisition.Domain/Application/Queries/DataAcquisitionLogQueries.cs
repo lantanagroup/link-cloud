@@ -229,7 +229,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         CancellationToken cancellationToken = default)
     {
         var completedOrFailedStatuses = new[]
-            { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped };
+            { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.Cancelled };
 
         try
         {
@@ -789,6 +789,11 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             var resourceType = Enum.Parse<ResourceType>(model.ResourceType, ignoreCase: true);
             query = query.Where(log =>
                 log.FhirQueries.Any(q => q.FhirQueryResourceTypes.Any(r => r.ResourceType == resourceType)));
+        }
+
+        if (model.CreatedBefore.HasValue)
+        {
+            query = query.Where(log => log.CreateDate <= model.CreatedBefore.Value);
         }
 
         return query;

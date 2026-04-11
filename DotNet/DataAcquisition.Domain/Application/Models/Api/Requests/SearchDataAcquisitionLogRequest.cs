@@ -20,4 +20,5 @@ public class SearchDataAcquisitionLogRequest
     public string? CorrelationId { get; set; }
     public string? ResourceType { get; set; }
     public bool IncludeDeleted { get; set; } = false;
+    public DateTime? CreatedBefore { get; set; }
 }

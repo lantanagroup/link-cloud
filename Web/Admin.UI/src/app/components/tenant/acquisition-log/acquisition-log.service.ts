@@ -36,7 +36,8 @@ export class AcquisitionLogService {
     pageNumber: number,
     pageSize: number,
     showLoadingIndicator: boolean = true,
-    includeDeleted: boolean = false) : Observable<IPagedAcquisitionLogSummary> {
+    includeDeleted: boolean = false,
+    createdBefore: string | null = null) : Observable<IPagedAcquisitionLogSummary> {
 
     const headers = new HttpHeaders({ 'X-Skip-Loading': 'true' });
 
@@ -91,6 +92,9 @@ export class AcquisitionLogService {
     }
     if(includeDeleted) {
         params = params.set('includeDeleted', 'true');
+    }
+    if(createdBefore) {
+        params = params.set('createdBefore', createdBefore);
     }
 
     if(showLoadingIndicator)
@@ -154,7 +158,7 @@ export class AcquisitionLogService {
   }
 
   executeAcquisitionLog(id: string) : Observable<any> {
-    return this.http.post<any>(`${this.baseUrl}/${id}/process`, id)
+    return this.http.post<any>(`${this.baseUrl}/${id}/process`, Number(id))
     .pipe(
       map((response: any) => {
         return response;
@@ -166,8 +170,63 @@ export class AcquisitionLogService {
     )
   }
 
+  cancelBulkAcquisitionLogs(ids: string[], minAgeHours: number = 24) : Observable<{ requested: number; cancelled: number; ineligible: number }> {
+    const params = new HttpParams().set('minAgeHours', minAgeHours.toString());
+    const numericIds = ids.map(id => Number(id));
+    return this.http.post<{ requested: number; cancelled: number; ineligible: number }>(`${this.baseUrl}/cancel-bulk`, numericIds, { params })
+    .pipe(
+      map((response: any) => {
+        return response;
+      }),
+      catchError((error: HttpErrorResponse) => {
+          var err = this.errorHandler.handleError(error);
+          return err;
+      })
+    )
+  }
+
+  cancelAcquisitionLogsByFilter(
+    patientId: string | null,
+    facilityId: string | null,
+    reportId: string | null,
+    resourceType: string | null,
+    resourceId: string | null,
+    queryType: string | null,
+    queryPhase: string | null,
+    status: string[] | string | null,
+    priority: string | null,
+    createdBefore: string | null = null,
+    minAgeHours: number = 24) : Observable<{ requested: number; cancelled: number; ineligible: number }> {
+
+    let body: any = {
+      patientId,
+      facilityId,
+      reportId,
+      resourceType,
+      resourceId,
+      queryType,
+      queryPhase,
+      priority,
+      createdBefore
+    };
+
+    if (status) {
+      body.statuses = Array.isArray(status) ? status : [status];
+    }
+
+    const params = new HttpParams().set('minAgeHours', minAgeHours.toString());
+    return this.http.post<{ requested: number; cancelled: number; ineligible: number }>(`${this.baseUrl}/cancel-by-filter`, body, { params })
+    .pipe(
+      catchError((error: HttpErrorResponse) => {
+          var err = this.errorHandler.handleError(error);
+          return err;
+      })
+    )
+  }
+
   bulkExecuteAcquisitionLogs(ids: string[]) : Observable<any> {
-    return this.http.post<any>(`${this.baseUrl}/process-bulk`, ids)
+    const numericIds = ids.map(id => Number(id));
+    return this.http.post<any>(`${this.baseUrl}/process-bulk`, numericIds)
     .pipe(
       map((response: any) => {
         return response;
@@ -188,7 +247,8 @@ export class AcquisitionLogService {
     queryType: string | null,
     queryPhase: string | null,
     status: string[] | string | null,
-    priority: string | null) : Observable<any> {
+    priority: string | null,
+    createdBefore: string | null = null) : Observable<any> {
 
     let body: any = {
       patientId,
@@ -198,7 +258,8 @@ export class AcquisitionLogService {
       resourceId,
       queryType,
       queryPhase,
-      priority
+      priority,
+      createdBefore
     };
 
     if (status) {
