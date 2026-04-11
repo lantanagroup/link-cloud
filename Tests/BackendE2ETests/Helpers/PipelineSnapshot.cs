@@ -8,6 +8,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 using Xunit.Abstractions;
 using DataAcquisitionLog = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog;
+using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 
 namespace LantanaGroup.Link.Tests.E2ETests.Helpers;
 
@@ -260,7 +261,7 @@ public static class PipelineSnapshot
 
                 foreach (var log in failedLogs)
                 {
-                    var notes = log.Notes.Count > 0 ? string.Join(" | ", log.Notes.Take(3)) : "(no notes)";
+                    var notes = "(notes unavailable in log projection)";
                     output.WriteLine($"[Snapshot][DataAcqLog]          FAILED Id={log.Id}, Patient={log.PatientId}, " +
                                      $"Status={log.Status}, Phase={log.QueryPhase}, Notes={notes}");
                 }

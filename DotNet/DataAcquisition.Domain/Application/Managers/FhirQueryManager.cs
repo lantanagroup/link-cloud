@@ -1,10 +1,12 @@
 ﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LinqKit;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 
@@ -14,16 +16,25 @@ public interface IFhirQueryManager
 {
     Task<FhirQuery> CreateAsync(CreateFhirQueryModel entity, CancellationToken cancellationToken = default);
     Task<FhirQuery> UpdateAsync(FhirQueryModel entity, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Targeted update of only the QueryParameters column for a FhirQuery.
+    /// Uses ExecuteUpdateAsync to issue a single UPDATE without loading the entity,
+    /// minimising lock duration under high concurrency.
+    /// </summary>
+    Task UpdateQueryParametersAsync(Guid fhirQueryId, List<string> queryParameters, CancellationToken cancellationToken = default);
 }
 public class FhirQueryManager : IFhirQueryManager
 {
     private readonly ILogger<FhirQueryManager> _logger;
     private readonly IDatabase _database;
+    private readonly DataAcquisitionDbContext _dbContext;
 
-    public FhirQueryManager(ILogger<FhirQueryManager> logger, IDatabase database)
+    public FhirQueryManager(ILogger<FhirQueryManager> logger, IDatabase database, DataAcquisitionDbContext dbContext)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _database = database ?? throw new ArgumentNullException(nameof(database));
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
     public async Task<FhirQuery> CreateAsync(CreateFhirQueryModel model, CancellationToken cancellationToken = default)
@@ -67,6 +78,21 @@ public class FhirQueryManager : IFhirQueryManager
         await _database.FhirQueryRepository.SaveChangesAsync();
 
         return entity;
+    }
+
+    public async Task UpdateQueryParametersAsync(Guid fhirQueryId, List<string> queryParameters, CancellationToken cancellationToken = default)
+    {
+        using var activity = ServiceActivitySource.Instance.StartActivity("FhirQueryManager.UpdateQueryParametersAsync");
+
+        var updated = await _dbContext.FhirQueries
+            .Where(q => q.Id == fhirQueryId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(q => q.QueryParameters, queryParameters)
+                .SetProperty(q => q.ModifyDate, DateTime.UtcNow),
+            cancellationToken);
+
+        if (updated == 0)
+            throw new InvalidOperationException($"FhirQuery with ID {fhirQueryId} not found.");
     }
 
     public async Task<FhirQuery> UpdateAsync(FhirQueryModel model, CancellationToken cancellationToken = default)

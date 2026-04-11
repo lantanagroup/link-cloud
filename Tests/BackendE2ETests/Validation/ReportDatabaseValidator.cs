@@ -1,8 +1,10 @@
 ﻿using LantanaGroup.Link.Report.Data;
+using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Tests.E2ETests.Helpers;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace LantanaGroup.Link.Tests.E2ETests.Validation;
@@ -88,7 +90,33 @@ public class ReportDatabaseValidator(DualOutputHelper output)
         output.WriteLine("");
         output.WriteLine("  --- ReportEntry ---");
 
-        var entries = await PipelineSnapshot.GetReportEntriesAsync(db, scheduleId);
+        // The ReportSchedule transitions to Submitted before all ReportEntry rows do,
+        // because they are updated by separate Kafka messages (PayloadSubmitted).
+        // Allow a short grace period for the entry-level status to catch up.
+        const int maxAttempts = 15;
+        const int delayMs = 2000;
+        List<ReportEntry> entries = [];
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            // Detach any previously-tracked entities so we get a fresh read.
+            foreach (var entry in db.ChangeTracker.Entries<ReportEntry>().ToList())
+                entry.State = EntityState.Detached;
+
+            entries = await PipelineSnapshot.GetReportEntriesAsync(db, scheduleId);
+
+            if (entries.Count == expectedPatientIds.Count &&
+                entries.All(e => e.SubmissionStatus == SubmissionStatus.Submitted))
+            {
+                break;
+            }
+
+            if (attempt < maxAttempts)
+            {
+                output.WriteLine($"      [Poll {attempt}/{maxAttempts}] Waiting for ReportEntry SubmissionStatus=Submitted...");
+                await Task.Delay(delayMs);
+            }
+        }
 
         Assert.Equal(expectedPatientIds.Count, entries.Count);
 

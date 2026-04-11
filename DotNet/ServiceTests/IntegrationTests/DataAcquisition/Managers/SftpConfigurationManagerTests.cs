@@ -15,7 +15,6 @@ namespace IntegrationTests.DataAcquisition.Managers;
 [Collection("DataAcquisitionIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
 public class SftpConfigurationManagerTests(DataAcquisitionIntegrationTestFixture fixture)
-    : IClassFixture<DataAcquisitionIntegrationTestFixture>
 {
     private ISftpConfigurationManager CreateManager(IServiceScope scope)
     {
@@ -32,8 +31,6 @@ public class SftpConfigurationManagerTests(DataAcquisitionIntegrationTestFixture
         using var scope = fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         const string organizationId = "TestFacility";
 
@@ -72,8 +69,6 @@ public class SftpConfigurationManagerTests(DataAcquisitionIntegrationTestFixture
         using var scope = fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         const string storedOrganizationId = "StoredOrganization";
         const string requestOrganizationId = "DifferentOrganization";
@@ -114,8 +109,6 @@ public class SftpConfigurationManagerTests(DataAcquisitionIntegrationTestFixture
         using var scope = fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         const string storedOrganizationId = "StoredOrganization";
         const string requestOrganizationId = "DifferentOrganization";
@@ -140,3 +133,4 @@ public class SftpConfigurationManagerTests(DataAcquisitionIntegrationTestFixture
             () => manager.DeleteAsync(requestOrganizationId, existingConfig.Id, CancellationToken.None));
     }
 }
+

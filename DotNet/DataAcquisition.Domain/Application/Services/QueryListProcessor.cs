@@ -39,7 +39,7 @@ public interface IQueryListProcessor
         CancellationToken cancellationToken = default
         );
 
-    Task Process(IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> queryList,
+    Task<int> Process(IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> queryList,
         GetPatientDataRequest request,
         FhirQueryConfigurationModel fhirQueryConfiguration,
         QueryPlanModel queryPlan,
@@ -124,7 +124,7 @@ public class QueryListProcessor : IQueryListProcessor
         return resources;
     }
 
-    public async Task Process(
+    public async Task<int> Process(
         IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> queryList,
         GetPatientDataRequest request,
         FhirQueryConfigurationModel fhirQueryConfiguration,
@@ -138,6 +138,7 @@ public class QueryListProcessor : IQueryListProcessor
         var traceId = Activity.Current?.TraceId.ToHexString();
         var spanId = Activity.Current?.SpanId.ToHexString();
         var traceAndSpanDelimited = traceId + "|" + spanId;
+        int logsCreated = 0;
 
         foreach (var query in queryList)
         {
@@ -180,6 +181,7 @@ public class QueryListProcessor : IQueryListProcessor
                     fhirQuery,
                     traceAndSpanDelimited,
                     cancellationToken);
+                logsCreated++;
             }
             else if (builtQuery is PagedParameterQueryFactoryResult)
             {
@@ -207,30 +209,18 @@ public class QueryListProcessor : IQueryListProcessor
                         pagedFhirQuery,
                         traceAndSpanDelimited,
                         cancellationToken);
+                    logsCreated++;
                 }
             }
             else if (builtQuery is ReferenceQueryFactoryResult)
             {
-                var config = (ReferenceQueryConfig)queryConfig;
-                _logger.LogDebug("Resource: {resourceType}", config.ResourceType);
-
-                var fhirQueryType = FhirQueryTypeUtilities.ToDomain(config.OperationType.ToString());
-                fhirQuery.QueryType = fhirQueryType;
-                fhirQuery.ResourceTypes = [Enum.Parse<ResourceType>(config.ResourceType)];
-                fhirQuery.QueryParameters = ["_id="];
-                fhirQuery.ResourceReferenceTypes = [];
-                fhirQuery.Paged = config.Paged;
-                fhirQuery.IsReference = true;
-
-                await CreateDataAcquisitionLogAsync(
-                    request,
-                    fhirQueryType,
-                    scheduledReport,
-                    fhirQuery,
-                    traceAndSpanDelimited,
-                    cancellationToken);
+                // Reference resources are now fetched inline during normal log
+                // processing (in ProcessReferences). No separate log is needed.
+                _logger.LogDebug("Skipping separate log creation for reference query {ResourceType} — references are resolved inline.", ((ReferenceQueryConfig)queryConfig).ResourceType);
             }
         }
+
+        return logsCreated;
     }
 
     private async Task CreateDataAcquisitionLogAsync(

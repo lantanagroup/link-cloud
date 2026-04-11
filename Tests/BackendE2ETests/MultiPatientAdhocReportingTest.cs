@@ -1,6 +1,5 @@
-using LantanaGroup.Link.Tests.E2ETests.Helpers;
+﻿using LantanaGroup.Link.Tests.E2ETests.Helpers;
 using LantanaGroup.Link.Tests.E2ETests.Services;
-using LantanaGroup.Link.Tests.E2ETests.Validation;
 using RestSharp;
 using Xunit;
 using Task = System.Threading.Tasks.Task;
@@ -18,7 +17,11 @@ public sealed class MultiPatientAdhocReportingTest : IAsyncLifetime
     private const string FacilityId = "MultiPatientTestFacility";
 
     private static readonly FhirDataLoader FhirDataLoader = new(TestConfig.ExternalFhirServerBase);
-    private static readonly TestConfig.SmokeTestConfig Config = new("MULTI_PATIENT_TEST");
+    private static readonly TestConfig.SmokeTestConfig Config = new("MULTI_PATIENT_TEST",
+        defaultPatientIds: [],
+        defaultPollingIntervalSeconds: 5,
+        defaultMaxRetryCount: 10_000_000,
+        defaultLokiScrapeWindowMinutes: 30);
 
     private readonly DualOutputHelper _output;
     private readonly RestClient _adminBffClient = AdminBffClientFactory.Create();
