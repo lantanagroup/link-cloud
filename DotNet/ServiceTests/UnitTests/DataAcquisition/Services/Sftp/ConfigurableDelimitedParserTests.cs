@@ -5,9 +5,9 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Task = System.Threading.Tasks.Task;
 
-namespace IntegrationTests.DataAcquisition.Services.Sftp;
+namespace UnitTests.DataAcquisition.Services.Sftp;
 
-[Trait("Category", "IntegrationTests")]
+[Trait("Category", "UnitTests")]
 public class ConfigurableDelimitedParserTests
 {
     private readonly ConfigurableDelimitedParser _parser;

@@ -10,9 +10,9 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Task = System.Threading.Tasks.Task;
 
-namespace IntegrationTests.DataAcquisition.Services.Sftp;
+namespace UnitTests.DataAcquisition.Services.Sftp;
 
-[Trait("Category", "IntegrationTests")]
+[Trait("Category", "UnitTests")]
 public class CernerCclExtractParserTests
 {
     private readonly CernerCclExtractParser _parser;

@@ -30,10 +30,9 @@ using Moq;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
-namespace IntegrationTests.DataAcquisition;
+namespace UnitTests.DataAcquisition;
 
-[Collection("DataAcquisitionIntegrationTests")]
-[Trait("Category", "IntegrationTests")]
+[Trait("Category", "UnitTests")]
 public class PatientDataServiceTests
 {
     private readonly Mock<IDatabase> _mockDatabase;

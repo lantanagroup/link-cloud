@@ -27,10 +27,9 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
-namespace IntegrationTests.DataAcquisition;
+namespace UnitTests.DataAcquisition;
 
-[Collection("DataAcquisitionIntegrationTests")]
-[Trait("Category", "IntegrationTests")]
+[Trait("Category", "UnitTests")]
 public class FhirApiServiceTests
 {
     [Fact]

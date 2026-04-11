@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.ParameterFactories;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.ParameterFactories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.QueryFactories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ParameterQuery;
@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Task = System.Threading.Tasks.Task;
 
-namespace IntegrationTests.DataAcquisition.Factories
+namespace UnitTests.DataAcquisition.Factories
 {
     public class ParameterQueryFactoryTests
     {
