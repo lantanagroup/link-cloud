@@ -5,6 +5,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition.Managers;
@@ -28,7 +29,17 @@ public class FhirListQueryConfigurationManagerTests(DataAcquisitionIntegrationTe
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
 
-        const string facilityId = "TestFacility";
+        var facilityId = $"SftpOnlyFacility_{Guid.NewGuid():N}";
+
+        // Defensive cleanup for shared fixture state.
+        var preExistingFhirList = await dbContext.FhirListConfigurations
+            .Where(c => c.FacilityId == facilityId)
+            .ToListAsync();
+        if (preExistingFhirList.Count > 0)
+        {
+            dbContext.FhirListConfigurations.RemoveRange(preExistingFhirList);
+            await dbContext.SaveChangesAsync();
+        }
 
         // Create existing SFTP configuration for the facility
         var sftpConfig = new SftpConfiguration
