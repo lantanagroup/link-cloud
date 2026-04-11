@@ -1,4 +1,4 @@
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
@@ -27,7 +27,7 @@ public class FhirListQueryConfigurationManagerTests(DataAcquisitionIntegrationTe
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
 
-        const string facilityId = "TestFacility";
+        var facilityId = $"TestFacility_{Guid.NewGuid():N}";
 
         // Create existing SFTP configuration for the facility
         var sftpConfig = new SftpConfiguration
