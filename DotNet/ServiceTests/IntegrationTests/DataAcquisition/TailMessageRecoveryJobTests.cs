@@ -1,0 +1,185 @@
+﻿using Confluent.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
+using LantanaGroup.Link.DataAcquisition.Jobs;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Moq;
+using Quartz;
+using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
+using Task = System.Threading.Tasks.Task;
+
+namespace IntegrationTests.DataAcquisition;
+
+[Collection("DataAcquisitionIntegrationTests")]
+[Trait("Category", "IntegrationTests")]
+public class TailMessageRecoveryJobTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+{
+    private readonly DataAcquisitionIntegrationTestFixture _fixture;
+
+    public TailMessageRecoveryJobTests(DataAcquisitionIntegrationTestFixture fixture)
+    {
+        _fixture = fixture;
+    }
+
+    [Fact]
+    public async Task Execute_RespectsMaxGroupsPerRun_ProcessesSmallBatchOnly()
+    {
+        _fixture.ResourceAcquiredProducerMock.Reset();
+
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"TailRecoveryFac_{tag}";
+        var correlationA = $"CorrA_{tag}";
+        var correlationB = $"CorrB_{tag}";
+
+        using (var scope = _fixture.ServiceProvider.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+            // Group A (orphaned, fully terminal)
+            await SeedTailGroupAsync(db, facilityId, correlationA, siblingCount: 2);
+
+            // Group B (also orphaned, fully terminal)
+            await SeedTailGroupAsync(db, facilityId, correlationB, siblingCount: 2);
+        }
+
+        var settings = Options.Create(new TailMessageRecoveryJobSettings
+        {
+            MinAgeMinutes = 0,
+            MaxGroupsPerRun = 1,
+            TimeBudgetPerRunSeconds = 30
+        });
+
+        var logger = new Mock<ILogger<TailMessageRecoveryJob>>().Object;
+        var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
+        var producer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
+
+        var job = new TailMessageRecoveryJob(logger, scopeFactory, producer, settings);
+
+        var jobContextMock = new Mock<IJobExecutionContext>();
+        jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
+
+        await job.Execute(jobContextMock.Object);
+
+        _fixture.ResourceAcquiredProducerMock.Verify(
+            p => p.ProduceAsync(
+                KafkaTopic.ResourceAcquired.ToString(),
+                It.IsAny<Message<ResourceKey, ResourceAcquired>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        using var assertScope = _fixture.ServiceProvider.CreateScope();
+        var assertDb = assertScope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var groupATailFlags = await assertDb.DataAcquisitionLogs
+            .Where(l => l.FacilityId == facilityId && l.CorrelationId == correlationA)
+            .Select(l => l.TailSent)
+            .ToListAsync();
+
+        var groupBTailFlags = await assertDb.DataAcquisitionLogs
+            .Where(l => l.FacilityId == facilityId && l.CorrelationId == correlationB)
+            .Select(l => l.TailSent)
+            .ToListAsync();
+
+        var groupsMarkedComplete = 0;
+        if (groupATailFlags.Count > 0 && groupATailFlags.All(x => x)) groupsMarkedComplete++;
+        if (groupBTailFlags.Count > 0 && groupBTailFlags.All(x => x)) groupsMarkedComplete++;
+
+        Assert.Equal(1, groupsMarkedComplete);
+    }
+
+    [Fact]
+    public async Task Execute_WhenTimeBudgetIsZero_DoesNotProcessAnyGroups()
+    {
+        _fixture.ResourceAcquiredProducerMock.Reset();
+
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"TailRecoveryFac_{tag}";
+        var correlation = $"Corr_{tag}";
+
+        using (var scope = _fixture.ServiceProvider.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+            await SeedTailGroupAsync(db, facilityId, correlation, siblingCount: 2);
+        }
+
+        var settings = Options.Create(new TailMessageRecoveryJobSettings
+        {
+            MinAgeMinutes = 0,
+            MaxGroupsPerRun = 10,
+            TimeBudgetPerRunSeconds = 0
+        });
+
+        var logger = new Mock<ILogger<TailMessageRecoveryJob>>().Object;
+        var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
+        var producer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
+
+        var job = new TailMessageRecoveryJob(logger, scopeFactory, producer, settings);
+
+        var jobContextMock = new Mock<IJobExecutionContext>();
+        jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
+
+        await job.Execute(jobContextMock.Object);
+
+        _fixture.ResourceAcquiredProducerMock.Verify(
+            p => p.ProduceAsync(
+                KafkaTopic.ResourceAcquired.ToString(),
+                It.IsAny<Message<ResourceKey, ResourceAcquired>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        using var assertScope = _fixture.ServiceProvider.CreateScope();
+        var assertDb = assertScope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var stillUnclaimed = await assertDb.DataAcquisitionLogs
+            .Where(l => l.FacilityId == facilityId && l.CorrelationId == correlation)
+            .AllAsync(l => !l.TailSent);
+
+        Assert.True(stillUnclaimed);
+    }
+
+    private static async Task SeedTailGroupAsync(
+        DataAcquisitionDbContext db,
+        string facilityId,
+        string correlationId,
+        int siblingCount)
+    {
+        var now = DateTime.UtcNow;
+
+        db.DataAcquisitionLogs.AddRange(
+            new DataAcquisitionLog
+            {
+                FacilityId = facilityId,
+                CorrelationId = correlationId,
+                QueryPhase = QueryPhase.Initial,
+                Status = RequestStatus.Completed,
+                TailSent = false,
+                SiblingCount = siblingCount,
+                PatientId = "Patient/1",
+                CreateDate = now.AddMinutes(-5),
+                ModifyDate = now.AddMinutes(-2)
+            },
+            new DataAcquisitionLog
+            {
+                FacilityId = facilityId,
+                CorrelationId = correlationId,
+                QueryPhase = QueryPhase.Initial,
+                Status = RequestStatus.Completed,
+                TailSent = false,
+                SiblingCount = siblingCount,
+                PatientId = "Patient/1",
+                CreateDate = now.AddMinutes(-5),
+                ModifyDate = now.AddMinutes(-2)
+            }
+        );
+
+        await db.SaveChangesAsync();
+    }
+}

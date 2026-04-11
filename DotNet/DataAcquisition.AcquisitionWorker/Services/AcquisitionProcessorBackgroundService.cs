@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+﻿using Confluent.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Internal;
@@ -9,8 +10,11 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Options;
+using System.Text;
 using System.Threading.Channels;
 
 namespace LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
@@ -142,16 +146,14 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
             {
                 if (log != null)
                 {
-                    log.Notes ??= new List<string>();
                     var safeMessage = $"[{DateTime.UtcNow:O}] Processing failed: {ex.GetType().Name} - {ex.Message}";
-                    log.Notes.Add(safeMessage);
                     log.Status = RequestStatus.Failed;
 
                     await logManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                     {
                         Id = log.Id,
                         Status = log.Status,
-                        Notes = log.Notes,
+                        NewNotes = [safeMessage],
                         ResourceAcquiredIds = log.ResourceAcquiredIds,
                         RetryAttempts = log.RetryAttempts,
                         CompletionDate = log.CompletionDate,
@@ -182,10 +184,74 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                 ct);
 
             _logger.LogInformation("Successfully completed acquisition for LogId {LogId}", log.Id);
+
+            // Inline tail check — if all siblings are terminal, produce AcquisitionComplete.
+            await TryProduceTailMessageAsync(scope.ServiceProvider, logManager, log.Id, ct);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to process LogId {LogId} for facility {FacilityId}", item.LogId, item.FacilityId);
+
+            // Even on failure the log may now be in a terminal status (MaxRetriesReached),
+            // so attempt the tail check to avoid stalling downstream.
+            try
+            {
+                await TryProduceTailMessageAsync(scope.ServiceProvider, logManager, log.Id, ct);
+            }
+            catch (Exception tailEx)
+            {
+                _logger.LogWarning(tailEx, "Post-failure tail check also failed for LogId {LogId}. Safety-net poller will recover.", item.LogId);
+            }
+        }
+    }
+
+    private async Task TryProduceTailMessageAsync(IServiceProvider scopeProvider, IDataAcquisitionLogManager logManager, long logId, CancellationToken ct)
+    {
+        try
+        {
+            var tailResult = await logManager.TryCompleteTailAsync(logId, ct);
+            if (tailResult == null)
+            {
+                return; // Group not yet complete.
+            }
+
+            var producer = scopeProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
+
+            var headers = new Headers
+            {
+                new Header(DataAcquisitionConstants.HeaderNames.CorrelationId,
+                    Encoding.UTF8.GetBytes(tailResult.CorrelationId))
+            };
+
+            if (!string.IsNullOrEmpty(tailResult.TraceParentId))
+            {
+                headers.Add("traceparent", Encoding.UTF8.GetBytes(tailResult.TraceParentId));
+            }
+
+            await producer.ProduceAsync(
+                KafkaTopic.ResourceAcquired.ToString(),
+                new Message<ResourceKey, ResourceAcquired>
+                {
+                    Key = new ResourceKey
+                    {
+                        FacilityId = tailResult.FacilityId,
+                        CorrelationId = tailResult.CorrelationId
+                    },
+                    Headers = headers,
+                    Value = tailResult.ResourceAcquired
+                }, ct);
+
+            _logger.LogInformation(
+                "Produced inline AcquisitionComplete tail for FacilityId={FacilityId}, CorrelationId={CorrelationId}",
+                tailResult.FacilityId, tailResult.CorrelationId);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to produce inline tail message for LogId {LogId}. Safety-net poller will recover.", logId);
         }
     }
 }

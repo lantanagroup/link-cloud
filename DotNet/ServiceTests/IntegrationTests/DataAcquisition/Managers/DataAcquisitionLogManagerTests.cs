@@ -122,7 +122,7 @@ public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionInteg
     }
 
     [Fact]
-    public async Task UpdateAsync_ValidUpdate_ReturnsUpdatedModel()
+    public async Task UpdateAsync_ValidUpdate_PersistsUpdatedFields()
     {
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
@@ -149,12 +149,12 @@ public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionInteg
         };
 
         // Act
-        var result = await manager.UpdateAsync(updateModel);
+        await manager.UpdateAsync(updateModel);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal(RequestStatus.Completed, result.Status);
-        Assert.NotNull(result.CompletionDate);
+        var updated = await dbContext.DataAcquisitionLogs.AsNoTracking().FirstAsync(x => x.Id == log.Id);
+        Assert.Equal(RequestStatus.Completed, updated.Status);
+        Assert.NotNull(updated.CompletionDate);
     }
 
     [Fact]

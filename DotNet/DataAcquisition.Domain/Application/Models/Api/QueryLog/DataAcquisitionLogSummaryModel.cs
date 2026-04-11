@@ -30,7 +30,7 @@ public class DataAcquisitionLogSummaryModel
     public int? RetryAttempts { get; init; }
     public DateTime? CompletionDate { get; init; }
     public long? CompletionTimeMilliseconds { get; init; }
-    public List<string>? ResourceAcquiredIds { get; init; }
+    public int ResourceAcquiredCount { get; init; }
     public List<string>? Notes { get; init; }
     public bool IsDeleted { get; init; }
     public bool IsCensus { get; init; }

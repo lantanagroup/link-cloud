@@ -1,11 +1,13 @@
 ﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
@@ -18,7 +20,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 public interface IDataAcquisitionLogManager
 {
     Task<DataAcquisitionLogModel> CreateAsync(CreateDataAcquisitionLogModel log, CancellationToken cancellationToken = default);
-    Task<DataAcquisitionLogModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default);
+    Task UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default);
     Task<int> UpdateStatusBatchAsync(IEnumerable<long> ids, RequestStatus newStatus, bool incrementRetry = false, CancellationToken cancellationToken = default);
     Task DeleteAsync(long id, CancellationToken cancellationToken = default);
     Task<int> SoftDeleteByFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
@@ -32,6 +34,20 @@ public interface IDataAcquisitionLogManager
     Task<int> FailStalledQueuedLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default);
     Task<int> ResetStalledProcessingLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default);
     Task<int> SetMaxRetriesReachedWithNoteBatchAsync(IEnumerable<long> ids, string note, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Stamps the SiblingCount on all logs in a (FacilityId, CorrelationId, QueryPhase) group.
+    /// Called once after all logs have been committed by CreateLogEntries.
+    /// </summary>
+    Task<int> StampSiblingCountAsync(string facilityId, string correlationId, QueryPhase queryPhase, int siblingCount, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Atomically checks whether all sibling logs in a group are terminal
+    /// and the SiblingCount matches. If so, marks TailSent = true and
+    /// returns the data needed to produce the tail Kafka message.
+    /// Returns null if the group is not yet complete.
+    /// </summary>
+    Task<TailCompletionResult?> TryCompleteTailAsync(long completedLogId, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogManager : IDataAcquisitionLogManager
@@ -90,7 +106,6 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             QueryPhase = model.QueryPhase,
             FhirVersion = model.FhirVersion,
             QueryType = model.QueryType,
-            ResourceAcquiredIds = model.ResourceAcquiredIds,
             FhirQueries = model.FhirQuery.Select(q => new FhirQuery
             {
                 FacilityId = model.FacilityId,
@@ -136,6 +151,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             IsCensus = model.IsCensus,
             CreateDate = DateTime.UtcNow,
             ModifyDate = DateTime.UtcNow,
+            SiblingCount = model.SiblingCount,
         };
 
         await _database.DataAcquisitionLogRepository.AddAsync(log);
@@ -288,7 +304,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         return totalUpdated;
     }
 
-    public async Task<DataAcquisitionLogModel?> UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default)
+    public async Task UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.UpdateAsync");
         activity?.SetTag(DiagnosticNames.ReportId, updateLog.Id);
@@ -301,24 +317,23 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
         var logId = updateLog.Id.Value;
         var retryAttempts = updateLog.RetryAttempts;
-        var resourceAcquiredIds = (updateLog.ResourceAcquiredIds is { Count: > 0 })
-            ? updateLog.ResourceAcquiredIds : null;
+        var resourceAcquiredIds = updateLog.ResourceAcquiredIds;
         var traceId = updateLog.TraceId;
         var executionDate = updateLog.ExecutionDate;
         var completionDate = updateLog.CompletionDate;
         var completionTimeMs = updateLog.CompletionTimeMilliseconds;
-        var notes = updateLog.Notes;
+        var newNotes = updateLog.NewNotes;
         var status = updateLog.Status;
         var now = DateTime.UtcNow;
 
         if (completionTimeMs is not null)
             activity?.SetTag(DiagnosticNames.Duration, completionTimeMs);
 
+        // 1. Atomic scalar update — single DB round-trip
         var updated = await _dbContext.DataAcquisitionLogs
             .Where(l => l.Id == logId)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(l => l.RetryAttempts, l => retryAttempts ?? l.RetryAttempts)
-                .SetProperty(l => l.ResourceAcquiredIds, l => resourceAcquiredIds ?? l.ResourceAcquiredIds)
                 .SetProperty(l => l.TraceId, l => traceId ?? l.TraceId)
                 .SetProperty(l => l.ExecutionDate, l => executionDate ?? l.ExecutionDate)
                 .SetProperty(l => l.CompletionDate, l => completionDate ?? l.CompletionDate)
@@ -333,38 +348,45 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             throw new DataAcquisitionLogNotFoundException($"Data acquisition log with ID {logId} not found.");
         }
 
-        if (notes != null)
+        // 2. Append-only notes — never deletes existing notes (fixes data-loss on retry)
+        if (newNotes is { Count: > 0 })
         {
-            await _dbContext.DataAcquisitionLogNotes
-                .Where(n => n.DataAcquisitionLogId == logId)
+            var noteRows = newNotes.Select(n => new DataAcquisitionLogNote
+            {
+                DataAcquisitionLogId = logId,
+                Note = n,
+                CreateDate = now
+            }).ToList();
+
+            _dbContext.DataAcquisitionLogNotes.AddRange(noteRows);
+        }
+
+        // 3. Persist resource IDs into the child table
+        if (resourceAcquiredIds is { Count: > 0 })
+        {
+            // Delete old rows first (idempotent on re-process)
+            await _dbContext.DataAcquisitionLogResourceIds
+                .Where(r => r.DataAcquisitionLogId == logId)
                 .ExecuteDeleteAsync(cancellationToken);
 
-            if (notes.Count > 0)
+            var resourceRows = resourceAcquiredIds.Select(rid => new DataAcquisitionLogResourceId
             {
-                var nowUtc = DateTime.UtcNow;
-                var noteRows = notes.Select(n => new DataAcquisitionLogNote
-                {
-                    DataAcquisitionLogId = logId,
-                    Note = n,
-                    CreateDate = nowUtc
-                }).ToList();
+                DataAcquisitionLogId = logId,
+                ResourceId = rid,
+                CreateDate = now
+            }).ToList();
 
-                _dbContext.DataAcquisitionLogNotes.AddRange(noteRows);
-                await _dbContext.SaveChangesAsync(cancellationToken);
-            }
+            _dbContext.DataAcquisitionLogResourceIds.AddRange(resourceRows);
         }
 
-        var updatedLog = await _dbContext.DataAcquisitionLogs
-            .AsNoTracking()
-            .FirstOrDefaultAsync(l => l.Id == logId, cancellationToken);
-
-        if (updatedLog == null)
+        // 4. Single SaveChangesAsync for all pending note/resource inserts
+        if (_dbContext.ChangeTracker.HasChanges())
         {
-            activity?.SetStatus(ActivityStatusCode.Error, "Updated data acquisition log could not be reloaded");
-            throw new DataAcquisitionLogNotFoundException($"Data acquisition log with ID {logId} not found after update.");
+            await _dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        return DataAcquisitionLogModel.FromDomain(updatedLog);
+        // No reload here - hot path under load. Callers that need fresh state
+        // should query explicitly.
     }
 
     public async Task<List<DataAcquisitionLog>> GetLogsByIdsAsync(List<long> ids, CancellationToken cancellationToken = default)
@@ -568,5 +590,135 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         }
 
         return updated;
+    }
+
+    public async Task<int> StampSiblingCountAsync(string facilityId, string correlationId, QueryPhase queryPhase, int siblingCount, CancellationToken cancellationToken = default)
+    {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.StampSiblingCountAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+        activity?.SetTag(DiagnosticNames.CorrelationId, correlationId);
+
+        return await _dbContext.DataAcquisitionLogs
+            .Where(l => l.FacilityId == facilityId
+                && l.CorrelationId == correlationId
+                && l.QueryPhase == queryPhase
+                && l.SiblingCount == null)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(l => l.SiblingCount, siblingCount)
+                .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                cancellationToken);
+    }
+
+    public async Task<TailCompletionResult?> TryCompleteTailAsync(long completedLogId, CancellationToken cancellationToken = default)
+    {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.TryCompleteTailAsync");
+        activity?.SetTag(DiagnosticNames.ReportId, completedLogId);
+
+        var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped };
+
+        // Load group identity for the completed log (PK lookup)
+        var groupInfo = await _dbContext.DataAcquisitionLogs.AsNoTracking()
+            .Where(l => l.Id == completedLogId)
+            .Select(l => new
+            {
+                l.FacilityId,
+                l.CorrelationId,
+                l.QueryPhase,
+                l.SiblingCount,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // Short-circuit: nothing to do if the log doesn't exist, SiblingCount
+        // isn't stamped yet, or the group isn't fully terminal.
+        if (groupInfo == null
+            || groupInfo.SiblingCount == null
+            || groupInfo.CorrelationId == null
+            || groupInfo.QueryPhase == null)
+        {
+            return null;
+        }
+
+        // Count terminal siblings. 
+        var terminalCount = await _dbContext.DataAcquisitionLogs.AsNoTracking()
+            .CountAsync(l =>
+                !l.TailSent
+                && l.SiblingCount != null
+                && l.CorrelationId != null
+                && l.QueryPhase != null
+                && l.FacilityId == groupInfo.FacilityId
+                && l.CorrelationId == groupInfo.CorrelationId
+                && l.QueryPhase == groupInfo.QueryPhase
+                && l.Status != null
+                && terminalStatuses.Contains(l.Status.Value),
+                cancellationToken);
+
+        if (terminalCount < groupInfo.SiblingCount)
+        {
+            return null;
+        }
+
+        // Atomically claim the tail — only one worker can win this race.
+        var claimed = await _dbContext.DataAcquisitionLogs
+            .Where(l =>
+                l.FacilityId == groupInfo.FacilityId
+                && l.CorrelationId == groupInfo.CorrelationId
+                && l.QueryPhase == groupInfo.QueryPhase
+                && l.SiblingCount != null
+                && !l.TailSent)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(l => l.TailSent, true)
+                .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                cancellationToken);
+
+        if (claimed == 0)
+        {
+            return null; // Another worker already sent the tail.
+        }
+
+        // Read the data we need for the tail Kafka message.
+        var representative = await _dbContext.DataAcquisitionLogs.AsNoTracking()
+            .Where(l =>
+                l.FacilityId == groupInfo.FacilityId
+                && l.CorrelationId == groupInfo.CorrelationId
+                && l.QueryPhase == groupInfo.QueryPhase)
+            .Select(l => new
+            {
+                l.PatientId,
+                l.ReportableEvent,
+                l.TraceId,
+                ScheduledReport = l.ScheduledReportEntity != null ? new ScheduledReport
+                {
+                    ReportTrackingId = l.ScheduledReportEntity.ReportTrackingId,
+                    Frequency = l.ScheduledReportEntity.Frequency,
+                    StartDate = DateTime.SpecifyKind(l.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
+                    EndDate = DateTime.SpecifyKind(l.ScheduledReportEntity.EndDate, DateTimeKind.Utc),
+                    ReportTypes = l.ScheduledReportEntity.ReportTypes != null
+                        ? l.ScheduledReportEntity.ReportTypes.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).ToList()
+                        : new List<string>()
+                } : null,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (representative == null)
+        {
+            return null;
+        }
+
+        return new TailCompletionResult
+        {
+            FacilityId = groupInfo.FacilityId,
+            CorrelationId = groupInfo.CorrelationId!,
+            TraceParentId = representative.TraceId,
+            ResourceAcquired = new ResourceAcquired
+            {
+                AcquisitionComplete = true,
+                PatientId = representative.PatientId ?? string.Empty,
+                QueryType = groupInfo.QueryPhase.ToString()!,
+                ReportableEvent = representative.ReportableEvent ?? default,
+                ScheduledReports = representative.ScheduledReport != null
+                    ? new List<ScheduledReport> { representative.ScheduledReport }
+                    : new List<ScheduledReport>()
+            }
+        };
     }
 }

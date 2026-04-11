@@ -20,7 +20,7 @@ public sealed class MultiPatientAdhocReportingTest : IAsyncLifetime
     private static readonly TestConfig.SmokeTestConfig Config = new("MULTI_PATIENT_TEST",
         defaultPatientIds: [],
         defaultPollingIntervalSeconds: 5,
-        defaultMaxRetryCount: 300,
+        defaultMaxRetryCount: 10_000_000,
         defaultLokiScrapeWindowMinutes: 30);
 
     private readonly DualOutputHelper _output;

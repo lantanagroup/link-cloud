@@ -89,7 +89,7 @@ public class DataAcquisitionLogModel
             RetryAttempts = log.RetryAttempts,
             CompletionDate = log.CompletionDate,
             CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
-            ResourceAcquiredIds = log.ResourceAcquiredIds,
+            ResourceAcquiredIds = log.ResourceIds?.Select(r => r.ResourceId).ToList() ?? new List<string>(),
             ReferenceResourceCount = log.ReferenceResources?.Count ?? 0,
             Notes = null,
             ScheduledReport = log.ScheduledReportEntity != null

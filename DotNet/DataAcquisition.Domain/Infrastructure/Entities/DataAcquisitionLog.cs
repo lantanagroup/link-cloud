@@ -39,8 +39,6 @@ public class DataAcquisitionLog
 
     public long? CompletionTimeMilliseconds { get; set; }
 
-    public List<string>? ResourceAcquiredIds { get; set; } = new();
-
     public long? ScheduledReportId { get; set; }
 
     [ForeignKey("ScheduledReportId")]
@@ -64,6 +62,14 @@ public class DataAcquisitionLog
     [StringLength(64)]
     public string? TraceId { get; set; }
 
+    /// <summary>
+    /// The total number of sibling logs created in the same
+    /// (FacilityId, CorrelationId, QueryPhase) group.
+    /// Stamped by the creator after all logs are committed.
+    /// Null means creation is still in progress (or legacy row).
+    /// </summary>
+    public int? SiblingCount { get; set; }
+
     [Key]
     public long Id { get; set; }
     public DateTime CreateDate { get; set; } = DateTime.UtcNow;
@@ -75,6 +81,9 @@ public class DataAcquisitionLog
 
     [InverseProperty("DataAcquisitionLog")]
     public virtual ICollection<DataAcquisitionLogNote> NoteEntries { get; set; } = new List<DataAcquisitionLogNote>();
+
+    [InverseProperty("DataAcquisitionLog")]
+    public virtual ICollection<DataAcquisitionLogResourceId> ResourceIds { get; set; } = new List<DataAcquisitionLogResourceId>();
 
     public virtual ICollection<ReferenceResources> ReferenceResources { get; set; } = new List<ReferenceResources>();
 }

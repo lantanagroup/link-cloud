@@ -463,9 +463,10 @@ public class LogController : Controller
         {
             try
             {
-                var updatedLog = await _logManager.UpdateAsync(updateModel, cancellationToken);
-
-                return Accepted(updatedLog);
+                updateModel.Id = long.Parse(id);
+                await _logManager.UpdateAsync(updateModel, cancellationToken);
+                var updated = _logQueries.GetAsync(updateModel.Id.Value, cancellationToken).Result;
+                return Accepted(updated);
             }
             catch (DataAcquisitionLogNotFoundException ex)
             {

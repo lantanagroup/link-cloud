@@ -282,7 +282,7 @@ public class PatientDataServiceTests
                 It.IsAny<string>(),
                 It.IsAny<ScheduledReport>(),
                 It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+            .ReturnsAsync(0);
 
         // Act
         await _service.CreateLogEntries(request, cancellationToken);
@@ -346,7 +346,7 @@ public class PatientDataServiceTests
 
         _mockLogManager
             .Setup(manager => manager.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), cancellationToken))
-            .ReturnsAsync(model);
+            .Returns(Task.CompletedTask);
 
         _mockFhirQueryQueries
             .Setup(m => m.GetByFacilityIdAsync("facilityId", cancellationToken))
@@ -436,7 +436,7 @@ public class PatientDataServiceTests
         _mockLogManager
             .Setup(manager => manager.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), cancellationToken))
             .Callback<UpdateDataAcquisitionLogModel, CancellationToken>((m, ct) => updatedModel = m)
-            .ReturnsAsync(model);
+            .Returns(Task.CompletedTask);
 
         // Act
         await _service.ExecuteLogRequest(request, cancellationToken);
@@ -509,7 +509,7 @@ public class PatientDataServiceTests
         _mockLogManager
             .Setup(manager => manager.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), cancellationToken))
             .Callback<UpdateDataAcquisitionLogModel, CancellationToken>((m, ct) => updatedModel = m)
-            .ReturnsAsync(model);
+            .Returns(Task.CompletedTask);
 
         // Act
         await _service.ExecuteLogRequest(request, cancellationToken);
@@ -581,7 +581,7 @@ public class PatientDataServiceTests
         _mockLogManager
             .Setup(manager => manager.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), cancellationToken))
             .Callback<UpdateDataAcquisitionLogModel, CancellationToken>((m, ct) => updatedModel = m)
-            .ReturnsAsync(model);
+            .Returns(Task.CompletedTask);
 
         // Act
         await _service.ExecuteLogRequest(request, cancellationToken);
@@ -590,7 +590,7 @@ public class PatientDataServiceTests
         Assert.NotNull(updatedModel);
         Assert.Equal(3, updatedModel.RetryAttempts);
         Assert.Equal(RequestStatus.MaxRetriesReached, updatedModel.Status);
-        Assert.Contains(updatedModel.Notes, n => n.Contains("Maximum retry attempts reached (3)."));
+        Assert.Contains(updatedModel.NewNotes, n => n.Contains("Maximum retry attempts reached (3)."));
     }
 
     [Fact]
@@ -686,7 +686,7 @@ public class PatientDataServiceTests
             {
                 updates.Add(model);
             })
-            .ReturnsAsync(logModel);
+            .Returns(Task.CompletedTask);
 
         // Act
         await _service.ExecuteLogRequest(request, cancellationToken);
@@ -698,7 +698,7 @@ public class PatientDataServiceTests
 
         Assert.Contains(updates, u =>
             u.Status == RequestStatus.Skipped &&
-            (u.Notes?.Any(n => n.Contains("No IDs found in _id query parameter for Search FHIR query. Marking log as Completed.")) ?? false));
+            (u.NewNotes?.Any(n => n.Contains("No IDs found in _id query parameter for Search FHIR query. Marking log as Completed.")) ?? false));
 
         // Most important: ExecuteSearch should NEVER be called when no valid IDs exist
         _mockFhirApiService.Verify(
@@ -781,14 +781,14 @@ public class PatientDataServiceTests
                 if (model.Status == RequestStatus.Completed)
                 {
                     // This note must NOT be present
-                    var hasNoIdsNote = model.Notes?.Any(n =>
+                    var hasNoIdsNote = model.NewNotes?.Any(n =>
                         n.Contains("No IDs found in _id query parameter for Search FHIR query") &&
                         n.Contains("Marking log as Completed")) ?? false;
 
                     Assert.False(hasNoIdsNote, "The 'No IDs found' note should not be added when valid IDs exist.");
                 }
             })
-            .ReturnsAsync(logModel);
+            .Returns(Task.CompletedTask);
 
         _mockLogManager
             .Setup(q => q.TrySetLogStatusAsync(logId, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
@@ -828,7 +828,7 @@ public class PatientDataServiceTests
             m => m.UpdateAsync(
                 It.Is<UpdateDataAcquisitionLogModel>(u =>
                     u.Status == RequestStatus.Completed &&
-                    (u.Notes == null || !u.Notes.Any(n => n.Contains("No IDs found in _id query parameter")))),
+                    (u.NewNotes == null || !u.NewNotes.Any(n => n.Contains("No IDs found in _id query parameter")))),
                 cancellationToken),
             Times.AtLeastOnce());
     }
@@ -922,7 +922,7 @@ public class PatientDataServiceTests
 
         _mockLogManager
             .Setup(m => m.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), cancellationToken))
-            .ReturnsAsync(model)
+            .Returns(Task.CompletedTask)
             .Callback<UpdateDataAcquisitionLogModel, CancellationToken>((updateModel, _) =>
             {
                 // Capture the final log state
@@ -1005,7 +1005,7 @@ public class PatientDataServiceTests
                 u.RetryAttempts == 0 &&
                 u.ExecutionDate >= DateTime.UtcNow.AddSeconds(20) &&  // Widened range to account for execution time
                 u.ExecutionDate <= DateTime.UtcNow.AddSeconds(40) &&
-                u.Notes.Any(n => n.Contains("Throttled (429): Retrying after") && n.Contains("30"))  // Check for specific delay in note
+                u.NewNotes.Any(n => n.Contains("Throttled (429): Retrying after") && n.Contains("30"))  // Check for specific delay in note
             ),
             cancellationToken),
             Times.Exactly(1));  // Exactly once for the reschedule (the Processing update is separate)
@@ -1070,7 +1070,7 @@ public class PatientDataServiceTests
                 u.RetryAttempts == 0 &&
                 u.ExecutionDate >= DateTime.UtcNow.AddMinutes(1.9) &&  // Approximate
                 u.ExecutionDate <= DateTime.UtcNow.AddMinutes(2.1) &&
-                u.Notes.Any(n => n.Contains("Throttled (429): Retrying after"))
+                u.NewNotes.Any(n => n.Contains("Throttled (429): Retrying after"))
             ),
             cancellationToken),
             Times.AtLeastOnce);
@@ -1133,7 +1133,7 @@ public class PatientDataServiceTests
                 u.RetryAttempts == 0 &&
                 u.ExecutionDate >= DateTime.UtcNow.AddSeconds(55) &&  // Approx for 60s, allowing execution variance
                 u.ExecutionDate <= DateTime.UtcNow.AddSeconds(65) &&
-                u.Notes.Any(n => n.Contains("Throttled (429): Retrying after") && n.Contains("60"))
+                u.NewNotes.Any(n => n.Contains("Throttled (429): Retrying after") && n.Contains("60"))
             ),
             cancellationToken),
             Times.Exactly(1));  // Once for reschedule (Processing update separate)
