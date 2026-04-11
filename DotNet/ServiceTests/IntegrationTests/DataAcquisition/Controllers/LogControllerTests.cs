@@ -12,6 +12,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -314,10 +315,17 @@ public class LogControllerTests : IClassFixture<DataAcquisitionIntegrationTestFi
     {
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
         var controller = CreateController(scope);
 
+        var maxExistingId = await dbContext.DataAcquisitionLogs
+            .OrderByDescending(l => l.Id)
+            .Select(l => l.Id)
+            .FirstOrDefaultAsync();
+        var nonExistingId = maxExistingId + 10_000;
+
         // Act
-        var result = await controller.Process(999);
+        var result = await controller.Process(nonExistingId);
 
         // Assert
         var problemResult = Assert.IsType<ObjectResult>(result);

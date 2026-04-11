@@ -62,7 +62,8 @@ namespace IntegrationTests.DataAcquisition
             // cannot run against 'master', so point to a dedicated test database.
             var csBuilder = new SqlConnectionStringBuilder(_sqlContainer.GetConnectionString())
             {
-                InitialCatalog = "DataAcquisitionTest"
+                InitialCatalog = "DataAcquisitionTest",
+                ConnectTimeout = 60
             };
             var connectionString = csBuilder.ConnectionString;
 
@@ -89,7 +90,13 @@ namespace IntegrationTests.DataAcquisition
 
             builder.Services.AddDbContext<DataAcquisitionDbContext>(options =>
             {
-                options.UseSqlServer(connectionString);
+                options.UseSqlServer(connectionString, sqlOptions =>
+                {
+                    sqlOptions.EnableRetryOnFailure(
+                        maxRetryCount: 5,
+                        maxRetryDelay: TimeSpan.FromSeconds(5),
+                        errorNumbersToAdd: null);
+                });
             });
 
             // Register generic repositories for all required entities
