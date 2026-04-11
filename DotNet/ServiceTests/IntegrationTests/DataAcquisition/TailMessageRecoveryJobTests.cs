@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -42,6 +42,15 @@ public class TailMessageRecoveryJobTests
         using (var scope = _fixture.ServiceProvider.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+            // Isolate this test from shared fixture state: exclude pre-existing
+            // orphaned groups from safety-net selection so MaxGroupsPerRun targets
+            // only groups seeded by this test.
+            await db.DataAcquisitionLogs
+                .Where(l => !l.TailSent)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(l => l.TailSent, true)
+                    .SetProperty(l => l.ModifyDate, DateTime.UtcNow));
 
             // Group A (orphaned, fully terminal)
             await SeedTailGroupAsync(db, facilityId, correlationA, siblingCount: 2);
@@ -107,6 +116,14 @@ public class TailMessageRecoveryJobTests
         using (var scope = _fixture.ServiceProvider.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+            // Isolate this test from shared fixture state.
+            await db.DataAcquisitionLogs
+                .Where(l => !l.TailSent)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(l => l.TailSent, true)
+                    .SetProperty(l => l.ModifyDate, DateTime.UtcNow));
+
             await SeedTailGroupAsync(db, facilityId, correlation, siblingCount: 2);
         }
 
