@@ -147,6 +147,17 @@ jobs:
         continue-on-error: true
         timeout-minutes: 5
 
+      - name: Normalize TRX output location
+        if: always()
+        run: |
+          mkdir -p ./TestResults
+          i=0
+          while IFS= read -r -d '' file; do
+            i=$((i+1))
+            cp "$file" "./TestResults/integration-$i.trx"
+          done < <(find . -type f -name "*.trx" -print0)
+          echo "Collected $i trx file(s) into ./TestResults"
+
       - name: Debug test results
         run: |
           ls -la ./TestResults || true
@@ -158,18 +169,14 @@ jobs:
         if: always()
         with:
           name: integration-test-results
-          path: |
-            ./TestResults/*.trx
-            ./TestResults/**/*.trx
+          path: ./TestResults/*.trx
 
       - name: .NET Integration Test Report
         uses: dorny/test-reporter@v2
         if: always()
         with:
           name: XUnit Integration Tests
-          path: |
-            ./TestResults/*.trx
-            ./TestResults/**/*.trx
+          path: ./TestResults/*.trx
           reporter: dotnet-trx
 
   dotnet-unit-tests:
