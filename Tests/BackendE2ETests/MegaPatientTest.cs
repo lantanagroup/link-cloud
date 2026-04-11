@@ -27,7 +27,7 @@ public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETe
     private string? _reportId;
 
     private AutomationConfig AutomationCfg => _sp.GetRequiredService<AutomationConfig>();
-    private DualOutputHelper Output => _sp.GetRequiredService<DualOutputHelper>();
+    private ConsoleAutomationOutput Output => _sp.GetRequiredService<ConsoleAutomationOutput>();
     private FhirDataLoader FhirDataLoader => _sp.GetRequiredService<FhirDataLoader>();
 
     public MegaPatientTest(BackendE2ETestFixture fixture)

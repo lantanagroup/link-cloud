@@ -1,12 +1,9 @@
-using Flurl.Http;
+﻿using Flurl.Http;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
-using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
-using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.Extensions.Options;
 
@@ -112,11 +109,23 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         GetOrDefaultAsync(() => Request($"data/acquisition-logs/{id}")
             .GetJsonAsync<DataAcquisitionLogApiModel>(cancellationToken: cancellationToken));
 
+    public Task<List<string>> GetAcquisitionLogNotesAsync(
+        long id,
+        CancellationToken cancellationToken = default) =>
+        Request($"data/acquisition-logs/{id}/notes")
+            .GetJsonAsync<List<string>>(cancellationToken: cancellationToken);
+
     public Task<DataAcquisitionLogStatusStatisticsApiModel?> GetReportStatusCountsAsync(
         string reportId,
         CancellationToken cancellationToken = default) =>
         GetOrDefaultAsync(() => Request($"data/acquisition-logs/report/{reportId}/status-counts")
             .GetJsonAsync<DataAcquisitionLogStatusStatisticsApiModel>(cancellationToken: cancellationToken));
+
+    public Task GetReportStatisticsAsync(
+        string reportId,
+        CancellationToken cancellationToken = default) =>
+        Request($"data/acquisition-logs/report/{reportId}/statistics")
+            .GetAsync(cancellationToken: cancellationToken);
 
     public Task<DataAcquisitionReportSummaryApiModel?> GetReportSummaryAsync(
         string reportId,
@@ -141,4 +150,64 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
             .SetQueryParam("pageSize", pageSize)
             .SetQueryParam("pageNumber", pageNumber)
             .GetJsonAsync<PagedConfigModel<ReferenceResourceApiModel>>(cancellationToken: cancellationToken);
+
+    public Task ProcessAcquisitionLogAsync(
+        long id,
+        CancellationToken cancellationToken = default) =>
+        Request($"data/acquisition-logs/{id}/process")
+            .PostJsonAsync(id, cancellationToken: cancellationToken);
+
+    public Task ProcessAcquisitionLogsBulkAsync(
+        List<long> ids,
+        CancellationToken cancellationToken = default) =>
+        Request("data/acquisition-logs/process-bulk")
+            .PostJsonAsync(ids, cancellationToken: cancellationToken);
+
+    public Task<DataAcquisitionBulkActionResultApiModel?> CancelAcquisitionLogsBulkAsync(
+        List<long> ids,
+        int minAgeHours = 24,
+        CancellationToken cancellationToken = default) =>
+        GetOrDefaultAsync(() => Request("data/acquisition-logs/cancel-bulk")
+            .SetQueryParam("minAgeHours", minAgeHours)
+            .PostJsonAsync(ids, cancellationToken: cancellationToken)
+            .ReceiveJson<DataAcquisitionBulkActionResultApiModel>());
+
+    public Task ProcessAcquisitionLogsByFilterAsync(
+        object filter,
+        CancellationToken cancellationToken = default) =>
+        Request("data/acquisition-logs/process-by-filter")
+            .PostJsonAsync(filter, cancellationToken: cancellationToken);
+
+    public Task<DataAcquisitionBulkActionResultApiModel?> CancelAcquisitionLogsByFilterAsync(
+        object filter,
+        int minAgeHours = 24,
+        CancellationToken cancellationToken = default) =>
+        GetOrDefaultAsync(() => Request("data/acquisition-logs/cancel-by-filter")
+            .SetQueryParam("minAgeHours", minAgeHours)
+            .PostJsonAsync(filter, cancellationToken: cancellationToken)
+            .ReceiveJson<DataAcquisitionBulkActionResultApiModel>());
+
+    public Task DeleteAcquisitionLogAsync(
+        long id,
+        CancellationToken cancellationToken = default) =>
+        DeleteOrIgnoreAsync(() => Request($"data/acquisition-logs/{id}")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
+    public Task SoftDeleteLogsByReportTrackingIdAsync(
+        string reportTrackingId,
+        CancellationToken cancellationToken = default) =>
+        DeleteOrIgnoreAsync(() => Request($"data/acquisition-logs/report/{reportTrackingId}")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
+    public Task RestoreLogsByReportTrackingIdAsync(
+        string reportTrackingId,
+        CancellationToken cancellationToken = default) =>
+        Request($"data/acquisition-logs/report/{reportTrackingId}/restore")
+            .PatchJsonAsync(new { }, cancellationToken: cancellationToken);
+
+    public Task RestoreLogsByFacilityAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        Request($"data/acquisition-logs/facility/{facilityId}/restore")
+            .PatchJsonAsync(new { }, cancellationToken: cancellationToken);
 }

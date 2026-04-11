@@ -32,8 +32,8 @@ public sealed class BackendE2ETestFixture : IDisposable
         builder.Services.AddSingleton(automationCfg);
 
         // Output helper (console-based for CI)
-        builder.Services.AddSingleton<DualOutputHelper>();
-        builder.Services.AddSingleton<IAutomationOutput>(sp => sp.GetRequiredService<DualOutputHelper>());
+        builder.Services.AddSingleton<ConsoleAutomationOutput>();
+        builder.Services.AddSingleton<IAutomationOutput>(sp => sp.GetRequiredService<ConsoleAutomationOutput>());
 
         // Infrastructure
         builder.Services.AddSingleton(sp => new LantanaGroup.Link.Automation.Link.Helpers.DatabaseConnectionFactory(sp.GetRequiredService<AutomationConfig>().Database));

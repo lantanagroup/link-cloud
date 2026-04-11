@@ -20,16 +20,6 @@ public class ConsoleAutomationOutput : IAutomationOutput
 }
 
 /// <summary>
-/// Alias kept for backward compatibility with existing DI registrations.
-/// Functionally identical to <see cref="ConsoleAutomationOutput"/>.
-/// New code should use <see cref="ConsoleAutomationOutput"/> directly.
-/// </summary>
-[Obsolete("Use ConsoleAutomationOutput instead. This alias exists only for backward compatibility.")]
-public class DualOutputHelper : ConsoleAutomationOutput
-{
-}
-
-/// <summary>
 /// Wraps an <see cref="IAutomationOutput"/> and raises an event for each log line,
 /// optionally forwarding to the inner output.
 /// </summary>

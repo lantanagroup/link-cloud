@@ -97,11 +97,15 @@ Centralized clinical code tables with real SNOMED, ICD-10, RxNorm, LOINC, and CV
 ## Helpers (`Helpers/`)
 
 - `IAutomationOutput` — platform-agnostic output abstraction (console, test output, event streams).
-- `DualOutputHelper` — writes to both console and captured output.
+- `ConsoleAutomationOutput` — writes to console output.
+- `EventingAutomationOutput` — wraps another output and raises a callback per line (optionally forwards).
 - `TimestampedAutomationOutput` — adds timestamps to output lines.
 - `RetryHelper` — generic async retry with configurable backoff.
 - `StatusPollingHelper` — polls a status endpoint until a condition is met.
 - `BackgroundMonitorLoop` — generic background polling loop with event emission.
+- `TestRunMonitor` — unified monitor coordinator for run-time diagnostics.
+- `ILogScraper` / `IMessageBusMonitor` — contracts for log and message-bus diagnostics.
+- `MonitorEventModels` / `MonitorProbeModels` — shared event and probe payload contracts.
 - `MilestoneTracker` — tracks named milestones with timestamps.
 - `ProgressTracker` — tracks per-item progress through pipeline stages.
 - `DatabaseConnectionFactory` — base class for database connection resolution.

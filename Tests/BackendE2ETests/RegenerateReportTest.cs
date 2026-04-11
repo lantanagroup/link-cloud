@@ -38,7 +38,7 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
     private List<(string Name, string Json)> _generatedBundles = [];
 
     private AutomationConfig AutomationCfg => _sp.GetRequiredService<AutomationConfig>();
-    private DualOutputHelper Output => _sp.GetRequiredService<DualOutputHelper>();
+    private ConsoleAutomationOutput Output => _sp.GetRequiredService<ConsoleAutomationOutput>();
     private FhirDataLoader FhirDataLoader => _sp.GetRequiredService<FhirDataLoader>();
 
     public RegenerateReportTest(BackendE2ETestFixture fixture)

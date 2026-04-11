@@ -33,7 +33,7 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
     private bool _queryDispatchConfigCreated;
 
     // Resolve clients once for readability
-    private IAutomationOutput Output => _sp.GetRequiredService<DualOutputHelper>();
+    private IAutomationOutput Output => _sp.GetRequiredService<ConsoleAutomationOutput>();
     private AutomationConfig AutomationCfg => _sp.GetRequiredService<AutomationConfig>();
     private IFacilityServiceClient FacilityClient => _sp.GetRequiredService<IFacilityServiceClient>();
     private IDataAcquisitionServiceClient DataAcqClient => _sp.GetRequiredService<IDataAcquisitionServiceClient>();
@@ -293,6 +293,33 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
         await RunAsync(results, "DataAcq.SearchAcquisitionLogs",
             () => DataAcqClient.SearchAcquisitionLogsAsync(_facilityId, Guid.NewGuid().ToString()));
 
+        await RunAsync(results, "DataAcq.GetAcquisitionLogNotes",
+            () => DataAcqClient.GetAcquisitionLogNotesAsync(1));
+
+        await RunAsync(results, "DataAcq.GetReportStatistics",
+            () => DataAcqClient.GetReportStatisticsAsync(Guid.NewGuid().ToString()));
+
+        await RunExpectingStatusAsync(results, "DataAcq.ProcessAcquisitionLog", 404,
+            () => DataAcqClient.ProcessAcquisitionLogAsync(long.MaxValue));
+
+        await RunAsync(results, "DataAcq.ProcessAcquisitionLogsBulk",
+            () => DataAcqClient.ProcessAcquisitionLogsBulkAsync([long.MaxValue]));
+
+        await RunAsync(results, "DataAcq.CancelAcquisitionLogsBulk",
+            () => DataAcqClient.CancelAcquisitionLogsBulkAsync([long.MaxValue], minAgeHours: 0));
+
+        await RunAsync(results, "DataAcq.ProcessAcquisitionLogsByFilter",
+            () => DataAcqClient.ProcessAcquisitionLogsByFilterAsync(new
+            {
+                FacilityId = _facilityId
+            }));
+
+        await RunAsync(results, "DataAcq.CancelAcquisitionLogsByFilter",
+            () => DataAcqClient.CancelAcquisitionLogsByFilterAsync(new
+            {
+                FacilityId = _facilityId
+            }, minAgeHours: 0));
+
         await RunAsync(results, "DataAcq.GetReportStatusCounts",
             () => DataAcqClient.GetReportStatusCountsAsync(Guid.NewGuid().ToString()));
 
@@ -303,10 +330,22 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
             () => DataAcqClient.GetAcquiredResourceIdsForReportAsync(_facilityId, Guid.NewGuid().ToString()));
 
         await RunAsync(results, "DataAcq.GetReferenceResourcesForLog",
-            () => DataAcqClient.GetReferenceResourcesForLogAsync(0));
+            () => DataAcqClient.GetReferenceResourcesForLogAsync(1));
 
         await RunAsync(results, "DataAcq.SoftDeleteLogsByFacility",
             () => DataAcqClient.SoftDeleteLogsByFacilityAsync(_facilityId));
+
+        await RunAsync(results, "DataAcq.DeleteAcquisitionLog",
+            () => DataAcqClient.DeleteAcquisitionLogAsync(long.MaxValue));
+
+        await RunAsync(results, "DataAcq.SoftDeleteLogsByReportTrackingId",
+            () => DataAcqClient.SoftDeleteLogsByReportTrackingIdAsync(Guid.NewGuid().ToString()));
+
+        await RunAsync(results, "DataAcq.RestoreLogsByReportTrackingId",
+            () => DataAcqClient.RestoreLogsByReportTrackingIdAsync(Guid.NewGuid().ToString()));
+
+        await RunAsync(results, "DataAcq.RestoreLogsByFacility",
+            () => DataAcqClient.RestoreLogsByFacilityAsync(_facilityId));
 
         await RunAsync(results, "Validation.GetValidationResults",
             () => ValidationClient.GetValidationResultsAsync(_facilityId, Guid.NewGuid().ToString()));
@@ -384,6 +423,23 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
         {
             await action();
             results.AddSuccess(name);
+        }
+        catch (Exception ex)
+        {
+            results.AddError(name, ex.Message);
+        }
+    }
+
+    private async Task RunExpectingStatusAsync(ApiRunResults results, string name, int expectedStatusCode, Func<Task> action)
+    {
+        try
+        {
+            await action();
+            results.AddError(name, $"Expected HTTP {expectedStatusCode} but call succeeded.");
+        }
+        catch (FlurlHttpException ex) when (ex.StatusCode == expectedStatusCode)
+        {
+            results.AddSuccess(name, $"{expectedStatusCode} (expected)");
         }
         catch (Exception ex)
         {

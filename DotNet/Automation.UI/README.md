@@ -61,6 +61,10 @@ The run detail page includes a modal for browsing DA logs with:
 - Per-log detail view with FHIR query parameters and resource types
 - Reference log identification
 
+### API stability execution
+
+- Includes an API stability run mode that validates broad service endpoint reachability and request/response compatibility via `LinkSdk` clients.
+
 ## Controllers
 
 | Controller | Purpose |
@@ -79,6 +83,8 @@ The run detail page includes a modal for browsing DA logs with:
 | `RunAutomationOutput` | `IAutomationOutput` implementation that captures logs and pushes to SignalR |
 | `RunHub` | SignalR hub for real-time log streaming to connected clients |
 
+`ConsoleAutomationOutput` is used as the base console writer where direct console output is needed.
+
 ## Persistence (MongoDB)
 
 Run state and pipeline snapshots are persisted to MongoDB via `ISnapshotStore` / `MongoSnapshotStore`:
@@ -94,6 +100,8 @@ Supports two modes:
 
 - **OpenID Connect** — full OIDC flow with cookie-based sessions (production).
 - **Anonymous** — `Authentication:EnableAnonymousAccess=true` bypasses all auth (development).
+
+When anonymous mode is enabled, outbound `LinkSdk` calls are configured with `AllowAnonymous=true` and skip bearer token attachment.
 
 ## Configuration
 
@@ -128,3 +136,4 @@ The Dockerfile is a multi-stage build that copies all required project reference
 - Targets `.NET 8`.
 - Razor Pages / MVC hybrid (uses controllers with Razor views, not Razor Pages page model).
 - SignalR is used for real-time log push — the client subscribes to a run group via `RunHub.SubscribeRun(runId)`.
+- Snapshot/run state is persisted in MongoDB (`automation_runs`, `pipeline_snapshots`) and can be shared across multiple UI instances.

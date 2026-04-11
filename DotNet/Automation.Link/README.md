@@ -34,6 +34,7 @@ Automation.Link
 - `LokiScraper` — scrapes Loki for service log entries within a time window.
 - `KafkaErrorMonitor` — monitors Kafka dead-letter/error topics.
 - `MonitorProbes` — individual probe implementations (schedule, entries, populations, milestones, etc.).
+- `ProgressMonitor` — aggregates monitor events into human-readable progress output for long-running test flows.
 
 ### Facility and config setup (`Helpers/`)
 
@@ -63,6 +64,7 @@ Automation.Link
 ## Key concepts
 
 - `IAutomationOutput` is the common output abstraction used across all components.
+- `ConsoleAutomationOutput` is the concrete console writer used by current test/UI hosts.
 - `BackgroundDiagnosticsMonitor` emits runtime `MonitorEvent` instances that consumers can observe and react to.
 - All validators are non-throwing by default — they report findings through output rather than assertions, unless explicitly asked to assert.
 
@@ -77,3 +79,4 @@ This project is consumed by:
 
 - Targets `.NET 8`.
 - Most classes are designed to be composed in DI-backed test/service bootstraps.
+- Uses global usings to re-export `Automation` types (`IAutomationOutput`, `ConsoleAutomationOutput`, `RetryHelper`, etc.) for consuming projects.

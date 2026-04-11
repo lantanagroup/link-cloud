@@ -7,7 +7,6 @@ global using LantanaGroup.Automation.Configuration;
 global using AutomationInvariant = LantanaGroup.Automation.Helpers.AutomationInvariant;
 global using IAutomationOutput = LantanaGroup.Automation.Helpers.IAutomationOutput;
 global using EventingAutomationOutput = LantanaGroup.Automation.Helpers.EventingAutomationOutput;
-global using DualOutputHelper = LantanaGroup.Automation.Helpers.DualOutputHelper;
 global using ConsoleAutomationOutput = LantanaGroup.Automation.Helpers.ConsoleAutomationOutput;
 global using RetryHelper = LantanaGroup.Automation.Helpers.RetryHelper;
 global using OAuthConfig = LantanaGroup.Automation.Configuration.OAuthConfig;

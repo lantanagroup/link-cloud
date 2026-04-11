@@ -71,6 +71,13 @@ public static class FhirQueryTypeUtilities
     }
 }
 
+public class DataAcquisitionBulkActionResultApiModel
+{
+    public int Requested { get; set; }
+    public int Cancelled { get; set; }
+    public int Ineligible { get; set; }
+}
+
 public class CreateFhirQueryConfigurationRequestApiModel
 {
     public string FacilityId { get; set; } = string.Empty;
