@@ -1,4 +1,4 @@
-name: "Tests"
+﻿name: "Tests"
 
 on:
 #  schedule:
@@ -30,7 +30,7 @@ jobs:
         id: should
         shell: bash
         run: |
-          # For PRs, pass base�HEAD; for other events, the script will fallback
+          # For PRs, pass base…HEAD; for other events, the script will fallback
           chmod +x Scripts/should-run-smoke-test.sh
           result=$(Scripts/should-run-smoke-test.sh "origin/${{ github.base_ref }}...HEAD")
           echo "$result"
@@ -155,7 +155,7 @@ jobs:
         if: always()
         with:
           name: XUnit Integration Tests
-          path: ./TestResults/dotnet-integration-test-results.trx
+          path: ./TestResults/**/*.trx
           reporter: dotnet-trx
 
   dotnet-unit-tests:
