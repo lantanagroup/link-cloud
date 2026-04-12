@@ -67,7 +67,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             [
                 organization,
                 CreateDevice(),
-                CreatePatientList(reportEntries.Select(x => x.PatientId).ToList(), schedule.ReportStartDate, schedule.ReportEndDate),
+                CreatePatientList(reportEntries.Select(x => x.PatientId).ToList(), schedule.ReportStartDate.DateTime, schedule.ReportEndDate.DateTime),
             ];
 
             var reportName = _blobStorageService.GetReportName(schedule);

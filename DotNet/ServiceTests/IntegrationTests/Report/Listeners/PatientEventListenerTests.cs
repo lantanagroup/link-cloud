@@ -1,11 +1,13 @@
-﻿using Confluent.Kafka;
-using LantanaGroup.Link.Report.Domain.Enums;
+using Confluent.Kafka;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Listeners;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
+using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
+using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Task = System.Threading.Tasks.Task;
@@ -37,8 +39,8 @@ public class PatientEventListenerTests : IClassFixture<ReportIntegrationTestFixt
         {
             Id = reportId,
             FacilityId = facilityId,
-            ReportStartDate = DateTime.UtcNow.AddDays(-30),
-            ReportEndDate = DateTime.UtcNow.AddDays(30),
+            ReportStartDate = DateTimeOffset.UtcNow.AddDays(-30),
+            ReportEndDate = DateTimeOffset.UtcNow.AddDays(30),
             Frequency = Frequency.Monthly,
             ReportTypes = { "DE-111", "DE-222" },
             Status = ScheduleStatus.Scheduled,
@@ -86,8 +88,8 @@ public class PatientEventListenerTests : IClassFixture<ReportIntegrationTestFixt
         {
             Id = reportId,
             FacilityId = facilityId,
-            ReportStartDate = DateTime.UtcNow.AddDays(-30),
-            ReportEndDate = DateTime.UtcNow.AddDays(30),
+            ReportStartDate = DateTimeOffset.UtcNow.AddDays(-30),
+            ReportEndDate = DateTimeOffset.UtcNow.AddDays(30),
             Frequency = Frequency.Monthly,
             ReportTypes = new List<string> { "DE-111", "DE-222" },
             Status = ScheduleStatus.Scheduled,
@@ -133,8 +135,8 @@ public class PatientEventListenerTests : IClassFixture<ReportIntegrationTestFixt
         {
             Id = reportId,
             FacilityId = facilityId,
-            ReportStartDate = DateTime.UtcNow.AddDays(-30),
-            ReportEndDate = DateTime.UtcNow.AddDays(30),
+            ReportStartDate = DateTimeOffset.UtcNow.AddDays(-30),
+            ReportEndDate = DateTimeOffset.UtcNow.AddDays(30),
             Frequency = Frequency.Monthly,
             ReportTypes = { "DE-111", "DE-333" },
             Status = ScheduleStatus.Scheduled,

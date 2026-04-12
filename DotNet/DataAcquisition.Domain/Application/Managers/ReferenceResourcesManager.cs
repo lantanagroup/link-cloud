@@ -1,13 +1,14 @@
 ﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
+using System.Data;
+using IDatabase = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
@@ -18,15 +19,15 @@ public interface IReferenceResourcesManager
     Task CreateBatchAsync(IReadOnlyList<CreateReferenceResourcesModel> models, CancellationToken cancellationToken = default);
     Task UpdateBatchAsync(IReadOnlyList<UpdateReferenceResourcesModel> models, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Links existing canonical reference resource rows to a data acquisition log
-    /// via the junction table. Duplicate links are silently ignored.
-    /// </summary>
     Task LinkToLogAsync(long dataAcquisitionLogId, IReadOnlyList<Guid> referenceResourceIds, CancellationToken cancellationToken = default);
 }
 
 public class ReferenceResourcesManager : IReferenceResourcesManager
 {
+    private const int InsertChunkSize = 250;
+    private const int LockTimeoutMs = 30000;
+    private const int ExistenceCheckChunkSize = 800;
+
     private readonly ILogger<ReferenceResourcesManager> _logger;
     private readonly IDatabase _database;
     private readonly DataAcquisitionDbContext _dbContext;
@@ -45,10 +46,7 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
         activity?.SetTag(DiagnosticNames.ResourceId, model.ResourceId);
         activity?.SetTag(DiagnosticNames.ResourceType, model.ResourceType);
 
-        if (model == null)
-        {
-            throw new ArgumentNullException(nameof(model));
-        }
+        if (model == null) throw new ArgumentNullException(nameof(model));
 
         var entity = new ReferenceResources
         {
@@ -73,10 +71,7 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
         activity?.SetTag(DiagnosticNames.ResourceId, model.Id);
         activity?.SetTag(DiagnosticNames.ResourceType, model.ResourceType);
 
-        if (model == null)
-        {
-            throw new ArgumentNullException(nameof(model));
-        }
+        if (model == null) throw new ArgumentNullException(nameof(model));
 
         var modifyDate = DateTime.UtcNow;
 
@@ -90,9 +85,7 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
             cancellationToken);
 
         if (updated == 0)
-        {
             throw new KeyNotFoundException($"ReferenceResources with ID {model.Id} not found.");
-        }
 
         return new ReferenceResourcesModel
         {
@@ -109,37 +102,125 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
         if (models == null || models.Count == 0)
             return;
 
-        var now = DateTime.UtcNow;
-        var entities = models.Select(m => new ReferenceResources
-        {
-            FacilityId = m.FacilityId,
-            ResourceId = m.ResourceId,
-            ResourceType = m.ResourceType,
-            ReferenceResource = m.ReferenceResource,
-            QueryPhase = m.QueryPhase,
-            CreateDate = now,
-            ModifyDate = now
-        }).ToList();
+        var dedupedModels = models
+            .GroupBy(m => new { m.FacilityId, m.ResourceType, m.ResourceId })
+            .Select(g => g.First())
+            .ToList();
 
-        _dbContext.ReferenceResources.AddRange(entities);
-
-        try
+        foreach (var group in dedupedModels.GroupBy(m => new { m.FacilityId, m.ResourceType }))
         {
-            await _dbContext.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 2601 or 2627 })
-        {
-            // Concurrent patient workers raced to insert the same canonical
-            // reference resource. The winner already inserted it; detach the
-            // duplicates so the DbContext is clean for subsequent operations.
-            _logger.LogDebug("Duplicate reference resource insert detected during CreateBatchAsync; treating as idempotent race.");
+            var facilityId = group.Key.FacilityId;
+            var resourceType = group.Key.ResourceType;
+            var batch = group.ToList();
 
-            foreach (var entry in _dbContext.ChangeTracker.Entries<ReferenceResources>()
-                         .Where(e => e.State == EntityState.Added))
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
+
+            await AcquireLockAsync($"ReferenceResources:{facilityId}:{resourceType}", cancellationToken);
+
+            try
             {
-                entry.State = EntityState.Detached;
+                var now = DateTime.UtcNow;
+                var resourceIds = batch.Select(m => m.ResourceId).Distinct().ToList();
+
+                var existingKeys = await GetExistingResourceIdsAsync(facilityId, resourceType, resourceIds, cancellationToken);
+
+                var toInsert = batch
+                    .Where(m => !existingKeys.Contains(m.ResourceId))
+                    .Select(m => new ReferenceResources
+                    {
+                        FacilityId = m.FacilityId,
+                        ResourceId = m.ResourceId,
+                        ResourceType = m.ResourceType,
+                        ReferenceResource = m.ReferenceResource,
+                        QueryPhase = m.QueryPhase,
+                        CreateDate = now,
+                        ModifyDate = now
+                    })
+                    .ToList();
+
+                if (toInsert.Count > 0)
+                {
+                    foreach (var chunk in Chunk(toInsert, InsertChunkSize))
+                    {
+                        _dbContext.ReferenceResources.AddRange(chunk);
+                        await _dbContext.SaveChangesAsync(cancellationToken);
+                    }
+                }
+
+                _dbContext.ChangeTracker.Clear();
+
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                throw;
             }
         }
+    }
+
+    private async Task<HashSet<string>> GetExistingResourceIdsAsync(string facilityId, string resourceType, IReadOnlyList<string> resourceIds, CancellationToken cancellationToken)
+    {
+        var existingKeys = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var idChunk in Chunk(resourceIds, ExistenceCheckChunkSize))
+        {
+            var existing = await _dbContext.ReferenceResources
+                .Where(r => r.FacilityId == facilityId
+                         && r.ResourceType == resourceType
+                         && idChunk.Contains(r.ResourceId))
+                .Select(r => r.ResourceId)
+                .ToListAsync(cancellationToken);
+
+            foreach (var id in existing)
+                existingKeys.Add(id);
+        }
+
+        return existingKeys;
+    }
+
+    private async Task AcquireLockAsync(string resource, CancellationToken cancellationToken)
+    {
+        var connection = _dbContext.Database.GetDbConnection();
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = @"
+            DECLARE @result int;
+            EXEC @result = sp_getapplock
+                @Resource = @resource,
+                @LockMode = 'Exclusive',
+                @LockOwner = 'Transaction',
+                @LockTimeout = @lockTimeoutMs,
+                @DbPrincipal = 'public';
+            SELECT @result;";
+
+        var resourceParam = command.CreateParameter();
+        resourceParam.ParameterName = "@resource";
+        resourceParam.Value = resource;
+        command.Parameters.Add(resourceParam);
+
+        var timeoutParam = command.CreateParameter();
+        timeoutParam.ParameterName = "@lockTimeoutMs";
+        timeoutParam.Value = LockTimeoutMs;
+        command.Parameters.Add(timeoutParam);
+
+        var dbTransaction = _dbContext.Database.CurrentTransaction?.GetDbTransaction();
+        if (dbTransaction == null)
+            throw new InvalidOperationException("AcquireLockAsync must be called within an active transaction.");
+
+        command.Transaction = dbTransaction;
+
+        var resultObj = await command.ExecuteScalarAsync(cancellationToken);
+        var result = Convert.ToInt32(resultObj);
+
+        if (result < 0)
+            throw new InvalidOperationException($"Unable to acquire SQL app lock for resource '{resource}'. sp_getapplock result={result}.");
+    }
+
+    private static IEnumerable<List<T>> Chunk<T>(IReadOnlyList<T> source, int size)
+    {
+        for (var i = 0; i < source.Count; i += size)
+            yield return source.Skip(i).Take(size).ToList();
     }
 
     public async Task UpdateBatchAsync(IReadOnlyList<UpdateReferenceResourcesModel> models, CancellationToken cancellationToken = default)
@@ -148,6 +229,7 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
             return;
 
         var modifyDate = DateTime.UtcNow;
+
         foreach (var model in models)
         {
             await _dbContext.ReferenceResources
@@ -183,9 +265,7 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
                 .ToListAsync(cancellationToken);
 
             foreach (var resource in resourcesToLink)
-            {
                 log.ReferenceResources.Add(resource);
-            }
 
             await _dbContext.SaveChangesAsync(cancellationToken);
         }

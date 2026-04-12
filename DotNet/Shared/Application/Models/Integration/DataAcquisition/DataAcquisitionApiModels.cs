@@ -71,6 +71,13 @@ public static class FhirQueryTypeUtilities
     }
 }
 
+public class DataAcquisitionBulkActionResultApiModel
+{
+    public int Requested { get; set; }
+    public int Cancelled { get; set; }
+    public int Ineligible { get; set; }
+}
+
 public class CreateFhirQueryConfigurationRequestApiModel
 {
     public string FacilityId { get; set; } = string.Empty;
@@ -125,7 +132,9 @@ public enum RequestStatus
     [StringValue("Skipped")]
     Skipped,
     [StringValue("Configuration Required")]
-    ConfigurationRequired
+    ConfigurationRequired,
+    [StringValue("Cancelled")]
+    Cancelled
 }
 
 public enum QueryPhase

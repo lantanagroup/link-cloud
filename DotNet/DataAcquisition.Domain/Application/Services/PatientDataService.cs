@@ -1,4 +1,4 @@
-ï»¿using Confluent.Kafka;
+using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
@@ -14,6 +14,10 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Comm
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
@@ -22,7 +26,6 @@ using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Net;
-using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using StringComparison = System.StringComparison;
 using Task = System.Threading.Tasks.Task;
@@ -326,7 +329,7 @@ public class PatientDataService : IPatientDataService
                 }
             }
 
-            // All logs committed â€” stamp the sibling count so workers know the full set exists.
+            // All logs committed — stamp the sibling count so workers know the full set exists.
             if (totalLogsCreated > 0)
             {
                 var queryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Value.QueryType);
@@ -357,7 +360,7 @@ public class PatientDataService : IPatientDataService
         //1. get log
         var log = await _dataAcquisitionLogQueries.GetAsync(request.logId, cancellationToken);
 
-        // Read facility config once â€” reused by the happy path and all error handlers
+        // Read facility config once — reused by the happy path and all error handlers
         FhirQueryConfigurationModel? fhirQueryConfiguration = null;
 
         try
@@ -459,7 +462,7 @@ public class PatientDataService : IPatientDataService
                     $"Log with ID {log.Id} is not in a queued state. Current status: {log.Status}");
             }
 
-            //2. atomically update to "Processing" â€” single DB write, no follow-up UpdateAsync needed
+            //2. atomically update to "Processing" — single DB write, no follow-up UpdateAsync needed
             var allowedStatuses = new List<RequestStatus> { RequestStatus.Queued };
             if (request.ignoreStatusConstraint && log.Status.HasValue)
             {

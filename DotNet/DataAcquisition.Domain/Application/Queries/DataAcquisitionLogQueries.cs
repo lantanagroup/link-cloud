@@ -7,6 +7,10 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
@@ -18,7 +22,6 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using IDatabase = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase;
-using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -369,10 +372,10 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
         ArgumentNullException.ThrowIfNull(request);
 
-        // Build the filtered (unsorted) query once � reused by both count and page.
+        // Build the filtered (unsorted) query once ? reused by both count and page.
         var baseQuery = BuildSearchQuery(request);
 
-        // Count doesn't need a sort � avoid the expensive ORDER BY for the count scan.
+        // Count doesn't need a sort ? avoid the expensive ORDER BY for the count scan.
         var total = await baseQuery.CountAsync(cancellationToken);
 
         // Only fetch the page if there are results to show
@@ -594,11 +597,37 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         foreach (var qp in queryPhaseCounts)
             statistics.QueryPhaseCounts[qp.Phase] = qp.Count;
 
-        // Resource type counts + total from ResourceIds junction table
-        var completedLogs = await baseQuery
+        // Resource type counts + total from ResourceIds junction table.
+        // Include reference resources linked to completed logs when they are stored
+        // separately in ReferenceResources.
+        var completedResourceIds = await baseQuery
             .Where(l => l.Status == RequestStatus.Completed)
             .SelectMany(l => l.ResourceIds.Select(r => r.ResourceId))
             .ToListAsync(cancellationToken);
+
+        var completedReferenceResourceIds = await baseQuery
+            .Where(l => l.Status == RequestStatus.Completed)
+            .SelectMany(l => l.ReferenceResources.Select(r => r.ResourceType + "/" + r.ResourceId))
+            .ToListAsync(cancellationToken);
+
+        var completedLogs = new List<string>(completedResourceIds.Count + completedReferenceResourceIds.Count);
+        completedLogs.AddRange(completedResourceIds);
+
+        // Avoid double-counting resources that already exist in ResourceIds.
+        var existingResourceSet = completedResourceIds
+            .Where(r => !string.IsNullOrWhiteSpace(r))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var referenceResourceId in completedReferenceResourceIds)
+        {
+            if (string.IsNullOrWhiteSpace(referenceResourceId))
+                continue;
+
+            if (existingResourceSet.Contains(referenceResourceId))
+                continue;
+
+            completedLogs.Add(referenceResourceId);
+        }
 
         foreach (var resource in completedLogs)
         {
@@ -613,7 +642,15 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
         statistics.TotalResourcesAcquired = statistics.ResourceTypeCounts.Values.Sum();
 
-        // Fastest / slowest completion times – lightweight projection, not full entity
+        // Distinct patients where ALL logs are terminal (Completed, MaxRetriesReached, Skipped, Cancelled)
+        var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.Cancelled };
+        statistics.TotalCompletedPatients = await baseQuery
+            .Where(l => l.PatientId != null)
+            .GroupBy(l => l.PatientId)
+            .Where(g => g.All(l => l.Status != null && terminalStatuses.Contains(l.Status.Value)))
+            .CountAsync(cancellationToken);
+
+        // Fastest / slowest completion times
         var fastest = await baseQuery
             .Where(l => l.CompletionTimeMilliseconds != null)
             .OrderBy(l => l.CompletionTimeMilliseconds)

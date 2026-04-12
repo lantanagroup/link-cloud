@@ -251,4 +251,16 @@ public class JobDataMapExtensionsTests
 
         Assert.Null(resolved);
     }
+
+    [Fact]
+    public void PutObject_GenericGuidNullable_NullValue_RetrievesNull()
+    {
+        var map = new JobDataMap();
+        Guid? id = null;
+
+        map.PutObject("id", id);
+
+        var resolved = map.GetObject<Guid?>("id");
+        Assert.Null(resolved);
+    }
 }

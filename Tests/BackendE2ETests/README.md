@@ -1,112 +1,97 @@
-# End-to-End (E2E) Test Project
+﻿# BackendE2ETests
 
 ## Overview
 
-This project is designed to execute end-to-end (E2E) tests for validating the functionality and behavior of the system.
-It ensures that all the services work together seamlessly within the system by routing requests through the **Admin BFF
-** service.
+`BackendE2ETests` validates end-to-end Link reporting flows against a running Link environment.
 
-## Key Features
+The tests exercise the pipeline by:
 
-- **Testing Framework:** This project uses **XUnit** as the testing framework.
-- **Admin BFF Service:** All tests communicate with the **Admin BFF service**, which acts as a proxy. The tests never
-  communicate directly with individual microservices but rely on the Admin BFF for all interactions.
-- **Docker Compatibility:** Tests can run in complete isolation of an external Docker Compose infrastructure to ensure
-  repeatability and deterministic results.
-- **Self-Contained Test Data:** All test data required during execution is embedded within the project. No external
-  internet dependency is needed to fetch the test data.
-- **Environment Cleanup:** Any data created during the tests is thoroughly cleaned up after execution, ensuring the
-  environment is restored to its initial state.
-- **Environment Variables Support:** Tests can be configured via environment variables when necessary, allowing for
-  customization of the test environment and behavior without modifying the codebase.
+1. generating deterministic synthetic FHIR data,
+2. loading data into FHIR,
+3. creating tenant/query/normalization/report configuration,
+4. running report generation and submission,
+5. validating downloaded ABS artifacts and pipeline persistence layers.
 
-## Prerequisites
+## Test suites
 
-- .NET 8.0 SDK must be installed.
-- Docker (optional, only required if you wish to run the tests in complete isolation).
+| Suite | Description |
+|---|---|
+| `AdhocReportTest` | Single-patient ad-hoc report test. |
+| `MultiPatientTest` | Multi-patient volume scenario. |
+| `MegaPatientTest` | High-volume stress scenario (thousands of resources). |
+| `MultiMeasureAdhocReportingTest` | Ad-hoc reporting across multiple measures simultaneously. |
+| `ReportScheduledWorkflowTest` | Scheduled (non-ad-hoc) report generation workflow. |
+| `RegenerateReportTest` | Re-generation of an existing report. |
+| `ApiStabilityTest` | Verifies API surface stability under normal conditions. |
 
-## Running the Tests
+## Project behavior highlights
 
-To execute the tests locally, follow these steps:
+- **Deterministic generation** using explicit seeds — same inputs always produce the same FHIR bundles.
+- **Scenario-driven FHIR data** — patients are generated with clinically coherent resources driven by 16 clinical scenarios (pneumonia, MI, DKA, GI bleed, etc.) via `ScenarioResourceMap`.
+- **Measure-aware profiles** — `GenerateWithProfiles()` creates qualifying and non-qualifying patients for specific measures (ACH Monthly, ACH Daily, Hypo).
+- **Background diagnostics monitoring** with event-driven output.
+- **Deep ABS validation** via `ReportAbsManifestValidator`.
+- **Predictive validation** via deterministic generation manifests and cross-layer validators (ABS, Report DB, DA DB).
+- **FHIR snapshot output** saved locally only when generated bundle content changes.
 
-1. Build the project:
-   ```bash
-   dotnet build
-   ```
+## Architecture
 
-2. Run the tests:
-   ```bash
-   dotnet test
-   ```
+```
+BackendE2ETests
+├── references Automation.Link (orchestration, validation, config)
+├── references Automation (FHIR generation, helpers)
+├── references LinkSdk (service API clients)
+└── references Shared (common models, extensions)
+```
 
-If you want to run the tests using the Docker Compose infrastructure, ensure the services are up and running:
+## Running
 
-   ```bash
-   docker-compose up
-   ```
+From repo root:
 
-### Configuring
+```bash
+dotnet test Tests/BackendE2ETests/BackendE2ETests.csproj
+```
 
-The `TestConfig` class supports configurable properties that are sourced from environment variables. Environment 
-variables can be specified on the host machine (i.e. Windows > Start > "Edit environment variables for your account")
-or they can be specified in a `.runsettings` file in the root of the repository.
+Run a specific suite:
 
-| Environment Variable                                | Description                                                                                                                                | Default Value                |
-|-----------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|------------------------------|
-| EXTERNAL_FHIR_SERVER_BASE_URL                       | Base URL for FHIR server from where the tests are being executed                                                                           | http://localhost:6157/fhir   |
-| INTERNAL_FHIR_SERVER_BASE_URL                       | Base URL for FHIR server from where link services are deployed/running (i.e. within the docker network)                                    | http://fhir-server:8080/fhir |
-| ADMIN_BFF_BASE_URL                                  | Base URL for Admin BFF service API                                                                                                         | http://localhost:8063/api    |
-| ADHOC_REPORTING_SMOKE_<br/>TEST_MEASURE_BUNDLE_PATH | Path to the measure bundle file used in smoke tests                                                                                        | resource://...ACH...json     |
-| ADMINBFF_OAUTH_SHOULD_AUTHENTICATE                  | Flag to enable OAuth authentication for Admin BFF                                                                                          | false                        |
-| ADMINBFF_OAUTH_TOKEN_ENDPOINT                       | OAuth token endpoint URL for Admin BFF authentication                                                                                      |                              |
-| ADMINBFF_OAUTH_CLIENT_ID                            | OAuth client ID for Admin BFF authentication                                                                                               |                              |
-| ADMINBFF_OAUTH_USERNAME                             | Username for Admin BFF OAuth authentication                                                                                                |                              |
-| ADMINBFF_OAUTH_PASSWORD                             | Password for Admin BFF OAuth authentication                                                                                                |                              |
-| ADMINBFF_OAUTH_SCOPE                                | OAuth scope for Admin BFF authentication                                                                                                   |                              |
-| FHIRSERVER_OAUTH_SHOULD_AUTHENTICATE                | Flag to enable OAuth authentication for FHIR server                                                                                        | false                        |
-| FHIRSERVER_OAUTH_TOKEN_ENDPOINT                     | OAuth token endpoint URL for FHIR server authentication                                                                                    |                              |
-| FHIRSERVER_OAUTH_CLIENT_ID                          | OAuth client ID for FHIR server authentication                                                                                             |                              |
-| FHIRSERVER_OAUTH_USERNAME                           | Username for FHIR server OAuth authentication                                                                                              |                              |
-| FHIRSERVER_OAUTH_PASSWORD                           | Password for FHIR server OAuth authentication                                                                                              |                              |
-| FHIRSERVER_OAUTH_SCOPE                              | OAuth scope for FHIR server authentication                                                                                                 |                              |
-| FHIRSERVER_BASICAUTH_SHOULD_AUTHENTICATE            | Whether to pass basic credentials as authentication to the FHIR server. If both OAUTH and BASICAUTH are specified, OAUTH takes precedence. | false                        | 
-| FHIRSERVER_BASICAUTH_USERNAME                       | Username for basic authentication with the FHIR server.                                                                                    |                              |
-| FHIRSERVER_BASICAUTH_PASSWORD                       | Password for basic authentication with the FHIR server.                                                                                    |                              |
+```bash
+dotnet test Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=AdhocReportTest"
+```
 
-The default values/settings are configured to support running the BackendE2ETests within the docker environment as specified by the `/docker-compose.yml` file.
+## Configuration (environment variables)
 
-> Note: If using the Rider IDE for development/testing, you need to configure the test settings in Rider to use `.runsettings` in the `Build, Execution, Deployment > Unit Testing > Test Runner > Test Settings` section.
+Primary environment variables used by `TestConfig` include:
 
-## Test Data
+| Variable | Purpose | Default |
+|---|---|---|
+| `EXTERNAL_FHIR_SERVER_BASE_URL` | FHIR base URL reachable from test host | `http://localhost:6157/fhir` |
+| `INTERNAL_FHIR_SERVER_BASE_URL` | FHIR base URL reachable from Link services | `http://fhir-server:8080/fhir` |
+| `ADMIN_BFF_BASE_URL` | Admin BFF API base URL | `http://localhost:8063/api` |
+| `LOKI_BASE_URL` | Loki base URL for diagnostics scraping | `http://localhost:3100` |
+| `CLEANUP_ADHOC_REPORT_TEST_DATA` | Whether to expunge FHIR data during cleanup | `true` |
+| `*_CLEANUP_SERVICE_DATA` | Whether tests remove Link service data (facility, reports, DA logs, query dispatch) after the run | `false` |
 
-- Test data resides within the **E2ETests** project.
-- The tests are pre-configured to load and utilize this data during execution.
+Also see scenario-specific values in `TestConfig` for `ADHOC_REPORT_TEST`, `MEGA_PATIENT_TEST`, and `MULTI_PATIENT_TEST` prefixes.
 
-## Cleanup
+## Generated FHIR snapshots
 
-Post execution, all test-created data in the environment is cleaned up. This ensures that the tests leave no residual
-data that might interfere with subsequent test runs.
+Generated bundles are written under:
 
-## End-to-End Tests
+- `E2E_GENERATED_FHIR_OUTPUT_PATH` (if set), otherwise
+- `generated-fhir-snapshots/<TestName>` beneath test runtime output base.
 
-### Smoke Test
+Writes are hash-gated (skip write when content is unchanged).
 
-This smoke test ensures that the core functionality of the system's adhoc and historical reporting capabilities are
-working as expected. It validates the interaction between services via the **Admin BFF** service. The test performs the
-following steps:
+## Diagnostics output
 
-1. **Load Data on a FHIR Server**: Populate the FHIR server with the necessary test data, ensuring the data is structured correctly for testing purposes.
+Tests consume diagnostics events and render concise output lines.
+Noisy cadence events are suppressed, while important pipeline, issue, and stop/failure signals are preserved.
 
-2. **Load a Measure into the MeasureEval and Validation Services**:
-    - Store a predefined measure into the **MeasureEval** service, which is responsible for evaluating measures.
-    - The measure's validationa rtifacts are also loaded into the **Validation** service to verify its compliance with the expected standards.
+## Cleanup behavior
 
-3. **Configure a Tenant for the FHIR Server**: Set up a dedicated tenant configuration associated with the FHIR server. This is a minimal configuration that indicates how to query and normalize.
+Cleanup is configurable and intentionally conservative by default:
 
-4. **Generate an Adhoc Report**:
-    - Trigger the generation of an adhoc report using the data and measures loaded into the system. This tests the report generation workflow from input processing to report creation.
-    - Polls the Admin BFF service on an interval to check when the report is submitted, and proceeds when it has been submitted
+- facility deletion disabled by default
+- FHIR expunge disabled by default
 
-5. **Download the Report Data**: Retrieve the generated report data.
-
-6. **Validate the Report Data**: Verify the downloaded report data against expected results to ensure accuracy and completeness.
+Enable cleanup explicitly through environment variables when desired.

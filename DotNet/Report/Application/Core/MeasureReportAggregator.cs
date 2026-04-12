@@ -42,8 +42,8 @@ public class MeasureReportAggregator
                 DateElement = FhirDateTime.Now(),
                 Measure = reportPopulation.Measure,
                 Period = new Period(
-                    new FhirDateTime(new DateTimeOffset(reportSchedule.ReportStartDate)),
-                    new FhirDateTime(new DateTimeOffset(reportSchedule.ReportEndDate))),
+                    new FhirDateTime(reportSchedule.ReportStartDate),
+                    new FhirDateTime(reportSchedule.ReportEndDate)),
                 Reporter = new ResourceReference($"Organization/{organizationId}")
             };
 

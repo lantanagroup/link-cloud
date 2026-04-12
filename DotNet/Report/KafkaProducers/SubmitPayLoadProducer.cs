@@ -48,8 +48,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                         PatientId = patientId,
                         PayloadUri = payloadUri,
                         ReportTypes = schedule.ReportTypes,
-                        StartDate = schedule.ReportStartDate,
-                        EndDate = schedule.ReportEndDate
+                        StartDate = schedule.ReportStartDate.UtcDateTime,
+                        EndDate = schedule.ReportEndDate.UtcDateTime
                     },
 
                     Headers = new Headers

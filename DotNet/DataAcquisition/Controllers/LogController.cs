@@ -8,15 +8,17 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
+using LantanaGroup.Link.DataAcquisition.Filters;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Settings;
 using Link.Authorization.Policies;
-using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -766,6 +768,7 @@ public class LogController : Controller
     /// <returns>
     /// A response indicating the result of the cancellation.
     /// </returns>
+    [ValidateAntiForgeryOrBearerToken]
     [HttpPost("cancel-bulk")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -868,6 +871,7 @@ public class LogController : Controller
     /// <returns>
     /// A response indicating the result of the cancellation.
     /// </returns>
+    [ValidateAntiForgeryOrBearerToken]
     [HttpPost("cancel-by-filter")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -921,6 +925,131 @@ public class LogController : Controller
         catch (Exception ex)
         {
             _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "CancelByFilter"), ex, "An Exception occurred while attempting to cancel logs by filter.");
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Returns a lightweight summary of data acquisition activity for a report.
+    /// Totals, status counts and resource-type counts computed via DB aggregates.
+    /// Intended for dashboard polling and run monitoring.
+    /// </summary>
+    [HttpGet("report/{reportId}/summary")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DataAcquisitionReportSummaryApiModel))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<DataAcquisitionReportSummaryApiModel>> GetReportSummary(
+        [FromRoute] string reportId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(reportId))
+            return BadRequest($"{nameof(reportId)} cannot be null or empty.");
+
+        reportId = HtmlInputSanitizer.Sanitize(reportId).SanitizeAndRemove();
+
+        try
+        {
+            var summary = await _logQueries.GetDataAcquisitionLogStatisticsByReportAsync(reportId, cancellationToken);
+
+            return Ok(new DataAcquisitionReportSummaryApiModel
+            {
+                ReportId = reportId,
+                TotalLogs = summary.TotalLogs,
+                TotalPatients = summary.TotalPatients,
+                TotalCompletedPatients = summary.TotalCompletedPatients,
+                TotalResourcesAcquired = summary.TotalResourcesAcquired,
+                TotalRetryAttempts = summary.TotalRetryAttempts,
+                TotalCompletionTimeMs = summary.TotalCompletionTimeMilliseconds,
+                StatusCounts = summary.RequestStatusCounts.Select(s => new DataAcquisitionReportSummaryApiModel.StatusCountEntry
+                {
+                    Status = s.Key.ToString(),
+                    Count = s.Value
+                }).ToList(),
+                ResourceTypeCounts = summary.ResourceTypeCounts.Select(r => new DataAcquisitionReportSummaryApiModel.ResourceTypeCountEntry
+                {
+                    ResourceType = r.Key,
+                    Count = r.Value
+                }).ToList()
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetReportSummary"), ex,
+                "An exception occurred while attempting to get report summary for reportId {reportId}", reportId.Sanitize());
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Get all ResourceAcquiredIds from completed logs for a facility/report pair.
+    /// Intended for automation reconciliation.
+    /// </summary>
+    [HttpGet("report/{reportId}/acquired-resource-ids")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<string>))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<List<string>>> GetAcquiredResourceIdsForReport(
+        [FromRoute] string reportId,
+        [FromQuery] string facilityId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(reportId))
+            return BadRequest("reportId cannot be null or empty.");
+
+        if (string.IsNullOrWhiteSpace(facilityId))
+            return BadRequest("facilityId cannot be null or empty.");
+
+        try
+        {
+            // Use the statistics query which already extracts resource IDs
+            // from the ResourceIds junction table for completed logs.
+            var statistics = await _logQueries.GetDataAcquisitionLogStatisticsByReportAsync(
+                reportId.SanitizeAndRemove(), cancellationToken);
+
+            // The statistics method aggregates resource type counts from completed logs' ResourceIds.
+            // We need the raw IDs, so query via SearchQueryLogSummary with full model to get them.
+            var pageNumber = 1;
+            const int pageSize = 500;
+            var results = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            while (true)
+            {
+                var page = await _logQueries.SearchAsync(new SearchDataAcquisitionLogRequest
+                {
+                    FacilityId = facilityId.SanitizeAndRemove(),
+                    ReportTrackingId = reportId.SanitizeAndRemove(),
+                    RequestStatuses = [RequestStatus.Completed],
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    SortBy = "Id",
+                    SortOrder = LantanaGroup.Link.Shared.Application.Enums.SortOrder.Ascending
+                }, cancellationToken);
+
+                if (page?.Records == null || page.Records.Count == 0)
+                    break;
+
+                foreach (var log in page.Records)
+                {
+                    // For each completed log, fetch full detail to get resource IDs
+                    var full = await _logQueries.GetAsync(log.Id, cancellationToken);
+                    if (full?.ResourceAcquiredIds == null) continue;
+
+                    foreach (var id in full.ResourceAcquiredIds.Where(x => !string.IsNullOrWhiteSpace(x) && x.Contains('/')))
+                        results.Add(id);
+                }
+
+                if (page.Records.Count < pageSize)
+                    break;
+
+                pageNumber++;
+            }
+
+            return Ok(results.ToList());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetAcquiredResourceIdsForReport"), ex,
+                "An exception occurred while attempting to get acquired resource ids for report {reportId}", reportId.Sanitize());
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }

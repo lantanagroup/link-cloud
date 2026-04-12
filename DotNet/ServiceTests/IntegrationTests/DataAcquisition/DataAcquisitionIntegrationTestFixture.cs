@@ -90,13 +90,7 @@ namespace IntegrationTests.DataAcquisition
 
             builder.Services.AddDbContext<DataAcquisitionDbContext>(options =>
             {
-                options.UseSqlServer(connectionString, sqlOptions =>
-                {
-                    sqlOptions.EnableRetryOnFailure(
-                        maxRetryCount: 5,
-                        maxRetryDelay: TimeSpan.FromSeconds(5),
-                        errorNumbersToAdd: null);
-                });
+                options.UseSqlServer(connectionString);
             });
 
             // Register generic repositories for all required entities

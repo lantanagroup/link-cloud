@@ -1,0 +1,170 @@
+﻿@model TestScenarioDefinition
+@{
+    ViewData["Title"] = $"Scenario: {Model.Name}";
+    var resourceRange = Model.ResourcesPerPatientMin == Model.ResourcesPerPatientMax
+        ? Model.ResourcesPerPatientMin.ToString()
+        : $"{Model.ResourcesPerPatientMin}–{Model.ResourcesPerPatientMax}";
+    var clinicalScenarios = ClinicalScenarioInfo.GetAll(Model.SelectedMeasures);
+    var qCount = Model.PatientProfiles.Count(p => p.RequiresInpatientEncounter());
+    var nqCount = Model.PatientProfiles.Count - qCount;
+    var queryPlanTemplates = (List<QueryPlanTemplate>?)ViewBag.QueryPlanTemplates ?? [];
+    var selectedQueryPlan = queryPlanTemplates.FirstOrDefault(t => t.Id == Model.QueryPlanTemplateId)
+        ?? queryPlanTemplates.FirstOrDefault(t => t.IsDefault);
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>
+            @Model.Name
+            @if (Model.IsSystemScenario)
+            {
+                <span class="badge bg-dark fs-6 align-middle">System</span>
+            }
+        </h2>
+        <div class="d-flex gap-2">
+            <form asp-controller="Scenarios" asp-action="Clone" method="post" class="d-inline">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" value="@Model.Id" />
+                <button type="submit" class="btn btn-outline-secondary">Clone</button>
+            </form>
+            <a asp-controller="Scenarios" asp-action="Index" class="btn btn-outline-primary">Back to List</a>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.Description))
+    {
+        <p class="text-muted">@Model.Description</p>
+    }
+
+    <div class="row g-3">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">Report Configuration</div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-5">Report Method</dt>
+                        <dd class="col-sm-7"><span class="badge bg-info text-dark">@Model.ReportMethod</span></dd>
+                        <dt class="col-sm-5">Measures</dt>
+                        <dd class="col-sm-7">
+                            @foreach (var m in Model.SelectedMeasures)
+                            {
+                                <span class="badge bg-secondary">@ProfiledMeasureCatalog.GetDisplayName(m)</span>
+                            }
+                        </dd>
+                        <dt class="col-sm-5">Query Plan</dt>
+                        <dd class="col-sm-7">
+                            @if (selectedQueryPlan != null)
+                            {
+                                <a asp-controller="QueryPlans" asp-action="Details" asp-route-id="@selectedQueryPlan.Id">@selectedQueryPlan.Name</a>
+                                @if (selectedQueryPlan.IsDefault)
+                                {
+                                    <span class="badge bg-success ms-1">Default</span>
+                                }
+                                @if (selectedQueryPlan.IsSystem)
+                                {
+                                    <span class="badge bg-dark ms-1">System</span>
+                                }
+                            }
+                            else
+                            {
+                                <span class="text-muted">System Default</span>
+                            }
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">Patient Pool</div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-5">Seed</dt>
+                        <dd class="col-sm-7"><code>@Model.Seed</code></dd>
+                        <dt class="col-sm-5">Patient Count</dt>
+                        <dd class="col-sm-7">@(Model.UseMeasureEligibilityProfiles ? Model.PatientProfiles.Count : Model.PatientCount)</dd>
+                        <dt class="col-sm-5">Resources/Patient</dt>
+                        <dd class="col-sm-7">@resourceRange</dd>
+                        <dt class="col-sm-5">Prefix</dt>
+                        <dd class="col-sm-7"><code>@Model.PatientPrefix</code></dd>
+                        <dt class="col-sm-5">Generation Mode</dt>
+                        <dd class="col-sm-7">@(Model.UseMeasureEligibilityProfiles ? $"Profiles ({qCount}Q / {nqCount}NQ)" : "Standard (random)")</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (selectedQueryPlan != null)
+    {
+        var detailAcquiredTypes = selectedQueryPlan.GetAcquiredResourceTypes();
+        <div class="card mt-3">
+            <div class="card-header">Acquired Resource Types <small class="text-muted">(@selectedQueryPlan.Name)</small></div>
+            <div class="card-body">
+                @foreach (var t in detailAcquiredTypes.OrderBy(x => x))
+                {
+                    <span class="badge bg-info text-dark me-1">@t</span>
+                }
+                <span class="badge bg-primary me-1">Patient</span>
+                <small class="text-muted ms-2">(Patient is always implicitly included)</small>
+            </div>
+        </div>
+    }
+
+    @if (Model.ReportMethod == ReportMethod.ScheduledReport)
+    {
+        <div class="card mt-3">
+            <div class="card-header">Discharge Control</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    @if (Model.UseMeasureEligibilityProfiles)
+                    {
+                        <dt class="col-sm-5">Qualifying Discharged</dt>
+                        <dd class="col-sm-7">@Model.DischargeQualifyingCount</dd>
+                        <dt class="col-sm-5">Non-Qualifying Discharged</dt>
+                        <dd class="col-sm-7">@Model.DischargeNonQualifyingCount</dd>
+                    }
+                    else
+                    {
+                        <dt class="col-sm-5">Patients to Discharge</dt>
+                        <dd class="col-sm-7">@Model.DischargeCount</dd>
+                    }
+                </dl>
+            </div>
+        </div>
+    }
+
+    @if (Model.SelectedClinicalScenarioIds.Count > 0)
+    {
+        <div class="card mt-3">
+            <div class="card-header">Selected Clinical Scenarios</div>
+            <div class="card-body">
+                <div class="row">
+                    @foreach (var scenarioId in Model.SelectedClinicalScenarioIds)
+                    {
+                        var cs = clinicalScenarios.FirstOrDefault(c => string.Equals(c.ScenarioId, scenarioId, StringComparison.OrdinalIgnoreCase));
+                        if (cs != null)
+                        {
+                            <div class="col-md-4 mb-2">
+                                <strong>@cs.PrimaryDiagnosis</strong>
+                                <br /><small class="text-muted">@cs.IcdCode &middot; @cs.ServiceType</small>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="card mt-3">
+        <div class="card-header">Housekeeping</div>
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-5">Cleanup FHIR Data</dt>
+                <dd class="col-sm-7">@(Model.CleanupFhirData ? "Yes" : "No")</dd>
+                <dt class="col-sm-5">Cleanup Service Data</dt>
+                <dd class="col-sm-7">@(Model.CleanupServiceData ? "Yes" : "No")</dd>
+            </dl>
+        </div>
+    </div>
+</div>

@@ -3,7 +3,6 @@ using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Options;
-using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.SerDes;
@@ -33,7 +32,7 @@ namespace LantanaGroup.Link.Report.Services
                 reportSchedule.Id,
                 reportSchedule.FacilityId,
                 reportSchedule.ReportTypes,
-                reportSchedule.ReportStartDate);
+                reportSchedule.ReportStartDate.UtcDateTime);
         }
 
         public string GetBlobName(params string[] segments)

@@ -71,8 +71,8 @@ public class ReportScheduledListenerTests : IClassFixture<ReportIntegrationTestF
         Assert.Equal(ScheduleStatus.Scheduled, created.Status);
         Assert.Equal(Frequency.Monthly, created.Frequency);
         Assert.Equal(2, created.ReportTypes.Count);
-        Assert.Equal(startDate.UtcDateTime, created.ReportStartDate);
-        Assert.Equal(endDate.UtcDateTime, created.ReportEndDate);
+        Assert.Equal(startDate, created.ReportStartDate);
+        Assert.Equal(endDate, created.ReportEndDate);
 
         var population = await reportPopulationManager.FindAsync(x => x.ReportScheduleId == reportId);
         Assert.NotNull(population);
@@ -298,8 +298,8 @@ public class ReportScheduledListenerTests : IClassFixture<ReportIntegrationTestF
         {
             Id = existingId,
             FacilityId = facilityId,
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow.AddDays(30),
+            ReportStartDate = DateTimeOffset.UtcNow.AddDays(-1),
+            ReportEndDate = DateTimeOffset.UtcNow.AddDays(30),
             Frequency = Frequency.Monthly,
             ReportTypes = { "DE-111" },
             Status = ScheduleStatus.Scheduled,

@@ -9,12 +9,15 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
-using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
@@ -863,14 +866,14 @@ public class DataAcquisitionLogManagerTests
         // Act
         var result = await queries.SearchAsync(new SearchDataAcquisitionLogRequest
         {
-            RequestStatuses = [LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus.Pending, LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus.Failed]
+            RequestStatuses = [RequestStatus.Pending, RequestStatus.Failed]
         });
 
         // Assert
         Assert.True(result.Records.Any());
         foreach (var rec in result.Records)
         {
-            if (rec.Status != LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus.Pending && rec.Status != LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus.Failed)
+            if (rec.Status != RequestStatus.Pending && rec.Status != RequestStatus.Failed)
                 Assert.Fail("Search results should only have Pending and Failed statuses");
         }
     }

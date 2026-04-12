@@ -1,6 +1,10 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 
@@ -24,6 +28,7 @@ public record QueryLogSummaryModel
     public RequestStatus? Status { get; init; }
     public bool IsDeleted { get; init; }
     public string? ReportTrackingId { get; init; }
+    public bool IsReferenceLog { get; init; }
 
     public static QueryLogSummaryModel FromDomain(DataAcquisitionLogModel log)
     {
@@ -54,7 +59,8 @@ public record QueryLogSummaryModel
             CompletionDate = log.CompletionDate,
             RetryAttempts = log.RetryAttempts,
             Status = log.Status,
-            ReportTrackingId = log.ReportTrackingId
+            ReportTrackingId = log.ReportTrackingId,
+            IsReferenceLog = log.FhirQuery?.Any(q => q.IsReference == true) == true
         };
     }
 }
