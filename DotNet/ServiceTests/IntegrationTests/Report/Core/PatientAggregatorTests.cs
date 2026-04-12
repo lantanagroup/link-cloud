@@ -1,4 +1,4 @@
-﻿using Azure.Storage.Blobs.Specialized;
+using Azure.Storage.Blobs.Specialized;
 using LantanaGroup.Link.Report.Application.Core;
 using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
@@ -7,6 +7,9 @@ using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
+using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
+using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 using Microsoft.Extensions.DependencyInjection;
 using System.Text;
 using SystemTask = System.Threading.Tasks.Task;
@@ -34,8 +37,8 @@ namespace IntegrationTests.Report.Core
             {
                 Id = Guid.NewGuid(),
                 FacilityId = facilityId,
-                ReportStartDate = DateTime.UtcNow.AddDays(-30),
-                ReportEndDate = DateTime.UtcNow,
+                ReportStartDate = DateTimeOffset.UtcNow.AddDays(-30),
+                ReportEndDate = DateTimeOffset.UtcNow,
                 Frequency = Frequency.Monthly,
                 ReportTypes = { "DE-111" },
                 Status = ScheduleStatus.Scheduled,
@@ -134,7 +137,7 @@ namespace IntegrationTests.Report.Core
         }
 
         // ------------------------------------------------------------------ //
-        //  No entry found → throws
+        //  No entry found ? throws
         // ------------------------------------------------------------------ //
 
         [Fact]
@@ -156,7 +159,7 @@ namespace IntegrationTests.Report.Core
         }
 
         // ------------------------------------------------------------------ //
-        //  Entry exists but no ReadyForValidation measure reports → empty results
+        //  Entry exists but no ReadyForValidation measure reports ? empty results
         // ------------------------------------------------------------------ //
 
         [Fact]
@@ -183,7 +186,7 @@ namespace IntegrationTests.Report.Core
         }
 
         // ------------------------------------------------------------------ //
-        //  Single ReadyForValidation measure report → aggregated correctly
+        //  Single ReadyForValidation measure report ? aggregated correctly
         // ------------------------------------------------------------------ //
 
         [Fact]
@@ -295,7 +298,7 @@ namespace IntegrationTests.Report.Core
             var mrJson = serializer.SerializeToString(measureReport);
             var mrReference = $"MeasureReport/{measureReport.Id}";
 
-            // Include the same Condition reference twice — only one should be counted
+            // Include the same Condition reference twice � only one should be counted
             var conditionRef = "Condition/cond-123";
             var conditionJson = "{\"resourceType\":\"Condition\",\"id\":\"cond-123\"}";
 
@@ -305,7 +308,7 @@ namespace IntegrationTests.Report.Core
             await UploadPatientBlobAsync(entryBlobName,
                 (conditionRef, conditionJson),
                 (mrReference, mrJson),
-                (conditionRef, conditionJson)); // duplicate — should be skipped
+                (conditionRef, conditionJson)); // duplicate � should be skipped
 
             await SeedReportEntryAsync(context, schedule.Id, facilityId, patientId,
                 ("DE-111", MeasureReportStatus.ReadyForValidation, measureReport.Id, entryBlobName));
@@ -324,7 +327,7 @@ namespace IntegrationTests.Report.Core
         }
 
         // ------------------------------------------------------------------ //
-        //  Mixed statuses — only ReadyForValidation entries are processed
+        //  Mixed statuses � only ReadyForValidation entries are processed
         // ------------------------------------------------------------------ //
 
         [Fact]

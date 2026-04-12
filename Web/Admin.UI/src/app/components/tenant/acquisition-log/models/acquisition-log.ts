@@ -1,4 +1,4 @@
-export interface AcquisitionLog {
+﻿export interface AcquisitionLog {
     id: string;
     reportTrackingId: string;
     priority: string;

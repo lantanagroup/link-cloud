@@ -1,0 +1,99 @@
+﻿@model List<TestScenarioDefinition>
+@{
+    ViewData["Title"] = "Saved Scenarios";
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2>Saved Scenarios</h2>
+            <p class="text-muted mb-0">Create, edit, clone, and manage reusable test configurations.</p>
+        </div>
+        <a asp-action="Create" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> New Scenario
+        </a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Report Method</th>
+                    <th>Measures</th>
+                    <th>Patients</th>
+                    <th>Resources/Patient</th>
+                    <th>Seed</th>
+                    <th>Type</th>
+                    <th>Updated</th>
+                    <th style="width: 220px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var s in Model)
+                {
+                    var resourceRange = s.ResourcesPerPatientMin == s.ResourcesPerPatientMax
+                        ? s.ResourcesPerPatientMin.ToString()
+                        : $"{s.ResourcesPerPatientMin}–{s.ResourcesPerPatientMax}";
+
+                    <tr>
+                        <td>
+                            <strong>@s.Name</strong>
+                            @if (!string.IsNullOrWhiteSpace(s.Description))
+                            {
+                                <br /><small class="text-muted">@s.Description</small>
+                            }
+                        </td>
+                        <td><span class="badge bg-info text-dark">@s.ReportMethod</span></td>
+                        <td>
+                            @foreach (var m in s.SelectedMeasures)
+                            {
+                                <span class="badge bg-secondary">@ProfiledMeasureCatalog.GetDisplayName(m)</span>
+                            }
+                        </td>
+                        <td>@(s.UseMeasureEligibilityProfiles ? s.PatientProfiles.Count : s.PatientCount)</td>
+                        <td>@resourceRange</td>
+                        <td><code>@s.Seed</code></td>
+                        <td>
+                            @if (s.IsSystemScenario)
+                            {
+                                <span class="badge bg-dark">System</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-light text-dark border">Custom</span>
+                            }
+                        </td>
+                        <td>@s.UpdatedAt.LocalDateTime.ToString("g")</td>
+                        <td class="text-nowrap">
+                            <div class="d-inline-flex gap-1">
+                                @if (s.IsSystemScenario)
+                                {
+                                    <a asp-action="Details" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary">View</a>
+                                }
+                                else
+                                {
+                                    <a asp-action="Edit" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary">Edit</a>
+                                }
+                                <form asp-action="Clone" method="post" class="d-inline m-0">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@s.Id" />
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary">Clone</button>
+                                </form>
+                                @if (!s.IsSystemScenario)
+                                {
+                                    <form asp-action="Delete" method="post" class="d-inline m-0">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@s.Id" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                onclick="return confirm('Delete this scenario?');">Delete</button>
+                                    </form>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

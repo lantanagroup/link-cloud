@@ -59,6 +59,8 @@
     <ProjectReference Include="..\Report\Report.csproj" />
     <ProjectReference Include="..\Shared\Shared.csproj" />
     <ProjectReference Include="..\Tenant\Tenant.csproj" />
+    <ProjectReference Include="..\LinkSdk\LinkSdk.csproj" />
+    <ProjectReference Include="..\Automation\Automation.csproj" />
   </ItemGroup>
 
   <ItemGroup>

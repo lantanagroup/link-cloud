@@ -1,4 +1,4 @@
-﻿using DataAcquisition.Domain.Application.Models;
+using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
@@ -9,6 +9,10 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
@@ -336,7 +340,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         if (completionTimeMs is not null)
             activity?.SetTag(DiagnosticNames.Duration, completionTimeMs);
 
-        // 1. Atomic scalar update � single DB round-trip
+        // 1. Atomic scalar update ? single DB round-trip
         var updated = await _dbContext.DataAcquisitionLogs
             .Where(l => l.Id == logId)
             .ExecuteUpdateAsync(setters => setters
@@ -355,7 +359,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             throw new DataAcquisitionLogNotFoundException($"Data acquisition log with ID {logId} not found.");
         }
 
-        // 2. Append-only notes � never deletes existing notes (fixes data-loss on retry)
+        // 2. Append-only notes ? never deletes existing notes (fixes data-loss on retry)
         if (newNotes is { Count: > 0 })
         {
             var noteRows = newNotes.Select(n => new DataAcquisitionLogNote
@@ -766,7 +770,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             return null;
         }
 
-        // Atomically claim the tail � only one worker can win this race.
+        // Atomically claim the tail ? only one worker can win this race.
         var claimed = await _dbContext.DataAcquisitionLogs
             .Where(l =>
                 l.FacilityId == groupInfo.FacilityId
