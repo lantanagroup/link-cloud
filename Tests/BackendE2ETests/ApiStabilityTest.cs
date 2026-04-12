@@ -80,13 +80,29 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
     {
         var results = new ApiRunResults(Output);
 
-        await RunWithRetryAsync(results, "Validation.InitializeArtifacts",
-            () => ValidationClient.InitializeArtifactsAsync(),
-            timeout: TimeSpan.FromMinutes(3), retryDelay: TimeSpan.FromSeconds(10));
+        await RunWithRetryAsync(results, "Validation.InitializeArtifacts", async () =>
+        {
+            var hasArtifacts = await ValidationClient.HasArtifactsAsync();
+            if (hasArtifacts)
+            {
+                Output.WriteLine("Validation artifacts already initialized. Skipping initialize call.");
+                return;
+            }
 
-        await RunWithRetryAsync(results, "Validation.InitializeCategories",
-            () => ValidationClient.InitializeCategoriesAsync(),
-            timeout: TimeSpan.FromMinutes(3), retryDelay: TimeSpan.FromSeconds(10));
+            await ValidationClient.InitializeArtifactsAsync();
+        }, timeout: TimeSpan.FromMinutes(3), retryDelay: TimeSpan.FromSeconds(10));
+
+        await RunWithRetryAsync(results, "Validation.InitializeCategories", async () =>
+        {
+            var hasCategories = await ValidationClient.HasCategoriesAsync();
+            if (hasCategories)
+            {
+                Output.WriteLine("Validation categories already initialized. Skipping initialize call.");
+                return;
+            }
+
+            await ValidationClient.InitializeCategoriesAsync();
+        }, timeout: TimeSpan.FromMinutes(3), retryDelay: TimeSpan.FromSeconds(10));
 
         string? measureId = null;
         await RunAsync(results, "MeasureLoader.Load", async () =>
