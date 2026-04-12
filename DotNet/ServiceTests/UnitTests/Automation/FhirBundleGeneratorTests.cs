@@ -11,6 +11,9 @@ public class FhirBundleGeneratorTests
     private static readonly HashSet<string> AllowedDiagnosticReportCategories =
     ["HM", "CH", "UA", "MB", "RAD", "PT"];
 
+    private static readonly HashSet<string> AllowedDiagnosticReportLoincCategoryCodes =
+    ["LP7796-8", "LP29708-2", "LP29684-5"];
+
     [Fact]
     public void Generate_ReturnsExpectedPatientIdsAndBundles()
     {
@@ -112,7 +115,7 @@ public class FhirBundleGeneratorTests
     }
 
     [Fact]
-    public void Generate_DiagnosticReportsUseValidV20074Categories()
+    public void Generate_DiagnosticReportsUseValidCategoryCoding()
     {
         var output = new NullOutputHelper();
 
@@ -126,8 +129,16 @@ public class FhirBundleGeneratorTests
         {
             var coding = report.Category?.FirstOrDefault()?.Coding?.FirstOrDefault();
             Assert.NotNull(coding);
-            Assert.Equal("http://terminology.hl7.org/CodeSystem/v2-0074", coding!.System);
-            Assert.Contains(coding.Code!, AllowedDiagnosticReportCategories);
+
+            if (string.Equals(coding!.System, "http://terminology.hl7.org/CodeSystem/v2-0074", StringComparison.OrdinalIgnoreCase))
+            {
+                Assert.Contains(coding.Code!, AllowedDiagnosticReportCategories);
+            }
+            else
+            {
+                Assert.Equal("http://loinc.org", coding.System);
+                Assert.Contains(coding.Code!, AllowedDiagnosticReportLoincCategoryCodes);
+            }
         }
     }
 
@@ -399,8 +410,16 @@ public class FhirBundleGeneratorTests
                     Assert.NotEmpty(dr.Category);
                     var coding = dr.Category.First().Coding?.FirstOrDefault();
                     Assert.NotNull(coding);
-                    Assert.Equal("http://terminology.hl7.org/CodeSystem/v2-0074", coding!.System);
-                    Assert.Contains(coding.Code!, AllowedDiagnosticReportCategories);
+
+                    if (string.Equals(coding!.System, "http://terminology.hl7.org/CodeSystem/v2-0074", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Assert.Contains(coding.Code!, AllowedDiagnosticReportCategories);
+                    }
+                    else
+                    {
+                        Assert.Equal("http://loinc.org", coding.System);
+                        Assert.Contains(coding.Code!, AllowedDiagnosticReportLoincCategoryCodes);
+                    }
                     foreach (var rr in dr.Result)
                         AssertRefExists(resources, rr, $"{key}.Result");
                     foreach (var rr in dr.Specimen)

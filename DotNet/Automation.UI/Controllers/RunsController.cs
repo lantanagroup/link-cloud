@@ -96,6 +96,7 @@ public class RunsController(
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> CancelJson([FromBody] RunActionRequest request, CancellationToken cancellationToken = default)
     {
         if (request?.Id == null || request.Id == Guid.Empty)
@@ -106,6 +107,7 @@ public class RunsController(
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteJson([FromBody] RunActionRequest request, CancellationToken cancellationToken = default)
     {
         if (request?.Id == null || request.Id == Guid.Empty)
