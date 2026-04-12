@@ -30,10 +30,18 @@ jobs:
         id: should
         shell: bash
         run: |
-          chmod +x Scripts/should-run-e2e-test.sh
-          result=$(Scripts/should-run-e2e-test.sh "origin/${{ github.base_ref }}...HEAD")
-          echo "$result"
-          echo "$result" >> "$GITHUB_OUTPUT"
+          RANGE="origin/${{ github.base_ref }}...HEAD"
+          git fetch origin "${{ github.base_ref }}" --depth=1 || true
+
+          CHANGED_FILES=$(git diff --name-only "$RANGE" || true)
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          if echo "$CHANGED_FILES" | grep -Eq '^(DotNet/|Tests/|Java/|docker-compose\.yml|\.github/workflows/tests\.yaml)'; then
+            echo "run_job=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_job=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Show decision
         run: echo "run_job=${{ steps.should.outputs.run_job }}"
