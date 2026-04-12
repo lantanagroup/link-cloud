@@ -1,13 +1,13 @@
-﻿using DataAcquisition.Domain.Application.Models;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
+using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ReferenceQuery;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -15,14 +15,13 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Utilities;
-using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
@@ -161,7 +160,9 @@ public class ReferenceResourceService : IReferenceResourceService
             {
                 try
                 {
-                    resourceByCanonicalId[existingRecord.Id] = FhirResourceDeserializer.DeserializeFhirResource(existingRecord);
+                    var deserialized = FhirResourceDeserializer.DeserializeFhirResource(existingRecord);
+                    if (deserialized != null)
+                        resourceByCanonicalId[existingRecord.Id] = deserialized;
                 }
                 catch
                 {
@@ -228,7 +229,9 @@ public class ReferenceResourceService : IReferenceResourceService
                 {
                     try
                     {
-                        resourceByCanonicalId[newRecord.Id] = FhirResourceDeserializer.DeserializeFhirResource(newRecord);
+                        var deserialized = FhirResourceDeserializer.DeserializeFhirResource(newRecord);
+                        if (deserialized != null)
+                            resourceByCanonicalId[newRecord.Id] = deserialized;
                     }
                     catch
                     {
@@ -261,6 +264,8 @@ public class ReferenceResourceService : IReferenceResourceService
                 foreach (var referenceId in newIdsToLink)
                 {
                     if (!resourceByCanonicalId.TryGetValue(referenceId, out var resource))
+                        continue;
+                    if (resource == null)
                         continue;
 
                     await _kafkaProducer.ProduceAsync(

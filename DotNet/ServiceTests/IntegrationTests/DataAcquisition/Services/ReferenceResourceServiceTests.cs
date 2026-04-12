@@ -2,6 +2,7 @@
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
@@ -38,7 +39,15 @@ namespace IntegrationTests.DataAcquisition.Services
             var refMgr = scope.ServiceProvider.GetRequiredService<IReferenceResourcesManager>();
             var refQueries = scope.ServiceProvider.GetRequiredService<IReferenceResourcesQueries>();
             var readFhirCommand = new Mock<IReadFhirCommand>().Object;
-            var kafkaProducer = new Mock<IProducer<ResourceKey, ResourceAcquired>>().Object;
+            var kafkaProducerMock = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
+            kafkaProducerMock
+                .Setup(p => p.ProduceAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<Message<ResourceKey, ResourceAcquired>>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new DeliveryResult<ResourceKey, ResourceAcquired>());
+
+            var kafkaProducer = kafkaProducerMock.Object;
             var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
             return new ReferenceResourceService(
@@ -72,7 +81,7 @@ namespace IntegrationTests.DataAcquisition.Services
                     FacilityId = facilityId,
                     ResourceId = "test-loc-1",
                     ResourceType = "Location",
-                    ReferenceResource = "{}",
+                    ReferenceResource = "{\"resourceType\":\"Location\",\"id\":\"test-loc-1\",\"status\":\"active\"}",
                     QueryPhase = QueryPhase.Referential
                 }
             });
@@ -85,7 +94,9 @@ namespace IntegrationTests.DataAcquisition.Services
                 QueryPhase = QueryPhase.Initial,
                 QueryType = FhirQueryType.Search,
                 Status = RequestStatus.Pending,
-                Priority = AcquisitionPriority.Normal
+                Priority = AcquisitionPriority.Normal,
+                ReportableEvent = ReportableEvent.Adhoc
+
             });
 
             var logModel = await scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>().GetAsync(parentLog.Id);
