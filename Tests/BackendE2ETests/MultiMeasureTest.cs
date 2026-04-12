@@ -1,6 +1,6 @@
-﻿using LantanaGroup.Link.Automation.Link;
+﻿using LantanaGroup.Automation.Generation;
+using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
-using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Automation.Link.Services;
 using LantanaGroup.Link.Automation.Link.Validation;
@@ -18,7 +18,7 @@ namespace LantanaGroup.Link.Tests.E2ETests;
 /// The qualifying patient must have an inpatient encounter within the measurement
 /// period AND a diabetic medication administration to satisfy both measures.
 /// </summary>
-public sealed class MultiMeasureAdhocReportingTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixture>
+public sealed class MultiMeasureTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixture>
 {
     private const int GenerationSeed = 20260420;
 
@@ -32,13 +32,16 @@ public sealed class MultiMeasureAdhocReportingTest : IAsyncLifetime, IClassFixtu
     private readonly IServiceProvider _sp;
     private readonly string _facilityId = $"MultiMeasure-{Guid.NewGuid():N}";
     private List<(string Name, string Json)> _generatedBundles = [];
+    private List<string> _expectedSubmittedPatientIds = [];
+    private List<ProfiledMeasureType> _measures = [];
+    private List<PatientCohortDefinition> _cohorts = [];
     private string? _reportId;
 
     private AutomationConfig AutomationCfg => _sp.GetRequiredService<AutomationConfig>();
     private ConsoleAutomationOutput Output => _sp.GetRequiredService<ConsoleAutomationOutput>();
     private FhirDataLoader FhirDataLoader => _sp.GetRequiredService<FhirDataLoader>();
 
-    public MultiMeasureAdhocReportingTest(BackendE2ETestFixture fixture)
+    public MultiMeasureTest(BackendE2ETestFixture fixture)
     {
         _sp = fixture.ServiceProvider;
     }
@@ -49,27 +52,70 @@ public sealed class MultiMeasureAdhocReportingTest : IAsyncLifetime, IClassFixtu
 
         Output.WriteLine($"Using deterministic generation seed: {GenerationSeed}");
 
-        // One qualifying patient (must satisfy BOTH Monthly ACH and Hypo criteria)
-        // and one non-qualifying patient.
-        var profiles = new List<PatientProfile>
-        {
-            new(MeasureEligibility.Qualifying),
-            new(MeasureEligibility.NonQualifying)
-        };
-
         var measures = new List<ProfiledMeasureType>
         {
             ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation,
             ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation
         };
+        _measures = measures;
 
-        var (patientIds, bundles) = FhirBundleGenerator.GenerateWithProfiles(
-            Output, (IReadOnlyList<ProfiledMeasureType>)measures, profiles, 250, "MultiMeasurePatient", GenerationSeed);
+        // Cohort 1: qualifies for both ACH and Hypo (inpatient + diabetic med)
+        // Cohort 2: qualifies for ACH only (inpatient, no Hypo med)
+        var cohorts = new List<PatientCohortDefinition>
+        {
+            new()
+            {
+                PatientCount = 1,
+                MeasureEligibilities = new Dictionary<ProfiledMeasureType, MeasureEligibility>
+                {
+                    [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation] = MeasureEligibility.Qualifying,
+                    [ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation] = MeasureEligibility.Qualifying
+                },
+                EligibleClinicalScenarioIds =
+                [
+                    ..ClinicalScenarioEligibility.GetEligibleScenarioIds(
+                    [
+                        ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation,
+                        ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation
+                    ], MeasureEligibility.Qualifying)
+                ],
+                ResourcesPerPatientMin = 250,
+                ResourcesPerPatientMax = 250
+            },
+            new()
+            {
+                PatientCount = 1,
+                MeasureEligibilities = new Dictionary<ProfiledMeasureType, MeasureEligibility>
+                {
+                    [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation] = MeasureEligibility.Qualifying,
+                    [ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation] = MeasureEligibility.NonQualifying
+                },
+                EligibleClinicalScenarioIds =
+                [
+                    ..ClinicalScenarioEligibility.GetEligibleScenarioIds(
+                    [
+                        ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation,
+                        ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation
+                    ], MeasureEligibility.NonQualifying)
+                ],
+                ResourcesPerPatientMin = 250,
+                ResourcesPerPatientMax = 250
+            }
+        };
+        _cohorts = cohorts;
+
+        var (patientIds, bundles) = FhirBundleGenerator.GenerateFromCohorts(
+            Output, measures, cohorts, "MultiMeasurePatient", GenerationSeed);
 
         _generatedBundles = bundles;
 
         if (Config.PatientIds.Count == 0)
             Config.PatientIds = patientIds;
+
+        // Patient 1 qualifies for both ACH + Hypo (submitted for both).
+        // Patient 2 qualifies for ACH only (submitted for ACH, not Hypo).
+        // Both appear in the ABS submission because each qualifies for at least one measure.
+        _expectedSubmittedPatientIds = patientIds.ToList();
 
         // Populate additional bundle locations for the Hypo measure
         Config.MeasureBundleLocation = ProfiledMeasureCatalog.GetBundleLocation(
@@ -94,37 +140,17 @@ public sealed class MultiMeasureAdhocReportingTest : IAsyncLifetime, IClassFixtu
     {
         Output.WriteLine("Cleaning up...\n");
 
-        if (Config.RemoveFacilityConfig)
-        {
-            await FacilitySetupHelper.CleanupFacilityAsync(
-                _sp.GetRequiredService<IFacilityServiceClient>(),
-                _sp.GetRequiredService<INormalizationServiceClient>(),
-                _sp.GetRequiredService<IDataAcquisitionServiceClient>(),
-                _sp.GetRequiredService<IQueryDispatchServiceClient>(),
-                Output,
-                _facilityId);
-        }
-
-        if (AutomationCfg.CleanupTestData)
-        {
-            await FacilitySetupHelper.CleanupQueryDispatchConfigAsync(
-                _sp.GetRequiredService<IQueryDispatchServiceClient>(),
-                Output,
-                _facilityId);
-
-            if (!string.IsNullOrWhiteSpace(_reportId))
-            {
-                await FacilitySetupHelper.SoftDeleteRunDataAsync(
-                    _sp.GetRequiredService<IReportServiceClient>(),
-                    _sp.GetRequiredService<IDataAcquisitionServiceClient>(),
-                    _sp.GetRequiredService<IQueryDispatchServiceClient>(),
-                    Output,
-                    _facilityId,
-                    _reportId);
-            }
-
-            FhirDataLoader.ExpungeEverything(Output);
-        }
+        await RunCleanupHelper.CleanupAfterRunAsync(
+            Config,
+            _sp.GetRequiredService<IFacilityServiceClient>(),
+            _sp.GetRequiredService<INormalizationServiceClient>(),
+            _sp.GetRequiredService<IDataAcquisitionServiceClient>(),
+            _sp.GetRequiredService<IQueryDispatchServiceClient>(),
+            _sp.GetRequiredService<IReportServiceClient>(),
+            FhirDataLoader,
+            Output,
+            _facilityId,
+            _reportId);
     }
 
     [Fact]
@@ -197,6 +223,7 @@ public sealed class MultiMeasureAdhocReportingTest : IAsyncLifetime, IClassFixtu
 
         // Step 8: Download and validate report artifacts.
         var downloadedResources = await reportApi.DownloadReportAsync(_facilityId, reportId, Config);
+        var internalAbsResources = await reportApi.DownloadReportAsync(_facilityId, reportId, Config, external: false);
 
         Assert.True(downloadedResources.ContainsKey("manifest.ndjson"),
             "Expected report to include manifest.ndjson but it was not");
@@ -211,9 +238,42 @@ public sealed class MultiMeasureAdhocReportingTest : IAsyncLifetime, IClassFixtu
         // Flush stale cache from diagnostics polling so validators read authoritative data.
         dataReader.InvalidateCache();
 
+        // Build the concrete generation manifest from cohort/profile/bundle data.
+        var profiles = PatientCohortDefinition.ExpandProfiles(_cohorts, GenerationSeed);
+        var generationManifest = GenerationManifest.Build(
+            Config.PatientIds, _generatedBundles, profiles, _measures);
+        generationManifest.MeasureIds = measureIds;
+        var queryPlanInput = QueryPlanBuilder.GetDefaultAsInput();
+        generationManifest.AcquiredResourceTypes = QueryPlanBuilder.GetAcquiredResourceTypes(queryPlanInput);
+        generationManifest.ParameterQueryResourceTypes = QueryPlanBuilder.GetParameterQueryResourceTypes(queryPlanInput);
+        generationManifest.SimulatedAcquiredResourceKeysByPatient = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysByPatient(
+            Config.PatientIds,
+            _generatedBundles,
+            queryPlanInput,
+            Config.StartDate,
+            Config.EndDate);
+        generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(_measures);
+
+        await _sp.GetRequiredService<ReportAbsManifestValidator>().ValidateAllAsync(
+            internalAbsResources,
+            _expectedSubmittedPatientIds,
+            (IReadOnlyList<string>)measureIds,
+            Config.StartDate,
+            Config.EndDate,
+            _facilityId,
+            reportId,
+            _generatedBundles,
+            expectedManifestPatientListIds: Config.PatientIds,
+            manifest: generationManifest);
+
         // Step 9: Database validation with all measure IDs.
         await _sp.GetRequiredService<ReportDatabaseValidator>().ValidateAllAsync(
-            _facilityId, reportId, (IReadOnlyList<string>)measureIds, Config.PatientIds);
+            _facilityId,
+            reportId,
+            (IReadOnlyList<string>)measureIds,
+            Config.PatientIds,
+            expectedSubmittedPatientIds: _expectedSubmittedPatientIds,
+            manifest: generationManifest);
         await _sp.GetRequiredService<DataAcquisitionDatabaseValidator>().ValidateAllAsync(
             _facilityId, reportId, measureIds[0], Config.PatientIds);
         await _sp.GetRequiredService<NormalizationDatabaseValidator>().ValidateAllAsync(_facilityId);

@@ -159,7 +159,12 @@ public class FhirDataLoader
 
     public void DeleteResourcesWithExpunge(IAutomationOutput output)
     {
-        output.WriteLine("Removing data from FHIR server...");
+        var total = _createdResources.Count;
+        output.WriteLine($"Expunging {total} tracked resource(s) from FHIR server...");
+
+        var succeeded = 0;
+        var failed = 0;
+        var failures = new List<string>();
 
         foreach (var resource in _createdResources)
         {
@@ -173,12 +178,29 @@ public class FhirDataLoader
 
             var response = _restClient.Execute(request);
 
-            output.WriteLine($"Expunging {resource} => Status: {response.StatusCode}");
-
-            if (!response.IsSuccessful)
+            if (response.IsSuccessful)
             {
-                output.WriteLine($"Failed to expunge {resource}: {response.Content}");
+                succeeded++;
             }
+            else
+            {
+                failed++;
+                if (failures.Count < 5)
+                    failures.Add($"{resource}: {response.StatusCode}");
+            }
+        }
+
+        if (failed == 0)
+        {
+            output.WriteLine($"FHIR expunge complete: {succeeded}/{total} resource(s) removed.");
+        }
+        else
+        {
+            output.WriteLine($"FHIR expunge finished with errors: {succeeded} succeeded, {failed} failed out of {total}.");
+            foreach (var f in failures)
+                output.WriteLine($"  {f}");
+            if (failed > failures.Count)
+                output.WriteLine($"  ... and {failed - failures.Count} more.");
         }
     }
 
@@ -253,7 +275,7 @@ public class FhirDataLoader
 
         await Task.WhenAll(tasks);
 
-        output.WriteLine($"Bundle loading complete: {successCount} succeeded, {failCount} failed.");
+        output.WriteLine($"Upload complete: {successCount} succeeded, {failCount} failed out of {bundles.Count} bundles.");
     }
 
     private void TrackCreatedResources(string responseContent, string name, string progress, IAutomationOutput output)
@@ -296,6 +318,7 @@ public class FhirDataLoader
         string progress,
         IAutomationOutput output)
     {
+        var delay = InitialRetryDelay;
         RestResponse? lastResponse = null;
 
         for (var attempt = 1; attempt <= MaxRetries; attempt++)
@@ -313,15 +336,28 @@ public class FhirDataLoader
             if (lastResponse.IsSuccessful)
             {
                 if (attempt > 1)
-                    output.WriteLine($"  {progress} Retry succeeded for {name} on attempt {attempt}");
+                    output.WriteLine($"  {progress} Posted {name} => {lastResponse.StatusCode} (succeeded on attempt {attempt})");
+                else
+                    output.WriteLine($"  {progress} Posted {name} => {lastResponse.StatusCode}");
+                return lastResponse;
+            }
+
+            var statusCode = (int)lastResponse.StatusCode;
+            if (statusCode != 0 && statusCode < 500)
+            {
+                output.WriteLine($"  {progress} Posted {name} => {lastResponse.StatusCode} (non-retryable)");
                 return lastResponse;
             }
 
             if (attempt < MaxRetries)
             {
-                var delay = InitialRetryDelay * Math.Pow(2, attempt - 1);
-                output.WriteLine($"  {progress} Attempt {attempt} failed for {name}: {lastResponse.StatusCode}. Retrying in {delay.TotalSeconds:F0}s...");
+                output.WriteLine($"  {progress} Posted {name} => {lastResponse.StatusCode} (attempt {attempt}/{MaxRetries}, retrying in {delay.TotalSeconds:F0}s...)");
                 await Task.Delay(delay);
+                delay *= 2;
+            }
+            else
+            {
+                output.WriteLine($"  {progress} Posted {name} => {lastResponse.StatusCode} (attempt {attempt}/{MaxRetries}, giving up)");
             }
         }
 

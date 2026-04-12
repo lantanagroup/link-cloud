@@ -1,11 +1,10 @@
-﻿using System.IO.Compression;
-using LantanaGroup.Link.Sdk.ApiClient;
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
+using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.SerDes;
-using LantanaGroup.Link.Sdk.Clients;
+using System.IO.Compression;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Automation.Link.Services;
@@ -50,6 +49,30 @@ public class ReportApiHelper
             "Expected response to include reportId but received empty payload.");
 
         return payload!.ReportId.ToString();
+    }
+
+    /// <summary>
+    /// Triggers a regeneration of an existing submitted report.
+    /// Returns the new report ID created by the regeneration.
+    /// </summary>
+    public async Task<string> RegenerateReportAsync(string facilityId, string existingReportId)
+    {
+        _output.WriteLine($"Regenerating report (facilityId={facilityId}, existingReportId={existingReportId})...");
+
+        var request = new RegenerateReportRequest
+        {
+            ReportId = existingReportId,
+            BypassSubmission = false
+        };
+
+        var payload = await _facilityClient.RegenerateReportAsync(facilityId, request);
+
+        AutomationInvariant.Require(payload?.ReportId != null && payload.ReportId != Guid.Empty,
+            "Expected regenerate response to include a new reportId but received empty payload.");
+
+        var newReportId = payload!.ReportId.ToString();
+        _output.WriteLine($"Regeneration initiated. New report ID: {newReportId}");
+        return newReportId;
     }
 
     public async Task<bool> CheckSubmissionStatusAsync(string reportId, TestScenarioConfig config, BackgroundDiagnosticsMonitor? diagnostics = null)

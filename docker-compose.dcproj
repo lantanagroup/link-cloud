@@ -53,6 +53,8 @@
     <None Include="DotNet\LinkSdk\Models\FacilityCreateRequest.cs" />
     <None Include="DotNet\LinkSdk\Models\ReportRequests.cs" />
     <None Include="DotNet\LinkSdk\README.md" />
+    <None Include="Scripts\run-adhoc-reporting-smoke-test.ps1" />
+    <None Include="Scripts\run-adhoc-reporting-smoke-test.sh" />
   </ItemGroup>
   <ItemGroup>
     <Content Include=".docker\collector.yml" />

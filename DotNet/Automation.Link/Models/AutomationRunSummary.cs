@@ -16,5 +16,6 @@ public class AutomationRunSummary
     public string? Error { get; set; }
     public string? FacilityId { get; set; }
     public string? ReportId { get; set; }
+    public string? RunConfigurationJson { get; set; }
     public IReadOnlyList<string> Logs { get; set; } = [];
 }

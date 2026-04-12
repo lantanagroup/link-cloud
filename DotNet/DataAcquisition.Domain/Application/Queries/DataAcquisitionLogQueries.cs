@@ -597,11 +597,37 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         foreach (var qp in queryPhaseCounts)
             statistics.QueryPhaseCounts[qp.Phase] = qp.Count;
 
-        // Resource type counts + total from ResourceIds junction table
-        var completedLogs = await baseQuery
+        // Resource type counts + total from ResourceIds junction table.
+        // Include reference resources linked to completed logs when they are stored
+        // separately in ReferenceResources.
+        var completedResourceIds = await baseQuery
             .Where(l => l.Status == RequestStatus.Completed)
             .SelectMany(l => l.ResourceIds.Select(r => r.ResourceId))
             .ToListAsync(cancellationToken);
+
+        var completedReferenceResourceIds = await baseQuery
+            .Where(l => l.Status == RequestStatus.Completed)
+            .SelectMany(l => l.ReferenceResources.Select(r => r.ResourceType + "/" + r.ResourceId))
+            .ToListAsync(cancellationToken);
+
+        var completedLogs = new List<string>(completedResourceIds.Count + completedReferenceResourceIds.Count);
+        completedLogs.AddRange(completedResourceIds);
+
+        // Avoid double-counting resources that already exist in ResourceIds.
+        var existingResourceSet = completedResourceIds
+            .Where(r => !string.IsNullOrWhiteSpace(r))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var referenceResourceId in completedReferenceResourceIds)
+        {
+            if (string.IsNullOrWhiteSpace(referenceResourceId))
+                continue;
+
+            if (existingResourceSet.Contains(referenceResourceId))
+                continue;
+
+            completedLogs.Add(referenceResourceId);
+        }
 
         foreach (var resource in completedLogs)
         {

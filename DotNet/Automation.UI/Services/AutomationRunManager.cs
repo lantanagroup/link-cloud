@@ -1,4 +1,7 @@
 ﻿using Automation.UI.Models;
+using Automation.UI.Models;
+using Automation.UI.Services.Persistence;
+using LantanaGroup.Automation;
 using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
@@ -13,6 +16,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
+using System.Text.Json;
 
 namespace Automation.UI.Services;
 
@@ -24,6 +28,7 @@ public class AutomationRunManager : IAutomationRunManager
     private readonly IServiceProvider _hostServices;
     private readonly RunSnapshotOrchestrator _orchestrator;
     private readonly ISnapshotStore _snapshotStore;
+    private readonly IQueryPlanTemplateStore _queryPlanTemplateStore;
     private readonly ConcurrentDictionary<Guid, MutableRunState> _runs = new();
 
     public AutomationRunManager(
@@ -32,7 +37,8 @@ public class AutomationRunManager : IAutomationRunManager
         ILogger<AutomationRunManager> logger,
         IServiceProvider hostServices,
         RunSnapshotOrchestrator orchestrator,
-        ISnapshotStore snapshotStore)
+        ISnapshotStore snapshotStore,
+        IQueryPlanTemplateStore queryPlanTemplateStore)
     {
         _hub = hub;
         _automationConfig = automationConfig.Value;
@@ -40,25 +46,37 @@ public class AutomationRunManager : IAutomationRunManager
         _hostServices = hostServices;
         _orchestrator = orchestrator;
         _snapshotStore = snapshotStore;
+        _queryPlanTemplateStore = queryPlanTemplateStore;
     }
 
     public Task<Guid> StartAsync(StartScenarioRequest request, CancellationToken cancellationToken = default)
     {
         var runId = Guid.NewGuid();
         var options = ResolveRunOptions(request);
-        var state = new MutableRunState(runId, request.Scenario, options);
+        var runNameOverride = string.IsNullOrWhiteSpace(request.ScenarioName) ? null : request.ScenarioName.Trim();
+        var state = new MutableRunState(runId, request.Scenario, options, runNameOverride, request.RunConfigurationJson);
         _runs[runId] = state;
 
         _ = PersistRunSummaryAsync(state);
 
-        _ = Task.Run(async () =>
+        state.ExecutionTask = Task.Run(async () =>
         {
             try
             {
-                await ExecuteAsync(state, cancellationToken);
+                await ExecuteAsync(state, state.RunCancellation.Token);
+            }
+            catch (OperationCanceledException) when (state.CancelRequested)
+            {
+                _logger.LogInformation("Run {RunId} execution cancelled.", state.RunId);
             }
             catch (Exception ex)
             {
+                if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
+                {
+                    _logger.LogInformation("Run {RunId} threw after cancellation: {Message}", state.RunId, ex.Message);
+                    return;
+                }
+
                 _logger.LogError(ex, "Unhandled exception in run {RunId}", state.RunId);
                 state.Status = AutomationRunStatus.Failed;
                 state.Error = ex.Message;
@@ -66,7 +84,74 @@ public class AutomationRunManager : IAutomationRunManager
                 await BroadcastStatus(state);
             }
         }, CancellationToken.None);
+
         return Task.FromResult(runId);
+    }
+
+    public async Task<bool> CancelRunAsync(Guid runId, CancellationToken cancellationToken = default)
+    {
+        if (!_runs.TryGetValue(runId, out var state))
+            return false;
+
+        if (state.Status is not AutomationRunStatus.Queued and not AutomationRunStatus.Running)
+            return false;
+
+        state.CancelRequested = true;
+        state.Status = AutomationRunStatus.Cancelled;
+        state.Error = "Cancelled by user.";
+        state.FinishedAt = DateTimeOffset.UtcNow;
+        await BroadcastStatus(state);
+
+        try
+        {
+            state.RunCancellation.Cancel();
+        }
+        catch
+        {
+            // best effort
+        }
+
+        if (state.ExecutionTask != null)
+        {
+            try
+            {
+                await Task.WhenAny(state.ExecutionTask, Task.Delay(TimeSpan.FromSeconds(10), cancellationToken));
+            }
+            catch
+            {
+                // best effort
+            }
+        }
+
+        var output = new RunAutomationOutput(message => WriteLog(state, message));
+        output.WriteLine("Cancellation requested. Running cancellation cleanup workflow...");
+
+        using var scope = _hostServices.CreateScope();
+        var dataAcqClient = scope.ServiceProvider.GetRequiredService<IDataAcquisitionServiceClient>();
+        var reportClient = scope.ServiceProvider.GetRequiredService<IReportServiceClient>();
+        var facilityClient = scope.ServiceProvider.GetRequiredService<IFacilityServiceClient>();
+        var normalizationClient = scope.ServiceProvider.GetRequiredService<INormalizationServiceClient>();
+        var queryDispatchClient = scope.ServiceProvider.GetRequiredService<IQueryDispatchServiceClient>();
+        var fhirDataLoader = state.FhirDataLoader
+            ?? new FhirDataLoader(_automationConfig.ExternalFhirServerBase, _automationConfig.FhirServerOAuth, _automationConfig.FhirServerBasicAuth);
+
+        await RunCleanupHelper.CleanupCancelledRunAsync(
+            facilityClient,
+            normalizationClient,
+            dataAcqClient,
+            queryDispatchClient,
+            reportClient,
+            fhirDataLoader,
+            output,
+            state.FacilityId,
+            state.ReportId,
+            cancellationToken);
+
+        await _orchestrator.CompleteRunAsync(runId);
+        await PersistRunSummaryAsync(state);
+        output.WriteLine("Cancellation cleanup complete.");
+
+        return true;
     }
 
     public async Task<AutomationRunIndexViewModel> GetRunsPageAsync(int pageNumber = 1, int pageSize = 20, CancellationToken cancellationToken = default)
@@ -101,7 +186,7 @@ public class AutomationRunManager : IAutomationRunManager
         if (_runs.TryGetValue(runId, out var state))
         {
             summary = ToSummary(state);
-            if (summary.Status is not AutomationRunStatus.Succeeded and not AutomationRunStatus.Failed)
+            if (summary.Status is not AutomationRunStatus.Succeeded and not AutomationRunStatus.Failed and not AutomationRunStatus.Cancelled)
                 return false;
 
             _runs.TryRemove(runId, out _);
@@ -111,7 +196,7 @@ public class AutomationRunManager : IAutomationRunManager
             summary = await _snapshotStore.GetRunSummaryAsync(runId, cancellationToken);
             if (summary == null)
                 return false;
-            if (summary.Status is not AutomationRunStatus.Succeeded and not AutomationRunStatus.Failed)
+            if (summary.Status is not AutomationRunStatus.Succeeded and not AutomationRunStatus.Failed and not AutomationRunStatus.Cancelled)
                 return false;
         }
 
@@ -153,7 +238,7 @@ public class AutomationRunManager : IAutomationRunManager
             return null;
         }
 
-        var isFinal = status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed;
+        var isFinal = status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed or AutomationRunStatus.Cancelled;
 
         try
         {
@@ -233,6 +318,7 @@ public class AutomationRunManager : IAutomationRunManager
 
             var lokiScraper = services.GetRequiredService<LokiScraper>();
             var fhirDataLoader = services.GetRequiredService<FhirDataLoader>();
+            state.FhirDataLoader = fhirDataLoader;
             var measureEvalClient = services.GetRequiredService<IMeasureEvalServiceClient>();
             var sdkValidationClient = services.GetRequiredService<IValidationServiceClient>();
 
@@ -264,33 +350,23 @@ public class AutomationRunManager : IAutomationRunManager
             if (state.Options.PatientProfiles is { Count: > 0 })
             {
                 var profiles = state.Options.PatientProfiles;
-                output.WriteLine($"Using measure-eligibility profiles: {profiles.Count(p => p.Eligibility == MeasureEligibility.Qualifying)} qualifying, {profiles.Count(p => p.Eligibility == MeasureEligibility.NonQualifying)} non-qualifying");
+                var selectedMeasures = (IReadOnlyList<ProfiledMeasureType>)state.Options.SelectedMeasures;
+                var qualAllCount = profiles.Count(p => p.QualifiesForAll(selectedMeasures));
+                var nqAllCount = profiles.Count(p => p.QualifiesForNone(selectedMeasures));
+                var mixedCount = profiles.Count - qualAllCount - nqAllCount;
+                output.WriteLine($"Using measure-eligibility profiles: {qualAllCount} qualifying-all, {nqAllCount} non-qualifying-all, {mixedCount} mixed");
 
-                if (state.Options.SelectedMeasures.Count > 1)
-                {
-                    (patientIds, bundles) = FhirBundleGenerator.GenerateWithProfiles(
-                        output,
-                        (IReadOnlyList<ProfiledMeasureType>)state.Options.SelectedMeasures,
-                        profiles,
-                        state.Options.ResourcesPerPatient,
-                        state.Options.Prefix,
-                        state.Options.Seed,
-                        generationConfig);
-                }
-                else
-                {
-                    (patientIds, bundles) = FhirBundleGenerator.GenerateWithProfiles(
-                        output,
-                        primaryMeasure,
-                        profiles,
-                        state.Options.ResourcesPerPatient,
-                        state.Options.Prefix,
-                        state.Options.Seed,
-                        generationConfig);
-                }
+                (patientIds, bundles) = FhirBundleGenerator.GenerateWithProfiles(
+                    output,
+                    selectedMeasures,
+                    profiles,
+                    state.Options.ResourcesPerPatient,
+                    state.Options.Prefix,
+                    state.Options.Seed,
+                    generationConfig);
 
                 expectedSubmittedPatientIds = patientIds
-                    .Where((_, idx) => idx < profiles.Count && profiles[idx].Eligibility == MeasureEligibility.Qualifying)
+                    .Where((_, idx) => idx < profiles.Count && profiles[idx].QualifiesForAny(selectedMeasures))
                     .ToList();
             }
             else
@@ -308,12 +384,6 @@ public class AutomationRunManager : IAutomationRunManager
             var expectedAllPatientIds = scenarioConfig.PatientIds;
 
             await fhirDataLoader.WaitForServerAsync(output);
-
-            if (state.Options.CleanupTestData)
-            {
-                output.WriteLine("Cleanup is enabled; expunging existing FHIR test data before loading generated bundles...");
-                fhirDataLoader.ExpungeEverything(output);
-            }
 
             await fhirDataLoader.LoadTransactionBundlesFromJsonAsync(output, bundles);
 
@@ -333,6 +403,12 @@ public class AutomationRunManager : IAutomationRunManager
                 state.FacilityId = facilityId;
             }
 
+            // Resolve the query plan template (null = use built-in defaults).
+            var queryPlanResolution = await ResolveQueryPlanAsync(state.Options.QueryPlanTemplateId);
+            var queryPlanInput = queryPlanResolution.Input;
+            if (!string.IsNullOrWhiteSpace(queryPlanResolution.Name))
+                output.WriteLine($"Using query plan: {queryPlanResolution.Name}");
+
             await FacilitySetupHelper.EnsureFacilityAsync(
                 services.GetRequiredService<IFacilityServiceClient>(),
                 output, facilityId, measureIds);
@@ -341,7 +417,7 @@ public class AutomationRunManager : IAutomationRunManager
                 output, facilityId);
             await FacilitySetupHelper.EnsureQueryPlansAsync(
                 services.GetRequiredService<IDataAcquisitionServiceClient>(),
-                output, facilityId, measureIds, "Epic");
+                output, facilityId, measureIds, "Epic", queryPlanInput);
             await FacilitySetupHelper.EnsureQueryConfigAsync(
                 services.GetRequiredService<IDataAcquisitionServiceClient>(),
                 services.GetRequiredService<AutomationConfig>(),
@@ -381,6 +457,50 @@ public class AutomationRunManager : IAutomationRunManager
                     throw new InvalidOperationException($"Expected report with id {reportId} to be submitted but it was not.");
             }
 
+            // ── RegenerateReport: the first report is just a prerequisite.
+            // Now trigger regeneration and track the *new* report through the full pipeline.
+            if (state.Options.ReportMethod == ReportMethod.RegenerateReport)
+            {
+                output.WriteLine("═══════════════════════════════════════════════════════════════");
+                output.WriteLine("Initial report submitted. Beginning REGENERATION phase...");
+                output.WriteLine("═══════════════════════════════════════════════════════════════");
+
+                // Flush stale domain data so the regenerated report starts fresh.
+                services.GetRequiredService<PipelineDataReader>().InvalidateCache();
+
+                var regeneratedReportId = await reportHelper.RegenerateReportAsync(facilityId, reportId);
+                reportId = regeneratedReportId;
+                lock (state.Sync)
+                {
+                    state.ReportId = reportId;
+                }
+
+                // Re-register the run with the new report ID so pollers track the regenerated report.
+                await _orchestrator.UpdateRunAsync(state.RunId, facilityId, reportId, cancellationToken);
+                await PersistRunSummaryAsync(state);
+
+                output.WriteLine($"Tracking regenerated report: {reportId}");
+
+                await using var regenDiagnostics = new BackgroundDiagnosticsMonitor(
+                    output,
+                    lokiScraper,
+                    _automationConfig,
+                    scenarioConfig.PatientIds.Count,
+                    pollInterval: diagnosticsPollInterval,
+                    forwardInternalLogsToOutput: true,
+                    pipelineReader: services.GetRequiredService<PipelineDataReader>(),
+                    expectsDataAcquisition: false);
+
+                await regenDiagnostics.StartAsync(facilityId, reportId);
+                var regenSubmitted = await reportHelper.CheckSubmissionStatusAsync(reportId, scenarioConfig, regenDiagnostics);
+                await regenDiagnostics.StopAsync();
+
+                if (!regenSubmitted)
+                    throw new InvalidOperationException($"Expected regenerated report with id {reportId} to be submitted but it was not.");
+
+                output.WriteLine("Regenerated report submitted successfully.");
+            }
+
             await pipelineSnapshot.WriteFullSnapshotAsync(output, facilityId, reportId);
 
             var downloadedResources = await reportHelper.DownloadReportAsync(facilityId, reportId, scenarioConfig);
@@ -398,6 +518,31 @@ public class AutomationRunManager : IAutomationRunManager
             // Flush stale cache from diagnostics polling so validators read authoritative data.
             services.GetRequiredService<PipelineDataReader>().InvalidateCache();
 
+            // Regeneration reuses prior data acquisition — no new DA logs exist for the regenerated report.
+            var expectDataAcquisitionData = state.Options.ReportMethod != ReportMethod.RegenerateReport;
+
+            // Build the concrete generation manifest when profiles are available.
+            GenerationManifest? generationManifest = null;
+            if (state.Options.PatientProfiles is { Count: > 0 })
+            {
+                generationManifest = GenerationManifest.Build(
+                    patientIds,
+                    bundles,
+                    state.Options.PatientProfiles,
+                    (IReadOnlyList<ProfiledMeasureType>)state.Options.SelectedMeasures);
+                generationManifest.MeasureIds = measureIds;
+                var effectiveQueryPlanInput = queryPlanInput ?? QueryPlanDefaults.GetDefaultAsInput();
+                generationManifest.AcquiredResourceTypes = QueryPlanDefaults.GetAcquiredResourceTypes(effectiveQueryPlanInput);
+                generationManifest.ParameterQueryResourceTypes = QueryPlanDefaults.GetParameterQueryResourceTypes(effectiveQueryPlanInput);
+                generationManifest.SimulatedAcquiredResourceKeysByPatient = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysByPatient(
+                    patientIds,
+                    bundles,
+                    effectiveQueryPlanInput,
+                    scenarioConfig.StartDate,
+                    scenarioConfig.EndDate);
+                generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(state.Options.SelectedMeasures);
+            }
+
             await reportAbsValidator.ValidateAllAsync(
                 internalAbsResources,
                 expectedSubmittedPatientIds,
@@ -407,39 +552,36 @@ public class AutomationRunManager : IAutomationRunManager
                 facilityId,
                 reportId,
                 bundles,
-                expectedManifestPatientListIds: expectedAllPatientIds);
+                expectedManifestPatientListIds: expectedAllPatientIds,
+                expectDataAcquisitionData: expectDataAcquisitionData,
+                manifest: generationManifest);
 
             await reportValidator.ValidateAllAsync(
                 facilityId,
                 reportId,
                 measureIds,
                 expectedAllPatientIds,
-                expectedSubmittedPatientIds: expectedSubmittedPatientIds);
-            await dataAcqValidator.ValidateAllAsync(facilityId, reportId, measureIds[0], expectedAllPatientIds);
+                expectedSubmittedPatientIds: expectedSubmittedPatientIds,
+                manifest: generationManifest);
+            await dataAcqValidator.ValidateAllAsync(facilityId, reportId, measureIds[0], expectedAllPatientIds, expectDataAcquisitionData: expectDataAcquisitionData);
             await normalizationValidator.ValidateAllAsync(facilityId);
             await tenantValidator.ValidateAllAsync(facilityId, measureId);
             await validationResultsValidator.ValidateAllAsync(facilityId, reportId, expectedAllPatientIds, scenarioConfig.LokiScrapeWindow);
 
-            if (scenarioConfig.RemoveFacilityConfig)
-                await FacilitySetupHelper.CleanupFacilityAsync(
-                    services.GetRequiredService<IFacilityServiceClient>(),
-                    services.GetRequiredService<INormalizationServiceClient>(),
-                    services.GetRequiredService<IDataAcquisitionServiceClient>(),
-                    services.GetRequiredService<IQueryDispatchServiceClient>(),
-                    output, facilityId);
+            await RunCleanupHelper.CleanupAfterRunAsync(
+                scenarioConfig,
+                services.GetRequiredService<IFacilityServiceClient>(),
+                services.GetRequiredService<INormalizationServiceClient>(),
+                services.GetRequiredService<IDataAcquisitionServiceClient>(),
+                services.GetRequiredService<IQueryDispatchServiceClient>(),
+                services.GetRequiredService<IReportServiceClient>(),
+                fhirDataLoader,
+                output,
+                facilityId,
+                reportId);
 
-            if (state.Options.CleanupTestData)
-            {
-                await FacilitySetupHelper.SoftDeleteRunDataAsync(
-                    services.GetRequiredService<IReportServiceClient>(),
-                    services.GetRequiredService<IDataAcquisitionServiceClient>(),
-                    services.GetRequiredService<IQueryDispatchServiceClient>(),
-                    output,
-                    facilityId,
-                    reportId);
-
-                fhirDataLoader.ExpungeEverything(output);
-            }
+            if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
+                throw new OperationCanceledException("Run was cancelled.");
 
             state.Status = AutomationRunStatus.Succeeded;
             state.FinishedAt = DateTimeOffset.UtcNow;
@@ -447,8 +589,18 @@ public class AutomationRunManager : IAutomationRunManager
             await BroadcastStatus(state);
             WriteLog(state, "Run completed successfully.");
         }
+        catch (OperationCanceledException) when (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
+        {
+            _logger.LogInformation("Run {RunId} cancellation acknowledged.", state.RunId);
+        }
         catch (Exception ex)
         {
+            if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
+            {
+                _logger.LogInformation("Run {RunId} faulted after cancel request: {Message}", state.RunId, ex.Message);
+                return;
+            }
+
             _logger.LogError(ex, "Run {RunId} failed", state.RunId);
             state.Status = AutomationRunStatus.Failed;
             state.Error = ex.Message;
@@ -492,7 +644,10 @@ public class AutomationRunManager : IAutomationRunManager
         services.AddLinkSdk();
 
         services.AddSingleton(sp => new LokiScraper(sp.GetRequiredService<IAutomationOutput>(), sp.GetRequiredService<AutomationConfig>()))
-            .AddSingleton(sp => new FhirDataLoader(sp.GetRequiredService<AutomationConfig>().ExternalFhirServerBase, sp.GetRequiredService<AutomationConfig>()))
+            .AddSingleton(sp => {
+                var cfg = sp.GetRequiredService<AutomationConfig>();
+                return new FhirDataLoader(cfg.ExternalFhirServerBase, cfg.FhirServerOAuth, cfg.FhirServerBasicAuth);
+            })
             .AddSingleton(sp => new LantanaGroup.Link.Automation.Link.Helpers.DatabaseConnectionFactory(sp.GetRequiredService<AutomationConfig>().Database))
             .AddSingleton<PipelineDataReader>();
 
@@ -513,7 +668,7 @@ public class AutomationRunManager : IAutomationRunManager
     {
         var downloadFileName = scenario switch
         {
-            AutomationScenarioKind.SmokeTest => "smoke-submission.zip",
+            AutomationScenarioKind.AdhocReportTest => "adhoc-report-submission.zip",
             AutomationScenarioKind.MultiPatientTest => "multi-patient-submission.zip",
             AutomationScenarioKind.MegaPatientTest => "mega-patient-submission.zip",
             AutomationScenarioKind.Custom => "custom-submission.zip",
@@ -531,7 +686,8 @@ public class AutomationRunManager : IAutomationRunManager
             StartDate = "2023-01-01T00:00:00Z",
             EndDate = "2023-12-31T23:59:59Z",
             PatientIds = [],
-            RemoveFacilityConfig = options.RemoveFacilityConfig,
+            CleanupServiceData = options.CleanupServiceData,
+            CleanupFhirData = options.CleanupFhirData,
             PollingIntervalSeconds = options.PollingIntervalSeconds,
             MaxPollingDurationMinutes = options.MaxPollingDurationMinutes,
             DownloadFileName = downloadFileName,
@@ -544,10 +700,10 @@ public class AutomationRunManager : IAutomationRunManager
         var defaultMeasures = new List<ProfiledMeasureType> { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation };
         var defaults = request.Scenario switch
         {
-            AutomationScenarioKind.SmokeTest => new ResolvedRunOptions(1, 1000, "SmokePatient", 20260326, 3, 0, 30, true, false, defaultMeasures, []),
-            AutomationScenarioKind.MultiPatientTest => new ResolvedRunOptions(1000, 100, "MultiPatient", 20260328, 3, 0, 30, true, false, defaultMeasures, []),
-            AutomationScenarioKind.MegaPatientTest => new ResolvedRunOptions(FhirBundleGenerator.DefaultPatientCount, FhirBundleGenerator.DefaultResourcesPerPatient, "MegaPatient", 20260327, 3, 0, 30, true, false, defaultMeasures, []),
-            AutomationScenarioKind.Custom => new ResolvedRunOptions(10, 250, "CustomPatient", 20260329, 3, 0, 30, true, false, defaultMeasures, []),
+            AutomationScenarioKind.AdhocReportTest => new ResolvedRunOptions(1, 1000, "AdhocPatient", 20260326, 3, 0, 30, false, true, defaultMeasures, [], []),
+            AutomationScenarioKind.MultiPatientTest => new ResolvedRunOptions(1000, 100, "MultiPatient", 20260328, 3, 0, 30, false, true, defaultMeasures, [], []),
+            AutomationScenarioKind.MegaPatientTest => new ResolvedRunOptions(FhirBundleGenerator.DefaultPatientCount, FhirBundleGenerator.DefaultResourcesPerPatient, "MegaPatient", 20260327, 3, 0, 30, false, true, defaultMeasures, [], []),
+            AutomationScenarioKind.Custom => new ResolvedRunOptions(10, 250, "CustomPatient", 20260329, 3, 0, 30, false, true, defaultMeasures, [], []),
             _ => throw new ArgumentOutOfRangeException(nameof(request.Scenario), request.Scenario, null)
         };
 
@@ -562,12 +718,30 @@ public class AutomationRunManager : IAutomationRunManager
             ? request.PatientProfiles
             : defaults.PatientProfiles;
 
+        var effectiveMeasures = request.SelectedMeasures is { Count: > 0 }
+            ? request.SelectedMeasures
+            : defaults.SelectedMeasures;
+
+        var cohorts = request.PatientCohorts is { Count: > 0 }
+            ? request.PatientCohorts
+            : ExtractCohortsFromJson(request.RunConfigurationJson, effectiveMeasures)
+              ?? [
+                  PatientCohortDefinition.AllQualifying(
+                      effectiveMeasures,
+                      request.PatientCount ?? defaults.PatientCount,
+                      request.ResourcesPerPatient ?? defaults.ResourcesPerPatient,
+                      request.ResourcesPerPatient ?? defaults.ResourcesPerPatient)
+              ];
+
         // Resolve measures: prefer SelectedMeasures list, fall back to single SelectedMeasure, then defaults
         var measures = request.SelectedMeasures is { Count: > 0 }
             ? request.SelectedMeasures
             : request.SelectedMeasure.HasValue
                 ? [request.SelectedMeasure.Value]
-                : defaults.SelectedMeasures;
+                : effectiveMeasures;
+
+        // Always expand profiles from cohorts — cohorts are the single source of truth.
+        profiles = ExpandProfilesFromCohorts(cohorts, request.Seed ?? defaults.Seed);
 
         return defaults with
         {
@@ -578,11 +752,109 @@ public class AutomationRunManager : IAutomationRunManager
             PollingIntervalSeconds = 3,
             MaxPollingDurationMinutes = 0,
             LokiScrapeWindowMinutes = 30,
-            RemoveFacilityConfig = request.RemoveFacilityConfig ?? defaults.RemoveFacilityConfig,
-            CleanupTestData = request.CleanupTestData ?? defaults.CleanupTestData,
+            CleanupServiceData = request.CleanupServiceData ?? defaults.CleanupServiceData,
+            CleanupFhirData = request.CleanupFhirData ?? defaults.CleanupFhirData,
             SelectedMeasures = measures,
-            PatientProfiles = profiles
+            PatientProfiles = profiles,
+            PatientCohorts = cohorts,
+            ReportMethod = request.ReportMethod,
+            QueryPlanTemplateId = request.QueryPlanTemplateId
         };
+    }
+
+    private static List<PatientProfile> ExpandProfilesFromCohorts(IReadOnlyList<PatientCohortDefinition> cohorts, int seed)
+        => PatientCohortDefinition.ExpandProfiles(cohorts, seed);
+
+    /// <summary>
+    /// Extracts cohort definitions from the <c>RunConfigurationJson</c> blob.
+    /// The JSON is the full scenario payload produced by the UI and contains a
+    /// <c>patientCohorts</c> array.  Returns null when parsing fails or the
+    /// array is empty so the caller can fall back to defaults.
+    /// </summary>
+    private static List<PatientCohortDefinition>? ExtractCohortsFromJson(string? json, List<ProfiledMeasureType> measures)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+
+            if (!doc.RootElement.TryGetProperty("patientCohorts", out var cohortsEl)
+                || cohortsEl.ValueKind != JsonValueKind.Array
+                || cohortsEl.GetArrayLength() == 0)
+                return null;
+
+            var cohorts = new List<PatientCohortDefinition>();
+
+            foreach (var item in cohortsEl.EnumerateArray())
+            {
+                var count = item.TryGetProperty("patientCount", out var pc) ? pc.GetInt32() : 0;
+                var min = item.TryGetProperty("resourcesPerPatientMin", out var rmin) ? rmin.GetInt32() : 50;
+                var max = item.TryGetProperty("resourcesPerPatientMax", out var rmax) ? rmax.GetInt32() : min;
+
+                var eligibilities = new Dictionary<ProfiledMeasureType, MeasureEligibility>();
+                if (item.TryGetProperty("measureEligibilities", out var meEl) && meEl.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var prop in meEl.EnumerateObject())
+                    {
+                        if (Enum.TryParse<ProfiledMeasureType>(prop.Name, ignoreCase: true, out var mt))
+                        {
+                            MeasureEligibility eligibility;
+                            if (prop.Value.ValueKind == JsonValueKind.String)
+                            {
+                                eligibility = Enum.TryParse<MeasureEligibility>(prop.Value.GetString(), ignoreCase: true, out var parsed)
+                                    ? parsed
+                                    : MeasureEligibility.Qualifying;
+                            }
+                            else if (prop.Value.ValueKind == JsonValueKind.Number)
+                            {
+                                eligibility = prop.Value.GetInt32() == 0
+                                    ? MeasureEligibility.Qualifying
+                                    : MeasureEligibility.NonQualifying;
+                            }
+                            else
+                            {
+                                eligibility = MeasureEligibility.Qualifying;
+                            }
+                            eligibilities[mt] = eligibility;
+                        }
+                    }
+                }
+
+                // Ensure every selected measure has an entry (default to qualifying).
+                foreach (var m in measures)
+                {
+                    eligibilities.TryAdd(m, MeasureEligibility.Qualifying);
+                }
+
+                var scenarioIds = new List<string>();
+                if (item.TryGetProperty("eligibleClinicalScenarioIds", out var sEl) && sEl.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var s in sEl.EnumerateArray())
+                    {
+                        var sv = s.GetString();
+                        if (!string.IsNullOrEmpty(sv))
+                            scenarioIds.Add(sv);
+                    }
+                }
+
+                cohorts.Add(new PatientCohortDefinition
+                {
+                    PatientCount = count,
+                    MeasureEligibilities = eligibilities,
+                    EligibleClinicalScenarioIds = scenarioIds,
+                    ResourcesPerPatientMin = min,
+                    ResourcesPerPatientMax = max
+                });
+            }
+
+            return cohorts.Count > 0 ? cohorts : null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private void WriteLog(MutableRunState state, string message)
@@ -669,7 +941,7 @@ public class AutomationRunManager : IAutomationRunManager
             return new AutomationRunSummary
             {
                 RunId = state.RunId,
-                RunName = GetRunName(state.Scenario, state.Options.SelectedMeasures),
+                RunName = state.RunNameOverride ?? GetRunName(state.Scenario, state.Options.SelectedMeasures),
                 Scenario = state.Scenario,
                 SelectedMeasure = string.Join(", ", state.Options.SelectedMeasures.Select(ProfiledMeasureCatalog.GetDisplayName)),
                 PatientCount = state.Options.PatientProfiles is { Count: > 0 }
@@ -677,6 +949,7 @@ public class AutomationRunManager : IAutomationRunManager
                     : state.Options.PatientCount,
                 ResourcesPerPatient = state.Options.ResourcesPerPatient,
                 Seed = state.Options.Seed,
+                RunConfigurationJson = state.RunConfigurationJson,
                 Status = state.Status,
                 CreatedAt = state.CreatedAt,
                 StartedAt = state.StartedAt,
@@ -706,12 +979,19 @@ public class AutomationRunManager : IAutomationRunManager
         };
     }
 
-    private sealed class MutableRunState(Guid runId, AutomationScenarioKind scenario, ResolvedRunOptions options)
+    private sealed class MutableRunState(
+        Guid runId,
+        AutomationScenarioKind scenario,
+        ResolvedRunOptions options,
+        string? runNameOverride,
+        string? runConfigurationJson)
     {
         public object Sync { get; } = new();
         public Guid RunId { get; } = runId;
         public AutomationScenarioKind Scenario { get; } = scenario;
         public ResolvedRunOptions Options { get; } = options;
+        public string? RunNameOverride { get; } = runNameOverride;
+        public string? RunConfigurationJson { get; } = runConfigurationJson;
         public DateTimeOffset CreatedAt { get; } = DateTimeOffset.UtcNow;
         public DateTimeOffset? StartedAt { get; set; }
         public DateTimeOffset? FinishedAt { get; set; }
@@ -720,6 +1000,10 @@ public class AutomationRunManager : IAutomationRunManager
         public AutomationRunStatus Status { get; set; } = AutomationRunStatus.Queued;
         public string? Error { get; set; }
         public List<string> Logs { get; } = [];
+        public CancellationTokenSource RunCancellation { get; } = new();
+        public bool CancelRequested { get; set; }
+        public Task? ExecutionTask { get; set; }
+        public FhirDataLoader? FhirDataLoader { get; set; }
     }
 
     private sealed class NullAutomationOutput : IAutomationOutput
@@ -741,8 +1025,58 @@ public class AutomationRunManager : IAutomationRunManager
         int PollingIntervalSeconds,
         int MaxPollingDurationMinutes,
         int LokiScrapeWindowMinutes,
-        bool RemoveFacilityConfig,
-        bool CleanupTestData,
+        bool CleanupServiceData,
+        bool CleanupFhirData,
         List<ProfiledMeasureType> SelectedMeasures,
-        List<PatientProfile> PatientProfiles);
+        List<PatientProfile> PatientProfiles,
+        List<PatientCohortDefinition> PatientCohorts,
+        ReportMethod ReportMethod = ReportMethod.Adhoc,
+        Guid? QueryPlanTemplateId = null);
+
+    /// <summary>
+    /// Resolves the query plan template for a run. Returns null to use built-in defaults.
+    /// </summary>
+    private async Task<QueryPlanResolution> ResolveQueryPlanAsync(Guid? templateId)
+    {
+        QueryPlanTemplate? template = null;
+
+        if (templateId.HasValue)
+            template = await _queryPlanTemplateStore.GetByIdAsync(templateId.Value);
+
+        // Fall back to the default template if no explicit one was provided or it wasn't found.
+        template ??= await _queryPlanTemplateStore.GetDefaultAsync();
+
+        if (template == null)
+            return new QueryPlanResolution(null, "Built-in Default");
+
+        return new QueryPlanResolution(ToQueryPlanInput(template), template.Name);
+    }
+
+    private static QueryPlanInput ToQueryPlanInput(QueryPlanTemplate template) => new()
+    {
+        EhrDescription = template.EhrDescription,
+        LookBack = template.LookBack,
+        InitialQueries = template.InitialQueries.Select(ToQueryPlanQueryEntry).ToList(),
+        SupplementalQueries = template.SupplementalQueries.Select(ToQueryPlanQueryEntry).ToList()
+    };
+
+    private static QueryPlanQueryEntry ToQueryPlanQueryEntry(QueryEntry src) => new()
+    {
+        ResourceType = src.ResourceType,
+        QueryConfigType = src.QueryConfigType,
+        OperationType = src.OperationType,
+        Paged = src.Paged,
+        Parameters = src.Parameters.Select(p => new QueryPlanParameterEntry
+        {
+            ParameterType = p.ParameterType,
+            Name = p.Name,
+            Variable = p.Variable,
+            Format = p.Format,
+            Literal = p.Literal,
+            Resource = p.Resource,
+            PagedValue = p.PagedValue
+        }).ToList()
+    };
+
+    private sealed record QueryPlanResolution(QueryPlanInput? Input, string Name);
 }

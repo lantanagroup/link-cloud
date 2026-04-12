@@ -1,118 +1,121 @@
+﻿using Newtonsoft.Json.Linq;
+using LantanaGroup.Automation.Generation;
 using Newtonsoft.Json.Linq;
 
 namespace LantanaGroup.Link.Automation.Link.Helpers;
 
+/// <summary>
+/// Platform-specific wire-format builder that converts <see cref="QueryPlanInput"/>
+/// into the <see cref="JObject"/> structure expected by the DataAcquisition service API.
+///
+/// For the canonical default plan definitions and resource-type extraction, see
+/// <see cref="QueryPlanDefaults"/> in the Automation project.
+/// </summary>
 public static class QueryPlanBuilder
 {
-    public static JObject BuildQueryPlan(string facilityId, string? measureId, string ehrDescription, string type)
+    /// <summary>
+    /// Returns the distinct set of FHIR resource types that the query plan acquires.
+    /// Delegates to <see cref="QueryPlanDefaults.GetAcquiredResourceTypes"/>.
+    /// </summary>
+    public static HashSet<string> GetAcquiredResourceTypes(QueryPlanInput? externalInput = null)
+        => QueryPlanDefaults.GetAcquiredResourceTypes(externalInput);
+
+    /// <summary>
+    /// Returns only the resource types acquired via Parameter queries.
+    /// Delegates to <see cref="QueryPlanDefaults.GetParameterQueryResourceTypes"/>.
+    /// </summary>
+    public static HashSet<string> GetParameterQueryResourceTypes(QueryPlanInput? externalInput = null)
+        => QueryPlanDefaults.GetParameterQueryResourceTypes(externalInput);
+
+    /// <summary>
+    /// Exports the built-in default query plan as a <see cref="QueryPlanInput"/>.
+    /// Delegates to <see cref="QueryPlanDefaults.GetDefaultAsInput"/>.
+    /// </summary>
+    public static QueryPlanInput GetDefaultAsInput()
+        => QueryPlanDefaults.GetDefaultAsInput();
+
+    /// <summary>
+    /// Builds a query plan JObject suitable for the DataAcquisition service API.
+    /// When <paramref name="externalInput"/> is provided, its queries override the defaults.
+    /// </summary>
+    public static JObject BuildQueryPlan(
+        string facilityId,
+        string? measureId,
+        string ehrDescription,
+        string type,
+        QueryPlanInput? externalInput = null)
     {
+        var plan = externalInput ?? QueryPlanDefaults.GetDefaultAsInput();
+
         return new JObject
         {
             ["PlanName"] = measureId,
             ["FacilityId"] = facilityId,
-            ["EHRDescription"] = ehrDescription,
-            ["LookBack"] = "P0D",
+            ["EHRDescription"] = plan.EhrDescription ?? ehrDescription,
+            ["LookBack"] = plan.LookBack ?? "P0D",
             ["Type"] = type,
-            ["InitialQueries"] = BuildInitialQueries(),
-            ["SupplementalQueries"] = BuildSupplementalQueries()
+            ["InitialQueries"] = ConvertEntriesToJObject(plan.InitialQueries),
+            ["SupplementalQueries"] = ConvertEntriesToJObject(plan.SupplementalQueries)
         };
     }
 
-    private static JObject BuildInitialQueries()
+    // ----- JObject conversion -----
+
+    private static JObject ConvertEntriesToJObject(List<QueryPlanQueryEntry> entries)
     {
-        return new JObject
+        var obj = new JObject();
+        for (var i = 0; i < entries.Count; i++)
         {
-            ["0"] = BuildParameterQuery("Encounter",
-                VariableParam("patient", 0),
-                VariableParam("date", 1, "ge{0}"),
-                VariableParam("date", 3, "le{0}")),
-            ["1"] = BuildParameterQuery("MedicationRequest",
-                VariableParam("patient", 0)),
-            ["2"] = BuildReferenceQuery("Location", 2, 100),
-            ["3"] = BuildReferenceQuery("Medication", 2, 100)
-        };
+            var e = entries[i];
+            obj[i.ToString()] = string.Equals(e.QueryConfigType, "Reference", StringComparison.OrdinalIgnoreCase)
+                ? BuildReferenceQuery(e.ResourceType, e.OperationType ?? 2, e.Paged ?? 100)
+                : BuildParameterQuery(e.ResourceType, e.Parameters.Select(ConvertParameter).ToArray());
+        }
+        return obj;
     }
 
-    private static JObject BuildSupplementalQueries()
+    private static JObject ConvertParameter(QueryPlanParameterEntry p) => p.ParameterType switch
     {
-        return new JObject
-        {
-            ["0"] = BuildParameterQuery("Condition",
-                VariableParam("patient", 0),
-                ResourceIdsParam("encounter", "Encounter", "100")),
-            ["1"] = BuildParameterQuery("Coverage",
-                VariableParam("patient", 0)),
-            ["2"] = BuildParameterQuery("DiagnosticReport",
-                VariableParam("patient", 0),
-                VariableParam("date", 1, "ge{0}"),
-                VariableParam("date", 3, "le{0}")),
-            ["3"] = BuildParameterQuery("Observation",
-                VariableParam("patient", 0),
-                VariableParam("date", 1, "ge{0}"),
-                VariableParam("date", 3, "le{0}"),
-                LiteralParam("category", "imaging,laboratory,social-history,vital-signs")),
-            ["4"] = BuildParameterQuery("Procedure",
-                VariableParam("patient", 0),
-                VariableParam("date", 1, "ge{0}"),
-                VariableParam("date", 3, "le{0}")),
-            ["5"] = BuildParameterQuery("ServiceRequest",
-                VariableParam("patient", 0),
-                ResourceIdsParam("encounter", "Encounter", "100")),
-            ["6"] = BuildReferenceQuery("Device", 2, 100),
-            ["7"] = BuildReferenceQuery("Specimen", 2, 100)
-        };
-    }
+        "ResourceIds" => ResourceIdsParam(p.Name, p.Resource ?? "", p.PagedValue ?? "100"),
+        "Literal" => LiteralParam(p.Name, p.Literal ?? ""),
+        _ => VariableParam(p.Name, p.Variable ?? 0, p.Format)
+    };
 
-    private static JObject BuildParameterQuery(string resourceType, params JObject[] parameters)
+    private static JObject BuildParameterQuery(string resourceType, params JObject[] parameters) => new()
     {
-        return new JObject
-        {
-            ["QueryConfigType"] = "Parameter",
-            ["ResourceType"] = resourceType,
-            ["Parameters"] = new JArray(parameters)
-        };
-    }
+        ["QueryConfigType"] = "Parameter",
+        ["ResourceType"] = resourceType,
+        ["Parameters"] = new JArray(parameters)
+    };
 
-    private static JObject BuildReferenceQuery(string resourceType, int operationType, int paged)
+    private static JObject BuildReferenceQuery(string resourceType, int operationType, int paged) => new()
     {
-        return new JObject
-        {
-            ["QueryConfigType"] = "Reference",
-            ["ResourceType"] = resourceType,
-            ["OperationType"] = operationType,
-            ["Paged"] = paged
-        };
-    }
+        ["QueryConfigType"] = "Reference",
+        ["ResourceType"] = resourceType,
+        ["OperationType"] = operationType,
+        ["Paged"] = paged
+    };
 
-    private static JObject VariableParam(string name, int variable, string? format = null)
+    private static JObject VariableParam(string name, int variable, string? format = null) => new()
     {
-        return new JObject
-        {
-            ["ParameterType"] = "Variable",
-            ["Name"] = name,
-            ["Variable"] = variable,
-            ["Format"] = format
-        };
-    }
+        ["ParameterType"] = "Variable",
+        ["Name"] = name,
+        ["Variable"] = variable,
+        ["Format"] = format
+    };
 
-    private static JObject ResourceIdsParam(string name, string resource, string paged)
+    private static JObject ResourceIdsParam(string name, string resource, string paged) => new()
     {
-        return new JObject
-        {
-            ["ParameterType"] = "ResourceIds",
-            ["Name"] = name,
-            ["Resource"] = resource,
-            ["Paged"] = paged
-        };
-    }
+        ["ParameterType"] = "ResourceIds",
+        ["Name"] = name,
+        ["Resource"] = resource,
+        ["Paged"] = paged
+    };
 
-    private static JObject LiteralParam(string name, string literal)
+    private static JObject LiteralParam(string name, string literal) => new()
     {
-        return new JObject
-        {
-            ["ParameterType"] = "Literal",
-            ["Name"] = name,
-            ["Literal"] = literal
-        };
-    }
+        ["ParameterType"] = "Literal",
+        ["Name"] = name,
+        ["Literal"] = literal
+    };
 }

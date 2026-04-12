@@ -1,4 +1,5 @@
 ﻿using DataAcquisition.Domain.Application.Models;
+using Confluent.Kafka;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
@@ -6,15 +7,20 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ReferenceQuery;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
@@ -50,18 +56,21 @@ public class ReferenceResourceService : IReferenceResourceService
     private readonly IReferenceResourcesManager _referenceResourcesManager;
     private readonly IReadFhirCommand _readFhirCommand;
     private readonly DataAcquisitionDbContext _dbContext;
+    private readonly IProducer<ResourceKey, ResourceAcquired> _kafkaProducer;
 
     public ReferenceResourceService(
         ILogger<ReferenceResourceService> logger,
         IReferenceResourcesQueries referenceResourcesQueries,
         IReferenceResourcesManager referenceResourcesManager,
         IReadFhirCommand readFhirCommand,
+        IProducer<ResourceKey, ResourceAcquired> kafkaProducer,
         DataAcquisitionDbContext dbContext)
     {
         _logger = logger;
         _referenceResourcesQueries = referenceResourcesQueries;
         _referenceResourcesManager = referenceResourcesManager;
         _readFhirCommand = readFhirCommand;
+        _kafkaProducer = kafkaProducer;
         _dbContext = dbContext;
     }
 
@@ -124,6 +133,7 @@ public class ReferenceResourceService : IReferenceResourceService
         _logger.LogInformation("Processing {Count} reference resources for log with ID: {LogId}", groupedIdentities.Sum(g => g.Count()), log.Id);
 
         var allCanonicalIdsToLink = new List<Guid>();
+        var resourceByCanonicalId = new Dictionary<Guid, Resource>();
 
         foreach (var group in groupedIdentities)
         {
@@ -147,6 +157,17 @@ public class ReferenceResourceService : IReferenceResourceService
 
             var existingIdSet = existing.Select(r => r.ResourceId).ToHashSet(StringComparer.Ordinal);
             allCanonicalIdsToLink.AddRange(existing.Select(r => r.Id));
+            foreach (var existingRecord in existing)
+            {
+                try
+                {
+                    resourceByCanonicalId[existingRecord.Id] = FhirResourceDeserializer.DeserializeFhirResource(existingRecord);
+                }
+                catch
+                {
+                    // Non-fatal; skip event publish for malformed cached payload.
+                }
+            }
 
             // Determine which IDs need fetching
             var missingIds = distinctIds.Where(id => !existingIdSet.Contains(id)).ToList();
@@ -203,11 +224,72 @@ public class ReferenceResourceService : IReferenceResourceService
                     PageSize = int.MaxValue
                 })).Records;
                 allCanonicalIdsToLink.AddRange(newRecords.Select(r => r.Id));
+                foreach (var newRecord in newRecords)
+                {
+                    try
+                    {
+                        resourceByCanonicalId[newRecord.Id] = FhirResourceDeserializer.DeserializeFhirResource(newRecord);
+                    }
+                    catch
+                    {
+                        // Non-fatal; skip event publish for malformed payload.
+                    }
+                }
             }
         }
 
-        // Link all canonical rows to this log
+        // Link all canonical rows to this log and publish ResourceAcquired events for
+        // newly linked references so downstream consumers (MeasureEval/Report) receive
+        // reference resources in this correlation's stream.
         if (allCanonicalIdsToLink.Count > 0)
-            await _referenceResourcesManager.LinkToLogAsync(log.Id, allCanonicalIdsToLink, cancellationToken);
+        {
+            var requestedCanonicalIds = allCanonicalIdsToLink.Distinct().ToList();
+
+            var alreadyLinkedIds = await _dbContext.DataAcquisitionLogs
+                .Where(l => l.Id == log.Id)
+                .SelectMany(l => l.ReferenceResources.Select(r => r.Id))
+                .ToListAsync(cancellationToken);
+
+            var newIdsToLink = requestedCanonicalIds
+                .Except(alreadyLinkedIds)
+                .ToList();
+
+            if (newIdsToLink.Count > 0)
+            {
+                await _referenceResourcesManager.LinkToLogAsync(log.Id, newIdsToLink, cancellationToken);
+
+                foreach (var referenceId in newIdsToLink)
+                {
+                    if (!resourceByCanonicalId.TryGetValue(referenceId, out var resource))
+                        continue;
+
+                    await _kafkaProducer.ProduceAsync(
+                        KafkaTopic.ResourceAcquired.ToString(),
+                        new Message<ResourceKey, ResourceAcquired>
+                        {
+                            Key = new ResourceKey
+                            {
+                                FacilityId = log.FacilityId,
+                                CorrelationId = log.CorrelationId
+                            },
+                            Headers = new Headers
+                            {
+                                new Header(DataAcquisitionConstants.HeaderNames.CorrelationId,
+                                    System.Text.Encoding.UTF8.GetBytes(log.CorrelationId))
+                            },
+                            Value = new ResourceAcquired
+                            {
+                                Resource = resource,
+                                ResourceType = resource.TypeName,
+                                ScheduledReports = [log.ScheduledReport],
+                                PatientId = null,
+                                QueryType = log.QueryPhase.ToString(),
+                                ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent))
+                            }
+                        },
+                        cancellationToken);
+                }
+            }
+        }
     }
 }

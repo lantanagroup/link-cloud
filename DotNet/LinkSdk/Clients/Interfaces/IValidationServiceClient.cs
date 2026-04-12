@@ -2,6 +2,8 @@
 
 public interface IValidationServiceClient
 {
+    Task<bool> HasArtifactsAsync(CancellationToken cancellationToken = default);
+    Task<bool> HasCategoriesAsync(CancellationToken cancellationToken = default);
     Task InitializeArtifactsAsync(CancellationToken cancellationToken = default);
     Task InitializeCategoriesAsync(CancellationToken cancellationToken = default);
     Task UpsertResourceArtifactAsync(string artifactId, string resourceJson, CancellationToken cancellationToken = default);

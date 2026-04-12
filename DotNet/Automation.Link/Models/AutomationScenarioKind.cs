@@ -2,7 +2,7 @@
 
 public enum AutomationScenarioKind
 {
-    SmokeTest,
+    AdhocReportTest,
     MultiPatientTest,
     MegaPatientTest,
     Custom

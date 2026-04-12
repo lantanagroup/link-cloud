@@ -8,10 +8,15 @@ public class StartScenarioRequest
     [Required]
     public AutomationScenarioKind Scenario { get; set; }
 
+    /// <summary>
+    /// How the report is triggered: Adhoc, ScheduledReport, or RegenerateReport.
+    /// </summary>
+    public ReportMethod ReportMethod { get; set; } = ReportMethod.Adhoc;
+
     [Range(1, 10000)]
     public int? PatientCount { get; set; }
 
-    [Range(1, 10000)]
+    [Range(1, int.MaxValue)]
     public int? ResourcesPerPatient { get; set; }
 
     [StringLength(64)]
@@ -20,9 +25,20 @@ public class StartScenarioRequest
     [Range(1, int.MaxValue)]
     public int? Seed { get; set; }
 
-    public bool? RemoveFacilityConfig { get; set; }
+    [StringLength(120)]
+    public string? ScenarioName { get; set; }
 
-    public bool? CleanupTestData { get; set; }
+    public string? RunConfigurationJson { get; set; }
+
+    /// <summary>
+    /// Remove facility config, soft-delete reports, DA logs, and query dispatch config after the run.
+    /// </summary>
+    public bool? CleanupServiceData { get; set; }
+
+    /// <summary>
+    /// Expunge all data from the FHIR server after the run.
+    /// </summary>
+    public bool? CleanupFhirData { get; set; }
 
     /// <summary>
     /// Single measure for backward compatibility. When set and <see cref="SelectedMeasures"/>
@@ -45,4 +61,12 @@ public class StartScenarioRequest
     /// When null or empty, standard random generation is used.
     /// </summary>
     public List<PatientProfile>? PatientProfiles { get; set; }
+
+    public List<PatientCohortDefinition>? PatientCohorts { get; set; }
+
+    /// <summary>
+    /// Optional query plan template ID. When set, the run uses this template's
+    /// query plan instead of the built-in defaults. When null, the system default is used.
+    /// </summary>
+    public Guid? QueryPlanTemplateId { get; set; }
 }

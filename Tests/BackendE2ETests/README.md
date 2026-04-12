@@ -16,7 +16,7 @@ The tests exercise the pipeline by:
 
 | Suite | Description |
 |---|---|
-| `SmokeTest` | Single-patient, fast feedback path. |
+| `AdhocReportTest` | Single-patient ad-hoc report test. |
 | `MultiPatientTest` | Multi-patient volume scenario. |
 | `MegaPatientTest` | High-volume stress scenario (thousands of resources). |
 | `MultiMeasureAdhocReportingTest` | Ad-hoc reporting across multiple measures simultaneously. |
@@ -31,7 +31,7 @@ The tests exercise the pipeline by:
 - **Measure-aware profiles** — `GenerateWithProfiles()` creates qualifying and non-qualifying patients for specific measures (ACH Monthly, ACH Daily, Hypo).
 - **Background diagnostics monitoring** with event-driven output.
 - **Deep ABS validation** via `ReportAbsManifestValidator`.
-- **Baseline comparison** for static test scenarios via `ValidationBaselineManager`.
+- **Predictive validation** via deterministic generation manifests and cross-layer validators (ABS, Report DB, DA DB).
 - **FHIR snapshot output** saved locally only when generated bundle content changes.
 
 ## Architecture
@@ -55,7 +55,7 @@ dotnet test Tests/BackendE2ETests/BackendE2ETests.csproj
 Run a specific suite:
 
 ```bash
-dotnet test Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=SmokeTest"
+dotnet test Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=AdhocReportTest"
 ```
 
 ## Configuration (environment variables)
@@ -68,10 +68,10 @@ Primary environment variables used by `TestConfig` include:
 | `INTERNAL_FHIR_SERVER_BASE_URL` | FHIR base URL reachable from Link services | `http://fhir-server:8080/fhir` |
 | `ADMIN_BFF_BASE_URL` | Admin BFF API base URL | `http://localhost:8063/api` |
 | `LOKI_BASE_URL` | Loki base URL for diagnostics scraping | `http://localhost:3100` |
-| `CLEANUP_SMOKE_TEST_DATA` | Whether to expunge FHIR data during cleanup | `false` |
-| `*_REMOVE_FACILITY_CONFIG` | Whether tests remove facility config during cleanup | `false` |
+| `CLEANUP_ADHOC_REPORT_TEST_DATA` | Whether to expunge FHIR data during cleanup | `true` |
+| `*_CLEANUP_SERVICE_DATA` | Whether tests remove Link service data (facility, reports, DA logs, query dispatch) after the run | `false` |
 
-Also see scenario-specific values in `TestConfig` for `ADHOC_REPORTING_SMOKE_TEST`, `MEGA_PATIENT_TEST`, and `MULTI_PATIENT_TEST` prefixes.
+Also see scenario-specific values in `TestConfig` for `ADHOC_REPORT_TEST`, `MEGA_PATIENT_TEST`, and `MULTI_PATIENT_TEST` prefixes.
 
 ## Generated FHIR snapshots
 
@@ -81,24 +81,6 @@ Generated bundles are written under:
 - `generated-fhir-snapshots/<TestName>` beneath test runtime output base.
 
 Writes are hash-gated (skip write when content is unchanged).
-
-## Baseline validation
-
-`ValidationBaselineManager` stores and compares baseline documents for static test scenarios.
-
-Default baseline location:
-
-- `Tests/BackendE2ETests/Baselines/<TestName>.baseline.json`
-
-Optional override:
-
-- `E2E_BASELINE_DIR`
-
-Regeneration switch:
-
-- `E2E_BASELINE_REGENERATE=true` to regenerate baseline files.
-
-If no baseline exists, tests create one automatically.
 
 ## Diagnostics output
 

@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Automation.Link.Helpers;
+using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 
@@ -33,6 +34,14 @@ public class ReportDatabaseValidator
             expectedPatientIds, expectedFrequency, expectedAdHocType, expectedSubmittedPatientIds);
     }
 
+    /// <summary>
+    /// Validates the report database state after a pipeline run.
+    /// </summary>
+    /// <param name="manifest">
+    /// Optional concrete generation manifest. When provided, the validator uses the
+    /// known resource inventory and per-measure qualifying counts instead of assuming
+    /// uniform expectations for all measures. When null, behaviour is backward-compatible.
+    /// </param>
     public async Task ValidateAllAsync(
         string facilityId,
         string reportId,
@@ -40,9 +49,13 @@ public class ReportDatabaseValidator
         List<string> expectedPatientIds,
         Frequency expectedFrequency = Frequency.Adhoc,
         string? expectedAdHocType = "Manual",
-        List<string>? expectedSubmittedPatientIds = null)
+        List<string>? expectedSubmittedPatientIds = null,
+        GenerationManifest? manifest = null)
     {
         var errors = new List<string>();
+
+        // Derive qualifying count map from manifest when available.
+        var qualifyingCountPerMeasure = manifest?.BuildQualifyingCountPerMeasure();
 
         try
         {
@@ -53,8 +66,8 @@ public class ReportDatabaseValidator
             await ValidateScheduleReportTypes(scheduleId, expectedMeasureIds, errors);
             await ValidateReportEntries(scheduleId, facilityId, expectedPatientIds, expectedSubmitted, errors);
             await ValidateEntryMeasureReports(scheduleId, expectedMeasureIds, expectedPatientIds.Count, errors);
-            await ValidateReportResources(scheduleId, facilityId, expectedSubmitted, errors);
-            await ValidateReportPopulations(scheduleId, facilityId, expectedMeasureIds, errors);
+            await ValidateReportResources(scheduleId, facilityId, expectedSubmitted, manifest, errors);
+            await ValidateReportPopulations(scheduleId, facilityId, expectedMeasureIds, qualifyingCountPerMeasure, errors);
         }
         catch (Exception ex)
         {
@@ -188,7 +201,7 @@ public class ReportDatabaseValidator
         }
     }
 
-    private async Task ValidateReportResources(Guid scheduleId, string facilityId, List<string> expectedPatientIds, List<string> errors)
+    private async Task ValidateReportResources(Guid scheduleId, string facilityId, List<string> expectedPatientIds, GenerationManifest? manifest, List<string> errors)
     {
         var resources = await _reader.GetReportResourceSummaryAsync(scheduleId, facilityId);
         var patientsWithResources = resources.Select(r => r.PatientId).Distinct().ToHashSet();
@@ -198,9 +211,50 @@ public class ReportDatabaseValidator
             if (!patientsWithResources.Contains(patientId))
                 AddError(errors, $"No ReportResource rows found for expected patient {patientId}.");
         }
+
+        // When the manifest is available, validate per-patient resource type counts.
+        // ReportResource is populated by PatientAggregator from MeasureEval's MeasureReport
+        // contained resources — the same data that goes into ABS patient NDJSON files.
+        // Expected types = generated ∩ acquired ∩ CQL-referenced.
+        if (manifest != null)
+        {
+            var dbCountsByPatient = resources
+                .GroupBy(r => r.PatientId)
+                .ToDictionary(g => g.Key,
+                    g => g.GroupBy(r => r.ResourceType)
+                          .ToDictionary(rg => rg.Key, rg => rg.Sum(r => r.Count), StringComparer.OrdinalIgnoreCase),
+                    StringComparer.Ordinal);
+
+            foreach (var patientId in expectedPatientIds)
+            {
+                var expectedCounts = manifest.GetExpectedAbsCountsForPatient(patientId);
+                if (expectedCounts == null)
+                    continue;
+
+                dbCountsByPatient.TryGetValue(patientId, out var actualCounts);
+                actualCounts ??= new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var (resourceType, expectedCount) in expectedCounts)
+                {
+                    actualCounts.TryGetValue(resourceType, out var actualCount);
+                    if (actualCount < expectedCount)
+                    {
+                        AddError(errors,
+                            $"ReportResource count for patient={patientId}, type={resourceType}: " +
+                            $"expected>={expectedCount} (sim-acquired ∩ reachable-CQL), " +
+                            $"actual={actualCount}.");
+                    }
+                }
+            }
+        }
     }
 
-    private async Task ValidateReportPopulations(Guid scheduleId, string facilityId, IReadOnlyList<string> expectedMeasureIds, List<string> errors)
+    private async Task ValidateReportPopulations(
+        Guid scheduleId,
+        string facilityId,
+        IReadOnlyList<string> expectedMeasureIds,
+        Dictionary<string, int>? expectedQualifyingCountPerMeasure,
+        List<string> errors)
     {
         var populations = await _reader.GetReportPopulationsAsync(scheduleId, facilityId);
 
@@ -216,25 +270,41 @@ public class ReportDatabaseValidator
             if (!string.IsNullOrWhiteSpace(pop.ReportType) && !expectedSet.Contains(pop.ReportType))
                 AddError(errors, $"ReportPopulation ReportType '{pop.ReportType}' does not match any expected measure [{string.Join(", ", expectedMeasureIds)}]");
 
+            // Use cohort data to determine if this measure has any qualifying patients.
+            var measureHasQualifyingPatients = true;
+            if (expectedQualifyingCountPerMeasure != null && !string.IsNullOrWhiteSpace(pop.ReportType))
+            {
+                expectedQualifyingCountPerMeasure.TryGetValue(pop.ReportType, out var count);
+                measureHasQualifyingPatients = count > 0;
+            }
+
             if (pop.GroupPopulations.Count == 0)
             {
+                if (!measureHasQualifyingPatients)
+                {
+                    _output.WriteLine($"  ReportPopulation '{pop.ReportType}' has no GroupPopulations (expected — 0 qualifying patients per cohort config).");
+                    continue;
+                }
+
                 AddError(errors, "ReportPopulation has no GroupPopulations.");
                 continue;
             }
 
-            foreach (var gp in pop.GroupPopulations)
+            var validGroups = pop.GroupPopulations.Count(gp =>
+                !string.IsNullOrWhiteSpace(gp.PopulationCodeJson)
+                && gp.PopulationCodeJson.Trim() != "{}"
+                && gp.MeasureReportPopulations.Count > 0
+                && gp.MeasureReportPopulations.All(mrp => !string.IsNullOrWhiteSpace(mrp.MeasureReportId)));
+
+            if (validGroups == 0)
             {
-                if (string.IsNullOrWhiteSpace(gp.PopulationCodeJson) || gp.PopulationCodeJson.Trim() == "{}")
-                    AddError(errors, "GroupPopulation PopulationCodeJson is empty/invalid.");
-
-                if (gp.MeasureReportPopulations.Count == 0)
-                    AddError(errors, "GroupPopulation has no MeasureReportPopulation rows.");
-
-                foreach (var mrp in gp.MeasureReportPopulations)
+                if (!measureHasQualifyingPatients)
                 {
-                    if (string.IsNullOrWhiteSpace(mrp.MeasureReportId))
-                        AddError(errors, "MeasureReportPopulation MeasureReportId should be populated.");
+                    _output.WriteLine($"  ReportPopulation '{pop.ReportType}' has GroupPopulations but none are valid (expected — 0 qualifying patients per cohort config).");
+                    continue;
                 }
+
+                AddError(errors, $"ReportPopulation '{pop.ReportType}' has no valid GroupPopulation with population code and measure report rows.");
             }
         }
     }

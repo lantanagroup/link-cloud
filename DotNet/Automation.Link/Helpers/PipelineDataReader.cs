@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
@@ -15,7 +15,7 @@ public class PipelineDataReader
     private readonly IFacilityServiceClient _facilityClient;
 
     // ---------------------------------------------------------------
-    // Time-based cache � collapses duplicate HTTP calls from the
+    // Time-based cache — collapses duplicate HTTP calls from the
     // many consumers (ProgressMonitor, PipelineProgressTracker,
     // MilestoneValidationOrchestrator, StoreBackedServicePoller,
     // PipelineSnapshot) into a single call per TTL window.
@@ -586,6 +586,50 @@ public class PipelineDataReader
         return ids?
             .Where(x => !string.IsNullOrWhiteSpace(x) && x.Contains('/'))
             .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    public async Task<HashSet<string>> GetReferenceResourceIdsForReportAsync(string facilityId, string reportId)
+    {
+        var keys = await GetOrFetchAsync($"referenceResourceIds:{facilityId}:{reportId}", async () =>
+        {
+            var innerKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var logs = await GetAcquisitionLogsAsync(facilityId, reportId);
+
+            foreach (var log in logs)
+            {
+                var pageNumber = 1;
+                const int pageSize = 100;
+
+                while (true)
+                {
+                    var page = await _dataAcqClient.GetReferenceResourcesForLogAsync(
+                        log.Id,
+                        pageSize: pageSize,
+                        pageNumber: pageNumber);
+
+                    var records = page?.Records ?? [];
+                    if (records.Count == 0)
+                        break;
+
+                    foreach (var r in records)
+                    {
+                        if (string.IsNullOrWhiteSpace(r.ResourceType) || string.IsNullOrWhiteSpace(r.ResourceId))
+                            continue;
+
+                        innerKeys.Add($"{r.ResourceType}/{r.ResourceId}");
+                    }
+
+                    if (records.Count < pageSize)
+                        break;
+
+                    pageNumber++;
+                }
+            }
+
+            return innerKeys;
+        });
+
+        return keys ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     }
 
     public Task<AcquisitionSummaryInfo?> GetDataAcquisitionReportSummaryAsync(string reportId)

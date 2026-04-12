@@ -1,11 +1,11 @@
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using static LantanaGroup.Automation.Generation.ResourceFactories.FhirConceptFactory;
 
 namespace LantanaGroup.Automation.Generation.ResourceFactories;
 
 public static class EncounterFactory
 {
-    /// <summary>Generate an inpatient Encounter driven by the ClinicalScenario for this seed.</summary>
+    /// <summary>Generate an inpatient Encounter driven by the given ClinicalScenario.</summary>
     public static Encounter Generate(
         string id,
         string patientId,
@@ -18,10 +18,8 @@ public static class EncounterFactory
         string stepDownLocationId,
         string orgId,
         string primaryDiagnosisConditionId,
-        int seed)
+        FhirGenerationCodes.ClinicalScenarioDefinition scenario)
     {
-        var scenario = FhirGenerationCodes.ClinicalScenarios[seed % FhirGenerationCodes.ClinicalScenarios.Length];
-
         return Create(
             id, patientId, start, end,
             attendingPractId, admittingPractId,
@@ -78,7 +76,12 @@ public static class EncounterFactory
         [
             new CodeableConcept
             {
-                Coding = [new Coding("http://snomed.info/sct", encTypeCode, encTypeDisplay)],
+                Coding =
+                [
+                    new Coding("http://snomed.info/sct", encTypeCode, encTypeDisplay),
+                    // NHSN Encounter Inpatient value set type
+                    new Coding("http://snomed.info/sct", "32485007", "Hospital admission (procedure)")
+                ],
                 Text   = encTypeDisplay
             }
         ],
@@ -141,6 +144,12 @@ public static class EncounterFactory
                 Condition = Ref($"Condition/{primaryDiagnosisConditionId}"),
                 Use       = CC("http://terminology.hl7.org/CodeSystem/diagnosis-role", "AD", "Admission diagnosis"),
                 Rank      = 1
+            },
+            new Encounter.DiagnosisComponent
+            {
+                Condition = Ref($"Condition/{primaryDiagnosisConditionId}"),
+                Use       = CC("http://terminology.hl7.org/CodeSystem/diagnosis-role", "CC", "Chief complaint"),
+                Rank      = 2
             }
         ],
             Hospitalization = new Encounter.HospitalizationComponent

@@ -1,6 +1,6 @@
-﻿using LantanaGroup.Link.Automation.Link;
+﻿using LantanaGroup.Automation.Generation;
+using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
-using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Automation.Link.Services;
 using LantanaGroup.Link.Automation.Link.Validation;
@@ -12,25 +12,27 @@ using Task = System.Threading.Tasks.Task;
 namespace LantanaGroup.Link.Tests.E2ETests;
 
 /// <summary>
-/// End-to-end smoke test that runs a single generated patient through the full
+/// End-to-end ad-hoc report test that runs a single generated patient through the full
 /// ad-hoc reporting pipeline.
 /// </summary>
-public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixture>
+public sealed class AdhocReportTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixture>
 {
     private const int GenerationSeed = 20260326;
 
-    private static readonly TestScenarioConfig Config = TestConfig.AdhocReportingSmokeTestConfig;
+    private static readonly TestScenarioConfig Config = TestConfig.AdhocReportTestConfig;
 
     private readonly IServiceProvider _sp;
-    private readonly string _facilityId = $"SmokeTest-{Guid.NewGuid():N}";
+    private readonly string _facilityId = $"AdhocReportTest-{Guid.NewGuid():N}";
     private List<(string Name, string Json)> _generatedBundles = [];
+    private List<ProfiledMeasureType> _measures = [];
+    private List<PatientCohortDefinition> _cohorts = [];
     private string? _reportId;
 
     private AutomationConfig AutomationCfg => _sp.GetRequiredService<AutomationConfig>();
     private ConsoleAutomationOutput Output => _sp.GetRequiredService<ConsoleAutomationOutput>();
     private FhirDataLoader FhirDataLoader => _sp.GetRequiredService<FhirDataLoader>();
 
-    public SmokeTest(BackendE2ETestFixture fixture)
+    public AdhocReportTest(BackendE2ETestFixture fixture)
     {
         _sp = fixture.ServiceProvider;
     }
@@ -40,7 +42,14 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
         _sp.GetRequiredService<PipelineDataReader>().InvalidateCache();
 
         Output.WriteLine($"Using deterministic generation seed: {GenerationSeed}");
-        var (patientIds, bundles) = FhirBundleGenerator.Generate(Output, 1, 1000, "SmokePatient", GenerationSeed);
+        var measures = new List<ProfiledMeasureType> { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation };
+        _measures = measures;
+        var cohorts = new List<PatientCohortDefinition>
+        {
+            PatientCohortDefinition.AllQualifying(measures, patientCount: 1, resourcesMin: 1000, resourcesMax: 1000)
+        };
+        _cohorts = cohorts;
+        var (patientIds, bundles) = FhirBundleGenerator.GenerateFromCohorts(Output, measures, cohorts, "AdhocPatient", GenerationSeed);
         _generatedBundles = bundles;
 
         if (Config.PatientIds.Count == 0)
@@ -62,42 +71,22 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
     {
         Output.WriteLine("Cleaning up...\n");
 
-        if (Config.RemoveFacilityConfig)
-        {
-            await FacilitySetupHelper.CleanupFacilityAsync(
-                _sp.GetRequiredService<IFacilityServiceClient>(),
-                _sp.GetRequiredService<INormalizationServiceClient>(),
-                _sp.GetRequiredService<IDataAcquisitionServiceClient>(),
-                _sp.GetRequiredService<IQueryDispatchServiceClient>(),
-                Output,
-                _facilityId);
-        }
-
-        if (AutomationCfg.CleanupTestData)
-        {
-            await FacilitySetupHelper.CleanupQueryDispatchConfigAsync(
-                _sp.GetRequiredService<IQueryDispatchServiceClient>(),
-                Output,
-                _facilityId);
-
-            if (!string.IsNullOrWhiteSpace(_reportId))
-            {
-                await FacilitySetupHelper.SoftDeleteRunDataAsync(
-                    _sp.GetRequiredService<IReportServiceClient>(),
-                    _sp.GetRequiredService<IDataAcquisitionServiceClient>(),
-                    _sp.GetRequiredService<IQueryDispatchServiceClient>(),
-                    Output,
-                    _facilityId,
-                    _reportId);
-            }
-
-            FhirDataLoader.ExpungeEverything(Output);
-        }
+        await RunCleanupHelper.CleanupAfterRunAsync(
+            Config,
+            _sp.GetRequiredService<IFacilityServiceClient>(),
+            _sp.GetRequiredService<INormalizationServiceClient>(),
+            _sp.GetRequiredService<IDataAcquisitionServiceClient>(),
+            _sp.GetRequiredService<IQueryDispatchServiceClient>(),
+            _sp.GetRequiredService<IReportServiceClient>(),
+            FhirDataLoader,
+            Output,
+            _facilityId,
+            _reportId);
     }
 
     [Fact]
-    [Trait("Category", "SmokeTest")]
-    public async Task ExecuteSmokeTest()
+    [Trait("Category", "AdhocReportTest")]
+    public async Task ExecuteAdhocReportTest()
     {
         // Step 1: Load measure definition into MeasureEval and Validation.
         var measureLoader = new MeasureLoader(
@@ -178,6 +167,20 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
         // Flush stale cache from diagnostics polling so validators read authoritative data.
         dataReader.InvalidateCache();
 
+        var profiles = PatientCohortDefinition.ExpandProfiles(_cohorts, GenerationSeed);
+        var generationManifest = GenerationManifest.Build(Config.PatientIds, _generatedBundles, profiles, _measures);
+        generationManifest.MeasureIds = [measureId];
+        var queryPlanInput = QueryPlanBuilder.GetDefaultAsInput();
+        generationManifest.AcquiredResourceTypes = QueryPlanBuilder.GetAcquiredResourceTypes(queryPlanInput);
+        generationManifest.ParameterQueryResourceTypes = QueryPlanBuilder.GetParameterQueryResourceTypes(queryPlanInput);
+        generationManifest.SimulatedAcquiredResourceKeysByPatient = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysByPatient(
+            Config.PatientIds,
+            _generatedBundles,
+            queryPlanInput,
+            Config.StartDate,
+            Config.EndDate);
+        generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(_measures);
+
         await _sp.GetRequiredService<ReportAbsManifestValidator>().ValidateAllAsync(
             internalAbsResources,
             Config.PatientIds,
@@ -186,18 +189,8 @@ public sealed class SmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixt
             Config.EndDate,
             _facilityId,
             reportId,
-            _generatedBundles);
-
-        await ValidationBaselineManager.ValidateOrCreateAsync(
-            Output,
-            dataReader,
-            nameof(SmokeTest),
-            _facilityId,
-            reportId,
-            measureId,
-            Config.PatientIds,
             _generatedBundles,
-            internalAbsResources);
+            manifest: generationManifest);
 
         // Step 9-10: Strict database validation.
         await _sp.GetRequiredService<ReportDatabaseValidator>().ValidateAllAsync(_facilityId, reportId, measureId, Config.PatientIds);

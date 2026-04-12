@@ -2,7 +2,6 @@
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Configuration;
-using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using System.Reflection;

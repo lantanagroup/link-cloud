@@ -26,6 +26,20 @@ public class ValidationServiceClient : LinkApiClientBase, IValidationServiceClie
     public Task InitializeCategoriesAsync(CancellationToken cancellationToken = default) =>
         Request("validation/category/$initialize").PostAsync(cancellationToken: cancellationToken);
 
+    public async Task<bool> HasArtifactsAsync(CancellationToken cancellationToken = default)
+    {
+        var artifacts = await Request("validation/artifact")
+            .GetJsonAsync<List<object>>(cancellationToken: cancellationToken);
+        return artifacts is { Count: > 0 };
+    }
+
+    public async Task<bool> HasCategoriesAsync(CancellationToken cancellationToken = default)
+    {
+        var categories = await Request("validation/category")
+            .GetJsonAsync<List<object>>(cancellationToken: cancellationToken);
+        return categories is { Count: > 0 };
+    }
+
     public Task UpsertResourceArtifactAsync(string artifactId, string resourceJson, CancellationToken cancellationToken = default) =>
         Request($"validation/artifact/RESOURCE/{artifactId}").PutStringAsync(resourceJson, cancellationToken: cancellationToken);
 

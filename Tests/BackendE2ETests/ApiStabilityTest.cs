@@ -48,14 +48,14 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
     public ApiStabilityTest(BackendE2ETestFixture fixture)
     {
         _sp = fixture.ServiceProvider;
-        _config.RemoveFacilityConfig = true;
+        _config.CleanupServiceData = true;
     }
 
     public Task InitializeAsync() => Task.CompletedTask;
 
     public async Task DisposeAsync()
     {
-        if (!_config.RemoveFacilityConfig)
+        if (!_config.CleanupServiceData)
             return;
 
         if (_monthlyPlanCreated)

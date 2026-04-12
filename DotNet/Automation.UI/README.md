@@ -30,7 +30,7 @@ Automation.UI (Razor Pages web app)
 
 | Scenario | Description |
 |---|---|
-| `SmokeTest` | Single-patient quick verification |
+| `AdhocReportTest` | Single-patient ad-hoc report verification |
 | `MultiPatientTest` | Multi-patient volume scenario |
 | `MegaPatientTest` | High-volume stress scenario |
 | `Custom` | User-defined patient count and configuration |

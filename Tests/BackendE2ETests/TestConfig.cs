@@ -32,9 +32,10 @@ public static class TestConfig
 
     // Infrastructure
     public static string LokiBaseUrl => Environment.GetEnvironmentVariable("LOKI_BASE_URL") ?? "http://localhost:3100";
-    public static string? SmokeTestDownloadPath =>
-    Environment.GetEnvironmentVariable("SMOKE_TEST_DOWNLOAD_PATH");
-    public static bool CleanupSmokeTestData => bool.Parse(Environment.GetEnvironmentVariable("CLEANUP_SMOKE_TEST_DATA") ?? "true");
+    public static string? AdhocReportTestDownloadPath =>
+        Environment.GetEnvironmentVariable("ADHOC_REPORT_TEST_DOWNLOAD_PATH");
+    public static bool CleanupAdhocReportTestData => bool.Parse(
+        Environment.GetEnvironmentVariable("CLEANUP_ADHOC_REPORT_TEST_DATA") ?? "true");
 
     /// <summary>
     /// Builds an <see cref="AutomationConfig"/> from environment variables.
@@ -46,8 +47,7 @@ public static class TestConfig
         InternalFhirServerBase = InternalFhirServerBase,
         AdminBffBase = AdminBffBase,
         LokiBaseUrl = LokiBaseUrl,
-        DownloadPath = SmokeTestDownloadPath,
-        CleanupTestData = CleanupSmokeTestData,
+        DownloadPath = AdhocReportTestDownloadPath,
         AdminBffOAuth = BuildOAuthConfig("ADMINBFF"),
         FhirServerOAuth = BuildOAuthConfig("FHIRSERVER"),
         FhirServerBasicAuth = BuildBasicAuthConfig("FHIRSERVER"),
@@ -79,7 +79,7 @@ public static class TestConfig
         }
     };
 
-    public static TestScenarioConfig AdhocReportingSmokeTestConfig => BuildScenarioConfig("ADHOC_REPORTING_SMOKE_TEST",
+    public static TestScenarioConfig AdhocReportTestConfig => BuildScenarioConfig("ADHOC_REPORT_TEST",
         defaultPatientIds: []);
 
     public static TestScenarioConfig MegaPatientTestConfig => BuildScenarioConfig("MEGA_PATIENT_TEST",
@@ -102,8 +102,8 @@ public static class TestConfig
             StartDate = Environment.GetEnvironmentVariable($"{prefix}_START_DATE") ?? "2023-01-01T00:00:00Z",
             EndDate = Environment.GetEnvironmentVariable($"{prefix}_END_DATE") ?? "2023-12-31T23:59:59Z",
             PatientIds = Environment.GetEnvironmentVariable($"{prefix}_PATIENT_IDS")?.Split(',')?.ToList() ?? defaultPatientIds ?? ["207727"],
-            RemoveFacilityConfig = bool.Parse(Environment.GetEnvironmentVariable($"{prefix}_REMOVE_FACILITY_CONFIG") ?? "false"),
-            RemoveReport = Environment.GetEnvironmentVariable($"{prefix}_REMOVE_REPORT")?.ToLower() == "true",
+            CleanupServiceData = bool.Parse(Environment.GetEnvironmentVariable($"{prefix}_CLEANUP_SERVICE_DATA") ?? "false"),
+            CleanupFhirData = CleanupAdhocReportTestData,
             PollingIntervalSeconds = int.Parse(Environment.GetEnvironmentVariable($"{prefix}_POLLING_INTERVAL_SECONDS") ?? defaultPollingIntervalSeconds.ToString()),
             MaxPollingDurationMinutes = int.Parse(Environment.GetEnvironmentVariable($"{prefix}_MAX_POLLING_DURATION_MINUTES") ?? defaultMaxPollingDurationMinutes.ToString()),
             DownloadFileName = Environment.GetEnvironmentVariable($"{prefix}_DOWNLOAD_FILENAME") ?? $"{prefix.ToLower().Replace('_', '-')}-submission.zip",

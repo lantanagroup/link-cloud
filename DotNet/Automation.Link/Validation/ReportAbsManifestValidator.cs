@@ -1,5 +1,5 @@
-﻿using System.Text.Json;
-using LantanaGroup.Link.Automation.Link.Helpers;
+﻿using LantanaGroup.Link.Automation.Link.Helpers;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.Automation.Link.Validation;
 
@@ -46,7 +46,8 @@ public class ReportAbsManifestValidator
         string? reportId = null,
         IReadOnlyList<(string Name, string Json)>? generatedBundles = null,
         IReadOnlyCollection<string>? expectedManifestPatientListIds = null,
-        bool expectDataAcquisitionData = true)
+        bool expectDataAcquisitionData = true,
+        GenerationManifest? manifest = null)
     {
         return ValidateAllAsync(
             internalAbsResources,
@@ -58,7 +59,8 @@ public class ReportAbsManifestValidator
             reportId,
             generatedBundles,
             expectedManifestPatientListIds,
-            expectDataAcquisitionData);
+            expectDataAcquisitionData,
+            manifest);
     }
 
     public async Task ValidateAllAsync(
@@ -71,7 +73,8 @@ public class ReportAbsManifestValidator
         string? reportId = null,
         IReadOnlyList<(string Name, string Json)>? generatedBundles = null,
         IReadOnlyCollection<string>? expectedManifestPatientListIds = null,
-        bool expectDataAcquisitionData = true)
+        bool expectDataAcquisitionData = true,
+        GenerationManifest? manifest = null)
     {
         var errors = new List<string>();
 
@@ -131,6 +134,8 @@ public class ReportAbsManifestValidator
                 reportId,
                 actualPatientFiles,
                 parsedPatientResources,
+                expectedMeasureIds,
+                manifest,
                 errors,
                 expectDataAcquisitionData);
 
@@ -138,6 +143,13 @@ public class ReportAbsManifestValidator
             {
                 ValidateGeneratedBundleReconciliation(generatedBundles, parsedPatientResources, errors);
             }
+        }
+
+        // When a manifest is available, validate ABS resource counts against the concrete
+        // generated input — no DB interrogation or baseline needed.
+        if (manifest != null)
+        {
+            ValidateAbsResourceCountsAgainstManifest(manifest, parsedPatientResources, expectedSubmittedPatientIds, errors);
         }
 
         await FailIfNeededAsync(errors);
@@ -351,6 +363,8 @@ public class ReportAbsManifestValidator
         string reportId,
         IReadOnlySet<string> actualPatientFiles,
         List<AbsResourceRecord> patientResources,
+        IReadOnlyList<string> expectedMeasureIds,
+        GenerationManifest? manifest,
         List<string> errors,
         bool expectDataAcquisitionData)
     {
@@ -448,67 +462,8 @@ public class ReportAbsManifestValidator
         CompareCountMapsExact("MeasureEval->ReportResource", measureEvalCountMap, reportCountMap, errors);
         CompareCountMapsExact("MeasureEval->ABS", measureEvalCountMap, absCountMap, errors);
 
-        if (expectDataAcquisitionData)
-        {
-            var acquiredKeys = await _reader.GetAcquiredResourceIdsForReportAsync(facilityId, reportId);
-
-            var dataAcqTypeCountMap = acquiredKeys
-                .Select(GetResourceTypeFromKey)
-                .Where(t => !string.IsNullOrWhiteSpace(t))
-                .GroupBy(t => t, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
-
-            var reportTypeCountMap = reportResources
-                .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType) && !string.IsNullOrWhiteSpace(r.ResourceId) && !IsDerivedType(r.ResourceType))
-                .Select(r => ToResourceKey(r.ResourceType, r.ResourceId))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .GroupBy(GetResourceTypeFromKey, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
-
-            var absTypeCountMap = patientResources
-                .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType)
-                            && !string.IsNullOrWhiteSpace(r.ResourceId)
-                            && !IsAbsSupplementalType(r.ResourceType)
-                            && !IsDerivedType(r.ResourceType))
-                .Select(r => ToResourceKey(r.ResourceType, r.ResourceId))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .GroupBy(GetResourceTypeFromKey, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
-
-            CompareTypeCountMinimum("DataAcquisition->ReportResource", dataAcqTypeCountMap, reportTypeCountMap, errors);
-            CompareTypeCountMinimum("DataAcquisition->ABS", dataAcqTypeCountMap, absTypeCountMap, errors);
-
-            var expectedNonDerived = expectedKeys
-                .Where(k => !IsDerivedType(k.Split('/')[0]))
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            var missingInAcquisition = expectedNonDerived
-                .Except(acquiredKeys, StringComparer.OrdinalIgnoreCase)
-                .Take(50)
-                .ToList();
-
-            foreach (var missing in missingInAcquisition)
-                AddError(errors, $"ReportResource {missing} not found in DataAcquisition completed ResourceAcquiredIds.");
-        }
-    }
-
-    private static void CompareTypeCountMinimum(
-        string sourceName,
-        Dictionary<string, int> minimumExpected,
-        Dictionary<string, int> actual,
-        List<string> errors)
-    {
-        foreach (var (resourceType, minCount) in minimumExpected)
-        {
-            if (!actual.TryGetValue(resourceType, out var actualCount))
-                continue;
-
-            if (actualCount > minCount)
-            {
-                AddError(errors,
-                    $"{sourceName} upstream count lower than downstream for type={resourceType}: upstream={minCount}, downstream={actualCount}.");
-            }
-        }
+        // NOTE: DataAcquisition database integrity checks belong in DA-focused validators.
+        // ABS validator intentionally reconciles deterministic expected sets against Report/ABS artifacts only.
     }
 
     private void ValidateGeneratedBundleReconciliation(
@@ -559,6 +514,88 @@ public class ReportAbsManifestValidator
             foreach (var missing in missingFromGenerated)
                 _output.WriteLine($"  [WARN] {missing}");
         }
+    }
+
+    /// <summary>
+    /// Validates that ABS patient artifacts contain the resources the pipeline should have
+    /// produced, using the generation manifest as the source of truth.
+    ///
+    /// <b>How the system works:</b>
+    /// <list type="number">
+    ///   <item>We <b>generated</b> resources and uploaded them to the FHIR server.</item>
+    ///   <item>Data Acquisition ran the query plan (Parameter + Reference queries) and
+    ///         sent every acquired resource to MeasureEval via Kafka.</item>
+    ///   <item>MeasureEval stored them in its Resource repository, then bundled them all
+    ///         and evaluated the CQL. The CQL engine loaded every resource whose type
+    ///         matches a <c>[ResourceType]</c> retrieve expression into the MeasureReport's
+    ///         contained list.</item>
+    ///   <item>MeasureEval wrote the MeasureReport + contained resources to a per-measure
+    ///         <c>.mr</c> file in ABS blob storage.</item>
+    ///   <item>The Report service's PatientAggregator read the <c>.mr</c> files, deduped
+    ///         resources across measures, and wrote <c>patient-{id}.ndjson</c> to ABS.
+    ///         It also saved the same resource references to the ReportResource DB.</item>
+    /// </list>
+    ///
+    /// A resource type is expected in ABS when: we generated it AND the query plan acquires
+    /// it AND the CQL references it. The system is deterministic — no tolerance is needed.
+    ///
+    /// Shared infrastructure resources (Location/Gen-*, Medication/Gen-*, Device/Gen-*)
+    /// are stored under the empty patient key in the manifest. They are excluded from
+    /// per-patient key validation because their IDs are rewritten by MeasureEval's normalize
+    /// step (the <c>#LCR-</c> prefix is stripped).
+    /// </summary>
+    private void ValidateAbsResourceCountsAgainstManifest(
+        GenerationManifest manifest,
+        List<AbsResourceRecord> parsedPatientResources,
+        IReadOnlyCollection<string> expectedSubmittedPatientIds,
+        List<string> errors)
+    {
+        var absCountsByPatientType = parsedPatientResources
+            .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType) && !string.IsNullOrWhiteSpace(r.ResourceId))
+            .GroupBy(r => r.PatientId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.GroupBy(r => r.ResourceType, StringComparer.OrdinalIgnoreCase)
+                      .ToDictionary(rg => rg.Key, rg => rg.Count(), StringComparer.OrdinalIgnoreCase),
+                StringComparer.Ordinal);
+
+        foreach (var patientId in expectedSubmittedPatientIds)
+        {
+            var expectedCounts = manifest.GetExpectedAbsCountsForPatient(patientId);
+            if (expectedCounts == null)
+                continue;
+
+            absCountsByPatientType.TryGetValue(patientId, out var actualCounts);
+            actualCounts ??= new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var (resourceType, expectedCount) in expectedCounts)
+            {
+                actualCounts.TryGetValue(resourceType, out var actualCount);
+                if (actualCount < expectedCount)
+                {
+                    AddError(errors,
+                        $"ABS patient={patientId}, type={resourceType}: " +
+                        $"expected>={expectedCount} (sim-acquired ∩ reachable-CQL), actual={actualCount}.");
+                }
+            }
+        }
+
+        // Validate that every expected patient-scoped resource key is present in ABS.
+        // Shared infrastructure (empty patient key) is excluded — those resources reach ABS
+        // through MeasureReport contained resources with MeasureEval-rewritten IDs.
+        var allAbsKeys = parsedPatientResources
+            .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType) && !string.IsNullOrWhiteSpace(r.ResourceId))
+            .Select(r => ToResourceKey(r.ResourceType, r.ResourceId))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var expectedKeys = manifest.AllExpectedAbsPatientResourceKeys();
+
+        var missing = expectedKeys
+            .Where(k => !allAbsKeys.Contains(k))
+            .ToList();
+
+        foreach (var key in missing.Take(MaxErrors))
+            AddError(errors, $"ABS artifacts missing expected resource: {key}");
     }
 
     private void ValidateManifestPatientList(
@@ -773,36 +810,6 @@ public class ReportAbsManifestValidator
             {
                 AddError(errors,
                     $"{sourceName} count mismatch for patient={key.PatientId}, type={key.ResourceType}: expected={expectedCount}, actual={actualCount}.");
-            }
-        }
-    }
-
-    /// <summary>
-    /// For each resource type that exists in BOTH the upstream (minimumExpected) and
-    /// downstream (actual) layers, verify that the downstream count does not exceed
-    /// the upstream count. Resource types acquired upstream but absent downstream
-    /// are expected — MeasureEval only references the subset of acquired data that
-    /// the CQL expressions actually use.
-    /// </summary>
-    private static void CompareCountMapsMinimum(
-        string sourceName,
-        Dictionary<(string PatientId, string ResourceType), int> minimumExpected,
-        Dictionary<(string PatientId, string ResourceType), int> actual,
-        List<string> errors)
-    {
-        foreach (var (key, minCount) in minimumExpected)
-        {
-            if (!actual.TryGetValue(key, out var actualCount))
-            {
-                // Upstream acquired this type but downstream doesn't reference it.
-                // This is normal — not every acquired resource type is used by the measure CQL.
-                continue;
-            }
-
-            if (actualCount > minCount)
-            {
-                AddError(errors,
-                    $"{sourceName} upstream count lower than downstream for patient={key.PatientId}, type={key.ResourceType}: upstream={minCount}, downstream={actualCount}.");
             }
         }
     }

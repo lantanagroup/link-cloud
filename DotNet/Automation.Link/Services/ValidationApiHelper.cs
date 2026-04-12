@@ -7,6 +7,12 @@ public class ValidationApiHelper(IValidationServiceClient validationClient, IAut
 {
     public async Task InitializeArtifactsAsync()
     {
+        if (await validationClient.HasArtifactsAsync())
+        {
+            output.WriteLine("Validation artifacts already initialized. Skipping initialize call.");
+            return;
+        }
+
         output.WriteLine("Initializing validation artifacts...");
         await RetryHelper.RetryUntilSuccess(async () =>
         {
@@ -17,6 +23,12 @@ public class ValidationApiHelper(IValidationServiceClient validationClient, IAut
 
     public async Task InitializeCategoriesAsync()
     {
+        if (await validationClient.HasCategoriesAsync())
+        {
+            output.WriteLine("Validation categories already initialized. Skipping initialize call.");
+            return;
+        }
+
         output.WriteLine("Initializing validation categories...");
         await RetryHelper.RetryUntilSuccess(async () =>
         {

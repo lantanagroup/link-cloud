@@ -1,4 +1,4 @@
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using static LantanaGroup.Automation.Generation.ResourceFactories.FhirConceptFactory;
 
 namespace LantanaGroup.Automation.Generation.ResourceFactories;
@@ -43,18 +43,31 @@ public static class DiagnosticReportFactory
         string categoryCode,
         string categoryDisplay,
         List<ResourceReference>? resultRefs = null,
-        List<ResourceReference>? specimenRefs = null) => new()
+        List<ResourceReference>? specimenRefs = null)
+    {
+        // Determine category system based on code.
+        // v2-0074 for lab/chemistry/microbiology; LOINC for note-type diagnostic reports.
+        var (catSystem, catCode, catDisplay) = categoryCode switch
+        {
+            "PAT" => ("http://loinc.org", "LP7796-8", "Pathology"),
+            "CG" => ("http://loinc.org", "LP29708-2", "Cardiology"),
+            _ when categoryCode == "RAD" && loincCode != "24627-2"
+                => ("http://loinc.org", "LP29684-5", "Radiology"),
+            _ => ("http://terminology.hl7.org/CodeSystem/v2-0074", categoryCode, categoryDisplay),
+        };
+
+        return new DiagnosticReport
         {
             Id = id,
             Status = DiagnosticReport.DiagnosticReportStatus.Final,
             Category =
-        [
-            new CodeableConcept
-            {
-                Coding = [new Coding("http://terminology.hl7.org/CodeSystem/v2-0074", categoryCode, categoryDisplay)],
-                Text   = categoryDisplay
-            }
-        ],
+            [
+                new CodeableConcept
+                {
+                    Coding = [new Coding(catSystem, catCode, catDisplay)],
+                    Text   = catDisplay
+                }
+            ],
             Code = Loinc(loincCode, display),
             Subject = Ref($"Patient/{patientId}"),
             Encounter = Ref($"Encounter/{encounterId}"),
@@ -66,4 +79,5 @@ public static class DiagnosticReportFactory
             Result = resultRefs ?? [],
             Conclusion = $"Results reviewed and interpreted. See individual observation values for findings."
         };
+    }
 }

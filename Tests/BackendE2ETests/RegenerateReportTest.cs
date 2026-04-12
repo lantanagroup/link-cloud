@@ -36,6 +36,8 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
     private readonly IServiceProvider _sp;
     private readonly string _facilityId = $"RegenTest-{Guid.NewGuid():N}";
     private List<(string Name, string Json)> _generatedBundles = [];
+    private List<ProfiledMeasureType> _measures = [];
+    private List<PatientCohortDefinition> _cohorts = [];
 
     private AutomationConfig AutomationCfg => _sp.GetRequiredService<AutomationConfig>();
     private ConsoleAutomationOutput Output => _sp.GetRequiredService<ConsoleAutomationOutput>();
@@ -44,7 +46,7 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
     public RegenerateReportTest(BackendE2ETestFixture fixture)
     {
         _sp = fixture.ServiceProvider;
-        _config.RemoveFacilityConfig = true;
+        _config.CleanupServiceData = true;
     }
 
     public async Task InitializeAsync()
@@ -52,7 +54,14 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
         _sp.GetRequiredService<PipelineDataReader>().InvalidateCache();
 
         Output.WriteLine($"Using deterministic generation seed: {GenerationSeed}");
-        var (patientIds, bundles) = FhirBundleGenerator.Generate(Output, 1, 100, "RegenPatient", GenerationSeed);
+        var measures = new List<ProfiledMeasureType> { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation };
+        _measures = measures;
+        var cohorts = new List<PatientCohortDefinition>
+        {
+            PatientCohortDefinition.AllQualifying(measures, patientCount: 1, resourcesMin: 100, resourcesMax: 100)
+        };
+        _cohorts = cohorts;
+        var (patientIds, bundles) = FhirBundleGenerator.GenerateFromCohorts(Output, measures, cohorts, "RegenPatient", GenerationSeed);
         _generatedBundles = bundles;
 
         if (_config.PatientIds.Count == 0)
@@ -70,26 +79,17 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
     {
         Output.WriteLine("Cleaning up...\n");
 
-        if (_config.RemoveFacilityConfig)
-        {
-            await FacilitySetupHelper.CleanupFacilityAsync(
-                _sp.GetRequiredService<IFacilityServiceClient>(),
-                _sp.GetRequiredService<INormalizationServiceClient>(),
-                _sp.GetRequiredService<IDataAcquisitionServiceClient>(),
-                _sp.GetRequiredService<IQueryDispatchServiceClient>(),
-                Output, _facilityId);
-        }
-
-        if (AutomationCfg.CleanupTestData)
-        {
-            await FacilitySetupHelper.CleanupQueryDispatchConfigAsync(
-                _sp.GetRequiredService<IQueryDispatchServiceClient>(),
-                Output,
-                _facilityId);
-        }
-
-        if (AutomationCfg.CleanupTestData)
-            FhirDataLoader.ExpungeEverything(Output);
+        await RunCleanupHelper.CleanupAfterRunAsync(
+            _config,
+            _sp.GetRequiredService<IFacilityServiceClient>(),
+            _sp.GetRequiredService<INormalizationServiceClient>(),
+            _sp.GetRequiredService<IDataAcquisitionServiceClient>(),
+            _sp.GetRequiredService<IQueryDispatchServiceClient>(),
+            _sp.GetRequiredService<IReportServiceClient>(),
+            FhirDataLoader,
+            Output,
+            _facilityId,
+            null);
     }
 
     [Fact]
@@ -190,6 +190,20 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
         // Flush stale cache from diagnostics polling so validators read authoritative data.
         dataReader.InvalidateCache();
 
+        var profiles = PatientCohortDefinition.ExpandProfiles(_cohorts, GenerationSeed);
+        var generationManifest = GenerationManifest.Build(_config.PatientIds, _generatedBundles, profiles, _measures);
+        generationManifest.MeasureIds = [measureId];
+        var queryPlanInput = QueryPlanBuilder.GetDefaultAsInput();
+        generationManifest.AcquiredResourceTypes = QueryPlanBuilder.GetAcquiredResourceTypes(queryPlanInput);
+        generationManifest.ParameterQueryResourceTypes = QueryPlanBuilder.GetParameterQueryResourceTypes(queryPlanInput);
+        generationManifest.SimulatedAcquiredResourceKeysByPatient = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysByPatient(
+            _config.PatientIds,
+            _generatedBundles,
+            queryPlanInput,
+            actualStartDate,
+            actualEndDate);
+        generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(_measures);
+
         await _sp.GetRequiredService<ReportAbsManifestValidator>().ValidateAllAsync(
             internalAbsResources,
             _config.PatientIds,
@@ -199,17 +213,8 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
             _facilityId,
             regeneratedReportId,
             _generatedBundles,
-            expectDataAcquisitionData: false);
-
-        await ValidationBaselineManager.ValidateOrCreateAsync(
-            Output, dataReader,
-            nameof(RegenerateReportTest),
-            _facilityId,
-            regeneratedReportId,
-            measureId,
-            _config.PatientIds,
-            _generatedBundles,
-            internalAbsResources);
+            expectDataAcquisitionData: false,
+            manifest: generationManifest);
 
         // Step 5: Database-level validation.
         await _sp.GetRequiredService<ReportDatabaseValidator>().ValidateAllAsync(

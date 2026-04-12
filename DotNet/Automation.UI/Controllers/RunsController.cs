@@ -1,5 +1,7 @@
 ﻿using Automation.UI.Models;
 using Automation.UI.Services;
+using Automation.UI.Services.Persistence;
+using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Sdk.Clients;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -9,6 +11,8 @@ namespace Automation.UI.Controllers;
 [Authorize]
 public class RunsController(
     IAutomationRunManager runManager,
+    IScenarioStore scenarioStore,
+    IQueryPlanTemplateStore queryPlanTemplateStore,
     IDataAcquisitionServiceClient dataAcqClient,
     ILogger<RunsController> logger) : Controller
 {
@@ -16,7 +20,21 @@ public class RunsController(
     public async Task<IActionResult> Index(int pageNumber = 1, int pageSize = 20, CancellationToken cancellationToken = default)
     {
         var runs = await runManager.GetRunsPageAsync(pageNumber, pageSize, cancellationToken);
-        return View(runs);
+        var scenarios = await scenarioStore.GetAllAsync(cancellationToken);
+        var queryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(cancellationToken);
+
+        var allMeasures = Enum.GetValues<ProfiledMeasureType>().ToList();
+        var clinicalScenarios = ClinicalScenarioInfo.GetAll(allMeasures);
+
+        var vm = new RunsIndexViewModel
+        {
+            Runs = runs,
+            SavedScenarios = scenarios,
+            ClinicalScenarios = clinicalScenarios,
+            QueryPlanTemplates = queryPlanTemplates
+        };
+
+        return View(vm);
     }
 
     [HttpPost]
@@ -24,7 +42,18 @@ public class RunsController(
     public async Task<IActionResult> Start(StartScenarioRequest request, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
+        {
+            var errors = ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => string.IsNullOrWhiteSpace(e.ErrorMessage) ? e.Exception?.Message : e.ErrorMessage)
+                .Where(e => !string.IsNullOrWhiteSpace(e))
+                .ToList();
+
+            TempData["RunStartError"] = errors.Count > 0
+                ? $"Unable to start test: {string.Join(" | ", errors)}"
+                : "Unable to start test due to invalid configuration.";
             return RedirectToAction(nameof(Index));
+        }
 
         var runId = await runManager.StartAsync(request, cancellationToken);
         return RedirectToAction(nameof(Details), new { id = runId });
@@ -56,6 +85,39 @@ public class RunsController(
     {
         await runManager.DeleteRunAsync(id, cancellationToken);
         return RedirectToAction(nameof(Index), new { pageNumber, pageSize });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Cancel(Guid id, int pageNumber = 1, int pageSize = 20, CancellationToken cancellationToken = default)
+    {
+        await runManager.CancelRunAsync(id, cancellationToken);
+        return RedirectToAction(nameof(Index), new { pageNumber, pageSize });
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> CancelJson([FromBody] RunActionRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request?.Id == null || request.Id == Guid.Empty)
+            return BadRequest(new { success = false, error = "Missing run ID" });
+
+        var cancelled = await runManager.CancelRunAsync(request.Id, cancellationToken);
+        return Ok(new { success = cancelled });
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> DeleteJson([FromBody] RunActionRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request?.Id == null || request.Id == Guid.Empty)
+            return BadRequest(new { success = false, error = "Missing run ID" });
+
+        var deleted = await runManager.DeleteRunAsync(request.Id, cancellationToken);
+        return Ok(new { success = deleted });
+    }
+
+    public class RunActionRequest
+    {
+        public Guid Id { get; set; }
     }
 
     [HttpGet]

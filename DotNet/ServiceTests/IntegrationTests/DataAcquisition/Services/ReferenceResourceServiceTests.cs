@@ -1,20 +1,22 @@
-﻿using DataAcquisition.Domain.Application.Models;
+﻿using Confluent.Kafka;
+using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
-using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
-using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition.Services
@@ -36,6 +38,7 @@ namespace IntegrationTests.DataAcquisition.Services
             var refMgr = scope.ServiceProvider.GetRequiredService<IReferenceResourcesManager>();
             var refQueries = scope.ServiceProvider.GetRequiredService<IReferenceResourcesQueries>();
             var readFhirCommand = new Mock<IReadFhirCommand>().Object;
+            var kafkaProducer = new Mock<IProducer<ResourceKey, ResourceAcquired>>().Object;
             var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
             return new ReferenceResourceService(
@@ -43,6 +46,7 @@ namespace IntegrationTests.DataAcquisition.Services
                 refQueries,
                 refMgr,
                 readFhirCommand,
+                kafkaProducer,
                 dbContext);
         }
 

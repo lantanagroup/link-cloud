@@ -28,6 +28,8 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
     private readonly IServiceProvider _sp;
     private readonly string _facilityId = $"MultiPatient-{Guid.NewGuid():N}";
     private List<(string Name, string Json)> _generatedBundles = [];
+    private List<ProfiledMeasureType> _measures = [];
+    private List<PatientCohortDefinition> _cohorts = [];
     private string? _reportId;
 
     private AutomationConfig AutomationCfg => _sp.GetRequiredService<AutomationConfig>();
@@ -44,8 +46,14 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
         _sp.GetRequiredService<PipelineDataReader>().InvalidateCache();
 
         Output.WriteLine($"Using deterministic generation seed: {GenerationSeed}");
-        // Generate 1000 synthetic patients, each with ~100 resources
-        var (patientIds, bundles) = FhirBundleGenerator.Generate(Output, 1000, 100, "MultiPatient", GenerationSeed);
+        var measures = new List<ProfiledMeasureType> { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation };
+        _measures = measures;
+        var cohorts = new List<PatientCohortDefinition>
+        {
+            PatientCohortDefinition.AllQualifying(measures, patientCount: 1000, resourcesMin: 100, resourcesMax: 100)
+        };
+        _cohorts = cohorts;
+        var (patientIds, bundles) = FhirBundleGenerator.GenerateFromCohorts(Output, measures, cohorts, "MultiPatient", GenerationSeed);
         _generatedBundles = bundles;
 
         // If config has no patient IDs set (the default), use generated ones
@@ -72,36 +80,17 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
     {
         Output.WriteLine("Cleaning up...\n");
 
-        if (Config.RemoveFacilityConfig)
-        {
-            await FacilitySetupHelper.CleanupFacilityAsync(
-                _sp.GetRequiredService<IFacilityServiceClient>(),
-                _sp.GetRequiredService<INormalizationServiceClient>(),
-                _sp.GetRequiredService<IDataAcquisitionServiceClient>(),
-                _sp.GetRequiredService<IQueryDispatchServiceClient>(),
-                Output, _facilityId);
-        }
-
-        if (AutomationCfg.CleanupTestData)
-        {
-            await FacilitySetupHelper.CleanupQueryDispatchConfigAsync(
-                _sp.GetRequiredService<IQueryDispatchServiceClient>(),
-                Output,
-                _facilityId);
-
-            if (!string.IsNullOrWhiteSpace(_reportId))
-            {
-                await FacilitySetupHelper.SoftDeleteRunDataAsync(
-                    _sp.GetRequiredService<IReportServiceClient>(),
-                    _sp.GetRequiredService<IDataAcquisitionServiceClient>(),
-                    _sp.GetRequiredService<IQueryDispatchServiceClient>(),
-                    Output,
-                    _facilityId,
-                    _reportId);
-            }
-
-            FhirDataLoader.ExpungeEverything(Output);
-        }
+        await RunCleanupHelper.CleanupAfterRunAsync(
+            Config,
+            _sp.GetRequiredService<IFacilityServiceClient>(),
+            _sp.GetRequiredService<INormalizationServiceClient>(),
+            _sp.GetRequiredService<IDataAcquisitionServiceClient>(),
+            _sp.GetRequiredService<IQueryDispatchServiceClient>(),
+            _sp.GetRequiredService<IReportServiceClient>(),
+            FhirDataLoader,
+            Output,
+            _facilityId,
+            _reportId);
     }
 
     [Fact]
@@ -188,6 +177,20 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
         // Flush stale cache from diagnostics polling so validators read authoritative data.
         dataReader.InvalidateCache();
 
+        var profiles = PatientCohortDefinition.ExpandProfiles(_cohorts, GenerationSeed);
+        var generationManifest = GenerationManifest.Build(Config.PatientIds, _generatedBundles, profiles, _measures);
+        generationManifest.MeasureIds = [measureId];
+        var queryPlanInput = QueryPlanBuilder.GetDefaultAsInput();
+        generationManifest.AcquiredResourceTypes = QueryPlanBuilder.GetAcquiredResourceTypes(queryPlanInput);
+        generationManifest.ParameterQueryResourceTypes = QueryPlanBuilder.GetParameterQueryResourceTypes(queryPlanInput);
+        generationManifest.SimulatedAcquiredResourceKeysByPatient = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysByPatient(
+            Config.PatientIds,
+            _generatedBundles,
+            queryPlanInput,
+            Config.StartDate,
+            Config.EndDate);
+        generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(_measures);
+
         await _sp.GetRequiredService<ReportAbsManifestValidator>().ValidateAllAsync(
             internalAbsResources,
             Config.PatientIds,
@@ -196,17 +199,8 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
             Config.EndDate,
             _facilityId,
             reportId,
-            _generatedBundles);
-
-        await ValidationBaselineManager.ValidateOrCreateAsync(
-            Output, dataReader,
-            nameof(MultiPatientTest),
-            _facilityId,
-            reportId,
-            measureId,
-            Config.PatientIds,
             _generatedBundles,
-            internalAbsResources);
+            manifest: generationManifest);
     }
 }
 

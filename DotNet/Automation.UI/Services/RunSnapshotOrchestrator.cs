@@ -84,6 +84,26 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
     }
 
     /// <summary>
+    /// Updates a run's facility/report IDs and restarts the poller.
+    /// Used when a regeneration produces a new report ID that we need to track.
+    /// </summary>
+    public async Task UpdateRunAsync(Guid runId, string facilityId, string reportId, CancellationToken ct = default)
+    {
+        // Stop existing poller
+        if (_activePollers.TryRemove(runId, out var existingHandle))
+        {
+            await existingHandle.StopAsync();
+            _logger.LogInformation("Stopped existing poller for run {RunId} before re-registration", runId);
+        }
+
+        // Clear old domain data so stale first-report data doesn't bleed through
+        await _store.UpdateRunMetaAsync(runId, facilityId, reportId, ct);
+
+        // The next reconciliation cycle will pick up the updated meta and start a new poller.
+        _logger.LogInformation("Updated run {RunId} to track new report {ReportId}", runId, reportId);
+    }
+
+    /// <summary>
     /// Marks a run as complete so the orchestrator stops polling.
     /// </summary>
     public async Task CompleteRunAsync(Guid runId)

@@ -21,12 +21,13 @@ public static class ScenarioResourceMap
     /// <summary>Medications given to virtually every inpatient (fever PRN, DVT prophylaxis, PPI, etc.).</summary>
     public static readonly int[] UniversalMedicationIndices = [0, 2, 11, 12]; // Acetaminophen, Enoxaparin, Heparin, Pantoprazole
 
-    /// <summary>Observations performed on every inpatient (vitals + basic labs).</summary>
+    /// <summary>Observations performed on every inpatient (vitals + basic labs + social-history + survey).</summary>
     public static readonly int[] UniversalObservationIndices =
     [
         0, 1, 2, 5, 6, 7,      // HR, Temp, SpO2, BP, RR, BMI
         8, 9, 10, 11,           // Hgb, Hct, WBC, Plt
-        12, 13, 14, 15, 16      // Cr, Glucose, Na, K, Cl
+        12, 13, 14, 15, 16,     // Cr, Glucose, Na, K, Cl
+        38, 39                  // Social-history (smoking status), Survey (PHQ-9)
     ];
 
     /// <summary>Specimen types used universally (venous blood, urine).</summary>
@@ -35,8 +36,8 @@ public static class ScenarioResourceMap
     /// <summary>Service requests ordered universally (CBC, BMP).</summary>
     public static readonly int[] UniversalServiceRequestIndices = [1, 2]; // CBC, BMP
 
-    /// <summary>Comorbidities that can appear on any patient (HTN, DM2).</summary>
-    public static readonly int[] UniversalConditionIndices = [0, 1]; // DM2, HTN
+    /// <summary>Comorbidities that can appear on any patient (HTN, DM2, health concern).</summary>
+    public static readonly int[] UniversalConditionIndices = [0, 1, 24]; // DM2, HTN, Health concern
 
     // -----------------------------------------------------------------------
     //  Per-scenario resource mappings
@@ -143,8 +144,8 @@ public static class ScenarioResourceMap
         [12, 15, 22],
         // 7 — Ischaemic stroke: glucose, cholesterol, PT/INR
         [13, 20, 25, 26],
-        // 8 — DKA: blood glucose, base excess, potassium, calcium, lactate
-        [13, 29, 30, 31, 34],
+        // 8 — DKA: blood glucose, POC glucose, base excess, potassium, calcium, lactate
+        [13, 29, 30, 31, 34, 37],
         // 9 — GI bleed: hemoglobin, hematocrit, PT/INR, albumin
         [8, 9, 25, 26, 36],
         // 10 — Pulmonary embolism: troponin, NT-proBNP, PT/INR, D-dimer proxy (LDH)
@@ -155,8 +156,8 @@ public static class ScenarioResourceMap
         [10, 24, 32],
         // 13 — AFib with RVR: troponin, NT-proBNP, potassium, magnesium proxy (calcium)
         [15, 27, 28, 31],
-        // 14 — Diabetic hypoglycemia: blood glucose (critically low), potassium, base excess
-        [13, 15, 29, 30],
+        // 14 — Diabetic hypoglycemia: blood glucose (critically low), POC glucose, potassium, base excess
+        [13, 15, 29, 30, 37],
         // 15 — Acute appendicitis: WBC, CRP, bilirubin
         [10, 17, 32],
     ];

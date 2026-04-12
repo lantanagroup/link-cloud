@@ -68,6 +68,19 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         await _runs.UpdateOneAsync(r => r.RunId == runId, update, new UpdateOptions { IsUpsert = true }, ct);
     }
 
+    public async Task UpdateRunMetaAsync(Guid runId, string facilityId, string reportId, CancellationToken ct = default)
+    {
+        var update = Builders<AutomationRunDocument>.Update
+            .Set(r => r.FacilityId, facilityId)
+            .Set(r => r.ReportId, reportId);
+
+        await _runs.UpdateOneAsync(r => r.RunId == runId, update, cancellationToken: ct);
+
+        // Clear stale domain snapshot data so milestones/entries from a prior report
+        // (e.g., initial report before regeneration) don't bleed into the UI.
+        await _snapshots.DeleteManyAsync(s => s.RunId == runId, ct);
+    }
+
     public async Task CompleteRunAsync(Guid runId, CancellationToken ct = default)
     {
         var update = Builders<AutomationRunDocument>.Update
@@ -89,6 +102,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             .Set(r => r.PatientCount, summary.PatientCount)
             .Set(r => r.ResourcesPerPatient, summary.ResourcesPerPatient)
             .Set(r => r.Seed, summary.Seed)
+            .Set(r => r.RunConfigurationJson, summary.RunConfigurationJson)
             .Set(r => r.Status, summary.Status.ToString())
             .Set(r => r.CreatedAt, summary.CreatedAt)
             .Set(r => r.StartedAt, summary.StartedAt ?? summary.CreatedAt)
@@ -96,8 +110,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             .Set(r => r.Error, summary.Error)
             .Set(r => r.FacilityId, facilityId ?? string.Empty)
             .Set(r => r.ReportId, reportId ?? string.Empty)
-            .Set(r => r.IsActive, hasIdentifiers && summary.Status is not AutomationRunStatus.Succeeded and not AutomationRunStatus.Failed)
-            .Set(r => r.CompletedAt, summary.Status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed ? summary.FinishedAt ?? DateTimeOffset.UtcNow : null)
+            .Set(r => r.IsActive, hasIdentifiers && summary.Status is not AutomationRunStatus.Succeeded and not AutomationRunStatus.Failed and not AutomationRunStatus.Cancelled)
+            .Set(r => r.CompletedAt, summary.Status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed or AutomationRunStatus.Cancelled ? summary.FinishedAt ?? DateTimeOffset.UtcNow : null)
             .SetOnInsert(r => r.RunId, summary.RunId);
 
         await _runs.UpdateOneAsync(r => r.RunId == summary.RunId, update, new UpdateOptions { IsUpsert = true }, ct);
@@ -167,6 +181,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             PatientCount = doc.PatientCount,
             ResourcesPerPatient = doc.ResourcesPerPatient,
             Seed = doc.Seed,
+            RunConfigurationJson = doc.RunConfigurationJson,
             Status = status,
             CreatedAt = doc.CreatedAt,
             StartedAt = doc.StartedAt,

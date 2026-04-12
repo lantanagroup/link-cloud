@@ -52,47 +52,72 @@ public static class FhirGenerationCodes
     //  Scenario drives: primary diagnosis, admit reason, medications, procedures
     // -----------------------------------------------------------------------
 
-    public static readonly (
-        string PrimaryDxSnomed, string PrimaryDxDisplay, string PrimaryDxIcd,
-        string AdmitTypeCode, string AdmitTypeDisplay,
-        string AdmitSourceCode, string AdmitSourceDisplay,
-        string DischargeDispositionCode, string DischargeDispositionDisplay,
-        string ServiceTypeCode, string ServiceTypeDisplay,
-        string PriorityCode, string PriorityDisplay)[] ClinicalScenarios =
+    public sealed record ClinicalScenarioDefinition(
+        Guid ScenarioId,
+        string PrimaryDxSnomed,
+        string PrimaryDxDisplay,
+        string PrimaryDxIcd,
+        string AdmitTypeCode,
+        string AdmitTypeDisplay,
+        string AdmitSourceCode,
+        string AdmitSourceDisplay,
+        string DischargeDispositionCode,
+        string DischargeDispositionDisplay,
+        string ServiceTypeCode,
+        string ServiceTypeDisplay,
+        string PriorityCode,
+        string PriorityDisplay);
+
+    public static readonly ClinicalScenarioDefinition[] ClinicalScenarios =
     [
-        // 0 — Community-acquired pneumonia, emergency admission
-        ("233604007", "Pneumonia (disorder)",                               "J18.9",  "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "305",  "General Medicine",  "EM", "emergency"),
-        // 1 — Acute decompensated heart failure, urgent admission
-        ("84114007",  "Heart failure (disorder)",                           "I50.9",  "32485007",  "Hospital admission (procedure)", "hosp-trans", "Transferred from other hospital",     "snf",     "Skilled nursing facility", "303", "Cardiology",   "R",  "routine"),
-        // 2 — Acute myocardial infarction, emergency admission
-        ("57054005",  "Acute myocardial infarction (disorder)",             "I21.9",  "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "306",  "Cardiothoracic Surgery", "EM", "emergency"),
-        // 3 — COPD exacerbation, emergency admission
-        ("195951007", "Acute exacerbation of chronic obstructive airways disease (disorder)", "J44.1", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "305", "Pulmonology", "EM", "emergency"),
-        // 4 — Sepsis from urinary source, emergency admission
-        ("10001005",  "Septicemia (disorder)",                              "A41.9",  "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "305",  "General Medicine",  "EM", "emergency"),
-        // 5 — Hip fracture, elective surgical admission
-        ("700097003", "Fracture of bone of hip region (disorder)",          "S72.001A","32485007", "Hospital admission (procedure)", "gp",   "General practitioner referral",       "home",    "Home",              "308",  "Orthopaedics",      "R",  "routine"),
-        // 6 — Acute renal failure, urgent admission
-        ("14669001",  "Acute renal failure syndrome (disorder)",            "N17.9",  "32485007",  "Hospital admission (procedure)", "hosp-trans", "Transferred from other hospital",     "home",    "Home",              "310",  "Nephrology",        "R",  "routine"),
-        // 7 — Ischaemic stroke, emergency admission
-        ("422504002", "Ischemic stroke (disorder)",                         "I63.9",  "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "rehab",   "Inpatient rehabilitation", "320", "Neurology",    "EM", "emergency"),
-        // 8 — Diabetic ketoacidosis (DKA), emergency admission
-        ("420422005", "Diabetic ketoacidosis (disorder)",                    "E11.10", "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "305",  "Endocrinology",    "EM", "emergency"),
-        // 9 — Gastrointestinal bleeding, emergency admission
-        ("74474003",  "Gastrointestinal hemorrhage (disorder)",              "K92.2",  "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "305",  "Gastroenterology", "EM", "emergency"),
-        // 10 — Pulmonary embolism, emergency admission
-        ("59282003",  "Pulmonary embolism (disorder)",                       "I26.99", "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "305",  "Pulmonology",      "EM", "emergency"),
-        // 11 — Acute pancreatitis, emergency admission
-        ("197456007", "Acute pancreatitis (disorder)",                       "K85.9",  "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "305",  "Gastroenterology", "EM", "emergency"),
-        // 12 — Cellulitis, urgent admission
-        ("128045006", "Cellulitis (disorder)",                               "L03.90", "32485007",  "Hospital admission (procedure)", "gp",   "General practitioner referral",       "home",    "Home",              "305",  "General Medicine",  "R",  "routine"),
-        // 13 — Atrial fibrillation with rapid ventricular response, emergency admission
-        ("49436004",  "Atrial fibrillation (disorder)",                      "I48.91", "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "303",  "Cardiology",       "EM", "emergency"),
-        // 14 — Diabetic hypoglycemia, emergency admission (relevant to Hypo measure)
-        ("421725003", "Diabetes mellitus type 2 with hypoglycemia (disorder)","E11.649","183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "305",  "Endocrinology",    "EM", "emergency"),
-        // 15 — Acute appendicitis, emergency surgical admission
-        ("74400008",  "Appendicitis (disorder)",                             "K35.80", "183452005", "Emergency hospital admission",  "emd",  "From accident/emergency department", "home",    "Home",              "301",  "General Surgery",  "EM", "emergency"),
+        new(ClinicalScenarioIds.Pneumonia,                 "233604007", "Pneumonia (disorder)", "J18.9", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "305", "General Medicine", "EM", "emergency"),
+        new(ClinicalScenarioIds.HeartFailure,              "84114007", "Heart failure (disorder)", "I50.9", "32485007", "Hospital admission (procedure)", "hosp-trans", "Transferred from other hospital", "snf", "Skilled nursing facility", "303", "Cardiology", "R", "routine"),
+        new(ClinicalScenarioIds.AcuteMyocardialInfarction, "57054005", "Acute myocardial infarction (disorder)", "I21.9", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "306", "Cardiothoracic Surgery", "EM", "emergency"),
+        new(ClinicalScenarioIds.CopdExacerbation,          "195951007", "Acute exacerbation of chronic obstructive airways disease (disorder)", "J44.1", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "305", "Pulmonology", "EM", "emergency"),
+        new(ClinicalScenarioIds.Sepsis,                    "10001005", "Septicemia (disorder)", "A41.9", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "305", "General Medicine", "EM", "emergency"),
+        new(ClinicalScenarioIds.HipFracture,               "700097003", "Fracture of bone of hip region (disorder)", "S72.001A", "32485007", "Hospital admission (procedure)", "gp", "General practitioner referral", "home", "Home", "308", "Orthopaedics", "R", "routine"),
+        new(ClinicalScenarioIds.AcuteRenalFailure,         "14669001", "Acute renal failure syndrome (disorder)", "N17.9", "32485007", "Hospital admission (procedure)", "hosp-trans", "Transferred from other hospital", "home", "Home", "310", "Nephrology", "R", "routine"),
+        new(ClinicalScenarioIds.IschemicStroke,            "422504002", "Ischemic stroke (disorder)", "I63.9", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "rehab", "Inpatient rehabilitation", "320", "Neurology", "EM", "emergency"),
+        new(ClinicalScenarioIds.DiabeticKetoacidosis,      "420422005", "Diabetic ketoacidosis (disorder)", "E11.10", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "305", "Endocrinology", "EM", "emergency"),
+        new(ClinicalScenarioIds.GastrointestinalBleed,     "74474003", "Gastrointestinal hemorrhage (disorder)", "K92.2", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "305", "Gastroenterology", "EM", "emergency"),
+        new(ClinicalScenarioIds.PulmonaryEmbolism,         "59282003", "Pulmonary embolism (disorder)", "I26.99", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "305", "Pulmonology", "EM", "emergency"),
+        new(ClinicalScenarioIds.AcutePancreatitis,         "197456007", "Acute pancreatitis (disorder)", "K85.9", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "305", "Gastroenterology", "EM", "emergency"),
+        new(ClinicalScenarioIds.Cellulitis,                "128045006", "Cellulitis (disorder)", "L03.90", "32485007", "Hospital admission (procedure)", "gp", "General practitioner referral", "home", "Home", "305", "General Medicine", "R", "routine"),
+        new(ClinicalScenarioIds.AtrialFibrillation,        "49436004", "Atrial fibrillation (disorder)", "I48.91", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "303", "Cardiology", "EM", "emergency"),
+        new(ClinicalScenarioIds.DiabeticHypoglycemia,      "421725003", "Diabetes mellitus type 2 with hypoglycemia (disorder)", "E11.649", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "305", "Endocrinology", "EM", "emergency"),
+        new(ClinicalScenarioIds.Appendicitis,              "74400008", "Appendicitis (disorder)", "K35.80", "183452005", "Emergency hospital admission", "emd", "From accident/emergency department", "home", "Home", "301", "General Surgery", "EM", "emergency"),
     ];
+
+    /// <summary>
+    /// Look up a clinical scenario by its stable GUID. Returns null if not found.
+    /// </summary>
+    public static ClinicalScenarioDefinition? GetScenarioById(string? scenarioId)
+    {
+        if (!Guid.TryParse(scenarioId, out var parsed))
+            return null;
+
+        return ClinicalScenarios.SingleOrDefault(s => s.ScenarioId == parsed);
+    }
+
+    /// <summary>
+    /// Pick a clinical scenario deterministically from a seed value.
+    /// Used only by generator internals when no explicit scenario ID is provided.
+    /// </summary>
+    public static ClinicalScenarioDefinition GetScenarioBySeed(int seed)
+        => ClinicalScenarios[Mod(seed, ClinicalScenarios.Length)];
+
+    /// <summary>
+    /// Get the array position of a scenario within <see cref="ClinicalScenarios"/>.
+    /// Used only by generator internals for <see cref="ScenarioResourceMap"/> lookups.
+    /// </summary>
+    internal static int GetScenarioArrayPosition(ClinicalScenarioDefinition scenario)
+        => Array.IndexOf(ClinicalScenarios, scenario);
+
+    internal static int Mod(int value, int modulus)
+    {
+        var r = value % modulus;
+        return r < 0 ? r + modulus : r;
+    }
 
     // -----------------------------------------------------------------------
     //  Observations with interpretation thresholds (criticalLow, normalLow,
@@ -148,6 +173,12 @@ public static class FhirGenerationCodes
         ("2532-0",  "Lipase [Enzymatic activity/volume] in Serum or Plasma",  "laboratory",  "U/L",              0,   0,    60,  5000),
         ("2524-7",  "Lactate [Moles/volume] in Serum or Plasma",             "laboratory",  "mmol/L",           0,   0.5,  2.0, 15),
         ("1751-7",  "Albumin [Mass/volume] in Serum or Plasma",              "laboratory",  "g/dL",             1.5, 3.5,  5.5, 6.5),
+        // 37 — POC blood glucose (Blood Glucose Laboratory and Point of Care Tests value set)
+        ("41653-7", "Glucose [Mass/volume] in Capillary blood by Glucometer", "laboratory",  "mg/dL",            20,  70,   99,  600),
+        // 38 — Social history: smoking status
+        ("72166-2", "Tobacco smoking status",                                  "social-history","SNOMED-CT",         0,   0,    0,   0),
+        // 39 — Survey: PHQ-9 depression screen
+        ("44249-1", "PHQ-9 quick depression assessment panel",                 "survey",        "{score}",           0,   0,    27,  27),
     ];
 
     // -----------------------------------------------------------------------
@@ -186,6 +217,10 @@ public static class FhirGenerationCodes
         ("302866003", "Hypoglycemia (disorder)",                                "E16.2",  "encounter-diagnosis"),
         // 23 — Surgical
         ("22298006",  "Myocardial infarction (disorder)",                       "I21.9",  "problem-list-item"),
+        // 24 — Health concern (dQM SDE Condition requires health-concern category)
+        ("160903007", "Full-time employment (finding)",                         "Z56.0", "health-concern"),
+        // 25 — Encounter diagnosis: chief complaint candidate
+        ("21522001",  "Abdominal pain (finding)",                               "R10.9", "encounter-diagnosis"),
     ];
 
     // -----------------------------------------------------------------------
@@ -396,6 +431,12 @@ public static class FhirGenerationCodes
         ("85319-2", "Blood culture panel",                               "MB",  "Microbiology"),
         ("24627-2", "Chest X-ray AP",                                    "RAD", "Radiology"),
         ("30954-2", "Relevant diagnostic tests/laboratory data Narrative","CH",  "Chemistry"),
+        // 8 — Radiology note (LOINC diagnostic imaging category)
+        ("18726-0", "Radiology studies (set)",                                "RAD", "Radiology"),
+        // 9 — Pathology note
+        ("60567-5", "Pathology Synoptic report",                               "PAT", "Pathology"),
+        // 10 — Cardiology note
+        ("11524-6", "EKG study",                                               "CG",  "Cardiology"),
     ];
 
     // -----------------------------------------------------------------------

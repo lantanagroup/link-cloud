@@ -1,4 +1,4 @@
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using static LantanaGroup.Automation.Generation.ResourceFactories.FhirConceptFactory;
 
 namespace LantanaGroup.Automation.Generation.ResourceFactories;
@@ -79,8 +79,10 @@ public static class ConditionFactory
             CC("http://terminology.hl7.org/CodeSystem/condition-category", "problem-list-item", "Problem List Item")
         };
 
-        if (categoryCode != "problem-list-item")
-            categories.Add(CC("http://terminology.hl7.org/CodeSystem/condition-category", categoryCode, categoryCode == "problem-list-item" ? "Problem List Item" : "Encounter Diagnosis"));
+        if (categoryCode == "encounter-diagnosis")
+            categories.Add(CC("http://terminology.hl7.org/CodeSystem/condition-category", "encounter-diagnosis", "Encounter Diagnosis"));
+        else if (categoryCode == "health-concern")
+            categories.Add(CC("http://hl7.org/fhir/us/core/CodeSystem/condition-category", "health-concern", "Health Concern"));
 
         var condition = new Condition
         {

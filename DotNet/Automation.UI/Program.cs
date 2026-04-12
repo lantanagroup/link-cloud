@@ -1,5 +1,5 @@
 ﻿using Automation.UI.Services;
-using Automation.UI.Services.Persistence; // MongoSnapshotStore implementation
+using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.DependencyInjection;
@@ -142,12 +142,22 @@ var mongoClientSettings = MongoClientSettings.FromUrl(mongoUrl);
 builder.Services.AddSingleton<IMongoClient>(_ => new MongoClient(mongoClientSettings));
 builder.Services.AddSingleton(sp => sp.GetRequiredService<IMongoClient>().GetDatabase(mongoDatabaseName));
 builder.Services.AddSingleton<ISnapshotStore, MongoSnapshotStore>();
+builder.Services.AddSingleton<IScenarioStore, MongoScenarioStore>();
+builder.Services.AddSingleton<IQueryPlanTemplateStore, MongoQueryPlanTemplateStore>();
 
 // -- Pipeline data reader (scoped so each poller gets its own) --
 builder.Services.AddScoped<PipelineDataReader>();
 
+// -- Seed system scenarios and query plan templates --
+builder.Services.AddHostedService<ScenarioSeedService>();
+builder.Services.AddHostedService<QueryPlanTemplateSeedService>();
+
 // -- MVC + SignalR --
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews()
+    .AddJsonOptions(opts =>
+    {
+        opts.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    });
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<RunSnapshotOrchestrator>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RunSnapshotOrchestrator>());
@@ -160,9 +170,9 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Runs/Index");
     app.UseHsts();
+    app.UseHttpsRedirection();
 }
 
-app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();

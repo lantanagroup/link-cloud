@@ -12,7 +12,6 @@ public class AutomationConfig
     public string AdminBffBase { get; set; } = "http://localhost:8063/api";
     public string LokiBaseUrl { get; set; } = "http://localhost:3100";
     public string? DownloadPath { get; set; }
-    public bool CleanupTestData { get; set; } = true;
 
     public OAuthConfig AdminBffOAuth { get; set; } = new();
     public OAuthConfig FhirServerOAuth { get; set; } = new();

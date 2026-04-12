@@ -1,4 +1,4 @@
-using Hl7.Fhir.Model;
+ï»¿using Hl7.Fhir.Model;
 using static LantanaGroup.Automation.Generation.ResourceFactories.FhirConceptFactory;
 
 namespace LantanaGroup.Automation.Generation.ResourceFactories;
@@ -46,6 +46,17 @@ public static class ObservationFactory
         var isLab = category == "laboratory";
         var periodEnd = effective.AddHours(1 + seed % 4);
 
+        var categoryDisplay = category switch
+        {
+            "laboratory" => "Laboratory",
+            "vital-signs" => "Vital Signs",
+            "social-history" => "Social History",
+            "survey" => "Survey",
+            "imaging" => "Imaging",
+            "procedure" => "Procedure",
+            _ => category
+        };
+
         var obs = new Observation
         {
             Id = id,
@@ -56,7 +67,7 @@ public static class ObservationFactory
                 {
                     Coding = [new Coding("http://terminology.hl7.org/CodeSystem/observation-category",
                                          category,
-                                         isLab ? "Laboratory" : "Vital Signs")]
+                                         categoryDisplay)]
                 }
             ],
             Code = Loinc(loincCode, display),
@@ -81,7 +92,7 @@ public static class ObservationFactory
         }
 
         // ---------------------------------------------------------------
-        // Culture / bacteriology — valueString
+        // Culture / bacteriology â€” valueString
         // ---------------------------------------------------------------
         if (loincCode == "600-7")
         {
@@ -94,12 +105,40 @@ public static class ObservationFactory
         }
 
         // ---------------------------------------------------------------
-        // Blood pressure — component-based
+        // Social history â€” coded value (e.g. smoking status)
+        // ---------------------------------------------------------------
+        if (category == "social-history")
+        {
+            var smokingStatuses = new[]
+            {
+                ("266919005", "Never smoker"),
+                ("8517006",   "Former smoker"),
+                ("77176002",  "Smoker"),
+                ("266919005", "Never smoker"),
+            };
+            var (statusCode, statusDisplay) = smokingStatuses[seed % smokingStatuses.Length];
+            obs.Value = Snomed(statusCode, statusDisplay);
+            return obs;
+        }
+
+        // ---------------------------------------------------------------
+        // Survey â€” integer score (e.g. PHQ-9)
+        // ---------------------------------------------------------------
+        if (category == "survey")
+        {
+            var score = seed % 28; // PHQ-9 range 0-27
+            obs.Value = new Integer(score);
+            obs.Interpretation = [InterpretationCode(score, 0, 0, 10, 27)];
+            return obs;
+        }
+
+        // ---------------------------------------------------------------
+        // Blood pressure â€” component-based
         // ---------------------------------------------------------------
         if (loincCode == "55284-4")
         {
-            var systolic = 100 + seed % 80;  // 100–179
-            var diastolic = 60 + seed % 40;  // 60–99
+            var systolic = 100 + seed % 80;  // 100â€“179
+            var diastolic = 60 + seed % 40;  // 60â€“99
             obs.Component =
             [
                 new Observation.ComponentComponent
@@ -119,7 +158,7 @@ public static class ObservationFactory
         }
 
         // ---------------------------------------------------------------
-        // Standard numeric value — vary within a clinically plausible range
+        // Standard numeric value â€” vary within a clinically plausible range
         // using a sine-like distribution so values cluster around normal
         // ---------------------------------------------------------------
         double value;
@@ -134,7 +173,7 @@ public static class ObservationFactory
         }
         else
         {
-            // Unbounded high (e.g. height, weight) — just use low + fraction of large range
+            // Unbounded high (e.g. height, weight) â€” just use low + fraction of large range
             value = Math.Round(normLow + seed % 100 / 100.0 * (normLow * 0.5), 1);
         }
 
@@ -150,7 +189,7 @@ public static class ObservationFactory
                     Low  = normLow > 0    ? Qty(normLow,  unit) : null,
                     High = normHigh < 999 ? Qty(normHigh, unit) : null,
                     Text = normHigh < 999
-                        ? $"{normLow} – {normHigh} {unit}"
+                        ? $"{normLow} â€“ {normHigh} {unit}"
                         : $"= {normLow} {unit}"
                 }
             ];

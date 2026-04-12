@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Automation.Link.Configuration;
+﻿using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
@@ -121,13 +121,14 @@ public static class FacilitySetupHelper
         IAutomationOutput output,
         string facilityId,
         List<string> measureIds,
-        string ehrDescription)
+        string ehrDescription,
+        QueryPlanInput? externalQueryPlan = null)
     {
-        foreach (var measureId in measureIds)
-        {
-            await EnsureQueryPlanAsync(dataAcqClient, output, facilityId, measureId, ehrDescription, "Discharge");
-            await EnsureQueryPlanAsync(dataAcqClient, output, facilityId, measureId, ehrDescription, "Monthly");
-        }
+        // Query plans are keyed by (facilityId, type) — not per measure.
+        // Create each plan type once using the first measure as the plan name.
+        var planName = measureIds.Count > 0 ? measureIds[0] : null;
+        await EnsureQueryPlanAsync(dataAcqClient, output, facilityId, planName, ehrDescription, "Discharge", externalQueryPlan);
+        await EnsureQueryPlanAsync(dataAcqClient, output, facilityId, planName, ehrDescription, "Monthly", externalQueryPlan);
     }
 
     public static async Task EnsureQueryConfigAsync(
@@ -228,9 +229,10 @@ public static class FacilitySetupHelper
         string facilityId,
         string? measureId,
         string ehrDescription,
-        string type)
+        string type,
+        QueryPlanInput? externalQueryPlan = null)
     {
-        var jBody = QueryPlanBuilder.BuildQueryPlan(facilityId, measureId, ehrDescription, type);
+        var jBody = QueryPlanBuilder.BuildQueryPlan(facilityId, measureId, ehrDescription, type, externalQueryPlan);
         var body = new CreateQueryPlanRequestApiModel
         {
             PlanName = jBody.Value<string>("PlanName"),

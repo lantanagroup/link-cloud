@@ -28,8 +28,16 @@ public class TestScenarioConfig
     public string StartDate { get; set; } = "2023-01-01T00:00:00Z";
     public string EndDate { get; set; } = "2023-12-31T23:59:59Z";
     public List<string> PatientIds { get; set; } = ["207727"];
-    public bool RemoveFacilityConfig { get; set; } = true;
-    public bool RemoveReport { get; set; }
+
+    /// <summary>
+    /// Remove facility config, soft-delete reports, DA logs, and query dispatch config after the run.
+    /// </summary>
+    public bool CleanupServiceData { get; set; }
+
+    /// <summary>
+    /// Expunge all data from the FHIR server after the run.
+    /// </summary>
+    public bool CleanupFhirData { get; set; } = true;
     public int PollingIntervalSeconds { get; set; } = 3;
 
     /// <summary>

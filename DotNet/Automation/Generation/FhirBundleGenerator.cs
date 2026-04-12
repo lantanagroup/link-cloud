@@ -90,7 +90,8 @@ public static class FhirBundleGenerator
         {
             var patientSeed = baseSeed + p;
             var patientId = $"{patientIdPrefix}-{p + 1:D3}";
-            var scenario = FhirGenerationCodes.ClinicalScenarios[Mod(patientSeed, FhirGenerationCodes.ClinicalScenarios.Length)];
+            var scenario = FhirGenerationCodes.GetScenarioBySeed(patientSeed);
+            var scenarioIdx = FhirGenerationCodes.GetScenarioArrayPosition(scenario);
             var attendingPractId = sharedPractitionerIds[Mod(patientSeed, sharedPractitionerIds.Count)];
             var admittingPractId = sharedPractitionerIds[Mod(patientSeed + 1, sharedPractitionerIds.Count)];
             var gpPractId = sharedPractitionerIds[Mod(patientSeed + 2, sharedPractitionerIds.Count)];
@@ -124,7 +125,7 @@ public static class FhirBundleGenerator
                     encounterId, patientId, encStart, encEnd,
                     attendingPractId, admittingPractId,
                     EdLocationId, IcuLocationId, StepDownLocationId, HospitalOrgId,
-                    primaryDxId, patientSeed)));
+                    primaryDxId, scenario)));
 
             entries.Add(Entry($"CareTeam/{careTeamId}",
                 CareTeamFactory.Generate(careTeamId, patientId, encounterId, attendingPractId, encStart, HospitalOrgId)));
@@ -132,7 +133,6 @@ public static class FhirBundleGenerator
             entries.Add(Entry($"CarePlan/{carePlanId}",
                 CarePlanFactory.Generate(carePlanId, patientId, encounterId, careTeamId, encStart, patientSeed)));
 
-            var scenarioIdx = Mod(patientSeed, FhirGenerationCodes.ClinicalScenarios.Length);
             GenerateScenarioDrivenResources(entries, scenarioIdx, patientId, encounterId,
                 encStart, encEnd, primaryDxId, attendingPractId, careTeamId, patientIdPrefix,
                 totalResourcesPerPatient, baseSeed, p, sharedPractitionerIds, sharedMedicationIds, config);
@@ -178,52 +178,35 @@ public static class FhirBundleGenerator
     }
 
     /// <summary>
-    /// Generate patients with explicit measure-eligibility profiles.
-    /// Each <see cref="PatientProfile"/> controls whether the patient qualifies
-    /// for the measure's Initial Population. Seeds are deterministic and repeatable.
-    /// <para>
-    /// This method does NOT alter the existing <see cref="Generate"/> code path.
-    /// </para>
+    /// Generate patients from cohort definitions. This is the primary entry point
+    /// for both Automation.UI and BackendE2ETests, ensuring identical generation
+    /// logic across both platforms.
     /// </summary>
-    public static (List<string> PatientIds, List<(string Name, string Json)> Bundles) GenerateWithProfiles(
+    public static (List<string> PatientIds, List<(string Name, string Json)> Bundles) GenerateFromCohorts(
         IAutomationOutput output,
-        IReadOnlyList<PatientProfile> profiles,
-        int totalResourcesPerPatient = DefaultResourcesPerPatient,
-        string patientIdPrefix = "ProfilePatient",
+        IReadOnlyList<ProfiledMeasureType> measures,
+        IReadOnlyList<PatientCohortDefinition> cohorts,
+        string patientIdPrefix = "CohortPatient",
         int? generationSeed = null,
         FhirGenerationConfig? config = null)
     {
-        return GenerateWithProfiles(
-            output,
-            ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation,
-            profiles,
-            totalResourcesPerPatient,
-            patientIdPrefix,
-            generationSeed,
-            config);
+        var seed = generationSeed.GetValueOrDefault();
+        var profiles = PatientCohortDefinition.ExpandProfiles(cohorts, seed);
+
+        if (profiles.Count == 0)
+            throw new ArgumentException("Cohorts produced zero patient profiles.", nameof(cohorts));
+
+        // Use the first profile's resource count as the run-level default;
+        // per-patient overrides are carried on each profile.
+        var defaultResources = profiles[0].ResourcesPerPatient ?? 100;
+
+        return GenerateWithProfiles(output, measures, profiles, defaultResources, patientIdPrefix, generationSeed, config);
     }
 
     /// <summary>
-    /// Generate patients with explicit measure-eligibility profiles in the context
-    /// of a designated measure.
-    /// </summary>
-    public static (List<string> PatientIds, List<(string Name, string Json)> Bundles) GenerateWithProfiles(
-        IAutomationOutput output,
-        ProfiledMeasureType measure,
-        IReadOnlyList<PatientProfile> profiles,
-        int totalResourcesPerPatient = DefaultResourcesPerPatient,
-        string patientIdPrefix = "ProfilePatient",
-        int? generationSeed = null,
-        FhirGenerationConfig? config = null)
-    {
-        return GenerateWithProfiles(output, [measure], profiles, totalResourcesPerPatient, patientIdPrefix, generationSeed, config);
-    }
-
-    /// <summary>
-    /// Generate patients with explicit measure-eligibility profiles that must
-    /// qualify (or not qualify) for ALL specified measures simultaneously.
-    /// Qualifying patients satisfy the criteria of every measure; non-qualifying
-    /// patients miss at least one (typically all) measures.
+    /// Generate patients with explicit measure-eligibility profiles that carry
+    /// per-measure eligibility. Each profile's <see cref="PatientProfile.MeasureEligibilities"/>
+    /// drives encounter type, medication generation, etc.
     /// </summary>
     public static (List<string> PatientIds, List<(string Name, string Json)> Bundles) GenerateWithProfiles(
         IAutomationOutput output,
@@ -243,44 +226,38 @@ public static class FhirBundleGenerator
         if (profiles.Count == 0)
             throw new ArgumentException("At least one patient profile is required.", nameof(profiles));
 
-        // For multi-measure: qualifying patients need to satisfy the most restrictive
-        // generation requirements. If any measure requires diabetic medication (Hypo),
-        // qualifying patients get it. This ensures they qualify for ALL measures.
-        var requireDiabeticMed = measures.Any(m =>
-            m == ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation);
-
         if (measures.Count > 1)
         {
-            output.WriteLine($"Multi-measure generation: [{string.Join(", ", measures)}] " +
-                             $"(requireDiabeticMedForQualifying={requireDiabeticMed})");
+            output.WriteLine($"Multi-measure generation: [{string.Join(", ", measures)}]");
         }
 
-        return GenerateWithProfilesForNhsnAcuteCareHospital(
+        return GenerateWithProfilesCore(
             output,
+            measures,
             profiles,
             totalResourcesPerPatient,
             patientIdPrefix,
             generationSeed,
-            requireDiabeticMedicationForQualifying: requireDiabeticMed,
             config: config);
     }
 
-    private static (List<string> PatientIds, List<(string Name, string Json)> Bundles) GenerateWithProfilesForNhsnAcuteCareHospital(
+    private static (List<string> PatientIds, List<(string Name, string Json)> Bundles) GenerateWithProfilesCore(
         IAutomationOutput output,
+        IReadOnlyList<ProfiledMeasureType> measures,
         IReadOnlyList<PatientProfile> profiles,
         int totalResourcesPerPatient = DefaultResourcesPerPatient,
         string patientIdPrefix = "ProfilePatient",
         int? generationSeed = null,
-        bool requireDiabeticMedicationForQualifying = false,
         FhirGenerationConfig? config = null)
     {
         var patientIds = new List<string>();
         var allEntries = new List<(string PatientId, List<Bundle.EntryComponent> Entries)>();
         var baseSeed = generationSeed.GetValueOrDefault();
 
-        var qualifyingCount = profiles.Count(p => p.Eligibility == MeasureEligibility.Qualifying);
-        var nonQualifyingCount = profiles.Count - qualifyingCount;
-        output.WriteLine($"Generating {profiles.Count} profiled patients ({qualifyingCount} qualifying, {nonQualifyingCount} non-qualifying) " +
+        var qualifyingAllCount = profiles.Count(p => p.QualifiesForAll(measures));
+        var nonQualifyingAllCount = profiles.Count(p => p.QualifiesForNone(measures));
+        var mixedEligibilityCount = profiles.Count - qualifyingAllCount - nonQualifyingAllCount;
+        output.WriteLine($"Generating {profiles.Count} profiled patients ({qualifyingAllCount} qualifying-all, {nonQualifyingAllCount} non-qualifying-all, {mixedEligibilityCount} mixed) " +
                          $"with ~{totalResourcesPerPatient} resources each..." +
                          (generationSeed.HasValue ? $" (seed={generationSeed.Value})" : string.Empty));
 
@@ -318,7 +295,9 @@ public static class FhirBundleGenerator
             var profile = profiles[p];
             var patientSeed = baseSeed + (profile.SeedOffset ?? p);
             var patientId = $"{patientIdPrefix}-{p + 1:D3}";
-            var scenario = FhirGenerationCodes.ClinicalScenarios[Mod(patientSeed, FhirGenerationCodes.ClinicalScenarios.Length)];
+            var scenario = FhirGenerationCodes.GetScenarioById(profile.ClinicalScenarioId)
+                           ?? FhirGenerationCodes.GetScenarioBySeed(patientSeed);
+            var scenarioIdx = FhirGenerationCodes.GetScenarioArrayPosition(scenario);
             var attendingPractId = sharedPractitionerIds[Mod(patientSeed, sharedPractitionerIds.Count)];
             var admittingPractId = sharedPractitionerIds[Mod(patientSeed + 1, sharedPractitionerIds.Count)];
             var gpPractId = sharedPractitionerIds[Mod(patientSeed + 2, sharedPractitionerIds.Count)];
@@ -329,10 +308,10 @@ public static class FhirBundleGenerator
             var primaryDxId = $"{patientId}-Condition-primary";
             patientIds.Add(patientId);
 
-            // Encounter dates: qualifying patients use measurement-period dates,
+            // Encounter dates: inpatient patients use measurement-period dates,
             // non-qualifying use dates well outside the measurement period.
             DateTime encStart, encEnd;
-            if (profile.Eligibility == MeasureEligibility.Qualifying)
+            if (profile.RequiresInpatientEncounter())
             {
                 encStart = EncounterStart(patientSeed);
                 encEnd = EncounterEnd(patientSeed);
@@ -360,10 +339,10 @@ public static class FhirBundleGenerator
                     primaryDxId, patientId, encounterId, encStart,
                     scenario.PrimaryDxSnomed, scenario.PrimaryDxDisplay, scenario.PrimaryDxIcd)));
 
-            if (profile.Eligibility == MeasureEligibility.Qualifying)
+            if (profile.RequiresInpatientEncounter())
             {
                 // Inpatient encounter — qualifies via class, type, and location
-                if (requireDiabeticMedicationForQualifying)
+                if (profile.RequiresHypoglycemicMedication())
                 {
                     entries.Add(Entry($"Encounter/{encounterId}",
                         EncounterFactory.Create(
@@ -399,7 +378,7 @@ public static class FhirBundleGenerator
                             encounterId, patientId, encStart, encEnd,
                             attendingPractId, admittingPractId,
                             EdLocationId, IcuLocationId, StepDownLocationId, HospitalOrgId,
-                            primaryDxId, patientSeed)));
+                            primaryDxId, scenario)));
                 }
             }
             else
@@ -419,18 +398,30 @@ public static class FhirBundleGenerator
             entries.Add(Entry($"CarePlan/{carePlanId}",
                 CarePlanFactory.Generate(carePlanId, patientId, encounterId, careTeamId, encStart, patientSeed)));
 
-            if (requireDiabeticMedicationForQualifying && profile.Eligibility == MeasureEligibility.Qualifying)
+            // Add Hypo medication entries when the profile requires it.
+            if (profile.RequiresHypoglycemicMedication())
             {
                 AddHypoglycemicQualifyingMedicationEntries(entries, patientId, encounterId, attendingPractId, patientSeed, encStart);
             }
 
-            var scenarioIdx = Mod(patientSeed, FhirGenerationCodes.ClinicalScenarios.Length);
             GenerateScenarioDrivenResources(entries, scenarioIdx, patientId, encounterId,
                 encStart, encEnd, primaryDxId, attendingPractId, careTeamId, patientIdPrefix,
                 totalResourcesPerPatient, baseSeed, p, sharedPractitionerIds, sharedMedicationIds, config);
 
-            var tag = profile.Eligibility == MeasureEligibility.Qualifying ? "QUALIFYING" : "NON-QUALIFYING";
-            output.WriteLine($"  Patient {patientId}: {entries.Count} entries [{tag}] | scenario={scenario.PrimaryDxDisplay} | " +
+            var measureEligibilityLabel = string.Join(", ", measures.Select(functionMeasure =>
+                {
+                    var shortName = functionMeasure switch
+                    {
+                        ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation => "ACH",
+                        ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation => "ACH-Daily",
+                        ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation => "Hypo",
+                        _ => functionMeasure.ToString()
+                    };
+                    var eligible = profile.QualifiesFor(functionMeasure) ? "Q" : "NQ";
+                    return $"{shortName}={eligible}";
+                }));
+
+            output.WriteLine($"  Patient {patientId}: {entries.Count} entries [{measureEligibilityLabel}] | scenario={scenario.PrimaryDxDisplay} | " +
                              $"encounter={encounterId} ({encStart:yyyy-MM-dd} ? {encEnd:yyyy-MM-dd})");
 
             allEntries.Add((patientId, entries));
@@ -510,7 +501,8 @@ public static class FhirBundleGenerator
                 false,
                 diabetesIndicationCode,
                 diabetesIndicationDisplay,
-                medicationRefId: HypoInsulinGlargineMedicationId)));
+                null,
+                HypoInsulinGlargineMedicationId)));
 
         entries.Add(Entry($"MedicationAdministration/{medicationAdministrationId}",
             MedicationAdministrationFactory.Create(
@@ -528,8 +520,8 @@ public static class FhirBundleGenerator
                 "[iU]",
                 diabetesIndicationCode,
                 diabetesIndicationDisplay,
-                infusionPeriod: false,
-                medicationRefId: HypoInsulinGlargineMedicationId)));
+                false,
+                HypoInsulinGlargineMedicationId)));
     }
 
     // ------------------------------------------------------------------

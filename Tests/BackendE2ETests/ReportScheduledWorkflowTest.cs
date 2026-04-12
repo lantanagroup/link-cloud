@@ -23,7 +23,7 @@ namespace LantanaGroup.Link.Tests.E2ETests;
 /// produce ReportScheduled integration event, create patient entry via PatientEvent,
 /// and validate full pipeline completion after Quartz executes EndOfReportPeriodJob.
 /// </summary>
-public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixture>
+public sealed class ReportScheduledTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixture>
 {
     private const int GenerationSeed = 20260326;
 
@@ -37,15 +37,17 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
     private readonly IServiceProvider _sp;
     private readonly string _facilityId = $"ScheduledTest-{Guid.NewGuid():N}";
     private List<(string Name, string Json)> _generatedBundles = [];
+    private List<ProfiledMeasureType> _measures = [];
+    private List<PatientCohortDefinition> _cohorts = [];
 
     private AutomationConfig AutomationCfg => _sp.GetRequiredService<AutomationConfig>();
     private ConsoleAutomationOutput Output => _sp.GetRequiredService<ConsoleAutomationOutput>();
     private FhirDataLoader FhirDataLoader => _sp.GetRequiredService<FhirDataLoader>();
 
-    public ReportScheduledWorkflowTest(BackendE2ETestFixture fixture)
+    public ReportScheduledTest(BackendE2ETestFixture fixture)
     {
         _sp = fixture.ServiceProvider;
-        _config.RemoveFacilityConfig = true;
+        _config.CleanupServiceData = true;
     }
 
     public async Task InitializeAsync()
@@ -53,7 +55,14 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
         _sp.GetRequiredService<PipelineDataReader>().InvalidateCache();
 
         Output.WriteLine($"Using deterministic generation seed: {GenerationSeed}");
-        var (patientIds, bundles) = FhirBundleGenerator.Generate(Output, 1, 1000, "ScheduledPatient", GenerationSeed);
+        var measures = new List<ProfiledMeasureType> { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation };
+        _measures = measures;
+        var cohorts = new List<PatientCohortDefinition>
+        {
+            PatientCohortDefinition.AllQualifying(measures, patientCount: 1, resourcesMin: 1000, resourcesMax: 1000)
+        };
+        _cohorts = cohorts;
+        var (patientIds, bundles) = FhirBundleGenerator.GenerateFromCohorts(Output, measures, cohorts, "ScheduledPatient", GenerationSeed);
         _generatedBundles = bundles;
 
         if (_config.PatientIds.Count == 0)
@@ -71,31 +80,22 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
     {
         Output.WriteLine("Cleaning up...\n");
 
-
-        if (_config.RemoveFacilityConfig)
-        {
-            await FacilitySetupHelper.CleanupFacilityAsync(
-                _sp.GetRequiredService<IFacilityServiceClient>(),
-                _sp.GetRequiredService<INormalizationServiceClient>(),
-                _sp.GetRequiredService<IDataAcquisitionServiceClient>(),
-                _sp.GetRequiredService<IQueryDispatchServiceClient>(),
-                Output, _facilityId);
-        }
-
-        if (AutomationCfg.CleanupTestData)
-        {
-            await FacilitySetupHelper.CleanupQueryDispatchConfigAsync(
-                _sp.GetRequiredService<IQueryDispatchServiceClient>(),
-                Output,
-                _facilityId);
-
-            FhirDataLoader.ExpungeEverything(Output);
-        }
+        await RunCleanupHelper.CleanupAfterRunAsync(
+            _config,
+            _sp.GetRequiredService<IFacilityServiceClient>(),
+            _sp.GetRequiredService<INormalizationServiceClient>(),
+            _sp.GetRequiredService<IDataAcquisitionServiceClient>(),
+            _sp.GetRequiredService<IQueryDispatchServiceClient>(),
+            _sp.GetRequiredService<IReportServiceClient>(),
+            FhirDataLoader,
+            Output,
+            _facilityId,
+            null);
     }
 
     [Fact]
-    [Trait("Category", "ReportScheduledWorkflowTest")]
-    public async Task ExecuteReportScheduledWorkflowTest()
+    [Trait("Category", "ReportScheduledTest")]
+    public async Task ExecuteReportScheduledTest()
     {
 
         var measureLoader = new MeasureLoader(
@@ -181,6 +181,20 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
         // Flush stale cache from diagnostics polling so validators read authoritative data.
         dataReader.InvalidateCache();
 
+        var profiles = PatientCohortDefinition.ExpandProfiles(_cohorts, GenerationSeed);
+        var generationManifest = GenerationManifest.Build(_config.PatientIds, _generatedBundles, profiles, _measures);
+        generationManifest.MeasureIds = [measureId];
+        var queryPlanInput = QueryPlanBuilder.GetDefaultAsInput();
+        generationManifest.AcquiredResourceTypes = QueryPlanBuilder.GetAcquiredResourceTypes(queryPlanInput);
+        generationManifest.ParameterQueryResourceTypes = QueryPlanBuilder.GetParameterQueryResourceTypes(queryPlanInput);
+        generationManifest.SimulatedAcquiredResourceKeysByPatient = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysByPatient(
+            _config.PatientIds,
+            _generatedBundles,
+            queryPlanInput,
+            actualStartDate,
+            actualEndDate);
+        generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(_measures);
+
         await _sp.GetRequiredService<ReportAbsManifestValidator>().ValidateAllAsync(
             internalAbsResources,
             _config.PatientIds,
@@ -189,17 +203,8 @@ public sealed class ReportScheduledWorkflowTest : IAsyncLifetime, IClassFixture<
             actualEndDate,
             _facilityId,
             reportId,
-            _generatedBundles);
-
-        await ValidationBaselineManager.ValidateOrCreateAsync(
-            Output, dataReader,
-            nameof(ReportScheduledWorkflowTest),
-            _facilityId,
-            reportId,
-            measureId,
-            _config.PatientIds,
             _generatedBundles,
-            internalAbsResources);
+            manifest: generationManifest);
 
         await _sp.GetRequiredService<ReportDatabaseValidator>().ValidateAllAsync(
             _facilityId, reportId, measureId, _config.PatientIds,
