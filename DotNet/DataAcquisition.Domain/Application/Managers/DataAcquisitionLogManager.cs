@@ -1,4 +1,4 @@
-using DataAcquisition.Domain.Application.Models;
+﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
@@ -82,32 +82,37 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
         activity?.SetTag(DiagnosticNames.CorrelationId, model.CorrelationId);
 
-        if (model.ScheduledReport == null)
-        {
-            throw new ArgumentNullException("Required property ScheduledReport must not be null");
-        }
+        ScheduledReportEntity? scheduledReportEntity = null;
+        var reportTrackingId = model.ScheduledReport?.ReportTrackingId;
 
-        // Find-or-create the normalised ScheduledReportEntity row.
-        var scheduledReportEntity = await _dbContext.ScheduledReports
-            .FirstOrDefaultAsync(
-                sr => sr.ReportTrackingId == model.ScheduledReport.ReportTrackingId,
-                cancellationToken);
-
-        if (scheduledReportEntity == null)
+        if (!string.IsNullOrWhiteSpace(reportTrackingId))
         {
-            scheduledReportEntity = new ScheduledReportEntity
+            // Find-or-create the normalised ScheduledReportEntity row.
+            scheduledReportEntity = await _dbContext.ScheduledReports
+                .FirstOrDefaultAsync(
+                    sr => sr.ReportTrackingId == reportTrackingId,
+                    cancellationToken);
+
+            if (scheduledReportEntity == null)
             {
-                ReportTrackingId = model.ScheduledReport.ReportTrackingId!,
-                Frequency = model.ScheduledReport.Frequency,
-                StartDate = model.ScheduledReport.StartDate,
-                EndDate = model.ScheduledReport.EndDate,
-                ReportTypes = model.ScheduledReport.ReportTypes != null
-                    ? string.Join(",", model.ScheduledReport.ReportTypes)
-                    : null,
-                CreateDate = DateTime.UtcNow,
-            };
-            _dbContext.ScheduledReports.Add(scheduledReportEntity);
-            await _dbContext.SaveChangesAsync(cancellationToken);
+                scheduledReportEntity = new ScheduledReportEntity
+                {
+                    ReportTrackingId = reportTrackingId,
+                    Frequency = model.ScheduledReport!.Frequency,
+                    StartDate = model.ScheduledReport.StartDate,
+                    EndDate = model.ScheduledReport.EndDate,
+                    ReportTypes = model.ScheduledReport.ReportTypes != null
+                        ? string.Join(",", model.ScheduledReport.ReportTypes)
+                        : null,
+                    CreateDate = DateTime.UtcNow,
+                };
+                _dbContext.ScheduledReports.Add(scheduledReportEntity);
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            }
+        }
+        else if (!model.IsCensus)
+        {
+            throw new ArgumentNullException("Required property ScheduledReport.ReportTrackingId must not be null or empty for non-census logs");
         }
 
         var log = new DataAcquisitionLog
@@ -140,12 +145,12 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                     ResourceType = r.ResourceType,
                 }).ToList()
             }).ToList(),
-            ScheduledReportId = scheduledReportEntity.Id,
+            ScheduledReportId = scheduledReportEntity?.Id,
             CompletionDate = null,
             CompletionTimeMilliseconds = null,
-            ReportTrackingId = model.ScheduledReport.ReportTrackingId,
-            ReportStartDate = model.ScheduledReport.StartDate,
-            ReportEndDate = model.ScheduledReport.EndDate,
+            ReportTrackingId = model.ScheduledReport?.ReportTrackingId,
+            ReportStartDate = model.ScheduledReport?.StartDate,
+            ReportEndDate = model.ScheduledReport?.EndDate,
             ExecutionDate = model.ExecutionDate,
             CorrelationId = model.CorrelationId,
             TraceId = model.TraceId,

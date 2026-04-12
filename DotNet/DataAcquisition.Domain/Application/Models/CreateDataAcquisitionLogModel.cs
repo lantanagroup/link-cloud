@@ -1,4 +1,4 @@
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
@@ -24,7 +24,7 @@ namespace DataAcquisition.Domain.Application.Models
         public DateTime? ExecutionDate { get; set; }
         public string? TraceId { get; set; }
         public List<string> Notes { get; set; } = new List<string>();
-        public required ScheduledReport ScheduledReport { get; set; }
+        public ScheduledReport? ScheduledReport { get; set; }
         public int? SiblingCount { get; set; }
     }
 }
